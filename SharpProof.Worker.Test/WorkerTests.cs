@@ -498,6 +498,147 @@ public sealed class WorkerTests {
     }
 
     [Test]
+    public async Task SpecResultFacetsProveConcatAndArrayEmptyContracts() {
+        using var project = TestProject.Create(
+            """
+            #nullable enable
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static string Concat(string? left, string? right) {
+                    Contract.Ensures(
+                        Contract.Result<string>() != null);
+                    return string.Concat(left, right);
+                }
+
+                public static int[] Empty() {
+                    Contract.Ensures(
+                        Contract.Result<int[]>() != null);
+                    Contract.Ensures(
+                        Contract.Result<int[]>().Length == 0);
+                    var result = Array.Empty<int>();
+                    return result;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(
+            response.Records,
+            Has.Length.EqualTo(3),
+            string.Join(
+                Environment.NewLine,
+                response.Records.Select(record =>
+                    record.CallableId + " / " +
+                    record.ContractOrdinal + " / " +
+                    record.Status + " / " +
+                    record.Reason)));
+        Assert.That(
+            response.Records.Select(static record => record.Status),
+            Is.All.EqualTo(WorkerVerificationStatus.Proven));
+        var concat = response.Records.Single(record =>
+            record.CallableId.Contains(
+                ".Concat(",
+                StringComparison.Ordinal));
+        var empty = response.Records
+            .Where(record => record.CallableId.Contains(
+                ".Empty",
+                StringComparison.Ordinal))
+            .ToArray();
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                concat.ProofCore,
+                Is.EqualTo(["spec:bcl.string.concat.string-string"]));
+            Assert.That(empty, Has.Length.EqualTo(2));
+            foreach (var record in empty)
+                Assert.That(
+                    record.ProofCore,
+                    Is.EqualTo(["spec:bcl.array.empty"]));
+        }
+    }
+
+    [Test]
+    public async Task EnumerableCardinalityIsNotTreatedAsArrayCardinality() {
+        using var project = TestProject.Create(
+            """
+            #nullable enable
+            using System.Collections.Generic;
+            using System.Linq;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static IEnumerable<int> Empty() {
+                    Contract.Ensures(
+                        Contract.Result<IEnumerable<int>>() != null);
+                    return Enumerable.Empty<int>();
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(
+            response.Errors,
+            Is.Empty,
+            string.Join(
+                Environment.NewLine,
+                response.Errors.Select(error =>
+                    error.Code + ": " + error.Message)));
+        var record = response.Records.Single();
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                record.Status,
+                Is.EqualTo(WorkerVerificationStatus.Unknown));
+            Assert.That(
+                record.Reason,
+                Is.EqualTo(WorkerVerificationReason.UnsupportedBody));
+            Assert.That(record.ProofCore, Is.Empty);
+        }
+    }
+
+    [Test]
+    public async Task ArraySummaryDoesNotAuthorizeALaterImpureCallHavoc() {
+        using var project = TestProject.Create(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                private static int s_ambient;
+                private static void TouchAmbient() => s_ambient++;
+
+                public static int[] Unsafe() {
+                    Contract.Ensures(
+                        Contract.Result<int[]>() != null);
+                    var result = Array.Empty<int>();
+                    TouchAmbient();
+                    return result;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        var record = response.Records.Single();
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                record.Status,
+                Is.EqualTo(WorkerVerificationStatus.Unknown));
+            Assert.That(
+                record.Reason,
+                Is.EqualTo(WorkerVerificationReason.UnsupportedBody));
+            Assert.That(record.ProofCore, Is.Empty);
+        }
+    }
+
+    [Test]
     public async Task AcyclicCfgLocalsBranchesAndMultipleReturnsAreProven() {
         using var project = TestProject.Create(
             """
@@ -1740,6 +1881,7 @@ public sealed class WorkerTests {
             var names = new HashSet<string>(
                 new[] {
                     "System.Private.CoreLib.dll",
+                    "System.Linq.dll",
                     "System.Runtime.dll",
                     "netstandard.dll"
                 },

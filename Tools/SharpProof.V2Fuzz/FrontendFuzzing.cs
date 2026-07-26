@@ -708,7 +708,23 @@ public sealed record FrontendDifferentialResult(
     string Detail,
     IrExceptionKind? ExceptionKind = null);
 
+public sealed record FrontendSemanticEdgeCase(
+    string ReturnType,
+    string Parameters,
+    string Expression,
+    IReadOnlyList<object?> Arguments,
+    FrontendSubsetDecision ExpectedDecision,
+    FrontendAbstention ExpectedAbstention);
+
+public sealed record FrontendSemanticEdgeResult(
+    FuzzOracleStatus Status,
+    FrontendSubsetDecision? ActualDecision,
+    FrontendAbstention? ActualAbstention,
+    string Detail,
+    IrExceptionKind? ExceptionKind = null);
+
 public sealed class FrontendDifferentialOracle {
+    private const string SemanticEdgeMethodPrefix = "EdgeTarget";
     private static readonly Lazy<ImmutableArray<MetadataReference>> References =
         new(CreateReferences, LazyThreadSafetyMode.ExecutionAndPublication);
 
@@ -832,6 +848,94 @@ public sealed class FrontendDifferentialOracle {
         }
     }
 
+    public ImmutableArray<FrontendSemanticEdgeResult> CompareSemanticEdges(
+        IReadOnlyList<FrontendSemanticEdgeCase> cases,
+        CancellationToken cancellationToken = default) {
+        if (cases == null) throw new ArgumentNullException(nameof(cases));
+        if (cases.Count == 0) return [];
+        for (var index = 0; index < cases.Count; index++) {
+            var generated = cases[index] ??
+                throw new ArgumentException(
+                    "Semantic edge cases cannot contain null.",
+                    nameof(cases));
+            _ = new FrontendSubsetClassification(
+                generated.ExpectedDecision,
+                generated.ExpectedAbstention);
+            if (string.IsNullOrWhiteSpace(generated.ReturnType) ||
+                generated.Parameters == null ||
+                string.IsNullOrWhiteSpace(generated.Expression) ||
+                generated.Arguments == null)
+                throw new ArgumentException(
+                    $"Semantic edge case {index} is incomplete.",
+                    nameof(cases));
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var source = CreateSemanticEdgeSource(cases);
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            cancellationToken: cancellationToken);
+        var compilation = CSharpCompilation.Create(
+            "SharpProofFrontendSemanticEdges",
+            [syntaxTree],
+            References.Value,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release,
+                checkOverflow: true,
+                nullableContextOptions: NullableContextOptions.Enable));
+        using var image = new MemoryStream();
+        var emit = compilation.Emit(image, cancellationToken: cancellationToken);
+        if (!emit.Success)
+            return RepeatSemanticFailure(
+                cases.Count,
+                "Generated semantic-edge C# did not compile: " +
+                FormatErrors(emit.Diagnostics));
+
+        var model = compilation.GetSemanticModel(syntaxTree);
+        var methods = syntaxTree.GetRoot(cancellationToken)
+            .DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Where(static method => method.Identifier.ValueText.StartsWith(
+                SemanticEdgeMethodPrefix,
+                StringComparison.Ordinal))
+            .OrderBy(static method => ParseSemanticEdgeMethodIndex(
+                method.Identifier.ValueText))
+            .ToArray();
+        if (methods.Length != cases.Count)
+            return RepeatSemanticFailure(
+                cases.Count,
+                "Roslyn exposed an unexpected semantic-edge method count.");
+
+        image.Position = 0;
+        var loadContext = new AssemblyLoadContext(
+            "SharpProofFrontendSemanticEdges",
+            isCollectible: true);
+        try {
+            var assembly = loadContext.LoadFromStream(image);
+            var runtimeType = assembly.GetType(
+                "SharpProofGeneratedFrontendEdges")!;
+            var results =
+                ImmutableArray.CreateBuilder<FrontendSemanticEdgeResult>(
+                    cases.Count);
+            for (var index = 0; index < cases.Count; index++) {
+                cancellationToken.ThrowIfCancellationRequested();
+                results.Add(CompareSemanticEdge(
+                    cases[index],
+                    methods[index],
+                    model,
+                    runtimeType,
+                    index,
+                    cancellationToken));
+            }
+            return results.ToImmutable();
+        }
+        finally {
+            loadContext.Unload();
+        }
+    }
+
     private static IReadOnlyDictionary<IrVarId, IrValue> CreateEnvironment(
         IrFactory factory,
         IMethodSymbol method,
@@ -870,6 +974,136 @@ public sealed class FrontendDifferentialOracle {
         return environment;
     }
 
+    private static FrontendSemanticEdgeResult CompareSemanticEdge(
+        FrontendSemanticEdgeCase generated,
+        MethodDeclarationSyntax methodSyntax,
+        SemanticModel model,
+        Type runtimeType,
+        int index,
+        CancellationToken cancellationToken) {
+        var method = (IMethodSymbol?)model.GetDeclaredSymbol(
+            methodSyntax,
+            cancellationToken);
+        var operation = GetExpressionOperation(
+            model,
+            methodSyntax.ExpressionBody!.Expression,
+            cancellationToken);
+        if (method == null || operation == null)
+            return SemanticFailure(
+                null,
+                null,
+                "Roslyn did not expose the semantic-edge method operation.");
+        if (generated.Arguments.Count != method.Parameters.Length)
+            return SemanticFailure(
+                null,
+                null,
+                "The semantic-edge runtime argument count is incorrect.");
+
+        var factory = new IrFactory();
+        var lowering = new RoslynOperationLowerer(factory).Lower(operation);
+        var actual = lowering.Classification;
+        if (actual.Decision != generated.ExpectedDecision ||
+            actual.Abstention != generated.ExpectedAbstention)
+            return SemanticFailure(
+                actual.Decision,
+                actual.Abstention,
+                "Expected " +
+                generated.ExpectedDecision +
+                "/" +
+                generated.ExpectedAbstention +
+                " but lowering returned " +
+                actual.Decision +
+                "/" +
+                actual.Abstention +
+                ".");
+        if (!actual.IsExact) {
+            if (lowering.Term is not IrOpaqueTerm)
+                return SemanticFailure(
+                    actual.Decision,
+                    actual.Abstention,
+                    "A closed abstention did not produce an opaque root term.");
+            return SemanticAgreement(actual);
+        }
+
+        var environment = CreateSemanticEdgeEnvironment(
+            factory,
+            method,
+            lowering,
+            generated.Arguments);
+        var interpreted = new IrInterpreter(factory).Evaluate(
+            lowering.Term,
+            environment);
+        var runtimeMethod = runtimeType.GetMethod(
+            SemanticEdgeMethodName(index),
+            BindingFlags.Public | BindingFlags.Static)!;
+        var comparison = CompareOutcomes(
+            interpreted,
+            InvokeMethod(
+                runtimeMethod,
+                generated.Arguments,
+                cancellationToken));
+        return new FrontendSemanticEdgeResult(
+            comparison.Status,
+            actual.Decision,
+            actual.Abstention,
+            comparison.Detail,
+            comparison.ExceptionKind);
+    }
+
+    private static IReadOnlyDictionary<IrVarId, IrValue>
+        CreateSemanticEdgeEnvironment(
+            IrFactory factory,
+            IMethodSymbol method,
+            FrontendLoweringResult lowering,
+            IReadOnlyList<object?> arguments) {
+        var environment = new Dictionary<IrVarId, IrValue>();
+        foreach (var binding in lowering.Variables) {
+            if (binding.Symbol is not IParameterSymbol parameter ||
+                !SymbolEqualityComparer.Default.Equals(
+                    parameter.ContainingSymbol,
+                    method))
+                continue;
+            var type = factory.GetVariableInfo(binding.Variable).Type;
+            environment.Add(
+                binding.Variable,
+                CreateSemanticEdgeValue(
+                    factory,
+                    type,
+                    arguments[parameter.Ordinal]));
+        }
+        return environment;
+    }
+
+    private static IrValue CreateSemanticEdgeValue(
+        IrFactory factory,
+        IrTypeId type,
+        object? value) {
+        var kind = factory.GetTypeInfo(type).Kind;
+        if (value == null) {
+            if (kind is IrTypeKind.String or
+                IrTypeKind.Reference or
+                IrTypeKind.Sequence)
+                return factory.CreateNullValue(type);
+            throw new InvalidOperationException(
+                "A non-nullable semantic-edge variable received null.");
+        }
+        return kind switch {
+            IrTypeKind.Boolean when value is bool boolean =>
+                factory.CreateBooleanValue(boolean),
+            IrTypeKind.Integer when value is sbyte or byte or short or ushort or
+                int or uint or long or char =>
+                factory.CreateIntegerValue(Convert.ToInt64(
+                    value,
+                    CultureInfo.InvariantCulture)),
+            IrTypeKind.String when value is string text =>
+                factory.CreateStringValue(text),
+            IrTypeKind.Reference =>
+                factory.CreateReferenceValue(type, value),
+            _ => throw new InvalidOperationException(
+                "A semantic-edge value is outside the executable IR subset.")
+        };
+    }
+
     private static IOperation? GetExpressionOperation(
         SemanticModel model,
         ExpressionSyntax expression,
@@ -894,20 +1128,27 @@ public sealed class FrontendDifferentialOracle {
     private static RuntimeOutcome InvokeMethod(
         MethodInfo method,
         GeneratedCSharpCase generated,
+        CancellationToken cancellationToken) =>
+        InvokeMethod(
+            method,
+            [
+                generated.Left,
+                generated.Right,
+                generated.Condition,
+                generated.Text,
+                generated.Values,
+                generated.Reference
+            ],
+            cancellationToken);
+
+    private static RuntimeOutcome InvokeMethod(
+        MethodInfo method,
+        IReadOnlyList<object?> arguments,
         CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         try {
             return RuntimeOutcome.Returned(
-                method.Invoke(
-                    null,
-                    [
-                        generated.Left,
-                        generated.Right,
-                        generated.Condition,
-                        generated.Text,
-                        generated.Values,
-                        generated.Reference
-                    ]));
+                method.Invoke(null, [.. arguments]));
         }
         catch (TargetInvocationException exception)
             when (exception.InnerException != null) {
@@ -935,12 +1176,54 @@ public sealed class FrontendDifferentialOracle {
         return builder.ToString();
     }
 
+    private static string CreateSemanticEdgeSource(
+        IReadOnlyList<FrontendSemanticEdgeCase> cases) {
+        var builder = new StringBuilder();
+        builder.AppendLine("#nullable enable");
+        builder.AppendLine(
+            "public enum SharpProofGeneratedEdgeEnum { One = 1 }");
+        builder.AppendLine(
+            "public readonly struct SharpProofGeneratedConvertible {");
+        builder.AppendLine("    private readonly long _value;");
+        builder.AppendLine(
+            "    public SharpProofGeneratedConvertible(long value) => _value = value;");
+        builder.AppendLine(
+            "    public static explicit operator long(SharpProofGeneratedConvertible value) => value._value;");
+        builder.AppendLine("}");
+        builder.AppendLine(
+            "public static class SharpProofGeneratedFrontendEdges {");
+        for (var index = 0; index < cases.Count; index++) {
+            var generated = cases[index];
+            builder.Append("    public static ");
+            builder.Append(generated.ReturnType);
+            builder.Append(' ');
+            builder.Append(SemanticEdgeMethodName(index));
+            builder.Append('(');
+            builder.Append(generated.Parameters);
+            builder.Append(") => ");
+            builder.Append(generated.Expression);
+            builder.AppendLine(";");
+        }
+        builder.AppendLine("}");
+        return builder.ToString();
+    }
+
     private static string MethodName(int index) =>
         "Target" + index.ToString(CultureInfo.InvariantCulture);
+
+    private static string SemanticEdgeMethodName(int index) =>
+        SemanticEdgeMethodPrefix +
+        index.ToString(CultureInfo.InvariantCulture);
 
     private static int ParseMethodIndex(string name) =>
         int.Parse(
             name.AsSpan("Target".Length),
+            NumberStyles.None,
+            CultureInfo.InvariantCulture);
+
+    private static int ParseSemanticEdgeMethodIndex(string name) =>
+        int.Parse(
+            name.AsSpan(SemanticEdgeMethodPrefix.Length),
             NumberStyles.None,
             CultureInfo.InvariantCulture);
 
@@ -1043,6 +1326,32 @@ public sealed class FrontendDifferentialOracle {
 
     private static FrontendDifferentialResult Mismatch(string detail) =>
         new(FuzzOracleStatus.Mismatch, detail);
+
+    private static ImmutableArray<FrontendSemanticEdgeResult>
+        RepeatSemanticFailure(
+            int count,
+            string detail) =>
+        [.. Enumerable.Repeat(
+            SemanticFailure(null, null, detail),
+            count)];
+
+    private static FrontendSemanticEdgeResult SemanticAgreement(
+        FrontendSubsetClassification classification) =>
+        new(
+            FuzzOracleStatus.Agreement,
+            classification.Decision,
+            classification.Abstention,
+            "");
+
+    private static FrontendSemanticEdgeResult SemanticFailure(
+        FrontendSubsetDecision? decision,
+        FrontendAbstention? abstention,
+        string detail) =>
+        new(
+            FuzzOracleStatus.Mismatch,
+            decision,
+            abstention,
+            detail);
 
     private sealed record RuntimeOutcome(object? Value, Exception? Exception) {
         internal static RuntimeOutcome Returned(object? value) =>

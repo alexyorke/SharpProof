@@ -21,8 +21,8 @@ Smt                   -> Ir, Verify, Z3
 ContractForGenerator  -> Frontend
 Analyzer              -> Attributes, Contracts, Effects, Frontend, Ir, Specs
 Worker.Protocol
-Worker                -> Attributes, Contracts, Frontend, Ir, Smt, Specs,
-                         Verify, Worker.Protocol
+Worker                -> Attributes, Contracts, Dataflow, Frontend, Ir, Smt,
+                         Specs, Verify, Worker.Protocol
 Worker.Launcher       -> Worker.Protocol
 ```
 
@@ -55,6 +55,11 @@ speculative semantic models, or display-string identity.
 `SharpProof.Dataflow` supplies deterministic fixpoint evaluation, partial
 orders, joins, widening, havoc, and interval/congruence, sequence-cardinality,
 and nullness domains. Source method effects are solved by stable SCC order.
+The out-of-process worker also projects validated `ApiSpec` result nullness and
+array cardinality into spec-justified Boolean and integer proxies. This is a
+bounded call-result integration, not a claim that Roslyn analysis entities,
+points-to state, or general CFG transfer have migrated to the
+roslyn-analyzers flow framework.
 External calls use a symbol-resolved `ApiSpecTable` or an explicitly trusted,
 complete effect contract. Unmodeled or untrusted metadata is unknown; there is
 no IL interpreter.

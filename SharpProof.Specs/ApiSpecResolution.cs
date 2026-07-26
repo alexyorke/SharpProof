@@ -82,6 +82,10 @@ public sealed class ResolvedApiSpecTable {
         spec.Template.Facets.Allocation.Behavior ==
             SpecAllocationBehavior.None;
 
+    public bool IsSideEffectFree(IMethodSymbol method) =>
+        TryGet(method, out var spec) &&
+        spec.Template.Facets.Effects.Effects == SpecEffect.None;
+
     public ApiSpecLookupResult Lookup(ISymbol symbol) {
         if (symbol == null) throw new ArgumentNullException(nameof(symbol));
         if (TryGet(symbol, out var spec)) return ApiSpecLookupResult.Resolved(spec);

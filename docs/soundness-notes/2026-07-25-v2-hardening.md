@@ -59,12 +59,13 @@ been completed.
 
 ## Validation evidence
 
-- `eng/acceptance/v2/Verify.ps1 -Configuration Release` passed: the solution
-  built with zero warnings and errors; 392 tests passed with one expected
-  unsupported-host skip; all 1,000 fuzz cases agreed with zero abstentions.
+- `eng/acceptance/v2/Verify.ps1 -Configuration Release` passed on the isolated
+  intended commit tree: the solution built with zero warnings and errors; 406
+  tests passed with one expected unsupported-host skip; all 1,000 fuzz cases
+  agreed with zero abstentions.
 - The 480-case corpus, cache replay, concurrent replay, cancellation, package,
   architecture, and performance gates passed. Default-off package rebuild
-  ratios were 1.011 median and 1.008 p95 in the final exact-code run.
+  ratios were 1.004 median and 1.029 p95 in the final exact-code run.
 - `scripts/Generate-Readme.ps1 -Verify`, `git diff --check`, and the changed-file
   LF/no-BOM scan passed.
 
@@ -72,9 +73,10 @@ been completed.
 
 The following are not represented as completed by this audit:
 
-- Phase 5's full migration to the roslyn-analyzers flow framework, production
-  integration of all interval/cardinality/nullness domains, and general
-  source-callee modular assume/guarantee verification.
+- Phase 5's full migration to the roslyn-analyzers entity/points-to and flow
+  framework, plus general source-callee modular assume/guarantee verification.
+  Interval, cardinality, and nullness now have bounded worker result
+  projections, but not general CFG, heap, or points-to integration.
 - The Phase 6 numerical checkpoint requiring executable runtime-tested coverage
   at least as broad as every legacy hardcoded family. The present ledger is
   sound and complete as an inventory, but only two families are executable
@@ -82,8 +84,10 @@ The following are not represented as completed by this audit:
 - A literal current-minus-10-percent size baseline across every replaced layer.
   Current hard caps prevent growth, but reaching that stricter checkpoint
   requires substantive decomposition rather than formatting compression.
-- Broader differential generation for nullable lifting, conversions,
-  side-effectful evaluation order, and every invocation argument form.
+- General call-host differential generation for side-effectful evaluation
+  order. The fixed semantic-edge lane now covers nullable lifting,
+  conversions, short-circuiting, and invocation forms, with evaluation order
+  checked structurally.
 - Real Visual Studio, Rider, and Windows arm64 host-matrix validation.
 - Four consecutive weekly clean corpus cycles, two independent human soundness
   reviewers, and protected-branch enforcement.

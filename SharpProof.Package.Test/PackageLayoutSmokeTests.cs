@@ -213,11 +213,13 @@ public sealed class PackageLayoutSmokeTests {
             toolEntries,
             Is.EquivalentTo(new[] {
                 "tools/net8/libz3.dll",
+                "tools/net8/Microsoft.CodeAnalysis.AnalyzerUtilities.dll",
                 "tools/net8/Microsoft.CodeAnalysis.CSharp.dll",
                 "tools/net8/Microsoft.CodeAnalysis.dll",
                 "tools/net8/Microsoft.Z3.dll",
                 "tools/net8/SharpProof.Attributes.dll",
                 "tools/net8/SharpProof.Contracts.dll",
+                "tools/net8/SharpProof.Dataflow.dll",
                 "tools/net8/SharpProof.Frontend.dll",
                 "tools/net8/SharpProof.Ir.dll",
                 "tools/net8/SharpProof.Smt.dll",

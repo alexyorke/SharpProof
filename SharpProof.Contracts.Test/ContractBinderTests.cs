@@ -87,6 +87,35 @@ public sealed class ContractBinderTests {
                     variable.Role == BoundContractVariableRole.Parameter).Variable));
     }
 
+    [Test]
+    public void ArrayLengthOverResultBindsToSequenceLength() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static int[] Empty() {
+                    Contract.Ensures(
+                        Contract.Result<int[]>() != null);
+                    Contract.Ensures(
+                        Contract.Result<int[]>().Length == 0);
+                    return System.Array.Empty<int>();
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+        var result = subject.Bind("Target", "Empty");
+
+        Assert.That(
+            result.IsSuccess,
+            Is.True,
+            result.Failure.ToString());
+        var equality = (IrBinaryTerm)result.Contracts!.Clauses
+            .Last()
+            .Condition;
+        Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(2));
+        Assert.That(equality.Left, Is.TypeOf<IrLengthTerm>());
+    }
+
     [TestCase("int", "long")]
     [TestCase("uint", "int")]
     [TestCase("string?", "object?")]

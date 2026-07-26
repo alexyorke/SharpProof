@@ -334,10 +334,23 @@ public sealed class ApiSpecTable {
     private static ImmutableArray<ApiSpecDeclaration> CreateDefaultDeclarations() {
         var documented = new SpecEvidence(SpecEvidenceKind.Documented, "dotnet-api-contract");
         var observed = new SpecEvidence(SpecEvidenceKind.Observed, "supported-runtime-observation");
+        var typeInitialization = new SpecEvidence(SpecEvidenceKind.Documented, "dotnet-generic-cache-type-initialization-boundary");
         var contractSemantics = new SpecEvidence(
             SpecEvidenceKind.Documented,
             "sharpproof-compiler-bound-ghost-contract");
         return [
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.array.empty", "M:System.Array.Empty``1", "System.Array",
+                    SpecTargetMemberKind.Method, "Empty", true, 1, null, [],
+                    SpecValueType.Sequence),
+                Facets(
+                    SpecEffect.Unknown, typeInitialization,
+                    SpecAllocationBehavior.Unknown, observed,
+                    SpecThrowBehavior.DoesNotThrow, [], documented,
+                    SpecNullness.NonNull, documented,
+                    SpecCardinality.Empty, documented),
+                []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
                     "bcl.object.ctor",
@@ -544,8 +557,8 @@ public sealed class ApiSpecTable {
                     [],
                     SpecValueType.Sequence),
                 Facets(
-                    SpecEffect.None,
-                    observed,
+                    SpecEffect.Unknown,
+                    typeInitialization,
                     SpecAllocationBehavior.Unknown,
                     observed,
                     SpecThrowBehavior.DoesNotThrow,

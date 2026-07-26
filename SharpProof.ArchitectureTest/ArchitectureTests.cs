@@ -54,6 +54,7 @@ public sealed class ArchitectureTests {
             ["SharpProof.Worker"] = [
                 "SharpProof.Attributes",
                 "SharpProof.Contracts",
+                "SharpProof.Dataflow",
                 "SharpProof.Frontend",
                 "SharpProof.Ir",
                 "SharpProof.Smt",

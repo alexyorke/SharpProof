@@ -212,6 +212,8 @@ public sealed class RoslynOperationLowerer {
     private LoweredExpression LowerConstant(IOperation operation) {
         var value = operation.ConstantValue.Value;
         var type = GetTypeId(operation.Type);
+        if (operation.Type is { IsValueType: true, SpecialType: SpecialType.None })
+            return Opaque(operation, FrontendAbstention.UnsupportedType);
         if (value == null) {
             var info = _factory.GetTypeInfo(type);
             if (info.Kind is IrTypeKind.String or IrTypeKind.Reference or IrTypeKind.Sequence)
@@ -219,16 +221,12 @@ public sealed class RoslynOperationLowerer {
             return Opaque(operation, FrontendAbstention.UnsupportedType);
         }
         return value switch {
-            bool boolean => LoweredExpression.Exact(_factory.Boolean(boolean)),
-            string text => LoweredExpression.Exact(_factory.String(text)),
-            sbyte number => LoweredExpression.Exact(_factory.Integer(number)),
-            byte number => LoweredExpression.Exact(_factory.Integer(number)),
-            short number => LoweredExpression.Exact(_factory.Integer(number)),
-            ushort number => LoweredExpression.Exact(_factory.Integer(number)),
-            int number => LoweredExpression.Exact(_factory.Integer(number)),
-            uint number => LoweredExpression.Exact(_factory.Integer(number)),
-            long number => LoweredExpression.Exact(_factory.Integer(number)),
-            char character => LoweredExpression.Exact(_factory.Integer(character)),
+            bool boolean when type == _factory.BooleanType =>
+                LoweredExpression.Exact(_factory.Boolean(boolean)),
+            string text when type == _factory.StringType =>
+                LoweredExpression.Exact(_factory.String(text)),
+            _ when type == _factory.IntegerType && value is sbyte or byte or short or ushort or int or uint or long or char =>
+                LoweredExpression.Exact(_factory.Integer(Convert.ToInt64(value, CultureInfo.InvariantCulture))),
             _ => Opaque(operation, FrontendAbstention.UnsupportedType)
         };
     }
@@ -320,6 +318,8 @@ public sealed class RoslynOperationLowerer {
                     operation,
                     FrontendAbstention.UserDefinedOperator,
                     operation.OperatorMethod);
+            if (operation.IsLifted)
+                return _owner.Opaque(operation, FrontendAbstention.LiftedOperator);
             var operand = _owner.LowerCore(operation.Operand);
             if (!operand.Classification.IsExact)
                 return _owner.Opaque(

@@ -114,6 +114,26 @@ public sealed class ApiSpecRuntimeOracleTests {
             SpecThrowBehavior.MayThrow,
             ["System.Exception"]);
         return new Dictionary<string, RowWitness>(StringComparer.Ordinal) {
+            ["bcl.array.empty"] = Row(
+                throws: Throws(
+                    "reference-type and value-type generic instantiations",
+                    [
+                        ThrowEdge.For(InvokeEmptyObjectArray),
+                        ThrowEdge.For(InvokeEmptyIntegerArray)
+                    ],
+                    doesNotThrowMutation),
+                nullness: Nullness(
+                    "reference-type and value-type generic instantiations",
+                    static () => ObserveNullness(
+                        static () => Array.Empty<object>(),
+                        static () => Array.Empty<int>()),
+                    SpecNullness.Null),
+                cardinality: Cardinality(
+                    "reference-type and value-type generic instantiations",
+                    static () => ObserveCardinality(
+                        static () => Array.Empty<object>(),
+                        static () => Array.Empty<int>()),
+                    SpecCardinality.NonEmpty)),
             ["bcl.object.ctor"] = Row(
                 Effect(
                     "an already allocated receiver",
@@ -365,10 +385,6 @@ public sealed class ApiSpecRuntimeOracleTests {
                             Math.Abs(int.MaxValue)))
                 ]),
             ["bcl.enumerable.empty"] = Row(
-                Effect(
-                    "reference-type and value-type generic instantiations",
-                    static () => ObserveNoEffects(EnumerableEmptyEdge),
-                    SpecEffect.WritesAmbientState),
                 throws: Throws(
                     "reference-type and value-type generic instantiations",
                     [
@@ -392,14 +408,14 @@ public sealed class ApiSpecRuntimeOracleTests {
     }
 
     private static RowWitness Row(
-        IFacetWitness effects,
+        IFacetWitness? effects = null,
         IFacetWitness? allocation = null,
         IFacetWitness? throws = null,
         IFacetWitness? nullness = null,
         IFacetWitness? cardinality = null,
         ImmutableArray<PostconditionWitness> postconditions = default) {
         var facets = ImmutableArray.CreateBuilder<IFacetWitness>(5);
-        facets.Add(effects);
+        if (effects != null) facets.Add(effects);
         if (allocation != null) facets.Add(allocation);
         if (throws != null) facets.Add(throws);
         if (nullness != null) facets.Add(nullness);
@@ -897,9 +913,12 @@ public sealed class ApiSpecRuntimeOracleTests {
     private static void AbsMinimum() => s_integerSink = Math.Abs(int.MinValue);
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static bool EnumerableEmptyEdge() =>
-        Enumerable.Empty<object>().Count() == 0 &&
-        Enumerable.Empty<int>().Count() == 0;
+    private static void InvokeEmptyObjectArray() =>
+        _ = Array.Empty<object>();
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void InvokeEmptyIntegerArray() =>
+        _ = Array.Empty<int>();
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void EnumerateEmptyObjects() =>

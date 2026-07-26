@@ -64,6 +64,9 @@ public static class LegacyApiCoverageManifest {
     /// </summary>
     public static ImmutableArray<CurrentApiSpecCoverage> CurrentBclRows { get; } = [
         NewSeed(
+            "bcl.array.empty",
+            "This seed was introduced by the v2 evidence process; Array.Empty<T> was not a legacy catalog family."),
+        NewSeed(
             "bcl.object.ctor",
             "This seed was introduced by the v2 evidence process; the legacy catalog did not model Object..ctor."),
         NewSeed(

@@ -208,6 +208,9 @@ public sealed class ApiSpecTests {
         var lookup = resolved.Lookup(toUpper);
         var empty = ApiSpecTable.Default.Templates.Single(
             static row => row.Target.WitnessIdentifier == "bcl.enumerable.empty");
+        var cachedEmptyRows = ApiSpecTable.Default.Templates.Where(static row =>
+            row.Target.WitnessIdentifier is "bcl.array.empty" or
+                "bcl.enumerable.empty");
 
         Assert.Multiple(() => {
             Assert.That(lookup.Status, Is.EqualTo(ApiSpecLookupStatus.Unknown));
@@ -215,6 +218,10 @@ public sealed class ApiSpecTests {
             Assert.That(
                 empty.Facets.Allocation.Behavior,
                 Is.EqualTo(SpecAllocationBehavior.Unknown));
+            Assert.That(
+                cachedEmptyRows.Select(static row =>
+                    row.Facets.Effects.Effects),
+                Is.All.EqualTo(SpecEffect.Unknown));
         });
     }
 
@@ -238,6 +245,19 @@ public sealed class ApiSpecTests {
                 method.Parameters.All(parameter =>
                     parameter.Type.SpecialType ==
                         SpecialType.System_String));
+        var arrayEmpty = compilation.GetTypeByMetadataName("System.Array")!
+            .GetMembers("Empty")
+            .OfType<IMethodSymbol>()
+            .Single(static method =>
+                method.IsGenericMethod &&
+                method.Parameters.Length == 0);
+        var enumerableEmpty = compilation
+            .GetTypeByMetadataName("System.Linq.Enumerable")!
+            .GetMembers("Empty")
+            .OfType<IMethodSymbol>()
+            .Single(static method =>
+                method.IsGenericMethod &&
+                method.Parameters.Length == 0);
         var toUpper = compilation.GetSpecialType(SpecialType.System_String)
             .GetMembers("ToUpper")
             .OfType<IMethodSymbol>()
@@ -246,7 +266,18 @@ public sealed class ApiSpecTests {
         Assert.Multiple(() => {
             Assert.That(resolved.IsPureAndAllocationFree(abs), Is.True);
             Assert.That(resolved.IsPureAndAllocationFree(concat), Is.False);
+            Assert.That(
+                resolved.IsPureAndAllocationFree(arrayEmpty),
+                Is.False);
+            Assert.That(
+                resolved.IsPureAndAllocationFree(enumerableEmpty),
+                Is.False);
             Assert.That(resolved.IsPureAndAllocationFree(toUpper), Is.False);
+            Assert.That(resolved.IsSideEffectFree(abs), Is.True);
+            Assert.That(resolved.IsSideEffectFree(concat), Is.True);
+            Assert.That(resolved.IsSideEffectFree(arrayEmpty), Is.False);
+            Assert.That(resolved.IsSideEffectFree(enumerableEmpty), Is.False);
+            Assert.That(resolved.IsSideEffectFree(toUpper), Is.False);
         });
     }
 
@@ -257,7 +288,7 @@ public sealed class ApiSpecTests {
         var resolved = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
 
         Assert.Multiple(() => {
-            Assert.That(templates.Length, Is.EqualTo(11));
+            Assert.That(templates.Length, Is.EqualTo(12));
             Assert.That(
                 templates.Select(static row => row.Target.WitnessIdentifier),
                 Is.Unique.And.All.Not.Empty);

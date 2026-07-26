@@ -72,11 +72,13 @@
       <TfmSpecificPackageFile Include="$(AttributesPayloadPath)" PackagePath="lib/netstandard2.0" />
       <TfmSpecificPackageFile Include="
           $(WorkerPayloadDirectory)\libz3.dll;
+          $(WorkerPayloadDirectory)\Microsoft.CodeAnalysis.AnalyzerUtilities.dll;
           $(WorkerPayloadDirectory)\Microsoft.CodeAnalysis.CSharp.dll;
           $(WorkerPayloadDirectory)\Microsoft.CodeAnalysis.dll;
           $(WorkerPayloadDirectory)\Microsoft.Z3.dll;
           $(WorkerPayloadDirectory)\SharpProof.Attributes.dll;
           $(WorkerPayloadDirectory)\SharpProof.Contracts.dll;
+          $(WorkerPayloadDirectory)\SharpProof.Dataflow.dll;
           $(WorkerPayloadDirectory)\SharpProof.Frontend.dll;
           $(WorkerPayloadDirectory)\SharpProof.Ir.dll;
           $(WorkerPayloadDirectory)\SharpProof.Smt.dll;

@@ -165,6 +165,77 @@ public sealed class ProgramLoweringTests {
     }
 
     [Test]
+    public void InvocationLoweringPreservesReceiverAndSourceArgumentOrder() {
+        var lowered = Lower(
+            """
+            private sealed class Receiver {
+            }
+            private static Receiver GetReceiver() => new();
+            private static long Probe(long marker, long value) => value;
+            private static long Optional(long value, long fallback = 7L) =>
+                checked(value + fallback);
+            private static long Ext(this Receiver receiver, long value) => value;
+            private static long Direct(long first, long second) =>
+                checked(first + second);
+            public static long Target(long value) =>
+                Direct(
+                    second: GetReceiver().Ext(Probe(2L, value)),
+                    first: Optional(Ext(GetReceiver(), Probe(1L, value))));
+            """);
+        var calls = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .OfType<IrCallInstruction>()
+            .ToArray();
+        var names = calls
+            .Select(call => lowered.Factory.GetString(
+                lowered.Factory.GetMemberInfo(call.Member).Name))
+            .ToArray();
+
+        Assert.That(lowered.Result.IsExact, Is.False);
+        Assert.That(
+            lowered.Result.Abstentions.Select(static value => value.Reason),
+            Does.Contain(FrontendAbstention.UnsupportedInvocationShape));
+        Assert.That(calls, Has.Length.EqualTo(8));
+        string[] expectedNames = [
+            "GetReceiver", "Probe", "Ext", "GetReceiver",
+            "Probe", "Ext", "Optional", "Direct"
+        ];
+        for (var index = 0; index < expectedNames.Length; index++)
+            Assert.That(names[index], Does.Contain(expectedNames[index]));
+
+        var probes = calls
+            .Where((_, index) => names[index].Contains(
+                "Probe",
+                StringComparison.Ordinal))
+            .ToArray();
+        long[] expectedMarkers = [2L, 1L];
+        Assert.That(
+            probes.Select(static call =>
+                ((IrIntegerTerm)call.Arguments[0]).Value),
+            Is.EqualTo(expectedMarkers));
+        var extensions = calls
+            .Where((_, index) => names[index].Contains(
+                "Ext",
+                StringComparison.Ordinal))
+            .ToArray();
+        Assert.That(
+            extensions.Select(static call => call.Receiver),
+            Is.All.Null);
+        Assert.That(
+            extensions.Select(static call => call.Arguments.Length),
+            Is.All.EqualTo(2));
+        var optional = calls
+            .Where((_, index) => names[index].Contains(
+                "Optional",
+                StringComparison.Ordinal))
+            .Single();
+        Assert.That(optional.Arguments, Has.Length.EqualTo(2));
+        Assert.That(
+            ((IrIntegerTerm)optional.Arguments[1]).Value,
+            Is.EqualTo(7L));
+    }
+
+    [Test]
     public void ProgramLoweringOrderAndIdentifiersAreDeterministic() {
         const string source =
             """

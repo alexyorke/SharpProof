@@ -106,6 +106,46 @@ internal sealed class ContractExpressionBinder {
             }
         }
 
+        if (operation is IBinaryOperation nullComparison &&
+            nullComparison.OperatorMethod == null &&
+            !nullComparison.IsLifted &&
+            nullComparison.OperatorKind is (
+                BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals) &&
+            TryGetResultNullOperands(nullComparison, out var resultInvocation)) {
+            var value = BindCore(resultInvocation, clauseKind, insideOld);
+            if (!value.IsSuccess) return value;
+            try {
+                var operationKind = nullComparison.OperatorKind ==
+                    BinaryOperatorKind.Equals
+                    ? IrBinaryOperator.Equal
+                    : IrBinaryOperator.NotEqual;
+                return ExpressionBindingResult.Success(
+                    _factory.Binary(
+                        operationKind, value.Term!,
+                        _factory.Null(value.Term!.Type)));
+            }
+            catch (ArgumentException) {
+                return ExpressionBindingResult.Fail(
+                    ContractBindingFailure.UnsupportedExpression);
+            }
+        }
+
+        if (operation is IPropertyReferenceOperation property &&
+            property.Instance is { Type: IArrayTypeSymbol { Rank: 1 } } instance &&
+            property.Property.Name == nameof(Array.Length) &&
+            property.Type?.SpecialType == SpecialType.System_Int32) {
+            var value = BindCore(instance, clauseKind, insideOld);
+            if (!value.IsSuccess) return value;
+            try {
+                return ExpressionBindingResult.Success(
+                    _factory.Length(value.Term!));
+            }
+            catch (ArgumentException) {
+                return ExpressionBindingResult.Fail(
+                    ContractBindingFailure.UnsupportedExpression);
+            }
+        }
+
         if (operation is IConversionOperation conversion) {
             var operand = BindCore(conversion.Operand, clauseKind, insideOld);
             if (!operand.IsSuccess) return operand;
@@ -204,6 +244,37 @@ internal sealed class ContractExpressionBinder {
         return ExpressionBindingResult.Fail(
             ContractBindingFailure.UnsupportedExpression);
     }
+
+    private bool TryGetResultNullOperands(
+        IBinaryOperation operation,
+        out IInvocationOperation result) {
+        var left = UnwrapImplicitConversions(operation.LeftOperand);
+        var right = UnwrapImplicitConversions(operation.RightOperand);
+        var match =
+            left is IInvocationOperation leftInvocation &&
+            _api.IsResult(leftInvocation.TargetMethod) &&
+            IsNullConstant(right)
+                ? leftInvocation
+                : right is IInvocationOperation rightInvocation &&
+                  _api.IsResult(rightInvocation.TargetMethod) &&
+                  IsNullConstant(left)
+                    ? rightInvocation
+                    : null;
+        result = match!;
+        return match != null;
+    }
+
+    private static IOperation UnwrapImplicitConversions(IOperation operation) {
+        while (operation is IConversionOperation {
+            IsImplicit: true,
+            OperatorMethod: null
+        } conversion)
+            operation = conversion.Operand;
+        return operation;
+    }
+
+    private static bool IsNullConstant(IOperation operation) =>
+        operation.ConstantValue is { HasValue: true, Value: null };
 
     private ExpressionBindingResult BindWithFrontend(IOperation operation) {
         var result = _lowerer.Lower(operation);

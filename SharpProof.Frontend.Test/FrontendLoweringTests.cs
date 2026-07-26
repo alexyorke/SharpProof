@@ -152,6 +152,34 @@ public sealed class FrontendLoweringTests {
     }
 
     [Test]
+    public void NullableAndEnumConstantsCannotBypassClosedTypeAbstention() {
+        AssertClassification(
+            """
+            public static long? Target() => (long?)1L;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+        AssertClassification(
+            """
+            public enum Choice {
+                First = 1
+            }
+            public static Choice Target() => Choice.First;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+    }
+
+    [Test]
+    public void LiftedUnaryOperatorsUseTheLiftedOperatorAbstention() =>
+        AssertClassification(
+            """
+            public static long? Target(long? value) => -value;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.LiftedOperator);
+
+    [Test]
     public void NamedOptionalAndExtensionInvocationsCloseTheSubset() {
         using var named = CompiledMethod.Create(
             """

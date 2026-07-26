@@ -117,10 +117,11 @@ internal sealed class CallableVerifier(
         }
         foreach (var path in body.Paths) {
             foreach (var specAssumption in path.SpecAssumptions) {
-                var predicate = Guard(
-                    factory,
-                    path.Condition,
-                    specAssumption.Predicate);
+                var pathCondition = SpecResultDomainProjection.Rewrite(
+                    factory, path.Condition, path.SpecResultProjections);
+                var specPredicate = SpecResultDomainProjection.Rewrite(
+                    factory, specAssumption.Predicate, path.SpecResultProjections);
+                var predicate = Guard(factory, pathCondition, specPredicate);
                 if (GetDepth(predicate) > _maximumExpressionDepth)
                     return [.. ensures.Select((_, index) =>
                         CreateUnknown(
@@ -182,10 +183,11 @@ internal sealed class CallableVerifier(
                     missingReturnValue = true;
                     break;
                 }
-                pathObligations.Add(Guard(
-                    factory,
-                    path.Condition,
-                    pathCondition));
+                pathCondition = SpecResultDomainProjection.Rewrite(
+                    factory, pathCondition, path.SpecResultProjections);
+                var executionCondition = SpecResultDomainProjection.Rewrite(
+                    factory, path.Condition, path.SpecResultProjections);
+                pathObligations.Add(Guard(factory, executionCondition, pathCondition));
             }
             if (missingReturnValue) {
                 records.Add(CreateUnknown(
@@ -266,36 +268,35 @@ internal sealed class CallableVerifier(
                          GetDomainRoleOrder(variable.Role))
                      .ThenBy(static variable => variable.Ordinal)) {
             var sourceType = GetSourceType(variable, contracts);
-            if (!TryGetNarrowIntegerRange(
+            if (!TryGetNarrowIntegerInterval(
                     sourceType?.SpecialType ?? SpecialType.None,
-                    out var minimum,
-                    out var maximum))
+                    out var interval))
                 continue;
             if (variable.Role == BoundContractVariableRole.Result) {
                 foreach (var path in paths) {
                     if (path.ReturnTerm == null ||
-                        path.ReturnTerm.Type != factory.IntegerType)
+                        path.ReturnTerm.Type != factory.IntegerType ||
+                        !SpecResultDomainProjection.TryCreateIntervalPredicate(
+                            factory, path.ReturnTerm, interval, out var predicate) ||
+                        predicate == null)
                         return false;
                     AddDomainAssumption(
                         Guard(
                             factory,
-                            path.Condition,
-                            CreateRangePredicate(
-                                factory,
-                                path.ReturnTerm,
-                                minimum,
-                                maximum)),
+                            SpecResultDomainProjection.Rewrite(
+                                factory, path.Condition, path.SpecResultProjections),
+                            predicate),
                         variable);
                 }
             }
             else {
-                AddDomainAssumption(
-                    CreateRangePredicate(
-                        factory,
-                        factory.Variable(variable.Variable),
-                        minimum,
-                        maximum),
-                    variable);
+                if (!SpecResultDomainProjection.TryCreateIntervalPredicate(
+                        factory, factory.Variable(variable.Variable),
+                        interval, out var predicate))
+                    return false;
+                if (predicate == null)
+                    return false;
+                AddDomainAssumption(predicate, variable);
             }
         }
         return true;
@@ -333,7 +334,8 @@ internal sealed class CallableVerifier(
                         IrBinaryOperator.Equal,
                         path.ReturnTerm,
                         path.ReturnTerm));
-            completions.Add(completion);
+            completions.Add(SpecResultDomainProjection.Rewrite(
+                factory, completion, path.SpecResultProjections));
         }
         var predicate = Disjoin(factory, completions);
         if (predicate is IrBooleanTerm { Value: true } ||
@@ -349,25 +351,6 @@ internal sealed class CallableVerifier(
         assumptionLabels.Add(
             justification,
             "body:normal-completion");
-    }
-
-    private static IrTerm CreateRangePredicate(
-        IrFactory factory,
-        IrTerm value,
-        long minimum,
-        long maximum) {
-        var lower = factory.Binary(
-            IrBinaryOperator.GreaterThanOrEqual,
-            value,
-            factory.Integer(minimum));
-        var upper = factory.Binary(
-            IrBinaryOperator.LessThanOrEqual,
-            value,
-            factory.Integer(maximum));
-        return factory.Binary(
-            IrBinaryOperator.AndAlso,
-            lower,
-            upper);
     }
 
     private static int GetDomainRoleOrder(BoundContractVariableRole role) =>
@@ -402,44 +385,23 @@ internal sealed class CallableVerifier(
             _ => throw new ArgumentOutOfRangeException(nameof(variable))
         };
 
-    private static bool TryGetNarrowIntegerRange(
+    private static bool TryGetNarrowIntegerInterval(
         SpecialType type,
-        out long minimum,
-        out long maximum) {
-        switch (type) {
-            case SpecialType.System_SByte:
-                minimum = sbyte.MinValue;
-                maximum = sbyte.MaxValue;
-                return true;
-            case SpecialType.System_Byte:
-                minimum = byte.MinValue;
-                maximum = byte.MaxValue;
-                return true;
-            case SpecialType.System_Int16:
-                minimum = short.MinValue;
-                maximum = short.MaxValue;
-                return true;
-            case SpecialType.System_UInt16:
-                minimum = ushort.MinValue;
-                maximum = ushort.MaxValue;
-                return true;
-            case SpecialType.System_Char:
-                minimum = char.MinValue;
-                maximum = char.MaxValue;
-                return true;
-            case SpecialType.System_Int32:
-                minimum = int.MinValue;
-                maximum = int.MaxValue;
-                return true;
-            case SpecialType.System_UInt32:
-                minimum = uint.MinValue;
-                maximum = uint.MaxValue;
-                return true;
-            default:
-                minimum = default;
-                maximum = default;
-                return false;
-        }
+        out IntervalValue interval) {
+        (long Minimum, long Maximum)? range = type switch {
+            SpecialType.System_SByte => (sbyte.MinValue, sbyte.MaxValue),
+            SpecialType.System_Byte => (byte.MinValue, byte.MaxValue),
+            SpecialType.System_Int16 => (short.MinValue, short.MaxValue),
+            SpecialType.System_UInt16 => (ushort.MinValue, ushort.MaxValue),
+            SpecialType.System_Char => (char.MinValue, char.MaxValue),
+            SpecialType.System_Int32 => (int.MinValue, int.MaxValue),
+            SpecialType.System_UInt32 => (uint.MinValue, uint.MaxValue),
+            _ => null
+        };
+        interval = range.HasValue
+            ? IntervalDomain.Instance.Range(range.Value.Minimum, range.Value.Maximum)
+            : IntervalValue.Bottom;
+        return range.HasValue && !interval.IsBottom;
     }
 
     private static bool IsSupportedProofDomain(
@@ -668,6 +630,7 @@ internal sealed class CallableVerifier(
             start.StartInstruction,
             initialEnvironment,
             factory.Boolean(true),
+            ImmutableDictionary<IrVarId, SpecResultProjection>.Empty,
             []));
         var paths = ImmutableArray.CreateBuilder<BodyPath>();
         var executionStates = 0;
@@ -678,12 +641,22 @@ internal sealed class CallableVerifier(
             var state = pending.Pop();
             var block = program.GetBlock(state.Block);
             var environment = state.Environment;
+            var specResultProjections = state.SpecResultProjections;
             var specAssumptions = state.SpecAssumptions;
+            OperationId? expectedMemoryHavoc = null;
             var transferred = false;
             for (var index = state.StartInstruction;
                  index < block.Instructions.Length;
                  index++) {
                 var instruction = block.Instructions[index];
+                if (expectedMemoryHavoc is { } expectedOperation) {
+                    expectedMemoryHavoc = null;
+                    if (instruction is IrHavocInstruction havoc &&
+                        havoc.Operation == expectedOperation && havoc.HavocKind == IrHavocKind.Memory &&
+                        havoc.Variables.IsEmpty)
+                        continue;
+                    return BodyLoweringResult.Fail(WorkerVerificationReason.UnsupportedBody);
+                }
                 switch (instruction) {
                     case IrAssignInstruction assign:
                         if (!TrySubstitute(
@@ -708,14 +681,22 @@ internal sealed class CallableVerifier(
                                 invocation,
                                 environment,
                                 out var resultTerm,
-                                out var addedAssumptions))
+                                out var addedAssumptions,
+                                out var resultProjection,
+                                out var consumesMemoryHavoc))
                             return BodyLoweringResult.Fail(
                                 WorkerVerificationReason.UnsupportedBody);
                         environment = environment.SetItem(
                             call.Target!.Value,
                             resultTerm);
+                        if (resultProjection.HasFacts)
+                            specResultProjections =
+                                specResultProjections.SetItem(
+                                    resultProjection.ResultVariable,
+                                    resultProjection);
                         specAssumptions =
                             specAssumptions.AddRange(addedAssumptions);
+                        expectedMemoryHavoc = consumesMemoryHavoc ? call.Operation : null;
                         break;
                     case IrBranchInstruction branch:
                         if (!TrySubstitute(
@@ -735,6 +716,7 @@ internal sealed class CallableVerifier(
                                 0,
                                 environment,
                                 state.PathCondition,
+                                specResultProjections,
                                 specAssumptions));
                         }
                         else {
@@ -759,12 +741,14 @@ internal sealed class CallableVerifier(
                                 0,
                                 environment,
                                 whenFalse,
+                                specResultProjections,
                                 specAssumptions));
                             pending.Push(new SymbolicExecutionState(
                                 branch.WhenTrue,
                                 0,
                                 environment,
                                 whenTrue,
+                                specResultProjections,
                                 specAssumptions));
                         }
                         transferred = true;
@@ -775,6 +759,7 @@ internal sealed class CallableVerifier(
                             0,
                             environment,
                             state.PathCondition,
+                            specResultProjections,
                             specAssumptions));
                         transferred = true;
                         break;
@@ -797,6 +782,7 @@ internal sealed class CallableVerifier(
                                 factory,
                                 environment,
                                 parameterBindings),
+                            specResultProjections,
                             specAssumptions));
                         if (paths.Count > maximumBodyPaths)
                             return BodyLoweringResult.Fail(
@@ -830,23 +816,26 @@ internal sealed class CallableVerifier(
         IInvocationOperation invocation,
         IReadOnlyDictionary<IrVarId, IrTerm> environment,
         [NotNullWhen(true)] out IrTerm? resultTerm,
-        out ImmutableArray<BodySpecAssumption> assumptions) {
+        out ImmutableArray<BodySpecAssumption> assumptions,
+        out SpecResultProjection projection,
+        out bool consumesMemoryHavoc) {
         resultTerm = null;
         assumptions = [];
+        projection = default;
+        consumesMemoryHavoc = false;
         if (!call.Target.HasValue ||
             invocation.TargetMethod.ReducedFrom != null ||
             invocation.TargetMethod.Parameters.Any(static parameter =>
                 parameter.RefKind != RefKind.None) ||
             !_apiSpecs.TryGet(invocation.TargetMethod, out var resolved) ||
-            resolved.Template.Facets.Effects.Effects != SpecEffect.None ||
-            resolved.Template.Facets.Allocation.Behavior !=
-                SpecAllocationBehavior.None ||
-            resolved.Template.Postconditions.IsDefaultOrEmpty ||
+            !TryAdmitSpecCallEffects(
+                invocation, call, resolved.Template, out consumesMemoryHavoc) ||
             !resolved.Template.Result.HasValue ||
             !TryGetSpecResultType(
                 factory,
                 invocation.Type,
                 resolved.Template.Target.ResultType,
+                factory.GetVariableInfo(call.Target.Value).Type,
                 out var resultType) ||
             factory.GetVariableInfo(call.Target.Value).Type != resultType ||
             invocation.Arguments.Length !=
@@ -890,26 +879,59 @@ internal sealed class CallableVerifier(
         substitutions.Add(
             resolved.Template.Result.Value,
             resultTerm);
-        var instantiated =
-            ApiSpecInstantiator.InstantiatePostconditions(
-                resolved.Template,
-                factory,
-                substitutions);
-        if (instantiated.Status != SpecInstantiationStatus.Succeeded ||
-            instantiated.Postconditions.IsDefaultOrEmpty ||
-            instantiated.Postconditions.Any(predicate =>
-                GetDepth(predicate) > _maximumExpressionDepth)) {
+        if (!SpecResultDomainProjection.TryCreate(
+                factory, resolved.Template, call.Target.Value, out projection,
+                out var facetPredicates)) {
             resultTerm = null;
+            projection = default;
             return false;
         }
-        assumptions = [.. instantiated.Postconditions.Select(predicate =>
+        var instantiated = ApiSpecInstantiator.InstantiatePostconditions(
+            resolved.Template, factory, substitutions);
+        if (instantiated.Status != SpecInstantiationStatus.Succeeded) {
+            resultTerm = null;
+            projection = default;
+            return false;
+        }
+        var projectionMap = projection.HasFacts
+            ? ImmutableDictionary<IrVarId, SpecResultProjection>.Empty.Add(
+                projection.ResultVariable, projection)
+            : ImmutableDictionary<IrVarId, SpecResultProjection>.Empty;
+        var predicates = instantiated.Postconditions
+            .Select(predicate => SpecResultDomainProjection.Rewrite(
+                factory, predicate, projectionMap))
+            .Concat(facetPredicates)
+            .ToImmutableArray();
+        if (predicates.IsDefaultOrEmpty ||
+            predicates.Any(predicate =>
+                GetDepth(predicate) > _maximumExpressionDepth)) {
+            resultTerm = null;
+            projection = default;
+            return false;
+        }
+        assumptions = [.. predicates.Select(predicate =>
             new BodySpecAssumption(
                 resolved.Template.Id,
                 resolved.Template.Target.WitnessIdentifier,
                 predicate))];
         return true;
     }
-
+    private static bool TryAdmitSpecCallEffects(
+        IInvocationOperation invocation, IrCallInstruction call, ApiSpecTemplate template,
+        out bool consumesMemoryHavoc) {
+        var effects = template.Facets.Effects.Effects;
+        consumesMemoryHavoc = effects != SpecEffect.None;
+        var cardinality = template.Facets.Cardinality;
+        return !consumesMemoryHavoc ||
+               effects == SpecEffect.Unknown && invocation.TargetMethod.IsStatic &&
+               invocation.TargetMethod.Parameters.IsEmpty && invocation.Instance == null &&
+               invocation.Arguments.IsEmpty && call.Receiver == null && call.Arguments.IsEmpty &&
+               invocation.Type is IArrayTypeSymbol && !template.Receiver.HasValue &&
+               template.Parameters.IsEmpty && template.Postconditions.IsDefaultOrEmpty &&
+               template.Facets.Nullness.Result == SpecNullness.NonNull &&
+               (cardinality.Result is SpecCardinality.Empty or SpecCardinality.NonEmpty ||
+                cardinality.Result == SpecCardinality.Exact && cardinality.ExactCount.HasValue);
+    }
     private static bool HasDirectArgumentOrder(
         IInvocationOperation invocation) {
         if (invocation.Arguments.Length !=
@@ -928,6 +950,7 @@ internal sealed class CallableVerifier(
         IrFactory factory,
         ITypeSymbol? sourceType,
         SpecValueType? specType,
+        IrTypeId loweredResultType,
         out IrTypeId resultType) {
         switch (specType) {
             case SpecValueType.Boolean
@@ -951,6 +974,11 @@ internal sealed class CallableVerifier(
                 when sourceType?.SpecialType ==
                     SpecialType.System_String:
                 resultType = factory.StringType;
+                return true;
+            case SpecValueType.Sequence
+                when sourceType is IArrayTypeSymbol &&
+                     factory.GetTypeInfo(loweredResultType).Kind == IrTypeKind.Sequence:
+                resultType = loweredResultType;
                 return true;
             default:
                 resultType = default;
@@ -1534,7 +1562,7 @@ internal sealed class CallableVerifier(
         };
 
     private bool IsKnownPure(IMethodSymbol method) =>
-        _apiSpecs.IsPureAndAllocationFree(method);
+        _apiSpecs.IsSideEffectFree(method);
 
     private static int GetDepth(IrTerm root) {
         var memo = new Dictionary<IrId, int>();
@@ -1605,6 +1633,7 @@ internal sealed class CallableVerifier(
                     factory.Boolean(true),
                     term,
                     ImmutableDictionary<IrVarId, IrTerm>.Empty,
+                    ImmutableDictionary<IrVarId, SpecResultProjection>.Empty,
                     [])
             ]);
         internal static BodyLoweringResult Success(
@@ -1645,12 +1674,16 @@ internal sealed class CallableVerifier(
         int StartInstruction,
         ImmutableDictionary<IrVarId, IrTerm> Environment,
         IrTerm PathCondition,
+        ImmutableDictionary<IrVarId, SpecResultProjection>
+            SpecResultProjections,
         ImmutableArray<BodySpecAssumption> SpecAssumptions);
 
     private readonly record struct BodyPath(
         IrTerm Condition,
         IrTerm? ReturnTerm,
         ImmutableDictionary<IrVarId, IrTerm> CurrentStates,
+        ImmutableDictionary<IrVarId, SpecResultProjection>
+            SpecResultProjections,
         ImmutableArray<BodySpecAssumption> SpecAssumptions);
 
     private readonly record struct BodySpecAssumption(
