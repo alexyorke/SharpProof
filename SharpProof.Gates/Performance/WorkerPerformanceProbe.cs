@@ -35,7 +35,7 @@ internal static class WorkerPerformanceProbe {
                 contract.Samples,
                 cancellationToken)
             .ConfigureAwait(false);
-        var forcedTermination = await MeasureForcedTerminationAsync(
+        var forcedTermination = await MeasureForcedTerminationCoreAsync(
                 repositoryRoot,
                 workspace,
                 contract,
@@ -44,6 +44,19 @@ internal static class WorkerPerformanceProbe {
         return new WorkerPerformanceMeasurements(
             cancellationLatencies,
             forcedTermination);
+    }
+
+    internal static async Task<double> MeasureForcedTerminationAsync(
+        string repositoryRoot,
+        AcceptancePerformanceContract contract,
+        CancellationToken cancellationToken = default) {
+        using var workspace = WorkerProbeWorkspace.Create();
+        return await MeasureForcedTerminationCoreAsync(
+                repositoryRoot,
+                workspace,
+                contract,
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private static async Task<double[]> MeasureWorkerCancellationAsync(
@@ -140,7 +153,7 @@ internal static class WorkerPerformanceProbe {
                 "The real worker did not report a cooperative project timeout.");
     }
 
-    private static async Task<double> MeasureForcedTerminationAsync(
+    private static async Task<double> MeasureForcedTerminationCoreAsync(
         string repositoryRoot,
         WorkerProbeWorkspace workspace,
         AcceptancePerformanceContract contract,

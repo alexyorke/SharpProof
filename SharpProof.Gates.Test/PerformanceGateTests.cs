@@ -138,6 +138,23 @@ public sealed class PerformanceGateTests {
     }
 
     [Test]
+    public async Task ForcedTerminationDeadlineIsStableAcrossLaunches() {
+        var root = RepositoryLayout.FindRoot();
+        var contract = AcceptancePerformanceContract.Load(root);
+        for (var sample = 0; sample < 5; sample++) {
+            var elapsed =
+                await WorkerPerformanceProbe.MeasureForcedTerminationAsync(
+                    root,
+                    contract);
+            Assert.That(
+                elapsed,
+                Is.LessThanOrEqualTo(
+                    contract.ForcedTerminationMilliseconds),
+                $"Sample {sample + 1}: {elapsed:F3} ms");
+        }
+    }
+
+    [Test]
     public async Task ReleasePerformanceContractPasses() {
         var result = await PerformanceGate.RunAsync(
             RepositoryLayout.FindRoot());
