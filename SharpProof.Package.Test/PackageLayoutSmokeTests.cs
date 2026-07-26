@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Security;
+using System.Security.Cryptography;
 using System.Text.Json;
 using NUnit.Framework;
+using SharpProof.CompilerProbe.TestAsset;
 using SharpProof.Worker;
 
 namespace SharpProof.Package.Test;
@@ -261,6 +263,101 @@ public sealed class PackageLayoutSmokeTests {
                 .And.Contain("expected a direct prologue statement"));
     }
 
+    [Test]
+    public async Task PackedConsumerProbeCapturesFinalCompilerInputs() {
+        using var workspace = PackageWorkspace.Create();
+        var packagePath = await PackSharpProofAsync(workspace);
+        workspace.WriteCompilerProbeConsumer(
+            GetPackageVersion(packagePath));
+        var restore = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "restore",
+            workspace.ConsumerProject,
+            "--nologo",
+            "/nodeReuse:false",
+            "--source",
+            workspace.PackageSource,
+            "--packages",
+            workspace.PackageCache);
+        Assert.That(restore.ExitCode, Is.Zero, restore.Output);
+
+        var withoutPath =
+            await RebuildCompilerProbeConsumerAsync(workspace);
+        Assert.That(withoutPath.ExitCode, Is.Zero, withoutPath.Output);
+        Assert.That(File.Exists(workspace.ProbeOutputPath), Is.False);
+        var profileOff = await RebuildCompilerProbeConsumerAsync(
+            workspace,
+            ("SharpProofProfile", "off"),
+            (
+                CompilerProbeContract.OutputPathPropertyName,
+                workspace.ProbeOutputPath));
+        Assert.That(profileOff.ExitCode, Is.Zero, profileOff.Output);
+        Assert.That(File.Exists(workspace.ProbeOutputPath), Is.False);
+
+        var first = await RebuildProbeAsync(
+            workspace,
+            "first-global",
+            "first-metadata");
+        Assert.That(first.ExitCode, Is.Zero, first.Output);
+        Assert.That(
+            File.Exists(workspace.ProbeOutputPath),
+            Is.True,
+            first.Output);
+        var firstBytes =
+            await File.ReadAllBytesAsync(workspace.ProbeOutputPath);
+        VerifyProbeSnapshot(
+            firstBytes,
+            "first-input",
+            "first-global",
+            "first-metadata");
+        var firstChecksum = SnapshotChecksum(firstBytes);
+
+        var noOp = await RebuildProbeAsync(
+            workspace,
+            "first-global",
+            "first-metadata");
+        Assert.That(noOp.ExitCode, Is.Zero, noOp.Output);
+        Assert.That(
+            await File.ReadAllBytesAsync(workspace.ProbeOutputPath),
+            Is.EqualTo(firstBytes));
+
+        workspace.WriteProbeInput("second-input");
+        var changedInput = await RebuildProbeAsync(
+            workspace,
+            "first-global",
+            "first-metadata");
+        Assert.That(changedInput.ExitCode, Is.Zero, changedInput.Output);
+        var inputBytes =
+            await File.ReadAllBytesAsync(workspace.ProbeOutputPath);
+        VerifyProbeSnapshot(
+            inputBytes,
+            "second-input",
+            "first-global",
+            "first-metadata");
+        Assert.That(
+            SnapshotChecksum(inputBytes),
+            Is.Not.EqualTo(firstChecksum));
+
+        var changedConfiguration = await RebuildProbeAsync(
+            workspace,
+            "second-global",
+            "second-metadata");
+        Assert.That(
+            changedConfiguration.ExitCode,
+            Is.Zero,
+            changedConfiguration.Output);
+        var configuredBytes =
+            await File.ReadAllBytesAsync(workspace.ProbeOutputPath);
+        VerifyProbeSnapshot(
+            configuredBytes,
+            "second-input",
+            "second-global",
+            "second-metadata");
+        Assert.That(
+            SnapshotChecksum(configuredBytes),
+            Is.Not.EqualTo(SnapshotChecksum(inputBytes)));
+    }
+
     private static async Task<string> PackSharpProofAsync(
         PackageWorkspace workspace) {
         var pack = await RunDotNetAsync(
@@ -296,6 +393,219 @@ public sealed class PackageLayoutSmokeTests {
             "--nologo",
             "/nodeReuse:false",
             "-p:UseSharedCompilation=false");
+
+    private static Task<ProcessResult> RebuildCompilerProbeConsumerAsync(
+        PackageWorkspace workspace,
+        params (string Name, string Value)[] properties) {
+        var arguments = new List<string> {
+            "build",
+            workspace.ConsumerProject,
+            "-t:Rebuild",
+            "-c",
+            "Release",
+            "--no-restore",
+            "--nologo",
+            "/nodeReuse:false",
+            "-p:UseSharedCompilation=false"
+        };
+        arguments.AddRange(properties.Select(static property =>
+            "-p:" + property.Name + "=" + property.Value));
+        return RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            [.. arguments]);
+    }
+
+    private static Task<ProcessResult> RebuildProbeAsync(
+        PackageWorkspace workspace,
+        string globalValue,
+        string metadataValue) =>
+        RebuildCompilerProbeConsumerAsync(
+            workspace,
+            ("SharpProofProfile", "advisory"),
+            (
+                CompilerProbeContract.OutputPathPropertyName,
+                workspace.ProbeOutputPath),
+            (
+                CompilerProbeContract.GlobalValuePropertyName,
+                globalValue),
+            ("SharpProofProbeAdditionalMetadata", metadataValue));
+
+    private static string SnapshotChecksum(byte[] snapshot) =>
+        Convert.ToHexString(SHA256.HashData(snapshot));
+
+    private static void VerifyProbeSnapshot(
+        byte[] snapshot,
+        string input,
+        string globalValue,
+        string metadataValue) {
+        using var document = JsonDocument.Parse(snapshot);
+        var root = document.RootElement;
+        Assert.That(
+            root.EnumerateObject().Select(static property => property.Name),
+            Is.EqualTo([
+                "schema",
+                "schemaVersion",
+                "assembly",
+                "options",
+                "consumedOptions",
+                "syntaxTrees",
+                "portableReferences",
+                "additionalFiles"
+            ]));
+        Assert.That(
+            root.GetProperty("schema").GetString(),
+            Is.EqualTo(CompilerProbeContract.SchemaName));
+        Assert.That(
+            root.GetProperty("schemaVersion").GetInt32(),
+            Is.EqualTo(CompilerProbeContract.SchemaVersion));
+        Assert.That(
+            root.GetProperty("assembly").GetProperty("name").GetString(),
+            Is.EqualTo("Consumer"));
+
+        var syntaxTrees = root.GetProperty("syntaxTrees")
+            .EnumerateArray()
+            .ToArray();
+        Assert.That(
+            syntaxTrees,
+            Has.Some.Matches<JsonElement>(tree =>
+                tree.GetProperty("path").GetString()?
+                    .EndsWith("/Subject.cs", StringComparison.Ordinal) ==
+                true));
+        Assert.That(
+            syntaxTrees,
+            Has.Some.Matches<JsonElement>(tree =>
+                tree.GetProperty("path").GetString()?
+                    .EndsWith(
+                        "/" + CompilerProbeContract.GlobalUsingsHintName,
+                        StringComparison.Ordinal) ==
+                true));
+        Assert.That(
+            syntaxTrees,
+            Has.Some.Matches<JsonElement>(tree =>
+                tree.GetProperty("path").GetString()?
+                    .EndsWith(
+                        "/" + CompilerProbeContract.ContractHintName,
+                        StringComparison.Ordinal) ==
+                true));
+        var subjectTree = syntaxTrees.Single(tree =>
+            tree.GetProperty("path").GetString()?
+                .EndsWith("/Subject.cs", StringComparison.Ordinal) ==
+            true);
+        Assert.That(
+            subjectTree.GetProperty("declaredSymbols")
+                .EnumerateArray()
+                .Select(static symbol => symbol.GetString()),
+            Does.Contain("HandwrittenProbe.AliasAssemblyName()")
+                .And.Contain("HandwrittenProbe.GeneratedIdentity(int)"));
+        var contractTree = syntaxTrees.Single(tree =>
+            tree.GetProperty("path").GetString()?
+                .EndsWith(
+                    "/" + CompilerProbeContract.ContractHintName,
+                    StringComparison.Ordinal) ==
+            true);
+        Assert.That(
+            contractTree.GetProperty("declaredSymbols")
+                .EnumerateArray()
+                .Select(static symbol => symbol.GetString()),
+            Does.Contain(
+                    CompilerProbeContract.GeneratedTypeMetadataName)
+                .And.Contain(
+                    CompilerProbeContract.GeneratedTypeMetadataName +
+                    "." + CompilerProbeContract.GeneratedMethodName +
+                    "(int)"));
+        var parseOptions = subjectTree.GetProperty("parseOptions");
+        Assert.That(
+            parseOptions.GetProperty("languageVersion").GetString(),
+            Is.EqualTo("CSharp13"));
+        Assert.That(
+            parseOptions.GetProperty("specifiedLanguageVersion").GetString(),
+            Is.EqualTo("CSharp13"));
+        var options = root.GetProperty("options");
+        Assert.That(
+            options.GetProperty("nullableContextOptions").GetString(),
+            Is.EqualTo("Annotations"));
+        Assert.That(
+            options.GetProperty("optimizationLevel").GetString(),
+            Is.EqualTo("Debug"));
+        Assert.That(
+            options.GetProperty("platform").GetString(),
+            Is.EqualTo("X64"));
+        Assert.That(options.GetProperty("allowUnsafe").GetBoolean(), Is.True);
+        Assert.That(options.GetProperty("checkOverflow").GetBoolean(), Is.True);
+        Assert.That(options.GetProperty("deterministic").GetBoolean(), Is.True);
+        Assert.That(
+            options.GetProperty("languageVersions")
+                .EnumerateArray()
+                .Select(static value => value.GetString()),
+            Does.Contain("CSharp13"));
+        Assert.That(
+            options.GetProperty("preprocessorSymbols")
+                .EnumerateArray()
+                .Select(static symbol => symbol.GetString()),
+            Does.Contain("PROBE_SYMBOL")
+                .And.Contain("SHARPPROOF_PROBE_GENERATED"));
+
+        var consumedOptions = root.GetProperty("consumedOptions")
+            .EnumerateArray()
+            .ToArray();
+        var globalOption = consumedOptions.Single(option =>
+            option.GetProperty("key").GetString() ==
+                CompilerProbeContract.GlobalValueOptionKey &&
+            string.IsNullOrEmpty(
+                option.GetProperty("path").GetString()));
+        Assert.That(
+            globalOption.GetProperty("value").GetString(),
+            Is.EqualTo(globalValue));
+        var outputOption = consumedOptions.Single(option =>
+            option.GetProperty("key").GetString() ==
+                CompilerProbeContract.OutputPathOptionKey);
+        Assert.That(
+            outputOption.GetProperty("value").GetString(),
+            Is.Not.Null.And.Not.Empty);
+        var metadataOption = consumedOptions.Single(option =>
+            option.GetProperty("key").GetString() ==
+                CompilerProbeContract.AdditionalFileMetadataOptionKey &&
+            option.GetProperty("path").GetString()?
+                .EndsWith(
+                    "/" + CompilerProbeContract.AdditionalFileName,
+                    StringComparison.Ordinal) ==
+            true);
+        Assert.That(
+            metadataOption.GetProperty("value").GetString(),
+            Is.EqualTo(metadataValue));
+
+        var additionalFile = root.GetProperty("additionalFiles")
+            .EnumerateArray()
+            .Single(file =>
+                file.GetProperty("path").GetString()?
+                    .EndsWith(
+                        "/" + CompilerProbeContract.AdditionalFileName,
+                        StringComparison.Ordinal) ==
+                true);
+        Assert.That(
+            additionalFile.GetProperty("metadataValue").GetString(),
+            Is.EqualTo(metadataValue));
+        Assert.That(
+            additionalFile.GetProperty("textSha256").GetString(),
+            Is.EqualTo(TextChecksum(input + "\n")).IgnoreCase);
+
+        var aliasReference = root.GetProperty("portableReferences")
+            .EnumerateArray()
+            .Single(reference =>
+                reference.GetProperty("aliases")
+                    .EnumerateArray()
+                    .Any(alias =>
+                        alias.GetString() == "probealias"));
+        Assert.That(
+            aliasReference.GetProperty("assemblyOrModuleIdentity")
+                .GetString(),
+            Does.Contain("NUnit.Framework").IgnoreCase);
+    }
+
+    private static string TextChecksum(string value) =>
+        Convert.ToHexString(
+            SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(value)));
 
     private static int CountDiagnosticLines(string output, string id) =>
         output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
@@ -464,6 +774,16 @@ public sealed class PackageLayoutSmokeTests {
                 "net8.0",
                 "SharpProof",
                 "result.json");
+            ProbeOutputPath = Path.Combine(
+                ConsumerDirectory,
+                "obj",
+                "Release",
+                "net8.0",
+                "SharpProof",
+                "compiler-probe.json");
+            ProbeInputPath = Path.Combine(
+                ConsumerDirectory,
+                CompilerProbeContract.AdditionalFileName);
             Directory.CreateDirectory(PackageSource);
             Directory.CreateDirectory(ConsumerDirectory);
         }
@@ -473,6 +793,8 @@ public sealed class PackageLayoutSmokeTests {
         internal string ConsumerDirectory { get; }
         internal string ConsumerProject { get; }
         internal string ResultPath { get; }
+        internal string ProbeOutputPath { get; }
+        internal string ProbeInputPath { get; }
 
         internal static PackageWorkspace Create() {
             var root = Path.Combine(
@@ -541,6 +863,74 @@ public sealed class PackageLayoutSmokeTests {
             File.WriteAllText(
                 Path.Combine(ConsumerDirectory, "Subject.cs"),
                 source,
+                new System.Text.UTF8Encoding(false));
+
+        internal void WriteCompilerProbeConsumer(string version) {
+            WriteSource(
+                """
+                extern alias probealias;
+                public static class HandwrittenProbe {
+                    public static string AliasAssemblyName() =>
+                        typeof(probealias::NUnit.Framework.Assert)
+                            .Assembly.GetName().Name!;
+
+                #if SHARPPROOF_PROBE_GENERATED
+                    public static int GeneratedIdentity(int value) =>
+                        ProbeGenerated.Verify(value);
+                #endif
+                }
+                """);
+            WriteProbeInput("first-input");
+            var escapedVersion = SecurityElement.Escape(version);
+            var escapedProbe = SecurityElement.Escape(
+                CompilerProbeContract.AssemblyPath);
+            var escapedAlias = SecurityElement.Escape(
+                typeof(Assert).Assembly.Location);
+            File.WriteAllText(
+                ConsumerProject,
+                $"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <LangVersion>13.0</LangVersion>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                    <Nullable>annotations</Nullable>
+                    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+                    <Optimize>false</Optimize>
+                    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+                    <Deterministic>true</Deterministic>
+                    <PlatformTarget>x64</PlatformTarget>
+                    <DefineConstants>PROBE_SYMBOL</DefineConstants>
+                    <DefineConstants Condition="'$({CompilerProbeContract.OutputPathPropertyName})' != '' AND '$(SharpProofProfile)' != 'off'">$(DefineConstants);SHARPPROOF_PROBE_GENERATED</DefineConstants>
+                    <SharpProofProbeAdditionalMetadata>first-metadata</SharpProofProbeAdditionalMetadata>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <PackageReference Include="SharpProof"
+                                      Version="{escapedVersion}" />
+                    <Analyzer Include="{escapedProbe}"
+                              Condition="'$({CompilerProbeContract.OutputPathPropertyName})' != '' AND '$(SharpProofProfile)' != 'off'" />
+                    <AdditionalFiles Include="{CompilerProbeContract.AdditionalFileName}">
+                      <{CompilerProbeContract.AdditionalFileMetadataName}>$(SharpProofProbeAdditionalMetadata)</{CompilerProbeContract.AdditionalFileMetadataName}>
+                    </AdditionalFiles>
+                    <CompilerVisibleProperty Include="{CompilerProbeContract.OutputPathPropertyName}" />
+                    <CompilerVisibleProperty Include="{CompilerProbeContract.GlobalValuePropertyName}" />
+                    <CompilerVisibleItemMetadata Include="AdditionalFiles"
+                                                 MetadataName="{CompilerProbeContract.AdditionalFileMetadataName}" />
+                    <Reference Include="NUnit.Framework">
+                      <HintPath>{escapedAlias}</HintPath>
+                      <Aliases>probealias</Aliases>
+                      <Private>false</Private>
+                    </Reference>
+                  </ItemGroup>
+                </Project>
+                """,
+                new System.Text.UTF8Encoding(false));
+        }
+
+        internal void WriteProbeInput(string value) =>
+            File.WriteAllText(
+                ProbeInputPath,
+                value + "\n",
                 new System.Text.UTF8Encoding(false));
 
         public void Dispose() {

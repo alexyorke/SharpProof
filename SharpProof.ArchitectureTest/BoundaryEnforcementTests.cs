@@ -293,6 +293,7 @@ public sealed class BoundaryEnforcementTests {
             @"SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj",
             @"SharpProof.Attributes.Test\SharpProof.Attributes.Test.csproj",
             @"SharpProof.Attributes\SharpProof.Attributes.csproj",
+            @"SharpProof.CompilerProbe.TestAsset\SharpProof.CompilerProbe.TestAsset.csproj",
             @"SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj",
             @"SharpProof.ContractForGenerator\SharpProof.ContractForGenerator.csproj",
             @"SharpProof.Contracts.Test\SharpProof.Contracts.Test.csproj",

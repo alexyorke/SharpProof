@@ -78,6 +78,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Gates", "SharpPr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Gates.Test", "SharpProof.Gates.Test\SharpProof.Gates.Test.csproj", "{59644792-68BF-4416-9B73-681E95074515}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.CompilerProbe.TestAsset", "SharpProof.CompilerProbe.TestAsset\SharpProof.CompilerProbe.TestAsset.csproj", "{278ABED7-47E5-44AA-9D9C-4494A7AC8D62}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -236,6 +238,10 @@ Global
 		{59644792-68BF-4416-9B73-681E95074515}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{59644792-68BF-4416-9B73-681E95074515}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{59644792-68BF-4416-9B73-681E95074515}.Release|Any CPU.Build.0 = Release|Any CPU
+		{278ABED7-47E5-44AA-9D9C-4494A7AC8D62}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{278ABED7-47E5-44AA-9D9C-4494A7AC8D62}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{278ABED7-47E5-44AA-9D9C-4494A7AC8D62}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{278ABED7-47E5-44AA-9D9C-4494A7AC8D62}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
