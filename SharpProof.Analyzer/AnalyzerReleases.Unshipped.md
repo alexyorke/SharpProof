@@ -2,27 +2,13 @@
 
 Rule ID | Category | Severity | Notes
 -------|--------|--------|-----
-SP0024 | Usage | Error | Reports malformed SharpProof contract arguments.
+SP0002 | Purity | Disabled | Reports `[EnforcePure]` methods whose observable purity is not proven.
+SP0013 | Allocation | Disabled | Reserved for known allocations in `[ZeroAllocations]` methods; currently not emitted.
+SP0015 | Capabilities | Disabled | Reserved for known capabilities outside `[AllowedCapabilities]`; currently not emitted.
+SP0016 | Capabilities | Disabled | Reports capability contracts whose rich effect summary remains unknown.
+SP0024 | Usage | Error | Reports invalid capability flags, exception types, and blank suppression or trust reasons.
 SP0025 | Configuration | Warning | Reports invalid supported analyzer options.
-SP0027 | Contracts | Disabled | Reports calls that do not prove a `[Requires]` precondition.
-SP0030 | ExceptionFlow | Disabled | Reports escaping exceptions that violate exception contracts.
+SP0027 | Contracts | Disabled | Reports only compiler-bound call-site `[Requires]` preconditions that concretely replay as false; unknown or throwing evaluation is silent.
+SP0030 | ExceptionFlow | Disabled | Reserved for escaping-exception violations once effect-trace replay exists; currently not emitted.
 SP0045 | Allocation | Disabled | Reports `[ZeroAllocations]` contracts that could not be verified.
 SP0046 | ExceptionFlow | Disabled | Reports exception contracts that could not be verified.
-
-### Removed Rules
-
-Rule ID | Category | Severity | Notes
--------|--------|--------|-----
-SP0018 | Contracts | Warning | Deep analyzer-side `[Ensures]` refutation was removed; opt-in worker verification owns supported postconditions.
-SP0019 | Contracts | Warning | Deep analyzer-side `[Ensures]` unknown reporting was removed with the legacy string-contract pipeline.
-SP0021 | Complexity | Warning | Statistical complexity contracts were removed because they do not have a crisp soundness oracle.
-SP0022 | Complexity | Warning | Statistical complexity-contract unknown reporting was removed with the complexity analyzer.
-
-### Changed Rules
-
-Rule ID | New Category | New Severity | Old Category | Old Severity | Notes
--------|--------------|--------------|--------------|--------------|-----
-SP0002 | Purity | Disabled | Purity | Error | Demoted to opt-in informational reporting for the narrowed analyzer.
-SP0013 | Allocation | Disabled | Allocation | Warning | Demoted to opt-in informational reporting for the narrowed analyzer.
-SP0015 | Capabilities | Disabled | Capabilities | Warning | Demoted to opt-in informational reporting for the narrowed analyzer.
-SP0016 | Capabilities | Disabled | Capabilities | Warning | Demoted to opt-in informational reporting for the narrowed analyzer.

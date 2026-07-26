@@ -13,7 +13,7 @@ namespace SharpProof.ArchitectureTest;
 
 [TestFixture]
 public sealed class ArchitectureTests {
-    private static readonly string[] V2ProductionProjects = [
+    private static readonly string[] ProductionProjects = [
         "SharpProof.Ir",
         "SharpProof.ContractForGenerator",
         "SharpProof.Specs",
@@ -67,7 +67,7 @@ public sealed class ArchitectureTests {
             ]
         };
 
-        foreach (var project in V2ProductionProjects) {
+        foreach (var project in ProductionProjects) {
             var actual = GetProjectReferences(project)
                 .OrderBy(static value => value, StringComparer.Ordinal)
                 .ToArray();
@@ -96,8 +96,8 @@ public sealed class ArchitectureTests {
     }
 
     [Test]
-    public void OnlyTheSmtLayerReferencesZ3InTheV2Graph() {
-        foreach (var project in V2ProductionProjects) {
+    public void OnlyTheSmtLayerReferencesZ3InTheProductionGraph() {
+        foreach (var project in ProductionProjects) {
             var xml = XDocument.Load(ProjectFile(project));
             var packages = xml
                 .Descendants("PackageReference")
@@ -187,7 +187,7 @@ public sealed class ArchitectureTests {
 
     [Test]
     public void ProofProducingOutcomeConstructorsStayInTheKernel() {
-        var productionFiles = V2ProductionProjects
+        var productionFiles = ProductionProjects
             .SelectMany(ProductionSourceFiles)
             .ToArray();
         Assert.That(
@@ -216,28 +216,6 @@ public sealed class ArchitectureTests {
                 "SharpProof.Effects/EffectSummaryOperations.cs",
                 "SharpProof.Effects/ExternalEffectResolver.cs"
             ]));
-    }
-
-    [Test]
-    public void HistoricalV1AcceptanceTreeRemainsPinned() {
-        const string expected = "1388666e46265f306f9687b90eb11e3bdce5c1b9";
-        var root = RepositoryRoot();
-        var start = new System.Diagnostics.ProcessStartInfo {
-            FileName = "git",
-            WorkingDirectory = root,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-        start.ArgumentList.Add("rev-parse");
-        start.ArgumentList.Add("HEAD:eng/acceptance/v1");
-        using var process = System.Diagnostics.Process.Start(start)!;
-        var actual = process.StandardOutput.ReadToEnd().Trim();
-        var error = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-
-        Assert.That(process.ExitCode, Is.Zero, error);
-        Assert.That(actual, Is.EqualTo(expected));
     }
 
     [Test]
@@ -390,7 +368,6 @@ public sealed class ArchitectureTests {
             RepositoryRoot(),
             "eng",
             "acceptance",
-            "v2",
             "algorithm-size-ratchets.json");
         var manifest = JsonSerializer.Deserialize<SizeRatchetManifest>(
             File.ReadAllText(path),

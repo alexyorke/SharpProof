@@ -83,7 +83,6 @@ throw `InvalidOperationException`; their effect specs describe that direct-call
 behavior.
 
 Callee postconditions may be assumed only after verification or explicit trust.
-Legacy string postconditions are never consumed as verified callee guarantees.
 
 ## Effects
 
@@ -138,7 +137,7 @@ unexplained canonical snapshot change, and all soundness and performance gates
 green. Promotion changes reporting severity only; it cannot enlarge the
 supported subset or proof semantics.
 
-The v2 effect subset accepts non-generic ordinary methods, explicit
+The current effect subset accepts non-generic ordinary methods, explicit
 constructors, and accessors using locals, primitive expressions, assignments,
 direct calls, object and array creation, `if`, `for`, `while`, `do`, constant
 `switch`, `try`/`catch`/`finally`, `using`, `lock`, conditional access, and

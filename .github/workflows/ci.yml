@@ -29,9 +29,9 @@ jobs:
         shell: pwsh
         run: .\scripts\Generate-Readme.ps1 -Verify
 
-      - name: Run the v2 acceptance contract
+      - name: Run the acceptance contract
         shell: pwsh
-        run: .\eng\acceptance\v2\Verify.ps1 -Configuration Release
+        run: .\eng\acceptance\Verify.ps1 -Configuration Release
 
       - name: Package NuGet packages
         shell: pwsh

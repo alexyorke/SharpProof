@@ -10,54 +10,6 @@ namespace SharpProof.Package.Test;
 [NonParallelizable]
 public sealed class PackageLayoutSmokeTests {
     [Test]
-    public async Task MigrationCodeFixShipsAsASeparatePackage() {
-        using var workspace = PackageWorkspace.Create();
-        var pack = await RunDotNetAsync(
-            FindRepositoryRoot(),
-            "pack",
-            Path.Combine(
-                FindRepositoryRoot(),
-                "SharpProof.Migration",
-                "SharpProof.Migration.csproj"),
-            "-c",
-            "Release",
-            "--nologo",
-            "/nodeReuse:false",
-            "-p:UseSharedCompilation=false",
-            "-p:GeneratePackageOnBuild=false",
-            "--output",
-            workspace.PackageSource);
-        Assert.That(pack.ExitCode, Is.Zero, pack.Output);
-
-        var packagePath = Directory
-            .EnumerateFiles(
-                workspace.PackageSource,
-                "SharpProof.Migration.*.nupkg")
-            .Single();
-        using var archive = ZipFile.OpenRead(packagePath);
-        var analyzerEntries = archive.Entries
-            .Select(static entry => entry.FullName)
-            .Where(static entry => entry.StartsWith(
-                "analyzers/dotnet/cs/",
-                StringComparison.Ordinal))
-            .ToArray();
-
-        Assert.That(
-            analyzerEntries,
-            Is.EquivalentTo(new[] {
-                "analyzers/dotnet/cs/SharpProof.Migration.dll",
-                "analyzers/dotnet/cs/System.Composition.AttributedModel.dll",
-                "analyzers/dotnet/cs/System.Composition.Convention.dll",
-                "analyzers/dotnet/cs/System.Composition.Hosting.dll",
-                "analyzers/dotnet/cs/System.Composition.Runtime.dll",
-                "analyzers/dotnet/cs/System.Composition.TypedParts.dll"
-            }));
-        Assert.That(
-            analyzerEntries,
-            Has.None.Contains("SharpProof.Legacy.Attributes.dll"));
-    }
-
-    [Test]
     public async Task PackedAnalyzerIsThinAndPackagedWorkerRuns() {
         using var workspace = PackageWorkspace.Create();
         var pack = await RunDotNetAsync(
@@ -192,8 +144,6 @@ public sealed class PackageLayoutSmokeTests {
             conditionalAnalyzerEntries,
             Has.None.Matches<string>(
                 entry =>
-                    entry.Contains("SharpProof.Symbolic", StringComparison.Ordinal) ||
-                    entry.Contains("SharpProof.ProofCore", StringComparison.Ordinal) ||
                     entry.Contains("Microsoft.Z3", StringComparison.Ordinal) ||
                     entry.Contains("libz3", StringComparison.OrdinalIgnoreCase) ||
                     entry.Contains("NativeSmtLocator", StringComparison.Ordinal)));
@@ -239,9 +189,6 @@ public sealed class PackageLayoutSmokeTests {
                 "tools/net8/System.Text.Json.dll",
                 "tools/net8/runtimes/win-x64/native/libz3.dll"
             }));
-        Assert.That(
-            entries,
-            Has.None.Contains("SharpProof.SymbolicCli"));
     }
 
     private static string GetPackageVersion(string packagePath) {
@@ -308,7 +255,7 @@ public sealed class PackageLayoutSmokeTests {
                 "Release",
                 "net8.0",
                 "SharpProof",
-                "result.v2.json");
+                "result.json");
             Directory.CreateDirectory(PackageSource);
             Directory.CreateDirectory(ConsumerDirectory);
         }

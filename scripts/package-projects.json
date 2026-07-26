@@ -2,8 +2,6 @@
   "schemaVersion": 1,
   "projects": [
     "SharpProof.Package/SharpProof.Package.csproj",
-    "SharpProof.Attributes/SharpProof.Attributes.csproj",
-    "SharpProof.Legacy.Attributes/SharpProof.Legacy.Attributes.csproj",
-    "SharpProof.Migration/SharpProof.Migration.csproj"
+    "SharpProof.Attributes/SharpProof.Attributes.csproj"
   ]
 }

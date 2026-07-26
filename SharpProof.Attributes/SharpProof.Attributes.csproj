@@ -6,7 +6,7 @@
     <IsPackable>true</IsPackable> 
     <PackageId>SharpProof.Attributes</PackageId>
     <Description>Contains SharpProof contracts for compiler-bound Requires, Ensures, Assume, Result, and Old expressions; closed contract attributes; suppressions and trust declarations; and composable method effects.</Description>
-    <PackageTags>SharpProof;Attributes;Roslyn;Analyzer;Purity;StaticAnalysis;SymbolicAnalysis;Capabilities;ZeroAllocations;Exceptions</PackageTags>
+    <PackageTags>SharpProof;Attributes;Contracts;Purity;StaticAnalysis;MethodEffects;Capabilities;ZeroAllocations;Exceptions;Preconditions;Postconditions</PackageTags>
     <Title>SharpProof Attributes</Title>
     <PackageReleaseNotes>Breaking soundness-first preview with compiler-bound Contract APIs, closed contract attributes, explicit suppression and trust declarations, and the effect-contract flagship.</PackageReleaseNotes>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild> 

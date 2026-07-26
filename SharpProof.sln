@@ -6,8 +6,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Package", "Sharp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Attributes", "SharpProof.Attributes\SharpProof.Attributes.csproj", "{F56D9622-9F43-49FD-94D5-8737ED2D1804}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Legacy.Attributes", "SharpProof.Legacy.Attributes\SharpProof.Legacy.Attributes.csproj", "{C9432A91-228C-4E10-AC81-3D649D90BF79}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Analyzer", "SharpProof.Analyzer\SharpProof.Analyzer.csproj", "{5852273E-89C2-4FAC-9FE0-89D4DD39432B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Smoke.Net472", "SharpProof.Smoke.Net472\SharpProof.Smoke.Net472.csproj", "{68FFBFC4-27CA-4316-A9B5-4502E0063031}"
@@ -46,10 +44,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Effects.Test", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.ArchitectureTest", "SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj", "{FAE3F838-E43F-46AE-805E-4141B76F3125}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Migration", "SharpProof.Migration\SharpProof.Migration.csproj", "{6661DB84-B93A-4462-AFA3-CE530D9CDC83}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Migration.Test", "SharpProof.Migration.Test\SharpProof.Migration.Test.csproj", "{77B3EFC1-E54F-4AC6-80B7-FDF9B4FDB91D}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Meta.Analyzers", "SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj", "{8CE11E6D-EE60-4535-AD19-B28706FEE6A1}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Meta.Analyzers.Test", "SharpProof.Meta.Analyzers.Test\SharpProof.Meta.Analyzers.Test.csproj", "{851D90FC-9C37-4280-B69D-B1F8C5EE832F}"
@@ -58,9 +52,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Testing", "Sharp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Testing.Test", "SharpProof.Testing.Test\SharpProof.Testing.Test.csproj", "{9D7101EE-B26C-4109-9E63-B31380D272FA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.V2Fuzz", "Tools\SharpProof.V2Fuzz\SharpProof.V2Fuzz.csproj", "{027614C7-2A53-4E07-8339-192C7D0136D0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Fuzz", "Tools\SharpProof.Fuzz\SharpProof.Fuzz.csproj", "{027614C7-2A53-4E07-8339-192C7D0136D0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.V2Fuzz.Test", "SharpProof.V2Fuzz.Test\SharpProof.V2Fuzz.Test.csproj", "{742C9C2A-4464-4869-A83A-F410A1BDD874}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Fuzz.Test", "SharpProof.Fuzz.Test\SharpProof.Fuzz.Test.csproj", "{742C9C2A-4464-4869-A83A-F410A1BDD874}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Worker.Protocol", "SharpProof.Worker.Protocol\SharpProof.Worker.Protocol.csproj", "{36F97523-EB92-4CE1-AD4B-273D80CF537B}"
 EndProject
@@ -70,7 +64,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Worker.Test", "S
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Attributes.Test", "SharpProof.Attributes.Test\SharpProof.Attributes.Test.csproj", "{B1144739-8324-4A6C-B9F8-71D42A19111B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Analyzer.V2.Test", "SharpProof.Analyzer.V2.Test\SharpProof.Analyzer.V2.Test.csproj", "{4CED69BB-71DC-41C1-9168-90A82513A663}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Analyzer.Test", "SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj", "{4CED69BB-71DC-41C1-9168-90A82513A663}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.ContractForGenerator", "SharpProof.ContractForGenerator\SharpProof.ContractForGenerator.csproj", "{9B447C17-9774-4A2F-AEDC-1714E97A0357}"
 EndProject
@@ -80,9 +74,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Worker.Launcher"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Package.Test", "SharpProof.Package.Test\SharpProof.Package.Test.csproj", "{038FCA09-897E-400F-B083-79CB0416BC87}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.V2Gates", "SharpProof.V2Gates\SharpProof.V2Gates.csproj", "{B43C703C-1A83-41F9-B7A8-B8708D074720}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Gates", "SharpProof.Gates\SharpProof.Gates.csproj", "{B43C703C-1A83-41F9-B7A8-B8708D074720}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.V2Gates.Test", "SharpProof.V2Gates.Test\SharpProof.V2Gates.Test.csproj", "{59644792-68BF-4416-9B73-681E95074515}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Gates.Test", "SharpProof.Gates.Test\SharpProof.Gates.Test.csproj", "{59644792-68BF-4416-9B73-681E95074515}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -98,10 +92,6 @@ Global
 		{F56D9622-9F43-49FD-94D5-8737ED2D1804}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F56D9622-9F43-49FD-94D5-8737ED2D1804}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F56D9622-9F43-49FD-94D5-8737ED2D1804}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C9432A91-228C-4E10-AC81-3D649D90BF79}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C9432A91-228C-4E10-AC81-3D649D90BF79}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C9432A91-228C-4E10-AC81-3D649D90BF79}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C9432A91-228C-4E10-AC81-3D649D90BF79}.Release|Any CPU.Build.0 = Release|Any CPU
 		{5852273E-89C2-4FAC-9FE0-89D4DD39432B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{5852273E-89C2-4FAC-9FE0-89D4DD39432B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5852273E-89C2-4FAC-9FE0-89D4DD39432B}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -178,14 +168,6 @@ Global
 		{FAE3F838-E43F-46AE-805E-4141B76F3125}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FAE3F838-E43F-46AE-805E-4141B76F3125}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FAE3F838-E43F-46AE-805E-4141B76F3125}.Release|Any CPU.Build.0 = Release|Any CPU
-		{6661DB84-B93A-4462-AFA3-CE530D9CDC83}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6661DB84-B93A-4462-AFA3-CE530D9CDC83}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6661DB84-B93A-4462-AFA3-CE530D9CDC83}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6661DB84-B93A-4462-AFA3-CE530D9CDC83}.Release|Any CPU.Build.0 = Release|Any CPU
-		{77B3EFC1-E54F-4AC6-80B7-FDF9B4FDB91D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{77B3EFC1-E54F-4AC6-80B7-FDF9B4FDB91D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{77B3EFC1-E54F-4AC6-80B7-FDF9B4FDB91D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{77B3EFC1-E54F-4AC6-80B7-FDF9B4FDB91D}.Release|Any CPU.Build.0 = Release|Any CPU
 		{8CE11E6D-EE60-4535-AD19-B28706FEE6A1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{8CE11E6D-EE60-4535-AD19-B28706FEE6A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8CE11E6D-EE60-4535-AD19-B28706FEE6A1}.Release|Any CPU.ActiveCfg = Release|Any CPU

@@ -1,24 +1,173 @@
 # Typed abstention reasons
 
-SharpProof represents uncertainty with closed enums rather than reason strings.
+SharpProof represents semantic uncertainty with closed enums. Display text can
+explain a result, but semantic branching, proof evidence, serialization, and
+cache identity use the typed values below.
 
-Frontend lowering can abstain for unsupported operation kinds, types, member or
-invocation shapes, control flow, statements, mutation, conversions,
-user-defined or lifted operators, invalid/error operations, and future unknown
-Roslyn kinds.
+`Unknown` is not failure converted into proof. It means SharpProof did not
+establish `Proven` or replay-validated `Refuted` within the admitted model and
+budgets. Unsupported analyzer callables usually abstain silently; worker
+verification returns an explicit typed record.
 
-The analyzer language gate separately records closed reasons for unsupported
-callables, missing operation roots, operation kinds, types, and operation
-shapes. These abstentions remain intentionally silent.
+## Frontend expression and program lowering
 
-Proof verification can abstain for unsupported operations or encoding,
-approximations touching the goal, missing API specifications, resource limits,
-timeouts, unavailable backends, infrastructure failure, malformed backend
-results, or failed counterexample replay.
+`SharpProof.Frontend.FrontendAbstention` has these exact values:
 
-The worker protocol adds callable, contract, body, expression, deep-Ensures,
-return-value, method-timeout, and project-timeout reasons. Worker responses
-retain the typed reason for automation and debugging.
+| Value | Meaning |
+|---|---|
+| `None` | The classification is exact; this is not an abstention |
+| `UnsupportedOperationKind` | A known Roslyn operation kind is outside the frontend subset |
+| `UnsupportedType` | The IR has no exact admitted type mapping |
+| `ErrorOperation` | Roslyn produced an error operation |
+| `InvalidOperation` | Roslyn produced an invalid/none operation |
+| `UserDefinedOperator` | Operator semantics depend on user code |
+| `LiftedOperator` | Nullable lifted operator semantics are not modeled exactly |
+| `UncheckedOverflowSemantics` | The requested unchecked behavior cannot be preserved exactly |
+| `ConversionMayChangeValue` | A conversion is not proven value-preserving in the admitted IR |
+| `UnsupportedMemberAccess` | The member observation has no exact lowering |
+| `UnsupportedInvocationShape` | Receiver, arguments, reduction, defaults, or call shape is unsupported |
+| `UnsupportedControlFlow` | Program control flow is outside the lowerer subset |
+| `UnsupportedStatement` | A statement has no exact program lowering |
+| `UnsupportedMutation` | A mutation has no exact state model |
+| `UnknownOperationKind` | A future numeric Roslyn operation kind is not in the closed table |
 
-Display messages may contain strings. Semantic branching, cache identity, and
-proof evidence must use the typed values.
+An exact expression result carries `None`. A closed abstention must carry one
+of the other values. Program lowering also records the exact `OperationId` that
+caused each abstention.
+
+## Analyzer language gate
+
+`SharpProof.Analyzer.LanguageSubsetAbstentionReason` is internal and has these
+exact values:
+
+- `None`
+- `UnsupportedCallable`
+- `MissingOperationRoot`
+- `UnsupportedOperationKind`
+- `UnsupportedType`
+- `UnsupportedOperationShape`
+
+This gate runs before feature analysis. Unsupported analyzer callables emit no
+feature diagnostic. Corpus instrumentation records their internal semantic
+status so silence is not counted as proof.
+
+## Approximation provenance
+
+Facts that over-approximate execution use
+`SharpProof.Verify.ApproximationReason`:
+
+- `UnsupportedOperation`
+- `UnresolvedApi`
+- `AbstractJoin`
+- `Widening`
+- `Budget`
+- `ExternalBoundary`
+
+An `ApproximatedJustification` is deliberately not a `ProofJustification`.
+Approximate facts therefore cannot be promoted into assumptions or appear as
+evidence authorizing `Proven`.
+
+## SMT backend failures
+
+`SharpProof.Verify.BackendFailureReason` has these exact values:
+
+- `None`
+- `UnsupportedEncoding`
+- `ResourceLimit`
+- `Timeout`
+- `Unavailable`
+- `MalformedResult`
+- `InfrastructureFailure`
+
+`None` accompanies satisfiable or unsatisfiable backend results. Every other
+value accompanies backend `Unknown` and is mapped through the proof kernel.
+
+## Proof-kernel abstention
+
+`SharpProof.Verify.AbstentionReason` has these exact values:
+
+| Value | Boundary |
+|---|---|
+| `UnsupportedOperation` | The proof query contains an operation outside the verified subset |
+| `ApproximationTouchedGoal` | Establishing the goal would depend on approximate evidence |
+| `MissingApiSpecification` | An external member has no exact resolved spec |
+| `UnsupportedEncoding` | The active SMT backend cannot encode the query |
+| `ResourceLimit` | A deterministic solver or method resource allowance was exhausted |
+| `Timeout` | The method wall boundary was reached |
+| `BackendUnavailable` | The configured backend or native dependency is unavailable |
+| `InfrastructureFailure` | Non-semantic worker/backend infrastructure failed |
+| `MalformedBackendResult` | Status, core, or model shape is invalid |
+| `CounterexampleReplayFailed` | A SAT model did not replay to an observed goal failure |
+
+Only the proof kernel constructs proof outcomes. Backend UNSAT becomes
+`Proven` only after evidence-core hygiene. Backend SAT becomes `Refuted` only
+after executable replay. Any failed check becomes `Unknown`.
+
+## Worker verification records
+
+`SharpProof.Worker.Protocol.WorkerVerificationStatus` is exactly:
+
+- `Proven`
+- `Refuted`
+- `Unknown`
+
+`WorkerVerificationReason` has these exact values:
+
+| Value | Meaning |
+|---|---|
+| `None` | A terminal `Proven` or `Refuted` record has no abstention |
+| `UnsupportedCallable` | Callable kind, target, companion, or contract binding target is unsupported |
+| `UnsupportedContract` | Contract structure or intrinsic use is invalid/unsupported |
+| `UnsupportedBody` | The bounded acyclic body executor cannot model the body |
+| `UnsupportedExpression` | Contract/body expression, spec application, or proof encoding is unsupported |
+| `DeepEnsures` | The constructed obligation exceeds `MaximumExpressionDepth`; it does not mean general deep verification is implemented |
+| `MissingReturnValue` | A result-dependent postcondition has a normal path without a usable return value |
+| `ResourceLimit` | Per-query or per-method resource allowance is exhausted |
+| `MethodTimeout` | The method wall boundary is reached |
+| `ProjectTimeout` | The project boundary leaves the record unfinished |
+| `BackendUnavailable` | Z3/backend loading or availability failed |
+| `InfrastructureFailure` | Non-semantic worker infrastructure failed |
+| `MalformedBackendResult` | The backend result cannot pass structural/kernel validation |
+| `CounterexampleReplayFailed` | A candidate refutation could not be reproduced by the executable IR |
+
+The worker intentionally coalesces some lower-layer distinctions. For example,
+proof `UnsupportedOperation`, `ApproximationTouchedGoal`,
+`MissingApiSpecification`, and `UnsupportedEncoding` map to worker
+`UnsupportedExpression`. Contract binding failures map to
+`UnsupportedContract`, `UnsupportedExpression`, or `UnsupportedCallable`
+according to their closed failure kind.
+
+## Protocol errors are separate
+
+Malformed requests, invalid compilation settings, missing input files,
+compilation errors, and project construction failures are serialized in the
+response `errors` array as typed string codes such as:
+
+- `request.null`, `request.malformed`, and `protocol.unsupported`;
+- `project.sources`, `project.references`, and `project.invalid_input`;
+- `compilation.language_version`, `compilation.nullable`, and other explicit
+  compilation-option codes;
+- `budgets.rlimit`, `budgets.expression_depth`, and other budget codes;
+- `cache.maximum_bytes`;
+- `input.unavailable`; and
+- `compiler.<diagnostic-id>`.
+
+These errors are not `WorkerVerificationReason` values and are not semantic
+answers.
+
+## Cancellation, diagnostics, and caching
+
+Caller cancellation remains cancellation and propagates across audited
+boundaries; it is not converted to a reason or cached response. Outer launcher
+termination is likewise infrastructure control, not a proof.
+
+An analyzer not-proven diagnostic and a worker `Unknown` record are different
+interfaces. Diagnostic silence can also mean disabled reporting or silent
+language-gate abstention. See [Diagnostics](diagnostic-examples.md) for the
+reporting surface and [Coverage and limits](coverage-and-limits.md) for the
+admitted product subset.
+
+Unknown outcomes, protocol errors, cancellation, timeout, malformed results,
+backend failures, and failed replay are never semantic cache entries. Only a
+complete validated project response whose records are hygienic `Proven` or
+replay-validated `Refuted` is cacheable.

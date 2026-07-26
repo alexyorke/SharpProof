@@ -3,15 +3,11 @@ using System.Collections.Immutable;
 namespace SharpProof.Worker.Protocol;
 
 public static class WorkerProtocolVersions {
-    public const string V1 = "1";
-    public const string V2 = "2";
-    public const string Current = V2;
+    public const string Current = "2";
 }
 
 public static class WorkerCacheVersions {
-    public const int V1 = 1;
-    public const int V2 = 2;
-    public const int Current = V2;
+    public const int Current = 2;
 }
 
 public static class WorkerLauncherDefaults {

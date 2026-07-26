@@ -168,7 +168,7 @@ internal static class LanguageSubsetGate {
             [OperationKind.Spread] = false
         }.ToImmutableDictionary();
 
-    internal static LanguageSubsetDecision ClassifyV2Effects(
+    internal static LanguageSubsetDecision ClassifyEffects(
         IMethodSymbol method,
         SyntaxNode declaration,
         SemanticModel semanticModel,

@@ -12,7 +12,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <SharpProofV2ProductionProject Condition="
+    <SharpProofProductionProject Condition="
       '$(MSBuildProjectName)' == 'SharpProof.Analyzer' Or
       '$(MSBuildProjectName)' == 'SharpProof.Attributes' Or
       '$(MSBuildProjectName)' == 'SharpProof.ContractForGenerator' Or
@@ -27,10 +27,10 @@
       '$(MSBuildProjectName)' == 'SharpProof.Verify' Or
       '$(MSBuildProjectName)' == 'SharpProof.Worker' Or
       '$(MSBuildProjectName)' == 'SharpProof.Worker.Launcher' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Worker.Protocol'">true</SharpProofV2ProductionProject>
+      '$(MSBuildProjectName)' == 'SharpProof.Worker.Protocol'">true</SharpProofProductionProject>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(SharpProofV2ProductionProject)' == 'true'">
+  <ItemGroup Condition="'$(SharpProofProductionProject)' == 'true'">
     <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers"
                       Version="3.3.4"
                       PrivateAssets="all" />
@@ -38,7 +38,7 @@
                      Link="BannedSymbols.txt" />
   </ItemGroup>
 
-  <PropertyGroup Condition="'$(SharpProofV2ProductionProject)' == 'true'">
+  <PropertyGroup Condition="'$(SharpProofProductionProject)' == 'true'">
     <WarningsAsErrors>$(WarningsAsErrors);RS0030</WarningsAsErrors>
   </PropertyGroup>
 </Project>

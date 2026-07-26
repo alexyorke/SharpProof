@@ -48,8 +48,8 @@ observation does not establish semantic purity. Allocation also remains
 - A counterexample involving a spec-modeled call result is still withheld when
   concrete replay cannot validate it.
 
-This tranche does not implement the full roslyn-analyzers entity/points-to
-framework migration or general modular source-callee assume/guarantee.
+This tranche does not implement roslyn-analyzers entity/points-to framework
+integration or general modular source-callee assume/guarantee.
 
 ## Executable regressions
 

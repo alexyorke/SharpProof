@@ -40,7 +40,7 @@ internal static class AnalyzerFeaturePipeline {
             SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
             context.Compilation,
             declaration.SyntaxTree);
-        var subset = LanguageSubsetGate.ClassifyV2Effects(
+        var subset = LanguageSubsetGate.ClassifyEffects(
                 method,
                 declaration,
                 semanticModel,

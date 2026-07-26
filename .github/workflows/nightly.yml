@@ -30,11 +30,11 @@ jobs:
       - name: Run the contract-declared nightly fuzz budget
         shell: pwsh
         run: |
-          $contract = Get-Content .\eng\acceptance\v2\contract.json -Raw | ConvertFrom-Json
+          $contract = Get-Content .\eng\acceptance\contract.json -Raw | ConvertFrom-Json
           .\scripts\Invoke-SharpProofDotnet.ps1 `
             -MemoryLimitMb $contract.worker.maximumMemoryMiB `
             -TimeoutSeconds $contract.worker.maximumProjectWallSeconds `
-            run --project .\Tools\SharpProof.V2Fuzz\SharpProof.V2Fuzz.csproj `
+            run --project .\Tools\SharpProof.Fuzz\SharpProof.Fuzz.csproj `
             -c Release --no-build -- `
             --cases $contract.fuzz.nightlyCases `
             --seed 23063 `

@@ -427,14 +427,14 @@ public sealed class WorkerMsBuildIntegrationTests {
                 "Release",
                 "net8.0",
                 "SharpProof",
-                "request.v2.json");
+                "request.json");
             ResultPath = Path.Combine(
                 root,
                 "obj",
                 "Release",
                 "net8.0",
                 "SharpProof",
-                "result.v2.json");
+                "result.json");
         }
 
         internal string ProjectPath { get; }

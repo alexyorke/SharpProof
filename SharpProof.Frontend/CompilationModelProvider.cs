@@ -12,7 +12,7 @@ public static class CompilationModelProvider {
         if (tree == null)
             throw new ArgumentNullException(nameof(tree));
 
-#pragma warning disable RS0030 // Audited compiler-host boundary; all v2 consumers route through this method.
+#pragma warning disable RS0030 // Audited compiler-host boundary; all consumers route through this method.
         return compilation.GetSemanticModel(tree, ignoreAccessibility: false);
 #pragma warning restore RS0030
     }

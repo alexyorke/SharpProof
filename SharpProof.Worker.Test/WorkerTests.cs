@@ -12,7 +12,7 @@ public sealed class WorkerTests {
     [Test]
     public void ProtocolValidationClosesVersionAndBudgetBounds() {
         var request = new WorkerVerifyRequest {
-            ProtocolVersion = WorkerProtocolVersions.V1,
+            ProtocolVersion = "unsupported",
             ProjectDirectory = "x",
             SourceFiles = ["a.cs"],
             ReferenceAssemblies = ["a.dll"],
@@ -1530,7 +1530,6 @@ public sealed class WorkerTests {
             FindRepositoryRoot(),
             "eng",
             "acceptance",
-            "v2",
             "contract.json");
         using var document = JsonDocument.Parse(
             File.ReadAllText(contractPath));

@@ -39,11 +39,11 @@ public sealed class BoundaryEnforcementTests {
     ];
 
     [Test]
-    public void BannedApiAnalyzerIsScopedToV2ProductionProjects() {
+    public void BannedApiAnalyzerIsScopedToProductionProjects() {
         var root = RepositoryRoot();
         var props = XDocument.Load(Path.Combine(root, "Directory.Build.props"));
         var marker = props
-            .Descendants("SharpProofV2ProductionProject")
+            .Descendants("SharpProofProductionProject")
             .Single();
         var matches = Regex.Matches(
             (string?)marker.Attribute("Condition") ?? string.Empty,
@@ -64,7 +64,7 @@ public sealed class BoundaryEnforcementTests {
             .Single(group =>
                 string.Equals(
                     (string?)group.Attribute("Condition"),
-                    "'$(SharpProofV2ProductionProject)' == 'true'",
+                    "'$(SharpProofProductionProject)' == 'true'",
                     StringComparison.Ordinal));
         var package = scopedGroup.Elements("PackageReference").Single();
         Assert.That(
@@ -83,7 +83,7 @@ public sealed class BoundaryEnforcementTests {
             .Single(group =>
                 string.Equals(
                     (string?)group.Attribute("Condition"),
-                    "'$(SharpProofV2ProductionProject)' == 'true'",
+                    "'$(SharpProofProductionProject)' == 'true'",
                     StringComparison.Ordinal))
             .Element("WarningsAsErrors")?.Value;
         Assert.That(scopedWarnings, Does.Contain("RS0030"));
@@ -161,7 +161,7 @@ public sealed class BoundaryEnforcementTests {
     }
 
     [Test]
-    public void ThinAnalyzerHasNoSolverOrRetiredEngineDependency() {
+    public void ThinAnalyzerHasOnlyCurrentFrontendDependencies() {
         var direct = ProjectReferences("SharpProof.Analyzer");
         string[] expectedDirect = [
             "SharpProof.Attributes",
@@ -178,8 +178,6 @@ public sealed class BoundaryEnforcementTests {
         var closure = TransitiveProjectClosure("SharpProof.Analyzer");
         Assert.That(closure, Does.Not.Contain("SharpProof.Smt"));
         Assert.That(closure, Does.Not.Contain("SharpProof.Verify"));
-        Assert.That(closure, Does.Not.Contain("SharpProof.Symbolic"));
-        Assert.That(closure, Does.Not.Contain("SharpProof.ProofCore"));
         Assert.That(
             ProjectPackages("SharpProof.Analyzer"),
             Does.Not.Contain("Microsoft.Z3"));
@@ -188,8 +186,6 @@ public sealed class BoundaryEnforcementTests {
         Assert.That(source, Does.Not.Contain("Microsoft.Z3"));
         Assert.That(source, Does.Not.Contain("SharpProof.Smt"));
         Assert.That(source, Does.Not.Contain("SharpProof.Verify"));
-        Assert.That(source, Does.Not.Contain("SharpProof.Symbolic"));
-        Assert.That(source, Does.Not.Contain("SharpProof.ProofCore"));
     }
 
     [Test]
@@ -265,9 +261,8 @@ public sealed class BoundaryEnforcementTests {
     }
 
     [Test]
-    public void OnlyMigrationParsesLegacyContractStrings() {
+    public void CurrentProductionDoesNotParseContractStrings() {
         var parserCallers = BannedApiProjects
-            .Append("SharpProof.Migration")
             .SelectMany(SourceFiles)
             .Where(file => Regex.IsMatch(
                 File.ReadAllText(file),
@@ -276,33 +271,13 @@ public sealed class BoundaryEnforcementTests {
             .Select(Relative)
             .ToArray();
 
-        Assert.That(parserCallers, Is.Not.Empty);
-        Assert.That(
-            parserCallers,
-            Has.All.StartsWith("SharpProof.Migration/"));
+        Assert.That(parserCallers, Is.Empty);
     }
 
     [Test]
-    public void ActiveV2ProjectsDoNotReferenceRetiredEnginesOrSemanticDisplayText() {
+    public void ProductionProjectsDoNotUseSemanticDisplayText() {
         foreach (var project in BannedApiProjects) {
-            Assert.That(
-                ProjectReferences(project),
-                Does.Not.Contain("SharpProof.Symbolic"),
-                project);
-            Assert.That(
-                ProjectReferences(project),
-                Does.Not.Contain("SharpProof.ProofCore"),
-                project);
-
             var source = ReadProductionSources(project);
-            Assert.That(
-                source,
-                Does.Not.Contain("SharpProof.Symbolic"),
-                project);
-            Assert.That(
-                source,
-                Does.Not.Contain("SharpProof.ProofCore"),
-                project);
             Assert.That(
                 source,
                 Does.Not.Contain("ToDisplayString("),
@@ -311,39 +286,66 @@ public sealed class BoundaryEnforcementTests {
     }
 
     [Test]
-    public void ActiveSolutionExcludesRetiredInProcessProducts() {
-        var root = RepositoryRoot();
-        var solution = File.ReadAllText(
-            Path.Combine(root, "SharpProof.sln"));
-        string[] retiredProjectEntries = [
-            "\"SharpProof.Symbolic\", \"SharpProof.Symbolic\\",
-            "\"SharpProof.ProofCore\", \"SharpProof.ProofCore\\",
-            "\"SharpProof.SymbolicCli\", \"Tools\\SharpProof.SymbolicCli\\",
-            "\"SharpProof.Fuzz\", \"Tools\\SharpProof.Fuzz\\",
-            "\"SharpProof.Fuzz.Core\", \"Tools\\SharpProof.Fuzz.Core\\",
-            "\"SharpProof.ToolingTest\", \"SharpProof.ToolingTest\\",
-            "\"SharpProof.Test\", \"SharpProof.Test\\"
+    public void ActiveSolutionContainsExactlyCurrentProjects() {
+        string[] expected = [
+            @"SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj",
+            @"SharpProof.Analyzer\SharpProof.Analyzer.csproj",
+            @"SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj",
+            @"SharpProof.Attributes.Test\SharpProof.Attributes.Test.csproj",
+            @"SharpProof.Attributes\SharpProof.Attributes.csproj",
+            @"SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj",
+            @"SharpProof.ContractForGenerator\SharpProof.ContractForGenerator.csproj",
+            @"SharpProof.Contracts.Test\SharpProof.Contracts.Test.csproj",
+            @"SharpProof.Contracts\SharpProof.Contracts.csproj",
+            @"SharpProof.Dataflow.Test\SharpProof.Dataflow.Test.csproj",
+            @"SharpProof.Dataflow\SharpProof.Dataflow.csproj",
+            @"SharpProof.Effects.Test\SharpProof.Effects.Test.csproj",
+            @"SharpProof.Effects\SharpProof.Effects.csproj",
+            @"SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj",
+            @"SharpProof.Frontend\SharpProof.Frontend.csproj",
+            @"SharpProof.Ir.Test\SharpProof.Ir.Test.csproj",
+            @"SharpProof.Ir\SharpProof.Ir.csproj",
+            @"SharpProof.Meta.Analyzers.Test\SharpProof.Meta.Analyzers.Test.csproj",
+            @"SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj",
+            @"SharpProof.Package.Test\SharpProof.Package.Test.csproj",
+            @"SharpProof.Package\SharpProof.Package.csproj",
+            @"SharpProof.Smoke.Net472\SharpProof.Smoke.Net472.csproj",
+            @"SharpProof.Smt.Test\SharpProof.Smt.Test.csproj",
+            @"SharpProof.Smt\SharpProof.Smt.csproj",
+            @"SharpProof.Specs.Test\SharpProof.Specs.Test.csproj",
+            @"SharpProof.Specs\SharpProof.Specs.csproj",
+            @"SharpProof.Testing.Test\SharpProof.Testing.Test.csproj",
+            @"SharpProof.Testing\SharpProof.Testing.csproj",
+            @"SharpProof.Fuzz.Test\SharpProof.Fuzz.Test.csproj",
+            @"SharpProof.Gates.Test\SharpProof.Gates.Test.csproj",
+            @"SharpProof.Gates\SharpProof.Gates.csproj",
+            @"SharpProof.Verify.Test\SharpProof.Verify.Test.csproj",
+            @"SharpProof.Verify\SharpProof.Verify.csproj",
+            @"SharpProof.Worker.Launcher\SharpProof.Worker.Launcher.csproj",
+            @"SharpProof.Worker.Protocol\SharpProof.Worker.Protocol.csproj",
+            @"SharpProof.Worker.Test\SharpProof.Worker.Test.csproj",
+            @"SharpProof.Worker\SharpProof.Worker.csproj",
+            @"Tools\SharpProof.Fuzz\SharpProof.Fuzz.csproj"
         ];
+        var actual = File.ReadLines(
+                Path.Combine(RepositoryRoot(), "SharpProof.sln"))
+            .Select(line => Regex.Match(
+                line,
+                "^Project\\(.*\\) = \".*\", \"(?<path>[^\"]+\\.csproj)\""))
+            .Where(static match => match.Success)
+            .Select(static match => match.Groups["path"].Value)
+            .ToArray();
 
-        foreach (var retired in retiredProjectEntries)
-            Assert.That(solution, Does.Not.Contain(retired), retired);
-
-        Assert.That(
-            File.Exists(Path.Combine(
-                root,
-                "SharpProof.Symbolic",
-                "SharpProof.Symbolic.csproj")),
-            Is.False);
-        Assert.That(
-            File.Exists(Path.Combine(
-                root,
-                "SharpProof.ProofCore",
-                "SharpProof.ProofCore.csproj")),
-            Is.False);
+        Assert.That(actual, Is.EquivalentTo(expected));
+        foreach (var project in actual)
+            Assert.That(
+                File.Exists(Path.Combine(RepositoryRoot(), project)),
+                Is.True,
+                project);
     }
 
     [Test]
-    public void AnalyzerPackagePayloadExcludesSolverAndRetiredEngineAssets() {
+    public void AnalyzerPackagePayloadExcludesWorkerAndSolverAssets() {
         var packageFile =
             Path.Combine(
                 RepositoryRoot(),
@@ -362,28 +364,18 @@ public sealed class BoundaryEnforcementTests {
                 })
                 .Select(element =>
                     (string?)element.Attribute("Include") ?? string.Empty));
-        var wholePackage = File.ReadAllText(packageFile);
-
         string[] forbiddenAssets = [
             "Microsoft.Z3",
             "libz3",
             "SharpProof.Smt",
             "SharpProof.Verify",
-            "SharpProof.Worker",
-            "SharpProof.Symbolic",
-            "SharpProof.ProofCore"
+            "SharpProof.Worker"
         ];
         foreach (var forbidden in forbiddenAssets)
             Assert.That(
                 analyzerPayload,
                 Does.Not.Contain(forbidden),
                 forbidden);
-        Assert.That(
-            wholePackage,
-            Does.Not.Contain("SharpProof.Symbolic"));
-        Assert.That(
-            wholePackage,
-            Does.Not.Contain("SharpProof.ProofCore"));
     }
 
     private static IReadOnlyCollection<string> TransitiveProjectClosure(

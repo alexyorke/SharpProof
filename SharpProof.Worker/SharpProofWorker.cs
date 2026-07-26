@@ -257,8 +257,7 @@ public sealed class SharpProofWorker : IDisposable {
                 projectDirectory,
                 "obj",
                 "SharpProof",
-                "cache",
-                "v2")
+                "cache")
             : Path.IsPathFullyQualified(request.Cache.Directory)
                 ? request.Cache.Directory
                 : Path.GetFullPath(

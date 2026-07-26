@@ -1,5 +1,5 @@
 # Roslyn compilation mutation and whole-compilation symbol search are outside
-# the SharpProof v2 compiler host boundary.
+# the SharpProof compiler host boundary.
 M:Microsoft.CodeAnalysis.Compilation.ReplaceSyntaxTree(Microsoft.CodeAnalysis.SyntaxTree,Microsoft.CodeAnalysis.SyntaxTree);Do not mutate a compilation during analysis.
 M:Microsoft.CodeAnalysis.Compilation.AddSyntaxTrees(Microsoft.CodeAnalysis.SyntaxTree[]);Do not synthesize syntax trees during analysis.
 M:Microsoft.CodeAnalysis.Compilation.AddSyntaxTrees(System.Collections.Generic.IEnumerable{Microsoft.CodeAnalysis.SyntaxTree});Do not synthesize syntax trees during analysis.
@@ -34,12 +34,11 @@ M:Microsoft.CodeAnalysis.CSharp.CSharpExtensions.TryGetSpeculativeSemanticModel(
 M:Microsoft.CodeAnalysis.CSharp.CSharpExtensions.TryGetSpeculativeSemanticModel(Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.PrimaryConstructorBaseTypeSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
 M:Microsoft.CodeAnalysis.CSharp.CSharpExtensions.TryGetSpeculativeSemanticModel(Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.AttributeSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
 
-# Contract migration owns the only legacy parser. It is intentionally excluded
-# from this scoped analyzer configuration.
-M:Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseStatement(System.String,System.Int32,Microsoft.CodeAnalysis.ParseOptions,System.Boolean);Only SharpProof.Migration may parse legacy contract text.
-M:Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression(System.String,System.Int32,Microsoft.CodeAnalysis.ParseOptions,System.Boolean);Only SharpProof.Migration may parse legacy contract text.
-M:Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTypeName(System.String,System.Int32,System.Boolean);Only SharpProof.Migration may parse legacy contract text.
-M:Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTypeName(System.String,System.Int32,Microsoft.CodeAnalysis.ParseOptions,System.Boolean);Only SharpProof.Migration may parse legacy contract text.
+# Reparsed source text is outside the compiler-bound semantic boundary.
+M:Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseStatement(System.String,System.Int32,Microsoft.CodeAnalysis.ParseOptions,System.Boolean);Use compiler-bound Roslyn operations instead of reparsing source text.
+M:Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression(System.String,System.Int32,Microsoft.CodeAnalysis.ParseOptions,System.Boolean);Use compiler-bound Roslyn operations instead of reparsing source text.
+M:Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTypeName(System.String,System.Int32,System.Boolean);Use compiler-bound Roslyn operations instead of reparsing source text.
+M:Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTypeName(System.String,System.Int32,Microsoft.CodeAnalysis.ParseOptions,System.Boolean);Use compiler-bound Roslyn operations instead of reparsing source text.
 
 # Display text is presentation only and must not become a semantic identity.
 M:Microsoft.CodeAnalysis.ISymbol.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat);Use typed symbols or an explicit structural identity.

@@ -6,7 +6,7 @@ namespace SharpProof.Meta.Analyzers;
 internal static class MetaDiagnosticDescriptors {
     private const string Category = "SharpProof.Soundness";
     private const string HelpBase =
-        "https://github.com/alexyorke/SharpProof/blob/main/docs/architecture-v2.md#mechanized-boundaries";
+        "https://github.com/alexyorke/SharpProof/blob/main/docs/architecture.md#mechanized-boundaries";
 
     internal static readonly DiagnosticDescriptor ForbiddenRoslynApi = new(
         "SPMETA001",

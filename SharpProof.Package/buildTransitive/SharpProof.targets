@@ -15,13 +15,13 @@
   <Target Name="_SharpProofInitializeVerify">
     <PropertyGroup>
       <_SharpProofVerifyDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(IntermediateOutputPath)SharpProof'))</_SharpProofVerifyDirectory>
-      <SharpProofVerifyRequestFile Condition="'$(SharpProofVerifyRequestFile)' == ''">$(_SharpProofVerifyDirectory)\request.v2.json</SharpProofVerifyRequestFile>
-      <SharpProofVerifyResultFile Condition="'$(SharpProofVerifyResultFile)' == ''">$(_SharpProofVerifyDirectory)\result.v2.json</SharpProofVerifyResultFile>
-      <SharpProofVerifyCacheDirectory Condition="'$(SharpProofVerifyCacheDirectory)' == ''">$(_SharpProofVerifyDirectory)\cache\v2</SharpProofVerifyCacheDirectory>
+      <SharpProofVerifyRequestFile Condition="'$(SharpProofVerifyRequestFile)' == ''">$(_SharpProofVerifyDirectory)\request.json</SharpProofVerifyRequestFile>
+      <SharpProofVerifyResultFile Condition="'$(SharpProofVerifyResultFile)' == ''">$(_SharpProofVerifyDirectory)\result.json</SharpProofVerifyResultFile>
+      <SharpProofVerifyCacheDirectory Condition="'$(SharpProofVerifyCacheDirectory)' == ''">$(_SharpProofVerifyDirectory)\cache</SharpProofVerifyCacheDirectory>
       <_SharpProofSourceList>$(_SharpProofVerifyDirectory)\sources.list</_SharpProofSourceList>
       <_SharpProofReferenceList>$(_SharpProofVerifyDirectory)\references.list</_SharpProofReferenceList>
       <_SharpProofConstantList>$(_SharpProofVerifyDirectory)\constants.list</_SharpProofConstantList>
-      <_SharpProofOptionsInput>$(_SharpProofVerifyDirectory)\options.v2.input</_SharpProofOptionsInput>
+      <_SharpProofOptionsInput>$(_SharpProofVerifyDirectory)\options.input</_SharpProofOptionsInput>
       <_SharpProofNullable>$(Nullable)</_SharpProofNullable>
       <_SharpProofNullable Condition="'$(_SharpProofNullable)' == ''">disable</_SharpProofNullable>
       <_SharpProofCheckedOverflow>$(CheckForOverflowUnderflow)</_SharpProofCheckedOverflow>
