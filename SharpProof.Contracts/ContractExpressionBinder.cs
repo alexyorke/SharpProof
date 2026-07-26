@@ -112,7 +112,7 @@ internal sealed class ContractExpressionBinder {
                     insideOld: true);
                 if (!value.IsSuccess) return value;
                 var substitutions = new Dictionary<IrVarId, IrTerm>();
-                foreach (var variable in CollectVariables(value.Term!)) {
+                foreach (var variable in IrTraversal.CollectVariables(value.Term!)) {
                     if (!_preState.TryGetValue(variable, out var preState)) {
                         var info = _factory.GetVariableInfo(variable);
                         preState = _factory.CreateVariable(
@@ -157,9 +157,9 @@ internal sealed class ContractExpressionBinder {
                     conversion.Type))
                 return operand;
             if (targetType == operand.Term!.Type &&
-                IsValuePreservingIntegerConversion(
-                    conversion.Operand.Type,
-                    conversion.Type))
+                RoslynOperatorSemantics.IsValuePreservingIntegerConversion(
+                    conversion.Operand.Type?.SpecialType ?? SpecialType.None,
+                    conversion.Type?.SpecialType ?? SpecialType.None))
                 return operand;
             return ExpressionBindingResult.Fail(
                 ContractBindingFailure.UnsupportedExpression);
@@ -195,13 +195,17 @@ internal sealed class ContractExpressionBinder {
             if (!left.IsSuccess) return left;
             var right = BindCore(binary.RightOperand, clauseKind, insideOld);
             if (!right.IsSuccess) return right;
-            var mapped = MapBinary(binary);
+            var mapped = RoslynOperatorSemantics.MapBinary(
+                binary.OperatorKind,
+                binary.Type?.SpecialType ?? SpecialType.None);
             if (!mapped.HasValue) return ExpressionBindingResult.Fail(
                 ContractBindingFailure.UnsupportedExpression);
             if (mapped == IrBinaryOperator.StringConcat ||
-                IsIntegerArithmetic(binary.OperatorKind) &&
+                RoslynOperatorSemantics.IsIntegerArithmetic(
+                    binary.OperatorKind) &&
                 (binary.Type?.SpecialType != SpecialType.System_Int64 ||
-                 RequiresCheckedArithmetic(binary.OperatorKind) &&
+                 RoslynOperatorSemantics.RequiresCheckedArithmetic(
+                     binary.OperatorKind) &&
                  !binary.IsChecked))
                 return ExpressionBindingResult.Fail(
                     ContractBindingFailure.UnsupportedExpression);
@@ -282,7 +286,7 @@ internal sealed class ContractExpressionBinder {
 
         var boundVariables = new HashSet<IrVarId>(
             result.Variables.Select(static binding => binding.Variable));
-        foreach (var variable in CollectVariables(result.Term)) {
+        foreach (var variable in IrTraversal.CollectVariables(result.Term)) {
             if (boundVariables.Contains(variable)) continue;
             if (_source.IsStatic)
                 return ExpressionBindingResult.Fail(
@@ -299,123 +303,6 @@ internal sealed class ContractExpressionBinder {
                 _api.IsResult(invocation.TargetMethod) ||
                 _api.IsOld(invocation.TargetMethod));
 
-    private static IrBinaryOperator? MapBinary(IBinaryOperation operation) =>
-        operation.OperatorKind switch {
-            BinaryOperatorKind.Add
-                when operation.Type?.SpecialType == SpecialType.System_String =>
-                IrBinaryOperator.StringConcat,
-            BinaryOperatorKind.Add => IrBinaryOperator.Add,
-            BinaryOperatorKind.Subtract => IrBinaryOperator.Subtract,
-            BinaryOperatorKind.Multiply => IrBinaryOperator.Multiply,
-            BinaryOperatorKind.Divide => IrBinaryOperator.Divide,
-            BinaryOperatorKind.Remainder => IrBinaryOperator.Remainder,
-            BinaryOperatorKind.ConditionalAnd => IrBinaryOperator.AndAlso,
-            BinaryOperatorKind.ConditionalOr => IrBinaryOperator.OrElse,
-            BinaryOperatorKind.Equals => IrBinaryOperator.Equal,
-            BinaryOperatorKind.NotEquals => IrBinaryOperator.NotEqual,
-            BinaryOperatorKind.LessThan => IrBinaryOperator.LessThan,
-            BinaryOperatorKind.LessThanOrEqual =>
-                IrBinaryOperator.LessThanOrEqual,
-            BinaryOperatorKind.GreaterThan => IrBinaryOperator.GreaterThan,
-            BinaryOperatorKind.GreaterThanOrEqual =>
-                IrBinaryOperator.GreaterThanOrEqual,
-            _ => null
-        };
-
-    private static bool IsIntegerArithmetic(BinaryOperatorKind kind) =>
-        kind is BinaryOperatorKind.Add or
-            BinaryOperatorKind.Subtract or
-            BinaryOperatorKind.Multiply or
-            BinaryOperatorKind.Divide or
-            BinaryOperatorKind.Remainder;
-
-    private static bool RequiresCheckedArithmetic(BinaryOperatorKind kind) =>
-        kind is BinaryOperatorKind.Add or
-            BinaryOperatorKind.Subtract or
-            BinaryOperatorKind.Multiply;
-
-    private static bool IsValuePreservingIntegerConversion(
-        ITypeSymbol? source,
-        ITypeSymbol? target) {
-        var sourceRange = GetIntegerRange(
-            source?.SpecialType ?? SpecialType.None);
-        var targetRange = GetIntegerRange(
-            target?.SpecialType ?? SpecialType.None);
-        return sourceRange.HasValue &&
-               targetRange.HasValue &&
-               sourceRange.Value.Minimum >= targetRange.Value.Minimum &&
-               sourceRange.Value.Maximum <= targetRange.Value.Maximum;
-    }
-
-    private static IntegerRange? GetIntegerRange(SpecialType type) =>
-        type switch {
-            SpecialType.System_SByte =>
-                new(sbyte.MinValue, sbyte.MaxValue),
-            SpecialType.System_Byte =>
-                new(byte.MinValue, byte.MaxValue),
-            SpecialType.System_Int16 =>
-                new(short.MinValue, short.MaxValue),
-            SpecialType.System_UInt16 =>
-                new(ushort.MinValue, ushort.MaxValue),
-            SpecialType.System_Char =>
-                new(char.MinValue, char.MaxValue),
-            SpecialType.System_Int32 =>
-                new(int.MinValue, int.MaxValue),
-            SpecialType.System_UInt32 =>
-                new(uint.MinValue, uint.MaxValue),
-            SpecialType.System_Int64 =>
-                new(long.MinValue, long.MaxValue),
-            _ => null
-        };
-
-    private static ImmutableHashSet<IrVarId> CollectVariables(IrTerm root) {
-        var result = ImmutableHashSet.CreateBuilder<IrVarId>();
-        var pending = new Stack<IrTerm>();
-        var visited = new HashSet<IrId>();
-        pending.Push(root);
-        while (pending.Count != 0) {
-            var term = pending.Pop();
-            if (!visited.Add(term.Id)) continue;
-            switch (term) {
-                case IrVariableTerm variable:
-                    result.Add(variable.Variable);
-                    break;
-                case IrOpaqueTerm opaque:
-                    if (opaque.Receiver != null) pending.Push(opaque.Receiver);
-                    foreach (var argument in opaque.Arguments)
-                        pending.Push(argument);
-                    break;
-                case IrUnaryTerm unary:
-                    pending.Push(unary.Operand);
-                    break;
-                case IrBinaryTerm binary:
-                    pending.Push(binary.Left);
-                    pending.Push(binary.Right);
-                    break;
-                case IrConditionalTerm conditional:
-                    pending.Push(conditional.Condition);
-                    pending.Push(conditional.WhenTrue);
-                    pending.Push(conditional.WhenFalse);
-                    break;
-                case IrCastTerm cast:
-                    pending.Push(cast.Operand);
-                    break;
-                case IrLengthTerm length:
-                    pending.Push(length.Value);
-                    break;
-                case IrSequenceAccessTerm access:
-                    pending.Push(access.Sequence);
-                    pending.Push(access.Index);
-                    break;
-            }
-        }
-        return result.ToImmutable();
-    }
-
-    private readonly struct IntegerRange(long minimum, long maximum) {
-        internal long Minimum { get; } = minimum;
-        internal long Maximum { get; } = maximum;
-    }
 }
 
 internal readonly struct ExpressionBindingResult {

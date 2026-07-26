@@ -204,7 +204,10 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         internal QueryEncoder(Context context, VerificationQuery query) {
             _context = context;
             _factory = query.Factory;
-            Variables = [.. CollectVariables(query)
+            Variables = [.. IrTraversal.CollectVariables(
+                    query.Assumptions
+                        .Select(static assumption => assumption.Predicate)
+                        .Append(query.Goal.Predicate))
                 .OrderBy(static variable => variable.Value)];
             IntegerVariables = [.. Variables.Where(variable =>
                 _factory.GetVariableInfo(variable).Type == _factory.IntegerType)];
@@ -420,55 +423,6 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                     _context.MkEq(left, _context.MkInt(long.MinValue)),
                     _context.MkEq(right, _context.MkInt(-1)))));
 
-        private static HashSet<IrVarId> CollectVariables(VerificationQuery query) {
-            var seenTerms = new HashSet<IrId>();
-            var variables = new HashSet<IrVarId>();
-            foreach (var root in query.Assumptions
-                         .Select(static assumption => assumption.Predicate)
-                         .Append(query.Goal.Predicate))
-                CollectVariables(root, seenTerms, variables);
-            return variables;
-        }
-
-        private static void CollectVariables(
-            IrTerm term,
-            ISet<IrId> seenTerms,
-            ISet<IrVarId> variables) {
-            if (!seenTerms.Add(term.Id)) return;
-            switch (term) {
-                case IrVariableTerm variable:
-                    variables.Add(variable.Variable);
-                    break;
-                case IrOpaqueTerm opaque:
-                    if (opaque.Receiver != null)
-                        CollectVariables(opaque.Receiver, seenTerms, variables);
-                    foreach (var argument in opaque.Arguments)
-                        CollectVariables(argument, seenTerms, variables);
-                    break;
-                case IrUnaryTerm unary:
-                    CollectVariables(unary.Operand, seenTerms, variables);
-                    break;
-                case IrBinaryTerm binary:
-                    CollectVariables(binary.Left, seenTerms, variables);
-                    CollectVariables(binary.Right, seenTerms, variables);
-                    break;
-                case IrConditionalTerm conditional:
-                    CollectVariables(conditional.Condition, seenTerms, variables);
-                    CollectVariables(conditional.WhenTrue, seenTerms, variables);
-                    CollectVariables(conditional.WhenFalse, seenTerms, variables);
-                    break;
-                case IrCastTerm cast:
-                    CollectVariables(cast.Operand, seenTerms, variables);
-                    break;
-                case IrLengthTerm length:
-                    CollectVariables(length.Value, seenTerms, variables);
-                    break;
-                case IrSequenceAccessTerm access:
-                    CollectVariables(access.Sequence, seenTerms, variables);
-                    CollectVariables(access.Index, seenTerms, variables);
-                    break;
-            }
-        }
     }
 
     private sealed class EncodedValue : IDisposable {

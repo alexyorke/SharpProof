@@ -380,16 +380,20 @@ public sealed class RoslynOperationLowerer {
             if (!left.Classification.IsExact || !right.Classification.IsExact)
                 return OpaqueBinary(operation, FirstAbstention(left, right));
 
-            var mapped = MapBinary(operation);
+            var mapped = RoslynOperatorSemantics.MapBinary(
+                operation.OperatorKind,
+                operation.Type?.SpecialType ?? SpecialType.None);
             if (!mapped.HasValue)
                 return OpaqueBinary(
                     operation, FrontendAbstention.UnsupportedOperationKind);
             if (mapped.Value != IrBinaryOperator.StringConcat &&
-                IsIntegerArithmetic(operation.OperatorKind) &&
+                RoslynOperatorSemantics.IsIntegerArithmetic(
+                    operation.OperatorKind) &&
                 operation.Type?.SpecialType != SpecialType.System_Int64)
                 return OpaqueBinary(operation, FrontendAbstention.UnsupportedType);
             if (mapped.Value != IrBinaryOperator.StringConcat &&
-                RequiresCheckedArithmetic(operation.OperatorKind) &&
+                RoslynOperatorSemantics.RequiresCheckedArithmetic(
+                    operation.OperatorKind) &&
                 !operation.IsChecked)
                 return OpaqueBinary(
                     operation, FrontendAbstention.UncheckedOverflowSemantics);
@@ -450,9 +454,9 @@ public sealed class RoslynOperationLowerer {
                     operation.Type))
                 return operand;
             if (target == operand.Term.Type &&
-                IsValuePreservingIntegerConversion(
-                    operation.Operand.Type,
-                    operation.Type))
+                RoslynOperatorSemantics.IsValuePreservingIntegerConversion(
+                    operation.Operand.Type?.SpecialType ?? SpecialType.None,
+                    operation.Type?.SpecialType ?? SpecialType.None))
                 return operand;
             if (operation.Operand.ConstantValue.HasValue)
                 return _owner.LowerConstant(operation);
@@ -534,62 +538,6 @@ public sealed class RoslynOperationLowerer {
                 operation.TargetMethod, operation.Instance,
                 operation.Arguments.Select(static value => value.Value));
 
-        private static IrBinaryOperator? MapBinary(IBinaryOperation operation) =>
-            operation.OperatorKind switch {
-                BinaryOperatorKind.Add
-                    when operation.Type?.SpecialType == SpecialType.System_String =>
-                    IrBinaryOperator.StringConcat,
-                BinaryOperatorKind.Add => IrBinaryOperator.Add,
-                BinaryOperatorKind.Subtract => IrBinaryOperator.Subtract,
-                BinaryOperatorKind.Multiply => IrBinaryOperator.Multiply,
-                BinaryOperatorKind.Divide => IrBinaryOperator.Divide,
-                BinaryOperatorKind.Remainder => IrBinaryOperator.Remainder,
-                BinaryOperatorKind.ConditionalAnd => IrBinaryOperator.AndAlso,
-                BinaryOperatorKind.ConditionalOr => IrBinaryOperator.OrElse,
-                BinaryOperatorKind.Equals => IrBinaryOperator.Equal,
-                BinaryOperatorKind.NotEquals => IrBinaryOperator.NotEqual,
-                BinaryOperatorKind.LessThan => IrBinaryOperator.LessThan,
-                BinaryOperatorKind.LessThanOrEqual => IrBinaryOperator.LessThanOrEqual,
-                BinaryOperatorKind.GreaterThan => IrBinaryOperator.GreaterThan,
-                BinaryOperatorKind.GreaterThanOrEqual => IrBinaryOperator.GreaterThanOrEqual,
-                _ => null
-            };
-
-        private static bool RequiresCheckedArithmetic(BinaryOperatorKind kind) =>
-            kind is BinaryOperatorKind.Add or
-                BinaryOperatorKind.Subtract or
-                BinaryOperatorKind.Multiply;
-
-        private static bool IsIntegerArithmetic(BinaryOperatorKind kind) =>
-            kind is BinaryOperatorKind.Add or
-                BinaryOperatorKind.Subtract or
-                BinaryOperatorKind.Multiply or
-                BinaryOperatorKind.Divide or
-                BinaryOperatorKind.Remainder;
-
-        private static bool IsValuePreservingIntegerConversion(
-            ITypeSymbol? source, ITypeSymbol? target) {
-            var sourceRange = GetIntegerRange(source?.SpecialType ?? SpecialType.None);
-            var targetRange = GetIntegerRange(target?.SpecialType ?? SpecialType.None);
-            return sourceRange.HasValue &&
-                   targetRange.HasValue &&
-                   sourceRange.Value.Minimum >= targetRange.Value.Minimum &&
-                   sourceRange.Value.Maximum <= targetRange.Value.Maximum;
-        }
-
-        private static IntegerRange? GetIntegerRange(SpecialType type) =>
-            type switch {
-                SpecialType.System_SByte => new(sbyte.MinValue, sbyte.MaxValue),
-                SpecialType.System_Byte => new(byte.MinValue, byte.MaxValue),
-                SpecialType.System_Int16 => new(short.MinValue, short.MaxValue),
-                SpecialType.System_UInt16 => new(ushort.MinValue, ushort.MaxValue),
-                SpecialType.System_Char => new(char.MinValue, char.MaxValue),
-                SpecialType.System_Int32 => new(int.MinValue, int.MaxValue),
-                SpecialType.System_UInt32 => new(uint.MinValue, uint.MaxValue),
-                SpecialType.System_Int64 => new(long.MinValue, long.MaxValue),
-                _ => null
-            };
-
         private static FrontendAbstention FirstAbstention(
             params LoweredExpression[] expressions) =>
             expressions
@@ -638,11 +586,6 @@ public sealed class RoslynOperationLowerer {
     }
 
     private readonly struct LoweringContext;
-
-    private readonly struct IntegerRange(long minimum, long maximum) {
-        internal long Minimum { get; } = minimum;
-        internal long Maximum { get; } = maximum;
-    }
 
     private sealed class LoweredExpression(
         IrTerm term,
