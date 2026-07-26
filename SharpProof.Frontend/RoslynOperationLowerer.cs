@@ -20,6 +20,7 @@ public sealed class RoslynOperationLowerer {
         _visitor = new LoweringVisitor(this);
     }
 
+    internal Func<ITypeSymbol?, ITypeSymbol?> TypeSpecializer { get; set; } = static type => type;
     public FrontendLoweringResult Lower(IOperation operation) {
         if (operation == null) throw new ArgumentNullException(nameof(operation));
         var lowered = _visitor.Visit(operation, default);
@@ -34,13 +35,12 @@ public sealed class RoslynOperationLowerer {
             .Select(static pair => new FrontendVariableBinding(pair.Key, pair.Value))
             .OrderBy(static binding => binding.Variable.Value)];
 
-    internal ImmutableArray<IrVarId> CreateCaptureBindings() =>
-        [.. _captureOrder];
+    internal ImmutableArray<IrVarId> CreateCaptureBindings() => [.. _captureOrder];
 
-    private LoweredExpression LowerCore(IOperation operation) =>
-        _visitor.Visit(operation, default);
+    private LoweredExpression LowerCore(IOperation operation) => _visitor.Visit(operation, default);
 
     internal IrTypeId GetTypeId(ITypeSymbol? type) {
+        type = TypeSpecializer(type);
         if (type == null) return _factory.ObjectType;
         if (type.TypeKind == TypeKind.Error)
             return _factory.GetOrCreateReferenceType(

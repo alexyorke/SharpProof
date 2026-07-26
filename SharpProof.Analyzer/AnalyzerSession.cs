@@ -22,9 +22,13 @@ internal sealed class DefaultAnalyzerSessionFactory : IAnalyzerSessionFactory {
 
 internal sealed class AnalyzerSession {
     private readonly EffectAnalysisSession? _effects;
+    private readonly ContractClauseInventoryBuilder _contractClauses;
+    private readonly ContractBinder _contractBinder;
     private readonly ResolvedApiSpecTable _apiSpecs;
     private readonly Action<IMethodSymbol, AnalyzerSemanticOutcome>? _outcomeObserver;
-    private readonly ConcurrentDictionary<AttributeSourceKey, byte> _validatedAttributes = new();
+    private readonly ConcurrentDictionary<
+        (SyntaxTree Tree, TextSpan Span),
+        byte> _validatedAttributes = new();
 
     internal AnalyzerSession(
         Compilation compilation,
@@ -38,6 +42,11 @@ internal sealed class AnalyzerSession {
             throw new ArgumentNullException(nameof(configuration));
         _outcomeObserver = outcomeObserver;
         Attributes = new AnalyzerAttributeSymbols(compilation);
+        _contractClauses = new ContractClauseInventoryBuilder(compilation);
+        _contractBinder = new ContractBinder(
+            compilation,
+            IrFactory,
+            _contractClauses);
         _apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         if (configuration.Mode is SharpProofMode.Effects or SharpProofMode.AllExperimental)
             _effects = new EffectAnalysisSession(compilation, _apiSpecs);
@@ -49,6 +58,10 @@ internal sealed class AnalyzerSession {
     internal IrFactory IrFactory { get; } = new();
     internal ResolvedApiSpecTable ApiSpecs => _apiSpecs;
     internal ResolvedApiSpecTable? EffectApiSpecs => _effects?.ApiSpecs;
+    internal ContractClauseInventory GetContractClauses(IMethodSymbol method) =>
+        _contractClauses.Create(method);
+    internal ContractBindingResult BindRequires(IMethodSymbol method) =>
+        _contractBinder.BindRequires(method);
 
     internal EffectMethodResult AnalyzeEffects(
         IMethodSymbol method,
@@ -71,37 +84,11 @@ internal sealed class AnalyzerSession {
         AnalyzerSemanticOutcome outcome) =>
         _outcomeObserver?.Invoke(method, outcome);
 
-    internal bool TryMarkControlAttributeValidated(AttributeData attribute) {
+    internal bool TryMarkAttributeValidated(AttributeData attribute) {
         var reference = attribute.ApplicationSyntaxReference;
         return reference == null ||
                _validatedAttributes.TryAdd(
-                   new AttributeSourceKey(
-                       reference.SyntaxTree,
-                       reference.Span),
+                   (reference.SyntaxTree, reference.Span),
                    0);
-    }
-
-    private readonly struct AttributeSourceKey : IEquatable<AttributeSourceKey> {
-        internal AttributeSourceKey(SyntaxTree tree, TextSpan span) {
-            Tree = tree;
-            Span = span;
-        }
-
-        private SyntaxTree Tree { get; }
-        private TextSpan Span { get; }
-
-        public bool Equals(AttributeSourceKey other) =>
-            ReferenceEquals(Tree, other.Tree) &&
-            Span.Equals(other.Span);
-
-        public override bool Equals(object? obj) =>
-            obj is AttributeSourceKey other && Equals(other);
-
-        public override int GetHashCode() {
-            unchecked {
-                return (System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(Tree) * 397) ^
-                       Span.GetHashCode();
-            }
-        }
     }
 }

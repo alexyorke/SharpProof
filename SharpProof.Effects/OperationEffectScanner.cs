@@ -519,7 +519,8 @@ internal sealed class OperationEffectScanner {
     private EffectSummary PotentialNullReceiver(IOperation? instance) {
         if (instance == null ||
             instance is IInstanceReferenceOperation ||
-            instance.Type is { IsValueType: true })
+            instance.Type is { IsValueType: true } ||
+            IsDefinitelyNonNull(instance))
             return EffectSummary.Empty;
         return EffectSummaryOperations.Throw(
             _session.ResolveExceptionSet(
@@ -535,7 +536,8 @@ internal sealed class OperationEffectScanner {
 
     private static bool IsDefinitelyNonNull(IOperation operation) {
         while (operation is IConversionOperation conversion &&
-               conversion.OperatorMethod == null)
+               conversion.OperatorMethod == null &&
+               !conversion.IsTryCast)
             operation = conversion.Operand;
         return operation switch {
             IInstanceReferenceOperation => true,

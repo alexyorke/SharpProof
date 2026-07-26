@@ -33,6 +33,7 @@ public enum ContractBindingFailure {
     CompanionSignatureMismatch,
     CompanionBodyUnavailable,
     InvalidClosedAttribute,
+    InvalidClausePlacement,
     UnsupportedTarget
 }
 

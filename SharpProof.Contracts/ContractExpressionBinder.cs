@@ -4,8 +4,8 @@ internal sealed class ContractExpressionBinder {
     private readonly IrFactory _factory;
     private readonly ContractApiSymbols _api;
     private readonly IMethodSymbol _source;
-    private readonly ContractTypeMapper _types;
     private readonly RoslynOperationLowerer _lowerer;
+    private readonly Func<ITypeSymbol?, ITypeSymbol?> _specializeType;
     private readonly Dictionary<ISymbol, IrVarId> _variables =
         new(SymbolEqualityComparer.Default);
     private readonly HashSet<IrVarId> _receiverVariables = [];
@@ -15,12 +15,15 @@ internal sealed class ContractExpressionBinder {
     internal ContractExpressionBinder(
         IrFactory factory,
         ContractApiSymbols api,
-        IMethodSymbol source) {
+        IMethodSymbol source,
+        Func<ITypeSymbol?, ITypeSymbol?>? specializeType = null) {
         _factory = factory;
         _api = api;
         _source = source;
-        _types = new ContractTypeMapper(factory);
-        _lowerer = new RoslynOperationLowerer(factory);
+        _specializeType = specializeType ?? (static type => type);
+        _lowerer = new RoslynOperationLowerer(factory) {
+            TypeSpecializer = _specializeType
+        };
     }
 
     internal ImmutableArray<FrontendVariableBinding> VariableBindings =>
@@ -44,6 +47,29 @@ internal sealed class ContractExpressionBinder {
         IOperation operation,
         BoundContractKind clauseKind,
         bool insideOld) {
+        if (operation is IBinaryOperation nullComparison &&
+            nullComparison.OperatorMethod == null &&
+            !nullComparison.IsLifted &&
+            nullComparison.OperatorKind is (
+                BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals) &&
+            TryGetNullComparisonValue(nullComparison, out var comparedValue)) {
+            var value = BindCore(comparedValue, clauseKind, insideOld);
+            if (!value.IsSuccess) return value;
+            try {
+                var operationKind = nullComparison.OperatorKind ==
+                    BinaryOperatorKind.Equals
+                    ? IrBinaryOperator.Equal
+                    : IrBinaryOperator.NotEqual;
+                return ExpressionBindingResult.Success(
+                    _factory.Binary(
+                        operationKind, value.Term!,
+                        _factory.Null(value.Term!.Type)));
+            }
+            catch (ArgumentException) {
+                return ExpressionBindingResult.Fail(
+                    ContractBindingFailure.UnsupportedExpression);
+            }
+        }
         if (!ContainsIntrinsic(operation))
             return BindWithFrontend(operation);
 
@@ -60,13 +86,13 @@ internal sealed class ContractExpressionBinder {
                     _source.MethodKind == MethodKind.Constructor ||
                     invocation.Type == null ||
                     !SymbolEqualityComparer.IncludeNullability.Equals(
-                        invocation.Type,
+                        _specializeType(invocation.Type),
                         _source.ReturnType))
                     return ExpressionBindingResult.Fail(
                         ContractBindingFailure.InvalidIntrinsicSignature);
                 _result ??= _factory.CreateVariable(
                     "source-result",
-                    _types.GetTypeId(_source.ReturnType));
+                    _lowerer.GetTypeId(_source.ReturnType));
                 return ExpressionBindingResult.Success(
                     _factory.Variable(_result.Value));
             }
@@ -106,30 +132,6 @@ internal sealed class ContractExpressionBinder {
             }
         }
 
-        if (operation is IBinaryOperation nullComparison &&
-            nullComparison.OperatorMethod == null &&
-            !nullComparison.IsLifted &&
-            nullComparison.OperatorKind is (
-                BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals) &&
-            TryGetResultNullOperands(nullComparison, out var resultInvocation)) {
-            var value = BindCore(resultInvocation, clauseKind, insideOld);
-            if (!value.IsSuccess) return value;
-            try {
-                var operationKind = nullComparison.OperatorKind ==
-                    BinaryOperatorKind.Equals
-                    ? IrBinaryOperator.Equal
-                    : IrBinaryOperator.NotEqual;
-                return ExpressionBindingResult.Success(
-                    _factory.Binary(
-                        operationKind, value.Term!,
-                        _factory.Null(value.Term!.Type)));
-            }
-            catch (ArgumentException) {
-                return ExpressionBindingResult.Fail(
-                    ContractBindingFailure.UnsupportedExpression);
-            }
-        }
-
         if (operation is IPropertyReferenceOperation property &&
             property.Instance is { Type: IArrayTypeSymbol { Rank: 1 } } instance &&
             property.Property.Name == nameof(Array.Length) &&
@@ -149,7 +151,7 @@ internal sealed class ContractExpressionBinder {
         if (operation is IConversionOperation conversion) {
             var operand = BindCore(conversion.Operand, clauseKind, insideOld);
             if (!operand.IsSuccess) return operand;
-            var targetType = _types.GetTypeId(conversion.Type);
+            var targetType = _lowerer.GetTypeId(conversion.Type);
             if (SymbolEqualityComparer.Default.Equals(
                     conversion.Operand.Type,
                     conversion.Type))
@@ -245,23 +247,17 @@ internal sealed class ContractExpressionBinder {
             ContractBindingFailure.UnsupportedExpression);
     }
 
-    private bool TryGetResultNullOperands(
+    private static bool TryGetNullComparisonValue(
         IBinaryOperation operation,
-        out IInvocationOperation result) {
+        out IOperation value) {
         var left = UnwrapImplicitConversions(operation.LeftOperand);
         var right = UnwrapImplicitConversions(operation.RightOperand);
-        var match =
-            left is IInvocationOperation leftInvocation &&
-            _api.IsResult(leftInvocation.TargetMethod) &&
-            IsNullConstant(right)
-                ? leftInvocation
-                : right is IInvocationOperation rightInvocation &&
-                  _api.IsResult(rightInvocation.TargetMethod) &&
-                  IsNullConstant(left)
-                    ? rightInvocation
-                    : null;
-        result = match!;
-        return match != null;
+        value = IsNullConstant(right)
+            ? left
+            : IsNullConstant(left)
+                ? right
+                : null!;
+        return value != null;
     }
 
     private static IOperation UnwrapImplicitConversions(IOperation operation) {

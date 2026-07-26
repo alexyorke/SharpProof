@@ -246,6 +246,39 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
+    public void PlacementFailuresAreTypedAndBindingsAreCompilationCached() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static long Valid(long value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+                public static long Conditional(long value) {
+                    if (value > 0) Contract.Requires(true);
+                    return value;
+                }
+                public static long Late(long value) {
+                    value++;
+                    Contract.Ensures(true);
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var first = subject.Bind("Target", "Valid");
+        Assert.That(subject.Bind("Target", "Valid"), Is.SameAs(first));
+        Assert.That(
+            subject.Bind("Target", "Conditional").Failure,
+            Is.EqualTo(ContractBindingFailure.InvalidClausePlacement));
+        Assert.That(
+            subject.Bind("Target", "Late").Failure,
+            Is.EqualTo(ContractBindingFailure.InvalidClausePlacement));
+    }
+
+    [Test]
     public void ClosedAttributesProduceTypedConditionsAndPureFacet() {
         const string source =
             """
@@ -300,6 +333,313 @@ public sealed class ContractBinderTests {
         Assert.That(
             result.Contracts.Clauses.Single().Evidence,
             Is.EqualTo(BoundContractEvidence.Companion));
+    }
+
+    [Test]
+    public void OpenGenericConstraintOrderIsSemanticallyMatched() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public interface IFirst {
+            }
+            public interface ISecond {
+            }
+            public interface IRepository<T>
+                where T : IFirst, ISecond {
+                T Select(T value, bool ok);
+            }
+            [ContractFor(typeof(IRepository<>))]
+            public static class RepositoryContracts<T>
+                where T : ISecond, IFirst {
+                public static T Select(
+                    IRepository<T> receiver,
+                    T value,
+                    bool ok) {
+                    Contract.Requires(ok);
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+        var result = subject.Bind("IRepository`1", "Select");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.UsesCompanion, Is.True);
+        Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
+    }
+
+    [Test]
+    public void ConstructedContainingTypeUsesOpenGenericCompanion() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public interface IRepository<T>
+                where T : class {
+                T Read(T value);
+            }
+            [ContractFor(typeof(IRepository<>))]
+            public static class RepositoryContracts<T>
+                where T : class {
+                public static T Read(
+                    IRepository<T> receiver,
+                    T value) {
+                    Contract.Requires(value != null);
+                    return value;
+                }
+            }
+            public static class Caller {
+                public static string Call(
+                    IRepository<string> repository,
+                    string value) => repository.Read(value);
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.BindCallRequires("Caller", "Call", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.UsesCompanion, Is.True);
+        Assert.That(
+            result.Contracts.Clauses.Select(static clause => clause.Kind),
+            Is.EqualTo([BoundContractKind.Requires]));
+        var parameter = (IParameterSymbol)result.Contracts.Variables
+            .Single(variable =>
+                variable.Role == BoundContractVariableRole.Parameter)
+            .Symbol!;
+        Assert.That(
+            parameter.Type.SpecialType,
+            Is.EqualTo(SpecialType.System_String));
+    }
+
+    [Test]
+    public void ConstructedGenericMethodUsesGenericCompanionMember() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public interface ITarget {
+                T Select<T>(T value)
+                    where T : class;
+            }
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static T Select<T>(
+                    ITarget receiver,
+                    T value)
+                    where T : class {
+                    Contract.Requires(value != null);
+                    return value;
+                }
+            }
+            public static class Caller {
+                public static string Call(
+                    ITarget target,
+                    string value) => target.Select<string>(value);
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.BindCallRequires("Caller", "Call", "Select");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.UsesCompanion, Is.True);
+        Assert.That(
+            result.Contracts.Clauses.Select(static clause => clause.Kind),
+            Is.EqualTo([BoundContractKind.Requires]));
+        var parameter = (IParameterSymbol)result.Contracts.Variables
+            .Single(variable =>
+                variable.Role == BoundContractVariableRole.Parameter)
+            .Symbol!;
+        Assert.That(
+            parameter.Type.SpecialType,
+            Is.EqualTo(SpecialType.System_String));
+    }
+
+    [TestCase("Left", ContractBindingFailure.None)]
+    [TestCase("Other", ContractBindingFailure.CompanionSignatureMismatch)]
+    public void TupleElementNamesAreMatchedExactly(
+        string companionElementName,
+        ContractBindingFailure expected) {
+        var source =
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+            public interface ITarget {
+                (int Left, string? Right) Read(
+                    (int Left, string? Right) value,
+                    bool ok);
+            }
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static (int ELEMENT, string? Right) Read(
+                    ITarget receiver,
+                    (int ELEMENT, string? Right) value,
+                    bool ok) {
+                    Contract.Requires(ok);
+                    return value;
+                }
+            }
+            """.Replace(
+                "ELEMENT",
+                companionElementName,
+                StringComparison.Ordinal);
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("ITarget", "Read");
+
+        Assert.That(result.Failure, Is.EqualTo(expected));
+        Assert.That(
+            result.IsSuccess,
+            Is.EqualTo(expected == ContractBindingFailure.None));
+    }
+
+    [TestCase(
+        """
+        #nullable enable
+        using SharpProof.Attributes;
+        public interface ITarget {
+            string? Read(string? value);
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static string? Read(
+                ITarget receiver,
+                string value) => value;
+        }
+        """)]
+    [TestCase(
+        """
+        using SharpProof.Attributes;
+        public interface ITarget {
+            ref int Read(ref int value);
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static int Read(
+                ITarget receiver,
+                ref int value) => value;
+        }
+        """)]
+    [TestCase(
+        """
+        using SharpProof.Attributes;
+        public interface ITarget {
+            void Read(int value = 1);
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static void Read(
+                ITarget receiver,
+                int value) {
+            }
+        }
+        """)]
+    [TestCase(
+        """
+        using SharpProof.Attributes;
+        public sealed class Outer<T> {
+            public sealed class Leaf {
+            }
+        }
+        public interface ITarget {
+            void Read(Outer<int>.Leaf value);
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static void Read(
+                ITarget receiver,
+                Outer<string>.Leaf value) {
+            }
+        }
+        """)]
+    public void ExactMemberShapeMismatchesFailClosed(string source) {
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("ITarget", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.CompanionSignatureMismatch));
+    }
+
+    [Test]
+    public void NestedGenericOwnerScopesDoNotAliasByOrdinal() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public sealed class Outer<TOuter> {
+                public interface ITarget<TInner> {
+                    void Read(TOuter value);
+                }
+            }
+            [ContractFor(typeof(Outer<>.ITarget<>))]
+            public static class TargetContracts<TContract> {
+                public static void Read(
+                    Outer<TContract>.ITarget<TContract> receiver,
+                    TContract value) {
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("Outer`1+ITarget`1", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.CompanionSignatureMismatch));
+    }
+
+    [Test]
+    public void StaticAndInstanceOverloadCollapseFailsAsAmbiguous() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public interface ITarget {
+                void Act(int value);
+                static abstract void Act(ITarget receiver, int value);
+            }
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Act(ITarget receiver, int value) {
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind(
+                "ITarget",
+                "Act",
+                parameterCount: 1,
+                isStatic: false).Failure,
+            Is.EqualTo(ContractBindingFailure.AmbiguousCompanion));
+    }
+
+    [Test]
+    public void LookalikeContractForAttributeIsIgnored() {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+            using ContractForAttribute = Lookalike.ContractForAttribute;
+            public interface ITarget {
+                void Act(bool ok);
+            }
+            [ContractFor(typeof(ITarget))]
+            public static class NotACompanion {
+                public static void Act(ITarget receiver, bool ok) {
+                    Contract.Requires(ok);
+                }
+            }
+            namespace Lookalike {
+                [AttributeUsage(AttributeTargets.Class)]
+                public sealed class ContractForAttribute : Attribute {
+                    public ContractForAttribute(Type target) {
+                    }
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+        var result = subject.Bind("ITarget", "Act");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.UsesCompanion, Is.False);
+        Assert.That(result.Contracts.Clauses, Is.Empty);
     }
 
     [TestCase(
@@ -377,8 +717,12 @@ public sealed class ContractBinderTests {
     }
 
     private sealed class ContractSubject : IDisposable {
-        private ContractSubject(CSharpCompilation compilation) =>
+        private readonly ContractBinder _binder;
+
+        private ContractSubject(CSharpCompilation compilation) {
             Compilation = compilation;
+            _binder = new ContractBinder(compilation, new IrFactory());
+        }
 
         private CSharpCompilation Compilation { get; }
 
@@ -411,16 +755,54 @@ public sealed class ContractBinderTests {
             string typeName,
             string methodName) {
             var method = GetMethod(typeName, methodName);
-            return new ContractBinder(Compilation, new IrFactory()).Bind(method);
+            return _binder.Bind(method);
+        }
+
+        internal ContractBindingResult Bind(
+            string typeName,
+            string methodName,
+            int parameterCount,
+            bool isStatic) {
+            var method = GetMethod(
+                typeName,
+                methodName,
+                parameterCount,
+                isStatic);
+            return _binder.Bind(method);
         }
 
         internal ContractBindingResult BindRequires(
             string typeName,
             string methodName) {
             var method = GetMethod(typeName, methodName);
-            return new ContractBinder(
-                Compilation,
-                new IrFactory()).BindRequires(method);
+            return _binder.BindRequires(method);
+        }
+
+        internal ContractBindingResult BindCallRequires(
+            string callerTypeName,
+            string callerMethodName,
+            string calledMethodName) {
+            var caller = GetMethod(callerTypeName, callerMethodName);
+            var declaration = caller.DeclaringSyntaxReferences
+                .Single()
+                .GetSyntax();
+            var invocation = declaration.DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Single(candidate =>
+                    candidate.Expression switch {
+                        MemberAccessExpressionSyntax member =>
+                            member.Name.Identifier.ValueText ==
+                            calledMethodName,
+                        SimpleNameSyntax name =>
+                            name.Identifier.ValueText == calledMethodName,
+                        _ => false
+                    });
+            var model = Compilation.GetSemanticModel(
+                invocation.SyntaxTree);
+            var target = model.GetSymbolInfo(invocation).Symbol as
+                IMethodSymbol ??
+                throw new InvalidOperationException(calledMethodName);
+            return _binder.BindRequires(target);
         }
 
         private IMethodSymbol GetMethod(
@@ -431,6 +813,20 @@ public sealed class ContractBinderTests {
             return type.GetMembers(methodName)
                 .OfType<IMethodSymbol>()
                 .Single();
+        }
+
+        private IMethodSymbol GetMethod(
+            string typeName,
+            string methodName,
+            int parameterCount,
+            bool isStatic) {
+            var type = Compilation.GetTypeByMetadataName(typeName) ??
+                       throw new InvalidOperationException(typeName);
+            return type.GetMembers(methodName)
+                .OfType<IMethodSymbol>()
+                .Single(method =>
+                    method.Parameters.Length == parameterCount &&
+                    method.IsStatic == isStatic);
         }
 
         public void Dispose() {

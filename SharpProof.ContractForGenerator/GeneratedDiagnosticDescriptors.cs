@@ -38,10 +38,10 @@ internal static class GeneratedDiagnosticDescriptors {
         "ContractFor member body required",
         "Companion method '{0}' must have a compiler-bound source body");
 
-    internal static readonly DiagnosticDescriptor NestedClause = Create(
+    internal static readonly DiagnosticDescriptor InvalidClausePlacement = Create(
         "SPCF0008",
-        "Contract clause is not directly owned by companion member",
-        "Contract.{0} must be directly compiler-bound in companion method '{1}', not inside a nested function");
+        "Invalid ContractFor clause placement",
+        "Contract.{0} in companion method '{1}' has invalid placement: {2}");
 
     private static DiagnosticDescriptor Create(
         string id,

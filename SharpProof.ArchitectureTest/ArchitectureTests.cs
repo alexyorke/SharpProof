@@ -38,7 +38,7 @@ public sealed class ArchitectureTests {
     public void NewLayerProjectReferencesFollowTheDependencyDag() {
         var allowed = new Dictionary<string, string[]>(StringComparer.Ordinal) {
             ["SharpProof.Ir"] = [],
-            ["SharpProof.ContractForGenerator"] = ["SharpProof.Frontend"],
+            ["SharpProof.ContractForGenerator"] = ["SharpProof.Contracts"],
             ["SharpProof.Specs"] = ["SharpProof.Ir"],
             ["SharpProof.Dataflow"] = [],
             ["SharpProof.Frontend"] = ["SharpProof.Ir"],

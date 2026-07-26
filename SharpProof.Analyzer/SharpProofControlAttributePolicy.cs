@@ -76,7 +76,7 @@ internal static class SharpProofControlAttributePolicy {
         AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken) {
-        if (!session.TryMarkControlAttributeValidated(attribute)) return;
+        if (!session.TryMarkAttributeValidated(attribute)) return;
         var location =
             attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation() ??
             AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(method, cancellationToken);

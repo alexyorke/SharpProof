@@ -1,6 +1,22 @@
 namespace SharpProof.Analyzer;
 
 internal static class AnalyzerFeaturePipeline {
+    internal static void ValidateMethodAttributes(
+        SymbolAnalysisContext context,
+        AnalyzerSession session) {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        if (context.Symbol is not IMethodSymbol method ||
+            method.DeclaringSyntaxReferences.IsDefaultOrEmpty)
+            return;
+        EffectContractDiagnostics.ValidateArguments(
+            method, session, context.ReportDiagnostic);
+        ClosedContractDiagnostics.Validate(
+            method, session, context.ReportDiagnostic);
+        _ = SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
+            method, session, context.ReportDiagnostic,
+            context.CancellationToken);
+    }
+
     internal static void AnalyzeOperationBlock(
         OperationBlockAnalysisContext context,
         AnalyzerSession session) {
@@ -24,6 +40,10 @@ internal static class AnalyzerFeaturePipeline {
                 AnalyzerSemanticOutcome.Abstained);
             return;
         }
+        ValidateContractClauses(
+            method,
+            session,
+            context.ReportDiagnostic);
         var isSuppressed = SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
             method,
             session,
@@ -78,6 +98,32 @@ internal static class AnalyzerFeaturePipeline {
                     context.ReportDiagnostic,
                     context.CancellationToken));
         session.RecordSemanticOutcome(method, outcome);
+    }
+
+    private static void ValidateContractClauses(
+        IMethodSymbol method,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic) {
+        foreach (var clause in session.GetContractClauses(method).Clauses) {
+            if (clause.IsValid) continue;
+            var reason = clause.Placement switch {
+                ContractClausePlacement.Conditional =>
+                    "expected an unconditional prologue statement",
+                ContractClausePlacement.NestedCallable =>
+                    "expected a clause directly owned by the callable",
+                ContractClausePlacement.Unreachable =>
+                    "expected a reachable prologue statement",
+                ContractClausePlacement.Late =>
+                    "expected the clause before every non-contract statement",
+                _ => "expected a direct prologue statement"
+            };
+            reportDiagnostic(
+                InvalidContractArgumentDiagnostics.Create(
+                    "Contract." + clause.Kind,
+                    "<placement>",
+                    reason,
+                    clause.Location));
+        }
     }
 
     private static SyntaxNode? FindDeclaration(

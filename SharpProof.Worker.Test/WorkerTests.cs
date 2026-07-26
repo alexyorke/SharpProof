@@ -276,6 +276,60 @@ public sealed class WorkerTests {
     }
 
     [Test]
+    public async Task PartialMethodDiscoveryUsesOnlyTheImplementation() {
+        using var project = TestProject.Create(
+            (
+                "Definition.cs",
+                """
+                public static partial class Subject {
+                    public static partial long Identity(long value);
+                }
+                """),
+            (
+                "Implementation.cs",
+                """
+                using SharpProof.Attributes;
+                public static partial class Subject {
+                    public static partial long Identity(long value) {
+                        Contract.Ensures(
+                            Contract.Result<long>() == value);
+                        return value;
+                    }
+                }
+                """));
+        var request = project.CreateRequest(cacheEnabled: false);
+        var snapshot = await WorkerInputSnapshot.LoadAsync(
+            request,
+            CancellationToken.None);
+        var compilation = WorkerCompilation.Create(request, snapshot);
+        var backend = new CountingBackend(
+            BackendCheckResult.Unsatisfiable([]));
+        var verifier = new CallableVerifier(
+            compilation,
+            backend,
+            request.Budgets.MaximumExpressionDepth);
+
+        var target = verifier.Discover().Single(candidate =>
+            candidate.Method.Name == "Identity");
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(target.Method.PartialDefinitionPart, Is.Not.Null);
+            Assert.That(target.Method.PartialImplementationPart, Is.Null);
+            Assert.That(
+                Path.GetFileName(target.Declaration.SyntaxTree.FilePath),
+                Is.EqualTo("Implementation.cs"));
+        }
+
+        using var worker = new SharpProofWorker(backend);
+        var response = await worker.VerifyAsync(request);
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.Records, Has.Length.EqualTo(1));
+        Assert.That(
+            response.Records[0].Status,
+            Is.EqualTo(WorkerVerificationStatus.Proven));
+        Assert.That(backend.CallCount, Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task GeneratedContractVerdictsMatchConcreteRuntime() {
         var cases = CreateRuntimeContractCases(seed: 23063, count: 24);
         using var project = TestProject.Create(
@@ -1832,35 +1886,42 @@ public sealed class WorkerTests {
     }
 
     private sealed class TestProject : IDisposable {
-        private TestProject(string directory, string sourcePath) {
+        private TestProject(string directory, string[] sourcePaths) {
             DirectoryPath = directory;
-            SourcePath = sourcePath;
+            SourcePaths = sourcePaths;
             CacheDirectory = Path.Combine(directory, "cache");
         }
 
         internal string DirectoryPath { get; }
-        internal string SourcePath { get; }
+        internal string[] SourcePaths { get; }
         internal string CacheDirectory { get; }
 
-        internal static TestProject Create(string source) {
+        internal static TestProject Create(string source) =>
+            Create(("Subject.cs", source));
+
+        internal static TestProject Create(
+            params (string FileName, string Source)[] sources) {
             var directory = Path.Combine(
                 Path.GetTempPath(),
                 "SharpProof.Worker.Test",
                 Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(directory);
-            var sourcePath = Path.Combine(directory, "Subject.cs");
-            File.WriteAllText(
-                sourcePath,
-                source,
-                new System.Text.UTF8Encoding(false));
-            return new TestProject(directory, sourcePath);
+            var sourcePaths = sources.Select(source => {
+                var sourcePath = Path.Combine(directory, source.FileName);
+                File.WriteAllText(
+                    sourcePath,
+                    source.Source,
+                    new System.Text.UTF8Encoding(false));
+                return sourcePath;
+            }).ToArray();
+            return new TestProject(directory, sourcePaths);
         }
 
         internal WorkerVerifyRequest CreateRequest(bool cacheEnabled) =>
             new() {
                 ProjectDirectory = DirectoryPath,
                 AssemblyName = "WorkerTest",
-                SourceFiles = [SourcePath],
+                SourceFiles = SourcePaths,
                 ReferenceAssemblies = GetReferences(),
                 DefineConstants = [Contract.ConditionalSymbol],
                 Compilation = CreateCompilationOptions(),

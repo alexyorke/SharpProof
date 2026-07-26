@@ -89,7 +89,11 @@ current analyzer reports SP0024 for:
 
 - a missing or blank `[SharpProofTrusted]` or `[SharpProofSuppress]` reason;
 - an undefined `[AllowedCapabilities]` flag value;
-- malformed or non-exception `[AllowedExceptions]` types.
+- malformed or non-exception `[AllowedExceptions]` types;
+- `[NotNull]` on a value that cannot be null, `[Positive]` on an unsupported
+  type, or `[InRange]` with an unsupported type or unordered bounds;
+- a `Requires`, `Ensures`, or `Assume` clause that is conditional, nested,
+  unreachable, late, or otherwise not a direct contiguous prologue statement.
 
 SP0024 is an enabled-by-default error because invalid control data cannot be
 silently interpreted.
@@ -245,11 +249,12 @@ otherwise bodyless declarations cannot carry executable compiler-bound
 clauses.
 
 <a id="spcf0008"></a>
-### SPCF0008 - nested contract clause
+### SPCF0008 - invalid ContractFor clause placement
 
-A `Contract.Requires`, `Ensures`, or `Assume` call is inside a lambda, local
-function, or other nested function rather than being directly owned by the
-companion member. Nested clauses do not describe the target member.
+A companion `Contract.Requires`, `Ensures`, or `Assume` call is not a direct,
+reachable statement in the method's contiguous contract prologue. Conditional,
+nested-callable, unreachable, late, and structurally nested clauses do not
+describe the target member.
 
 ## What diagnostics do not mean
 

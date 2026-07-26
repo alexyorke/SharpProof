@@ -8,23 +8,21 @@ internal static class RequiresCallSiteAnalyzer {
         AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken) {
-        var invocations = GetReachableInvocations(
+        var callSites = GetReachableCallSites(
             declaration,
             semanticModel,
             cancellationToken);
-        if (invocations == null)
+        if (callSites == null)
             return AnalyzerSemanticOutcome.Unknown;
 
         var outcome = AnalyzerSemanticOutcome.NotApplicable;
-        foreach (var candidate in invocations) {
+        foreach (var candidate in callSites) {
             cancellationToken.ThrowIfCancellationRequested();
             outcome = AnalyzerSemanticOutcomes.Combine(
                 outcome,
-                AnalyzeInvocation(
+                AnalyzeCallSite(
                     caller,
-                    candidate.Invocation,
-                    candidate.IsDefinitelyExecuted,
-                    candidate.HasReplayablePrefix,
+                    candidate,
                     semanticModel,
                     session,
                     reportDiagnostic,
@@ -33,7 +31,7 @@ internal static class RequiresCallSiteAnalyzer {
         return outcome;
     }
 
-    private static ImmutableArray<InvocationCandidate>? GetReachableInvocations(
+    private static ImmutableArray<CallSiteCandidate>? GetReachableCallSites(
         SyntaxNode declaration,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
@@ -54,9 +52,9 @@ internal static class RequiresCallSiteAnalyzer {
             return null;
 
         var definitelyExecuted = GetDefinitelyExecutedBlocks(graph);
-        var invocations = new Dictionary<
+        var callSites = new Dictionary<
             (SyntaxTree Tree, TextSpan Span),
-            InvocationCandidate>();
+            CallSiteCandidate>();
         foreach (var block in graph.Blocks) {
             cancellationToken.ThrowIfCancellationRequested();
             if (!block.IsReachable) continue;
@@ -64,28 +62,45 @@ internal static class RequiresCallSiteAnalyzer {
                          .Concat(block.BranchValue == null
                              ? []
                              : [block.BranchValue])) {
-                foreach (var invocation in root.DescendantsAndSelf()
-                             .OfType<IInvocationOperation>()) {
-                    var key = (
-                        invocation.Syntax.SyntaxTree,
-                        invocation.Syntax.Span);
-                    var candidate = new InvocationCandidate(
-                        invocation,
-                        definitelyExecuted.Contains(block.Ordinal),
+                foreach (var operation in root.DescendantsAndSelf()) {
+                    var call = operation switch {
+                        IInvocationOperation invocation => (
+                            invocation.TargetMethod,
+                            invocation.Instance,
+                            invocation.Arguments),
+                        IObjectCreationOperation {
+                            Constructor: { } constructor
+                        } creation => (
+                            constructor,
+                            (IOperation?)null,
+                            creation.Arguments),
+                        _ => ((IMethodSymbol, IOperation?,
+                            ImmutableArray<IArgumentOperation>)?)null
+                    };
+                    if (call == null) continue;
+                    var candidate = new CallSiteCandidate(
+                        operation,
+                        call.Value.Item1,
+                        call.Value.Item2,
+                        call.Value.Item3,
+                        definitelyExecuted.Contains(block.Ordinal) &&
                         HasReplayablePrefix(
                             declaration,
-                            invocation,
+                            operation,
                             semanticModel,
                             cancellationToken));
-                    if (!invocations.TryGetValue(key, out var existing) ||
+                    var key = (
+                        operation.Syntax.SyntaxTree,
+                        operation.Syntax.Span);
+                    if (!callSites.TryGetValue(key, out var existing) ||
                         !existing.CanReplay && candidate.CanReplay)
-                        invocations[key] = candidate;
+                        callSites[key] = candidate;
                 }
             }
         }
-        return [.. invocations.Values
+        return [.. callSites.Values
             .OrderBy(static candidate =>
-                candidate.Invocation.Syntax.SpanStart)];
+                candidate.Operation.Syntax.SpanStart)];
     }
 
     private static HashSet<int> GetDefinitelyExecutedBlocks(
@@ -130,17 +145,17 @@ internal static class RequiresCallSiteAnalyzer {
 
     private static bool HasReplayablePrefix(
         SyntaxNode declaration,
-        IInvocationOperation invocation,
+        IOperation callSite,
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         if (declaration is BaseMethodDeclarationSyntax {
             ExpressionBody.Expression: { } expressionBody
         })
-            return expressionBody.Span == invocation.Syntax.Span;
+            return expressionBody.Span == callSite.Syntax.Span;
         if (declaration is AccessorDeclarationSyntax {
             ExpressionBody.Expression: { } accessorExpression
         })
-            return accessorExpression.Span == invocation.Syntax.Span;
+            return accessorExpression.Span == callSite.Syntax.Span;
 
         var body = declaration switch {
             BaseMethodDeclarationSyntax method => method.Body,
@@ -148,16 +163,16 @@ internal static class RequiresCallSiteAnalyzer {
             _ => null
         };
         if (body == null) return false;
-        var statement = invocation.Syntax.AncestorsAndSelf()
+        var statement = callSite.Syntax.AncestorsAndSelf()
             .OfType<StatementSyntax>()
             .FirstOrDefault(candidate =>
                 ReferenceEquals(candidate.Parent, body));
         if (statement == null ||
             statement switch {
                 ExpressionStatementSyntax expression =>
-                    expression.Expression.Span != invocation.Syntax.Span,
+                    expression.Expression.Span != callSite.Syntax.Span,
                 ReturnStatementSyntax { Expression: { } returned } =>
-                    returned.Span != invocation.Syntax.Span,
+                    returned.Span != callSite.Syntax.Span,
                 _ => true
             })
             return false;
@@ -333,25 +348,22 @@ internal static class RequiresCallSiteAnalyzer {
         }
     }
 
-    private static AnalyzerSemanticOutcome AnalyzeInvocation(
+    private static AnalyzerSemanticOutcome AnalyzeCallSite(
         IMethodSymbol caller,
-        IInvocationOperation invocation,
-        bool isDefinitelyExecuted,
-        bool hasReplayablePrefix,
+        CallSiteCandidate candidate,
         SemanticModel semanticModel,
         AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken) {
         if (!SymbolEqualityComparer.Default.Equals(
                 semanticModel.GetEnclosingSymbol(
-                    invocation.Syntax.SpanStart,
+                    candidate.Operation.Syntax.SpanStart,
                     cancellationToken),
                 caller))
             return AnalyzerSemanticOutcome.NotApplicable;
 
         var factory = session.IrFactory;
-        var binding = new ContractBinder(session.Compilation, factory)
-            .BindRequires(invocation.TargetMethod);
+        var binding = session.BindRequires(candidate.TargetMethod);
         if (!binding.IsSuccess || binding.Contracts == null)
             return AnalyzerSemanticOutcome.Unknown;
         var requires = binding.Contracts.Clauses
@@ -359,15 +371,15 @@ internal static class RequiresCallSiteAnalyzer {
             .ToImmutableArray();
         if (requires.IsDefaultOrEmpty)
             return AnalyzerSemanticOutcome.NotApplicable;
-        if (!isDefinitelyExecuted || !hasReplayablePrefix)
+        if (!candidate.CanReplay)
             return AnalyzerSemanticOutcome.Unknown;
-        if (invocation.TargetMethod.ReducedFrom != null ||
-            invocation.TargetMethod.Parameters.Any(static parameter =>
+        if (candidate.TargetMethod.ReducedFrom != null ||
+            candidate.TargetMethod.Parameters.Any(static parameter =>
                 parameter.RefKind != RefKind.None))
             return AnalyzerSemanticOutcome.Unknown;
 
         var replayPlan = CreateReplayPlan(
-            invocation,
+            candidate,
             binding.Contracts,
             factory,
             session.IsKnownPure,
@@ -413,15 +425,15 @@ internal static class RequiresCallSiteAnalyzer {
             reportDiagnostic(
                 Diagnostic.Create(
                     GeneratedDiagnosticDescriptors.RequiresNotProvenRule,
-                    invocation.Syntax.GetLocation(),
-                    invocation.TargetMethod.Name,
+                    candidate.Operation.Syntax.GetLocation(),
+                    candidate.TargetMethod.Name,
                     printer.Print(instantiated)));
         }
         return outcome;
     }
 
     private static InvocationReplayPlan? CreateReplayPlan(
-        IInvocationOperation invocation,
+        CallSiteCandidate callSite,
         BoundMethodContracts contracts,
         IrFactory factory,
         Func<IMethodSymbol, bool> isKnownPure,
@@ -430,12 +442,12 @@ internal static class RequiresCallSiteAnalyzer {
             factory,
             isKnownPure);
         var inputs = ImmutableArray.CreateBuilder<InvocationReplayInput>();
-        if (invocation.Instance != null) {
-            var receiver = lowerer.Lower(invocation.Instance);
+        if (callSite.Instance != null) {
+            var receiver = lowerer.Lower(callSite.Instance);
             if (!receiver.IsExact) return null;
             inputs.Add(new InvocationReplayInput(receiver.Term, true));
         }
-        foreach (var argument in invocation.Arguments
+        foreach (var argument in callSite.Arguments
                      .OrderBy(static argument =>
                          argument.IsImplicit ? 1 : 0)
                      .ThenBy(static argument =>
@@ -457,9 +469,9 @@ internal static class RequiresCallSiteAnalyzer {
                 BoundContractVariableRole.PreState)
                 continue;
             IOperation? actual = variable.Role switch {
-                BoundContractVariableRole.Receiver => invocation.Instance,
+                BoundContractVariableRole.Receiver => callSite.Instance,
                 BoundContractVariableRole.Parameter =>
-                    invocation.Arguments.FirstOrDefault(argument =>
+                    callSite.Arguments.FirstOrDefault(argument =>
                         argument.Parameter?.Ordinal == variable.Ordinal)?.Value,
                 _ => null
             };
@@ -475,14 +487,17 @@ internal static class RequiresCallSiteAnalyzer {
             inputs.ToImmutable());
     }
 
-    private readonly struct InvocationCandidate(
-        IInvocationOperation invocation,
-        bool isDefinitelyExecuted,
-        bool hasReplayablePrefix) {
-        internal IInvocationOperation Invocation { get; } = invocation;
-        internal bool IsDefinitelyExecuted { get; } = isDefinitelyExecuted;
-        internal bool HasReplayablePrefix { get; } = hasReplayablePrefix;
-        internal bool CanReplay => IsDefinitelyExecuted && HasReplayablePrefix;
+    private readonly struct CallSiteCandidate(
+        IOperation operation,
+        IMethodSymbol targetMethod,
+        IOperation? instance,
+        ImmutableArray<IArgumentOperation> arguments,
+        bool canReplay) {
+        internal IOperation Operation { get; } = operation;
+        internal IMethodSymbol TargetMethod { get; } = targetMethod;
+        internal IOperation? Instance { get; } = instance;
+        internal ImmutableArray<IArgumentOperation> Arguments { get; } = arguments;
+        internal bool CanReplay { get; } = canReplay;
     }
 
     private sealed class InvocationReplayPlan(
