@@ -3,6 +3,7 @@
   "projects": [
     "SharpProof.Package/SharpProof.Package.csproj",
     "SharpProof.Attributes/SharpProof.Attributes.csproj",
-    "SharpProof.Symbolic/SharpProof.Symbolic.csproj"
+    "SharpProof.Legacy.Attributes/SharpProof.Legacy.Attributes.csproj",
+    "SharpProof.Migration/SharpProof.Migration.csproj"
   ]
 }

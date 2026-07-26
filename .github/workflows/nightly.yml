@@ -1,0 +1,41 @@
+name: Nightly soundness gates
+
+on:
+  schedule:
+    - cron: "17 8 * * *"
+  workflow_dispatch:
+
+jobs:
+  fuzz:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup required .NET SDKs
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+          global-json-file: global.json
+
+      - name: Restore and build
+        shell: pwsh
+        run: |
+          .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\scripts\Invoke-SharpProofDotnet.ps1 build SharpProof.sln -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Run the contract-declared nightly fuzz budget
+        shell: pwsh
+        run: |
+          $contract = Get-Content .\eng\acceptance\v2\contract.json -Raw | ConvertFrom-Json
+          .\scripts\Invoke-SharpProofDotnet.ps1 `
+            -MemoryLimitMb $contract.worker.maximumMemoryMiB `
+            -TimeoutSeconds $contract.worker.maximumProjectWallSeconds `
+            run --project .\Tools\SharpProof.V2Fuzz\SharpProof.V2Fuzz.csproj `
+            -c Release --no-build -- `
+            --cases $contract.fuzz.nightlyCases `
+            --seed 23063 `
+            --max-parallelism $contract.fuzz.maximumParallelism

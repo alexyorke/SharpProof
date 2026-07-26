@@ -1,0 +1,245 @@
+using NUnit.Framework;
+using SharpProof.Ir;
+using SharpProof.V2Fuzz;
+
+namespace SharpProof.V2Fuzz.Test;
+
+[TestFixture]
+public sealed class FuzzRunnerTests {
+    [Test]
+    public async Task FixedSeedIsDeterministicAndSound() {
+        var options = new FuzzOptions(Cases: 24, Seed: 12345, MaximumParallelism: 4);
+
+        var first = await FuzzRunner.RunAsync(options);
+        var second = await FuzzRunner.RunAsync(options);
+
+        Assert.That(first, Is.EqualTo(second));
+        Assert.That(first.SchemaVersion, Is.EqualTo(2));
+        Assert.That(first.Passed, Is.True);
+        Assert.That(first.Agreements, Is.EqualTo(options.Cases));
+        Assert.That(first.Abstentions, Is.Zero);
+        Assert.That(first.FrontendAgreements, Is.EqualTo(options.Cases));
+        Assert.That(first.SmtAgreements, Is.EqualTo(options.Cases));
+        Assert.That(
+            first.PartialSmtAgreements,
+            Is.EqualTo(options.Cases));
+    }
+
+    [Test]
+    public async Task ParallelismDoesNotChangeDeterministicOutcomes() {
+        var serial = await FuzzRunner.RunAsync(
+            new FuzzOptions(Cases: 16, Seed: -9876, MaximumParallelism: 1));
+        var parallel = await FuzzRunner.RunAsync(
+            new FuzzOptions(Cases: 16, Seed: -9876, MaximumParallelism: 4));
+
+        Assert.That(serial.Passed, Is.True);
+        Assert.That(parallel.Passed, Is.True);
+        Assert.That(parallel.Agreements, Is.EqualTo(serial.Agreements));
+        Assert.That(parallel.Abstentions, Is.EqualTo(serial.Abstentions));
+        Assert.That(
+            parallel.FrontendAgreements,
+            Is.EqualTo(serial.FrontendAgreements));
+        Assert.That(parallel.SmtAgreements, Is.EqualTo(serial.SmtAgreements));
+        Assert.That(
+            parallel.PartialSmtAgreements,
+            Is.EqualTo(serial.PartialSmtAgreements));
+        Assert.That(parallel.Failures, Is.EqualTo(serial.Failures));
+    }
+
+    [Test]
+    public async Task CancellationPropagates() {
+        var cancellation = new CancellationToken(canceled: true);
+        try {
+            await FuzzRunner.RunAsync(
+                new FuzzOptions(Cases: 10, Seed: 1, MaximumParallelism: 1),
+                cancellation);
+            Assert.Fail("Expected cancellation to propagate.");
+        }
+        catch (OperationCanceledException) {
+            Assert.Pass();
+        }
+    }
+
+    [Test]
+    public void GeneratedSourceFlowsThroughFrontendAndMatchesRuntime() {
+        var first = new SmallCSharpCaseGenerator(seed: 741).Next(
+            maximumDepth: 4);
+        var second = new SmallCSharpCaseGenerator(seed: 741).Next(
+            maximumDepth: 4);
+
+        Assert.That(first.Source, Is.EqualTo(second.Source));
+        Assert.That(first.Left, Is.EqualTo(second.Left));
+        Assert.That(first.Right, Is.EqualTo(second.Right));
+        Assert.That(first.Condition, Is.EqualTo(second.Condition));
+        var comparison = new FrontendDifferentialOracle().Compare(first);
+        Assert.That(
+            comparison.Status,
+            Is.EqualTo(FuzzOracleStatus.Agreement),
+            comparison.Detail + Environment.NewLine + first.Source);
+    }
+
+    [Test]
+    public async Task FiniteDomainOracleChecksSatAndUnsatWithExplicitAssumptions() {
+        var factory = new IrFactory();
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        var enabled = factory.CreateVariable("enabled", factory.BooleanType);
+        var satisfiable = factory.Binary(
+            IrBinaryOperator.AndAlso,
+            factory.Binary(
+                IrBinaryOperator.Equal,
+                factory.Variable(value),
+                factory.Integer(2)),
+            factory.Variable(enabled));
+        var unsatisfiable = factory.Binary(
+            IrBinaryOperator.LessThan,
+            factory.Variable(value),
+            factory.Integer(-2));
+        var oracle = new FiniteDomainSmtDifferentialOracle();
+
+        var sat = await oracle.CompareAsync(factory, satisfiable);
+        var unsat = await oracle.CompareAsync(factory, unsatisfiable);
+
+        Assert.That(sat.Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+        Assert.That(
+            sat.Expected,
+            Is.EqualTo(FiniteDomainSatisfiability.Satisfiable));
+        Assert.That(
+            sat.Actual,
+            Is.EqualTo(FiniteDomainSatisfiability.Satisfiable));
+        Assert.That(sat.FiniteDomainAssumptions, Is.EqualTo(2));
+        Assert.That(unsat.Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+        Assert.That(
+            unsat.Expected,
+            Is.EqualTo(FiniteDomainSatisfiability.Unsatisfiable));
+        Assert.That(
+            unsat.Actual,
+            Is.EqualTo(FiniteDomainSatisfiability.Unsatisfiable));
+        Assert.That(unsat.FiniteDomainAssumptions, Is.EqualTo(1));
+    }
+
+    [TestCase(0, 0, 1, 1)]
+    [TestCase(7, 1, 0, 1)]
+    public async Task PartialTermOracleChecksShortCircuitAndUndefinedArithmetic(
+        int seed,
+        int expectedTrue,
+        int expectedFalse,
+        int expectedUndefined) {
+        var factory = new IrFactory();
+        var generated = PartialTermSmtCaseGenerator.Create(factory, seed);
+
+        var result = await new PartialTermSmtDifferentialOracle()
+            .CompareAsync(factory, generated);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                result.Status,
+                Is.EqualTo(FuzzOracleStatus.Agreement),
+                result.Detail);
+            Assert.That(result.ScenarioCount, Is.EqualTo(2));
+            Assert.That(result.DefinedTrueCount, Is.EqualTo(expectedTrue));
+            Assert.That(result.DefinedFalseCount, Is.EqualTo(expectedFalse));
+            Assert.That(result.UndefinedCount, Is.EqualTo(expectedUndefined));
+        }
+    }
+
+    [Test]
+    public void CSharpShrinkerIsDeterministicAndPreservesMismatch() {
+        var expression = GeneratedCSharpExpression.Binary(
+            GeneratedExpressionKind.Add,
+            GeneratedCSharpExpression.Conditional(
+                GeneratedCSharpExpression.Condition(),
+                GeneratedCSharpExpression.Left(),
+                GeneratedCSharpExpression.Right()),
+            GeneratedCSharpExpression.Integer(1));
+        var generated = new GeneratedCSharpCase(
+            expression,
+            Left: 3,
+            Right: 4,
+            Condition: true);
+        static bool Preserves(GeneratedCSharpCase candidate) =>
+            candidate.Expression.Render().Contains(
+                "left",
+                StringComparison.Ordinal);
+
+        var first = CSharpStructuralShrinker.Minimize(generated, Preserves);
+        var second = CSharpStructuralShrinker.Minimize(generated, Preserves);
+
+        Assert.That(
+            first.Expression.NodeCount,
+            Is.LessThan(expression.NodeCount));
+        Assert.That(Preserves(first), Is.True);
+        Assert.That(first.Source, Is.EqualTo(second.Source));
+    }
+
+    [Test]
+    public async Task IrShrinkerIsDeterministicAndPreservesMismatch() {
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("value", factory.IntegerType);
+        var variableTerm = factory.Variable(variable);
+        var formula = factory.Binary(
+            IrBinaryOperator.AndAlso,
+            factory.Binary(
+                IrBinaryOperator.GreaterThan,
+                factory.Binary(
+                    IrBinaryOperator.Add,
+                    variableTerm,
+                    factory.Integer(1)),
+                factory.Integer(0)),
+            factory.Binary(
+                IrBinaryOperator.LessThan,
+                variableTerm,
+                factory.Integer(2)));
+        Task<bool> Preserves(IrTerm candidate, CancellationToken _) =>
+            Task.FromResult(Contains(candidate, variable));
+
+        var first = await IrStructuralShrinker.MinimizeAsync(
+            factory,
+            formula,
+            Preserves);
+        var second = await IrStructuralShrinker.MinimizeAsync(
+            factory,
+            formula,
+            Preserves);
+
+        Assert.That(
+            IrStructuralShrinker.StructuralSize(first),
+            Is.LessThan(IrStructuralShrinker.StructuralSize(formula)));
+        Assert.That(Contains(first, variable), Is.True);
+        Assert.That(first, Is.SameAs(second));
+    }
+
+    [TestCase("--cases", "0")]
+    [TestCase("--max-parallelism", "5")]
+    [TestCase("--unknown", "1")]
+    public void InvalidOptionsFailClosed(string option, string value) {
+        try {
+            FuzzOptions.Parse([option, value]);
+            Assert.Fail("Expected invalid options to fail.");
+        }
+        catch (FuzzUsageException) {
+            Assert.Pass();
+        }
+    }
+
+    private static bool Contains(IrTerm term, IrVarId variable) => term switch {
+        IrVariableTerm item => item.Variable == variable,
+        IrUnaryTerm unary => Contains(unary.Operand, variable),
+        IrBinaryTerm binary =>
+            Contains(binary.Left, variable) ||
+            Contains(binary.Right, variable),
+        IrConditionalTerm conditional =>
+            Contains(conditional.Condition, variable) ||
+            Contains(conditional.WhenTrue, variable) ||
+            Contains(conditional.WhenFalse, variable),
+        IrCastTerm cast => Contains(cast.Operand, variable),
+        IrLengthTerm length => Contains(length.Value, variable),
+        IrSequenceAccessTerm access =>
+            Contains(access.Sequence, variable) ||
+            Contains(access.Index, variable),
+        IrOpaqueTerm opaque =>
+            opaque.Receiver != null &&
+            Contains(opaque.Receiver, variable) ||
+            opaque.Arguments.Any(argument => Contains(argument, variable)),
+        _ => false
+    };
+}

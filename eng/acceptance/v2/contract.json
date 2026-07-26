@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 2,
+  "releaseLine": "0.2.0-preview",
+  "flagship": "effects",
+  "historicalBaseline": {
+    "path": "eng/acceptance/v1",
+    "gitTree": "1388666e46265f306f9687b90eb11e3bdce5c1b9"
+  },
+  "supportedTargetFrameworks": [
+    "netstandard2.0",
+    "net8.0",
+    "net472"
+  ],
+  "analyzer": {
+    "defaultMode": "off",
+    "defaultDiagnosticSeverity": "Info",
+    "diagnosticsEnabledByDefault": false,
+    "unsupportedCallableBehavior": "silent"
+  },
+  "worker": {
+    "protocolVersion": 2,
+    "maximumParallelism": 4,
+    "maximumMemoryMiB": 2048,
+    "queryRlimit": 3000000,
+    "methodRlimit": 20000000,
+    "maximumMethodWallSeconds": 10,
+    "maximumProjectWallSeconds": 300,
+    "cancellationP95Milliseconds": 250,
+    "forcedTerminationMilliseconds": 1000
+  },
+  "cache": {
+    "schemaVersion": 2,
+    "maximumMiB": 512,
+    "cacheableOutcomes": [
+      "Proven",
+      "Refuted"
+    ]
+  },
+  "trustedKernel": {
+    "paths": [
+      "SharpProof.Verify/ProofKernel.cs",
+      "SharpProof.Verify/Evidence.cs",
+      "SharpProof.Verify/Outcomes.cs"
+    ],
+    "maximumNonblankLines": 275
+  },
+  "fuzz": {
+    "pullRequestCases": 1000,
+    "nightlyCases": 10000,
+    "maximumParallelism": 4
+  },
+  "performance": {
+    "warmups": 5,
+    "samples": 30,
+    "maximumMedianRatio": 1.10,
+    "maximumP95Ratio": 1.20,
+    "maximumRetainedMemoryRatio": 1.05,
+    "maximumRetainedMemoryIncreaseMiB": 32,
+    "maximumEnabledRetainedCompilations": 0,
+    "maximumEnabledRetainedMemoryIncreaseMiB": 32,
+    "ideEdits": 200,
+    "ideEditP95Milliseconds": 100,
+    "ideEditMaximumMilliseconds": 250
+  }
+}

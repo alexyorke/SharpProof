@@ -5,12 +5,15 @@
 
   <ItemGroup Condition="'$(SharpProofDogfood)' == 'true'">
     <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Analyzer.dll" />
-    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Symbolic.dll" />
-    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.ProofCore.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.ContractForGenerator\bin\$(Configuration)\netstandard2.0\SharpProof.ContractForGenerator.dll" />
     <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Attributes.dll" />
+    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Contracts.dll" />
+    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Dataflow.dll" />
+    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Effects.dll" />
+    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Frontend.dll" />
+    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Ir.dll" />
+    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Specs.dll" />
     <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\Microsoft.CodeAnalysis.AnalyzerUtilities.dll" />
-    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\Microsoft.Z3.dll" />
-    <AdditionalFiles Include="$(MSBuildThisFileDirectory)SharpProof.Package\SharpProof.NativeSmtLocator.txt" />
   </ItemGroup>
 
   <Target Name="_ValidateSharpProofDogfoodAnalyzer"

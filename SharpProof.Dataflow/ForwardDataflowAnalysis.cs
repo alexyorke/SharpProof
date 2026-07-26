@@ -1,0 +1,146 @@
+namespace SharpProof.Dataflow;
+
+public sealed class ForwardDataflowAnalysisOptions {
+    public ForwardDataflowAnalysisOptions(int widenAfter = 2, int maxIterations = 10_000) {
+        if (widenAfter < 0) throw new ArgumentOutOfRangeException(nameof(widenAfter));
+        if (maxIterations <= 0) throw new ArgumentOutOfRangeException(nameof(maxIterations));
+        WidenAfter = widenAfter;
+        MaxIterations = maxIterations;
+    }
+
+    public int WidenAfter { get; }
+    public int MaxIterations { get; }
+}
+
+public sealed class DataflowAnalysisResult<T> {
+    internal DataflowAnalysisResult(
+        ImmutableArray<T> inputStates,
+        ImmutableArray<T> outputStates,
+        int iterations) {
+        InputStates = inputStates;
+        OutputStates = outputStates;
+        Iterations = iterations;
+    }
+
+    public ImmutableArray<T> InputStates { get; }
+    public ImmutableArray<T> OutputStates { get; }
+    public int Iterations { get; }
+
+    public T GetInputState(int blockId) => InputStates[blockId];
+    public T GetOutputState(int blockId) => OutputStates[blockId];
+}
+
+/// <summary>
+/// Deterministic, round-based forward worklist solver.
+/// </summary>
+public static class ForwardDataflowAnalysis {
+    public static DataflowAnalysisResult<T> Analyze<T>(
+        DataflowGraph<T> graph,
+        IAbstractDomain<T> domain,
+        T initialState,
+        ForwardDataflowAnalysisOptions? options = null) =>
+        AnalyzeCore(graph, domain, initialState, options ?? new ForwardDataflowAnalysisOptions(), null);
+
+    internal static DataflowAnalysisResult<T> AnalyzeWithWorklistOrderForTesting<T>(
+        DataflowGraph<T> graph,
+        IAbstractDomain<T> domain,
+        T initialState,
+        ForwardDataflowAnalysisOptions options,
+        Func<ImmutableArray<int>, ImmutableArray<int>> worklistOrder) {
+        if (worklistOrder == null) throw new ArgumentNullException(nameof(worklistOrder));
+        return AnalyzeCore(graph, domain, initialState, options, worklistOrder);
+    }
+
+    private static DataflowAnalysisResult<T> AnalyzeCore<T>(
+        DataflowGraph<T> graph,
+        IAbstractDomain<T> domain,
+        T initialState,
+        ForwardDataflowAnalysisOptions options,
+        Func<ImmutableArray<int>, ImmutableArray<int>>? worklistOrder) {
+        if (graph == null) throw new ArgumentNullException(nameof(graph));
+        if (domain == null) throw new ArgumentNullException(nameof(domain));
+        if (options == null) throw new ArgumentNullException(nameof(options));
+
+        var inputs = new T[graph.Blocks.Length];
+        var outputs = new T[graph.Blocks.Length];
+        var updateCounts = new int[graph.Blocks.Length];
+        for (var index = 0; index < graph.Blocks.Length; index++) {
+            inputs[index] = domain.Bottom;
+            outputs[index] = domain.Bottom;
+        }
+        inputs[graph.EntryBlockId] = initialState;
+
+        var pending = new SortedSet<int> { graph.EntryBlockId };
+        var iterations = 0;
+        while (pending.Count != 0) {
+            if (iterations >= options.MaxIterations)
+                throw new InvalidOperationException("The dataflow analysis did not converge within its iteration limit.");
+            iterations++;
+
+            var batch = pending.ToImmutableArray();
+            pending.Clear();
+            if (worklistOrder != null) {
+                var orderedBatch = worklistOrder(batch);
+                ValidatePermutation(batch, orderedBatch);
+                batch = orderedBatch;
+            }
+
+            var changedOutputs = new Dictionary<int, T>();
+            foreach (var blockId in batch) {
+                var transferred = graph.GetBlock(blockId).Transfer(inputs[blockId]);
+                var monotoneOutput = domain.Join(outputs[blockId], transferred);
+                if (!domain.AreEquivalent(outputs[blockId], monotoneOutput))
+                    changedOutputs.Add(blockId, monotoneOutput);
+            }
+            if (changedOutputs.Count == 0) continue;
+
+            foreach (var change in changedOutputs)
+                outputs[change.Key] = change.Value;
+
+            var affected = new SortedSet<int>();
+            foreach (var blockId in changedOutputs.Keys)
+                foreach (var successor in graph.GetSuccessors(blockId))
+                    affected.Add(successor);
+
+            foreach (var blockId in affected) {
+                var incoming = blockId == graph.EntryBlockId ? initialState : domain.Bottom;
+                foreach (var predecessor in graph.GetPredecessors(blockId))
+                    incoming = domain.Join(incoming, outputs[predecessor]);
+
+                var candidate = domain.Join(inputs[blockId], incoming);
+                if (domain.AreEquivalent(inputs[blockId], candidate)) continue;
+                var updated = graph.IsCyclicBlock(blockId) &&
+                              updateCounts[blockId] >= options.WidenAfter
+                    ? domain.Widen(inputs[blockId], candidate)
+                    : candidate;
+                if (!domain.LessThanOrEqual(inputs[blockId], updated) ||
+                    !domain.LessThanOrEqual(candidate, updated))
+                    throw new InvalidOperationException("Domain widening must be an upper bound.");
+
+                updateCounts[blockId]++;
+                if (!domain.AreEquivalent(inputs[blockId], updated)) {
+                    inputs[blockId] = updated;
+                    pending.Add(blockId);
+                }
+            }
+        }
+
+        return new DataflowAnalysisResult<T>(
+            [.. inputs],
+            [.. outputs],
+            iterations);
+    }
+
+    private static void ValidatePermutation(
+        ImmutableArray<int> original,
+        ImmutableArray<int> reordered) {
+        if (original.Length != reordered.Length)
+            throw new InvalidOperationException("The worklist test hook must return a permutation.");
+        var expected = new HashSet<int>(original);
+        foreach (var blockId in reordered)
+            if (!expected.Remove(blockId))
+                throw new InvalidOperationException("The worklist test hook must return a permutation.");
+        if (expected.Count != 0)
+            throw new InvalidOperationException("The worklist test hook must return a permutation.");
+    }
+}

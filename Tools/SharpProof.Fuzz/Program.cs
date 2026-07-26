@@ -1,1 +1,0 @@
-return await SharpProof.Tools.Fuzz.Program.Main(args);

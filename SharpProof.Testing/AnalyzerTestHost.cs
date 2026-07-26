@@ -18,17 +18,39 @@ internal static class AnalyzerTestHost {
         new(CreateTrustedPlatformReferencesWithEnforcePure);
     private static readonly Lazy<MetadataReference> EnforcePureAttributeReference =
         new(() => MetadataReference.CreateFromFile(typeof(EnforcePureAttribute).Assembly.Location));
-    private static readonly AnalyzerOptions EmptyAnalyzerOptions = new([]);
-    public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(string source) {
+    public static Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(string source) =>
+        GetDiagnosticsAsync(
+            source,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+                ["sharpproof_mode"] = "all-experimental"
+            },
+            [.. AnalyzerInstances.SelectMany(static analyzer => analyzer.SupportedDiagnostics)
+                .Select(static descriptor => descriptor.Id)]);
+    internal static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(
+        string source,
+        IReadOnlyDictionary<string, string> globalOptions,
+        params string[] enabledDiagnosticIds) {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, PreviewParseOptions, string.Empty);
+        var specificDiagnosticOptions = enabledDiagnosticIds
+            .Distinct(StringComparer.Ordinal)
+            .ToImmutableDictionary(
+                static id => id,
+                static _ => ReportDiagnostic.Info,
+                StringComparer.Ordinal);
         var compilation = CreateCompilation(
             "AnalyzerTestHost",
             TrustedPlatformReferencesWithEnforcePure.Value,
-            DefaultCompilationOptions,
+            DefaultCompilationOptions
+                .WithSpecificDiagnosticOptions(specificDiagnosticOptions)
+                .WithSyntaxTreeOptionsProvider(
+                    new TestSyntaxTreeOptionsProvider(enabledDiagnosticIds)),
             syntaxTree);
+        var analyzerOptions = new AnalyzerOptions(
+            [],
+            new TestAnalyzerConfigOptionsProvider(globalOptions, enabledDiagnosticIds));
         var compilationWithAnalyzers = compilation.WithAnalyzers(
             AnalyzerInstances,
-            new CompilationWithAnalyzersOptions(EmptyAnalyzerOptions, null, false, false, false));
+            new CompilationWithAnalyzersOptions(analyzerOptions, null, false, false, false));
         return await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
     }
     internal static string GetRepositoryRoot() {
@@ -39,6 +61,12 @@ internal static class AnalyzerTestHost {
         }
         throw new InvalidOperationException("Could not find repository root.");
     }
+    internal static SharpProof.Analyzer.Configuration.AnalyzerConfiguration GetConfiguration(
+        IReadOnlyDictionary<string, string> globalOptions) =>
+        SharpProof.Analyzer.Configuration.AnalyzerConfiguration.FromOptions(
+            new AnalyzerOptions(
+                [],
+                new TestAnalyzerConfigOptionsProvider(globalOptions, [])));
     private static ImmutableArray<MetadataReference> CreateTrustedPlatformReferences() {
         var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
         if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
@@ -66,4 +94,61 @@ internal static class AnalyzerTestHost {
             new[] { syntaxTree },
             references,
             options);
+    private sealed class TestAnalyzerConfigOptionsProvider(
+        IReadOnlyDictionary<string, string> globalValues,
+        IEnumerable<string> enabledDiagnosticIds)
+        : AnalyzerConfigOptionsProvider {
+        private static readonly AnalyzerConfigOptions Empty = new TestAnalyzerConfigOptions(
+            new Dictionary<string, string>());
+        private readonly AnalyzerConfigOptions _global = new TestAnalyzerConfigOptions(globalValues);
+        private readonly AnalyzerConfigOptions _tree = new TestAnalyzerConfigOptions(
+            enabledDiagnosticIds
+                .Distinct(StringComparer.Ordinal)
+                .ToDictionary(
+                    static id => "dotnet_diagnostic." + id + ".severity",
+                    static _ => "warning",
+                    StringComparer.OrdinalIgnoreCase));
+        public override AnalyzerConfigOptions GlobalOptions => _global;
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => _tree;
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => Empty;
+    }
+    private sealed class TestAnalyzerConfigOptions(
+        IReadOnlyDictionary<string, string> values)
+        : AnalyzerConfigOptions {
+        public override bool TryGetValue(string key, out string value) {
+            if (values.TryGetValue(key, out var found)) {
+                value = found;
+                return true;
+            }
+            value = string.Empty;
+            return false;
+        }
+    }
+    private sealed class TestSyntaxTreeOptionsProvider(
+        IEnumerable<string> enabledDiagnosticIds)
+        : SyntaxTreeOptionsProvider {
+        private readonly ImmutableHashSet<string> _enabledDiagnosticIds =
+            enabledDiagnosticIds.ToImmutableHashSet(StringComparer.Ordinal);
+        public override GeneratedKind IsGenerated(
+            SyntaxTree tree,
+            CancellationToken cancellationToken) =>
+            GeneratedKind.NotGenerated;
+        public override bool TryGetDiagnosticValue(
+            SyntaxTree tree,
+            string diagnosticId,
+            CancellationToken cancellationToken,
+            out ReportDiagnostic severity) =>
+            TryGetValue(diagnosticId, out severity);
+        public override bool TryGetGlobalDiagnosticValue(
+            string diagnosticId,
+            CancellationToken cancellationToken,
+            out ReportDiagnostic severity) =>
+            TryGetValue(diagnosticId, out severity);
+        private bool TryGetValue(string diagnosticId, out ReportDiagnostic severity) {
+            severity = _enabledDiagnosticIds.Contains(diagnosticId)
+                ? ReportDiagnostic.Warn
+                : ReportDiagnostic.Default;
+            return severity != ReportDiagnostic.Default;
+        }
+    }
 }

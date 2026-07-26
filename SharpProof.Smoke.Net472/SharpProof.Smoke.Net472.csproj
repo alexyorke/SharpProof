@@ -6,7 +6,6 @@
     <RootNamespace>SharpProof.Smoke.Net472</RootNamespace>
     <AssemblyName>SharpProof.Smoke.Net472</AssemblyName>
     <IsPackable>false</IsPackable>
-    <SharpProofDogfood>true</SharpProofDogfood>
     <WarningsAsErrors>$(WarningsAsErrors);AD0001;CS8032;CS8034;CS8785</WarningsAsErrors>
   </PropertyGroup>
 </Project>

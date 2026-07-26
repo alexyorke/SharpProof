@@ -13,15 +13,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Windows x64 native SMT
+          - name: Windows packaged analyzer and worker
             os: windows-latest
-            expected-smt: Required
-          - name: Linux x64 graceful SMT fallback
+          - name: Linux packaged analyzer
             os: ubuntu-latest
-            expected-smt: Graceful
-          - name: macOS x64 native SMT
+          - name: macOS packaged analyzer
             os: macos-15-intel
-            expected-smt: Required
     steps:
       - uses: actions/checkout@v4
       - name: Setup required .NET SDKs
@@ -34,4 +31,3 @@ jobs:
         run: >-
           ./scripts/Test-SharpProofPackageConsumers.ps1
           -Configuration Release
-          -ExpectedSmt ${{ matrix.expected-smt }}

@@ -4,189 +4,54 @@ param(
 )
 
 Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
-. (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
+$ErrorActionPreference = 'Stop'
 
-$repositoryRoot = Split-Path -Parent $PSScriptRoot
-$pages = @(
-    @{
-        Name = "symbolic query examples"
-        TemplatePath = "docs/symbolic-query-examples.source.md"
-        OutputPath = "docs/symbolic-query-examples.md"
-        ManifestPath = "docs/readme-examples/symbolic-examples.json"
-        Marker = "<!-- SYMBOLIC_QUERY_EXAMPLES -->"
-        Header = "<!-- Generated from docs/symbolic-query-examples.source.md by scripts/Generate-Readme.ps1. -->"
-    }
+$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$documents = @(
+    'README.md',
+    'SEMANTICS.md',
+    'docs\architecture-v2.md',
+    'eng\acceptance\v2\README.md'
+)
+$requiredReadmeText = @(
+    '0.2.0-preview.1',
+    'sharpproof_mode',
+    'SharpProofVerify=true',
+    'SharpProof.Worker'
+)
+$retiredReadmeText = @(
+    'SharpProof.Symbolic',
+    'SharpProof.ProofCore',
+    'SharpProof.SymbolicCli',
+    'ExpectedComplexity'
 )
 
-function Get-ReadmeExampleTests {
-    param([string]$Root)
-
-    $map = @{}
-    $files = @(& git -C $Root ls-files --cached --others --exclude-standard -- 'SharpProof.Test/*.cs' 'SharpProof.ToolingTest/*.cs')
-    if ($LASTEXITCODE -ne 0) {
-        throw "git ls-files failed while inventorying README example tests."
+foreach ($relativePath in $documents) {
+    $path = Join-Path $repositoryRoot $relativePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        throw "Required maintained document is missing: $relativePath"
     }
-
-    $pattern = '(?ms)(?<attributes>(?:^[ \t]*\[[^\r\n]+\][ \t]*\r?\n)+)[ \t]*public\s+(?:async\s+)?(?:Task(?:<[^>\r\n]+>)?|ValueTask(?:<[^>\r\n]+>)?|void)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)'
-    foreach ($file in $files) {
-        $fullPath = Join-Path $Root $file
-        if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) { continue }
-        $content = Get-Content -LiteralPath $fullPath -Raw
-        foreach ($match in [System.Text.RegularExpressions.Regex]::Matches($content, $pattern)) {
-            $attributes = $match.Groups['attributes'].Value
-            $exampleMatch = [System.Text.RegularExpressions.Regex]::Match(
-                $attributes,
-                'ReadmeExample\("(?<id>[^"]+)"\)')
-            $testMatch = [System.Text.RegularExpressions.Regex]::IsMatch(
-                $attributes,
-                '(?:^|[,\[\s])Test(?:Attribute)?(?:\s*[,\]\(])')
-            if (-not $exampleMatch.Success -or -not $testMatch) {
-                continue
-            }
-
-            $id = $exampleMatch.Groups['id'].Value
-            $name = $match.Groups["name"].Value
-            if ($map.ContainsKey($id)) {
-                throw "Duplicate [ReadmeExample] id '$id' found in '$fullPath'."
-            }
-
-            $map[$id] = "{0}.{1}" -f [System.IO.Path]::GetFileNameWithoutExtension($file), $name
-        }
-    }
-
-    return $map
-}
-
-function Convert-ToGeneratedExamplesMarkdown {
-    param(
-        [object[]]$Examples,
-        [hashtable]$Tests,
-        [string]$Root
-    )
-
-    $builder = New-Object System.Text.StringBuilder
-    foreach ($example in $Examples) {
-        $sourceFile = Join-Path $Root $example.SourcePath
-        $outputFile = Join-Path $Root $example.OutputPath
-        if (-not (Test-Path -LiteralPath $sourceFile)) {
-            throw "Missing generated example source file: $($example.SourcePath)"
-        }
-
-        if (-not (Test-Path -LiteralPath $outputFile)) {
-            throw "Missing generated example output file: $($example.OutputPath)"
-        }
-
-        $sourceText = ConvertTo-SharpProofGeneratedText -Text (Get-Content -LiteralPath $sourceFile -Raw)
-        $outputText = ConvertTo-SharpProofGeneratedText -Text (Get-Content -LiteralPath $outputFile -Raw)
-        $diagnosticIds = @()
-        if ($example.PSObject.Properties.Name -contains "DiagnosticId" -and
-            -not [string]::IsNullOrWhiteSpace($example.DiagnosticId)) {
-            $diagnosticIds += $example.DiagnosticId
-        }
-        if ($example.PSObject.Properties.Name -contains "DiagnosticIds") {
-            $diagnosticIds += @($example.DiagnosticIds) |
-                Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-        }
-        foreach ($diagnosticId in $diagnosticIds | Sort-Object -Unique) {
-            [void]$builder.AppendLine(('<a id="{0}"></a>' -f $diagnosticId.ToLowerInvariant()))
-            [void]$builder.AppendLine()
-        }
-        [void]$builder.AppendLine("### $($example.Title)")
-        [void]$builder.AppendLine()
-        [void]$builder.AppendLine($example.Summary)
-        [void]$builder.AppendLine()
-        if ($Tests.ContainsKey($example.Id)) {
-            [void]$builder.AppendLine("Backed by test: ``$($Tests[$example.Id])``.")
-            [void]$builder.AppendLine()
-        }
-        if ($example.PSObject.Properties.Name -contains "Command" -and -not [string]::IsNullOrWhiteSpace($example.Command)) {
-            [void]$builder.AppendLine("Command:")
-            [void]$builder.AppendLine()
-            [void]$builder.AppendLine('```powershell')
-            [void]$builder.AppendLine($example.Command)
-            [void]$builder.AppendLine('```')
-            [void]$builder.AppendLine()
-        }
-
-        [void]$builder.AppendLine(('Source (`{0}`):' -f $example.SourcePath))
-        [void]$builder.AppendLine()
-        [void]$builder.AppendLine(('```{0}' -f $example.Language))
-        [void]$builder.Append($sourceText)
-        [void]$builder.AppendLine('```')
-        [void]$builder.AppendLine()
-        [void]$builder.AppendLine(('{0}:' -f $example.OutputLabel))
-        [void]$builder.AppendLine()
-        [void]$builder.AppendLine(('```{0}' -f $example.OutputLanguage))
-        [void]$builder.Append($outputText)
-        [void]$builder.AppendLine('```')
-        [void]$builder.AppendLine()
-    }
-
-    return $builder.ToString().TrimEnd("`r`n".ToCharArray())
-}
-
-function Get-ManifestExamples {
-    param([string]$ManifestFile)
-
-    if (-not (Test-Path -LiteralPath $ManifestFile)) {
-        throw "Missing generated example manifest: $ManifestFile"
-    }
-
-    $examples = Get-Content -LiteralPath $ManifestFile -Raw | ConvertFrom-Json
-    if ($null -eq $examples) {
-        throw "Manifest '$ManifestFile' is empty."
-    }
-
-    return @($examples)
-}
-
-function Get-GeneratedPage {
-    param(
-        [hashtable]$Page,
-        [hashtable]$Tests,
-        [string]$Root
-    )
-
-    $templateFile = Join-Path $Root $Page.TemplatePath
-    if (-not (Test-Path -LiteralPath $templateFile)) {
-        throw "Missing template file: $($Page.TemplatePath)"
-    }
-
-    $template = ConvertTo-SharpProofGeneratedText -Text (Get-Content -LiteralPath $templateFile -Raw)
-    if (-not $template.Contains($Page.Marker)) {
-        throw "Template '$($Page.TemplatePath)' is missing marker '$($Page.Marker)'."
-    }
-
-    $examples = Get-ManifestExamples -ManifestFile (Join-Path $Root $Page.ManifestPath)
-    $generatedExamples = Convert-ToGeneratedExamplesMarkdown -Examples $examples -Tests $Tests -Root $Root
-    $content = $Page.Header + "`n`n" + $template.Replace($Page.Marker, $generatedExamples)
-    return @{
-        Examples = $examples
-        Content = ConvertTo-SharpProofGeneratedText -Text $content
+    $content = Get-Content -LiteralPath $path -Raw
+    if ($content.Contains("`r")) {
+        throw "Maintained document must use LF line endings: $relativePath"
     }
 }
 
-$tests = Get-ReadmeExampleTests -Root $repositoryRoot
-$generatedPages = @()
-
-foreach ($page in $pages) {
-    $generated = Get-GeneratedPage -Page $page -Tests $tests -Root $repositoryRoot
-    $generatedPages += @{
-        Page = $page
-        Content = $generated.Content
+$readme = Get-Content -LiteralPath (Join-Path $repositoryRoot 'README.md') -Raw
+foreach ($required in $requiredReadmeText) {
+    if (-not $readme.Contains($required, [StringComparison]::Ordinal)) {
+        throw "README.md is missing required v2 text: $required"
+    }
+}
+foreach ($retired in $retiredReadmeText) {
+    if ($readme.Contains($retired, [StringComparison]::Ordinal)) {
+        throw "README.md still advertises retired surface: $retired"
     }
 }
 
-foreach ($generatedPage in $generatedPages) {
-    $outputFile = Join-Path $repositoryRoot $generatedPage.Page.OutputPath
-    Update-SharpProofGeneratedFile `
-        -Path $outputFile `
-        -Content $generatedPage.Content `
-        -DisplayPath $generatedPage.Page.OutputPath `
-        -GeneratorCommand '.\scripts\Generate-Readme.ps1' `
-        -Verify:$Verify
-    if (-not $Verify) { Write-Host ("Regenerated {0}." -f $generatedPage.Page.OutputPath) }
+if ($Verify) {
+    Write-Host 'Maintained SharpProof v2 documentation is current.'
 }
-
-if ($Verify) { Write-Host "Generated example pages are up to date." }
+else {
+    Write-Host 'Documentation is hand-maintained; validation passed.'
+}

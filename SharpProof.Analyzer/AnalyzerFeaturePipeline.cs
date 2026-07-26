@@ -1,84 +1,87 @@
 namespace SharpProof.Analyzer;
+
 internal static class AnalyzerFeaturePipeline {
-    internal static void AnalyzeOperationBlock(OperationBlockAnalysisContext context, AnalyzerSession session) {
-        if (!TryCreateOperationBlockContext(context, session, out var methodContext)) return;
-        AnalyzeCallable(methodContext, session);
-    }
-    internal static void AnalyzeSyntaxFallback(SyntaxNodeAnalysisContext context, AnalyzerSession session) {
-        if (!RequiresSyntaxFallback(context.Node) ||
-            !TryCreateSyntaxContext(context, session, out var methodContext))
-            return;
-        AnalyzeCallable(methodContext, session);
-    }
-    internal static bool RequiresSyntaxFallback(SyntaxNode node) {
-        if (node is PropertyDeclarationSyntax { ExpressionBody: not null } or
-            IndexerDeclarationSyntax { ExpressionBody: not null } or
-            LocalFunctionStatementSyntax)
-            return true;
-        return node switch {
-            BaseMethodDeclarationSyntax method => method.Body == null && method.ExpressionBody == null,
-            AccessorDeclarationSyntax accessor => accessor.Body == null && accessor.ExpressionBody == null,
-            _ => false
-        };
-    }
-    private static void AnalyzeCallable(MethodBodyAnalysisContext context, AnalyzerSession session) {
-        using (SymbolicAnalysisLimitContext.Push(session.Configuration.AnalysisLimits, context.Node)) {
-            ContractDiagnosticSupport.ReportInvalidEffectConfigurations(context);
-            EnforcePureContractAnalyzer.Analyze(context);
-            MethodAllocationAnalyzer.AnalyzeSymbolForZeroAllocations(context);
-            MethodCapabilityAnalyzer.AnalyzeSymbolForCapabilities(context);
-            MethodRequiresAnalyzer.AnalyzeSymbolForRequires(context, session.SmtAnalysis);
-            MethodEnsuresAnalyzer.AnalyzeSymbolForEnsures(context, session.SmtAnalysis);
-            MethodExpectedComplexityAnalyzer.AnalyzeSymbolForExpectedComplexity(context);
-            ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(context);
-            NullableContractAnalyzer.Analyze(context, session);
-        }
-    }
-    private static bool TryCreateOperationBlockContext(
+    internal static void AnalyzeOperationBlock(
         OperationBlockAnalysisContext context,
-        AnalyzerSession session,
-        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out MethodBodyAnalysisContext? methodContext) {
-        methodContext = null;
-        if (context.OwningSymbol is not IMethodSymbol methodSymbol || methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty)
-            return false;
-        var declaration = FindDeclaration(methodSymbol, context.OperationBlocks, context.CancellationToken);
-        if (declaration == null || RequiresSyntaxFallback(declaration)) return false;
-        var semanticModel = context.Compilation.GetSemanticModel(declaration.SyntaxTree);
-        var state = session.GetOrCreateMethodBodyAnalysis(
-            methodSymbol,
-            declaration,
-            semanticModel,
+        AnalyzerSession session) {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        if (context.OwningSymbol is not IMethodSymbol method)
+            return;
+        if (method.DeclaringSyntaxReferences.IsDefaultOrEmpty) {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Abstained);
+            return;
+        }
+
+        var declaration = FindDeclaration(
+            method,
             context.OperationBlocks,
             context.CancellationToken);
-        Action<Diagnostic> reportDiagnostic = context.ReportDiagnostic;
-        methodContext = new MethodBodyAnalysisContext(state, context.CancellationToken, reportDiagnostic);
-        return true;
-    }
-    private static bool TryCreateSyntaxContext(
-        SyntaxNodeAnalysisContext context,
-        AnalyzerSession session,
-        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out MethodBodyAnalysisContext? methodContext) {
-        methodContext = null;
-        var declaredSymbol = context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken);
-        var methodSymbol = declaredSymbol as IMethodSymbol;
-        if (methodSymbol == null &&
-            declaredSymbol is IPropertySymbol propertySymbol &&
-            context.Node is PropertyDeclarationSyntax { ExpressionBody: not null } or
-                IndexerDeclarationSyntax { ExpressionBody: not null })
-            methodSymbol = propertySymbol.GetMethod;
-        if (methodSymbol == null || methodSymbol.DeclaringSyntaxReferences.IsDefaultOrEmpty) return false;
-        var state = session.GetOrCreateMethodBodyAnalysis(
-            methodSymbol,
-            context.Node,
-            context.SemanticModel,
-            [],
+        if (declaration == null) {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Abstained);
+            return;
+        }
+        var isSuppressed = SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
+            method,
+            session,
+            context.ReportDiagnostic,
             context.CancellationToken);
-        Action<Diagnostic> reportDiagnostic = context.ReportDiagnostic;
-        methodContext = new MethodBodyAnalysisContext(state, context.CancellationToken, reportDiagnostic);
-        return true;
+        if (isSuppressed) {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Suppressed);
+            return;
+        }
+
+        var semanticModel =
+            SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
+            context.Compilation,
+            declaration.SyntaxTree);
+        var subset = LanguageSubsetGate.ClassifyV2Effects(
+                method,
+                declaration,
+                semanticModel,
+                context.OperationBlocks,
+                session.HasResolvedApiSpec,
+                context.CancellationToken);
+        if (!subset.IsSupported) {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Abstained);
+            return;
+        }
+
+        var outcome = AnalyzerSemanticOutcome.NotApplicable;
+        if (session.Configuration.Mode is
+            SharpProofMode.Effects or SharpProofMode.AllExperimental)
+            outcome = AnalyzerSemanticOutcomes.Combine(
+                outcome,
+                EffectContractDiagnostics.Analyze(
+                    method,
+                    declaration,
+                    session,
+                    context.ReportDiagnostic,
+                    context.CancellationToken));
+
+        if (session.Configuration.Mode is
+            SharpProofMode.Contracts or SharpProofMode.AllExperimental)
+            outcome = AnalyzerSemanticOutcomes.Combine(
+                outcome,
+                RequiresCallSiteAnalyzer.Analyze(
+                    method,
+                    declaration,
+                    semanticModel,
+                    session,
+                    context.ReportDiagnostic,
+                    context.CancellationToken));
+        session.RecordSemanticOutcome(method, outcome);
     }
+
     private static SyntaxNode? FindDeclaration(
-        IMethodSymbol methodSymbol,
+        IMethodSymbol method,
         ImmutableArray<IOperation> operationBlocks,
         CancellationToken cancellationToken) {
         var operationSyntax = operationBlocks.IsDefaultOrEmpty
@@ -87,21 +90,19 @@ internal static class AnalyzerFeaturePipeline {
                 .OrderByDescending(static operation => operation.Syntax.Span.Length)
                 .First()
                 .Syntax;
-        var references = methodSymbol.DeclaringSyntaxReferences;
-        if (operationSyntax != null)
-            foreach (var syntaxReference in references)
-                if (syntaxReference.SyntaxTree == operationSyntax.SyntaxTree &&
-                    syntaxReference.Span.Contains(operationSyntax.Span))
-                    return NormalizeDeclaration(syntaxReference.GetSyntax(cancellationToken));
-        var declaration = references.FirstOrDefault()?.GetSyntax(cancellationToken);
-        return declaration == null ? null : NormalizeDeclaration(declaration);
+        foreach (var reference in method.DeclaringSyntaxReferences) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (operationSyntax == null ||
+                reference.SyntaxTree == operationSyntax.SyntaxTree &&
+                reference.Span.Contains(operationSyntax.Span))
+                return NormalizeDeclaration(reference.GetSyntax(cancellationToken));
+        }
+        return null;
     }
-    private static SyntaxNode NormalizeDeclaration(SyntaxNode declaration) => declaration switch {
-        AccessorDeclarationSyntax => declaration,
-        PropertyDeclarationSyntax => declaration,
-        IndexerDeclarationSyntax => declaration,
-        ArrowExpressionClauseSyntax { Parent: PropertyDeclarationSyntax property } => property,
-        ArrowExpressionClauseSyntax { Parent: IndexerDeclarationSyntax indexer } => indexer,
-        _ => declaration
-    };
+
+    private static SyntaxNode NormalizeDeclaration(SyntaxNode declaration) =>
+        declaration switch {
+            ArrowExpressionClauseSyntax { Parent: { } parent } => parent,
+            _ => declaration
+        };
 }

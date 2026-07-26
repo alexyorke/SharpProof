@@ -1,15 +1,24 @@
-# Unknown evidence
+# Typed abstention reasons
 
-SharpProof uses `Unknown` when available evidence cannot prove or disprove a
-derived property. Unknown is not a contract violation fact, although a contract
-such as `[EnforcePure]` still fails verification unless its verdict is Proven.
+SharpProof represents uncertainty with closed enums rather than reason strings.
 
-`SharpProofUnknownReason` carries a stable code, category, message, retryability,
-and configuration classification. Common categories cover unresolved dispatch,
-unsupported operations, missing or malformed metadata, recursive cycles,
-cancellation, and exhausted analysis budgets. Effect sites retain the operation,
-origin, transitive source, and proof status that produced the reason.
+Frontend lowering can abstain for unsupported operation kinds, types, member or
+invocation shapes, control flow, statements, mutation, conversions,
+user-defined or lifted operators, invalid/error operations, and future unknown
+Roslyn kinds.
 
-Consumers should branch on the result status and verdict enum. Messages are for
-humans and may improve without changing semantics. Budget truncations are
-available through `SharpProofAnalysisResult.Truncations`.
+The analyzer language gate separately records closed reasons for unsupported
+callables, missing operation roots, operation kinds, types, and operation
+shapes. These abstentions remain intentionally silent.
+
+Proof verification can abstain for unsupported operations or encoding,
+approximations touching the goal, missing API specifications, resource limits,
+timeouts, unavailable backends, infrastructure failure, malformed backend
+results, or failed counterexample replay.
+
+The worker protocol adds callable, contract, body, expression, deep-Ensures,
+return-value, method-timeout, and project-timeout reasons. Worker responses
+retain the typed reason for automation and debugging.
+
+Display messages may contain strings. Semantic branching, cache identity, and
+proof evidence must use the typed values.

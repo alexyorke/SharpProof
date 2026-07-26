@@ -1,0 +1,164 @@
+using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
+using SharpProof.Analyzer;
+using SharpProof.Attributes;
+
+namespace SharpProof.Analyzer.V2.Test;
+
+internal static class AnalyzerV2TestHost {
+    private static readonly CSharpParseOptions ParseOptions =
+        new(LanguageVersion.Preview);
+    private static readonly Lazy<ImmutableArray<MetadataReference>> References =
+        new(CreateReferences);
+
+    internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        string source,
+        string? mode,
+        IEnumerable<string> enabledIds,
+        DiagnosticAnalyzer? analyzer = null,
+        IEnumerable<MetadataReference>? additionalReferences = null) {
+        var compilation = CreateCompilation(
+            source,
+            enabledIds,
+            additionalReferences);
+        return await AnalyzeAsync(
+                compilation,
+                mode,
+                analyzer)
+            .ConfigureAwait(false);
+    }
+
+    internal static CSharpCompilation CreateCompilation(
+        string source,
+        IEnumerable<string> enabledIds,
+        IEnumerable<MetadataReference>? additionalReferences = null) {
+        var enabled = enabledIds.ToImmutableHashSet(StringComparer.Ordinal);
+        var tree = CSharpSyntaxTree.ParseText(
+            source,
+            ParseOptions,
+            "input.cs");
+        return CSharpCompilation.Create(
+            "AnalyzerV2Fixture",
+            [tree],
+            additionalReferences == null
+                ? References.Value
+                : References.Value.AddRange(additionalReferences),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+                .WithSpecificDiagnosticOptions(
+                    enabled.ToImmutableDictionary(
+                        static id => id,
+                        static _ => ReportDiagnostic.Warn,
+                        StringComparer.Ordinal)));
+    }
+
+    internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        CSharpCompilation compilation,
+        string? mode,
+        DiagnosticAnalyzer? analyzer = null) {
+        var values = new Dictionary<string, string>(
+            StringComparer.OrdinalIgnoreCase);
+        if (mode != null)
+            values.Add("sharpproof_mode", mode);
+        var analyzerOptions = new AnalyzerOptions(
+            [],
+            new TestOptionsProvider(values));
+        var withAnalyzers = compilation.WithAnalyzers(
+            [analyzer ?? new SharpProofAnalyzer()],
+            new CompilationWithAnalyzersOptions(
+                analyzerOptions,
+                onAnalyzerException: null,
+                concurrentAnalysis: true,
+                logAnalyzerExecutionTime: false,
+                reportSuppressedDiagnostics: false));
+        return [.. (await withAnalyzers.GetAnalyzerDiagnosticsAsync())
+            .OrderBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
+            .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)];
+    }
+
+    internal static byte[] EmitImage(CSharpCompilation compilation) {
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        if (!result.Success)
+            throw new InvalidOperationException(
+                string.Join(
+                    Environment.NewLine,
+                    result.Diagnostics.Select(static diagnostic =>
+                        diagnostic.ToString())));
+        return stream.ToArray();
+    }
+
+    internal static MetadataReference EmitReference(
+        string source,
+        string assemblyName) {
+        var tree = CSharpSyntaxTree.ParseText(
+            source,
+            ParseOptions,
+            assemblyName + ".cs");
+        var compilation = CSharpCompilation.Create(
+            assemblyName,
+            [tree],
+            References.Value,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        if (!result.Success)
+            throw new InvalidOperationException(
+                string.Join(
+                    Environment.NewLine,
+                    result.Diagnostics.Select(static diagnostic =>
+                        diagnostic.ToString())));
+        return MetadataReference.CreateFromImage(stream.ToArray());
+    }
+
+    internal static string FindRepositoryRoot() {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
+             directory != null;
+             directory = directory.Parent) {
+            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
+                return directory.FullName;
+        }
+        throw new InvalidOperationException("Could not find the repository root.");
+    }
+
+    private static ImmutableArray<MetadataReference> CreateReferences() {
+        var trustedPlatformAssemblies =
+            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
+            throw new InvalidOperationException(
+                "Trusted platform assemblies are unavailable.");
+        return [.. trustedPlatformAssemblies
+            .Split(Path.PathSeparator)
+            .Select(static path => MetadataReference.CreateFromFile(path))
+            .Cast<MetadataReference>()
+            .Append(
+                MetadataReference.CreateFromFile(
+                    typeof(Contract).Assembly.Location))];
+    }
+
+    private sealed class TestOptionsProvider(
+        IReadOnlyDictionary<string, string> globalValues)
+        : AnalyzerConfigOptionsProvider {
+        private static readonly AnalyzerConfigOptions Empty =
+            new TestOptions(new Dictionary<string, string>());
+        private readonly AnalyzerConfigOptions _global =
+            new TestOptions(globalValues);
+
+        public override AnalyzerConfigOptions GlobalOptions => _global;
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => Empty;
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => Empty;
+    }
+
+    private sealed class TestOptions(
+        IReadOnlyDictionary<string, string> values)
+        : AnalyzerConfigOptions {
+        public override bool TryGetValue(string key, out string value) {
+            if (values.TryGetValue(key, out var found)) {
+                value = found;
+                return true;
+            }
+            value = string.Empty;
+            return false;
+        }
+    }
+}

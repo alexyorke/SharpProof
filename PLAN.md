@@ -1,5 +1,9 @@
 # SharpProof Net LOC Reduction Plan
 
+> Historical note: this preservation-first plan is superseded for active work
+> by the soundness-first v2 migration contract in `eng/acceptance/v2`. It is
+> retained only as evidence for the 0.1 preview line.
+
 ## Objective
 
 Reduce the repository's total handwritten code while preserving every feature and

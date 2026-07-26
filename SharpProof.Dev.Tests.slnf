@@ -2,8 +2,25 @@
   "solution": {
     "path": "SharpProof.sln",
     "projects": [
-      "SharpProof.Test\\SharpProof.Test.csproj",
-      "SharpProof.ToolingTest\\SharpProof.ToolingTest.csproj"
+      "SharpProof.Analyzer.V2.Test\\SharpProof.Analyzer.V2.Test.csproj",
+      "SharpProof.ArchitectureTest\\SharpProof.ArchitectureTest.csproj",
+      "SharpProof.Attributes.Test\\SharpProof.Attributes.Test.csproj",
+      "SharpProof.ContractForGenerator.Test\\SharpProof.ContractForGenerator.Test.csproj",
+      "SharpProof.Contracts.Test\\SharpProof.Contracts.Test.csproj",
+      "SharpProof.Dataflow.Test\\SharpProof.Dataflow.Test.csproj",
+      "SharpProof.Effects.Test\\SharpProof.Effects.Test.csproj",
+      "SharpProof.Frontend.Test\\SharpProof.Frontend.Test.csproj",
+      "SharpProof.Ir.Test\\SharpProof.Ir.Test.csproj",
+      "SharpProof.Meta.Analyzers.Test\\SharpProof.Meta.Analyzers.Test.csproj",
+      "SharpProof.Migration.Test\\SharpProof.Migration.Test.csproj",
+      "SharpProof.Package.Test\\SharpProof.Package.Test.csproj",
+      "SharpProof.Smt.Test\\SharpProof.Smt.Test.csproj",
+      "SharpProof.Specs.Test\\SharpProof.Specs.Test.csproj",
+      "SharpProof.Testing.Test\\SharpProof.Testing.Test.csproj",
+      "SharpProof.V2Fuzz.Test\\SharpProof.V2Fuzz.Test.csproj",
+      "SharpProof.V2Gates.Test\\SharpProof.V2Gates.Test.csproj",
+      "SharpProof.Verify.Test\\SharpProof.Verify.Test.csproj",
+      "SharpProof.Worker.Test\\SharpProof.Worker.Test.csproj"
     ]
   }
 }

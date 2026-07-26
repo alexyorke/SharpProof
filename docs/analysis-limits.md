@@ -1,33 +1,20 @@
-# Bounded analysis limits
+# Analysis limits
 
-SharpProof bounds fact collection, state merging, and solver work so analysis
-cannot grow without limit. Exceeded bounds record stable truncation evidence and
-produce `Unknown`; retained facts are never upgraded into an optimistic proof.
+The checked-in v2 acceptance contract is
+`eng/acceptance/v2/contract.json`. Its shipping defaults are:
 
-`SharpProofAnalysisBudget` controls CFG/state limits such as merged branch facts,
-finite-foreach facts, structural null depth, path conditions, and fact-choice
-combinations. All values must be positive. Analyzer builds expose matching
-compilation-global `sharpproof_analysis_*` options; invalid values report
-`SP0025` while the default remains active.
+- at most 4 worker processes and 2 GiB for the worker Job Object;
+- Z3 query rlimit 3,000,000 and method rlimit 20,000,000;
+- 10 seconds per method and 300 seconds per project as outer fail-closed
+  boundaries;
+- expression depth 64;
+- a 512 MiB content-addressed cache;
+- 250 ms cancellation p95 and 1 second forced termination;
+- 1,000 deterministic fuzz cases for pull requests and 10,000 nightly.
 
-```csharp
-var budget = new SharpProofAnalysisBudget(
-    MaxFiniteForeachElementFacts: 16,
-    MaxMergedPathConditions: 64);
+The analyzer remains default-off and does not create an analysis session in
+that mode. Performance gates use 5 warmups, 30 samples, and 200 simulated IDE
+edits. Unknown rate is recorded as a metric, never a release gate.
 
-using var session = SharpProofAnalysisSession.FromText(
-    sourceText,
-    "Example.cs",
-    new SharpProofAnalysisOptions(budget));
-var result = session.Analyze(new SharpProofAnalysisRequest(
-    target,
-    SharpProofAnalysisFacet.ProofFacts));
-
-foreach (var item in result.Truncations)
-    Console.WriteLine($"{item.Code}: {item.Observed} > {item.Limit}");
-```
-
-Each truncation includes its stable code, retained limit, observed count,
-provenance, and optional source span. Z3 timeout, expression-node,
-path-condition, and method budgets remain separate solver limits and surface as
-unified unknown reasons.
+No budget outcome is promoted to `Proven` or `Refuted`. Only terminal hygienic
+proofs and replay-validated refutations are cacheable.

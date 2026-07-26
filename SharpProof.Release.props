@@ -2,9 +2,9 @@
   <PropertyGroup>
     <SharpProofProductName>SharpProof</SharpProofProductName>
     <SharpProofPublisher>Alex Yorke</SharpProofPublisher>
-    <SharpProofVersionPrefix>0.1.0</SharpProofVersionPrefix>
+    <SharpProofVersionPrefix>0.2.0</SharpProofVersionPrefix>
     <SharpProofPackageVersion>$(SharpProofVersionPrefix)-preview.1</SharpProofPackageVersion>
-    <SharpProofProductDescription>SharpProof bounded symbolic C# analysis platform for purity, zero-allocation and capability contracts, invariants, runtime hazards, complexity queries, and Z3-backed proofs. Profile-enabled common bug diagnostics cover async, ownership, concurrency, LINQ, and serialization.</SharpProofProductDescription>
+    <SharpProofProductDescription>SharpProof soundness-first C# effect analysis for purity, zero-allocation, capabilities, exception contracts, and compiler-bound preconditions. Unsupported code is handled conservatively and proof-producing features are opt-in.</SharpProofProductDescription>
     <SharpProofProjectUrl>https://github.com/alexyorke/SharpProof</SharpProofProjectUrl>
   </PropertyGroup>
 </Project>

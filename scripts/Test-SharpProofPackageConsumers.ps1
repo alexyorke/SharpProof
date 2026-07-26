@@ -12,199 +12,38 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
-$wrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
-$fixtureRoot = Join-Path $PSScriptRoot 'package-consumers'
-$artifactRoot = Join-Path $repoRoot 'artifacts/package-consumers'
-$runRoot = Join-Path $artifactRoot ('run-' + [Guid]::NewGuid().ToString('N'))
-$packageSource = Join-Path $runRoot 'packages'
-$consumerRoot = Join-Path $runRoot 'consumers'
-$packageCache = Join-Path $runRoot '.nuget'
+$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$testProject = Join-Path $repositoryRoot 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
 $isWindowsHost = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
     [System.Runtime.InteropServices.OSPlatform]::Windows)
 
-function Invoke-DotnetCommand {
-    param(
-        [Parameter(Mandatory = $true)][string[]]$Arguments,
-        [Parameter(Mandatory = $true)][string]$WorkingDirectory
-    )
-
-    Push-Location $WorkingDirectory
-    try {
-        if ($isWindowsHost) {
-            $lines = @(& $wrapper -MemoryLimitMb 6144 -TimeoutSeconds 600 @Arguments 2>&1)
-        }
-        else {
-            $lines = @(& dotnet @Arguments 2>&1)
-        }
-        $exitCode = $LASTEXITCODE
-    }
-    finally {
-        Pop-Location
-    }
-
-    $output = $lines -join [Environment]::NewLine
-    if ($output.Length -ne 0) {
-        Write-Host $output
-    }
-    if ($exitCode -ne 0) {
-        throw "dotnet $($Arguments -join ' ') failed with exit code $exitCode."
-    }
-
-    return $output
-}
-
-function Expand-ProjectTemplate {
-    param(
-        [Parameter(Mandatory = $true)][string]$TemplatePath,
-        [Parameter(Mandatory = $true)][string]$DestinationPath,
-        [Parameter(Mandatory = $true)][string]$PackageVersion
-    )
-
-    $content = [System.IO.File]::ReadAllText($TemplatePath)
-    $content = $content.Replace('__PACKAGE_VERSION__', $PackageVersion).Replace("`r`n", "`n")
-    [System.IO.File]::WriteAllText(
-        $DestinationPath,
-        $content,
-        [System.Text.UTF8Encoding]::new($false))
-}
-
-function New-PackageConsumer {
-    param([string]$Name, [string]$PackageVersion, [string]$SourceFileName)
-
-    $consumer = Join-Path $consumerRoot $Name
-    New-Item -ItemType Directory -Path $consumer | Out-Null
-    Expand-ProjectTemplate (Join-Path $fixtureRoot "$Name.csproj.template") `
-        (Join-Path $consumer "$Name.csproj") $PackageVersion
-    Copy-Item -LiteralPath (Join-Path $fixtureRoot "$Name.cs") `
-        -Destination (Join-Path $consumer $SourceFileName)
-    [void](Invoke-DotnetCommand @(
-        'restore', (Join-Path $consumer "$Name.csproj"),
-        '--configfile', $nugetConfigPath,
-        '--packages', $packageCache) $consumer)
-    return $consumer
-}
-
-function Get-EvaluatedProjectProperty {
-    param(
-        [Parameter(Mandatory = $true)][string]$ProjectPath,
-        [Parameter(Mandatory = $true)][string]$PropertyName
-    )
-
-    # This property-only evaluation does not run build targets. Capture its
-    # single-line output directly; the Job Object wrapper intentionally writes
-    # child output to the host instead of the PowerShell pipeline.
-    Push-Location $repoRoot
-    try {
-        $lines = @(& dotnet msbuild $ProjectPath -nologo "-getProperty:$PropertyName" 2>&1)
-        $exitCode = $LASTEXITCODE
-    }
-    finally {
-        Pop-Location
-    }
-
-    $output = $lines -join [Environment]::NewLine
-    if ($exitCode -ne 0) {
-        throw "Evaluating $PropertyName from '$ProjectPath' failed with exit code $exitCode.$([Environment]::NewLine)$output"
-    }
-
-    $value = @($output -split '\r?\n') |
-        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-        Select-Object -Last 1
-    if ($null -eq $value) {
-        throw "Project '$ProjectPath' does not evaluate $PropertyName."
-    }
-    return ([string]$value).Trim()
-}
-
-$previousPackageCache = $env:NUGET_PACKAGES
-New-Item -ItemType Directory -Force -Path $packageSource, $consumerRoot, $packageCache | Out-Null
-
+Push-Location $repositoryRoot
 try {
-    $packageProjectManifest = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'package-projects.json') -Raw | ConvertFrom-Json
-    $packageProjects = @($packageProjectManifest.projects | ForEach-Object { Join-Path $repoRoot $_ })
-    $analyzerProject, $attributesProject, $symbolicProject = $packageProjects
-    $analyzerVersion = Get-EvaluatedProjectProperty $analyzerProject 'PackageVersion'
-    $attributesVersion = Get-EvaluatedProjectProperty $attributesProject 'Version'
-    $symbolicVersion = Get-EvaluatedProjectProperty $symbolicProject 'Version'
-    if ($analyzerVersion -ne $attributesVersion -or $analyzerVersion -ne $symbolicVersion) {
-        throw "Package versions do not match: analyzer '$analyzerVersion', attributes '$attributesVersion', symbolic '$symbolicVersion'."
+    if ($isWindowsHost) {
+        & (Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1') `
+            -MemoryLimitMb 6144 `
+            -TimeoutSeconds 900 `
+            test $testProject `
+            --configuration $Configuration `
+            --logger 'console;verbosity=minimal'
     }
-
-    [void](Invoke-DotnetCommand @('restore', (Join-Path $repoRoot 'SharpProof.sln')) $repoRoot)
-    [void](Invoke-DotnetCommand @(
-        'build', $analyzerProject,
-        '--configuration', $Configuration,
-        '--no-restore',
-        '/m:1',
-        '/warnaserror') $repoRoot)
-    foreach ($packageProject in $packageProjects) {
-        [void](Invoke-DotnetCommand @(
-            'pack', $packageProject,
-            '--configuration', $Configuration,
-            '--no-build',
-            '--output', $packageSource) $repoRoot)
+    else {
+        & dotnet test $testProject `
+            --configuration $Configuration `
+            --logger 'console;verbosity=minimal'
     }
-
-    $env:NUGET_PACKAGES = $packageCache
-    $nugetConfigPath = Join-Path $runRoot 'NuGet.Config'
-    $escapedPackageSource = [System.Security.SecurityElement]::Escape($packageSource)
-    $nugetConfig = '<configuration><packageSources><clear />' +
-        '<add key="local-sharpproof" value="' + $escapedPackageSource + '" />' +
-        '<add key="nuget.org" value="https://api.nuget.org/v3/index.json" />' +
-        '</packageSources></configuration>'
-    [System.IO.File]::WriteAllText(
-        $nugetConfigPath,
-        $nugetConfig,
-        [System.Text.UTF8Encoding]::new($false))
-    $symbolicConsumer = New-PackageConsumer 'SymbolicConsumer' $symbolicVersion 'Program.cs'
-    [void](Invoke-DotnetCommand @(
-        'run',
-        '--project', (Join-Path $symbolicConsumer 'SymbolicConsumer.csproj'),
-        '--configuration', $Configuration,
-        '--no-restore',
-        '--', $ExpectedSmt) $symbolicConsumer)
-
-    $analyzerConsumer = New-PackageConsumer 'AnalyzerConsumer' $analyzerVersion 'AnalyzerConsumer.cs'
-    $analyzerDiagnosticLog = Join-Path $analyzerConsumer 'analyzer-diagnostics.sarif'
-    [void](Invoke-DotnetCommand @(
-        'build', (Join-Path $analyzerConsumer 'AnalyzerConsumer.csproj'),
-        '--configuration', $Configuration,
-        '--no-restore',
-        "/p:ErrorLog=$analyzerDiagnosticLog") $analyzerConsumer)
-    if (-not (Test-Path -LiteralPath $analyzerDiagnosticLog)) {
-        throw 'The analyzer consumer did not produce its compiler diagnostic log.'
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
     }
-    $analyzerDiagnostics = [System.IO.File]::ReadAllText($analyzerDiagnosticLog)
-    $analyzerSarif = $analyzerDiagnostics | ConvertFrom-Json
-    $loadFailureIds = @('AD0001', 'CS8032', 'CS8034', 'CS8785')
-    $loadFailures = @($analyzerSarif.runs | ForEach-Object { $_.results } | Where-Object {
-        $loadFailureIds -contains $_.ruleId
-    })
-    if ($loadFailures.Count -ne 0) {
-        throw 'The packaged analyzer reported an analyzer/generator load failure.'
-    }
-    $sharpProofDiagnostics = @($analyzerSarif.runs | ForEach-Object { $_.results } | Where-Object {
-        $_.ruleId -eq 'SP0019'
-    })
-    if ($sharpProofDiagnostics.Count -eq 0) {
-        throw 'The analyzer consumer did not report SP0019, so analyzer loading was not proven.'
-    }
-
-    $runtimeDescription = [System.Runtime.InteropServices.RuntimeInformation]::OSDescription + '/' +
-        [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture
-    Write-Host "Package consumers passed for $runtimeDescription with expectation $ExpectedSmt."
 }
 finally {
-    $env:NUGET_PACKAGES = $previousPackageCache
-    $resolvedArtifactRoot = [System.IO.Path]::GetFullPath($artifactRoot).TrimEnd(
-        [System.IO.Path]::DirectorySeparatorChar,
-        [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
-    $resolvedRunRoot = [System.IO.Path]::GetFullPath($runRoot)
-    if (-not $resolvedRunRoot.StartsWith($resolvedArtifactRoot, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Refusing to remove package-consumer run directory outside '$resolvedArtifactRoot'."
-    }
-    if (Test-Path -LiteralPath $resolvedRunRoot) {
-        Remove-Item -LiteralPath $resolvedRunRoot -Recurse -Force
-    }
+    Pop-Location
 }
+
+$workerScope = if ($isWindowsHost) {
+    'analyzer and out-of-process worker'
+}
+else {
+    'analyzer (packaged worker is not supported on this host)'
+}
+Write-Host "SharpProof packaged $workerScope consumer passed ($ExpectedSmt host policy)."

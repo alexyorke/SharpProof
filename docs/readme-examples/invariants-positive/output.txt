@@ -1,2 +1,0 @@
-Status: Succeeded
-Proof: value > 0: ProvenTrue (ir_state_contains_condition)

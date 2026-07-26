@@ -13,19 +13,16 @@ param(
     [int]$TimeoutSeconds = 300,
 
     [Parameter()]
-    [ValidateRange(1, 60000)]
-    [int]$SmtQueryTimeoutMs = 100,
-
-    [Parameter()]
-    [ValidateRange(1, 600000)]
-    [int]$SmtMethodBudgetMs = 500,
-
-    [Parameter()]
-    # The largest engine project is opt-in until its self-analysis scalability issue is resolved:
-    # -Project 'SharpProof.Symbolic\SharpProof.Symbolic.csproj'
     [string[]]$Project = @(
         'SharpProof.Attributes\SharpProof.Attributes.csproj',
-        'SharpProof.ProofCore\SharpProof.ProofCore.csproj',
+        'SharpProof.Ir\SharpProof.Ir.csproj',
+        'SharpProof.Specs\SharpProof.Specs.csproj',
+        'SharpProof.Dataflow\SharpProof.Dataflow.csproj',
+        'SharpProof.Frontend\SharpProof.Frontend.csproj',
+        'SharpProof.Contracts\SharpProof.Contracts.csproj',
+        'SharpProof.Effects\SharpProof.Effects.csproj',
+        'SharpProof.Verify\SharpProof.Verify.csproj',
+        'SharpProof.Smt\SharpProof.Smt.csproj',
         'SharpProof.Analyzer\SharpProof.Analyzer.csproj'
     )
 )
@@ -64,9 +61,7 @@ try
             /p:SharpProofDogfood=true `
             /p:GeneratePackageOnBuild=false `
             /p:TreatWarningsAsErrors=false `
-            /p:sharpproof_smt_mode=bounded `
-            /p:sharpproof_smt_timeout_ms=$SmtQueryTimeoutMs `
-            /p:sharpproof_smt_method_budget_ms=$SmtMethodBudgetMs
+            /p:SharpProofMode=off
         if ($LASTEXITCODE -ne 0)
         {
             exit $LASTEXITCODE

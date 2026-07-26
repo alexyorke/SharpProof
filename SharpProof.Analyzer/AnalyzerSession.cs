@@ -1,45 +1,105 @@
 namespace SharpProof.Analyzer;
-internal sealed class AnalyzerSession : IDisposable {
-    private readonly ConcurrentDictionary<IMethodSymbol, Lazy<MethodBodyAnalysisState>> _methodBodyAnalyses =
-        new(SymbolEq.Default);
-    private readonly MethodEffectAnalysisSession _effectAnalysis;
-    internal AnalyzerSession(Compilation compilation, AnalyzerOptions options, CancellationToken cancellationToken) {
-        Configuration = AnalyzerConfiguration.FromOptions(options);
-        SmtAnalysis = new SmtAnalysisService(Configuration.SmtOptions);
-        var configuredEffects = new ConfiguredEffectContractResolver(options.AnalyzerConfigOptionsProvider.GlobalOptions);
-        _effectAnalysis = new MethodEffectAnalysisSession(
-            compilation,
-            cancellationToken,
-            configuredEffects.Resolve,
-            SmtAnalysis);
+
+internal interface IAnalyzerSessionFactory {
+    AnalyzerSession Create(
+        Compilation compilation,
+        AnalyzerConfiguration configuration,
+        CancellationToken cancellationToken);
+}
+
+internal sealed class DefaultAnalyzerSessionFactory : IAnalyzerSessionFactory {
+    internal static DefaultAnalyzerSessionFactory Instance { get; } = new();
+
+    private DefaultAnalyzerSessionFactory() {
     }
+
+    public AnalyzerSession Create(
+        Compilation compilation,
+        AnalyzerConfiguration configuration,
+        CancellationToken cancellationToken) =>
+        new(compilation, configuration, cancellationToken);
+}
+
+internal sealed class AnalyzerSession {
+    private readonly EffectAnalysisSession? _effects;
+    private readonly ResolvedApiSpecTable _apiSpecs;
+    private readonly Action<IMethodSymbol, AnalyzerSemanticOutcome>? _outcomeObserver;
+    private readonly ConcurrentDictionary<AttributeSourceKey, byte> _validatedAttributes = new();
+
+    internal AnalyzerSession(
+        Compilation compilation,
+        AnalyzerConfiguration configuration,
+        CancellationToken cancellationToken,
+        Action<IMethodSymbol, AnalyzerSemanticOutcome>? outcomeObserver = null) {
+        cancellationToken.ThrowIfCancellationRequested();
+        Compilation = compilation ??
+            throw new ArgumentNullException(nameof(compilation));
+        Configuration = configuration ??
+            throw new ArgumentNullException(nameof(configuration));
+        _outcomeObserver = outcomeObserver;
+        Attributes = new AnalyzerAttributeSymbols(compilation);
+        _apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
+        if (configuration.Mode is SharpProofMode.Effects or SharpProofMode.AllExperimental)
+            _effects = new EffectAnalysisSession(compilation, ApiSpecTable.Default);
+    }
+
+    internal Compilation Compilation { get; }
     internal AnalyzerConfiguration Configuration { get; }
-    internal SmtAnalysisService SmtAnalysis { get; }
-    internal MethodBodyAnalysisState GetOrCreateMethodBodyAnalysis(
-        IMethodSymbol methodSymbol,
-        SyntaxNode declaration,
-        SemanticModel semanticModel,
-        ImmutableArray<IOperation> operationBlocks,
+    internal AnalyzerAttributeSymbols Attributes { get; }
+    internal IrFactory IrFactory { get; } = new();
+
+    internal EffectMethodResult AnalyzeEffects(
+        IMethodSymbol method,
         CancellationToken cancellationToken) {
-        var lazy = _methodBodyAnalyses.GetOrAdd(
-            methodSymbol,
-            _ => new Lazy<MethodBodyAnalysisState>(
-                () => new MethodBodyAnalysisState(
-                    MethodAnalysisSnapshot.Create(methodSymbol, declaration, semanticModel, operationBlocks, cancellationToken),
-                    _effectAnalysis),
-                LazyThreadSafetyMode.ExecutionAndPublication));
-        try {
-            return lazy.Value;
-        }
-        catch {
-            if (_methodBodyAnalyses.TryGetValue(methodSymbol, out var current) &&
-                ReferenceEquals(current, lazy))
-                _methodBodyAnalyses.TryRemove(methodSymbol, out _);
-            throw;
-        }
+        cancellationToken.ThrowIfCancellationRequested();
+        return (_effects ??
+                throw new InvalidOperationException(
+                    "Effect analysis was not enabled for this compilation."))
+            .Analyze(method, cancellationToken);
     }
-    public void Dispose() {
-        SmtAnalysis.Dispose();
-        _methodBodyAnalyses.Clear();
+
+    internal bool HasResolvedApiSpec(IMethodSymbol method) =>
+        _apiSpecs.TryGet(method, out _);
+
+    internal bool IsKnownPure(IMethodSymbol method) =>
+        _apiSpecs.IsPureAndAllocationFree(method);
+
+    internal void RecordSemanticOutcome(
+        IMethodSymbol method,
+        AnalyzerSemanticOutcome outcome) =>
+        _outcomeObserver?.Invoke(method, outcome);
+
+    internal bool TryMarkControlAttributeValidated(AttributeData attribute) {
+        var reference = attribute.ApplicationSyntaxReference;
+        return reference == null ||
+               _validatedAttributes.TryAdd(
+                   new AttributeSourceKey(
+                       reference.SyntaxTree,
+                       reference.Span),
+                   0);
+    }
+
+    private readonly struct AttributeSourceKey : IEquatable<AttributeSourceKey> {
+        internal AttributeSourceKey(SyntaxTree tree, TextSpan span) {
+            Tree = tree;
+            Span = span;
+        }
+
+        private SyntaxTree Tree { get; }
+        private TextSpan Span { get; }
+
+        public bool Equals(AttributeSourceKey other) =>
+            ReferenceEquals(Tree, other.Tree) &&
+            Span.Equals(other.Span);
+
+        public override bool Equals(object? obj) =>
+            obj is AttributeSourceKey other && Equals(other);
+
+        public override int GetHashCode() {
+            unchecked {
+                return (System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(Tree) * 397) ^
+                       Span.GetHashCode();
+            }
+        }
     }
 }

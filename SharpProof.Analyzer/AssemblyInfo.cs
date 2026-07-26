@@ -1,4 +1,3 @@
 [assembly: InternalsVisibleTo("SharpProof.Test")]
-[assembly: InternalsVisibleTo("SharpProof.ToolingTest")]
-[assembly: InternalsVisibleTo("SharpProof.Fuzz.Core")]
-[assembly: InternalsVisibleTo("SharpProof.SymbolicCli")]
+[assembly: InternalsVisibleTo("SharpProof.Analyzer.V2.Test")]
+[assembly: InternalsVisibleTo("SharpProof.V2Gates")]

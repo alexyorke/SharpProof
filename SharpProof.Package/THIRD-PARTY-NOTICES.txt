@@ -4,8 +4,8 @@ Microsoft Z3 4.12.2
 Source: https://github.com/Z3Prover/z3/tree/z3-4.12.2
 Package: https://www.nuget.org/packages/Microsoft.Z3/4.12.2
 
-The package embeds Microsoft.Z3.dll, the win-x64 libz3.dll, and the osx-x64
-libz3.dylib from the official Microsoft.Z3 4.12.2 NuGet package.
+The package embeds Microsoft.Z3.dll and the win-x64 libz3.dll from the
+official Microsoft.Z3 4.12.2 NuGet package.
 
 Z3
 Copyright (c) Microsoft Corporation

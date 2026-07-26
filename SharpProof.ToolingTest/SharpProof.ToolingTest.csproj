@@ -1,6 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <Import Project="..\SharpProof.Testing.props" />
-  <ItemGroup>
-    <ProjectReference Include="..\Tools\SharpProof.Fuzz.Core\SharpProof.Fuzz.Core.csproj" />
-  </ItemGroup>
-</Project>

@@ -5,10 +5,10 @@
     <LangVersion>latest</LangVersion>
     <IsPackable>true</IsPackable> 
     <PackageId>SharpProof.Attributes</PackageId>
-    <Description>Contains SharpProof contracts for composable method effects, including EnforcePureAttribute, EffectContractAttribute, ZeroAllocationsAttribute, AllowedCapabilitiesAttribute, DoesNotThrowAttribute, AllowedExceptionsAttribute, ExpectedComplexityAttribute, SharpProofEffect, and SharpProofCapability.</Description>
-    <PackageTags>SharpProof;Attributes;Roslyn;Analyzer;Purity;StaticAnalysis;SymbolicAnalysis;Capabilities;ZeroAllocations;Exceptions;Complexity</PackageTags>
+    <Description>Contains SharpProof contracts for compiler-bound Requires, Ensures, Assume, Result, and Old expressions; closed contract attributes; suppressions and trust declarations; and composable method effects.</Description>
+    <PackageTags>SharpProof;Attributes;Roslyn;Analyzer;Purity;StaticAnalysis;SymbolicAnalysis;Capabilities;ZeroAllocations;Exceptions</PackageTags>
     <Title>SharpProof Attributes</Title>
-    <PackageReleaseNotes>Public preview release of the SharpProof contract attributes package, including purity, synchronization, zero-allocation, capability-contract, exception-contract, symbolic postcondition, and complexity-contract attributes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Breaking soundness-first preview with compiler-bound Contract APIs, closed contract attributes, explicit suppression and trust declarations, and the effect-contract flagship.</PackageReleaseNotes>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild> 
   </PropertyGroup>
   <ItemGroup>
