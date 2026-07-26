@@ -3,7 +3,7 @@ namespace SharpProof.Analyzer;
 
 internal static class GeneratedDiagnosticDescriptors {
     private const string HelpBase =
-        "https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md#";
+        "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#";
 
     internal static readonly DiagnosticDescriptor PurityNotVerifiedRule = Create(
         "SP0002",

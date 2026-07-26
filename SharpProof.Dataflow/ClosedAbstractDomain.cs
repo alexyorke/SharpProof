@@ -11,7 +11,7 @@ public abstract class ClosedAbstractDomain<T> : AbstractDomain<T>, IAbstractDoma
     public abstract T Top { get; }
     public abstract bool LessThanOrEqual(T left, T right);
     public abstract T Join(T left, T right);
-    public abstract T Widen(T previous, T next);
+    public abstract T Widen(T previous, T candidate);
     public abstract T Havoc(T value);
 
     public virtual bool AreEquivalent(T left, T right) =>

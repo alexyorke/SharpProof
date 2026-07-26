@@ -28,9 +28,7 @@ public sealed class IrProgramBuilder(IrFactory factory) {
     }
 
     public IrMemberLocation MemberLocation(
-        IrMemberId member,
-        IrTerm? receiver,
-        params IrTerm[] arguments) {
+        IrMemberId member, IrTerm? receiver, params IrTerm[] arguments) {
         if (arguments == null) throw new ArgumentNullException(nameof(arguments));
         var memberInfo = _factory.GetMemberInfo(member);
         ValidateCallShape(memberInfo, receiver, arguments, nameof(arguments));
@@ -140,10 +138,8 @@ public sealed class IrProgramBuilder(IrFactory factory) {
                 [.. arguments]));
     }
 
-    public IrAssumeInstruction Assume(
-        IrBlockId block,
-        OperationId operation,
-        IrTerm condition) {
+    public IrAssumeInstruction Assume(IrBlockId block, OperationId operation, IrTerm condition) {
+        if (condition == null) throw new ArgumentNullException(nameof(condition));
         ValidateBoolean(condition, nameof(condition));
         ValidateOperation(operation);
         return Append(
@@ -151,10 +147,8 @@ public sealed class IrProgramBuilder(IrFactory factory) {
             id => new IrAssumeInstruction(id, operation, condition));
     }
 
-    public IrAssertInstruction Assert(
-        IrBlockId block,
-        OperationId operation,
-        IrTerm condition) {
+    public IrAssertInstruction Assert(IrBlockId block, OperationId operation, IrTerm condition) {
+        if (condition == null) throw new ArgumentNullException(nameof(condition));
         ValidateBoolean(condition, nameof(condition));
         ValidateOperation(operation);
         return Append(
@@ -199,6 +193,7 @@ public sealed class IrProgramBuilder(IrFactory factory) {
         IrTerm condition,
         IrBlockId whenTrue,
         IrBlockId whenFalse) {
+        if (condition == null) throw new ArgumentNullException(nameof(condition));
         ValidateBoolean(condition, nameof(condition));
         ValidateOperation(operation);
         GetBlock(whenTrue);

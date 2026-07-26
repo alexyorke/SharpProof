@@ -69,6 +69,10 @@ public sealed class FiniteDomainSmtDifferentialOracle {
         }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1822:Mark members as static",
+        Justification = "Oracle methods intentionally share an instance-shaped test API.")]
     public async Task<FiniteDomainDifferentialResult> CompareAsync(
         IrFactory factory,
         IrTerm formula,

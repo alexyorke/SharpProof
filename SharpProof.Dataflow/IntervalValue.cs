@@ -82,8 +82,8 @@ public readonly struct IntervalValue : IEquatable<IntervalValue> {
 
     public override string ToString() {
         if (IsBottom) return "bottom";
-        var lower = LowerBound?.ToString() ?? "-inf";
-        var upper = UpperBound?.ToString() ?? "+inf";
+        var lower = LowerBound?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "-inf";
+        var upper = UpperBound?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "+inf";
         return Modulus switch {
             var value when value.IsZero => $"[{lower}, {upper}]",
             var value when value.IsOne => $"[{lower}, {upper}]",

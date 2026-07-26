@@ -59,6 +59,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
         MetaDiagnosticDescriptors.All;
 
     public override void Initialize(AnalysisContext context) {
+        if (context == null) throw new ArgumentNullException(nameof(context));
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.RegisterCompilationStartAction(startContext => {
@@ -187,9 +188,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
         }
     }
 
-    private static bool IsProofProducingType(
-        ITypeSymbol? type,
-        KnownSymbols knownSymbols) =>
+    private static bool IsProofProducingType(ITypeSymbol? type, KnownSymbols knownSymbols) =>
         IsSameType(type, knownSymbols.ProvenOutcome) ||
         IsSameType(type, knownSymbols.RefutedOutcome) ||
         IsSameType(type, knownSymbols.ValidatedModel);
@@ -200,8 +199,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
         AnalyzeCSharpExpressionText(context);
     }
 
-    private static void AnalyzeSemanticString(
-        OperationAnalysisContext context) {
+    private static void AnalyzeSemanticString(OperationAnalysisContext context) {
         if (context.Operation is not IBinaryOperation {
             OperatorKind: BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals
         } binary ||
@@ -394,8 +392,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
             clause.CatchKeyword.GetLocation()));
     }
 
-    private static bool RethrowsCancellationImmediately(
-        CatchClauseSyntax clause) =>
+    private static bool RethrowsCancellationImmediately(CatchClauseSyntax clause) =>
         clause.Block.Statements.FirstOrDefault() is
             ThrowStatementSyntax { Expression: null };
 
@@ -480,8 +477,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
             "SharpProof",
             "Specs");
 
-    private static bool IsCriticalStateNamespace(
-        INamespaceSymbol? namespaceSymbol) =>
+    private static bool IsCriticalStateNamespace(INamespaceSymbol? namespaceSymbol) =>
         IsNamespaceOrNested(namespaceSymbol, "SharpProof", "Analyzer") ||
         IsNamespaceOrNested(namespaceSymbol, "SharpProof", "Frontend") ||
         IsNamespaceOrNested(namespaceSymbol, "SharpProof", "Verify");
@@ -514,9 +510,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
         return current?.IsGlobalNamespace == true;
     }
 
-    private static bool IsSameType(
-        ITypeSymbol? actual,
-        INamedTypeSymbol? expected) =>
+    private static bool IsSameType(ITypeSymbol? actual, INamedTypeSymbol? expected) =>
         actual != null &&
         expected != null &&
         SymbolEqualityComparer.Default.Equals(

@@ -30,7 +30,8 @@ internal static class OpenSourceCorpusRunner {
             """,
             AnalyzerGateHost.ParseOptions,
             "__SharpProofOssCorpusGlobalUsings.cs",
-            Encoding.UTF8));
+            Encoding.UTF8,
+            cancellationToken));
 
         var methodsByFile = document.Methods
             .GroupBy(
@@ -49,7 +50,8 @@ internal static class OpenSourceCorpusRunner {
                     OpenSourceCorpusCatalog.NormalizeLineEndings(file.Content),
                     AnalyzerGateHost.ParseOptions,
                     file.Path,
-                    Encoding.UTF8)
+                    Encoding.UTF8,
+                    cancellationToken)
                 .GetCompilationUnitRoot(cancellationToken);
             var key = $"{file.SourceId}|{file.Path}";
             if (methodsByFile.TryGetValue(key, out var methods)) {

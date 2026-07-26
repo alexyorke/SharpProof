@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -40,6 +41,10 @@ internal static class OpenSourceCorpusImporter {
             .ConfigureAwait(false);
     }
 
+    [SuppressMessage(
+        "Globalization",
+        "CA1308:Normalize strings to uppercase",
+        Justification = "Checked-in corpus manifests publish SHA-256 values in lowercase hexadecimal.")]
     internal static async Task ImportAsync(
         string repositoryRoot,
         string upstreamRoot,

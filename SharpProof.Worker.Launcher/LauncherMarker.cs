@@ -1,3 +1,3 @@
 namespace SharpProof.Worker.Launcher;
 
-public static class LauncherMarker;
+internal static class LauncherMarker;

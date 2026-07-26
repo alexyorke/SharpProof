@@ -26,8 +26,7 @@ internal sealed class WorkerInputSnapshot {
         WorkerVerifyRequest request,
         WorkerCacheIdentity cacheIdentity,
         CancellationToken cancellationToken) {
-        if (cacheIdentity == null)
-            throw new ArgumentNullException(nameof(cacheIdentity));
+        ArgumentNullException.ThrowIfNull(cacheIdentity);
         var projectDirectory = Path.GetFullPath(request.ProjectDirectory);
         var sourcePaths = request.SourceFiles
             .Select(path => ResolvePath(projectDirectory, path))

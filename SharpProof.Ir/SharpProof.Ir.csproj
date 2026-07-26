@@ -4,6 +4,8 @@
     <LangVersion>12.0</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <IsPackable>false</IsPackable>
+    <!-- Integer and String are intentional names in the typed IR vocabulary. -->
+    <NoWarn>$(NoWarn);CA1720</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />

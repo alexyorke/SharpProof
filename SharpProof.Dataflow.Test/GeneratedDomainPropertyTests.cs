@@ -202,6 +202,8 @@ internal static class GeneratedDomainLawAssertions {
 }
 
 internal static class GeneratedDomainSamples {
+    private static readonly int[] Moduli = [1, 2, 3, 4, 5, 8, 16];
+
     public static IReadOnlyList<IntervalValue> Intervals(int seed, int count) {
         var domain = IntervalDomain.Instance;
         var random = new Random(seed);
@@ -290,7 +292,7 @@ internal static class GeneratedDomainSamples {
             : random.NextInt64(0, 513);
 
     private static BigInteger NextModulus(Random random) =>
-        new(new[] { 1, 2, 3, 4, 5, 8, 16 }[random.Next(7)]);
+        new(Moduli[random.Next(Moduli.Length)]);
 }
 
 [TestFixture]

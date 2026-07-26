@@ -10,6 +10,6 @@ public interface IAbstractDomain<T> {
     bool LessThanOrEqual(T left, T right);
     bool AreEquivalent(T left, T right);
     T Join(T left, T right);
-    T Widen(T previous, T next);
+    T Widen(T previous, T candidate);
     T Havoc(T value);
 }

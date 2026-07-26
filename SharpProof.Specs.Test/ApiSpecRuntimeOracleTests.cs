@@ -425,33 +425,33 @@ public sealed class ApiSpecRuntimeOracleTests {
             postconditions.IsDefault ? [] : postconditions);
     }
 
-    private static IFacetWitness Effect(
+    private static FacetWitness<SpecEffect> Effect(
         string edgeInputs,
         Func<SpecEffect> observe,
         SpecEffect mutation) =>
-        new FacetWitness<SpecEffect>(
+        new(
             FacetKind.Effects,
             edgeInputs,
             static template => template.Facets.Effects.Effects,
             claim => observe() == claim,
             mutation);
 
-    private static IFacetWitness Allocation(
+    private static FacetWitness<SpecAllocationBehavior> Allocation(
         string edgeInputs,
         ImmutableArray<AllocationEdge> edges,
         SpecAllocationBehavior mutation) =>
-        new FacetWitness<SpecAllocationBehavior>(
+        new(
             FacetKind.Allocation,
             edgeInputs,
             static template => template.Facets.Allocation.Behavior,
             claim => ObserveAllocation(edges) == claim,
             mutation);
 
-    private static IFacetWitness Throws(
+    private static FacetWitness<ThrowClaim> Throws(
         string edgeInputs,
         ImmutableArray<ThrowEdge> edges,
         ThrowClaim mutation) =>
-        new FacetWitness<ThrowClaim>(
+        new(
             FacetKind.Throws,
             edgeInputs,
             static template => new ThrowClaim(
@@ -460,22 +460,22 @@ public sealed class ApiSpecRuntimeOracleTests {
             claim => MatchesThrowClaim(ObserveThrows(edges), claim),
             mutation);
 
-    private static IFacetWitness Nullness(
+    private static FacetWitness<SpecNullness> Nullness(
         string edgeInputs,
         Func<SpecNullness> observe,
         SpecNullness mutation) =>
-        new FacetWitness<SpecNullness>(
+        new(
             FacetKind.Nullness,
             edgeInputs,
             static template => template.Facets.Nullness.Result,
             claim => observe() == claim,
             mutation);
 
-    private static IFacetWitness Cardinality(
+    private static FacetWitness<SpecCardinality> Cardinality(
         string edgeInputs,
         Func<SpecCardinality> observe,
         SpecCardinality mutation) =>
-        new FacetWitness<SpecCardinality>(
+        new(
             FacetKind.Cardinality,
             edgeInputs,
             static template => template.Facets.Cardinality.Result,
@@ -513,8 +513,7 @@ public sealed class ApiSpecRuntimeOracleTests {
         const string embeddedNull = "A\0B";
         var emptyLength = empty.Length;
         var embeddedNullLength = embeddedNull.Length;
-        return emptyLength == 0 && embeddedNullLength == 3 &&
-               emptyLength != embeddedNullLength
+        return emptyLength == 0 && embeddedNullLength == 3
             ? SpecEffect.ReadsReceiverState
             : SpecEffect.Unknown;
     }
@@ -870,7 +869,7 @@ public sealed class ApiSpecRuntimeOracleTests {
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static bool StringConcatEdge() =>
-        string.Concat(null, null) == string.Empty &&
+        string.Concat(null, null).Length == 0 &&
         string.Concat(null, ConcatRight) == ConcatRight &&
         string.Concat(ConcatLeft, ConcatRight) == "leftright";
 

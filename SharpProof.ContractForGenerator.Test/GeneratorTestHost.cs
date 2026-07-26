@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace SharpProof.ContractForGenerator.Test;
 
 internal static class GeneratorTestHost {
@@ -46,7 +48,8 @@ internal static class GeneratorTestHost {
             .ThenBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
             .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)
             .ThenBy(
-                static diagnostic => diagnostic.GetMessage(),
+                static diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture),
                 StringComparer.Ordinal)
             .ToImmutableArray();
         return new GeneratorRun(
@@ -63,9 +66,9 @@ internal static class GeneratorTestHost {
             diagnostic.Id + "|" +
             diagnostic.Location.SourceTree?.FilePath + "|" +
             diagnostic.Location.SourceSpan.Start + "|" +
-            diagnostic.GetMessage())];
+            diagnostic.GetMessage(CultureInfo.InvariantCulture))];
 
-    private static GeneratorDriver CreateDriver() =>
+    private static CSharpGeneratorDriver CreateDriver() =>
         CSharpGeneratorDriver.Create(
             generators: [
                 new ContractForValidatorGenerator().AsSourceGenerator()
@@ -127,8 +130,8 @@ internal sealed class DiagnosticIdentityComparer :
                Equals(left.Location.SourceTree, right.Location.SourceTree) &&
                left.Location.SourceSpan == right.Location.SourceSpan &&
                string.Equals(
-                   left.GetMessage(),
-                   right.GetMessage(),
+                   left.GetMessage(CultureInfo.InvariantCulture),
+                   right.GetMessage(CultureInfo.InvariantCulture),
                    StringComparison.Ordinal);
     }
 
@@ -137,7 +140,7 @@ internal sealed class DiagnosticIdentityComparer :
             var hash = StringComparer.Ordinal.GetHashCode(diagnostic.Id);
             hash = hash * 31 + diagnostic.Location.SourceSpan.GetHashCode();
             hash = hash * 31 + StringComparer.Ordinal.GetHashCode(
-                diagnostic.GetMessage());
+                diagnostic.GetMessage(CultureInfo.InvariantCulture));
             return hash;
         }
     }

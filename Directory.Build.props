@@ -5,7 +5,8 @@
     <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
     <ImplicitUsings Condition="'$(ImplicitUsings)' == ''">enable</ImplicitUsings>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <AnalysisLevel>latest</AnalysisLevel>
+    <!-- Run every built-in .NET analyzer rule, including rules disabled by default. -->
+    <AnalysisLevel>latest-all</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <WarningsAsErrors>$(WarningsAsErrors);CA1811;CS8019;IDE0051;IDE0052;IDE0060</WarningsAsErrors>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>

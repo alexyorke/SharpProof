@@ -1,6 +1,6 @@
 namespace SharpProof.Gates;
 
-public static class RepositoryLayout {
+internal static class RepositoryLayout {
     public static string FindRoot(string? start = null) {
         var directory = new DirectoryInfo(start ?? AppContext.BaseDirectory);
         while (directory != null) {

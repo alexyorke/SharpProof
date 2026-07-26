@@ -67,7 +67,7 @@ public sealed class RuntimeEffectOracleTests {
             try {
                 _ = divide(0);
             }
-            catch (Exception exception) {
+            catch (DivideByZeroException exception) {
                 observedException = exception.GetType().FullName;
             }
         });

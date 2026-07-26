@@ -378,7 +378,7 @@ public sealed class BoundaryEnforcementTests {
                 forbidden);
     }
 
-    private static IReadOnlyCollection<string> TransitiveProjectClosure(
+    private static HashSet<string> TransitiveProjectClosure(
         string rootProject) {
         var result = new HashSet<string>(StringComparer.Ordinal);
         var pending = new Stack<string>();

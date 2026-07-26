@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using SharpProof.Ir;
 
 namespace SharpProof.Testing;
@@ -10,6 +11,10 @@ public sealed record GeneratedIrCase(
 public enum GeneratedIrCategory {
     Arithmetic,
     Boolean,
+    [SuppressMessage(
+        "Naming",
+        "CA1720:Identifier contains type name",
+        Justification = "String is the corresponding IR vocabulary category.")]
     String,
     StringLength,
     NullCast,
@@ -17,6 +22,10 @@ public enum GeneratedIrCategory {
     ArrayIndex
 }
 
+[SuppressMessage(
+    "Security",
+    "CA5394:Do not use insecure randomness",
+    Justification = "The seeded generator intentionally produces deterministic test cases.")]
 public sealed class WellSortedIrGenerator(IrFactory factory, int seed) {
     private static readonly long[] InterestingIntegers = [
         long.MinValue,
@@ -42,7 +51,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed) {
         factory.GetOrCreateSequenceType(factory.IntegerType));
 
     public GeneratedIrCase Next(int maximumDepth = 4) {
-        if (maximumDepth < 0) throw new ArgumentOutOfRangeException(nameof(maximumDepth));
+        ArgumentOutOfRangeException.ThrowIfNegative(maximumDepth);
         var category = (GeneratedIrCategory)_random.Next(7);
         var term = category switch {
             GeneratedIrCategory.Arithmetic => Integer(maximumDepth),
@@ -62,7 +71,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed) {
     }
 
     public GeneratedIrCase NextArithmeticOrBoolean(int maximumDepth = 4) {
-        if (maximumDepth < 0) throw new ArgumentOutOfRangeException(nameof(maximumDepth));
+        ArgumentOutOfRangeException.ThrowIfNegative(maximumDepth);
         var category = _random.Next(2) == 0
             ? GeneratedIrCategory.Arithmetic
             : GeneratedIrCategory.Boolean;

@@ -93,7 +93,7 @@ internal sealed class ContractApiSymbols {
     internal bool IsOld(IMethodSymbol method) =>
         SymbolEqualityComparer.Default.Equals(method.OriginalDefinition, Old);
 
-    internal bool IsAttribute(AttributeData attribute, INamedTypeSymbol expected) =>
+    internal static bool IsAttribute(AttributeData attribute, INamedTypeSymbol expected) =>
         attribute.AttributeClass != null &&
         SymbolEqualityComparer.Default.Equals(
             attribute.AttributeClass.OriginalDefinition,

@@ -3,6 +3,12 @@
     <SharpProofDogfoodAnalyzerDirectory Condition="'$(SharpProofDogfoodAnalyzerDirectory)' == ''">$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0</SharpProofDogfoodAnalyzerDirectory>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
+    <!-- Test frameworks discover fixtures through reflection; test awaits do not
+         expose a reusable library synchronization-context contract. -->
+    <NoWarn>$(NoWarn);CA1515;CA2007;CA5394</NoWarn>
+  </PropertyGroup>
+
   <ItemGroup Condition="'$(SharpProofDogfood)' == 'true'">
     <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Analyzer.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.ContractForGenerator\bin\$(Configuration)\netstandard2.0\SharpProof.ContractForGenerator.dll" />

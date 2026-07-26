@@ -54,8 +54,7 @@ internal sealed class CallableVerifier(
         CallableTarget target,
         MethodResourceBudget resourceBudget,
         CancellationToken cancellationToken) {
-        if (resourceBudget == null)
-            throw new ArgumentNullException(nameof(resourceBudget));
+        ArgumentNullException.ThrowIfNull(resourceBudget);
         cancellationToken.ThrowIfCancellationRequested();
         var factory = _factory;
         var binding = new ContractBinder(_compilation, factory)
@@ -255,7 +254,7 @@ internal sealed class CallableVerifier(
         BoundMethodContracts contracts,
         ImmutableArray<BodyPath> paths,
         ImmutableArray<Assumption>.Builder assumptions,
-        IDictionary<ProofJustification, string> assumptionLabels) {
+        Dictionary<ProofJustification, string> assumptionLabels) {
         var seenPredicates = assumptions
             .Select(static assumption => assumption.Predicate.Id)
             .ToHashSet();
@@ -294,8 +293,7 @@ internal sealed class CallableVerifier(
                         factory, factory.Variable(variable.Variable),
                         interval, out var predicate))
                     return false;
-                if (predicate == null)
-                    return false;
+                if (predicate == null) return false;
                 AddDomainAssumption(predicate, variable);
             }
         }
@@ -322,7 +320,7 @@ internal sealed class CallableVerifier(
         IrFactory factory,
         ImmutableArray<BodyPath> paths,
         ImmutableArray<Assumption>.Builder assumptions,
-        IDictionary<ProofJustification, string> assumptionLabels) {
+        Dictionary<ProofJustification, string> assumptionLabels) {
         var completions = ImmutableArray.CreateBuilder<IrTerm>(paths.Length);
         foreach (var path in paths) {
             var completion = path.ReturnTerm == null
@@ -415,11 +413,9 @@ internal sealed class CallableVerifier(
             if (!visited.Add(term.Id)) continue;
             if (term is IrVariableTerm variable) {
                 var kind = factory.GetTypeInfo(variable.Type).Kind;
-                if (kind is not (IrTypeKind.Boolean or IrTypeKind.Integer))
-                    return false;
+                if (kind is not (IrTypeKind.Boolean or IrTypeKind.Integer)) return false;
             }
-            if (term is IrBinaryTerm { Operator: IrBinaryOperator.StringConcat })
-                return false;
+            if (term is IrBinaryTerm { Operator: IrBinaryOperator.StringConcat }) return false;
             if (term is IrLengthTerm length &&
                 length.Value.Type == factory.StringType)
                 return false;
@@ -501,7 +497,7 @@ internal sealed class CallableVerifier(
             nameof(SharpProof.Attributes.Contract.Ensures) or
             nameof(SharpProof.Attributes.Contract.Assume);
 
-    private void AddResourceLimitRecords(
+    private static void AddResourceLimitRecords(
         ImmutableArray<WorkerVerificationRecord>.Builder records,
         CallableTarget target,
         int start,
@@ -619,7 +615,7 @@ internal sealed class CallableVerifier(
         IrFactory factory,
         IrProgram program,
         ProgramOperationGroup start,
-        IReadOnlyDictionary<IrInstructionId, IInvocationOperation> callBindings,
+        ImmutableDictionary<IrInstructionId, IInvocationOperation> callBindings,
         ImmutableDictionary<IrVarId, IrTerm> initialEnvironment,
         ImmutableDictionary<IrVarId, IrVarId> parameterBindings,
         int maximumBodyPaths,
@@ -987,8 +983,7 @@ internal sealed class CallableVerifier(
     }
 
     private int? FindExecutableBodyStart(CallableTarget target) {
-        if (target.Declaration.ExpressionBody != null)
-            return target.Declaration.ExpressionBody.Expression.SpanStart;
+        if (target.Declaration.ExpressionBody != null) return target.Declaration.ExpressionBody.Expression.SpanStart;
         if (target.Declaration.Body == null) return null;
         foreach (var statement in target.Declaration.Body.Statements) {
             if (statement is EmptyStatementSyntax ||
@@ -1011,8 +1006,7 @@ internal sealed class CallableVerifier(
         IrProgram program,
         out ImmutableArray<ProgramOperationGroup> groups) {
         groups = [];
-        if (graph.Blocks.Length != program.Blocks.Length)
-            return false;
+        if (graph.Blocks.Length != program.Blocks.Length) return false;
         var result = ImmutableArray.CreateBuilder<ProgramOperationGroup>();
         for (var blockIndex = 0;
              blockIndex < graph.Blocks.Length;
@@ -1025,8 +1019,7 @@ internal sealed class CallableVerifier(
             var terminated = false;
             foreach (var operation in source.Operations) {
                 if (operation is IEmptyOperation) continue;
-                if (groupIndex >= instructionGroups.Length)
-                    return false;
+                if (groupIndex >= instructionGroups.Length) return false;
                 result.Add(instructionGroups[groupIndex++].WithSource(
                     operation));
                 if (operation is IReturnOperation) {
@@ -1035,13 +1028,11 @@ internal sealed class CallableVerifier(
                 }
             }
             if (!terminated) {
-                if (groupIndex >= instructionGroups.Length)
-                    return false;
+                if (groupIndex >= instructionGroups.Length) return false;
                 result.Add(instructionGroups[groupIndex++].WithSource(
                     source.BranchValue));
             }
-            if (groupIndex != instructionGroups.Length)
-                return false;
+            if (groupIndex != instructionGroups.Length) return false;
         }
         groups = result.ToImmutable();
         return true;
@@ -1144,14 +1135,12 @@ internal sealed class CallableVerifier(
         return Visit(start);
 
         bool Visit(IrBlockId blockId) {
-            if (colors.TryGetValue(blockId, out var color))
-                return color == 2;
+            if (colors.TryGetValue(blockId, out var color)) return color == 2;
             if (++reachable > maximumBlocks) return false;
             colors.Add(blockId, 1);
             var block = program.GetBlock(blockId);
             foreach (var successor in GetSuccessors(block.Terminator)) {
-                if (colors.TryGetValue(successor, out color) && color == 1)
-                    return false;
+                if (colors.TryGetValue(successor, out color) && color == 1) return false;
                 if (!Visit(successor)) return false;
             }
             colors[blockId] = 2;
@@ -1215,7 +1204,7 @@ internal sealed class CallableVerifier(
         CreateCurrentStates(
             BoundMethodContracts contracts,
             IrFactory factory,
-            IReadOnlyDictionary<IrVarId, IrTerm> environment,
+            ImmutableDictionary<IrVarId, IrTerm> environment,
             IReadOnlyDictionary<IrVarId, IrVarId> parameterBindings) {
         var result =
             ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
@@ -1382,12 +1371,12 @@ internal sealed class CallableVerifier(
         }
     }
 
-    private WorkerVerificationRecord CreateRecord(
+    private static WorkerVerificationRecord CreateRecord(
         CallableTarget target,
         int contractOrdinal,
         ProofOutcome outcome,
         BoundMethodContracts contracts,
-        IReadOnlyDictionary<ProofJustification, string> assumptionLabels,
+        Dictionary<ProofJustification, string> assumptionLabels,
         bool usesSpecModeledCallResult) {
         var record = CreateBaseRecord(target, contractOrdinal);
         switch (outcome) {
@@ -1462,7 +1451,7 @@ internal sealed class CallableVerifier(
         _ => "<opaque>"
     };
 
-    private WorkerVerificationRecord CreateUnknown(
+    private static WorkerVerificationRecord CreateUnknown(
         CallableTarget target,
         int contractOrdinal,
         WorkerVerificationReason reason) {

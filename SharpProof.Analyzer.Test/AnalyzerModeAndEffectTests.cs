@@ -394,7 +394,7 @@ public sealed class AnalyzerModeAndEffectTests {
             AnalyzerSemanticOutcome> _outcomes =
             new(StringComparer.Ordinal);
 
-        internal IReadOnlyDictionary<string, AnalyzerSemanticOutcome> Outcomes =>
+        internal ConcurrentDictionary<string, AnalyzerSemanticOutcome> Outcomes =>
             _outcomes;
 
         public AnalyzerSession Create(

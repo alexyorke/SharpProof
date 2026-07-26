@@ -64,9 +64,9 @@ internal sealed class AnalyzerConfiguration {
             builder.Add(new InvalidAnalyzerConfigurationValue(option.Key, value.Trim(), reason));
     }
     private static bool TryParseBool(string value) =>
-        value.Trim().ToLowerInvariant() is
-            "1" or "true" or "yes" or "on" or
-            "0" or "false" or "no" or "off";
+        value.Trim().ToUpperInvariant() is
+            "1" or "TRUE" or "YES" or "ON" or
+            "0" or "FALSE" or "NO" or "OFF";
     private static string? GetIntegerError(string value, int minimum, string reason) =>
         int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) &&
         parsed >= minimum
@@ -113,17 +113,17 @@ internal sealed class AnalyzerConfiguration {
                 StringComparison.Ordinal)
         };
     private static bool TryParseBool(string value, out bool parsed) {
-        switch (value.Trim().ToLowerInvariant()) {
+        switch (value.Trim().ToUpperInvariant()) {
             case "1":
-            case "true":
-            case "yes":
-            case "on":
+            case "TRUE":
+            case "YES":
+            case "ON":
                 parsed = true;
                 return true;
             case "0":
-            case "false":
-            case "no":
-            case "off":
+            case "FALSE":
+            case "NO":
+            case "OFF":
                 parsed = false;
                 return true;
             default:
@@ -136,10 +136,10 @@ internal sealed class AnalyzerConfiguration {
     private static SharpProofMode GetMode(AnalyzerOptions options) {
         var option = AnalyzerConfigurationOptionRegistry.All[0];
         if (!TryGetGlobalOption(options, option, out var value)) return SharpProofMode.Off;
-        return value.Trim().ToLowerInvariant() switch {
-            "effects" => SharpProofMode.Effects,
-            "contracts" => SharpProofMode.Contracts,
-            "all-experimental" => SharpProofMode.AllExperimental,
+        return value.Trim().ToUpperInvariant() switch {
+            "EFFECTS" => SharpProofMode.Effects,
+            "CONTRACTS" => SharpProofMode.Contracts,
+            "ALL-EXPERIMENTAL" => SharpProofMode.AllExperimental,
             _ => SharpProofMode.Off
         };
     }

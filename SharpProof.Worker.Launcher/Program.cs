@@ -4,6 +4,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using SharpProof.Worker.Protocol;
 
+[assembly: DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+
 namespace SharpProof.Worker.Launcher;
 
 internal static class Program {
@@ -362,24 +364,24 @@ internal sealed class LauncherArguments {
         bool.Parse(Required(key));
 
     private WorkerNullableContext NullableContext(string key) =>
-        Required(key).ToLowerInvariant() switch {
-            "disable" => WorkerNullableContext.Disabled,
-            "warnings" => WorkerNullableContext.Warnings,
-            "annotations" => WorkerNullableContext.Annotations,
-            "enable" => WorkerNullableContext.Enabled,
+        Required(key).ToUpperInvariant() switch {
+            "DISABLE" => WorkerNullableContext.Disabled,
+            "WARNINGS" => WorkerNullableContext.Warnings,
+            "ANNOTATIONS" => WorkerNullableContext.Annotations,
+            "ENABLE" => WorkerNullableContext.Enabled,
             _ => throw new ArgumentException(
                 "The nullable context is invalid.",
                 key)
         };
 
     private WorkerOutputKind OutputKind(string key) =>
-        Required(key).ToLowerInvariant() switch {
-            "exe" => WorkerOutputKind.ConsoleApplication,
-            "winexe" => WorkerOutputKind.WindowsApplication,
-            "library" => WorkerOutputKind.DynamicallyLinkedLibrary,
-            "module" => WorkerOutputKind.NetModule,
-            "winmdobj" => WorkerOutputKind.WindowsRuntimeMetadata,
-            "appcontainerexe" =>
+        Required(key).ToUpperInvariant() switch {
+            "EXE" => WorkerOutputKind.ConsoleApplication,
+            "WINEXE" => WorkerOutputKind.WindowsApplication,
+            "LIBRARY" => WorkerOutputKind.DynamicallyLinkedLibrary,
+            "MODULE" => WorkerOutputKind.NetModule,
+            "WINMDOBJ" => WorkerOutputKind.WindowsRuntimeMetadata,
+            "APPCONTAINEREXE" =>
                 WorkerOutputKind.WindowsRuntimeApplication,
             _ => throw new ArgumentException(
                 "The output type is invalid.",
@@ -396,12 +398,12 @@ internal sealed class LauncherArguments {
             throw new ArgumentException(
                 "Prefer32Bit is valid only for AnyCPU.",
                 key);
-        return value.ToLowerInvariant() switch {
-            "x86" => WorkerPlatform.X86,
-            "x64" => WorkerPlatform.X64,
-            "arm" => WorkerPlatform.Arm,
-            "arm64" => WorkerPlatform.Arm64,
-            "itanium" => WorkerPlatform.Itanium,
+        return value.ToUpperInvariant() switch {
+            "X86" => WorkerPlatform.X86,
+            "X64" => WorkerPlatform.X64,
+            "ARM" => WorkerPlatform.Arm,
+            "ARM64" => WorkerPlatform.Arm64,
+            "ITANIUM" => WorkerPlatform.Itanium,
             _ => throw new ArgumentException(
                 "The platform target is invalid.",
                 key)

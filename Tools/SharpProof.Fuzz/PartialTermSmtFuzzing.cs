@@ -86,6 +86,10 @@ public static class PartialTermSmtCaseGenerator {
 }
 
 public sealed class PartialTermSmtDifferentialOracle {
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1822:Mark members as static",
+        Justification = "Oracle methods intentionally share an instance-shaped test API.")]
     public async Task<PartialTermSmtDifferentialResult> CompareAsync(
         IrFactory factory,
         PartialTermSmtCase generated,
@@ -283,7 +287,7 @@ public sealed class PartialTermSmtDifferentialOracle {
     private static void ValidateScenario(
         IrFactory factory,
         ImmutableArray<IrVarId> variables,
-        IReadOnlyDictionary<IrVarId, IrValue> scenario) {
+        ImmutableDictionary<IrVarId, IrValue> scenario) {
         foreach (var variable in variables) {
             if (!scenario.TryGetValue(variable, out var value))
                 throw new ArgumentException(

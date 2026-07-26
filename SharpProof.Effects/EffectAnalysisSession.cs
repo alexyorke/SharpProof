@@ -379,7 +379,7 @@ public sealed class EffectAnalysisSession {
         return summary;
     }
 
-    private bool HasPotentialStaticInitialization(INamedTypeSymbol type) {
+    private static bool HasPotentialStaticInitialization(INamedTypeSymbol type) {
         foreach (var constructor in type.StaticConstructors)
             if (!constructor.IsImplicitlyDeclared)
                 return true;
@@ -409,7 +409,7 @@ public sealed class EffectAnalysisSession {
             _ => false
         };
 
-    private static SyntaxNode? GetInitializerExpression(SyntaxNode declaration) =>
+    private static Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax? GetInitializerExpression(SyntaxNode declaration) =>
         declaration switch {
             Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclaratorSyntax variable =>
                 variable.Initializer?.Value,
@@ -548,12 +548,12 @@ public sealed class EffectAnalysisSession {
                          .Where(nodes.ContainsKey)
                          .Distinct<IMethodSymbol>(SymbolEqualityComparer.Default)
                          .OrderBy(static target => target, EffectMethodComparer.Instance)) {
-                if (!indices.ContainsKey(target)) {
+                if (!indices.TryGetValue(target, out var targetIndex)) {
                     Visit(target);
                     lowLinks[method] = Math.Min(lowLinks[method], lowLinks[target]);
                 }
                 else if (onStack.Contains(target)) {
-                    lowLinks[method] = Math.Min(lowLinks[method], indices[target]);
+                    lowLinks[method] = Math.Min(lowLinks[method], targetIndex);
                 }
             }
             if (lowLinks[method] != indices[method]) return;

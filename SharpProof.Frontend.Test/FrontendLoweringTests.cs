@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -11,6 +12,8 @@ namespace SharpProof.Frontend.Test;
 
 [TestFixture]
 public sealed class FrontendLoweringTests {
+    private static readonly long[] ElementValues = [4L, 8L, 15L];
+
     [TestCase(4L, true, 2L, ExpectedResult = 18L)]
     [TestCase(-7L, false, 3L, ExpectedResult = -2L)]
     public object? SupportedExpressionsMatchCompiledCSharp(
@@ -76,7 +79,7 @@ public sealed class FrontendLoweringTests {
                 checked(values[index] + values.LongLength);
             """);
         Assert.That(
-            element.CompareWithInterpreter(new long[] { 4L, 8L, 15L }, 1),
+            element.CompareWithInterpreter(ElementValues, 1),
             Is.EqualTo(11L));
     }
 
@@ -581,7 +584,7 @@ public sealed class FrontendLoweringTests {
             return interpreted;
         }
 
-        internal IReadOnlyDictionary<IrVarId, IrValue> CreateEnvironment(
+        internal Dictionary<IrVarId, IrValue> CreateEnvironment(
             FrontendLoweringResult lowering,
             params object?[] arguments) {
             var values = new Dictionary<IrVarId, IrValue>();
@@ -641,7 +644,8 @@ public sealed class FrontendLoweringTests {
             if (value == null) return factory.CreateNullValue(type);
             return info.Kind switch {
                 IrTypeKind.Boolean => factory.CreateBooleanValue((bool)value),
-                IrTypeKind.Integer => factory.CreateIntegerValue(Convert.ToInt64(value)),
+                IrTypeKind.Integer => factory.CreateIntegerValue(
+                    Convert.ToInt64(value, CultureInfo.InvariantCulture)),
                 IrTypeKind.String => factory.CreateStringValue((string)value),
                 IrTypeKind.Sequence => factory.CreateSequenceValue(
                     type,
@@ -683,7 +687,7 @@ public sealed class FrontendLoweringTests {
         public void Dispose() => _context.Unload();
     }
 
-    private static MetadataReference CreateAliasedTypeReference(
+    private static PortableExecutableReference CreateAliasedTypeReference(
         string assemblyName,
         string alias) {
         var tree = CSharpSyntaxTree.ParseText(

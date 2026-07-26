@@ -95,7 +95,7 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator {
                          diagnostic.Location.SourceSpan.Start)
                      .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)
                      .ThenBy(
-                         static diagnostic => diagnostic.GetMessage(),
+                         static diagnostic => diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture),
                          StringComparer.Ordinal))
             context.ReportDiagnostic(diagnostic);
     }
@@ -128,7 +128,7 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator {
                 diagnostics.Add(Diagnostic.Create(
                     GeneratedDiagnosticDescriptors.InvalidTarget,
                     attributes.FirstOrDefault() is { } first
-                        ? GetAttributeLocation(first, cancellationToken, fallback)
+                        ? GetAttributeLocation(first, fallback, cancellationToken)
                         : fallback,
                     companion.Name));
                 continue;
@@ -136,8 +136,8 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator {
             var attribute = attributes[0];
             var attributeLocation = GetAttributeLocation(
                 attribute,
-                cancellationToken,
-                fallback);
+                fallback,
+                cancellationToken);
             if (attribute.ConstructorArguments.Length != 1 ||
                 attribute.ConstructorArguments[0].Kind != TypedConstantKind.Type ||
                 attribute.ConstructorArguments[0].Value is not INamedTypeSymbol target ||
@@ -471,8 +471,8 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator {
             method,
             clauses,
             diagnostics,
-            cancellationToken,
-            nested: false);
+            nested: false,
+            cancellationToken);
     }
 
     private static IOperation? GetOperationRoot(
@@ -510,8 +510,8 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator {
         IMethodSymbol method,
         ContractClauseSymbols clauses,
         List<Diagnostic> diagnostics,
-        CancellationToken cancellationToken,
-        bool nested) {
+        bool nested,
+        CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         var nowNested = nested ||
                         operation is IAnonymousFunctionOperation or
@@ -530,8 +530,8 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator {
                 method,
                 clauses,
                 diagnostics,
-                cancellationToken,
-                nowNested);
+                nowNested,
+                cancellationToken);
     }
 
     private static IMethodSymbol NormalizePartialMethod(IMethodSymbol method) =>
@@ -539,8 +539,8 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator {
 
     private static Location GetAttributeLocation(
         AttributeData attribute,
-        CancellationToken cancellationToken,
-        Location fallback) =>
+        Location fallback,
+        CancellationToken cancellationToken) =>
         attribute.ApplicationSyntaxReference?
             .GetSyntax(cancellationToken)
             .GetLocation() ?? fallback;

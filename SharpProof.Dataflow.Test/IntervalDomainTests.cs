@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.CodeAnalysis.FlowAnalysis.DataFlow;
 
 namespace SharpProof.Dataflow.Test;
@@ -56,7 +57,9 @@ public sealed class IntervalDomainTests {
 
         Assert.That(
             joined.Modulus,
-            Is.EqualTo(BigInteger.Parse("18446744073709551615")));
+            Is.EqualTo(BigInteger.Parse(
+                "18446744073709551615",
+                CultureInfo.InvariantCulture)));
         Assert.That(_domain.LessThanOrEqual(joined, divisibleByThree), Is.True);
     }
 

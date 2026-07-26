@@ -16,6 +16,7 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer {
         GeneratedDiagnosticDescriptors.SupportedDiagnostics;
 
     public override void Initialize(AnalysisContext context) {
+        if (context == null) throw new ArgumentNullException(nameof(context));
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.RegisterCompilationStartAction(InitializeCompilation);

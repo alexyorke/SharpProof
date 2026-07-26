@@ -63,7 +63,7 @@ internal static class WorkerPerformanceProbe {
                 .ConfigureAwait(false);
 
             var stopwatch = Stopwatch.StartNew();
-            cancellation.Cancel();
+            await cancellation.CancelAsync().ConfigureAwait(false);
             try {
                 _ = await verification.ConfigureAwait(false);
                 throw new InvalidOperationException(
@@ -96,8 +96,8 @@ internal static class WorkerPerformanceProbe {
             checked((int)contract.ForcedTerminationMilliseconds));
         var result = await WaitForExitAsync(
                 process,
-                cancellationToken,
-                contract.ForcedTerminationMilliseconds + 10_000)
+                contract.ForcedTerminationMilliseconds + 10_000,
+                cancellationToken)
             .ConfigureAwait(false);
         if (result.ExitCode != 0)
             throw new InvalidOperationException(
@@ -144,13 +144,15 @@ internal static class WorkerPerformanceProbe {
             projectWallMilliseconds: 1,
             methodWallMilliseconds: 1,
             probeGraceMilliseconds);
-        var standardOutput = process.StandardOutput.ReadToEndAsync();
-        var standardError = process.StandardError.ReadToEndAsync();
         using var boundary = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
         boundary.CancelAfter(
             TimeSpan.FromMilliseconds(
                 contract.ForcedTerminationMilliseconds + 10_000));
+        var standardOutput = process.StandardOutput.ReadToEndAsync(
+            boundary.Token);
+        var standardError = process.StandardError.ReadToEndAsync(
+            boundary.Token);
         try {
             var workerProcessId = await WaitForWorkerReadyAsync(
                     readyPath,
@@ -268,13 +270,15 @@ internal static class WorkerPerformanceProbe {
 
     private static async Task<ProcessResult> WaitForExitAsync(
         Process process,
-        CancellationToken cancellationToken,
-        double timeoutMilliseconds) {
-        var standardOutput = process.StandardOutput.ReadToEndAsync();
-        var standardError = process.StandardError.ReadToEndAsync();
+        double timeoutMilliseconds,
+        CancellationToken cancellationToken) {
         using var boundary = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
         boundary.CancelAfter(TimeSpan.FromMilliseconds(timeoutMilliseconds));
+        var standardOutput = process.StandardOutput.ReadToEndAsync(
+            boundary.Token);
+        var standardError = process.StandardError.ReadToEndAsync(
+            boundary.Token);
         try {
             await process.WaitForExitAsync(boundary.Token)
                 .ConfigureAwait(false);

@@ -6,7 +6,7 @@ namespace SharpProof.Meta.Analyzers;
 internal static class MetaDiagnosticDescriptors {
     private const string Category = "SharpProof.Soundness";
     private const string HelpBase =
-        "https://github.com/alexyorke/SharpProof/blob/main/docs/architecture.md#mechanized-boundaries";
+        "https://github.com/alexyorke/SharpProof/blob/master/docs/architecture.md#mechanized-boundaries";
 
     internal static readonly DiagnosticDescriptor ForbiddenRoslynApi = new(
         "SPMETA001",
@@ -15,7 +15,8 @@ internal static class MetaDiagnosticDescriptors {
         Category,
         DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        "Compiler APIs that synthesize or speculatively bind source, use display text as identity, or enumerate whole compilations are forbidden.",
+        "Compiler APIs that synthesize or speculatively bind source, " +
+        "use display text as identity, or enumerate whole compilations are forbidden.",
         HelpBase);
 
     internal static readonly DiagnosticDescriptor MutableStaticState = new(

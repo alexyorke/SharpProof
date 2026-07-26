@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
@@ -7,6 +8,26 @@ namespace SharpProof.Analyzer.Test;
 
 [TestFixture]
 public sealed class AnalyzerArchitectureTests {
+    private static readonly string[] ExpectedAnalyzerReferences = [
+        "SharpProof.Attributes",
+        "SharpProof.Contracts",
+        "SharpProof.Effects",
+        "SharpProof.Frontend",
+        "SharpProof.Ir",
+        "SharpProof.Specs"
+    ];
+
+    private static readonly string[] ExpectedAnalyzerOutputAssemblies = [
+        "SharpProof.Analyzer",
+        "SharpProof.Attributes",
+        "SharpProof.Contracts",
+        "SharpProof.Dataflow",
+        "SharpProof.Effects",
+        "SharpProof.Frontend",
+        "SharpProof.Ir",
+        "SharpProof.Specs"
+    ];
+
     [Test]
     public async Task ConcurrentRunsProduceTheSameDiagnostics() {
         const string source = """
@@ -51,15 +72,7 @@ public sealed class AnalyzerArchitectureTests {
 
         Assert.That(
             references,
-            Is.SubsetOf(
-                new[] {
-                    "SharpProof.Attributes",
-                    "SharpProof.Contracts",
-                    "SharpProof.Effects",
-                    "SharpProof.Frontend",
-                    "SharpProof.Ir",
-                    "SharpProof.Specs"
-                }));
+            Is.SubsetOf(ExpectedAnalyzerReferences));
     }
 
     [Test]
@@ -85,17 +98,7 @@ public sealed class AnalyzerArchitectureTests {
         using (Assert.EnterMultipleScope()) {
             Assert.That(
                 sharpProofNames,
-                Is.SubsetOf(
-                    new[] {
-                        "SharpProof.Analyzer",
-                        "SharpProof.Attributes",
-                        "SharpProof.Contracts",
-                        "SharpProof.Dataflow",
-                        "SharpProof.Effects",
-                        "SharpProof.Frontend",
-                        "SharpProof.Ir",
-                        "SharpProof.Specs"
-                    }));
+                Is.SubsetOf(ExpectedAnalyzerOutputAssemblies));
             Assert.That(names, Does.Not.Contain("Microsoft.Z3"));
         }
     }
@@ -204,7 +207,7 @@ public sealed class AnalyzerArchitectureTests {
         }
     }
 
-    private static IReadOnlyDictionary<string, ReleaseRule>
+    private static Dictionary<string, ReleaseRule>
         ReadReleaseSection(
             string path,
             string section) {
@@ -227,7 +230,7 @@ public sealed class AnalyzerArchitectureTests {
             if (columns.Length < 4 ||
                 columns[0].Length != 6 ||
                 !columns[0].StartsWith("SP", StringComparison.Ordinal) ||
-                !int.TryParse(columns[0].Substring(2), out _))
+                !int.TryParse(columns[0].AsSpan(2), out _))
                 continue;
             var rule = new ReleaseRule(
                 columns[0],
@@ -253,7 +256,7 @@ public sealed class AnalyzerArchitectureTests {
             diagnostics.Select(diagnostic =>
                 diagnostic.Id + "|" +
                 diagnostic.Location.SourceSpan.Start + "|" +
-                diagnostic.GetMessage()));
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)));
 
     private sealed record ReleaseRule(
         string Id,

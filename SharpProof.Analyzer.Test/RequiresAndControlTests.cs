@@ -1,3 +1,4 @@
+using System.Globalization;
 using NUnit.Framework;
 
 namespace SharpProof.Analyzer.Test;
@@ -29,7 +30,9 @@ public sealed class RequiresAndControlTests {
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(["SP0027"]));
-        Assert.That(diagnostics[0].GetMessage(), Does.Contain("false"));
+        Assert.That(
+            diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+            Does.Contain("false"));
     }
 
     [Test]
@@ -208,7 +211,7 @@ public sealed class RequiresAndControlTests {
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(["SP0002"]));
         Assert.That(
-            diagnostics[0].GetMessage(),
+            diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("TrustedWithoutSummary"));
     }
 

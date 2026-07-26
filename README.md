@@ -321,28 +321,28 @@ cache/concurrency/cancellation tests, the pinned corpus, a fixed-seed
 
 ## Documentation
 
-- [Documentation index](https://github.com/alexyorke/SharpProof/blob/main/docs/README.md)
+- [Documentation index](https://github.com/alexyorke/SharpProof/blob/master/docs/README.md)
   is the complete maintained-doc map.
-- [SEMANTICS.md](https://github.com/alexyorke/SharpProof/blob/main/SEMANTICS.md)
+- [SEMANTICS.md](https://github.com/alexyorke/SharpProof/blob/master/SEMANTICS.md)
   is the normative soundness boundary and wins if another document conflicts
   with it.
-- [Architecture](https://github.com/alexyorke/SharpProof/blob/main/docs/architecture.md)
+- [Architecture](https://github.com/alexyorke/SharpProof/blob/master/docs/architecture.md)
   describes the production dependency graph and proof boundary.
-- [Coverage and limits](https://github.com/alexyorke/SharpProof/blob/main/docs/coverage-and-limits.md)
+- [Coverage and limits](https://github.com/alexyorke/SharpProof/blob/master/docs/coverage-and-limits.md)
   summarizes admitted and rejected product areas.
-- [Analysis limits](https://github.com/alexyorke/SharpProof/blob/main/docs/analysis-limits.md)
+- [Analysis limits](https://github.com/alexyorke/SharpProof/blob/master/docs/analysis-limits.md)
   lists shipping worker and performance budgets.
-- [Diagnostics](https://github.com/alexyorke/SharpProof/blob/main/docs/diagnostic-examples.md)
+- [Diagnostics](https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md)
   documents analyzer and `ContractFor` generator IDs.
-- [Typed Unknown reasons](https://github.com/alexyorke/SharpProof/blob/main/docs/unknown-reasons.md)
+- [Typed Unknown reasons](https://github.com/alexyorke/SharpProof/blob/master/docs/unknown-reasons.md)
   explains fail-closed abstentions.
-- [Native SMT packaging](https://github.com/alexyorke/SharpProof/blob/main/docs/native-smt-packaging.md)
+- [Native SMT packaging](https://github.com/alexyorke/SharpProof/blob/master/docs/native-smt-packaging.md)
   describes analyzer and worker payload separation.
-- [SMT lifecycle](https://github.com/alexyorke/SharpProof/blob/main/docs/smt-lifecycle.md)
+- [SMT lifecycle](https://github.com/alexyorke/SharpProof/blob/master/docs/smt-lifecycle.md)
   describes solver ownership and disposal.
-- [API result domains](https://github.com/alexyorke/SharpProof/blob/main/docs/soundness-notes/2026-07-25-api-spec-result-domains.md)
+- [API result domains](https://github.com/alexyorke/SharpProof/blob/master/docs/soundness-notes/2026-07-25-api-spec-result-domains.md)
   records the bounded nullness/cardinality integration.
-- [Hardening audit](https://github.com/alexyorke/SharpProof/blob/main/docs/soundness-notes/2026-07-25-hardening.md)
+- [Hardening audit](https://github.com/alexyorke/SharpProof/blob/master/docs/soundness-notes/2026-07-25-hardening.md)
   records validation evidence and outstanding checkpoints.
-- [Acceptance contract](https://github.com/alexyorke/SharpProof/blob/main/eng/acceptance/README.md)
+- [Acceptance contract](https://github.com/alexyorke/SharpProof/blob/master/eng/acceptance/README.md)
   describes the active release gate.

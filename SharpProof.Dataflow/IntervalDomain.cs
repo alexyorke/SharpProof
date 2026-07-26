@@ -5,7 +5,6 @@ namespace SharpProof.Dataflow;
 /// </summary>
 public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue> {
     public static IntervalDomain Instance { get; } = new();
-
     private IntervalDomain() {
     }
 
@@ -13,7 +12,6 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue> {
     public override IntervalValue Top { get; } = new(null, null, 1, 0);
 
     public IntervalValue Constant(long value) => new(value, value, 0, value);
-
     public IntervalValue Range(long? lowerBound, long? upperBound) =>
         Create(lowerBound, upperBound, 1, 0);
 
@@ -89,19 +87,19 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue> {
         return Create(lower, upper, modulus, remainder);
     }
 
-    public override IntervalValue Widen(IntervalValue previous, IntervalValue next) {
-        if (previous.IsBottom) return next;
-        if (next.IsBottom || LessThanOrEqual(next, previous)) return previous;
+    public override IntervalValue Widen(IntervalValue previous, IntervalValue candidate) {
+        if (previous.IsBottom) return candidate;
+        if (candidate.IsBottom || LessThanOrEqual(candidate, previous)) return previous;
 
-        var joined = Join(previous, next);
+        var joined = Join(previous, candidate);
         var lower = previous.LowerBound.HasValue &&
-                    next.LowerBound.HasValue &&
-                    next.LowerBound.Value >= previous.LowerBound.Value
+                    candidate.LowerBound.HasValue &&
+                    candidate.LowerBound.Value >= previous.LowerBound.Value
             ? previous.LowerBound
             : null;
         var upper = previous.UpperBound.HasValue &&
-                    next.UpperBound.HasValue &&
-                    next.UpperBound.Value <= previous.UpperBound.Value
+                    candidate.UpperBound.HasValue &&
+                    candidate.UpperBound.Value <= previous.UpperBound.Value
             ? previous.UpperBound
             : null;
         return Create(lower, upper, joined.Modulus, joined.Remainder);

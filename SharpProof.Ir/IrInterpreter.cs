@@ -172,7 +172,7 @@ public sealed class IrInterpreter(IrFactory factory) {
         }
     }
 
-    private IrEvaluationResult EvaluateVariable(
+    private static IrEvaluationResult EvaluateVariable(
         IrVariableTerm variable,
         IReadOnlyDictionary<IrVarId, IrValue> variables) {
         if (!variables.TryGetValue(variable.Variable, out var value))

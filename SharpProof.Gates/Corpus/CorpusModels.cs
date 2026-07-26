@@ -3,14 +3,14 @@ using SharpProof.Analyzer;
 
 namespace SharpProof.Gates.Corpus;
 
-public enum CorpusVerdict {
+internal enum CorpusVerdict {
     Proven,
     Refuted,
     Unknown,
     SilentUnknown
 }
 
-public enum CorpusVariant {
+internal enum CorpusVariant {
     Baseline,
     Rename,
     EscapedIdentifiers,
@@ -23,12 +23,12 @@ public enum CorpusVariant {
     ReorderIndependentStatements
 }
 
-public enum CorpusOrigin {
+internal enum CorpusOrigin {
     SyntheticMetamorphic,
     OpenSource
 }
 
-public sealed record CorpusCase(
+internal sealed record CorpusCase(
     string Id,
     string SeedId,
     CorpusVariant Variant,

@@ -8,7 +8,8 @@ internal static class AnalyzerConfigurationOptionRegistry {
     ];
 
     internal static bool IsAcceptedValue(AnalyzerConfigurationOption option, string? value) =>
-        !string.IsNullOrWhiteSpace(value) && option.AllowedValues.Contains(value!.Trim().ToLowerInvariant(), StringComparer.Ordinal);
+        !string.IsNullOrWhiteSpace(value) &&
+        option.AllowedValues.Contains(value!.Trim(), StringComparer.OrdinalIgnoreCase);
 
     private static AnalyzerConfigurationOption Choice(
         string key,

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
@@ -170,7 +171,7 @@ public sealed class RuntimeFlagshipOracleTests {
         var actual = diagnostics
             .Select(static diagnostic =>
                 (diagnostic.Id, Method: ExtractQuotedName(
-                    diagnostic.GetMessage())))
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture))))
             .OrderBy(static item => item.Id, StringComparer.Ordinal)
             .ThenBy(static item => item.Method, StringComparer.Ordinal)
             .ToArray();
@@ -182,7 +183,7 @@ public sealed class RuntimeFlagshipOracleTests {
     }
 
     private static string ExtractQuotedName(string message) {
-        var first = message.IndexOf('\'');
+        var first = message.IndexOf('\'', StringComparison.Ordinal);
         var second = first < 0 ? -1 : message.IndexOf('\'', first + 1);
         return first >= 0 && second > first
             ? message.Substring(first + 1, second - first - 1)
@@ -200,12 +201,12 @@ public sealed class RuntimeFlagshipOracleTests {
         Type fixture,
         string methodName)
         where TDelegate : Delegate =>
-        (TDelegate)(fixture.GetMethod(
+        (fixture.GetMethod(
                 methodName,
                 BindingFlags.Public | BindingFlags.Static) ??
             throw new InvalidOperationException(
                 $"Runtime method '{methodName}' is missing."))
-        .CreateDelegate(typeof(TDelegate));
+        .CreateDelegate<TDelegate>();
 
     private static void WithRuntimeAssembly(
         byte[] image,

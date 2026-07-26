@@ -182,8 +182,7 @@ internal sealed class OperationEffectScanner {
         if (access == EffectAccess.Write)
             return EffectSummaryOperations.Unsupported();
         var receiver = ClassifyRegion(property.Instance);
-        var arguments = property.Arguments
-            .ToImmutableArray();
+        var arguments = property.Arguments;
         var childEffects = EffectSummaryOperations.Join(
             property.Instance == null ? EffectSummary.Empty : Scan(property.Instance),
             ScanMany(property.Arguments.Select(static argument => argument.Value)),
@@ -724,7 +723,7 @@ internal sealed class OperationEffectScanner {
         return false;
     }
 
-    private EffectRegionSet[] CreateUnknownArguments(int count) {
+    private static EffectRegionSet[] CreateUnknownArguments(int count) {
         var result = new EffectRegionSet[count];
         for (var index = 0; index < result.Length; index++)
             result[index] = EffectRegionSet.Unknown;

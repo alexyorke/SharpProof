@@ -541,7 +541,7 @@ public sealed class IrFactory {
         }
     }
 
-    private bool? TryCompareConstants(IrTerm left, IrTerm right) {
+    private static bool? TryCompareConstants(IrTerm left, IrTerm right) {
         if (left is IrBooleanTerm leftBoolean && right is IrBooleanTerm rightBoolean)
             return leftBoolean.Value == rightBoolean.Value;
         if (left is IrIntegerTerm leftInteger && right is IrIntegerTerm rightInteger)
@@ -598,7 +598,7 @@ public sealed class IrFactory {
             throw new ArgumentException("A non-empty name is required.", parameterName);
     }
 
-    private void RequireTypes(IrTerm left, IrTerm right, IrTypeId expected, IrBinaryOperator @operator) {
+    private static void RequireTypes(IrTerm left, IrTerm right, IrTypeId expected, IrBinaryOperator @operator) {
         if (left.Type != expected || right.Type != expected)
             throw new ArgumentException(
                 "Operands are not valid for binary operator " + @operator + ".",

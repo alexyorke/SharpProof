@@ -1,11 +1,16 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Attributes;
 
 namespace SharpProof.Attributes.Test;
 
 [TestFixture]
-public sealed class ContractApiTests {
+[SuppressMessage(
+    "Performance",
+    "CA1812:Avoid uninstantiated internal classes",
+    Justification = "NUnit instantiates test fixtures through reflection.")]
+internal sealed class ContractApiTests {
     [TestCase(nameof(Contract.Requires))]
     [TestCase(nameof(Contract.Ensures))]
     [TestCase(nameof(Contract.Assume))]

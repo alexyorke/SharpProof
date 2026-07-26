@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text.Json;
 using System.Xml.Linq;
@@ -13,6 +14,11 @@ namespace SharpProof.ArchitectureTest;
 
 [TestFixture]
 public sealed class ArchitectureTests {
+    private static readonly JsonSerializerOptions SizeRatchetJsonOptions =
+        new() {
+            PropertyNameCaseInsensitive = true
+        };
+
     private static readonly string[] ProductionProjects = [
         "SharpProof.Ir",
         "SharpProof.ContractForGenerator",
@@ -371,9 +377,7 @@ public sealed class ArchitectureTests {
             "algorithm-size-ratchets.json");
         var manifest = JsonSerializer.Deserialize<SizeRatchetManifest>(
             File.ReadAllText(path),
-            new JsonSerializerOptions {
-                PropertyNameCaseInsensitive = true
-            });
+            SizeRatchetJsonOptions);
         return manifest ??
             throw new InvalidOperationException(
                 "Could not deserialize the algorithm size-ratchet manifest.");
@@ -443,6 +447,10 @@ public sealed class ArchitectureTests {
         throw new InvalidOperationException("Could not find the repository root.");
     }
 
+    [SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "System.Text.Json instantiates this model through reflection.")]
     private sealed class SizeRatchetManifest {
         public int SchemaVersion { get; init; }
 
@@ -459,6 +467,10 @@ public sealed class ArchitectureTests {
         public string MemberLines { get; init; } = "";
     }
 
+    [SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "System.Text.Json instantiates this model through reflection.")]
     private sealed class SizeRatchetEntry {
         public string Path { get; init; } = "";
 

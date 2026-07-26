@@ -7,8 +7,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$repositoryDocumentPrefix =
-    'https://github.com/alexyorke/SharpProof/blob/main/'
+$repositoryDefaultBranch = 'master'
 $maintainedDocuments = @(
     'README.md',
     'SEMANTICS.md',
@@ -104,6 +103,45 @@ function Get-MarkdownAnchors {
     return $anchors
 }
 
+function Assert-RepositoryDocumentLink {
+    param(
+        [Parameter(Mandatory)][string]$SourceRelativePath,
+        [Parameter(Mandatory)][string]$Target
+    )
+
+    if (-not $Target.StartsWith(
+            $repositoryDocumentPrefix,
+            [StringComparison]::OrdinalIgnoreCase)) {
+        throw (
+            "Repository documentation link in $SourceRelativePath must use " +
+            "the '$repositoryDefaultBranch' branch: $Target")
+    }
+
+    $relativeTarget = $Target.Substring($repositoryDocumentPrefix.Length)
+    $parts = $relativeTarget.Split([char]'#', 2)
+    if ($parts[0].Length -eq 0) {
+        throw "Repository documentation link has no file path in ${SourceRelativePath}: $Target"
+    }
+
+    $targetPath = Get-RepositoryPath (
+        [Uri]::UnescapeDataString($parts[0]))
+    if (-not $targetPath.StartsWith(
+            $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
+            [StringComparison]::OrdinalIgnoreCase) -or
+        -not (Test-Path -LiteralPath $targetPath -PathType Leaf)) {
+        throw "Broken repository documentation link in ${SourceRelativePath}: $Target"
+    }
+
+    if ($parts.Length -eq 2 -and $parts[1].Length -ne 0) {
+        $targetContent = Get-Content -LiteralPath $targetPath -Raw
+        $anchors = Get-MarkdownAnchors $targetContent
+        $fragment = [Uri]::UnescapeDataString($parts[1])
+        if (-not $anchors.Contains($fragment)) {
+            throw "Broken repository documentation anchor in ${SourceRelativePath}: $Target"
+        }
+    }
+}
+
 function Assert-MarkdownLinks {
     param([Parameter(Mandatory)][string]$RelativePath)
 
@@ -114,11 +152,12 @@ function Assert-MarkdownLinks {
         '(?<!!)\[[^\]]+\]\((?<target><[^>]+>|[^)\s]+)(?:\s+"[^"]*")?\)')) {
         $target = $match.Groups['target'].Value.Trim('<', '>')
         if ($target.StartsWith(
-            $repositoryDocumentPrefix,
+            "$repositoryUrl/blob/",
             [StringComparison]::OrdinalIgnoreCase)) {
-            $target = $target.Substring($repositoryDocumentPrefix.Length)
+            Assert-RepositoryDocumentLink $RelativePath $target
+            continue
         }
-        elseif ($target -match '^(?:https?://|mailto:)') {
+        if ($target -match '^(?:https?://|mailto:)') {
             continue
         }
 
@@ -148,6 +187,17 @@ function Assert-MarkdownLinks {
     }
 }
 
+function Assert-RepositoryLinksInSource {
+    param([Parameter(Mandatory)][string]$RelativePath)
+
+    $content = Get-RequiredText $RelativePath
+    $pattern =
+        [regex]::Escape("$repositoryUrl/blob/") + '[^"''\s)]+'
+    foreach ($match in [regex]::Matches($content, $pattern)) {
+        Assert-RepositoryDocumentLink $RelativePath $match.Value
+    }
+}
+
 function Get-EnumMembers {
     param(
         [Parameter(Mandatory)][string]$Content,
@@ -172,12 +222,22 @@ function Get-EnumMembers {
     )
 }
 
+$releaseXml = [xml](Get-RequiredText 'SharpProof.Release.props')
+$repositoryUrl = $releaseXml.SelectSingleNode(
+    '//SharpProofProjectUrl').InnerText.TrimEnd('/')
+$repositoryDocumentPrefix =
+    "$repositoryUrl/blob/$repositoryDefaultBranch/"
+
 foreach ($relativePath in $maintainedDocuments) {
     Assert-LfUtf8Document $relativePath
     Assert-MarkdownLinks $relativePath
 }
+foreach ($relativePath in @(
+        'SharpProof.Analyzer\GeneratedDiagnosticDescriptors.cs',
+        'SharpProof.Meta.Analyzers\MetaDiagnosticDescriptors.cs')) {
+    Assert-RepositoryLinksInSource $relativePath
+}
 
-$releaseXml = [xml](Get-RequiredText 'SharpProof.Release.props')
 $versionPrefix = $releaseXml.SelectSingleNode(
     '//SharpProofVersionPrefix').InnerText
 $versionExpression = $releaseXml.SelectSingleNode(

@@ -28,8 +28,8 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
     public DifferentialResult Compare(
         IrTerm term,
         IReadOnlyDictionary<IrVarId, IrValue> variables) {
-        if (term == null) throw new ArgumentNullException(nameof(term));
-        if (variables == null) throw new ArgumentNullException(nameof(variables));
+        ArgumentNullException.ThrowIfNull(term);
+        ArgumentNullException.ThrowIfNull(variables);
 
         var interpreted = new IrInterpreter(_factory).Evaluate(term, variables);
         if (!TryCreateProgram(term, variables, out var program, out var orderedVariables, out var reason))

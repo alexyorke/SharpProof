@@ -2,7 +2,7 @@ namespace SharpProof.Worker;
 
 internal sealed class VerificationCache(
     string directory,
-    long maximumBytes) {
+    long maximumBytes) : IDisposable {
     private readonly string _directory =
         Path.GetFullPath(directory ?? throw new ArgumentNullException(nameof(directory)));
     private readonly long _maximumBytes = maximumBytes > 0
@@ -61,8 +61,7 @@ internal sealed class VerificationCache(
     internal async Task TryWriteAsync(
         CacheableWorkerResponse response,
         CancellationToken cancellationToken) {
-        if (response == null)
-            throw new ArgumentNullException(nameof(response));
+        ArgumentNullException.ThrowIfNull(response);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             Directory.CreateDirectory(_directory);
@@ -133,6 +132,8 @@ internal sealed class VerificationCache(
         Convert.ToHexString(
                 SHA256.HashData(Encoding.UTF8.GetBytes(value)))
             .ToLowerInvariant();
+
+    public void Dispose() => _gate.Dispose();
 
     private sealed class CacheEnvelope {
         public int SchemaVersion { get; set; }

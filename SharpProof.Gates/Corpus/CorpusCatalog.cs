@@ -3,7 +3,7 @@ using System.Text;
 
 namespace SharpProof.Gates.Corpus;
 
-public static class CorpusCatalog {
+internal static class CorpusCatalog {
     public static ImmutableArray<CorpusVariant> Variants { get; } =
         [.. Enum.GetValues<CorpusVariant>()];
 

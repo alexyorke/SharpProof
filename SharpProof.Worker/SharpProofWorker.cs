@@ -4,7 +4,7 @@ public sealed class SharpProofWorker : IDisposable {
     private readonly ISmtBackend _backend;
     private readonly Func<long>? _readConsumedResourceCount;
     private readonly SemaphoreSlim _methodResourceGate = new(1, 1);
-    private readonly IDisposable? _ownedBackend;
+    private readonly IrSmtBackend? _ownedBackend;
     private bool _disposed;
 
     public SharpProofWorker(ISmtBackend backend)
@@ -27,7 +27,7 @@ public sealed class SharpProofWorker : IDisposable {
         _ownedBackend = backend;
 
     public static SharpProofWorker Create(WorkerBudgets budgets) {
-        if (budgets == null) throw new ArgumentNullException(nameof(budgets));
+        ArgumentNullException.ThrowIfNull(budgets);
         return new SharpProofWorker(
             new IrSmtBackend(
                 new IrSmtBackendOptions(budgets.QueryRlimit)));
@@ -41,6 +41,7 @@ public sealed class SharpProofWorker : IDisposable {
         var validation = WorkerProtocolJson.Validate(request);
         if (!validation.IsValid)
             return ErrorResponse(string.Empty, validation.Errors);
+        ArgumentNullException.ThrowIfNull(request);
 
         WorkerInputSnapshot snapshot;
         try {
@@ -63,18 +64,7 @@ public sealed class SharpProofWorker : IDisposable {
                 }]);
         }
 
-        VerificationCache? cache = null;
-        if (request.Cache.Enabled) {
-            try {
-                cache = CreateCache(request);
-            }
-            catch (Exception exception) when (exception is
-                ArgumentException or
-                NotSupportedException) {
-                // An invalid cache location disables caching without
-                // changing the verification result.
-            }
-        }
+        using var cache = CreateCacheIfEnabled(request);
         if (cache != null) {
             var cached = await cache.TryReadAsync(
                 snapshot.InputHash,
@@ -248,6 +238,18 @@ public sealed class SharpProofWorker : IDisposable {
             Status = WorkerVerificationStatus.Unknown,
             Reason = WorkerVerificationReason.InfrastructureFailure
         };
+
+    private static VerificationCache? CreateCacheIfEnabled(
+        WorkerVerifyRequest request) {
+        try {
+            return request.Cache.Enabled ? CreateCache(request) : null;
+        }
+        catch (Exception exception) when (exception is
+            ArgumentException or
+            NotSupportedException) {
+            return null;
+        }
+    }
 
     private static VerificationCache CreateCache(
         WorkerVerifyRequest request) {

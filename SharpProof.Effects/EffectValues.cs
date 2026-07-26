@@ -213,7 +213,7 @@ internal sealed class EffectNamedTypeComparer : IComparer<INamedTypeSymbol> {
             : string.Compare(left.MetadataName, right.MetadataName, StringComparison.Ordinal);
     }
 
-    private int CompareContainingType(INamedTypeSymbol? left, INamedTypeSymbol? right) {
+    private static int CompareContainingType(INamedTypeSymbol? left, INamedTypeSymbol? right) {
         if (ReferenceEquals(left, right)) return 0;
         if (left == null) return -1;
         if (right == null) return 1;

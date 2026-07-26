@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
     <SharpProofMode Condition="'$(SharpProofMode)' == ''">off</SharpProofMode>
-    <SharpProofAnalyzerDirectory Condition="'$(SharpProofAnalyzerDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\tools\analyzers\dotnet\cs'))</SharpProofAnalyzerDirectory>
+    <SharpProofAnalyzerDirectory Condition="'$(SharpProofAnalyzerDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/analyzers/dotnet/cs'))</SharpProofAnalyzerDirectory>
     <_SharpProofAnalyzerDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == ''">false</SharpProofVerify>
     <SharpProofVerifyQueryRlimit Condition="'$(SharpProofVerifyQueryRlimit)' == ''">3000000</SharpProofVerifyQueryRlimit>

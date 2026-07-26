@@ -83,15 +83,14 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
     }
 
     public override SequenceCardinalityValue Widen(
-        SequenceCardinalityValue previous,
-        SequenceCardinalityValue next) {
+        SequenceCardinalityValue previous, SequenceCardinalityValue candidate) {
         Validate(previous.Kind);
-        Validate(next.Kind);
-        if (previous.IsBottom) return next;
-        if (next.IsBottom || LessThanOrEqual(next, previous)) return previous;
+        Validate(candidate.Kind);
+        if (previous.IsBottom) return candidate;
+        if (candidate.IsBottom || LessThanOrEqual(candidate, previous)) return previous;
         return Create(
-            JoinKind(previous.Kind, next.Kind),
-            _intervals.Widen(previous.Length, next.Length));
+            JoinKind(previous.Kind, candidate.Kind),
+            _intervals.Widen(previous.Length, candidate.Length));
     }
 
     public override SequenceCardinalityValue Havoc(SequenceCardinalityValue value) {

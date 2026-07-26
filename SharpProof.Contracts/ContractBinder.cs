@@ -244,7 +244,7 @@ public sealed class ContractBinder(Compilation compilation, IrFactory factory) {
         INamedTypeSymbol candidate,
         INamedTypeSymbol targetType) {
         var attributes = candidate.GetAttributes()
-            .Where(attribute => _api!.IsAttribute(attribute, _api.ContractFor))
+            .Where(attribute => ContractApiSymbols.IsAttribute(attribute, _api!.ContractFor))
             .ToImmutableArray();
         if (attributes.Length != 1 ||
             attributes[0].ConstructorArguments.Length != 1)
@@ -364,7 +364,7 @@ public sealed class ContractBinder(Compilation compilation, IrFactory factory) {
         return result;
     }
 
-    private IReadOnlyDictionary<IrVarId, IrTerm>? CreateCanonicalSubstitutions(
+    private Dictionary<IrVarId, IrTerm>? CreateCanonicalSubstitutions(
         IMethodSymbol target,
         IMethodSymbol source,
         bool usesCompanion,
@@ -440,7 +440,7 @@ public sealed class ContractBinder(Compilation compilation, IrFactory factory) {
                 return ClosedAttributeBindingResult.Fail(result);
         }
         var pureCount = target.GetAttributes()
-            .Count(attribute => _api!.IsAttribute(attribute, _api.Pure));
+            .Count(attribute => ContractApiSymbols.IsAttribute(attribute, _api!.Pure));
         if (pureCount > 1)
             return ClosedAttributeBindingResult.Fail(
                 ContractBindingFailure.InvalidClosedAttribute);
@@ -457,7 +457,7 @@ public sealed class ContractBinder(Compilation compilation, IrFactory factory) {
         ImmutableArray<BoundContractClause>.Builder clauses) {
         foreach (var attribute in attributes) {
             IrTerm? condition = null;
-            if (_api!.IsAttribute(attribute, _api.NotNull)) {
+            if (ContractApiSymbols.IsAttribute(attribute, _api!.NotNull)) {
                 var type = _factory.GetTypeInfo(value.Type);
                 if (type.Kind is not (
                         IrTypeKind.Reference or IrTypeKind.String or
@@ -468,7 +468,7 @@ public sealed class ContractBinder(Compilation compilation, IrFactory factory) {
                     value,
                     _factory.Null(value.Type));
             }
-            else if (_api.IsAttribute(attribute, _api.Positive)) {
+            else if (ContractApiSymbols.IsAttribute(attribute, _api.Positive)) {
                 if (value.Type != _factory.IntegerType)
                     return ContractBindingFailure.InvalidClosedAttribute;
                 condition = _factory.Binary(
@@ -476,7 +476,7 @@ public sealed class ContractBinder(Compilation compilation, IrFactory factory) {
                     value,
                     _factory.Integer(0));
             }
-            else if (_api.IsAttribute(attribute, _api.InRange)) {
+            else if (ContractApiSymbols.IsAttribute(attribute, _api.InRange)) {
                 if (value.Type != _factory.IntegerType ||
                     attribute.ConstructorArguments.Length != 2 ||
                     !TryGetInt64(attribute.ConstructorArguments[0], out var minimum) ||

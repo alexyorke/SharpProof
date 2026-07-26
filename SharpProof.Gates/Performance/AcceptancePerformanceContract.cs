@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace SharpProof.Gates.Performance;
 
-public sealed record AcceptancePerformanceContract(
+internal sealed record AcceptancePerformanceContract(
     int Warmups,
     int Samples,
     double MaximumMedianRatio,

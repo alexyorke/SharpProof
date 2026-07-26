@@ -206,7 +206,7 @@ public sealed class FiniteCfgConcreteOracleTests {
         throw new InvalidOperationException();
     }
 
-    private static IReadOnlyList<FiniteTransfer>
+    private static List<FiniteTransfer>
         EnumerateBottomStrictMonotoneTransfers() {
         var result = new List<FiniteTransfer>();
         for (var encoded = 0; encoded < 64; encoded++) {

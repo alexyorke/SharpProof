@@ -12,7 +12,7 @@ using SharpProof.Analyzer;
 
 namespace SharpProof.Gates.Performance;
 
-public sealed record PerformanceGateResult(
+internal sealed record PerformanceGateResult(
     bool Passed,
     int Warmups,
     int Samples,
@@ -33,7 +33,7 @@ public sealed record PerformanceGateResult(
     double ForcedTerminationMilliseconds,
     ImmutableArray<string> Failures);
 
-public static class PerformanceGate {
+internal static class PerformanceGate {
     private const int RetainedCompilationCount = 40;
 
     public static async Task<PerformanceGateResult> RunAsync(
@@ -169,8 +169,7 @@ public static class PerformanceGate {
             string kind,
             int iterations,
             CancellationToken cancellationToken = default) {
-        if (iterations <= 0)
-            throw new ArgumentOutOfRangeException(nameof(iterations));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
         var sessionFactory = new RejectingSessionFactory();
         var analyzer = new SharpProofAnalyzer(sessionFactory);
         var diagnosticCount = 0;
@@ -199,7 +198,7 @@ public static class PerformanceGate {
             sessionFactory.CreateCount);
     }
 
-    private static Compilation CreateTimingCompilation(
+    private static CSharpCompilation CreateTimingCompilation(
         string source,
         string kind,
         int index) =>
@@ -220,11 +219,16 @@ public static class PerformanceGate {
         var probeParent = Path.Combine(
             Path.GetTempPath(),
             "SharpProof.Gates.Performance");
-        var probeRoot = Path.Combine(
-            probeParent,
-            Guid.NewGuid().ToString("N"));
-        var baselineDirectory = Path.Combine(probeRoot, "baseline");
-        var defaultOffDirectory = Path.Combine(probeRoot, "default-off");
+        var resolvedParent = Path.GetFullPath(probeParent);
+        var resolvedRoot = Path.GetFullPath(
+            Path.Combine(resolvedParent, Guid.NewGuid().ToString("N")));
+        if (!resolvedRoot.StartsWith(
+                resolvedParent + Path.DirectorySeparatorChar,
+                StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                "Refusing to use an unexpected performance probe path.");
+        var baselineDirectory = Path.Combine(resolvedRoot, "baseline");
+        var defaultOffDirectory = Path.Combine(resolvedRoot, "default-off");
         Directory.CreateDirectory(baselineDirectory);
         Directory.CreateDirectory(defaultOffDirectory);
         try {
@@ -275,13 +279,6 @@ public static class PerformanceGate {
             return new PackageBuildTiming(baseline, defaultOff);
         }
         finally {
-            var resolvedRoot = Path.GetFullPath(probeRoot);
-            var resolvedParent = Path.GetFullPath(probeParent);
-            if (!resolvedRoot.StartsWith(
-                    resolvedParent + Path.DirectorySeparatorChar,
-                    StringComparison.Ordinal))
-                throw new InvalidOperationException(
-                    "Refusing to remove an unexpected performance probe.");
             if (Directory.Exists(resolvedRoot))
                 Directory.Delete(resolvedRoot, recursive: true);
         }
@@ -393,8 +390,10 @@ public static class PerformanceGate {
         using var process = Process.Start(startInfo) ??
             throw new InvalidOperationException(
                 "The performance probe process did not start.");
-        var standardOutput = process.StandardOutput.ReadToEndAsync();
-        var standardError = process.StandardError.ReadToEndAsync();
+        var standardOutput = process.StandardOutput.ReadToEndAsync(
+            cancellationToken);
+        var standardError = process.StandardError.ReadToEndAsync(
+            cancellationToken);
         var stopwatch = Stopwatch.StartNew();
         try {
             await process.WaitForExitAsync(cancellationToken)
@@ -600,7 +599,10 @@ public static class PerformanceGate {
             var currentMarker = currentlyAllocates
                 ? "return new object();"
                 : marker;
-            var warmText = currentTree.GetText(cancellationToken).WithChanges(
+            var warmSourceText = await currentTree.GetTextAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
+            var warmText = warmSourceText.WithChanges(
                 new TextChange(
                     new TextSpan(markerStart, currentMarker.Length),
                     allocates ? "return new object();" : marker));
@@ -631,7 +633,9 @@ public static class PerformanceGate {
                 ? "return new object();"
                 : marker;
             var stopwatch = Stopwatch.StartNew();
-            var changedText = currentTree.GetText(cancellationToken).WithChanges(
+            var currentText = await currentTree.GetTextAsync(cancellationToken)
+                .ConfigureAwait(false);
+            var changedText = currentText.WithChanges(
                 new TextChange(
                     new TextSpan(markerStart, currentMarker.Length),
                     replacement));

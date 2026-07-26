@@ -71,7 +71,6 @@
                                  PackagePath="tools/analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="$(AttributesPayloadPath)" PackagePath="lib/netstandard2.0" />
       <TfmSpecificPackageFile Include="
-          $(WorkerPayloadDirectory)\libz3.dll;
           $(WorkerPayloadDirectory)\Microsoft.CodeAnalysis.AnalyzerUtilities.dll;
           $(WorkerPayloadDirectory)\Microsoft.CodeAnalysis.CSharp.dll;
           $(WorkerPayloadDirectory)\Microsoft.CodeAnalysis.dll;

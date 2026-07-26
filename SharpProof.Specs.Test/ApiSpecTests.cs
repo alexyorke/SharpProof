@@ -439,7 +439,9 @@ public sealed class ApiSpecTests {
                 "A .NET 8 reference pack could not be located.");
     }
 
-    private static MetadataReference CreateReference(string assemblyName, string source) {
+    private static PortableExecutableReference CreateReference(
+        string assemblyName,
+        string source) {
         var compilation = CSharpCompilation.Create(
             assemblyName,
             [CSharpSyntaxTree.ParseText(source)],

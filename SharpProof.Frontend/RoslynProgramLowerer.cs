@@ -280,7 +280,7 @@ public sealed class RoslynProgramLowerer(
             return lowered.Term;
         }
 
-        private IrTerm? LowerInvocation(
+        private IrVariableTerm? LowerInvocation(
             IrBlockId block,
             OperationId operation,
             IInvocationOperation invocation,

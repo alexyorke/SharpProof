@@ -58,4 +58,15 @@ public sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism) {
     }
 }
 
-public sealed class FuzzUsageException(string message) : Exception(message);
+public sealed class FuzzUsageException : Exception {
+    public FuzzUsageException() {
+    }
+
+    public FuzzUsageException(string message)
+        : base(message) {
+    }
+
+    public FuzzUsageException(string message, Exception innerException)
+        : base(message, innerException) {
+    }
+}

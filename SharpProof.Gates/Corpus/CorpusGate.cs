@@ -8,7 +8,7 @@ using SharpProof.Analyzer;
 
 namespace SharpProof.Gates.Corpus;
 
-public sealed record CorpusGateResult(
+internal sealed record CorpusGateResult(
     bool Passed,
     int CaseCount,
     int BaseCaseCount,
@@ -28,7 +28,7 @@ public sealed record CorpusGateResult(
     ImmutableArray<string> AllowedDegradations,
     ImmutableArray<string> Failures);
 
-public static class CorpusGate {
+internal static class CorpusGate {
     public static async Task<CorpusGateResult> RunAsync(
         string repositoryRoot,
         CancellationToken cancellationToken = default) {
@@ -349,7 +349,7 @@ public static class CorpusGate {
             SnapshotExpectation>(StringComparer.Ordinal);
         foreach (var rawLine in File.ReadAllLines(path)) {
             var line = rawLine.Trim();
-            if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal))
+            if (line.Length == 0 || line.StartsWith('#'))
                 continue;
             var parts = line.Split('|');
             if (parts.Length != 4 ||

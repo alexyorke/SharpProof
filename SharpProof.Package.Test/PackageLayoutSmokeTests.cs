@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Security;
+using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.Worker;
 
@@ -9,6 +10,83 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 [NonParallelizable]
 public sealed class PackageLayoutSmokeTests {
+    private static readonly string[] ExpectedAnalyzerEntryFileNames = [
+        "SharpProof.Analyzer.dll",
+        "SharpProof.ContractForGenerator.dll"
+    ];
+
+    private static readonly string[] ExpectedAnalyzerDependencyFileNames = [
+        "Microsoft.CodeAnalysis.AnalyzerUtilities.dll",
+        "SharpProof.Attributes.dll",
+        "SharpProof.Contracts.dll",
+        "SharpProof.Dataflow.dll",
+        "SharpProof.Effects.dll",
+        "SharpProof.Frontend.dll",
+        "SharpProof.Ir.dll",
+        "SharpProof.Specs.dll",
+        "System.Buffers.dll",
+        "System.Collections.Immutable.dll",
+        "System.Memory.dll",
+        "System.Numerics.Vectors.dll",
+        "System.Reflection.Metadata.dll",
+        "System.Runtime.CompilerServices.Unsafe.dll",
+        "System.Text.Encoding.CodePages.dll",
+        "System.Threading.Tasks.Extensions.dll"
+    ];
+
+    private static readonly string[] ExpectedConditionalAnalyzerEntries = [
+        "tools/analyzers/dotnet/cs/Microsoft.CodeAnalysis.AnalyzerUtilities.dll",
+        "tools/analyzers/dotnet/cs/SharpProof.Analyzer.dll",
+        "tools/analyzers/dotnet/cs/SharpProof.Attributes.dll",
+        "tools/analyzers/dotnet/cs/SharpProof.ContractForGenerator.dll",
+        "tools/analyzers/dotnet/cs/SharpProof.Contracts.dll",
+        "tools/analyzers/dotnet/cs/SharpProof.Dataflow.dll",
+        "tools/analyzers/dotnet/cs/SharpProof.Effects.dll",
+        "tools/analyzers/dotnet/cs/SharpProof.Frontend.dll",
+        "tools/analyzers/dotnet/cs/SharpProof.Ir.dll",
+        "tools/analyzers/dotnet/cs/SharpProof.Specs.dll",
+        "tools/analyzers/dotnet/cs/System.Buffers.dll",
+        "tools/analyzers/dotnet/cs/System.Collections.Immutable.dll",
+        "tools/analyzers/dotnet/cs/System.Memory.dll",
+        "tools/analyzers/dotnet/cs/System.Numerics.Vectors.dll",
+        "tools/analyzers/dotnet/cs/System.Reflection.Metadata.dll",
+        "tools/analyzers/dotnet/cs/System.Runtime.CompilerServices.Unsafe.dll",
+        "tools/analyzers/dotnet/cs/System.Text.Encoding.CodePages.dll",
+        "tools/analyzers/dotnet/cs/System.Threading.Tasks.Extensions.dll"
+    ];
+
+    private static readonly string[] ExpectedToolEntries = [
+        "tools/net8/Microsoft.CodeAnalysis.AnalyzerUtilities.dll",
+        "tools/net8/Microsoft.CodeAnalysis.CSharp.dll",
+        "tools/net8/Microsoft.CodeAnalysis.dll",
+        "tools/net8/Microsoft.Z3.dll",
+        "tools/net8/SharpProof.Attributes.dll",
+        "tools/net8/SharpProof.Contracts.dll",
+        "tools/net8/SharpProof.Dataflow.dll",
+        "tools/net8/SharpProof.Frontend.dll",
+        "tools/net8/SharpProof.Ir.dll",
+        "tools/net8/SharpProof.Smt.dll",
+        "tools/net8/SharpProof.Specs.dll",
+        "tools/net8/SharpProof.Verify.dll",
+        "tools/net8/SharpProof.Worker.deps.json",
+        "tools/net8/SharpProof.Worker.dll",
+        "tools/net8/SharpProof.Worker.Launcher.deps.json",
+        "tools/net8/SharpProof.Worker.Launcher.dll",
+        "tools/net8/SharpProof.Worker.Launcher.runtimeconfig.json",
+        "tools/net8/SharpProof.Worker.Protocol.dll",
+        "tools/net8/SharpProof.Worker.runtimeconfig.json",
+        "tools/net8/System.Collections.Immutable.dll",
+        "tools/net8/System.IO.Pipelines.dll",
+        "tools/net8/System.Reflection.Metadata.dll",
+        "tools/net8/System.Text.Encodings.Web.dll",
+        "tools/net8/System.Text.Json.dll",
+        "tools/net8/runtimes/win-x64/native/libz3.dll"
+    ];
+
+    private static readonly string[] ExpectedNativeZ3Entries = [
+        "tools/net8/runtimes/win-x64/native/libz3.dll"
+    ];
+
     [Test]
     public async Task PackedAnalyzerIsThinAndPackagedWorkerRuns() {
         using var workspace = PackageWorkspace.Create();
@@ -56,8 +134,8 @@ public sealed class PackageLayoutSmokeTests {
             "--nologo");
         Assert.That(disabledItems.ExitCode, Is.Zero, disabledItems.Output);
         Assert.That(
-            disabledItems.Output,
-            Does.Not.Contain("SharpProof.Analyzer.dll"));
+            GetPackagedAnalyzerItems(disabledItems.Output),
+            Is.Empty);
         var enabledItems = await RunDotNetAsync(
             workspace.ConsumerDirectory,
             "msbuild",
@@ -69,6 +147,18 @@ public sealed class PackageLayoutSmokeTests {
             enabledItems.Output,
             Does.Contain("SharpProof.Analyzer.dll")
                 .And.Contain("SharpProof.ContractForGenerator.dll"));
+        var packagedAnalyzerItems =
+            GetPackagedAnalyzerItems(enabledItems.Output);
+        Assert.That(
+            packagedAnalyzerItems
+                .Where(static item => item.Role == "EntryPoint")
+                .Select(static item => item.FileName),
+            Is.EquivalentTo(ExpectedAnalyzerEntryFileNames));
+        Assert.That(
+            packagedAnalyzerItems
+                .Where(static item => item.Role == "Dependency")
+                .Select(static item => item.FileName),
+            Is.EquivalentTo(ExpectedAnalyzerDependencyFileNames));
 
         var analyzerBuild = await RunDotNetAsync(
             workspace.ConsumerDirectory,
@@ -120,26 +210,7 @@ public sealed class PackageLayoutSmokeTests {
         Assert.That(analyzerEntries, Is.Empty);
         Assert.That(
             conditionalAnalyzerEntries,
-            Is.EquivalentTo(new[] {
-                "tools/analyzers/dotnet/cs/Microsoft.CodeAnalysis.AnalyzerUtilities.dll",
-                "tools/analyzers/dotnet/cs/SharpProof.Analyzer.dll",
-                "tools/analyzers/dotnet/cs/SharpProof.Attributes.dll",
-                "tools/analyzers/dotnet/cs/SharpProof.ContractForGenerator.dll",
-                "tools/analyzers/dotnet/cs/SharpProof.Contracts.dll",
-                "tools/analyzers/dotnet/cs/SharpProof.Dataflow.dll",
-                "tools/analyzers/dotnet/cs/SharpProof.Effects.dll",
-                "tools/analyzers/dotnet/cs/SharpProof.Frontend.dll",
-                "tools/analyzers/dotnet/cs/SharpProof.Ir.dll",
-                "tools/analyzers/dotnet/cs/SharpProof.Specs.dll",
-                "tools/analyzers/dotnet/cs/System.Buffers.dll",
-                "tools/analyzers/dotnet/cs/System.Collections.Immutable.dll",
-                "tools/analyzers/dotnet/cs/System.Memory.dll",
-                "tools/analyzers/dotnet/cs/System.Numerics.Vectors.dll",
-                "tools/analyzers/dotnet/cs/System.Reflection.Metadata.dll",
-                "tools/analyzers/dotnet/cs/System.Runtime.CompilerServices.Unsafe.dll",
-                "tools/analyzers/dotnet/cs/System.Text.Encoding.CodePages.dll",
-                "tools/analyzers/dotnet/cs/System.Threading.Tasks.Extensions.dll"
-            }));
+            Is.EquivalentTo(ExpectedConditionalAnalyzerEntries));
         Assert.That(
             conditionalAnalyzerEntries,
             Has.None.Matches<string>(
@@ -154,6 +225,22 @@ public sealed class PackageLayoutSmokeTests {
         Assert.That(
             entries,
             Does.Contain("buildTransitive/SharpProof.targets"));
+        Assert.That(
+            ReadArchiveText(
+                archive,
+                "buildTransitive/SharpProof.props"),
+            Does.Contain(
+                    "$(MSBuildThisFileDirectory)../tools/analyzers/dotnet/cs")
+                .And.Not.Contain(@"..\tools\analyzers"));
+        Assert.That(
+            ReadArchiveText(
+                archive,
+                "buildTransitive/SharpProof.targets"),
+            Does.Not.Contain("*.dll")
+                .And.Contain(
+                    "<SharpProofAnalyzerRole>EntryPoint</SharpProofAnalyzerRole>")
+                .And.Contain(
+                    "<SharpProofAnalyzerRole>Dependency</SharpProofAnalyzerRole>"));
         var toolEntries = entries
             .Where(entry => entry.StartsWith(
                 "tools/net8/",
@@ -161,34 +248,23 @@ public sealed class PackageLayoutSmokeTests {
             .ToArray();
         Assert.That(
             toolEntries,
-            Is.EquivalentTo(new[] {
-                "tools/net8/libz3.dll",
-                "tools/net8/Microsoft.CodeAnalysis.AnalyzerUtilities.dll",
-                "tools/net8/Microsoft.CodeAnalysis.CSharp.dll",
-                "tools/net8/Microsoft.CodeAnalysis.dll",
-                "tools/net8/Microsoft.Z3.dll",
-                "tools/net8/SharpProof.Attributes.dll",
-                "tools/net8/SharpProof.Contracts.dll",
-                "tools/net8/SharpProof.Dataflow.dll",
-                "tools/net8/SharpProof.Frontend.dll",
-                "tools/net8/SharpProof.Ir.dll",
-                "tools/net8/SharpProof.Smt.dll",
-                "tools/net8/SharpProof.Specs.dll",
-                "tools/net8/SharpProof.Verify.dll",
-                "tools/net8/SharpProof.Worker.deps.json",
-                "tools/net8/SharpProof.Worker.dll",
-                "tools/net8/SharpProof.Worker.Launcher.deps.json",
-                "tools/net8/SharpProof.Worker.Launcher.dll",
-                "tools/net8/SharpProof.Worker.Launcher.runtimeconfig.json",
-                "tools/net8/SharpProof.Worker.Protocol.dll",
-                "tools/net8/SharpProof.Worker.runtimeconfig.json",
-                "tools/net8/System.Collections.Immutable.dll",
-                "tools/net8/System.IO.Pipelines.dll",
-                "tools/net8/System.Reflection.Metadata.dll",
-                "tools/net8/System.Text.Encodings.Web.dll",
-                "tools/net8/System.Text.Json.dll",
-                "tools/net8/runtimes/win-x64/native/libz3.dll"
-            }));
+            Is.EquivalentTo(ExpectedToolEntries));
+        Assert.That(
+            entries.Where(static entry =>
+                entry.EndsWith(
+                    "/libz3.dll",
+                    StringComparison.OrdinalIgnoreCase)),
+            Is.EquivalentTo(ExpectedNativeZ3Entries));
+    }
+
+    private static string ReadArchiveText(
+        ZipArchive archive,
+        string entryPath) {
+        var entry = archive.GetEntry(entryPath) ??
+            throw new InvalidOperationException(
+                "Package entry was not found: " + entryPath);
+        using var reader = new StreamReader(entry.Open());
+        return reader.ReadToEnd();
     }
 
     private static string GetPackageVersion(string packagePath) {
@@ -221,6 +297,27 @@ public sealed class PackageLayoutSmokeTests {
             process.ExitCode,
             (await standardOutput) + Environment.NewLine +
             (await standardError));
+    }
+
+    private static (string FileName, string Role)[]
+        GetPackagedAnalyzerItems(string output) {
+        using var document = JsonDocument.Parse(output);
+        var result = new List<(string FileName, string Role)>();
+        foreach (var item in document.RootElement
+            .GetProperty("Items")
+            .GetProperty("Analyzer")
+            .EnumerateArray()) {
+            var identity = item.GetProperty("Identity").GetString();
+            if (identity == null ||
+                !identity.Replace('\\', '/').Contains(
+                    "/tools/analyzers/dotnet/cs/",
+                    StringComparison.Ordinal))
+                continue;
+            result.Add((
+                Path.GetFileName(identity),
+                item.GetProperty("SharpProofAnalyzerRole").GetString() ?? ""));
+        }
+        return [.. result];
     }
 
     private static string FindRepositoryRoot() {

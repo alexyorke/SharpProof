@@ -25,10 +25,15 @@ try {
     var summary = await FuzzRunner.RunAsync(options, cancellation.Token);
     Console.WriteLine(JsonSerializer.Serialize(
         summary,
-        new JsonSerializerOptions { WriteIndented = true }));
+        FuzzJson.Indented));
     return summary.Passed ? 0 : 1;
 }
 catch (OperationCanceledException) when (cancellation.IsCancellationRequested) {
     Console.Error.WriteLine("SharpProof fuzz run cancelled.");
     return 130;
+}
+
+file static class FuzzJson {
+    internal static JsonSerializerOptions Indented { get; } =
+        new() { WriteIndented = true };
 }

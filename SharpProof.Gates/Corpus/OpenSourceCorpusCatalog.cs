@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -46,6 +47,10 @@ internal static class OpenSourceCorpusCatalog {
                 CorpusOrigin.OpenSource,
                 $"{method.SourceId}:{method.Path}:{method.StartLine}"))];
 
+    [SuppressMessage(
+        "Globalization",
+        "CA1308:Normalize strings to uppercase",
+        Justification = "Checked-in corpus manifests publish SHA-256 values in lowercase hexadecimal.")]
     internal static string ComputeSha256(string value) =>
         Convert.ToHexString(
                 SHA256.HashData(
@@ -197,6 +202,10 @@ internal static class OpenSourceCorpusCatalog {
         return matches[0];
     }
 
+    [SuppressMessage(
+        "Globalization",
+        "CA1308:Normalize strings to uppercase",
+        Justification = "Checked-in corpus manifests publish SHA-256 values in lowercase hexadecimal.")]
     private static void ValidateSource(
         OpenSourceCorpusSource source,
         string corpusDirectory) {

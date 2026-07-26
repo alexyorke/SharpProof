@@ -73,7 +73,7 @@ public static class IrSubstitution {
         return rewritten;
     }
 
-    private static IrTerm RewriteOpaque(
+    private static IrOpaqueTerm RewriteOpaque(
         IrFactory factory,
         IrOpaqueTerm opaque,
         IReadOnlyDictionary<IrVarId, IrTerm> replacements,

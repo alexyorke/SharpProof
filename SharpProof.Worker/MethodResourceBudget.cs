@@ -12,10 +12,10 @@ internal sealed class MethodResourceBudget {
         uint queryRlimit,
         uint methodRlimit) {
         _readConsumedResourceCount = readConsumedResourceCount;
-        if (queryRlimit == 0)
-            throw new ArgumentOutOfRangeException(nameof(queryRlimit));
-        if (methodRlimit < queryRlimit)
-            throw new ArgumentOutOfRangeException(nameof(methodRlimit));
+        ArgumentOutOfRangeException.ThrowIfZero(queryRlimit);
+        ArgumentOutOfRangeException.ThrowIfLessThan(
+            methodRlimit,
+            queryRlimit);
         _queryRlimit = queryRlimit;
         _methodRlimit = methodRlimit;
         _startingResourceCount =

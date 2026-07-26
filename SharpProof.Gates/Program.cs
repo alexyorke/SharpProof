@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using SharpProof.Gates.Corpus;
 using SharpProof.Gates.Performance;
@@ -5,6 +6,18 @@ using SharpProof.Gates.Performance;
 namespace SharpProof.Gates;
 
 internal static class Program {
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "The executable boundary converts unexpected gate failures into a stable exit code and diagnostic.")]
+    [SuppressMessage(
+        "Globalization",
+        "CA1303:Do not pass literals as localized parameters",
+        Justification = "This developer-facing repository gate is not localized.")]
+    [SuppressMessage(
+        "Performance",
+        "CA1849:Call async methods when in an async method",
+        Justification = "The gate writes short console diagnostics synchronously before returning its process exit code.")]
     private static async Task<int> Main(string[] args) {
         try {
             var root = RepositoryLayout.FindRoot();

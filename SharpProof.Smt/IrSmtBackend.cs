@@ -123,7 +123,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
 
     private static BackendCheckResult CreateUnsatisfiable(
         Solver solver,
-        IReadOnlyDictionary<string, int> tracked) {
+        Dictionary<string, int> tracked) {
         var core = ImmutableArray.CreateBuilder<int>();
         foreach (var expression in solver.UnsatCore) {
             if (!tracked.TryGetValue(expression.ToString(), out var index))
@@ -408,7 +408,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                     _context.MkEq(left, _context.MkInt(long.MinValue)),
                     _context.MkEq(right, _context.MkInt(-1)))));
 
-        private static IEnumerable<IrVarId> CollectVariables(VerificationQuery query) {
+        private static HashSet<IrVarId> CollectVariables(VerificationQuery query) {
             var seenTerms = new HashSet<IrId>();
             var variables = new HashSet<IrVarId>();
             foreach (var root in query.Assumptions

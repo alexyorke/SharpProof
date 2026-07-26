@@ -510,6 +510,10 @@ public sealed record GeneratedCSharpCase(
     long Right,
     bool Condition) {
     public string? Text { get; init; }
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1819:Properties should not return arrays",
+        Justification = "The value is passed to compiled code as a long[] argument.")]
     public long[]? Values { get; init; }
     public object? Reference { get; init; }
 
@@ -735,6 +739,10 @@ public sealed class FrontendDifferentialOracle {
         return CompareBatch([generated], cancellationToken)[0];
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1822:Mark members as static",
+        Justification = "Oracle methods intentionally share an instance-shaped test API.")]
     public ImmutableArray<FrontendDifferentialResult> CompareBatch(
         IReadOnlyList<GeneratedCSharpCase> generatedCases,
         CancellationToken cancellationToken = default) {
@@ -848,6 +856,10 @@ public sealed class FrontendDifferentialOracle {
         }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Performance",
+        "CA1822:Mark members as static",
+        Justification = "Oracle methods intentionally share an instance-shaped test API.")]
     public ImmutableArray<FrontendSemanticEdgeResult> CompareSemanticEdges(
         IReadOnlyList<FrontendSemanticEdgeCase> cases,
         CancellationToken cancellationToken = default) {
@@ -936,7 +948,7 @@ public sealed class FrontendDifferentialOracle {
         }
     }
 
-    private static IReadOnlyDictionary<IrVarId, IrValue> CreateEnvironment(
+    private static Dictionary<IrVarId, IrValue> CreateEnvironment(
         IrFactory factory,
         IMethodSymbol method,
         FrontendLoweringResult lowering,
@@ -1050,7 +1062,7 @@ public sealed class FrontendDifferentialOracle {
             comparison.ExceptionKind);
     }
 
-    private static IReadOnlyDictionary<IrVarId, IrValue>
+    private static Dictionary<IrVarId, IrValue>
         CreateSemanticEdgeEnvironment(
             IrFactory factory,
             IMethodSymbol method,

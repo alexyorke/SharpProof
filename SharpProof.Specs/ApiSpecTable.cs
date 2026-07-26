@@ -128,7 +128,7 @@ public sealed class ApiSpecTable {
 
     private static SpecVarId AddVariable(
         SpecId id,
-        ICollection<SpecVariableInfo> variables,
+        ImmutableArray<SpecVariableInfo>.Builder variables,
         SpecVariableRole role,
         int ordinal,
         SpecValueType type) {
@@ -181,7 +181,7 @@ public sealed class ApiSpecTable {
         }
     }
 
-    private static SpecTerm CompileUnary(
+    private static SpecUnaryTerm CompileUnary(
         SpecUnaryDeclaration unary,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables) {
         var operand = CompileTerm(unary.Operand, variables);
@@ -195,7 +195,7 @@ public sealed class ApiSpecTable {
         return new SpecUnaryTerm(unary.Operator, operand, expected);
     }
 
-    private static SpecTerm CompileBinary(
+    private static SpecBinaryTerm CompileBinary(
         SpecBinaryDeclaration binary,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables) {
         var left = CompileTerm(binary.Left, variables);
@@ -229,7 +229,7 @@ public sealed class ApiSpecTable {
         return new SpecBinaryTerm(binary.Operator, left, right, resultType);
     }
 
-    private static SpecTerm CompileConditional(
+    private static SpecConditionalTerm CompileConditional(
         SpecConditionalDeclaration conditional,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables) {
         var condition = CompileTerm(conditional.Condition, variables);
@@ -252,7 +252,7 @@ public sealed class ApiSpecTable {
         ValidateText(target.MemberName, nameof(target.MemberName));
         ValidateDefined(target.MemberKind, nameof(target.MemberKind));
         if (target.GenericArity < 0)
-            throw new ArgumentOutOfRangeException(nameof(target.GenericArity));
+            throw new ArgumentOutOfRangeException(nameof(declaration));
         if (target.ParameterTypes.IsDefault)
             throw new ArgumentException("Parameter types must be initialized.", nameof(declaration));
         foreach (var parameterType in target.ParameterTypes)

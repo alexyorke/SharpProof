@@ -9,6 +9,36 @@ namespace SharpProof.Worker.Test;
 
 [TestFixture]
 public sealed class WorkerTests {
+    private static readonly string[] InvalidBudgetErrorCodes = [
+        "protocol.unsupported",
+        "budgets.rlimit",
+        "budgets.method_rlimit",
+        "budgets.parallelism",
+        "budgets.expression_depth",
+        "budgets.worker_processes",
+        "budgets.wall_order",
+        "cache.maximum_bytes"
+    ];
+
+    private static readonly string[] MissingCompilationErrorCodes = [
+        "compilation.target_framework",
+        "compilation.language_version",
+        "compilation.nullable",
+        "compilation.optimization",
+        "compilation.checked_overflow",
+        "compilation.allow_unsafe",
+        "compilation.deterministic",
+        "compilation.output_kind",
+        "compilation.platform"
+    ];
+
+    private static readonly string[] RequiredReferenceFileNames = [
+        "System.Private.CoreLib.dll",
+        "System.Linq.dll",
+        "System.Runtime.dll",
+        "netstandard.dll"
+    ];
+
     [Test]
     public void ProtocolValidationClosesVersionAndBudgetBounds() {
         var request = new WorkerVerifyRequest {
@@ -33,16 +63,7 @@ public sealed class WorkerTests {
         Assert.That(validation.IsValid, Is.False);
         Assert.That(
             validation.Errors.Select(static error => error.Code),
-            Is.SupersetOf(new[] {
-                "protocol.unsupported",
-                "budgets.rlimit",
-                "budgets.method_rlimit",
-                "budgets.parallelism",
-                "budgets.expression_depth",
-                "budgets.worker_processes",
-                "budgets.wall_order",
-                "cache.maximum_bytes"
-            }));
+            Is.SupersetOf(InvalidBudgetErrorCodes));
         Assert.Throws<JsonException>((Action)(() =>
             WorkerProtocolJson.DeserializeRequest(
                 """{"protocolVersion":"1","unknown":true}""")));
@@ -70,17 +91,7 @@ public sealed class WorkerTests {
         Assert.That(validation.IsValid, Is.False);
         Assert.That(
             validation.Errors.Select(static error => error.Code),
-            Is.SupersetOf(new[] {
-                "compilation.target_framework",
-                "compilation.language_version",
-                "compilation.nullable",
-                "compilation.optimization",
-                "compilation.checked_overflow",
-                "compilation.allow_unsafe",
-                "compilation.deterministic",
-                "compilation.output_kind",
-                "compilation.platform"
-            }));
+            Is.SupersetOf(MissingCompilationErrorCodes));
     }
 
     [Test]
@@ -1483,7 +1494,8 @@ public sealed class WorkerTests {
         using var projectProject = TestProject.Create(
             TautologySource.Replace(
                 "Proof(long value)",
-                "Proof(long value)") +
+                "Proof(long value)",
+                StringComparison.Ordinal) +
             """
             public static class Second {
                 public static long Proof(long value) {
@@ -1878,12 +1890,7 @@ public sealed class WorkerTests {
                     "TRUSTED_PLATFORM_ASSEMBLIES")!)
                 .Split(Path.PathSeparator);
             var names = new HashSet<string>(
-                new[] {
-                    "System.Private.CoreLib.dll",
-                    "System.Linq.dll",
-                    "System.Runtime.dll",
-                    "netstandard.dll"
-                },
+                RequiredReferenceFileNames,
                 StringComparer.OrdinalIgnoreCase);
             return [.. trusted
                 .Where(path => names.Contains(Path.GetFileName(path)))

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Security;
 using System.Xml.Linq;
 using NUnit.Framework;
@@ -281,40 +282,53 @@ public sealed class WorkerMsBuildIntegrationTests {
                 properties["SharpProofVerify"],
                 Is.EqualTo("false"));
             Assert.That(
-                uint.Parse(properties["SharpProofVerifyQueryRlimit"]),
+                uint.Parse(
+                    properties["SharpProofVerifyQueryRlimit"],
+                    CultureInfo.InvariantCulture),
                 Is.EqualTo(WorkerBudgets.DefaultQueryRlimit));
             Assert.That(
-                uint.Parse(properties["SharpProofVerifyMethodRlimit"]),
+                uint.Parse(
+                    properties["SharpProofVerifyMethodRlimit"],
+                    CultureInfo.InvariantCulture),
                 Is.EqualTo(WorkerBudgets.DefaultMethodRlimit));
             Assert.That(
                 int.Parse(properties[
-                    "SharpProofVerifyMethodWallTimeMilliseconds"]),
+                        "SharpProofVerifyMethodWallTimeMilliseconds"],
+                    CultureInfo.InvariantCulture),
                 Is.EqualTo(
                     WorkerBudgets.DefaultMethodWallTimeMilliseconds));
             Assert.That(
                 int.Parse(properties[
-                    "SharpProofVerifyProjectWallTimeMilliseconds"]),
+                        "SharpProofVerifyProjectWallTimeMilliseconds"],
+                    CultureInfo.InvariantCulture),
                 Is.EqualTo(
                     WorkerBudgets.DefaultProjectWallTimeMilliseconds));
             Assert.That(
-                int.Parse(properties["SharpProofVerifyMaxParallelism"]),
+                int.Parse(
+                    properties["SharpProofVerifyMaxParallelism"],
+                    CultureInfo.InvariantCulture),
                 Is.EqualTo(WorkerBudgets.MaximumParallelism));
             Assert.That(
                 int.Parse(properties[
-                    "SharpProofVerifyMaximumExpressionDepth"]),
+                        "SharpProofVerifyMaximumExpressionDepth"],
+                    CultureInfo.InvariantCulture),
                 Is.EqualTo(
                     WorkerBudgets.DefaultMaximumExpressionDepth));
             Assert.That(
                 long.Parse(properties[
-                    "SharpProofVerifyProcessMemoryLimitBytes"]),
+                        "SharpProofVerifyProcessMemoryLimitBytes"],
+                    CultureInfo.InvariantCulture),
                 Is.EqualTo(
                     WorkerBudgets.DefaultProcessMemoryLimitBytes));
             Assert.That(
-                int.Parse(properties["SharpProofVerifyMaxWorkerProcesses"]),
+                int.Parse(
+                    properties["SharpProofVerifyMaxWorkerProcesses"],
+                    CultureInfo.InvariantCulture),
                 Is.EqualTo(WorkerBudgets.MaximumParallelism));
             Assert.That(
                 int.Parse(properties[
-                    "SharpProofVerifyTerminationGraceMilliseconds"]),
+                        "SharpProofVerifyTerminationGraceMilliseconds"],
+                    CultureInfo.InvariantCulture),
                 Is.EqualTo(
                     WorkerLauncherDefaults.TerminationGraceMilliseconds));
             Assert.That(
@@ -322,7 +336,8 @@ public sealed class WorkerMsBuildIntegrationTests {
                 Is.True);
             Assert.That(
                 long.Parse(properties[
-                    "SharpProofVerifyCacheMaximumBytes"]),
+                        "SharpProofVerifyCacheMaximumBytes"],
+                    CultureInfo.InvariantCulture),
                 Is.EqualTo(WorkerCacheOptions.DefaultMaximumBytes));
         }
     }
