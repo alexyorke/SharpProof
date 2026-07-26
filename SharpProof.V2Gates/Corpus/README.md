@@ -37,7 +37,9 @@ targets are analyzed in one compilation of the pinned upstream source.
 The snapshot records each target's internal semantic outcome independently
 from its canonical diagnostics. Unsupported real-world methods therefore
 remain explicit `SilentUnknown`/`Abstained` entries rather than being omitted
-or counted as proofs.
+or counted as proofs. Gate output reports explicit Unknown, silent Unknown, and
+their combined semantic Unknown count and rate. These are visibility metrics,
+not thresholds.
 
 ## Reproducible update
 

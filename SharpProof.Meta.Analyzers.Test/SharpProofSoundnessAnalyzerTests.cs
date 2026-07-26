@@ -192,26 +192,267 @@ public sealed class SharpProofSoundnessAnalyzerTests {
         Assert.That(diagnostics, Is.Empty);
     }
 
+    [TestCase(
+        """
+        using System;
+        namespace SharpProof.Verify;
+        sealed class C {
+            void M(bool condition) {
+                try { }
+                catch (OperationCanceledException) {
+                    if (condition) throw;
+                }
+            }
+        }
+        """)]
+    [TestCase(
+        """
+        using System;
+        namespace SharpProof.Verify;
+        sealed class C {
+            void M() {
+                try { }
+                catch (OperationCanceledException) {
+                    { throw; }
+                }
+            }
+        }
+        """)]
+    [TestCase(
+        """
+        using System;
+        using System.Threading;
+        namespace SharpProof.Verify;
+        sealed class C {
+            void M(CancellationToken token) {
+                try { }
+                catch (OperationCanceledException) {
+                    token.ThrowIfCancellationRequested();
+                }
+            }
+        }
+        """)]
+    [TestCase(
+        """
+        using System;
+        using System.Threading;
+        namespace SharpProof.Verify;
+        sealed class C {
+            void M() {
+                try { }
+                catch (OperationCanceledException) {
+                    CancellationToken.None.ThrowIfCancellationRequested();
+                }
+            }
+        }
+        """)]
+    [TestCase(
+        """
+        using System;
+        using System.Threading;
+        namespace SharpProof.Verify;
+        sealed class C {
+            void M(bool condition, CancellationToken token) {
+                try { }
+                catch (OperationCanceledException) {
+                    if (condition)
+                        token.ThrowIfCancellationRequested();
+                }
+            }
+        }
+        """)]
+    [TestCase(
+        """
+        using System;
+        namespace SharpProof.Verify;
+        sealed class LookalikeToken {
+            internal void ThrowIfCancellationRequested() { }
+        }
+        sealed class C {
+            void M(LookalikeToken token) {
+                try { }
+                catch (OperationCanceledException) {
+                    token.ThrowIfCancellationRequested();
+                }
+            }
+        }
+        """)]
+    [TestCase(
+        """
+        using System;
+        using System.Threading;
+        namespace SharpProof.Verify;
+        sealed class C {
+            void M(CancellationToken token) {
+                try { }
+                catch (OperationCanceledException) {
+                    return;
+                    token.ThrowIfCancellationRequested();
+                }
+            }
+        }
+        """)]
+    [TestCase(
+        """
+        using System;
+        namespace SharpProof.Worker;
+        static class Program {
+            internal static int Main() {
+                try { }
+                catch (OperationCanceledException) { return 4; }
+                return 0;
+            }
+        }
+        """)]
+    public async Task RejectsDeferredOrUnrelatedCancellationPropagation(
+        string source) {
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SPMETA003"));
+    }
+
     [Test]
-    public async Task AllowsCancellationRethrowGuardAndAuditedWorkerBoundary() {
+    public async Task AllowsImmediateRethrowAndAuditedWorkerBoundaries() {
         const string source =
             """
             using System;
+            using System.Collections.Immutable;
             using System.Threading;
-            namespace SharpProof.Worker;
-            static class Program {
-                internal static int Main() {
-                    try { throw new OperationCanceledException(); }
-                    catch (OperationCanceledException) { return 4; }
+            using System.Threading.Tasks;
+            namespace SharpProof.Worker.Protocol {
+                public sealed class WorkerVerificationRecord { }
+            }
+            namespace SharpProof.Worker {
+                static class Program {
+                    internal static async Task<int> Main(string[] args) {
+                        await Task.Yield();
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) { return 4; }
+                    }
+                }
+
+                sealed class SharpProofWorker {
+                    private static async Task<ImmutableArray<
+                        SharpProof.Worker.Protocol.WorkerVerificationRecord>>
+                        VerifyTargetAsync(
+                            object verifier,
+                            object target,
+                            object budgets,
+                            object parallelism,
+                            object resourceGate,
+                            object resourceCount,
+                            object projectBoundary,
+                            CancellationToken callerCancellation) {
+                        await Task.Yield();
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) {
+                            callerCancellation.ThrowIfCancellationRequested();
+                            return ImmutableArray<
+                                SharpProof.Worker.Protocol.WorkerVerificationRecord>
+                                .Empty;
+                        }
+                    }
                 }
             }
-            sealed class C {
-                int M(CancellationToken callerToken) {
-                    try { throw new OperationCanceledException(); }
-                    catch (OperationCanceledException) {
-                        callerToken.ThrowIfCancellationRequested();
-                        return 0;
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task AuditedWorkerTimeoutBoundaryMustGuardCallerCancellation() {
+        const string source =
+            """
+            using System;
+            using System.Collections.Immutable;
+            using System.Threading;
+            using System.Threading.Tasks;
+            namespace SharpProof.Worker.Protocol {
+                public sealed class WorkerVerificationRecord { }
+            }
+            namespace SharpProof.Worker {
+                sealed class SharpProofWorker {
+                    private static async Task<ImmutableArray<
+                        SharpProof.Worker.Protocol.WorkerVerificationRecord>>
+                        VerifyTargetAsync(
+                            object verifier,
+                            object target,
+                            object budgets,
+                            object parallelism,
+                            object resourceGate,
+                            object resourceCount,
+                            object projectBoundary,
+                            CancellationToken callerCancellation) {
+                        await Task.Yield();
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) {
+                            return ImmutableArray<
+                                SharpProof.Worker.Protocol.WorkerVerificationRecord>
+                                .Empty;
+                        }
                     }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SPMETA003"));
+    }
+
+    [Test]
+    public async Task RejectsTargetTypedProofOutcomesOutsideTheKernel() {
+        const string source =
+            """
+            namespace SharpProof.Verify {
+                public sealed class ProvenOutcome {
+                    public ProvenOutcome() { }
+                }
+                public sealed class RefutedOutcome {
+                    public RefutedOutcome() { }
+                }
+                public sealed class ValidatedModel {
+                    public ValidatedModel() { }
+                }
+                public sealed class ProofKernel { }
+            }
+            namespace FriendAssembly.Consumer {
+                sealed class FriendCode {
+                    SharpProof.Verify.ProvenOutcome Proven() => new();
+                    SharpProof.Verify.RefutedOutcome Refuted() => new();
+                    SharpProof.Verify.ValidatedModel Model() => new();
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA011"),
+            Is.EqualTo(3));
+    }
+
+    [Test]
+    public async Task AllowsProofOutcomeConstructionInsideTheKernel() {
+        const string source =
+            """
+            namespace SharpProof.Verify {
+                public sealed class ProvenOutcome {
+                    public ProvenOutcome() { }
+                }
+                public sealed class RefutedOutcome {
+                    public RefutedOutcome(ValidatedModel model) { }
+                }
+                public sealed class ValidatedModel {
+                    public ValidatedModel() { }
+                }
+                public sealed class ProofKernel {
+                    ProvenOutcome Proven() => new();
+                    RefutedOutcome Refuted() => new(new ValidatedModel());
+                    ValidatedModel Model() => new();
                 }
             }
             """;

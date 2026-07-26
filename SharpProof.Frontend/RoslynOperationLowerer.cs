@@ -358,16 +358,12 @@ public sealed class RoslynOperationLowerer {
             IBinaryOperation operation,
             LoweringContext argument) {
             if (operation.OperatorMethod != null)
-                return _owner.Opaque(
+                return OpaqueBinary(
                     operation,
                     FrontendAbstention.UserDefinedOperator,
-                    operation.OperatorMethod,
-                    arguments: [operation.LeftOperand, operation.RightOperand]);
+                    operation.OperatorMethod);
             if (operation.IsLifted)
-                return _owner.Opaque(
-                    operation,
-                    FrontendAbstention.LiftedOperator,
-                    arguments: [operation.LeftOperand, operation.RightOperand]);
+                return OpaqueBinary(operation, FrontendAbstention.LiftedOperator);
 
             var left = _owner.LowerCore(operation.LeftOperand);
             if (operation.OperatorKind == BinaryOperatorKind.ConditionalAnd &&
@@ -379,38 +375,29 @@ public sealed class RoslynOperationLowerer {
 
             var right = _owner.LowerCore(operation.RightOperand);
             if (!left.Classification.IsExact || !right.Classification.IsExact)
-                return _owner.Opaque(
-                    operation,
-                    FirstAbstention(left, right),
-                    arguments: [operation.LeftOperand, operation.RightOperand]);
+                return OpaqueBinary(operation, FirstAbstention(left, right));
 
             var mapped = MapBinary(operation);
             if (!mapped.HasValue)
-                return _owner.Opaque(
+                return OpaqueBinary(
                     operation,
-                    FrontendAbstention.UnsupportedOperationKind,
-                    arguments: [operation.LeftOperand, operation.RightOperand]);
-            if (IsIntegerArithmetic(operation.OperatorKind) &&
+                    FrontendAbstention.UnsupportedOperationKind);
+            if (mapped.Value != IrBinaryOperator.StringConcat &&
+                IsIntegerArithmetic(operation.OperatorKind) &&
                 operation.Type?.SpecialType != SpecialType.System_Int64)
-                return _owner.Opaque(
-                    operation,
-                    FrontendAbstention.UnsupportedType,
-                    arguments: [operation.LeftOperand, operation.RightOperand]);
-            if (RequiresCheckedArithmetic(operation.OperatorKind) &&
+                return OpaqueBinary(operation, FrontendAbstention.UnsupportedType);
+            if (mapped.Value != IrBinaryOperator.StringConcat &&
+                RequiresCheckedArithmetic(operation.OperatorKind) &&
                 !operation.IsChecked)
-                return _owner.Opaque(
+                return OpaqueBinary(
                     operation,
-                    FrontendAbstention.UncheckedOverflowSemantics,
-                    arguments: [operation.LeftOperand, operation.RightOperand]);
+                    FrontendAbstention.UncheckedOverflowSemantics);
             try {
                 return LoweredExpression.Exact(
                     _owner._factory.Binary(mapped.Value, left.Term, right.Term));
             }
             catch (ArgumentException) {
-                return _owner.Opaque(
-                    operation,
-                    FrontendAbstention.UnsupportedType,
-                    arguments: [operation.LeftOperand, operation.RightOperand]);
+                return OpaqueBinary(operation, FrontendAbstention.UnsupportedType);
             }
         }
 
@@ -478,6 +465,13 @@ public sealed class RoslynOperationLowerer {
                 return operand;
             if (operation.Operand.ConstantValue.HasValue)
                 return _owner.LowerConstant(operation);
+            if (!operation.IsTryCast &&
+                operation.Conversion.IsReference &&
+                operation.Type?.SpecialType == SpecialType.System_String &&
+                _owner._factory.GetTypeInfo(operand.Term.Type).Kind ==
+                    IrTypeKind.Reference)
+                return LoweredExpression.Exact(
+                    _owner._factory.Cast(target, operand.Term));
             return _owner.Opaque(
                 operation,
                 FrontendAbstention.ConversionMayChangeValue,
@@ -578,7 +572,7 @@ public sealed class RoslynOperationLowerer {
             operation.OperatorKind switch {
                 BinaryOperatorKind.Add
                     when operation.Type?.SpecialType == SpecialType.System_String =>
-                    null,
+                    IrBinaryOperator.StringConcat,
                 BinaryOperatorKind.Add => IrBinaryOperator.Add,
                 BinaryOperatorKind.Subtract => IrBinaryOperator.Subtract,
                 BinaryOperatorKind.Multiply => IrBinaryOperator.Multiply,
@@ -636,6 +630,13 @@ public sealed class RoslynOperationLowerer {
             expressions
                 .Select(static expression => expression.Classification.Abstention)
                 .First(static abstention => abstention != FrontendAbstention.None);
+
+        private LoweredExpression OpaqueBinary(
+            IBinaryOperation operation,
+            FrontendAbstention abstention,
+            IMethodSymbol? symbol = null) =>
+            _owner.Opaque(operation, abstention, symbol,
+                arguments: [operation.LeftOperand, operation.RightOperand]);
     }
 
     private LoweredExpression CreateMissingOperation() {

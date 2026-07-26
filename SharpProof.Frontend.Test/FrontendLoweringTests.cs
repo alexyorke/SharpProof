@@ -39,6 +39,14 @@ public sealed class FrontendLoweringTests {
             boolean.CompareWithInterpreter(false, 5L, null),
             Is.EqualTo(false));
 
+        using var concatenation = CompiledMethod.Create(
+            """
+            public static string Target(string text) => text + "proof";
+            """);
+        Assert.That(
+            concatenation.CompareWithInterpreter((object?)null),
+            Is.EqualTo("proof"));
+
         using var length = CompiledMethod.Create(
             """
             public static long Target(string text) => (long)text.Length;
@@ -135,6 +143,12 @@ public sealed class FrontendLoweringTests {
             """,
             FrontendSubsetDecision.ClosedAbstention,
             FrontendAbstention.ConversionMayChangeValue);
+        AssertClassification(
+            """
+            public static string Target(object value) => (string)value;
+            """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
     }
 
     [Test]

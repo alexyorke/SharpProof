@@ -353,9 +353,13 @@ public sealed class IrInterpreter(IrFactory factory) {
     }
 
     private IrEvaluationResult EvaluateStringConcat(IrValue left, IrValue right) {
-        if (left.Kind != IrValueKind.String || right.Kind != IrValueKind.String)
+        if (left.Kind is not (IrValueKind.String or IrValueKind.Null) ||
+            right.Kind is not (IrValueKind.String or IrValueKind.Null))
             return InvalidValue("String concatenation requires string values.");
-        return IrEvaluationResult.FromValue(_factory.CreateStringValue(left.String + right.String));
+        return IrEvaluationResult.FromValue(
+            _factory.CreateStringValue(
+                (left.Kind == IrValueKind.Null ? "" : left.String) +
+                (right.Kind == IrValueKind.Null ? "" : right.String)));
     }
 
     private IrEvaluationResult EvaluateConditional(
@@ -382,6 +386,14 @@ public sealed class IrInterpreter(IrFactory factory) {
                 IrExceptionKind.InvalidCast,
                 "Null cannot be cast to a non-nullable IR type.");
         }
+        if (target.Kind == IrTypeKind.String &&
+            operand.Value.Kind == IrValueKind.Reference)
+            return operand.Value.Reference is string value
+                ? IrEvaluationResult.FromValue(
+                    _factory.CreateStringValue(value))
+                : IrEvaluationResult.FromException(
+                    IrExceptionKind.InvalidCast,
+                    "The concrete reference is not a string.");
         return IrEvaluationResult.FromUnsupported(
             IrUnsupportedReason.UnsupportedCast,
             "The interpreter has no runtime type relation for this cast.");

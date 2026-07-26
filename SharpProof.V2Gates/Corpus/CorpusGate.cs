@@ -17,6 +17,12 @@ public sealed record CorpusGateResult(
     int SyntheticSeedCount,
     int VariantCount,
     int DiagnosticCount,
+    int UnknownCount,
+    int SilentUnknownCount,
+    int TotalUnknownCount,
+    double UnknownRate,
+    double SilentUnknownRate,
+    double TotalUnknownRate,
     int CacheReplayCount,
     int ConcurrentReplayCount,
     ImmutableArray<string> AllowedDegradations,
@@ -127,6 +133,12 @@ public static class CorpusGate {
             .ConfigureAwait(false);
         failures.AddRange(concurrencyFailures);
 
+        var unknownCount = immutableObservations.Count(static observation =>
+            observation.Verdict == CorpusVerdict.Unknown);
+        var silentUnknownCount = immutableObservations.Count(static observation =>
+            observation.Verdict == CorpusVerdict.SilentUnknown);
+        var totalUnknownCount = unknownCount + silentUnknownCount;
+        var observationCount = immutableObservations.Length;
         return new CorpusGateResult(
             failures.Count == 0,
             cases.Length,
@@ -140,6 +152,18 @@ public static class CorpusGate {
             CorpusCatalog.Variants.Length,
             observations.Sum(static observation =>
                 observation.Diagnostics.Length),
+            unknownCount,
+            silentUnknownCount,
+            totalUnknownCount,
+            observationCount == 0
+                ? 0
+                : unknownCount / (double)observationCount,
+            observationCount == 0
+                ? 0
+                : silentUnknownCount / (double)observationCount,
+            observationCount == 0
+                ? 0
+                : totalUnknownCount / (double)observationCount,
             CorpusCatalog.Seeds.Length,
             CorpusCatalog.Variants.Length,
             allowedDegradations.ToImmutable(),

@@ -67,9 +67,12 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
             "Evaluate",
             BindingFlags.Public | BindingFlags.Static)!;
         try {
+            var runtimeValues = new Dictionary<IrValue, object?>(
+                ReferenceEqualityComparer.Instance);
             var actual = method.Invoke(
                 null,
-                [.. orderedVariables.Select(binding => ToRuntimeValue(variables[binding]))]);
+                [.. orderedVariables.Select(
+                    binding => ToRuntimeValue(variables[binding], runtimeValues))]);
             return CompareValue(interpreted, actual);
         }
         catch (TargetInvocationException exception) when (exception.InnerException != null) {
@@ -214,9 +217,17 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
                     return false;
                 builder.Append(").Length");
                 break;
-            case IrSequenceAccessTerm:
+            case IrSequenceAccessTerm access:
+                builder.Append('(');
+                if (!TryAppendExpression(builder, access.Sequence, variables, out _, out reason))
+                    return false;
+                builder.Append(")[");
+                if (!TryAppendExpression(builder, access.Index, variables, out _, out reason))
+                    return false;
+                builder.Append(']');
+                break;
             case IrOpaqueTerm:
-                reason = "The term contains an opaque call or unsupported sequence access.";
+                reason = "The term contains an opaque call.";
                 return false;
             default:
                 reason = "The term kind is outside the executable oracle subset.";
@@ -228,11 +239,16 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
     }
 
     private bool TryGetCSharpType(IrTypeId type, out string name) {
-        var kind = _factory.GetTypeInfo(type).Kind;
-        name = kind switch {
+        var info = _factory.GetTypeInfo(type);
+        name = info.Kind switch {
             IrTypeKind.Boolean => "bool",
             IrTypeKind.Integer => "long",
             IrTypeKind.String => "string",
+            IrTypeKind.Reference when type == _factory.ObjectType => "object",
+            IrTypeKind.Sequence when
+                info.ElementType != null &&
+                TryGetCSharpType(info.ElementType.Value, out var elementType) =>
+                elementType + "[]",
             _ => ""
         };
         return name.Length != 0;
@@ -268,14 +284,58 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
         builder.Append(')');
     }
 
-    private static object? ToRuntimeValue(IrValue value) => value.Kind switch {
+    private object? ToRuntimeValue(
+        IrValue value,
+        IDictionary<IrValue, object?> converted) {
+        if (converted.TryGetValue(value, out var existing)) return existing;
+        var runtimeValue = value.Kind switch {
         IrValueKind.Boolean => value.Boolean,
         IrValueKind.Integer => value.Integer,
         IrValueKind.String => value.String,
         IrValueKind.Null => null,
+        IrValueKind.Reference => value.Reference,
+        IrValueKind.Sequence => ToRuntimeArray(value, converted),
         _ => throw new InvalidOperationException(
             "The concrete value is outside the executable oracle subset.")
-    };
+        };
+        converted[value] = runtimeValue;
+        return runtimeValue;
+    }
+
+    private Array ToRuntimeArray(
+        IrValue value,
+        IDictionary<IrValue, object?> converted) {
+        var info = _factory.GetTypeInfo(value.Type);
+        if (info.ElementType == null ||
+            !TryGetRuntimeType(info.ElementType.Value, out var elementType))
+            throw new InvalidOperationException(
+                "The sequence element type is outside the executable oracle subset.");
+        var result = Array.CreateInstance(elementType, value.Elements.Length);
+        converted[value] = result;
+        for (var index = 0; index < value.Elements.Length; index++)
+            result.SetValue(
+                ToRuntimeValue(value.Elements[index], converted),
+                index);
+        return result;
+    }
+
+    private bool TryGetRuntimeType(IrTypeId type, out Type runtimeType) {
+        var info = _factory.GetTypeInfo(type);
+        if (info.Kind == IrTypeKind.Sequence &&
+            info.ElementType != null &&
+            TryGetRuntimeType(info.ElementType.Value, out var elementType)) {
+            runtimeType = elementType.MakeArrayType();
+            return true;
+        }
+        runtimeType = info.Kind switch {
+            IrTypeKind.Boolean => typeof(bool),
+            IrTypeKind.Integer => typeof(long),
+            IrTypeKind.String => typeof(string),
+            IrTypeKind.Reference when type == _factory.ObjectType => typeof(object),
+            _ => null!
+        };
+        return runtimeType != null;
+    }
 
     private static DifferentialResult CompareValue(
         IrEvaluationResult interpreted,

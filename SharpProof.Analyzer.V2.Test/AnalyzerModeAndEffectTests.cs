@@ -40,6 +40,21 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
+    public async Task EffectModeReusesAnalyzerResolvedApiSpecs() {
+        var factory = new SpecReuseSessionFactory();
+        _ = await AnalyzerV2TestHost.AnalyzeAsync(
+            ModeFixture,
+            "effects",
+            ["SP0045"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(factory.Session, Is.Not.Null);
+        Assert.That(
+            factory.Session!.EffectApiSpecs,
+            Is.SameAs(factory.Session.ApiSpecs));
+    }
+
+    [Test]
     public async Task InvalidModeReportsConfigurationAndFailsClosed() {
         var factory = new ThrowingSessionFactory();
         var diagnostics = await AnalyzerV2TestHost.AnalyzeAsync(
@@ -395,5 +410,20 @@ public sealed class AnalyzerModeAndEffectTests {
                     outcome,
                     (_, current) =>
                         AnalyzerSemanticOutcomes.Combine(current, outcome)));
+    }
+
+    private sealed class SpecReuseSessionFactory : IAnalyzerSessionFactory {
+        internal AnalyzerSession? Session { get; private set; }
+
+        public AnalyzerSession Create(
+            Compilation compilation,
+            AnalyzerConfiguration configuration,
+            CancellationToken cancellationToken) {
+            Session = new AnalyzerSession(
+                compilation,
+                configuration,
+                cancellationToken);
+            return Session;
+        }
     }
 }

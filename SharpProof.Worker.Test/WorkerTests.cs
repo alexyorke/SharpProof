@@ -498,6 +498,152 @@ public sealed class WorkerTests {
     }
 
     [Test]
+    public async Task AcyclicCfgLocalsBranchesAndMultipleReturnsAreProven() {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static bool ThroughLocals(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() == value);
+                    var local = value;
+                    local = !!local;
+                    return local;
+                }
+
+                public static bool Choose(
+                    bool chooseLeft,
+                    bool left,
+                    bool right) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() ==
+                        (chooseLeft ? left : right));
+                    if (chooseLeft) {
+                        return left;
+                    }
+                    return right;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.Records, Has.Length.EqualTo(2));
+        Assert.That(
+            response.Records.Select(static record => record.Status),
+            Is.All.EqualTo(WorkerVerificationStatus.Proven));
+        Assert.That(
+            response.Records.Select(static record => record.Reason),
+            Is.All.EqualTo(WorkerVerificationReason.None));
+    }
+
+    [Test]
+    public async Task OldUsesEntryStateBeforeParameterMutation() {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static bool Flip(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() !=
+                        Contract.Old(value));
+                    value = !value;
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        var record = response.Records.Single();
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                record.Status,
+                Is.EqualTo(WorkerVerificationStatus.Proven));
+            Assert.That(
+                record.Reason,
+                Is.EqualTo(WorkerVerificationReason.None));
+        }
+    }
+
+    [Test]
+    public async Task LoopsAndUnspecifiedCallsAbstainSafely() {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                private static bool Read(bool value) => value;
+
+                public static bool Loop(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() == false);
+                    while (value) {
+                        value = false;
+                    }
+                    return value;
+                }
+
+                public static bool Call(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() == value);
+                    return Read(value);
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.Records, Has.Length.EqualTo(2));
+        Assert.That(
+            response.Records.Select(static record => record.Status),
+            Is.All.EqualTo(WorkerVerificationStatus.Unknown));
+        Assert.That(
+            response.Records.Select(static record => record.Reason),
+            Is.All.EqualTo(WorkerVerificationReason.UnsupportedBody));
+    }
+
+    [Test]
+    public async Task NestedSameShapeCallsRemainBoundToCompilerIdentity() {
+        using var project = TestProject.Create(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Nested(int value) {
+                    Contract.Ensures(
+                        Contract.Result<int>() >= 0);
+                    return Math.Abs(Math.Sign(value));
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        var record = response.Records.Single();
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                record.Status,
+                Is.EqualTo(WorkerVerificationStatus.Unknown));
+            Assert.That(
+                record.Reason,
+                Is.EqualTo(WorkerVerificationReason.UnsupportedBody));
+            Assert.That(record.ProofCore, Is.Empty);
+        }
+    }
+
+    [Test]
     public async Task SpecModeledCallCannotEmitAnUnreplayedCounterexample() {
         using var project = TestProject.Create(
             """
@@ -911,6 +1057,84 @@ public sealed class WorkerTests {
                 ? Directory.GetFiles(project.CacheDirectory, "*.json")
                 : [],
             Is.Empty);
+    }
+
+    [Test]
+    public void CacheableResponseRequiresValidatedTerminalRecords() {
+        var response = new WorkerVerifyResponse {
+            ProtocolVersion = WorkerProtocolVersions.Current,
+            InputHash = new string('a', 64),
+            Records = [
+                new WorkerVerificationRecord {
+                    CallableId = "Subject.M()",
+                    SourcePath = "input.cs",
+                    Status = WorkerVerificationStatus.Proven,
+                    Reason = WorkerVerificationReason.None
+                }
+            ],
+            Errors = []
+        };
+
+        Assert.That(
+            CacheableWorkerResponse.TryCreate(
+                response,
+                response.InputHash,
+                out var proven),
+            Is.True);
+        Assert.That(proven, Is.Not.Null);
+
+        response.Records[0].Status = WorkerVerificationStatus.Refuted;
+        Assert.That(
+            CacheableWorkerResponse.TryCreate(
+                response,
+                response.InputHash,
+                out var refuted),
+            Is.True);
+        Assert.That(refuted, Is.Not.Null);
+
+        response.Records[0].Status = WorkerVerificationStatus.Unknown;
+        Assert.That(
+            CacheableWorkerResponse.TryCreate(
+                response,
+                response.InputHash,
+                out _),
+            Is.False);
+
+        response.Records[0].Status = WorkerVerificationStatus.Proven;
+        response.Records[0].Reason =
+            WorkerVerificationReason.InfrastructureFailure;
+        Assert.That(
+            CacheableWorkerResponse.TryCreate(
+                response,
+                response.InputHash,
+                out _),
+            Is.False);
+
+        response.Records[0].Reason = WorkerVerificationReason.None;
+        response.Errors = [
+            new WorkerProtocolError {
+                Code = "worker.error",
+                Message = "Not cacheable."
+            }
+        ];
+        Assert.That(
+            CacheableWorkerResponse.TryCreate(
+                response,
+                response.InputHash,
+                out _),
+            Is.False);
+        Assert.That(
+            CacheableWorkerResponse.TryCreate(
+                response,
+                new string('b', 64),
+                out _),
+            Is.False);
+        Assert.That(
+            CacheableWorkerResponse.TryCreate(
+                response,
+                "not-a-sha-256-hash",
+                out _),
+            Is.False);
     }
 
     [Test]

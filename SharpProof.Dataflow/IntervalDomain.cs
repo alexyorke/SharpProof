@@ -123,8 +123,8 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue> {
             }
         }
 
-        var lower = AddBound(left.LowerBound, right.LowerBound);
-        var upper = AddBound(left.UpperBound, right.UpperBound);
+        if (!TryAddBounds(left, right, out var lower, out var upper))
+            return Top;
         var modulus = BigInteger.GreatestCommonDivisor(left.Modulus, right.Modulus);
         var remainder = modulus.IsZero
             ? BigInteger.Zero
@@ -173,14 +173,18 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue> {
         return Math.Max(left.Value, right.Value);
     }
 
-    private static long? AddBound(long? left, long? right) {
-        if (!left.HasValue || !right.HasValue) return null;
-        try {
-            return checked(left.Value + right.Value);
-        }
-        catch (OverflowException) {
-            return null;
-        }
+    private static bool TryAddBounds(IntervalValue left, IntervalValue right,
+        out long? lower, out long? upper) {
+        var minimum = new BigInteger(left.LowerBound ?? long.MinValue) +
+            new BigInteger(right.LowerBound ?? long.MinValue);
+        var maximum = new BigInteger(left.UpperBound ?? long.MaxValue) +
+            new BigInteger(right.UpperBound ?? long.MaxValue);
+        var valid = minimum >= long.MinValue && maximum <= long.MaxValue;
+        lower = valid && left.LowerBound.HasValue && right.LowerBound.HasValue
+            ? (long)minimum : null;
+        upper = valid && left.UpperBound.HasValue && right.UpperBound.HasValue
+            ? (long)maximum : null;
+        return valid;
     }
 
     private static bool TryFirstCongruentAtOrAbove(

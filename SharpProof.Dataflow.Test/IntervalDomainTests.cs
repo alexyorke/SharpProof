@@ -84,6 +84,14 @@ public sealed class IntervalDomainTests {
             Is.EqualTo(_domain.Top));
 
     [Test]
+    public void PotentialEndpointOverflowFailsClosed() =>
+        Assert.That(
+            _domain.Add(
+                _domain.Range(-485, 292),
+                _domain.Range(null, 386)),
+            Is.EqualTo(_domain.Top));
+
+    [Test]
     public void WideningTerminatesForAscendingBounds() {
         var previous = _domain.Constant(0);
         for (var upper = 1; upper <= 64; upper++) {

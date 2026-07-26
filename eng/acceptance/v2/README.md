@@ -14,6 +14,9 @@ layout. A migration tranche is acceptable only when:
   `Refuted` outcome has a replay-validated witness;
 - proof-kernel evidence and outcome construction stays within the explicit
   trusted-kernel file set and its nonblank LOC budget;
+- replaced frontend, dataflow, effects, and proof-kernel algorithm files stay
+  within the physical-file and Roslyn member-size ratchets declared in
+  `algorithm-size-ratchets.json`;
 - `Unknown`, timeout, cancellation, malformed, and infrastructure results are
   never cached as semantic answers;
 - cache, worklist, formatting, renaming, and concurrency variants produce the
@@ -48,4 +51,6 @@ Run the active local gate from the repository root:
 The verifier checks the pinned historical tree and contract invariants, builds
 the production-size ratchet, builds the repository under the bounded Job
 Object wrapper, and runs every v2 architecture, semantic, corpus, fuzz, worker,
-package, cancellation, and performance gate.
+package, cancellation, and performance gate. Default-off performance compares
+real baseline and SharpProof-imported MSBuild rebuilds and separately checks
+the loaded-but-off analyzer retention boundary.

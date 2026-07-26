@@ -59,6 +59,17 @@ External calls use a symbol-resolved `ApiSpecTable` or an explicitly trusted,
 complete effect contract. Unmodeled or untrusted metadata is unknown; there is
 no IL interpreter.
 
+The removed `KnownEffectCatalog` is not migration authority. Its 162 former
+source-pattern families have a checked-in typed disposition ledger in
+`LegacyApiCoverageManifest`: each family is either ported to a concrete
+`ApiSpec`, cut because it is outside the admitted language or target-framework
+surface, or rejected because the legacy semantic claim lacks current evidence.
+Only the exact `List<T>.Add` and `Enumerable.Empty<T>` families are direct
+ports. The other four current BCL rows are explicitly recorded as new
+soundness-reviewed seeds, so the coverage gate cannot invent lineage merely to
+make a count pass. The manifest is audit data only and is never consulted as an
+analysis fallback.
+
 ## Contracts and modular verification
 
 `Contract.Requires`, `Ensures`, `Assume`, `Result`, and `Old` bind as normal C#
@@ -112,6 +123,12 @@ The v2 gate includes:
 - cache/concurrency/cancellation determinism;
 - worker/package consumer smoke checks;
 - fixed-seed fuzzing and performance budgets.
+
+Default-off latency samples alternate real baseline and SharpProof-imported
+MSBuild rebuilds. A separate loaded-but-off analyzer canary covers session
+creation and retained state, while the package policy proves that the shipped
+default omits the analyzer and verifier entirely. The corpus reports explicit,
+silent, and total semantic Unknown rates as metrics; none is a release gate.
 
 The active contract is `eng/acceptance/v2`. `eng/acceptance/v1` is an immutable
 historical tree and is not a compatibility constraint for this coordinated

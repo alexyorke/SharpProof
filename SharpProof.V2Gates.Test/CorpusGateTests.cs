@@ -83,6 +83,20 @@ public sealed class CorpusGateTests {
             Assert.That(result.OpenSourceMethodCount, Is.EqualTo(200));
             Assert.That(result.OpenSourceFileCount, Is.EqualTo(87));
             Assert.That(result.SyntheticSeedCount, Is.EqualTo(28));
+            Assert.That(result.UnknownCount, Is.EqualTo(118));
+            Assert.That(result.SilentUnknownCount, Is.EqualTo(191));
+            Assert.That(result.TotalUnknownCount, Is.EqualTo(309));
+            Assert.That(
+                result.UnknownRate,
+                Is.EqualTo(result.UnknownCount / (double)result.CaseCount));
+            Assert.That(
+                result.SilentUnknownRate,
+                Is.EqualTo(
+                    result.SilentUnknownCount / (double)result.CaseCount));
+            Assert.That(
+                result.TotalUnknownRate,
+                Is.EqualTo(
+                    result.TotalUnknownCount / (double)result.CaseCount));
             Assert.That(result.CacheReplayCount, Is.GreaterThan(0));
             Assert.That(result.ConcurrentReplayCount, Is.GreaterThan(0));
         }

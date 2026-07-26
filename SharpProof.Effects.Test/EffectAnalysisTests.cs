@@ -24,6 +24,32 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
+    public void RuntimeStringConcatenationIsAManagedAllocation() {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static string Runtime(string left, string right) =>
+                    left + right;
+                public static string Constant() => "sharp" + "proof";
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        var runtime = session.Analyze(Method(compilation, "Runtime"));
+        var constant = session.Analyze(Method(compilation, "Constant"));
+
+        Assert.That(
+            runtime.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Managed));
+        Assert.That(
+            runtime.Projection.Effects & SharpProofEffect.Allocates,
+            Is.EqualTo(SharpProofEffect.Allocates));
+        Assert.That(
+            constant.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.None));
+    }
+
+    [Test]
     public void ConversionEffectsPreventFalseZeroAllocationAndDoesNotThrowProofs() {
         var compilation = EffectTestHost.CreateCompilation(
             """

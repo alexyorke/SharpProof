@@ -51,9 +51,7 @@
   </Target>
 
   <Target Name="_SharpProofVerifyCore"
-          DependsOnTargets="ResolveReferences;_SharpProofWriteOptionsInput"
-          Inputs="@(Compile);@(ReferencePath);@(ReferencePathWithRefAssemblies);$(MSBuildProjectFullPath);$(_SharpProofLauncherPath);$(_SharpProofWorkerPath);$(_SharpProofOptionsInput)"
-          Outputs="$(SharpProofVerifyResultFile)">
+          DependsOnTargets="ResolveReferences;_SharpProofWriteOptionsInput">
     <Error Condition="'$(TargetFramework)' == ''"
            Text="SharpProof verification requires an explicit target framework identity." />
     <Error Condition="'$(LangVersion)' == ''"

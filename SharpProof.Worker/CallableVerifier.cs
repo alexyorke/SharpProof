@@ -89,11 +89,10 @@ internal sealed class CallableVerifier(
         var assumptionOrdinal = 0;
         foreach (var clause in contracts.Clauses) {
             if (clause.Kind == BoundContractKind.Ensures) continue;
-            var predicate = ApplyBodySubstitutions(
+            var predicate = ApplyEntrySubstitutions(
                 factory,
                 clause.Condition,
-                contracts,
-                body.ReturnTerm);
+                contracts);
             if (predicate == null ||
                 GetDepth(predicate) > _maximumExpressionDepth)
                 return [.. ensures.Select((_, index) =>
@@ -116,28 +115,33 @@ internal sealed class CallableVerifier(
                 assumptionOrdinal.ToString(CultureInfo.InvariantCulture));
             assumptionOrdinal++;
         }
-        foreach (var specAssumption in body.SpecAssumptions) {
-            if (GetDepth(specAssumption.Predicate) >
-                _maximumExpressionDepth)
-                return [.. ensures.Select((_, index) =>
-                    CreateUnknown(
-                        target,
-                        index,
-                        WorkerVerificationReason.UnsupportedExpression))];
-            ProofJustification justification =
-                new SpecJustification(specAssumption.Spec);
-            assumptions.Add(new Assumption(
-                factory,
-                specAssumption.Predicate,
-                justification));
-            assumptionLabels.Add(
-                justification,
-                "spec:" + specAssumption.WitnessIdentifier);
+        foreach (var path in body.Paths) {
+            foreach (var specAssumption in path.SpecAssumptions) {
+                var predicate = Guard(
+                    factory,
+                    path.Condition,
+                    specAssumption.Predicate);
+                if (GetDepth(predicate) > _maximumExpressionDepth)
+                    return [.. ensures.Select((_, index) =>
+                        CreateUnknown(
+                            target,
+                            index,
+                            WorkerVerificationReason.UnsupportedExpression))];
+                ProofJustification justification =
+                    new SpecJustification(specAssumption.Spec);
+                assumptions.Add(new Assumption(
+                    factory,
+                    predicate,
+                    justification));
+                assumptionLabels.Add(
+                    justification,
+                    "spec:" + specAssumption.WitnessIdentifier);
+            }
         }
         if (!TryAddSourceDomainAssumptions(
                 factory,
                 contracts,
-                body.ReturnTerm,
+                body.Paths,
                 assumptions,
                 assumptionLabels))
             return [.. ensures.Select((_, index) =>
@@ -147,9 +151,16 @@ internal sealed class CallableVerifier(
                     WorkerVerificationReason.UnsupportedExpression))];
         AddNormalCompletionAssumption(
             factory,
-            body.ReturnTerm,
+            body.Paths,
             assumptions,
             assumptionLabels);
+        if (assumptions.Any(assumption =>
+                GetDepth(assumption.Predicate) > _maximumExpressionDepth))
+            return [.. ensures.Select((_, index) =>
+                CreateUnknown(
+                    target,
+                    index,
+                    WorkerVerificationReason.UnsupportedExpression))];
         var assumptionsUseSupportedDomain = assumptions.All(assumption =>
             IsSupportedProofDomain(factory, assumption.Predicate));
 
@@ -157,18 +168,33 @@ internal sealed class CallableVerifier(
             ensures.Length);
         for (var index = 0; index < ensures.Length; index++) {
             cancellationToken.ThrowIfCancellationRequested();
-            var condition = ApplyBodySubstitutions(
-                factory,
-                ensures[index].Condition,
-                contracts,
-                body.ReturnTerm);
-            if (condition == null) {
+            var pathObligations = ImmutableArray.CreateBuilder<IrTerm>(
+                body.Paths.Length);
+            var missingReturnValue = false;
+            foreach (var path in body.Paths) {
+                var pathCondition = ApplyBodySubstitutions(
+                    factory,
+                    ensures[index].Condition,
+                    contracts,
+                    path.ReturnTerm,
+                    path.CurrentStates);
+                if (pathCondition == null) {
+                    missingReturnValue = true;
+                    break;
+                }
+                pathObligations.Add(Guard(
+                    factory,
+                    path.Condition,
+                    pathCondition));
+            }
+            if (missingReturnValue) {
                 records.Add(CreateUnknown(
                     target,
                     index,
                     WorkerVerificationReason.MissingReturnValue));
                 continue;
             }
+            var condition = Conjoin(factory, pathObligations);
             if (GetDepth(condition) > _maximumExpressionDepth) {
                 records.Add(CreateUnknown(
                     target,
@@ -225,7 +251,7 @@ internal sealed class CallableVerifier(
     private static bool TryAddSourceDomainAssumptions(
         IrFactory factory,
         BoundMethodContracts contracts,
-        IrTerm? returnTerm,
+        ImmutableArray<BodyPath> paths,
         ImmutableArray<Assumption>.Builder assumptions,
         IDictionary<ProofJustification, string> assumptionLabels) {
         var seenPredicates = assumptions
@@ -245,26 +271,41 @@ internal sealed class CallableVerifier(
                     out var minimum,
                     out var maximum))
                 continue;
-            var value = variable.Role == BoundContractVariableRole.Result
-                ? returnTerm
-                : factory.Variable(variable.Variable);
-            if (value == null || value.Type != factory.IntegerType)
-                return false;
-            var lower = factory.Binary(
-                IrBinaryOperator.GreaterThanOrEqual,
-                value,
-                factory.Integer(minimum));
-            var upper = factory.Binary(
-                IrBinaryOperator.LessThanOrEqual,
-                value,
-                factory.Integer(maximum));
-            var predicate = factory.Binary(
-                IrBinaryOperator.AndAlso,
-                lower,
-                upper);
+            if (variable.Role == BoundContractVariableRole.Result) {
+                foreach (var path in paths) {
+                    if (path.ReturnTerm == null ||
+                        path.ReturnTerm.Type != factory.IntegerType)
+                        return false;
+                    AddDomainAssumption(
+                        Guard(
+                            factory,
+                            path.Condition,
+                            CreateRangePredicate(
+                                factory,
+                                path.ReturnTerm,
+                                minimum,
+                                maximum)),
+                        variable);
+                }
+            }
+            else {
+                AddDomainAssumption(
+                    CreateRangePredicate(
+                        factory,
+                        factory.Variable(variable.Variable),
+                        minimum,
+                        maximum),
+                    variable);
+            }
+        }
+        return true;
+
+        void AddDomainAssumption(
+            IrTerm predicate,
+            BoundContractVariable variable) {
             if (predicate is IrBooleanTerm { Value: true } ||
                 !seenPredicates.Add(predicate.Id))
-                continue;
+                return;
             var label = CreateDomainLabel(variable);
             ProofJustification justification = new LoweredJustification(
                 factory.CreateOperation("source-" + label));
@@ -274,19 +315,27 @@ internal sealed class CallableVerifier(
                 justification));
             assumptionLabels.Add(justification, label);
         }
-        return true;
     }
 
     private static void AddNormalCompletionAssumption(
         IrFactory factory,
-        IrTerm? returnTerm,
+        ImmutableArray<BodyPath> paths,
         ImmutableArray<Assumption>.Builder assumptions,
         IDictionary<ProofJustification, string> assumptionLabels) {
-        if (returnTerm == null) return;
-        var predicate = factory.Binary(
-            IrBinaryOperator.Equal,
-            returnTerm,
-            returnTerm);
+        var completions = ImmutableArray.CreateBuilder<IrTerm>(paths.Length);
+        foreach (var path in paths) {
+            var completion = path.ReturnTerm == null
+                ? path.Condition
+                : factory.Binary(
+                    IrBinaryOperator.AndAlso,
+                    path.Condition,
+                    factory.Binary(
+                        IrBinaryOperator.Equal,
+                        path.ReturnTerm,
+                        path.ReturnTerm));
+            completions.Add(completion);
+        }
+        var predicate = Disjoin(factory, completions);
         if (predicate is IrBooleanTerm { Value: true } ||
             assumptions.Any(assumption =>
                 assumption.Predicate.Id == predicate.Id))
@@ -300,6 +349,25 @@ internal sealed class CallableVerifier(
         assumptionLabels.Add(
             justification,
             "body:normal-completion");
+    }
+
+    private static IrTerm CreateRangePredicate(
+        IrFactory factory,
+        IrTerm value,
+        long minimum,
+        long maximum) {
+        var lower = factory.Binary(
+            IrBinaryOperator.GreaterThanOrEqual,
+            value,
+            factory.Integer(minimum));
+        var upper = factory.Binary(
+            IrBinaryOperator.LessThanOrEqual,
+            value,
+            factory.Integer(maximum));
+        return factory.Binary(
+            IrBinaryOperator.AndAlso,
+            lower,
+            upper);
     }
 
     private static int GetDomainRoleOrder(BoundContractVariableRole role) =>
@@ -487,6 +555,10 @@ internal sealed class CallableVerifier(
         CallableTarget target,
         BoundMethodContracts contracts,
         IrFactory factory) {
+        const int maximumBodyBlocks = 64;
+        const int maximumBodyPaths = 64;
+        const int maximumExecutionStates = 4096;
+
         if (target.Method.Parameters.Any(static parameter =>
                 parameter.RefKind != RefKind.None))
             return BodyLoweringResult.Fail(
@@ -494,48 +566,275 @@ internal sealed class CallableVerifier(
         if (target.Method.ReturnsVoid ||
             target.Method.MethodKind == MethodKind.Constructor) {
             return ContainsOnlyContractStatements(target)
-                ? BodyLoweringResult.Success(null)
+                ? BodyLoweringResult.Single(factory, null)
                 : BodyLoweringResult.Fail(
                     WorkerVerificationReason.UnsupportedBody);
         }
 
-        var returnExpression = FindSingleReturnExpression(target);
-        if (returnExpression == null)
+        var bodyStart = FindExecutableBodyStart(target);
+        if (!bodyStart.HasValue)
             return BodyLoweringResult.Fail(
                 WorkerVerificationReason.UnsupportedBody);
-        var operation = target.SemanticModel.GetOperation(returnExpression);
-        if (operation == null)
+        Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph? graph;
+        try {
+            graph = Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(
+                target.Declaration,
+                target.SemanticModel);
+        }
+        catch (ArgumentException) {
             return BodyLoweringResult.Fail(
                 WorkerVerificationReason.UnsupportedBody);
-        if (operation is IInvocationOperation invocation)
-            return LowerSpecInvocation(
-                target,
-                contracts,
-                factory,
-                invocation);
-        var lowering = new RoslynOperationLowerer(
+        }
+        if (graph == null)
+            return BodyLoweringResult.Fail(
+                WorkerVerificationReason.UnsupportedBody);
+
+        var lowering = new RoslynProgramLowerer(
             factory,
-            IsKnownPure).Lower(operation);
-        if (!TryRewriteLoweredTerm(
+            IsKnownPure).Lower(graph);
+        if (!TryCreateProgramGroups(
+                graph,
+                lowering.Program,
+                out var groups))
+            return BodyLoweringResult.Fail(
+                WorkerVerificationReason.UnsupportedBody);
+
+        var start = groups.FirstOrDefault(group =>
+            IsAtOrAfterBodyStart(group.Source, bodyStart.Value));
+        if (start == null)
+            return BodyLoweringResult.Fail(
+                WorkerVerificationReason.UnsupportedBody);
+
+        var groupsByOperation = groups
+            .ToDictionary(static group => group.Operation);
+        foreach (var abstention in lowering.Abstentions) {
+            if (!groupsByOperation.TryGetValue(
+                    abstention.Operation,
+                    out var group) ||
+                IsAtOrAfterBodyStart(group.Source, bodyStart.Value))
+                return BodyLoweringResult.Fail(
+                    WorkerVerificationReason.UnsupportedBody);
+        }
+
+        if (!TryCreateCallBindings(
+                factory,
+                groups.Where(group =>
+                    IsAtOrAfterBodyStart(group.Source, bodyStart.Value)),
+                out var callBindings))
+            return BodyLoweringResult.Fail(
+                WorkerVerificationReason.UnsupportedBody);
+
+        if (!TryValidateAcyclicBody(
+                lowering.Program,
+                start.Block,
+                maximumBodyBlocks))
+            return BodyLoweringResult.Fail(
+                WorkerVerificationReason.UnsupportedBody);
+        if (!TryCreateInitialEnvironment(
                 target,
                 contracts,
                 factory,
-                lowering,
-                out var rewritten))
+                lowering.Variables,
+                out var initialEnvironment,
+                out var parameterBindings))
             return BodyLoweringResult.Fail(
                 WorkerVerificationReason.UnsupportedBody);
-        return GetDepth(rewritten) <= _maximumExpressionDepth
-            ? BodyLoweringResult.Success(rewritten)
-            : BodyLoweringResult.Fail(
-                WorkerVerificationReason.UnsupportedBody);
+
+        return ExecuteAcyclicBody(
+            contracts,
+            factory,
+            lowering.Program,
+            start,
+            callBindings,
+            initialEnvironment,
+            parameterBindings,
+            maximumBodyPaths,
+            maximumExecutionStates);
     }
 
-    private BodyLoweringResult LowerSpecInvocation(
-        CallableTarget target,
+    private BodyLoweringResult ExecuteAcyclicBody(
         BoundMethodContracts contracts,
         IrFactory factory,
-        IInvocationOperation invocation) {
-        if (invocation.TargetMethod.ReducedFrom != null ||
+        IrProgram program,
+        ProgramOperationGroup start,
+        IReadOnlyDictionary<IrInstructionId, IInvocationOperation> callBindings,
+        ImmutableDictionary<IrVarId, IrTerm> initialEnvironment,
+        ImmutableDictionary<IrVarId, IrVarId> parameterBindings,
+        int maximumBodyPaths,
+        int maximumExecutionStates) {
+        var pending = new Stack<SymbolicExecutionState>();
+        pending.Push(new SymbolicExecutionState(
+            start.Block,
+            start.StartInstruction,
+            initialEnvironment,
+            factory.Boolean(true),
+            []));
+        var paths = ImmutableArray.CreateBuilder<BodyPath>();
+        var executionStates = 0;
+        while (pending.Count != 0) {
+            if (++executionStates > maximumExecutionStates)
+                return BodyLoweringResult.Fail(
+                    WorkerVerificationReason.UnsupportedBody);
+            var state = pending.Pop();
+            var block = program.GetBlock(state.Block);
+            var environment = state.Environment;
+            var specAssumptions = state.SpecAssumptions;
+            var transferred = false;
+            for (var index = state.StartInstruction;
+                 index < block.Instructions.Length;
+                 index++) {
+                var instruction = block.Instructions[index];
+                switch (instruction) {
+                    case IrAssignInstruction assign:
+                        if (!TrySubstitute(
+                                factory,
+                                assign.Value,
+                                environment,
+                                out var assigned) ||
+                            GetDepth(assigned) > _maximumExpressionDepth)
+                            return BodyLoweringResult.Fail(
+                                WorkerVerificationReason.UnsupportedBody);
+                        environment = environment.SetItem(
+                            assign.Target,
+                            assigned);
+                        break;
+                    case IrCallInstruction call:
+                        if (!callBindings.TryGetValue(
+                                call.Id,
+                                out var invocation) ||
+                            !TryApplySpecCall(
+                                factory,
+                                call,
+                                invocation,
+                                environment,
+                                out var resultTerm,
+                                out var addedAssumptions))
+                            return BodyLoweringResult.Fail(
+                                WorkerVerificationReason.UnsupportedBody);
+                        environment = environment.SetItem(
+                            call.Target!.Value,
+                            resultTerm);
+                        specAssumptions =
+                            specAssumptions.AddRange(addedAssumptions);
+                        break;
+                    case IrBranchInstruction branch:
+                        if (!TrySubstitute(
+                                factory,
+                                branch.Condition,
+                                environment,
+                                out var condition) ||
+                            condition.Type != factory.BooleanType ||
+                            GetDepth(condition) > _maximumExpressionDepth)
+                            return BodyLoweringResult.Fail(
+                                WorkerVerificationReason.UnsupportedBody);
+                        if (condition is IrBooleanTerm literal) {
+                            pending.Push(new SymbolicExecutionState(
+                                literal.Value
+                                    ? branch.WhenTrue
+                                    : branch.WhenFalse,
+                                0,
+                                environment,
+                                state.PathCondition,
+                                specAssumptions));
+                        }
+                        else {
+                            var whenTrue = factory.Binary(
+                                IrBinaryOperator.AndAlso,
+                                state.PathCondition,
+                                condition);
+                            var whenFalse = factory.Binary(
+                                IrBinaryOperator.AndAlso,
+                                state.PathCondition,
+                                factory.Unary(
+                                    IrUnaryOperator.Not,
+                                    condition));
+                            if (GetDepth(whenTrue) >
+                                    _maximumExpressionDepth ||
+                                GetDepth(whenFalse) >
+                                    _maximumExpressionDepth)
+                                return BodyLoweringResult.Fail(
+                                    WorkerVerificationReason.UnsupportedBody);
+                            pending.Push(new SymbolicExecutionState(
+                                branch.WhenFalse,
+                                0,
+                                environment,
+                                whenFalse,
+                                specAssumptions));
+                            pending.Push(new SymbolicExecutionState(
+                                branch.WhenTrue,
+                                0,
+                                environment,
+                                whenTrue,
+                                specAssumptions));
+                        }
+                        transferred = true;
+                        break;
+                    case IrGotoInstruction go:
+                        pending.Push(new SymbolicExecutionState(
+                            go.Target,
+                            0,
+                            environment,
+                            state.PathCondition,
+                            specAssumptions));
+                        transferred = true;
+                        break;
+                    case IrReturnInstruction returned:
+                        if (returned.Value == null ||
+                            !TrySubstitute(
+                                factory,
+                                returned.Value,
+                                environment,
+                                out var returnTerm) ||
+                            GetDepth(returnTerm) >
+                                _maximumExpressionDepth)
+                            return BodyLoweringResult.Fail(
+                                WorkerVerificationReason.UnsupportedBody);
+                        paths.Add(new BodyPath(
+                            state.PathCondition,
+                            returnTerm,
+                            CreateCurrentStates(
+                                contracts,
+                                factory,
+                                environment,
+                                parameterBindings),
+                            specAssumptions));
+                        if (paths.Count > maximumBodyPaths)
+                            return BodyLoweringResult.Fail(
+                                WorkerVerificationReason.UnsupportedBody);
+                        transferred = true;
+                        break;
+                    case IrLoadInstruction:
+                    case IrStoreInstruction:
+                    case IrHavocInstruction:
+                    case IrAssumeInstruction:
+                    case IrAssertInstruction:
+                    default:
+                        return BodyLoweringResult.Fail(
+                            WorkerVerificationReason.UnsupportedBody);
+                }
+                if (transferred) break;
+            }
+            if (!transferred)
+                return BodyLoweringResult.Fail(
+                    WorkerVerificationReason.UnsupportedBody);
+        }
+        return paths.Count == 0
+            ? BodyLoweringResult.Fail(
+                WorkerVerificationReason.UnsupportedBody)
+            : BodyLoweringResult.Success(paths.ToImmutable());
+    }
+
+    private bool TryApplySpecCall(
+        IrFactory factory,
+        IrCallInstruction call,
+        IInvocationOperation invocation,
+        IReadOnlyDictionary<IrVarId, IrTerm> environment,
+        [NotNullWhen(true)] out IrTerm? resultTerm,
+        out ImmutableArray<BodySpecAssumption> assumptions) {
+        resultTerm = null;
+        assumptions = [];
+        if (!call.Target.HasValue ||
+            invocation.TargetMethod.ReducedFrom != null ||
             invocation.TargetMethod.Parameters.Any(static parameter =>
                 parameter.RefKind != RefKind.None) ||
             !_apiSpecs.TryGet(invocation.TargetMethod, out var resolved) ||
@@ -549,64 +848,45 @@ internal sealed class CallableVerifier(
                 invocation.Type,
                 resolved.Template.Target.ResultType,
                 out var resultType) ||
+            factory.GetVariableInfo(call.Target.Value).Type != resultType ||
             invocation.Arguments.Length !=
-                resolved.Template.Parameters.Length)
-            return BodyLoweringResult.Fail(
-                WorkerVerificationReason.UnsupportedBody);
+                resolved.Template.Parameters.Length ||
+            !HasDirectArgumentOrder(invocation))
+            return false;
 
         var substitutions = new Dictionary<SpecVarId, IrTerm>();
         if (resolved.Template.Receiver.HasValue) {
-            if (invocation.Instance == null ||
-                !TryLowerSpecInput(
-                    target,
-                    contracts,
+            if (call.Receiver == null ||
+                !TrySubstitute(
                     factory,
-                    invocation.Instance,
+                    call.Receiver,
+                    environment,
                     out var receiver))
-                return BodyLoweringResult.Fail(
-                    WorkerVerificationReason.UnsupportedBody);
+                return false;
             substitutions.Add(
                 resolved.Template.Receiver.Value,
                 receiver);
         }
-        else if (invocation.Instance != null) {
-            return BodyLoweringResult.Fail(
-                WorkerVerificationReason.UnsupportedBody);
+        else if (call.Receiver != null) {
+            return false;
         }
 
-        var arguments = new IArgumentOperation?[
-            resolved.Template.Parameters.Length];
-        foreach (var argument in invocation.Arguments) {
-            var ordinal = argument.Parameter?.Ordinal ?? -1;
-            if (argument.ArgumentKind != ArgumentKind.Explicit ||
-                ordinal < 0 ||
-                ordinal >= arguments.Length ||
-                arguments[ordinal] != null)
-                return BodyLoweringResult.Fail(
-                    WorkerVerificationReason.UnsupportedBody);
-            arguments[ordinal] = argument;
-        }
-        for (var index = 0; index < arguments.Length; index++) {
-            var argument = arguments[index];
-            if (argument == null ||
-                !TryLowerSpecInput(
-                    target,
-                    contracts,
+        if (call.Arguments.Length !=
+            resolved.Template.Parameters.Length)
+            return false;
+        for (var index = 0; index < call.Arguments.Length; index++) {
+            if (!TrySubstitute(
                     factory,
-                    argument.Value,
-                    out var lowered))
-                return BodyLoweringResult.Fail(
-                    WorkerVerificationReason.UnsupportedBody);
+                    call.Arguments[index],
+                    environment,
+                    out var argument))
+                return false;
             substitutions.Add(
                 resolved.Template.Parameters[index],
-                lowered);
+                argument);
         }
 
-        var resultVariable = factory.CreateVariable(
-            "spec-call-result:" +
-            resolved.Template.Target.WitnessIdentifier,
-            resultType);
-        var resultTerm = factory.Variable(resultVariable);
+        resultTerm = factory.Variable(call.Target.Value);
         substitutions.Add(
             resolved.Template.Result.Value,
             resultTerm);
@@ -616,85 +896,32 @@ internal sealed class CallableVerifier(
                 factory,
                 substitutions);
         if (instantiated.Status != SpecInstantiationStatus.Succeeded ||
-            instantiated.Postconditions.IsDefaultOrEmpty)
-            return BodyLoweringResult.Fail(
-                WorkerVerificationReason.UnsupportedBody);
-        return BodyLoweringResult.SpecModeled(
-            resultTerm,
-            [.. instantiated.Postconditions.Select(predicate =>
-                new BodySpecAssumption(
-                    resolved.Template.Id,
-                    resolved.Template.Target.WitnessIdentifier,
-                    predicate))]);
-    }
-
-    private bool TryLowerSpecInput(
-        CallableTarget target,
-        BoundMethodContracts contracts,
-        IrFactory factory,
-        IOperation operation,
-        [NotNullWhen(true)] out IrTerm? term) {
-        var lowering = new RoslynOperationLowerer(
-            factory,
-            IsKnownPure).Lower(operation);
-        if (!TryRewriteLoweredTerm(
-                target,
-                contracts,
-                factory,
-                lowering,
-                out term) ||
-            GetDepth(term) > _maximumExpressionDepth) {
-            term = null;
+            instantiated.Postconditions.IsDefaultOrEmpty ||
+            instantiated.Postconditions.Any(predicate =>
+                GetDepth(predicate) > _maximumExpressionDepth)) {
+            resultTerm = null;
             return false;
         }
+        assumptions = [.. instantiated.Postconditions.Select(predicate =>
+            new BodySpecAssumption(
+                resolved.Template.Id,
+                resolved.Template.Target.WitnessIdentifier,
+                predicate))];
         return true;
     }
 
-    private static bool TryRewriteLoweredTerm(
-        CallableTarget target,
-        BoundMethodContracts contracts,
-        IrFactory factory,
-        FrontendLoweringResult lowering,
-        [NotNullWhen(true)] out IrTerm? rewritten) {
-        if (!lowering.IsExact) {
-            rewritten = null;
+    private static bool HasDirectArgumentOrder(
+        IInvocationOperation invocation) {
+        if (invocation.Arguments.Length !=
+            invocation.TargetMethod.Parameters.Length)
             return false;
-        }
-        var replacements = new Dictionary<IrVarId, IrTerm>();
-        var canonicalParameters = contracts.Variables
-            .Where(static variable =>
-                variable.Role == BoundContractVariableRole.Parameter)
-            .ToDictionary(static variable => variable.Ordinal);
-        foreach (var binding in lowering.Variables) {
-            if (binding.Symbol is not IParameterSymbol parameter ||
-                !SymbolEqualityComparer.Default.Equals(
-                    parameter.ContainingSymbol,
-                    target.Method) ||
-                 !canonicalParameters.TryGetValue(
-                     parameter.Ordinal,
-                     out var canonical)) {
-                rewritten = null;
+        for (var index = 0; index < invocation.Arguments.Length; index++) {
+            var argument = invocation.Arguments[index];
+            if (argument.ArgumentKind != ArgumentKind.Explicit ||
+                argument.Parameter?.Ordinal != index)
                 return false;
-            }
-            replacements[binding.Variable] =
-                factory.Variable(canonical.Variable);
         }
-        foreach (var variable in CollectVariables(lowering.Term)) {
-            if (replacements.ContainsKey(variable)) continue;
-            rewritten = null;
-            return false;
-        }
-        try {
-            rewritten = IrSubstitution.Substitute(
-                factory,
-                lowering.Term,
-                replacements);
-            return true;
-        }
-        catch (ArgumentException) {
-            rewritten = null;
-            return false;
-        }
+        return true;
     }
 
     private static bool TryGetSpecResultType(
@@ -731,22 +958,272 @@ internal sealed class CallableVerifier(
         }
     }
 
-    private ExpressionSyntax? FindSingleReturnExpression(
-        CallableTarget target) {
+    private int? FindExecutableBodyStart(CallableTarget target) {
         if (target.Declaration.ExpressionBody != null)
-            return target.Declaration.ExpressionBody.Expression;
+            return target.Declaration.ExpressionBody.Expression.SpanStart;
         if (target.Declaration.Body == null) return null;
-        ExpressionSyntax? result = null;
         foreach (var statement in target.Declaration.Body.Statements) {
-            if (statement is ReturnStatementSyntax { Expression: { } expression }) {
-                if (result != null) return null;
-                result = expression;
+            if (statement is EmptyStatementSyntax ||
+                IsContractStatement(statement))
+                continue;
+            return statement.SpanStart;
+        }
+        return null;
+    }
+
+    private static bool IsAtOrAfterBodyStart(
+        IOperation? operation,
+        int bodyStart) =>
+        operation != null &&
+        (operation.Syntax.SpanStart >= bodyStart ||
+         operation.Syntax.Span.Contains(bodyStart));
+
+    private static bool TryCreateProgramGroups(
+        Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph graph,
+        IrProgram program,
+        out ImmutableArray<ProgramOperationGroup> groups) {
+        groups = [];
+        if (graph.Blocks.Length != program.Blocks.Length)
+            return false;
+        var result = ImmutableArray.CreateBuilder<ProgramOperationGroup>();
+        for (var blockIndex = 0;
+             blockIndex < graph.Blocks.Length;
+             blockIndex++) {
+            var source = graph.Blocks[blockIndex];
+            var target = program.Blocks[blockIndex];
+            var instructionGroups =
+                CreateInstructionGroups(target);
+            var groupIndex = 0;
+            var terminated = false;
+            foreach (var operation in source.Operations) {
+                if (operation is IEmptyOperation) continue;
+                if (groupIndex >= instructionGroups.Length)
+                    return false;
+                result.Add(instructionGroups[groupIndex++].WithSource(
+                    operation));
+                if (operation is IReturnOperation) {
+                    terminated = true;
+                    break;
+                }
             }
-            else if (!IsContractStatement(statement)) {
-                return null;
+            if (!terminated) {
+                if (groupIndex >= instructionGroups.Length)
+                    return false;
+                result.Add(instructionGroups[groupIndex++].WithSource(
+                    source.BranchValue));
+            }
+            if (groupIndex != instructionGroups.Length)
+                return false;
+        }
+        groups = result.ToImmutable();
+        return true;
+    }
+
+    private static ImmutableArray<ProgramOperationGroup>
+        CreateInstructionGroups(IrBasicBlock block) {
+        var groups = ImmutableArray.CreateBuilder<ProgramOperationGroup>();
+        var start = 0;
+        while (start < block.Instructions.Length) {
+            var operation = block.Instructions[start].Operation;
+            var end = start + 1;
+            while (end < block.Instructions.Length &&
+                   block.Instructions[end].Operation == operation)
+                end++;
+            groups.Add(new ProgramOperationGroup(
+                block.Id,
+                start,
+                end,
+                operation,
+                null,
+                block.Instructions.Slice(start, end - start)));
+            start = end;
+        }
+        return groups.ToImmutable();
+    }
+
+    private static bool TryCreateCallBindings(
+        IrFactory factory,
+        IEnumerable<ProgramOperationGroup> groups,
+        out ImmutableDictionary<IrInstructionId, IInvocationOperation>
+            bindings) {
+        var result =
+            ImmutableDictionary.CreateBuilder<
+                IrInstructionId,
+                IInvocationOperation>();
+        foreach (var group in groups) {
+            var calls = group.Instructions
+                .OfType<IrCallInstruction>()
+                .ToImmutableArray();
+            if (calls.IsDefaultOrEmpty) continue;
+            if (group.Source == null) {
+                bindings =
+                    ImmutableDictionary<
+                        IrInstructionId,
+                        IInvocationOperation>.Empty;
+                return false;
+            }
+            var invocations = EnumerateInvocationsInEvaluationOrder(
+                    group.Source)
+                .ToImmutableArray();
+            if (calls.Length != invocations.Length) {
+                bindings =
+                    ImmutableDictionary<
+                        IrInstructionId,
+                        IInvocationOperation>.Empty;
+                return false;
+            }
+            for (var index = 0; index < calls.Length; index++) {
+                var call = calls[index];
+                var invocation = invocations[index];
+                var member = factory.GetMemberInfo(call.Member);
+                if (member.Identity !=
+                        CompilerIdentityBridge.InternSymbol(
+                            factory,
+                            invocation.TargetMethod) ||
+                    member.IsStatic !=
+                        (invocation.Instance == null) ||
+                    member.ParameterTypes.Length !=
+                        invocation.Arguments.Length) {
+                    bindings =
+                        ImmutableDictionary<
+                            IrInstructionId,
+                            IInvocationOperation>.Empty;
+                    return false;
+                }
+                result.Add(call.Id, invocation);
             }
         }
-        return result;
+        bindings = result.ToImmutable();
+        return true;
+    }
+
+    private static IEnumerable<IInvocationOperation>
+        EnumerateInvocationsInEvaluationOrder(IOperation operation) {
+        foreach (var child in operation.ChildOperations)
+            foreach (var invocation in
+                     EnumerateInvocationsInEvaluationOrder(child))
+                yield return invocation;
+        if (operation is IInvocationOperation current)
+            yield return current;
+    }
+
+    private static bool TryValidateAcyclicBody(
+        IrProgram program,
+        IrBlockId start,
+        int maximumBlocks) {
+        var colors = new Dictionary<IrBlockId, int>();
+        var reachable = 0;
+        return Visit(start);
+
+        bool Visit(IrBlockId blockId) {
+            if (colors.TryGetValue(blockId, out var color))
+                return color == 2;
+            if (++reachable > maximumBlocks) return false;
+            colors.Add(blockId, 1);
+            var block = program.GetBlock(blockId);
+            foreach (var successor in GetSuccessors(block.Terminator)) {
+                if (colors.TryGetValue(successor, out color) && color == 1)
+                    return false;
+                if (!Visit(successor)) return false;
+            }
+            colors[blockId] = 2;
+            return true;
+        }
+    }
+
+    private static ImmutableArray<IrBlockId> GetSuccessors(
+        IrInstruction terminator) =>
+        terminator switch {
+            IrBranchInstruction branch =>
+                branch.WhenTrue == branch.WhenFalse
+                    ? [branch.WhenTrue]
+                    : [branch.WhenTrue, branch.WhenFalse],
+            IrGotoInstruction go => [go.Target],
+            IrReturnInstruction => [],
+            _ => []
+        };
+
+    private static bool TryCreateInitialEnvironment(
+        CallableTarget target,
+        BoundMethodContracts contracts,
+        IrFactory factory,
+        ImmutableArray<FrontendVariableBinding> variables,
+        out ImmutableDictionary<IrVarId, IrTerm> environment,
+        out ImmutableDictionary<IrVarId, IrVarId> parameterBindings) {
+        var canonicalParameters = contracts.Variables
+            .Where(static variable =>
+                variable.Role == BoundContractVariableRole.Parameter)
+            .ToDictionary(static variable => variable.Ordinal);
+        var values =
+            ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
+        var bindings =
+            ImmutableDictionary.CreateBuilder<IrVarId, IrVarId>();
+        foreach (var binding in variables) {
+            if (binding.Symbol is ILocalSymbol) continue;
+            if (binding.Symbol is not IParameterSymbol parameter ||
+                !SymbolEqualityComparer.Default.Equals(
+                    parameter.ContainingSymbol,
+                    target.Method) ||
+                !canonicalParameters.TryGetValue(
+                    parameter.Ordinal,
+                    out var canonical)) {
+                environment =
+                    ImmutableDictionary<IrVarId, IrTerm>.Empty;
+                parameterBindings =
+                    ImmutableDictionary<IrVarId, IrVarId>.Empty;
+                return false;
+            }
+            values.Add(
+                binding.Variable,
+                factory.Variable(canonical.Variable));
+            bindings.Add(binding.Variable, canonical.Variable);
+        }
+        environment = values.ToImmutable();
+        parameterBindings = bindings.ToImmutable();
+        return true;
+    }
+
+    private static ImmutableDictionary<IrVarId, IrTerm>
+        CreateCurrentStates(
+            BoundMethodContracts contracts,
+            IrFactory factory,
+            IReadOnlyDictionary<IrVarId, IrTerm> environment,
+            IReadOnlyDictionary<IrVarId, IrVarId> parameterBindings) {
+        var result =
+            ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
+        foreach (var variable in contracts.Variables) {
+            if (variable.Role == BoundContractVariableRole.Parameter)
+                result[variable.Variable] =
+                    factory.Variable(variable.Variable);
+        }
+        foreach (var binding in parameterBindings) {
+            if (environment.TryGetValue(binding.Key, out var value))
+                result[binding.Value] = value;
+        }
+        return result.ToImmutable();
+    }
+
+    private static bool TrySubstitute(
+        IrFactory factory,
+        IrTerm term,
+        IReadOnlyDictionary<IrVarId, IrTerm> environment,
+        [NotNullWhen(true)] out IrTerm? substituted) {
+        foreach (var variable in CollectVariables(term)) {
+            if (environment.ContainsKey(variable)) continue;
+            substituted = null;
+            return false;
+        }
+        try {
+            substituted = IrSubstitution.Substitute(
+                factory,
+                term,
+                environment);
+            return true;
+        }
+        catch (ArgumentException) {
+            substituted = null;
+            return false;
+        }
     }
 
     private bool ContainsOnlyContractStatements(CallableTarget target) =>
@@ -769,11 +1246,39 @@ internal sealed class CallableVerifier(
                 .GetOperation(value.Expression);
     }
 
+    private static IrTerm? ApplyEntrySubstitutions(
+        IrFactory factory,
+        IrTerm term,
+        BoundMethodContracts contracts) =>
+        ApplyBodySubstitutions(
+            factory,
+            term,
+            contracts,
+            null,
+            ImmutableDictionary<IrVarId, IrTerm>.Empty,
+            allowMissingResult: true);
+
     private static IrTerm? ApplyBodySubstitutions(
         IrFactory factory,
         IrTerm term,
         BoundMethodContracts contracts,
-        IrTerm? returnTerm) {
+        IrTerm? returnTerm,
+        IReadOnlyDictionary<IrVarId, IrTerm> currentStates) =>
+        ApplyBodySubstitutions(
+            factory,
+            term,
+            contracts,
+            returnTerm,
+            currentStates,
+            allowMissingResult: false);
+
+    private static IrTerm? ApplyBodySubstitutions(
+        IrFactory factory,
+        IrTerm term,
+        BoundMethodContracts contracts,
+        IrTerm? returnTerm,
+        IReadOnlyDictionary<IrVarId, IrTerm> currentStates,
+        bool allowMissingResult) {
         var replacements = new Dictionary<IrVarId, IrTerm>();
         foreach (var variable in contracts.Variables) {
             if (variable.Role == BoundContractVariableRole.PreState &&
@@ -781,10 +1286,18 @@ internal sealed class CallableVerifier(
                 replacements[variable.Variable] =
                     factory.Variable(variable.CurrentStateVariable.Value);
             else if (variable.Role == BoundContractVariableRole.Result) {
-                if (returnTerm == null) return null;
-                replacements[variable.Variable] = returnTerm;
+                if (returnTerm == null) {
+                    if (!allowMissingResult &&
+                        CollectVariables(term).Contains(variable.Variable))
+                        return null;
+                }
+                else {
+                    replacements[variable.Variable] = returnTerm;
+                }
             }
         }
+        foreach (var currentState in currentStates)
+            replacements[currentState.Key] = currentState.Value;
         try {
             return IrSubstitution.Substitute(
                 factory,
@@ -793,6 +1306,51 @@ internal sealed class CallableVerifier(
         }
         catch (ArgumentException) {
             return null;
+        }
+    }
+
+    private static IrTerm Guard(
+        IrFactory factory,
+        IrTerm condition,
+        IrTerm consequence) =>
+        factory.Binary(
+            IrBinaryOperator.OrElse,
+            factory.Unary(IrUnaryOperator.Not, condition),
+            consequence);
+
+    private static IrTerm Conjoin(
+        IrFactory factory,
+        IReadOnlyList<IrTerm> terms) =>
+        Combine(
+            factory,
+            terms,
+            IrBinaryOperator.AndAlso,
+            identity: true);
+
+    private static IrTerm Disjoin(
+        IrFactory factory,
+        IReadOnlyList<IrTerm> terms) =>
+        Combine(
+            factory,
+            terms,
+            IrBinaryOperator.OrElse,
+            identity: false);
+
+    private static IrTerm Combine(
+        IrFactory factory,
+        IReadOnlyList<IrTerm> terms,
+        IrBinaryOperator @operator,
+        bool identity) {
+        if (terms.Count == 0) return factory.Boolean(identity);
+        return Visit(0, terms.Count);
+
+        IrTerm Visit(int start, int count) {
+            if (count == 1) return terms[start];
+            var leftCount = count / 2;
+            return factory.Binary(
+                @operator,
+                Visit(start, leftCount),
+                Visit(start + leftCount, count - leftCount));
         }
     }
 
@@ -1026,38 +1584,74 @@ internal sealed class CallableVerifier(
 
     private readonly struct BodyLoweringResult {
         private BodyLoweringResult(
-            IrTerm? returnTerm,
-            ImmutableArray<BodySpecAssumption> specAssumptions,
-            bool usesSpecModeledCallResult,
+            ImmutableArray<BodyPath> paths,
             WorkerVerificationReason reason,
             bool isSuccess) {
-            ReturnTerm = returnTerm;
-            SpecAssumptions = specAssumptions;
-            UsesSpecModeledCallResult = usesSpecModeledCallResult;
+            Paths = paths;
             Reason = reason;
             IsSuccess = isSuccess;
         }
 
-        internal IrTerm? ReturnTerm { get; }
-        internal ImmutableArray<BodySpecAssumption> SpecAssumptions { get; }
-        internal bool UsesSpecModeledCallResult { get; }
+        internal ImmutableArray<BodyPath> Paths { get; }
+        internal bool UsesSpecModeledCallResult =>
+            Paths.Any(path => !path.SpecAssumptions.IsDefaultOrEmpty);
         internal WorkerVerificationReason Reason { get; }
         internal bool IsSuccess { get; }
-        internal static BodyLoweringResult Success(IrTerm? term) =>
-            new(term, [], false, WorkerVerificationReason.None, true);
-        internal static BodyLoweringResult SpecModeled(
-            IrTerm term,
-            ImmutableArray<BodySpecAssumption> assumptions) =>
-            new(
-                term,
-                assumptions,
-                true,
-                WorkerVerificationReason.None,
-                true);
+        internal static BodyLoweringResult Single(
+            IrFactory factory,
+            IrTerm? term) =>
+            Success([
+                new BodyPath(
+                    factory.Boolean(true),
+                    term,
+                    ImmutableDictionary<IrVarId, IrTerm>.Empty,
+                    [])
+            ]);
+        internal static BodyLoweringResult Success(
+            ImmutableArray<BodyPath> paths) =>
+            new(paths, WorkerVerificationReason.None, true);
         internal static BodyLoweringResult Fail(
             WorkerVerificationReason reason) =>
-            new(null, [], false, reason, false);
+            new([], reason, false);
     }
+
+    private sealed class ProgramOperationGroup(
+        IrBlockId block,
+        int startInstruction,
+        int endInstruction,
+        OperationId operation,
+        IOperation? source,
+        ImmutableArray<IrInstruction> instructions) {
+        internal IrBlockId Block { get; } = block;
+        internal int StartInstruction { get; } = startInstruction;
+        internal int EndInstruction { get; } = endInstruction;
+        internal OperationId Operation { get; } = operation;
+        internal IOperation? Source { get; } = source;
+        internal ImmutableArray<IrInstruction> Instructions { get; } =
+            instructions;
+
+        internal ProgramOperationGroup WithSource(IOperation? source) =>
+            new(
+                Block,
+                StartInstruction,
+                EndInstruction,
+                Operation,
+                source,
+                Instructions);
+    }
+
+    private sealed record SymbolicExecutionState(
+        IrBlockId Block,
+        int StartInstruction,
+        ImmutableDictionary<IrVarId, IrTerm> Environment,
+        IrTerm PathCondition,
+        ImmutableArray<BodySpecAssumption> SpecAssumptions);
+
+    private readonly record struct BodyPath(
+        IrTerm Condition,
+        IrTerm? ReturnTerm,
+        ImmutableDictionary<IrVarId, IrTerm> CurrentStates,
+        ImmutableArray<BodySpecAssumption> SpecAssumptions);
 
     private readonly record struct BodySpecAssumption(
         SpecId Spec,

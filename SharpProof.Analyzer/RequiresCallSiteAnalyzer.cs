@@ -24,6 +24,7 @@ internal static class RequiresCallSiteAnalyzer {
                     caller,
                     candidate.Invocation,
                     candidate.IsDefinitelyExecuted,
+                    candidate.HasReplayablePrefix,
                     semanticModel,
                     session,
                     reportDiagnostic,
@@ -70,10 +71,14 @@ internal static class RequiresCallSiteAnalyzer {
                         invocation.Syntax.Span);
                     var candidate = new InvocationCandidate(
                         invocation,
-                        definitelyExecuted.Contains(block.Ordinal));
+                        definitelyExecuted.Contains(block.Ordinal),
+                        HasReplayablePrefix(
+                            declaration,
+                            invocation,
+                            semanticModel,
+                            cancellationToken));
                     if (!invocations.TryGetValue(key, out var existing) ||
-                        !existing.IsDefinitelyExecuted &&
-                        candidate.IsDefinitelyExecuted)
+                        !existing.CanReplay && candidate.CanReplay)
                         invocations[key] = candidate;
                 }
             }
@@ -123,10 +128,216 @@ internal static class RequiresCallSiteAnalyzer {
             pending.Enqueue(destination);
     }
 
+    private static bool HasReplayablePrefix(
+        SyntaxNode declaration,
+        IInvocationOperation invocation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken) {
+        if (declaration is BaseMethodDeclarationSyntax {
+            ExpressionBody.Expression: { } expressionBody
+        })
+            return expressionBody.Span == invocation.Syntax.Span;
+        if (declaration is AccessorDeclarationSyntax {
+            ExpressionBody.Expression: { } accessorExpression
+        })
+            return accessorExpression.Span == invocation.Syntax.Span;
+
+        var body = declaration switch {
+            BaseMethodDeclarationSyntax method => method.Body,
+            AccessorDeclarationSyntax accessor => accessor.Body,
+            _ => null
+        };
+        if (body == null) return false;
+        var statement = invocation.Syntax.AncestorsAndSelf()
+            .OfType<StatementSyntax>()
+            .FirstOrDefault(candidate =>
+                ReferenceEquals(candidate.Parent, body));
+        if (statement == null ||
+            statement switch {
+                ExpressionStatementSyntax expression =>
+                    expression.Expression.Span != invocation.Syntax.Span,
+                ReturnStatementSyntax { Expression: { } returned } =>
+                    returned.Span != invocation.Syntax.Span,
+                _ => true
+            })
+            return false;
+        foreach (var prior in body.Statements.TakeWhile(
+                     candidate => !ReferenceEquals(candidate, statement)))
+            if (prior is not (
+                    EmptyStatementSyntax or
+                    LocalFunctionStatementSyntax) &&
+                !IsDefinitelyNonThrowing(
+                    semanticModel.GetOperation(prior, cancellationToken),
+                    semanticModel.Compilation,
+                    [],
+                    cancellationToken))
+                return false;
+        return true;
+    }
+
+    private static bool IsDefinitelyNonThrowing(
+        IOperation? operation,
+        Compilation compilation,
+        HashSet<IMethodSymbol> activeMethods,
+        CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (operation == null) return false;
+        switch (operation) {
+            case ILiteralOperation:
+            case ILocalReferenceOperation:
+            case IParameterReferenceOperation:
+            case IDiscardOperation:
+            case IInstanceReferenceOperation:
+            case IDefaultValueOperation:
+            case ITypeOfOperation:
+            case INameOfOperation:
+                return true;
+            case IInvocationOperation invocation:
+                return !invocation.IsVirtual &&
+                       (invocation.Instance == null ||
+                        invocation.Instance is IInstanceReferenceOperation &&
+                        IsDefinitelyNonThrowing(
+                            invocation.Instance,
+                            compilation,
+                            activeMethods,
+                            cancellationToken)) &&
+                       invocation.Arguments.All(argument =>
+                           IsDefinitelyNonThrowing(
+                               argument.Value,
+                               compilation,
+                               activeMethods,
+                               cancellationToken)) &&
+                       IsDefinitelyNonThrowingSourceMethod(
+                           invocation.TargetMethod,
+                           compilation,
+                           activeMethods,
+                           cancellationToken);
+            case ISimpleAssignmentOperation assignment:
+                return assignment.Target is
+                           ILocalReferenceOperation or
+                           IParameterReferenceOperation or
+                           IDiscardOperation &&
+                       IsDefinitelyNonThrowing(
+                           assignment.Value,
+                           compilation,
+                           activeMethods,
+                           cancellationToken);
+            case IBinaryOperation binary:
+                return binary.OperatorMethod == null &&
+                       !binary.IsChecked &&
+                       binary.OperatorKind is not (
+                           BinaryOperatorKind.Divide or
+                           BinaryOperatorKind.Remainder) &&
+                       ChildrenAreDefinitelyNonThrowing(
+                           binary,
+                           compilation,
+                           activeMethods,
+                           cancellationToken);
+            case IUnaryOperation unary:
+                return unary.OperatorMethod == null &&
+                       !unary.IsChecked &&
+                       ChildrenAreDefinitelyNonThrowing(
+                           unary,
+                           compilation,
+                           activeMethods,
+                           cancellationToken);
+            case IConversionOperation conversion:
+                return conversion.OperatorMethod == null &&
+                       !conversion.IsChecked &&
+                       !conversion.Conversion.IsUserDefined &&
+                       (conversion.Conversion.IsIdentity ||
+                        conversion.Conversion.IsImplicit) &&
+                       IsDefinitelyNonThrowing(
+                           conversion.Operand,
+                           compilation,
+                           activeMethods,
+                           cancellationToken);
+            case IBlockOperation:
+            case IExpressionStatementOperation:
+            case IReturnOperation:
+            case IVariableDeclarationGroupOperation:
+            case IVariableDeclarationOperation:
+            case IVariableDeclaratorOperation:
+            case IVariableInitializerOperation:
+            case IArgumentOperation:
+            case IParenthesizedOperation:
+            case IConditionalOperation:
+                return ChildrenAreDefinitelyNonThrowing(
+                    operation,
+                    compilation,
+                    activeMethods,
+                    cancellationToken);
+            default:
+                return false;
+        }
+    }
+
+    private static bool ChildrenAreDefinitelyNonThrowing(
+        IOperation operation,
+        Compilation compilation,
+        HashSet<IMethodSymbol> activeMethods,
+        CancellationToken cancellationToken) =>
+        operation.ChildOperations.All(child =>
+            IsDefinitelyNonThrowing(
+                child,
+                compilation,
+                activeMethods,
+                cancellationToken));
+
+    private static bool IsDefinitelyNonThrowingSourceMethod(
+        IMethodSymbol method,
+        Compilation compilation,
+        HashSet<IMethodSymbol> activeMethods,
+        CancellationToken cancellationToken) {
+        var normalized = method.OriginalDefinition;
+        if (normalized.DeclaringSyntaxReferences.Length != 1 ||
+            !activeMethods.Add(normalized))
+            return false;
+        try {
+            var declaration = normalized.DeclaringSyntaxReferences[0]
+                .GetSyntax(cancellationToken);
+            var semanticModel =
+                SharpProof.Frontend.Host.CompilationModelProvider
+                    .GetSemanticModel(
+                        compilation,
+                        declaration.SyntaxTree);
+            var body = declaration switch {
+                BaseMethodDeclarationSyntax {
+                    Body: { } block
+                } => semanticModel.GetOperation(block, cancellationToken),
+                BaseMethodDeclarationSyntax {
+                    ExpressionBody.Expression: { } expression
+                } => semanticModel.GetOperation(expression, cancellationToken),
+                AccessorDeclarationSyntax {
+                    Body: { } block
+                } => semanticModel.GetOperation(block, cancellationToken),
+                AccessorDeclarationSyntax {
+                    ExpressionBody.Expression: { } expression
+                } => semanticModel.GetOperation(expression, cancellationToken),
+                LocalFunctionStatementSyntax {
+                    Body: { } block
+                } => semanticModel.GetOperation(block, cancellationToken),
+                LocalFunctionStatementSyntax {
+                    ExpressionBody.Expression: { } expression
+                } => semanticModel.GetOperation(expression, cancellationToken),
+                _ => null
+            };
+            return IsDefinitelyNonThrowing(
+                body,
+                compilation,
+                activeMethods,
+                cancellationToken);
+        }
+        finally {
+            activeMethods.Remove(normalized);
+        }
+    }
+
     private static AnalyzerSemanticOutcome AnalyzeInvocation(
         IMethodSymbol caller,
         IInvocationOperation invocation,
         bool isDefinitelyExecuted,
+        bool hasReplayablePrefix,
         SemanticModel semanticModel,
         AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic,
@@ -148,23 +359,30 @@ internal static class RequiresCallSiteAnalyzer {
             .ToImmutableArray();
         if (requires.IsDefaultOrEmpty)
             return AnalyzerSemanticOutcome.NotApplicable;
-        if (!isDefinitelyExecuted)
+        if (!isDefinitelyExecuted || !hasReplayablePrefix)
             return AnalyzerSemanticOutcome.Unknown;
         if (invocation.TargetMethod.ReducedFrom != null ||
             invocation.TargetMethod.Parameters.Any(static parameter =>
                 parameter.RefKind != RefKind.None))
             return AnalyzerSemanticOutcome.Unknown;
 
-        var substitutions = CreateSubstitutions(
+        var replayPlan = CreateReplayPlan(
             invocation,
             binding.Contracts,
             factory,
             session.IsKnownPure,
             cancellationToken);
-        if (substitutions == null)
+        if (replayPlan == null)
             return AnalyzerSemanticOutcome.Unknown;
 
         var interpreter = new IrInterpreter(factory);
+        foreach (var input in replayPlan.Inputs) {
+            var replayedInput = interpreter.Evaluate(input.Term);
+            if (replayedInput.Status != IrEvaluationStatus.Value ||
+                input.IsReceiver &&
+                replayedInput.Value?.Kind == IrValueKind.Null)
+                return AnalyzerSemanticOutcome.Unknown;
+        }
         var printer = new IrPrinter(factory);
         var outcome = AnalyzerSemanticOutcome.Proven;
         foreach (var clause in requires) {
@@ -174,7 +392,7 @@ internal static class RequiresCallSiteAnalyzer {
                 instantiated = IrSubstitution.Substitute(
                     factory,
                     clause.Condition,
-                    substitutions);
+                    replayPlan.Substitutions);
             }
             catch (ArgumentException) {
                 outcome = AnalyzerSemanticOutcomes.Combine(
@@ -202,7 +420,7 @@ internal static class RequiresCallSiteAnalyzer {
         return outcome;
     }
 
-    private static IReadOnlyDictionary<IrVarId, IrTerm>? CreateSubstitutions(
+    private static InvocationReplayPlan? CreateReplayPlan(
         IInvocationOperation invocation,
         BoundMethodContracts contracts,
         IrFactory factory,
@@ -211,6 +429,26 @@ internal static class RequiresCallSiteAnalyzer {
         var lowerer = new RoslynOperationLowerer(
             factory,
             isKnownPure);
+        var inputs = ImmutableArray.CreateBuilder<InvocationReplayInput>();
+        if (invocation.Instance != null) {
+            var receiver = lowerer.Lower(invocation.Instance);
+            if (!receiver.IsExact) return null;
+            inputs.Add(new InvocationReplayInput(receiver.Term, true));
+        }
+        foreach (var argument in invocation.Arguments
+                     .OrderBy(static argument =>
+                         argument.IsImplicit ? 1 : 0)
+                     .ThenBy(static argument =>
+                         argument.IsImplicit
+                             ? argument.Parameter?.Ordinal ?? int.MaxValue
+                             : argument.Syntax.SpanStart)) {
+            cancellationToken.ThrowIfCancellationRequested();
+            var loweredArgument = lowerer.Lower(argument.Value);
+            if (!loweredArgument.IsExact) return null;
+            inputs.Add(new InvocationReplayInput(
+                loweredArgument.Term,
+                false));
+        }
         var substitutions = new Dictionary<IrVarId, IrTerm>();
         foreach (var variable in contracts.Variables) {
             cancellationToken.ThrowIfCancellationRequested();
@@ -232,13 +470,34 @@ internal static class RequiresCallSiteAnalyzer {
             if (lowered.Term.Type != expected) return null;
             substitutions.Add(variable.Variable, lowered.Term);
         }
-        return substitutions;
+        return new InvocationReplayPlan(
+            substitutions,
+            inputs.ToImmutable());
     }
 
     private readonly struct InvocationCandidate(
         IInvocationOperation invocation,
-        bool isDefinitelyExecuted) {
+        bool isDefinitelyExecuted,
+        bool hasReplayablePrefix) {
         internal IInvocationOperation Invocation { get; } = invocation;
         internal bool IsDefinitelyExecuted { get; } = isDefinitelyExecuted;
+        internal bool HasReplayablePrefix { get; } = hasReplayablePrefix;
+        internal bool CanReplay => IsDefinitelyExecuted && HasReplayablePrefix;
+    }
+
+    private sealed class InvocationReplayPlan(
+        IReadOnlyDictionary<IrVarId, IrTerm> substitutions,
+        ImmutableArray<InvocationReplayInput> inputs) {
+        internal IReadOnlyDictionary<IrVarId, IrTerm> Substitutions { get; } =
+            substitutions;
+        internal ImmutableArray<InvocationReplayInput> Inputs { get; } =
+            inputs;
+    }
+
+    private readonly struct InvocationReplayInput(
+        IrTerm term,
+        bool isReceiver) {
+        internal IrTerm Term { get; } = term;
+        internal bool IsReceiver { get; } = isReceiver;
     }
 }

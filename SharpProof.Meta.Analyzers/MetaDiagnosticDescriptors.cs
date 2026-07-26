@@ -108,6 +108,16 @@ internal static class MetaDiagnosticDescriptors {
         "Transient and abstaining results are not stable semantic facts and must not be cached.",
         HelpBase);
 
+    internal static readonly DiagnosticDescriptor ProofOutcomeConstruction = new(
+        "SPMETA011",
+        "Proof outcome bypasses the trusted kernel",
+        "'{0}' instances may only be created by the proof kernel",
+        Category,
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        "Only the proof kernel may construct proven or refuted outcomes and replay-validated models.",
+        HelpBase);
+
     internal static readonly ImmutableArray<DiagnosticDescriptor> All = [
         ForbiddenRoslynApi,
         MutableStaticState,
@@ -118,6 +128,7 @@ internal static class MetaDiagnosticDescriptors {
         AssumptionConstruction,
         EffectSummaryConstruction,
         CSharpExpressionText,
-        NonCacheableSemanticAnswer
+        NonCacheableSemanticAnswer,
+        ProofOutcomeConstruction
     ];
 }

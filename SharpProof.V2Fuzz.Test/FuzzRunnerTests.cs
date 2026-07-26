@@ -14,7 +14,7 @@ public sealed class FuzzRunnerTests {
         var second = await FuzzRunner.RunAsync(options);
 
         Assert.That(first, Is.EqualTo(second));
-        Assert.That(first.SchemaVersion, Is.EqualTo(2));
+        Assert.That(first.SchemaVersion, Is.EqualTo(3));
         Assert.That(first.Passed, Is.True);
         Assert.That(first.Agreements, Is.EqualTo(options.Cases));
         Assert.That(first.Abstentions, Is.Zero);
@@ -23,6 +23,10 @@ public sealed class FuzzRunnerTests {
         Assert.That(
             first.PartialSmtAgreements,
             Is.EqualTo(options.Cases));
+        Assert.That(first.FrontendCoverage.HasExpandedCategories, Is.True);
+        Assert.That(first.FrontendCoverage.DivideByZeroExceptions, Is.GreaterThan(0));
+        Assert.That(first.FrontendCoverage.OverflowExceptions, Is.GreaterThan(0));
+        Assert.That(first.FrontendCoverage.InvalidCastExceptions, Is.GreaterThan(0));
     }
 
     [Test]
@@ -76,6 +80,56 @@ public sealed class FuzzRunnerTests {
             comparison.Status,
             Is.EqualTo(FuzzOracleStatus.Agreement),
             comparison.Detail + Environment.NewLine + first.Source);
+    }
+
+    [Test]
+    public void ExpandedFrontendShapesMatchRuntime() {
+        var cases = new[] {
+            new GeneratedCSharpCase(
+                GeneratedCSharpExpression.Length(
+                    GeneratedCSharpExpression.Text()),
+                Left: 0,
+                Right: 0,
+                Condition: false) {
+                Text = null
+            },
+            new GeneratedCSharpCase(
+                GeneratedCSharpExpression.ArrayIndex(
+                    GeneratedCSharpExpression.Values(),
+                    GeneratedCSharpExpression.Left()),
+                Left: 1,
+                Right: 0,
+                Condition: false) {
+                Values = [7]
+            },
+            new GeneratedCSharpCase(
+                GeneratedCSharpExpression.CastToString(
+                    GeneratedCSharpExpression.NullReference()),
+                Left: 0,
+                Right: 0,
+                Condition: false)
+        };
+
+        var results = new FrontendDifferentialOracle().CompareBatch(cases);
+
+        Assert.That(
+            results.Select(static result => result.Status),
+            Is.All.EqualTo(FuzzOracleStatus.Agreement));
+        Assert.That(
+            results[0].ExceptionKind,
+            Is.EqualTo(IrExceptionKind.NullReference));
+        Assert.That(
+            results[1].ExceptionKind,
+            Is.EqualTo(IrExceptionKind.IndexOutOfRange));
+        Assert.That(results[2].ExceptionKind, Is.Null);
+    }
+
+    [Test]
+    public void ExpandedCoverageRequirementFailsClosed() {
+        var empty = new FrontendFuzzCoverage(
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        Assert.That(empty.HasExpandedCategories, Is.False);
     }
 
     [Test]

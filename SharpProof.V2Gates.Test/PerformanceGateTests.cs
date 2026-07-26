@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using SharpProof.V2Gates.Performance;
+using System.Xml.Linq;
 
 namespace SharpProof.V2Gates.Test;
 
@@ -87,6 +88,56 @@ public sealed class PerformanceGateTests {
     }
 
     [Test]
+    public void DefaultOffMeasurementRunsTheAnalyzerDriverWithoutASession() {
+        var measurement = PerformanceGate.MeasureDefaultOffAnalyzerBatch(
+            "public static class Subject { public static int M() => 1; }",
+            "DefaultOffProbe",
+            iterations: 3);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(measurement.MeanMilliseconds, Is.GreaterThan(0));
+            Assert.That(measurement.AnalyzerDriverRunCount, Is.EqualTo(3));
+            Assert.That(measurement.DiagnosticCount, Is.Zero);
+            Assert.That(measurement.AnalysisSessionCreateCount, Is.Zero);
+        }
+    }
+
+    [Test]
+    public void DefaultOffPackagePolicyOmitsAnalyzerAndVerifierWork() =>
+        PerformanceGate.ValidateDefaultOffPackagePolicy(
+            RepositoryLayout.FindRoot());
+
+    [Test]
+    public void DefaultOffPolicyRejectsAWidenedVerifierCondition() {
+        var root = RepositoryLayout.FindRoot();
+        var props = XDocument.Load(Path.Combine(
+            root,
+            "SharpProof.Package",
+            "buildTransitive",
+            "SharpProof.props"));
+        var targets = XDocument.Load(Path.Combine(
+            root,
+            "SharpProof.Package",
+            "buildTransitive",
+            "SharpProof.targets"));
+        var verifier = targets.Descendants("Target").Single(target =>
+            string.Equals(
+                (string?)target.Attribute("Name"),
+                "SharpProofVerify",
+                StringComparison.Ordinal));
+        verifier.SetAttributeValue(
+            "Condition",
+            (string?)verifier.Attribute("Condition") +
+            " OR 'true' == 'true'");
+
+        Assert.Throws<InvalidDataException>(
+            (Action)(() =>
+                PerformanceGate.ValidateDefaultOffPackagePolicy(
+                    props,
+                    targets)));
+    }
+
+    [Test]
     public async Task ReleasePerformanceContractPasses() {
         var result = await PerformanceGate.RunAsync(
             RepositoryLayout.FindRoot());
@@ -97,6 +148,9 @@ public sealed class PerformanceGateTests {
             string.Join(Environment.NewLine, result.Failures));
         using (Assert.EnterMultipleScope()) {
             Assert.That(result.Passed, Is.True);
+            Assert.That(
+                result.DefaultOffAnalyzerDriverRunCount,
+                Is.EqualTo(1));
             Assert.That(result.BaselineRetainedBytes, Is.GreaterThan(0));
             Assert.That(result.DefaultOffRetainedBytes, Is.GreaterThan(0));
             Assert.That(result.EnabledRetainedCompilationCount, Is.Zero);

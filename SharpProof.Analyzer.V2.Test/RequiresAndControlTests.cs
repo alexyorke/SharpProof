@@ -58,6 +58,105 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
+    public async Task NonCompletingCallPrefixCannotProduceARefutation() {
+        var diagnostics = await AnalyzerV2TestHost.AnalyzeAsync(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private sealed class Receiver {
+                    public void Positive(int ignored, int value) {
+                        Contract.Requires(value > 0);
+                    }
+
+                    public int Identity(int value) => value;
+                }
+
+                private static void Positive(int ignored, int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void ThrowingEarlierArgument() {
+                    Positive(((string)null!).Length, -1);
+                }
+
+                public static void NullReceiver() {
+                    ((Receiver)null!).Positive(0, -1);
+                }
+
+                public static void ThrowingPriorStatement() {
+                    var zero = 0;
+                    _ = 1 / zero;
+                    Positive(0, -1);
+                }
+
+                public static void NullReceiverPriorStatement() {
+                    Receiver receiver = null!;
+                    _ = receiver.Identity(0);
+                    Positive(0, -1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task AllNormallyEvaluatedArgumentsCanProduceARefutation() {
+        var diagnostics = await AnalyzerV2TestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void Positive(int ignored, int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Call() {
+                    Positive(1, -1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
+    public async Task DefinitelyNonThrowingSourcePrefixPreservesRefutation() {
+        var diagnostics = await AnalyzerV2TestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Identity(int value) => value;
+
+                private static void Positive(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Call(int value) {
+                    var probe = Identity(value);
+                    _ = probe;
+                    Positive(-1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
     public async Task UnsupportedCallableAbstainsSilently() {
         var diagnostics = await AnalyzerV2TestHost.AnalyzeAsync(
             """

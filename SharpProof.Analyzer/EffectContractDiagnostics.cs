@@ -187,7 +187,8 @@ internal static class EffectContractDiagnostics {
         Compilation compilation,
         Location fallbackLocation,
         Action<Diagnostic> reportDiagnostic) {
-        var exceptionType = compilation.GetTypeByMetadataName("System.Exception");
+        var exceptionType = compilation.GetTypeByMetadataName(
+            FrameworkTypeMetadataNames.Exception);
         var types = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
         foreach (var attribute in attributes) {
             if (attribute.ConstructorArguments.Length != 1 ||

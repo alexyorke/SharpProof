@@ -79,12 +79,14 @@ public sealed class IrVariableInfo {
 public sealed class IrMemberInfo {
     internal IrMemberInfo(
         IrMemberId id,
+        IrIdentityId identity,
         IrTypeId declaringType,
         IrStringId name,
         IrTypeId returnType,
         bool isStatic,
         ImmutableArray<IrTypeId> parameterTypes) {
         Id = id;
+        Identity = identity;
         DeclaringType = declaringType;
         Name = name;
         ReturnType = returnType;
@@ -93,6 +95,7 @@ public sealed class IrMemberInfo {
     }
 
     public IrMemberId Id { get; }
+    public IrIdentityId Identity { get; }
     public IrTypeId DeclaringType { get; }
     public IrStringId Name { get; }
     public IrTypeId ReturnType { get; }

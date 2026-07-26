@@ -15,24 +15,41 @@ public sealed class EffectMethodResult {
 /// <summary>
 /// Compilation-scoped deterministic may-effect analysis.
 /// </summary>
-public sealed class EffectAnalysisSession(
-    Compilation compilation,
-    ApiSpecTable? apiSpecs = null) {
-    private readonly Compilation _compilation =
-        compilation ?? throw new ArgumentNullException(nameof(compilation));
-    private readonly INamedTypeSymbol? _conditionalAttribute =
-        compilation.GetTypeByMetadataName(
-            "System.Diagnostics.ConditionalAttribute");
+public sealed class EffectAnalysisSession {
+    private readonly Compilation _compilation;
+    private readonly INamedTypeSymbol? _conditionalAttribute;
     private readonly Dictionary<SyntaxTree, ImmutableHashSet<string>>
         _definedPreprocessorSymbols = [];
-    private readonly ExternalEffectResolver _external = new(
-        compilation ?? throw new ArgumentNullException(nameof(compilation)),
-        apiSpecs ?? ApiSpecTable.Default);
+    private readonly ExternalEffectResolver _external;
     private readonly object _gate = new();
     private volatile ImmutableDictionary<IMethodSymbol, EffectSummary>? _summaries;
     private ImmutableArray<IMethodSymbol> _orderedMethods;
 
+    public EffectAnalysisSession(
+        Compilation compilation,
+        ApiSpecTable? apiSpecs = null)
+        : this(
+            compilation,
+            new ApiSpecResolver(apiSpecs ?? ApiSpecTable.Default)
+                .Resolve(
+                    compilation ??
+                    throw new ArgumentNullException(nameof(compilation)))) {
+    }
+
+    internal EffectAnalysisSession(
+        Compilation compilation,
+        ResolvedApiSpecTable apiSpecs) {
+        _compilation = compilation ??
+            throw new ArgumentNullException(nameof(compilation));
+        _conditionalAttribute = compilation.GetTypeByMetadataName(
+            FrameworkTypeMetadataNames.ConditionalAttribute);
+        _external = new ExternalEffectResolver(
+            compilation,
+            apiSpecs ?? throw new ArgumentNullException(nameof(apiSpecs)));
+    }
+
     public Compilation Compilation => _compilation;
+    internal ResolvedApiSpecTable ApiSpecs => _external.ApiSpecs;
 
     public EffectMethodResult Analyze(
         IMethodSymbol method,
@@ -146,7 +163,8 @@ public sealed class EffectAnalysisSession(
 
     internal EffectThrowSet ResolveThrownException(IOperation? exception) {
         if (exception?.ConstantValue is { HasValue: true, Value: null })
-            return ResolveExceptionSet("System.NullReferenceException");
+            return ResolveExceptionSet(
+                FrameworkTypeMetadataNames.NullReferenceException);
         if (exception?.Type is INamedTypeSymbol named)
             return EffectThrowSet.Create([named]);
         return EffectThrowSet.Unknown;

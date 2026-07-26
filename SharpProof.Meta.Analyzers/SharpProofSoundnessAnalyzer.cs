@@ -177,7 +177,22 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
                 MetaDiagnosticDescriptors.EffectSummaryConstruction,
                 creation.Syntax.GetLocation()));
         }
+
+        if (IsProofProducingType(creation.Type, knownSymbols) &&
+            !IsSameType(containingType, knownSymbols.ProofKernel)) {
+            context.ReportDiagnostic(Diagnostic.Create(
+                MetaDiagnosticDescriptors.ProofOutcomeConstruction,
+                creation.Syntax.GetLocation(),
+                creation.Type?.Name ?? string.Empty));
+        }
     }
+
+    private static bool IsProofProducingType(
+        ITypeSymbol? type,
+        KnownSymbols knownSymbols) =>
+        IsSameType(type, knownSymbols.ProvenOutcome) ||
+        IsSameType(type, knownSymbols.RefutedOutcome) ||
+        IsSameType(type, knownSymbols.ValidatedModel);
 
     private static void AnalyzeBinaryOperation(
         OperationAnalysisContext context) {
@@ -366,12 +381,10 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
         if (!IsSameType(
                 caughtType,
                 knownSymbols.OperationCanceledException) ||
-            clause.Block.DescendantNodes().OfType<ThrowStatementSyntax>().Any() ||
-            CallsCancellationRethrowGuard(
+            RethrowsCancellationImmediately(clause) ||
+            IsAuditedCancellationBoundary(
                 clause,
                 context,
-                knownSymbols) ||
-            IsAuditedCancellationBoundary(
                 context.ContainingSymbol,
                 knownSymbols))
             return;
@@ -381,29 +394,80 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
             clause.CatchKeyword.GetLocation()));
     }
 
-    private static bool CallsCancellationRethrowGuard(
-        CatchClauseSyntax clause,
-        SyntaxNodeAnalysisContext context,
-        KnownSymbols knownSymbols) =>
-        clause.Block.DescendantNodes()
-            .OfType<InvocationExpressionSyntax>()
-            .Any(invocation => {
-                var method = context.SemanticModel.GetSymbolInfo(
-                    invocation,
-                    context.CancellationToken).Symbol as IMethodSymbol;
-                return method?.Name == "ThrowIfCancellationRequested" &&
-                       IsSameType(
-                           method.ContainingType,
-                           knownSymbols.CancellationToken);
-            });
+    private static bool RethrowsCancellationImmediately(
+        CatchClauseSyntax clause) =>
+        clause.Block.Statements.FirstOrDefault() is
+            ThrowStatementSyntax { Expression: null };
 
     private static bool IsAuditedCancellationBoundary(
+        CatchClauseSyntax clause,
+        SyntaxNodeAnalysisContext context,
         ISymbol? containingSymbol,
-        KnownSymbols knownSymbols) =>
-        containingSymbol?.Name == "Main" &&
-        IsSameType(
-            containingSymbol.ContainingType,
-            knownSymbols.WorkerProgram);
+        KnownSymbols knownSymbols) {
+        if (containingSymbol is not IMethodSymbol method) return false;
+        if (IsAuditedWorkerMain(
+                method,
+                knownSymbols.WorkerProgram,
+                knownSymbols.TaskOfInt32) ||
+            IsAuditedWorkerMain(
+                method,
+                knownSymbols.WorkerLauncherProgram,
+                knownSymbols.TaskOfInt32))
+            return true;
+        if (method is not {
+            Name: "VerifyTargetAsync",
+            IsStatic: true,
+            Parameters.Length: 8
+        } ||
+            !IsSameType(
+                method.ContainingType,
+                knownSymbols.SharpProofWorker) ||
+            !SymbolEqualityComparer.Default.Equals(
+                method.ReturnType,
+                knownSymbols.VerifyTargetTask) ||
+            method.Parameters[7].Name != "callerCancellation" ||
+            !IsSameType(
+                method.Parameters[7].Type,
+                knownSymbols.CancellationToken) ||
+            clause.Block.Statements.FirstOrDefault() is not
+                ExpressionStatementSyntax expression ||
+            context.SemanticModel.GetOperation(
+                expression.Expression,
+                context.CancellationToken) is not
+                IInvocationOperation invocation ||
+            invocation.TargetMethod.Name !=
+                "ThrowIfCancellationRequested" ||
+            !IsSameType(
+                invocation.TargetMethod.ContainingType,
+                knownSymbols.CancellationToken))
+            return false;
+
+        IOperation? receiver = invocation.Instance;
+        while (receiver is IConversionOperation conversion)
+            receiver = conversion.Operand;
+        return receiver is IParameterReferenceOperation parameter &&
+               SymbolEqualityComparer.Default.Equals(
+                   parameter.Parameter,
+                   method.Parameters[7]);
+    }
+
+    private static bool IsAuditedWorkerMain(
+        IMethodSymbol method,
+        INamedTypeSymbol? program,
+        INamedTypeSymbol? taskOfInt32) =>
+        method is {
+            Name: "Main",
+            IsStatic: true,
+            Parameters.Length: 1
+        } &&
+        IsSameType(method.ContainingType, program) &&
+        SymbolEqualityComparer.Default.Equals(
+            method.ReturnType,
+            taskOfInt32) &&
+        method.Parameters[0].Type is IArrayTypeSymbol {
+            Rank: 1
+        } arguments &&
+        arguments.ElementType.SpecialType == SpecialType.System_String;
 
     private static bool IsSemanticNamespace(ISymbol symbol) =>
         IsCriticalStateNamespace(symbol.ContainingNamespace) ||
@@ -496,8 +560,33 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
                 "SharpProof.Effects.EffectSummaryOperations");
             ExternalEffectResolver = compilation.GetTypeByMetadataName(
                 "SharpProof.Effects.ExternalEffectResolver");
+            ProvenOutcome = compilation.GetTypeByMetadataName(
+                "SharpProof.Verify.ProvenOutcome");
+            RefutedOutcome = compilation.GetTypeByMetadataName(
+                "SharpProof.Verify.RefutedOutcome");
+            ValidatedModel = compilation.GetTypeByMetadataName(
+                "SharpProof.Verify.ValidatedModel");
             WorkerProgram = compilation.GetTypeByMetadataName(
                 "SharpProof.Worker.Program");
+            WorkerLauncherProgram = compilation.GetTypeByMetadataName(
+                "SharpProof.Worker.Launcher.Program");
+            SharpProofWorker = compilation.GetTypeByMetadataName(
+                "SharpProof.Worker.SharpProofWorker");
+            var task = compilation.GetTypeByMetadataName(
+                "System.Threading.Tasks.Task`1");
+            TaskOfInt32 = task?.Construct(compilation.GetSpecialType(
+                SpecialType.System_Int32));
+            var immutableArray = compilation.GetTypeByMetadataName(
+                "System.Collections.Immutable.ImmutableArray`1");
+            var workerRecord = compilation.GetTypeByMetadataName(
+                "SharpProof.Worker.Protocol.WorkerVerificationRecord");
+            VerifyTargetTask =
+                task != null &&
+                immutableArray != null &&
+                workerRecord != null
+                    ? task.Construct(
+                        immutableArray.Construct(workerRecord))
+                    : null;
         }
 
         internal INamedTypeSymbol? Compilation { get; }
@@ -518,6 +607,13 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
         internal INamedTypeSymbol? EffectSummaryDomain { get; }
         internal INamedTypeSymbol? EffectSummaryOperations { get; }
         internal INamedTypeSymbol? ExternalEffectResolver { get; }
+        internal INamedTypeSymbol? ProvenOutcome { get; }
+        internal INamedTypeSymbol? RefutedOutcome { get; }
+        internal INamedTypeSymbol? ValidatedModel { get; }
         internal INamedTypeSymbol? WorkerProgram { get; }
+        internal INamedTypeSymbol? WorkerLauncherProgram { get; }
+        internal INamedTypeSymbol? SharpProofWorker { get; }
+        internal INamedTypeSymbol? TaskOfInt32 { get; }
+        internal INamedTypeSymbol? VerifyTargetTask { get; }
     }
 }

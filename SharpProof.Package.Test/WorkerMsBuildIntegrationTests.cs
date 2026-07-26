@@ -32,7 +32,15 @@ public sealed class WorkerMsBuildIntegrationTests {
     [Test]
     public async Task VerificationIsOffByDefaultAndDuringDesignTimeBuilds() {
         using var project = ConsumerProject.Create(IdentitySource);
-        var normal = await project.BuildAsync(verify: false);
+        var projectDirectory = Path.GetDirectoryName(project.ProjectPath)!;
+        var normal = await project.BuildAsync(
+            verify: null,
+            (
+                "SharpProofWorkerPath",
+                Path.Combine(projectDirectory, "missing-worker.dll")),
+            (
+                "SharpProofLauncherPath",
+                Path.Combine(projectDirectory, "missing-launcher.dll")));
         Assert.That(normal.ExitCode, Is.Zero, normal.Output);
         Assert.That(File.Exists(project.RequestPath), Is.False);
         Assert.That(File.Exists(project.ResultPath), Is.False);
@@ -152,7 +160,8 @@ public sealed class WorkerMsBuildIntegrationTests {
         var secondWrite = File.GetLastWriteTimeUtc(project.ResultPath);
 
         Assert.That(secondJson, Is.EqualTo(firstJson));
-        Assert.That(secondWrite, Is.EqualTo(firstWrite));
+        Assert.That(secondWrite, Is.GreaterThan(firstWrite));
+        Assert.That(second.Output, Does.Contain("SharpProof Proven"));
 
         await Task.Delay(1_100);
         var changedMethodRlimit =
@@ -368,6 +377,15 @@ public sealed class WorkerMsBuildIntegrationTests {
             response.Records.Single().Status,
             Is.EqualTo(WorkerVerificationStatus.Refuted));
 
+        var repeatedRefutation = await refuted.BuildAsync(verify: true);
+        Assert.That(
+            repeatedRefutation.ExitCode,
+            Is.Not.Zero,
+            repeatedRefutation.Output);
+        Assert.That(
+            repeatedRefutation.Output,
+            Does.Contain("exited with code 5"));
+
         using var timedOut = ConsumerProject.Create(IdentitySource);
         var timedOutBuild = await timedOut.BuildAsync(
             verify: true,
@@ -446,7 +464,7 @@ public sealed class WorkerMsBuildIntegrationTests {
         }
 
         internal async Task<BuildResult> BuildAsync(
-            bool verify,
+            bool? verify,
             params (string Name, string Value)[] properties) {
             var startInfo = new ProcessStartInfo {
                 FileName = "dotnet",
@@ -463,9 +481,10 @@ public sealed class WorkerMsBuildIntegrationTests {
             startInfo.ArgumentList.Add("--nologo");
             startInfo.ArgumentList.Add("/nodeReuse:false");
             startInfo.ArgumentList.Add("-p:UseSharedCompilation=false");
-            startInfo.ArgumentList.Add(
-                "-p:SharpProofVerify=" +
-                (verify ? "true" : "false"));
+            if (verify.HasValue)
+                startInfo.ArgumentList.Add(
+                    "-p:SharpProofVerify=" +
+                    (verify.Value ? "true" : "false"));
             foreach (var property in properties)
                 startInfo.ArgumentList.Add(
                     "-p:" + property.Name + "=" + property.Value);

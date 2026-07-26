@@ -40,13 +40,15 @@ internal sealed class AnalyzerSession {
         Attributes = new AnalyzerAttributeSymbols(compilation);
         _apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         if (configuration.Mode is SharpProofMode.Effects or SharpProofMode.AllExperimental)
-            _effects = new EffectAnalysisSession(compilation, ApiSpecTable.Default);
+            _effects = new EffectAnalysisSession(compilation, _apiSpecs);
     }
 
     internal Compilation Compilation { get; }
     internal AnalyzerConfiguration Configuration { get; }
     internal AnalyzerAttributeSymbols Attributes { get; }
     internal IrFactory IrFactory { get; } = new();
+    internal ResolvedApiSpecTable ApiSpecs => _apiSpecs;
+    internal ResolvedApiSpecTable? EffectApiSpecs => _effects?.ApiSpecs;
 
     internal EffectMethodResult AnalyzeEffects(
         IMethodSymbol method,

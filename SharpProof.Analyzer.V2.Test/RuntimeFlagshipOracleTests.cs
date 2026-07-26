@@ -32,6 +32,9 @@ public sealed class RuntimeFlagshipOracleTests {
             [ZeroAllocations]
             public static byte[] Allocate() => new byte[64];
 
+            [ZeroAllocations]
+            public static string Concatenate(string value) => value + "proof";
+
             [DoesNotThrow]
             public static int NoThrow(int value) => value + 1;
 
@@ -78,6 +81,7 @@ public sealed class RuntimeFlagshipOracleTests {
             diagnostics,
             ("SP0002", "Writes"),
             ("SP0045", "Allocate"),
+            ("SP0045", "Concatenate"),
             ("SP0046", "Throws"),
             ("SP0016", "DisallowedSync"),
             ("SP0046", "DisallowedException"));
@@ -134,6 +138,18 @@ public sealed class RuntimeFlagshipOracleTests {
             var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
             Assert.That(observedLength, Is.EqualTo(64 * 64));
             Assert.That(allocated, Is.GreaterThanOrEqualTo(64 * 64));
+
+            var concatenate = Delegate<Func<string, string>>(
+                fixture,
+                "Concatenate");
+            _ = concatenate("sharp");
+            before = GC.GetAllocatedBytesForCurrentThread();
+            observedLength = 0;
+            for (var index = 0; index < 64; index++)
+                observedLength += concatenate("sharp").Length;
+            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Assert.That(observedLength, Is.EqualTo(64 * 10));
+            Assert.That(allocated, Is.GreaterThan(0));
 
             AssertThrows<DivideByZeroException>(
                 Delegate<Func<int, int>>(fixture, "Throws"));

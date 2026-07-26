@@ -149,8 +149,12 @@ public sealed class SharpProofWorker : IDisposable {
             Errors = []
         };
         WorkerProtocolJson.Canonicalize(response);
-        if (cache != null)
-            await cache.TryWriteAsync(response, cancellationToken)
+        if (cache != null &&
+            CacheableWorkerResponse.TryCreate(
+                response,
+                snapshot.InputHash,
+                out var cacheable))
+            await cache.TryWriteAsync(cacheable, cancellationToken)
                 .ConfigureAwait(false);
         return response;
     }

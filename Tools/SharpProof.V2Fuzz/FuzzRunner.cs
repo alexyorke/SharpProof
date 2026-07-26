@@ -15,6 +15,36 @@ public sealed record FuzzFailure(
     public string Term => Minimized;
 }
 
+public sealed record FrontendFuzzCoverage(
+    int TextParameters,
+    int StringLiterals,
+    int NullStrings,
+    int StringConcatenations,
+    int StringLengths,
+    int StringCasts,
+    int ArrayLengths,
+    int ArrayIndexes,
+    int DivideByZeroExceptions,
+    int OverflowExceptions,
+    int NullReferenceExceptions,
+    int IndexOutOfRangeExceptions,
+    int InvalidCastExceptions) {
+    public bool HasExpandedCategories =>
+        TextParameters > 0 &&
+        StringLiterals > 0 &&
+        NullStrings > 0 &&
+        StringConcatenations > 0 &&
+        StringLengths > 0 &&
+        StringCasts > 0 &&
+        ArrayLengths > 0 &&
+        ArrayIndexes > 0 &&
+        DivideByZeroExceptions > 0 &&
+        OverflowExceptions > 0 &&
+        NullReferenceExceptions > 0 &&
+        IndexOutOfRangeExceptions > 0 &&
+        InvalidCastExceptions > 0;
+}
+
 public sealed record FuzzSummary(
     int SchemaVersion,
     int Cases,
@@ -25,12 +55,15 @@ public sealed record FuzzSummary(
     int FrontendAgreements,
     int SmtAgreements,
     int PartialSmtAgreements,
+    FrontendFuzzCoverage FrontendCoverage,
+    bool CoverageSatisfied,
     ImmutableArray<FuzzFailure> Failures) {
-    public bool Passed => Failures.IsDefaultOrEmpty;
+    public bool Passed => Failures.IsDefaultOrEmpty && CoverageSatisfied;
 }
 
 public static class FuzzRunner {
     private const int FrontendCompilationBatchSize = 256;
+    private const int PullRequestCoverageBudget = FuzzOptions.DefaultCases;
 
     public static async Task<FuzzSummary> RunAsync(
         FuzzOptions options,
@@ -68,6 +101,12 @@ public static class FuzzRunner {
                 cancellationToken);
             batchResults.CopyTo(frontendResults, offset);
         }
+        var frontendCoverage = CreateFrontendCoverage(
+            frontendCases,
+            frontendResults);
+        var coverageSatisfied =
+            options.Cases < PullRequestCoverageBudget ||
+            HasRequiredFrontendCoverage(frontendCoverage);
         var parallelOptions = new ParallelOptions {
             MaxDegreeOfParallelism = options.MaximumParallelism,
             CancellationToken = cancellationToken
@@ -185,7 +224,7 @@ public static class FuzzRunner {
             });
 
         return new FuzzSummary(
-            SchemaVersion: 2,
+            SchemaVersion: 3,
             options.Cases,
             options.Seed,
             options.MaximumParallelism,
@@ -194,10 +233,102 @@ public static class FuzzRunner {
             frontendAgreements,
             smtAgreements,
             partialSmtAgreements,
+            frontendCoverage,
+            coverageSatisfied,
             [.. failures
                 .OrderBy(static failure => failure.Case)
                 .ThenBy(static failure => failure.Oracle, StringComparer.Ordinal)]);
     }
+
+    private static FrontendFuzzCoverage CreateFrontendCoverage(
+        IReadOnlyList<GeneratedCSharpCase> cases,
+        IReadOnlyList<FrontendDifferentialResult> results) {
+        var textParameters = 0;
+        var stringLiterals = 0;
+        var nullStrings = 0;
+        var stringConcatenations = 0;
+        var stringLengths = 0;
+        var stringCasts = 0;
+        var arrayLengths = 0;
+        var arrayIndexes = 0;
+        foreach (var generated in cases)
+            Count(generated.Expression);
+
+        var divideByZero = 0;
+        var overflow = 0;
+        var nullReference = 0;
+        var indexOutOfRange = 0;
+        var invalidCast = 0;
+        foreach (var result in results) {
+            switch (result.ExceptionKind) {
+                case IrExceptionKind.DivideByZero:
+                    divideByZero++;
+                    break;
+                case IrExceptionKind.Overflow:
+                    overflow++;
+                    break;
+                case IrExceptionKind.NullReference:
+                    nullReference++;
+                    break;
+                case IrExceptionKind.IndexOutOfRange:
+                    indexOutOfRange++;
+                    break;
+                case IrExceptionKind.InvalidCast:
+                    invalidCast++;
+                    break;
+            }
+        }
+        return new FrontendFuzzCoverage(
+            textParameters,
+            stringLiterals,
+            nullStrings,
+            stringConcatenations,
+            stringLengths,
+            stringCasts,
+            arrayLengths,
+            arrayIndexes,
+            divideByZero,
+            overflow,
+            nullReference,
+            indexOutOfRange,
+            invalidCast);
+
+        void Count(GeneratedCSharpExpression expression) {
+            switch (expression.Kind) {
+                case GeneratedExpressionKind.TextParameter:
+                    textParameters++;
+                    break;
+                case GeneratedExpressionKind.StringLiteral:
+                    stringLiterals++;
+                    break;
+                case GeneratedExpressionKind.NullString:
+                    nullStrings++;
+                    break;
+                case GeneratedExpressionKind.StringConcat:
+                    stringConcatenations++;
+                    break;
+                case GeneratedExpressionKind.Length
+                    when expression.Children[0].Type ==
+                         GeneratedExpressionType.String:
+                    stringLengths++;
+                    break;
+                case GeneratedExpressionKind.Length:
+                    arrayLengths++;
+                    break;
+                case GeneratedExpressionKind.CastToString:
+                    stringCasts++;
+                    break;
+                case GeneratedExpressionKind.ArrayIndex:
+                    arrayIndexes++;
+                    break;
+            }
+            foreach (var child in expression.Children) Count(child);
+        }
+    }
+
+    private static bool HasRequiredFrontendCoverage(
+        FrontendFuzzCoverage coverage) =>
+        coverage.HasExpandedCategories;
 
     private static IrTerm CreateTotalFiniteDomainFormula(
         IrFactory factory,
@@ -208,7 +339,7 @@ public static class FuzzRunner {
             unchecked(caseSeed ^ 0x6C8E9CF5));
         for (var attempt = 0; attempt < 64; attempt++) {
             cancellationToken.ThrowIfCancellationRequested();
-            var generated = generator.Next(maximumDepth: 3);
+            var generated = generator.NextArithmeticOrBoolean(maximumDepth: 3);
             var formula = generated.Term.Type == factory.BooleanType
                 ? generated.Term
                 : factory.Binary(

@@ -100,7 +100,7 @@ internal sealed class OperationEffectScanner {
                     increment.IsChecked
                         ? EffectSummaryOperations.Throw(
                             _session.ResolveExceptionSet(
-                                "System.OverflowException"))
+                                FrameworkTypeMetadataNames.OverflowException))
                         : EffectSummary.Empty,
                     ScanOperatorCall(
                         increment.OperatorMethod,
@@ -212,12 +212,12 @@ internal sealed class OperationEffectScanner {
                          element.ArrayReference.Type is IArrayTypeSymbol arrayType &&
                          !arrayType.ElementType.IsValueType
             ? _session.ResolveExceptionSet(
-                "System.NullReferenceException",
-                "System.IndexOutOfRangeException",
-                "System.ArrayTypeMismatchException")
+                FrameworkTypeMetadataNames.NullReferenceException,
+                FrameworkTypeMetadataNames.IndexOutOfRangeException,
+                FrameworkTypeMetadataNames.ArrayTypeMismatchException)
             : _session.ResolveExceptionSet(
-                "System.NullReferenceException",
-                "System.IndexOutOfRangeException");
+                FrameworkTypeMetadataNames.NullReferenceException,
+                FrameworkTypeMetadataNames.IndexOutOfRangeException);
         return EffectSummaryOperations.Join(
             Scan(element.ArrayReference),
             ScanMany(element.Indices),
@@ -285,7 +285,7 @@ internal sealed class OperationEffectScanner {
                 exceptions,
                 EffectSummaryOperations.Throw(
                     _session.ResolveExceptionSet(
-                        "System.OverflowException")));
+                        FrameworkTypeMetadataNames.OverflowException)));
         return EffectSummaryOperations.Join(
             Scan(assignment.Target, EffectAccess.Read),
             Scan(assignment.Value),
@@ -305,11 +305,11 @@ internal sealed class OperationEffectScanner {
         return IsSignedIntegral(type)
             ? EffectSummaryOperations.Throw(
                 _session.ResolveExceptionSet(
-                    "System.DivideByZeroException",
-                    "System.OverflowException"))
+                    FrameworkTypeMetadataNames.DivideByZeroException,
+                    FrameworkTypeMetadataNames.OverflowException))
             : EffectSummaryOperations.Throw(
                 _session.ResolveExceptionSet(
-                    "System.DivideByZeroException"));
+                    FrameworkTypeMetadataNames.DivideByZeroException));
     }
 
     private EffectSummary ScanInvocation(IInvocationOperation invocation) {
@@ -360,17 +360,21 @@ internal sealed class OperationEffectScanner {
     }
 
     private EffectSummary ScanBinary(IBinaryOperation binary) {
-        var exceptions = IntegralDivisionExceptions(
-            binary.OperatorKind,
-            binary.Type);
+        var exceptions =
+            IntegralDivisionExceptions(binary.OperatorKind, binary.Type);
         if (binary.IsChecked)
             exceptions = EffectSummaryOperations.Join(
                 exceptions,
                 EffectSummaryOperations.Throw(
-                    _session.ResolveExceptionSet("System.OverflowException")));
+                    _session.ResolveExceptionSet(FrameworkTypeMetadataNames.OverflowException)));
         return EffectSummaryOperations.Join(
             Scan(binary.LeftOperand),
             Scan(binary.RightOperand),
+            binary.OperatorKind == BinaryOperatorKind.Add &&
+            binary.Type?.SpecialType == SpecialType.System_String &&
+            !binary.ConstantValue.HasValue
+                ? EffectSummaryOperations.Allocate(EffectAllocationKind.Managed)
+                : EffectSummary.Empty,
             exceptions,
             ScanOperatorCall(
                 binary.OperatorMethod,
@@ -383,7 +387,8 @@ internal sealed class OperationEffectScanner {
             Scan(unary.Operand),
             unary.IsChecked
                 ? EffectSummaryOperations.Throw(
-                    _session.ResolveExceptionSet("System.OverflowException"))
+                    _session.ResolveExceptionSet(
+                        FrameworkTypeMetadataNames.OverflowException))
                 : EffectSummary.Empty,
             ScanOperatorCall(
                 unary.OperatorMethod,
@@ -426,14 +431,15 @@ internal sealed class OperationEffectScanner {
         if (conversion.IsUnboxing)
             return EffectSummaryOperations.Throw(
                 _session.ResolveExceptionSet(
-                    "System.InvalidCastException",
-                    "System.NullReferenceException"));
+                    FrameworkTypeMetadataNames.InvalidCastException,
+                    FrameworkTypeMetadataNames.NullReferenceException));
         if (conversion.IsUserDefined)
             return ClassifyNullableAndCheckedConversion(operation);
         if (conversion.IsReference)
             return conversion.IsExplicit && !operation.IsTryCast
                 ? EffectSummaryOperations.Throw(
-                    _session.ResolveExceptionSet("System.InvalidCastException"))
+                    _session.ResolveExceptionSet(
+                        FrameworkTypeMetadataNames.InvalidCastException))
                 : EffectSummary.Empty;
         if (conversion.IsNullable)
             return ClassifyNullableAndCheckedConversion(operation);
@@ -468,7 +474,7 @@ internal sealed class OperationEffectScanner {
                 result,
                 EffectSummaryOperations.Throw(
                     _session.ResolveExceptionSet(
-                        "System.InvalidOperationException")));
+                        FrameworkTypeMetadataNames.InvalidOperationException)));
         return result;
     }
 
@@ -476,7 +482,8 @@ internal sealed class OperationEffectScanner {
         IConversionOperation operation) =>
         operation.IsChecked
             ? EffectSummaryOperations.Throw(
-                _session.ResolveExceptionSet("System.OverflowException"))
+                _session.ResolveExceptionSet(
+                    FrameworkTypeMetadataNames.OverflowException))
             : EffectSummary.Empty;
 
     private EffectSummary ScanOperatorCall(
@@ -516,7 +523,8 @@ internal sealed class OperationEffectScanner {
             instance.Type is { IsValueType: true })
             return EffectSummary.Empty;
         return EffectSummaryOperations.Throw(
-            _session.ResolveExceptionSet("System.NullReferenceException"));
+            _session.ResolveExceptionSet(
+                FrameworkTypeMetadataNames.NullReferenceException));
     }
 
     private EffectSummary PotentialNullLock(IOperation value) =>
@@ -524,7 +532,7 @@ internal sealed class OperationEffectScanner {
             ? EffectSummary.Empty
             : EffectSummaryOperations.Throw(
                 _session.ResolveExceptionSet(
-                    "System.ArgumentNullException"));
+                    FrameworkTypeMetadataNames.ArgumentNullException));
 
     private static bool IsDefinitelyNonNull(IOperation operation) {
         while (operation is IConversionOperation conversion &&
@@ -548,7 +556,7 @@ internal sealed class OperationEffectScanner {
             ? EffectSummary.Empty
             : EffectSummaryOperations.Throw(
                 _session.ResolveExceptionSet(
-                    "System.OverflowException"));
+                    FrameworkTypeMetadataNames.OverflowException));
 
     private static bool IsDefinitelyNonNegative(IOperation operation) {
         if (!operation.ConstantValue.HasValue ||

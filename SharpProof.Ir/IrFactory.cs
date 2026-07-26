@@ -176,7 +176,14 @@ public sealed class IrFactory {
             if (_memberIds.TryGetValue(key, out var existing)) return existing;
             var id = new IrMemberId(_scope, _members.Count);
             _memberIds.Add(key, id);
-            _members.Add(new IrMemberInfo(id, declaringType, nameId, returnType, isStatic, parameters));
+            _members.Add(new IrMemberInfo(
+                id,
+                identity,
+                declaringType,
+                nameId,
+                returnType,
+                isStatic,
+                parameters));
             return id;
         }
     }

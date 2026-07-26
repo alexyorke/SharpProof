@@ -19,15 +19,31 @@ internal sealed class ExternalEffectResolver {
 
     internal ExternalEffectResolver(
         Compilation compilation,
-        ApiSpecTable apiSpecs) {
-        _compilation = compilation;
+        ApiSpecTable apiSpecs)
+        : this(
+            compilation,
+            new ApiSpecResolver(
+                    apiSpecs ?? throw new ArgumentNullException(nameof(apiSpecs)))
+                .Resolve(
+                    compilation ??
+                    throw new ArgumentNullException(nameof(compilation)))) {
+    }
+
+    internal ExternalEffectResolver(
+        Compilation compilation,
+        ResolvedApiSpecTable apiSpecs) {
+        _compilation = compilation ??
+            throw new ArgumentNullException(nameof(compilation));
         _effectContractAttribute = compilation.GetTypeByMetadataName(
             "SharpProof.Attributes.EffectContractAttribute");
-        _exceptionType = compilation.GetTypeByMetadataName("System.Exception");
+        _exceptionType = compilation.GetTypeByMetadataName(
+            FrameworkTypeMetadataNames.Exception);
         _trustedAttribute = compilation.GetTypeByMetadataName(
             "SharpProof.Attributes.SharpProofTrustedAttribute");
-        _specs = new ApiSpecResolver(apiSpecs).Resolve(compilation);
+        _specs = apiSpecs ?? throw new ArgumentNullException(nameof(apiSpecs));
     }
+
+    internal ResolvedApiSpecTable ApiSpecs => _specs;
 
     internal EffectSummary Resolve(IMethodSymbol method) {
         if (TryResolveContract(method, out var contract))

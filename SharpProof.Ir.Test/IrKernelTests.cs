@@ -620,6 +620,44 @@ public sealed class IrKernelTests {
     }
 
     [Test]
+    public void InterpreterUsesConcreteStringReferenceTypeForStringCasts() {
+        var factory = new IrFactory();
+        var source = factory.CreateVariable("source", factory.ObjectType);
+        var cast = factory.Cast(
+            factory.StringType,
+            factory.Variable(source));
+        var interpreter = new IrInterpreter(factory);
+
+        var succeeded = interpreter.Evaluate(
+            cast,
+            new Dictionary<IrVarId, IrValue> {
+                [source] = factory.CreateReferenceValue(
+                    factory.ObjectType,
+                    "sharp")
+            });
+        var failed = interpreter.Evaluate(
+            cast,
+            new Dictionary<IrVarId, IrValue> {
+                [source] = factory.CreateReferenceValue(
+                    factory.ObjectType,
+                    new object())
+            });
+        var concatNull = interpreter.Evaluate(
+            factory.Binary(
+                IrBinaryOperator.StringConcat,
+                factory.Null(factory.StringType),
+                factory.String("proof")));
+
+        Assert.That(succeeded.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(succeeded.Value!.String, Is.EqualTo("sharp"));
+        Assert.That(failed.Status, Is.EqualTo(IrEvaluationStatus.Exception));
+        Assert.That(
+            failed.Exception!.Kind,
+            Is.EqualTo(IrExceptionKind.InvalidCast));
+        Assert.That(concatNull.Value!.String, Is.EqualTo("proof"));
+    }
+
+    [Test]
     public void InterpreterEvaluatesOperandsBeforeOpaqueAbstention() {
         var factory = new IrFactory();
         var receiverType = factory.GetOrCreateReferenceType(

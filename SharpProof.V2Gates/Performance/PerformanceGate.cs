@@ -3,8 +3,10 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using SharpProof.Analyzer;
 
@@ -14,6 +16,7 @@ public sealed record PerformanceGateResult(
     bool Passed,
     int Warmups,
     int Samples,
+    int DefaultOffAnalyzerDriverRunCount,
     double MedianRatio,
     double P95Ratio,
     long BaselineRetainedBytes,
@@ -31,7 +34,6 @@ public sealed record PerformanceGateResult(
     ImmutableArray<string> Failures);
 
 public static class PerformanceGate {
-    private const int TimingIterationsPerSample = 50;
     private const int RetainedCompilationCount = 40;
 
     public static async Task<PerformanceGateResult> RunAsync(
@@ -40,53 +42,24 @@ public static class PerformanceGate {
         var contract = AcceptancePerformanceContract.Load(repositoryRoot);
         ValidateContract(contract);
         var source = CreateDefaultOffSource(320);
-        var compilation = AnalyzerGateHost.CreateCompilation(
+        ValidateDefaultOffPackagePolicy(repositoryRoot);
+        var configurationProbe = MeasureDefaultOffAnalyzerBatch(
             source,
-            "DefaultOffPerformance");
-
-        for (var index = 0; index < contract.Warmups; index++) {
-            cancellationToken.ThrowIfCancellationRequested();
-            MeasureNoAnalyzerBatch(
-                source,
-                "Baseline",
-                TimingIterationsPerSample,
-                cancellationToken);
-            MeasureNoAnalyzerBatch(
-                source,
-                "DefaultOff",
-                TimingIterationsPerSample,
-                cancellationToken);
-        }
-
-        var baselineTimes = new double[contract.Samples];
-        var defaultOffTimes = new double[contract.Samples];
-        for (var index = 0; index < contract.Samples; index++) {
-            cancellationToken.ThrowIfCancellationRequested();
-            if ((index & 1) == 0) {
-                baselineTimes[index] = MeasureNoAnalyzerBatch(
+            "DefaultOffConfigurationProbe",
+            iterations: 1,
+            cancellationToken);
+        var defaultOffAnalyzerDriverRuns =
+            configurationProbe.AnalyzerDriverRunCount;
+        var packageBuildTiming =
+            await MeasureDefaultOffPackageBuildsAsync(
+                    repositoryRoot,
                     source,
-                    "Baseline",
-                    TimingIterationsPerSample,
-                    cancellationToken);
-                defaultOffTimes[index] = MeasureNoAnalyzerBatch(
-                    source,
-                    "DefaultOff",
-                    TimingIterationsPerSample,
-                    cancellationToken);
-            }
-            else {
-                defaultOffTimes[index] = MeasureNoAnalyzerBatch(
-                    source,
-                    "DefaultOff",
-                    TimingIterationsPerSample,
-                    cancellationToken);
-                baselineTimes[index] = MeasureNoAnalyzerBatch(
-                    source,
-                    "Baseline",
-                    TimingIterationsPerSample,
-                    cancellationToken);
-            }
-        }
+                    contract.Warmups,
+                    contract.Samples,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        var baselineTimes = packageBuildTiming.BaselineMilliseconds;
+        var defaultOffTimes = packageBuildTiming.DefaultOffMilliseconds;
 
         var medianRatio = Ratio(
             Percentile(defaultOffTimes, 0.50),
@@ -96,14 +69,14 @@ public static class PerformanceGate {
             Percentile(baselineTimes, 0.95));
 
         WarmRetentionPaths(
-            compilation,
+            source,
             contract.Warmups,
             cancellationToken);
-        var baselineRetained = MeasureNoAnalyzerRetainedBytes(
+        var baselineRetained = MeasureCompilerOnlyRetainedBytes(
             source,
             "Baseline",
             cancellationToken);
-        var defaultOffRetained = MeasureNoAnalyzerRetainedBytes(
+        var defaultOffRetained = MeasureDefaultOffAnalyzerRetainedBytes(
             source,
             "DefaultOff",
             cancellationToken);
@@ -172,6 +145,7 @@ public static class PerformanceGate {
             failures.Count == 0,
             contract.Warmups,
             contract.Samples,
+            defaultOffAnalyzerDriverRuns,
             medianRatio,
             p95Ratio,
             baselineRetained,
@@ -189,21 +163,40 @@ public static class PerformanceGate {
             failures.ToImmutable());
     }
 
-    private static double MeasureNoAnalyzerBatch(
-        string source,
-        string kind,
-        int iterations,
-        CancellationToken cancellationToken) {
+    internal static DefaultOffBatchMeasurement
+        MeasureDefaultOffAnalyzerBatch(
+            string source,
+            string kind,
+            int iterations,
+            CancellationToken cancellationToken = default) {
+        if (iterations <= 0)
+            throw new ArgumentOutOfRangeException(nameof(iterations));
+        var sessionFactory = new RejectingSessionFactory();
+        var analyzer = new SharpProofAnalyzer(sessionFactory);
+        var diagnosticCount = 0;
         var stopwatch = Stopwatch.StartNew();
         for (var index = 0; index < iterations; index++) {
+            cancellationToken.ThrowIfCancellationRequested();
             var compilation = CreateTimingCompilation(
                 source,
                 kind,
                 index);
             _ = compilation.GetDiagnostics(cancellationToken);
+            diagnosticCount += AnalyzeDefaultOff(
+                compilation,
+                analyzer,
+                cancellationToken);
         }
         stopwatch.Stop();
-        return stopwatch.Elapsed.TotalMilliseconds / iterations;
+        if (diagnosticCount != 0 || sessionFactory.CreateCount != 0)
+            throw new InvalidOperationException(
+                "Default-off analysis produced diagnostics or created an " +
+                "analysis session.");
+        return new DefaultOffBatchMeasurement(
+            stopwatch.Elapsed.TotalMilliseconds / iterations,
+            iterations,
+            diagnosticCount,
+            sessionFactory.CreateCount);
     }
 
     private static Compilation CreateTimingCompilation(
@@ -217,18 +210,239 @@ public static class PerformanceGate {
             "_" +
             index.ToString(CultureInfo.InvariantCulture));
 
+    private static async Task<PackageBuildTiming>
+        MeasureDefaultOffPackageBuildsAsync(
+            string repositoryRoot,
+            string source,
+            int warmups,
+            int samples,
+            CancellationToken cancellationToken) {
+        var probeParent = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.V2Gates.Performance");
+        var probeRoot = Path.Combine(
+            probeParent,
+            Guid.NewGuid().ToString("N"));
+        var baselineDirectory = Path.Combine(probeRoot, "baseline");
+        var defaultOffDirectory = Path.Combine(probeRoot, "default-off");
+        Directory.CreateDirectory(baselineDirectory);
+        Directory.CreateDirectory(defaultOffDirectory);
+        try {
+            var baselineProject = CreatePerformanceProbeProject(
+                baselineDirectory,
+                source,
+                repositoryRoot,
+                importSharpProof: false);
+            var defaultOffProject = CreatePerformanceProbeProject(
+                defaultOffDirectory,
+                source,
+                repositoryRoot,
+                importSharpProof: true);
+            await RunDotnetAsync(
+                    baselineProject,
+                    restore: true,
+                    symbol: null,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await RunDotnetAsync(
+                    defaultOffProject,
+                    restore: true,
+                    symbol: null,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            for (var index = 0; index < warmups; index++)
+                await RunBuildPairAsync(
+                        baselineProject,
+                        defaultOffProject,
+                        $"SHARPPROOF_WARMUP_{index}",
+                        defaultFirst: (index & 1) != 0,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+            var baseline = new double[samples];
+            var defaultOff = new double[samples];
+            for (var index = 0; index < samples; index++) {
+                var pair = await RunBuildPairAsync(
+                        baselineProject,
+                        defaultOffProject,
+                        $"SHARPPROOF_SAMPLE_{index}",
+                        defaultFirst: (index & 1) != 0,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                baseline[index] = pair.BaselineMilliseconds;
+                defaultOff[index] = pair.DefaultOffMilliseconds;
+            }
+            return new PackageBuildTiming(baseline, defaultOff);
+        }
+        finally {
+            var resolvedRoot = Path.GetFullPath(probeRoot);
+            var resolvedParent = Path.GetFullPath(probeParent);
+            if (!resolvedRoot.StartsWith(
+                    resolvedParent + Path.DirectorySeparatorChar,
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "Refusing to remove an unexpected performance probe.");
+            if (Directory.Exists(resolvedRoot))
+                Directory.Delete(resolvedRoot, recursive: true);
+        }
+    }
+
+    private static string CreatePerformanceProbeProject(
+        string directory,
+        string source,
+        string repositoryRoot,
+        bool importSharpProof) {
+        File.WriteAllText(
+            Path.Combine(directory, "Subject.cs"),
+            source,
+            new UTF8Encoding(false));
+        var props = System.Security.SecurityElement.Escape(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Package",
+            "buildTransitive",
+            "SharpProof.props"));
+        var targets = System.Security.SecurityElement.Escape(Path.Combine(
+            repositoryRoot,
+            "SharpProof.Package",
+            "buildTransitive",
+            "SharpProof.targets"));
+        var imports = importSharpProof
+            ? ($"""<Import Project="{props}" />""" + Environment.NewLine,
+               Environment.NewLine + $"""<Import Project="{targets}" />""")
+            : (string.Empty, string.Empty);
+        var project = Path.Combine(directory, "Probe.csproj");
+        File.WriteAllText(
+            project,
+            $"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              {imports.Item1}<PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+                <LangVersion>12.0</LangVersion>
+                <Deterministic>true</Deterministic>
+                <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
+              </PropertyGroup>{imports.Item2}
+            </Project>
+            """,
+            new UTF8Encoding(false));
+        return project;
+    }
+
+    private static async Task<PackageBuildPair> RunBuildPairAsync(
+        string baselineProject,
+        string defaultOffProject,
+        string symbol,
+        bool defaultFirst,
+        CancellationToken cancellationToken) {
+        if (defaultFirst) {
+            var defaultOff = await RunDotnetAsync(
+                    defaultOffProject,
+                    restore: false,
+                    symbol,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            var baseline = await RunDotnetAsync(
+                    baselineProject,
+                    restore: false,
+                    symbol,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            return new PackageBuildPair(baseline, defaultOff);
+        }
+        else {
+            var baseline = await RunDotnetAsync(
+                    baselineProject,
+                    restore: false,
+                    symbol,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            var defaultOff = await RunDotnetAsync(
+                    defaultOffProject,
+                    restore: false,
+                    symbol,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            return new PackageBuildPair(baseline, defaultOff);
+        }
+    }
+
+    private static async Task<double> RunDotnetAsync(
+        string project,
+        bool restore,
+        string? symbol,
+        CancellationToken cancellationToken) {
+        var startInfo = new ProcessStartInfo {
+            FileName = "dotnet",
+            WorkingDirectory = Path.GetDirectoryName(project)!,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add(restore ? "restore" : "build");
+        startInfo.ArgumentList.Add(project);
+        startInfo.ArgumentList.Add("--nologo");
+        startInfo.ArgumentList.Add("/nodeReuse:false");
+        startInfo.ArgumentList.Add("-p:UseSharedCompilation=false");
+        if (!restore) {
+            startInfo.ArgumentList.Add("--no-restore");
+            startInfo.ArgumentList.Add("-c");
+            startInfo.ArgumentList.Add("Release");
+            startInfo.ArgumentList.Add("-t:Rebuild");
+            startInfo.ArgumentList.Add("-p:DefineConstants=" + symbol);
+        }
+        using var process = Process.Start(startInfo) ??
+            throw new InvalidOperationException(
+                "The performance probe process did not start.");
+        var standardOutput = process.StandardOutput.ReadToEndAsync();
+        var standardError = process.StandardError.ReadToEndAsync();
+        var stopwatch = Stopwatch.StartNew();
+        try {
+            await process.WaitForExitAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch {
+            if (!process.HasExited)
+                process.Kill(entireProcessTree: true);
+            throw;
+        }
+        stopwatch.Stop();
+        var output = (await standardOutput.ConfigureAwait(false)) +
+                     Environment.NewLine +
+                     (await standardError.ConfigureAwait(false));
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException(
+                $"The default-off package performance probe failed:{Environment.NewLine}" +
+                output);
+        return stopwatch.Elapsed.TotalMilliseconds;
+    }
+
     private static void WarmRetentionPaths(
-        Compilation compilation,
+        string source,
         int warmups,
         CancellationToken cancellationToken) {
+        var sessionFactory = new RejectingSessionFactory();
+        var analyzer = new SharpProofAnalyzer(sessionFactory);
         for (var index = 0; index < warmups; index++) {
-            _ = compilation.GetDiagnostics(cancellationToken);
-            _ = compilation.GetDiagnostics(cancellationToken);
+            var baseline = AnalyzerGateHost.CreateCompilation(
+                source,
+                $"RetentionBaselineWarmup_{index}");
+            _ = baseline.GetDiagnostics(cancellationToken);
+            var defaultOff = AnalyzerGateHost.CreateCompilation(
+                source,
+                $"RetentionDefaultOffWarmup_{index}");
+            _ = defaultOff.GetDiagnostics(cancellationToken);
+            _ = AnalyzeDefaultOff(
+                defaultOff,
+                analyzer,
+                cancellationToken);
         }
+        if (sessionFactory.CreateCount != 0)
+            throw new InvalidOperationException(
+                "Default-off retention warmup created an analysis session.");
         ForceCollection();
     }
 
-    private static long MeasureNoAnalyzerRetainedBytes(
+    private static long MeasureCompilerOnlyRetainedBytes(
         string source,
         string kind,
         CancellationToken cancellationToken) {
@@ -248,6 +462,53 @@ public static class PerformanceGate {
         GC.KeepAlive(retained);
         return Math.Max(1, after - before);
     }
+
+    private static long MeasureDefaultOffAnalyzerRetainedBytes(
+        string source,
+        string kind,
+        CancellationToken cancellationToken) {
+        ForceCollection();
+        var before = GC.GetTotalMemory(forceFullCollection: true);
+        var retained = new List<Compilation>(RetainedCompilationCount);
+        var sessionFactory = new RejectingSessionFactory();
+        var analyzer = new SharpProofAnalyzer(sessionFactory);
+        var diagnosticCount = 0;
+        for (var index = 0; index < RetainedCompilationCount; index++) {
+            cancellationToken.ThrowIfCancellationRequested();
+            var compilation = AnalyzerGateHost.CreateCompilation(
+                source,
+                $"Retained_{kind}_{index}");
+            _ = compilation.GetDiagnostics(cancellationToken);
+            diagnosticCount += AnalyzeDefaultOff(
+                compilation,
+                analyzer,
+                cancellationToken);
+            retained.Add(compilation);
+        }
+        if (diagnosticCount != 0 || sessionFactory.CreateCount != 0)
+            throw new InvalidOperationException(
+                "Default-off retention produced diagnostics or created an " +
+                "analysis session.");
+        ForceCollection();
+        var after = GC.GetTotalMemory(forceFullCollection: true);
+        GC.KeepAlive(retained);
+        GC.KeepAlive(analyzer);
+        return Math.Max(1, after - before);
+    }
+
+    private static int AnalyzeDefaultOff(
+        Compilation compilation,
+        DiagnosticAnalyzer analyzer,
+        CancellationToken cancellationToken) =>
+        AnalyzerGateHost.AnalyzeAsync(
+                compilation,
+                analyzer,
+                mode: null,
+                concurrentAnalysis: true,
+                cancellationToken)
+            .GetAwaiter()
+            .GetResult()
+            .Length;
 
     private static void WarmEnabledAnalyzerRetentionPaths(
         int warmups,
@@ -330,15 +591,23 @@ public static class PerformanceGate {
         if (markerStart < 0)
             throw new InvalidOperationException("IDE edit marker is missing.");
         var analyzer = new SharpProofAnalyzer();
+        var currentCompilation = compilation;
+        var currentTree = tree;
+        var currentlyAllocates = false;
 
         for (var index = 0; index < contract.Warmups; index++) {
-            var allocates = (index & 1) != 0;
-            var warmText = tree.GetText(cancellationToken).WithChanges(
+            var allocates = !currentlyAllocates;
+            var currentMarker = currentlyAllocates
+                ? "return new object();"
+                : marker;
+            var warmText = currentTree.GetText(cancellationToken).WithChanges(
                 new TextChange(
-                    new TextSpan(markerStart, marker.Length),
+                    new TextSpan(markerStart, currentMarker.Length),
                     allocates ? "return new object();" : marker));
-            var warmTree = tree.WithChangedText(warmText);
-            var warmCompilation = compilation.ReplaceSyntaxTree(tree, warmTree);
+            var warmTree = currentTree.WithChangedText(warmText);
+            var warmCompilation = currentCompilation.ReplaceSyntaxTree(
+                currentTree,
+                warmTree);
             var diagnostics = await AnalyzerGateHost.AnalyzeAsync(
                     warmCompilation,
                     analyzer,
@@ -347,22 +616,28 @@ public static class PerformanceGate {
                     cancellationToken)
                 .ConfigureAwait(false);
             ValidateIdeDiagnostics(diagnostics, allocates, index, "warmup");
+            currentTree = warmTree;
+            currentCompilation = warmCompilation;
+            currentlyAllocates = allocates;
         }
 
         var latencies = new double[contract.IdeEdits];
         var diagnosticFailures = ImmutableArray.CreateBuilder<string>();
         for (var index = 0; index < latencies.Length; index++) {
             cancellationToken.ThrowIfCancellationRequested();
-            var allocates = (index & 1) != 0;
+            var allocates = !currentlyAllocates;
             var replacement = allocates ? "return new object();" : marker;
+            var currentMarker = currentlyAllocates
+                ? "return new object();"
+                : marker;
             var stopwatch = Stopwatch.StartNew();
-            var changedText = tree.GetText(cancellationToken).WithChanges(
+            var changedText = currentTree.GetText(cancellationToken).WithChanges(
                 new TextChange(
-                    new TextSpan(markerStart, marker.Length),
+                    new TextSpan(markerStart, currentMarker.Length),
                     replacement));
-            var changedTree = tree.WithChangedText(changedText);
-            var changedCompilation = compilation.ReplaceSyntaxTree(
-                tree,
+            var changedTree = currentTree.WithChangedText(changedText);
+            var changedCompilation = currentCompilation.ReplaceSyntaxTree(
+                currentTree,
                 changedTree);
             var diagnostics = await AnalyzerGateHost.AnalyzeAsync(
                     changedCompilation,
@@ -383,6 +658,9 @@ public static class PerformanceGate {
             catch (InvalidOperationException exception) {
                 diagnosticFailures.Add(exception.Message);
             }
+            currentTree = changedTree;
+            currentCompilation = changedCompilation;
+            currentlyAllocates = allocates;
         }
         return new IdeEditMeasurement(
             latencies,
@@ -530,11 +808,151 @@ public static class PerformanceGate {
                 "The v2 performance limits must be positive.");
     }
 
+    internal static void ValidateDefaultOffPackagePolicy(
+        string repositoryRoot) {
+        var packageRoot = Path.Combine(
+            repositoryRoot,
+            "SharpProof.Package",
+            "buildTransitive");
+        var props = XDocument.Load(Path.Combine(
+            packageRoot,
+            "SharpProof.props"));
+        var targets = XDocument.Load(Path.Combine(
+            packageRoot,
+            "SharpProof.targets"));
+        ValidateDefaultOffPackagePolicy(props, targets);
+    }
+
+    internal static void ValidateDefaultOffPackagePolicy(
+        XDocument props,
+        XDocument targets) {
+        var mode = props.Descendants("SharpProofMode").SingleOrDefault(
+            static element =>
+                string.Equals(
+                    (string?)element.Attribute("Condition"),
+                    "'$(SharpProofMode)' == ''",
+                    StringComparison.Ordinal));
+        var verify = props.Descendants("SharpProofVerify").SingleOrDefault(
+            static element =>
+                string.Equals(
+                    (string?)element.Attribute("Condition"),
+                    "'$(SharpProofVerify)' == ''",
+                    StringComparison.Ordinal));
+        var analyzerGroup = targets.Descendants("ItemGroup")
+            .SingleOrDefault(static group =>
+                group.Elements("Analyzer").Any());
+        var verifierTarget = targets.Descendants("Target")
+            .SingleOrDefault(static target =>
+                string.Equals(
+                    (string?)target.Attribute("Name"),
+                    "SharpProofVerify",
+                    StringComparison.Ordinal));
+        var verifierCore = targets.Descendants("Target")
+            .SingleOrDefault(static target =>
+                string.Equals(
+                    (string?)target.Attribute("Name"),
+                    "_SharpProofVerifyCore",
+                    StringComparison.Ordinal));
+        var normalizedCondition = NormalizeMsBuildCondition(
+            (string?)analyzerGroup?.Attribute("Condition"));
+        var normalizedVerifierCondition = NormalizeMsBuildCondition(
+            (string?)verifierTarget?.Attribute("Condition"));
+        const string expectedVerifierCondition =
+            "'$(SharpProofVerify)'=='true'AND'$(OS)'=='Windows_NT'AND" +
+            "'$(DesignTimeBuild)'!='true'AND'$(BuildingProject)'!='false'";
+        var unexpectedCoreDependency = targets.Descendants("Target")
+            .Where(target => !ReferenceEquals(target, verifierTarget))
+            .Any(target => SplitTargetList(
+                    (string?)target.Attribute("DependsOnTargets"))
+                .Contains(
+                    "_SharpProofVerifyCore",
+                    StringComparer.Ordinal));
+        var callTargetInvokesCore = targets.Descendants("CallTarget")
+            .Any(call => SplitTargetList(
+                    (string?)call.Attribute("Targets"))
+                .Contains(
+                    "_SharpProofVerifyCore",
+                    StringComparer.Ordinal));
+        var verifierExec = targets.Descendants("Exec").ToArray();
+        if (!string.Equals(mode?.Value, "off", StringComparison.Ordinal) ||
+            !string.Equals(verify?.Value, "false", StringComparison.Ordinal) ||
+            !string.Equals(
+                normalizedCondition,
+                "'$(_SharpProofModeNormalized)'!='off'",
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                normalizedVerifierCondition,
+                expectedVerifierCondition,
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                (string?)verifierTarget?.Attribute("AfterTargets"),
+                "CoreCompile",
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                (string?)verifierTarget?.Attribute("DependsOnTargets"),
+                "_SharpProofInitializeVerify;_SharpProofVerifyCore",
+                StringComparison.Ordinal) ||
+            verifierCore == null ||
+            verifierCore.Attribute("BeforeTargets") != null ||
+            verifierCore.Attribute("AfterTargets") != null ||
+            unexpectedCoreDependency ||
+            callTargetInvokesCore ||
+            verifierExec.Length != 1 ||
+            !ReferenceEquals(
+                verifierExec[0].Ancestors("Target").SingleOrDefault(),
+                verifierCore)) {
+            throw new InvalidDataException(
+                "The package must omit the analyzer and verifier in its " +
+                "default-off configuration.");
+        }
+    }
+
+    private static string NormalizeMsBuildCondition(string? condition) =>
+        string.Concat((condition ?? string.Empty)
+            .Where(static character => !char.IsWhiteSpace(character)));
+
+    private static ImmutableArray<string> SplitTargetList(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? []
+            : [.. value.Split(
+                    [';'],
+                    StringSplitOptions.RemoveEmptyEntries)
+                .Select(static target => target.Trim())
+                .Where(static target => target.Length != 0)];
+
     private sealed record EnabledAnalyzerRetentionMeasurement(
         int RetainedCompilationCount,
         double RetainedMemoryIncreaseMiB);
 
+    private sealed record PackageBuildTiming(
+        double[] BaselineMilliseconds,
+        double[] DefaultOffMilliseconds);
+
+    private readonly record struct PackageBuildPair(
+        double BaselineMilliseconds,
+        double DefaultOffMilliseconds);
+
+    internal sealed record DefaultOffBatchMeasurement(
+        double MeanMilliseconds,
+        int AnalyzerDriverRunCount,
+        int DiagnosticCount,
+        int AnalysisSessionCreateCount);
+
     private sealed record IdeEditMeasurement(
         double[] Latencies,
         ImmutableArray<string> DiagnosticFailures);
+
+    private sealed class RejectingSessionFactory : IAnalyzerSessionFactory {
+        internal int CreateCount { get; private set; }
+
+        public AnalyzerSession Create(
+            Compilation compilation,
+            SharpProof.Analyzer.Configuration.AnalyzerConfiguration configuration,
+            CancellationToken cancellationToken) {
+            CreateCount++;
+            throw new InvalidOperationException(
+                "Default-off analysis must not create an analysis session.");
+        }
+    }
+
 }

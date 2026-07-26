@@ -37,7 +37,12 @@ internal sealed class VerificationCache(
                 }
                 var response = WorkerProtocolJson.DeserializeResponse(
                     envelope.Payload);
-                if (!IsCacheable(response, inputHash)) return null;
+                if (response == null ||
+                    !CacheableWorkerResponse.TryCreate(
+                        response,
+                        inputHash,
+                        out _))
+                    return null;
                 File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
                 return response;
             }
@@ -54,18 +59,18 @@ internal sealed class VerificationCache(
     }
 
     internal async Task TryWriteAsync(
-        WorkerVerifyResponse response,
+        CacheableWorkerResponse response,
         CancellationToken cancellationToken) {
-        if (!IsCacheable(response, response.InputHash)) return;
+        if (response == null)
+            throw new ArgumentNullException(nameof(response));
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             Directory.CreateDirectory(_directory);
-            var payload = WorkerProtocolJson.SerializeResponse(response);
             var envelope = new CacheEnvelope {
                 SchemaVersion = WorkerCacheVersions.Current,
                 InputHash = response.InputHash,
-                Payload = payload,
-                PayloadHash = HashText(payload)
+                Payload = response.Payload,
+                PayloadHash = HashText(response.Payload)
             };
             var json = JsonSerializer.Serialize(
                 envelope,
@@ -123,23 +128,6 @@ internal sealed class VerificationCache(
             throw new ArgumentException("A SHA-256 input hash is required.", nameof(inputHash));
         return Path.Combine(_directory, inputHash.ToLowerInvariant() + ".json");
     }
-
-    private static bool IsCacheable(
-        WorkerVerifyResponse? response,
-        string inputHash) =>
-        response != null &&
-        string.Equals(
-            response.ProtocolVersion,
-            WorkerProtocolVersions.Current,
-            StringComparison.Ordinal) &&
-        string.Equals(response.InputHash, inputHash, StringComparison.Ordinal) &&
-        response.Errors is { Length: 0 } &&
-        response.Records is { Length: > 0 } &&
-        response.Records.All(static record =>
-            record.Status is
-                WorkerVerificationStatus.Proven or
-                WorkerVerificationStatus.Refuted &&
-            record.Reason == WorkerVerificationReason.None);
 
     private static string HashText(string value) =>
         Convert.ToHexString(
