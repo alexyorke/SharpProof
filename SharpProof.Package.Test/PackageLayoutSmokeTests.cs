@@ -390,11 +390,9 @@ public sealed class PackageLayoutSmokeTests {
                 """,
                 new System.Text.UTF8Encoding(false));
             File.WriteAllText(
-                Path.Combine(ConsumerDirectory, ".editorconfig"),
+                Path.Combine(ConsumerDirectory, ".globalconfig"),
                 """
-                root = true
-
-                [*.cs]
+                is_global = true
                 dotnet_diagnostic.SP0045.severity = warning
                 """,
                 new System.Text.UTF8Encoding(false));

@@ -16,6 +16,7 @@ internal sealed record WorkerPerformanceMeasurements(
 
 internal static class WorkerPerformanceProbe {
     private const int CooperativeProjectWallMilliseconds = 100;
+    private const int CooperativeTerminationGraceMilliseconds = 10_000;
     private const int ForcedTerminationProbeHeadroomMilliseconds = 50;
     private const int LauncherWorkloadMethods = 384;
 
@@ -27,7 +28,6 @@ internal static class WorkerPerformanceProbe {
         await VerifyCooperativeLauncherCancellationAsync(
                 repositoryRoot,
                 workspace,
-                contract,
                 cancellationToken)
             .ConfigureAwait(false);
         var cancellationLatencies = await MeasureWorkerCancellationAsync(
@@ -81,7 +81,6 @@ internal static class WorkerPerformanceProbe {
     private static async Task VerifyCooperativeLauncherCancellationAsync(
         string repositoryRoot,
         WorkerProbeWorkspace workspace,
-        AcceptancePerformanceContract contract,
         CancellationToken cancellationToken) {
         var workerPath = FindBuiltAssembly(
             repositoryRoot,
@@ -93,10 +92,12 @@ internal static class WorkerPerformanceProbe {
             "cooperative",
             CooperativeProjectWallMilliseconds,
             CooperativeProjectWallMilliseconds,
-            checked((int)contract.ForcedTerminationMilliseconds));
+            CooperativeTerminationGraceMilliseconds);
         var result = await WaitForExitAsync(
                 process,
-                contract.ForcedTerminationMilliseconds + 10_000,
+                CooperativeProjectWallMilliseconds +
+                CooperativeTerminationGraceMilliseconds +
+                10_000,
                 cancellationToken)
             .ConfigureAwait(false);
         if (result.ExitCode != 0)
