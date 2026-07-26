@@ -90,26 +90,7 @@ public sealed class PackageLayoutSmokeTests {
     [Test]
     public async Task PackedAnalyzerIsThinAndPackagedWorkerRuns() {
         using var workspace = PackageWorkspace.Create();
-        var pack = await RunDotNetAsync(
-            FindRepositoryRoot(),
-            "pack",
-            Path.Combine(
-                FindRepositoryRoot(),
-                "SharpProof.Package",
-                "SharpProof.Package.csproj"),
-            "-c",
-            "Release",
-            "--nologo",
-            "/nodeReuse:false",
-            "-p:UseSharedCompilation=false",
-            "-p:GeneratePackageOnBuild=false",
-            "--output",
-            workspace.PackageSource);
-        Assert.That(pack.ExitCode, Is.Zero, pack.Output);
-
-        var packagePath = Directory
-            .EnumerateFiles(workspace.PackageSource, "SharpProof.*.nupkg")
-            .Single();
+        var packagePath = await PackSharpProofAsync(workspace);
         VerifyPackageLayout(packagePath);
 
         workspace.WriteConsumer(GetPackageVersion(packagePath));
@@ -191,6 +172,136 @@ public sealed class PackageLayoutSmokeTests {
         Assert.That(build.Output, Does.Contain("SharpProof Proven"));
         Assert.That(File.Exists(workspace.ResultPath), Is.True);
     }
+
+    [Test]
+    public async Task PackedAnalyzerReportsContractCorrectnessRegressions() {
+        using var workspace = PackageWorkspace.Create();
+        var packagePath = await PackSharpProofAsync(workspace);
+        workspace.WriteAnalyzerConsumer(
+            GetPackageVersion(packagePath),
+            """
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                public sealed class Positive {
+                    public Positive(int value) {
+                        Contract.Requires(value > 0);
+                    }
+                }
+
+                public static Positive RefutedConstructor() =>
+                    new Positive(-1);
+            }
+            """,
+            "all-experimental",
+            "SP0027");
+        var restore = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "restore",
+            workspace.ConsumerProject,
+            "--nologo",
+            "/nodeReuse:false",
+            "--source",
+            workspace.PackageSource,
+            "--packages",
+            workspace.PackageCache);
+        Assert.That(restore.ExitCode, Is.Zero, restore.Output);
+
+        var validBuild = await BuildAnalyzerConsumerAsync(workspace);
+        Assert.That(validBuild.ExitCode, Is.Zero, validBuild.Output);
+        Assert.That(validBuild.Output, Does.Contain("SP0027"));
+
+        workspace.WriteSource(
+            """
+            using System;
+            using System.Threading.Tasks;
+            using SharpProof.Attributes;
+
+            public interface Subject {
+                [AllowedCapabilities((SharpProofCapability)(1 << 30))]
+                [AllowedExceptions(typeof(string))]
+                [AllowedExceptions(typeof(int))]
+                [return: Positive]
+                Task Unsupported(
+                    [Positive] string text,
+                    [NotNull] int count,
+                    [InRange(5, 1)] int range);
+            }
+
+            public static class PlacementSubject {
+                public static void InvalidPlacements(bool condition) {
+                    if (condition) {
+                        Contract.Requires(condition);
+                    }
+                    _ = condition;
+                    Contract.Ensures(condition);
+                    {
+                        Contract.Assume(condition);
+                    }
+                }
+            }
+            """);
+        var invalidBuild = await BuildAnalyzerConsumerAsync(workspace);
+        Assert.That(invalidBuild.ExitCode, Is.Not.Zero, invalidBuild.Output);
+        Assert.That(
+            CountDiagnosticLines(invalidBuild.Output, "SP0024"),
+            Is.GreaterThanOrEqualTo(10),
+            invalidBuild.Output);
+        Assert.That(
+            invalidBuild.Output,
+            Does.Contain("AllowedCapabilities")
+                .And.Contain("AllowedExceptions")
+                .And.Contain("[Positive]")
+                .And.Contain("[NotNull]")
+                .And.Contain("[InRange]")
+                .And.Contain("invalid argument 'Task'")
+                .And.Contain("expected an unconditional prologue statement")
+                .And.Contain(
+                    "expected the clause before every non-contract statement")
+                .And.Contain("expected a direct prologue statement"));
+    }
+
+    private static async Task<string> PackSharpProofAsync(
+        PackageWorkspace workspace) {
+        var pack = await RunDotNetAsync(
+            FindRepositoryRoot(),
+            "pack",
+            Path.Combine(
+                FindRepositoryRoot(),
+                "SharpProof.Package",
+                "SharpProof.Package.csproj"),
+            "-c",
+            "Release",
+            "--nologo",
+            "/nodeReuse:false",
+            "-p:UseSharedCompilation=false",
+            "-p:GeneratePackageOnBuild=false",
+            "--output",
+            workspace.PackageSource);
+        Assert.That(pack.ExitCode, Is.Zero, pack.Output);
+        return Directory
+            .EnumerateFiles(workspace.PackageSource, "SharpProof.*.nupkg")
+            .Single();
+    }
+
+    private static Task<ProcessResult> BuildAnalyzerConsumerAsync(
+        PackageWorkspace workspace) =>
+        RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "build",
+            workspace.ConsumerProject,
+            "-c",
+            "Release",
+            "--no-restore",
+            "--nologo",
+            "/nodeReuse:false",
+            "-p:UseSharedCompilation=false");
+
+    private static int CountDiagnosticLines(string output, string id) =>
+        output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Count(line => line.Contains(
+                ": error " + id + ":",
+                StringComparison.Ordinal));
 
     private static void VerifyPackageLayout(string packagePath) {
         using var archive = ZipFile.OpenRead(packagePath);
@@ -372,10 +483,9 @@ public sealed class PackageLayoutSmokeTests {
             return new PackageWorkspace(root);
         }
 
-        internal void WriteConsumer(string version) {
-            var escapedVersion = SecurityElement.Escape(version);
-            File.WriteAllText(
-                Path.Combine(ConsumerDirectory, "Subject.cs"),
+        internal void WriteConsumer(string version) =>
+            WriteAnalyzerConsumer(
+                version,
                 """
                 using SharpProof.Attributes;
                 public static class Subject {
@@ -388,14 +498,26 @@ public sealed class PackageLayoutSmokeTests {
                     }
                 }
                 """,
-                new System.Text.UTF8Encoding(false));
+                "effects",
+                "SP0045");
+
+        internal void WriteAnalyzerConsumer(
+            string version,
+            string source,
+            string mode,
+            params string[] enabledDiagnosticIds) {
+            WriteSource(source);
             File.WriteAllText(
                 Path.Combine(ConsumerDirectory, ".globalconfig"),
-                """
-                is_global = true
-                dotnet_diagnostic.SP0045.severity = warning
-                """,
+                string.Join(
+                    "\n",
+                    enabledDiagnosticIds
+                        .Select(static id =>
+                            "dotnet_diagnostic." + id + ".severity = warning")
+                        .Prepend("is_global = true")) + "\n",
                 new System.Text.UTF8Encoding(false));
+            var escapedVersion = SecurityElement.Escape(version);
+            var escapedMode = SecurityElement.Escape(mode);
             File.WriteAllText(
                 ConsumerProject,
                 $"""
@@ -403,7 +525,7 @@ public sealed class PackageLayoutSmokeTests {
                   <PropertyGroup>
                     <TargetFramework>net8.0</TargetFramework>
                     <LangVersion>12.0</LangVersion>
-                    <SharpProofMode>effects</SharpProofMode>
+                    <SharpProofMode>{escapedMode}</SharpProofMode>
                     <WarningsAsErrors>AD0001;CS8032;CS8034;CS8785</WarningsAsErrors>
                   </PropertyGroup>
                   <ItemGroup>
@@ -414,6 +536,12 @@ public sealed class PackageLayoutSmokeTests {
                 """,
                 new System.Text.UTF8Encoding(false));
         }
+
+        internal void WriteSource(string source) =>
+            File.WriteAllText(
+                Path.Combine(ConsumerDirectory, "Subject.cs"),
+                source,
+                new System.Text.UTF8Encoding(false));
 
         public void Dispose() {
             var resolved = Path.GetFullPath(_root);

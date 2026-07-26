@@ -183,6 +183,149 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
+    public async Task UnsupportedCallableStillReportsMalformedAttributes() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using System.Threading.Tasks;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [AllowedCapabilities((SharpProofCapability)(1 << 30))]
+                [AllowedExceptions(typeof(string))]
+                [AllowedExceptions(typeof(int))]
+                public static async Task Unsupported() {
+                    await Task.Yield();
+                }
+            }
+            """,
+            "effects",
+            ["SP0024"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0024", "SP0024", "SP0024"]));
+    }
+
+    [Test]
+    public async Task UnsupportedCallableReportsEveryMalformedClosedContract() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System.Threading.Tasks;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [return: Positive]
+                public static async Task Unsupported(
+                    [Positive] string text,
+                    [NotNull] int count,
+                    [InRange(5, 1)] int range) {
+                    await Task.Yield();
+                }
+
+                [return: NotNull]
+                public static async Task<string> Valid(
+                    [NotNull] string text,
+                    [Positive] int count,
+                    [InRange(1, 5)] int range) {
+                    await Task.Yield();
+                    return text;
+                }
+            }
+            """,
+            "contracts",
+            ["SP0024"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0024", 4)));
+    }
+
+    [Test]
+    public async Task BodylessDeclarationsReportEveryMalformedAttribute() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public interface IFixture {
+                [AllowedExceptions(typeof(string))]
+                [return: Positive]
+                string InterfaceMethod(
+                    [NotNull] int count,
+                    [InRange(5, 1)] int range);
+            }
+
+            public abstract class Fixture {
+                [SharpProofTrusted(" ")]
+                public abstract void AbstractMethod();
+            }
+            """,
+            "all-experimental",
+            ["SP0024"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0024", 5)));
+    }
+
+    [Test]
+    public async Task EveryMisplacedContractClauseIsDiagnosed() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static void Valid(bool condition) {
+                    Contract.Requires(condition);
+                    Contract.Ensures(condition);
+                    Contract.Assume(condition);
+                    _ = condition;
+                }
+
+                public static void Conditional(bool condition) {
+                    if (condition) {
+                        Contract.Requires(condition);
+                    }
+                }
+
+                public static void Late(bool condition) {
+                    _ = condition;
+                    Contract.Ensures(condition);
+                }
+
+                public static void Nested(bool condition) {
+                    void Local() {
+                        Contract.Assume(condition);
+                    }
+                    Local();
+                }
+
+                public static void Unreachable(bool condition) {
+                    return;
+                    Contract.Requires(condition);
+                }
+
+                public static void Misplaced(bool condition) {
+                    {
+                        Contract.Ensures(condition);
+                    }
+                }
+            }
+            """,
+            "contracts",
+            ["SP0024"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0024", 5)));
+        Assert.That(
+            diagnostics.Select(diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Has.All.Contain("<placement>"));
+    }
+
+    [Test]
     public async Task SuppressionOnlyChangesReportingAndTrustDoesNotSharpen() {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """

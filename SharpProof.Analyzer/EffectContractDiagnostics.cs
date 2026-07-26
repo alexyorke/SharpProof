@@ -16,28 +16,35 @@ internal static class EffectContractDiagnostics {
         SharpProofCapability.Synchronization |
         SharpProofCapability.NativeInterop;
 
+    internal static void ValidateArguments(IMethodSymbol method, AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic) {
+        var attributes = AnalyzerAttributeSymbols.GetCallableAttributes(method).ToImmutableArray();
+        var location = method.Locations.FirstOrDefault() ?? Location.None;
+        _ = DecodeCapabilities(
+            SelectAttributes(attributes, session.Attributes.AllowedCapabilities),
+            location, session, reportDiagnostic);
+        _ = DecodeAllowedExceptions(
+            SelectAttributes(attributes, session.Attributes.AllowedExceptions),
+            session.Compilation, location, session, reportDiagnostic);
+    }
+
     internal static AnalyzerSemanticOutcome Analyze(
         IMethodSymbol method,
         SyntaxNode declaration,
         AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken) {
-        var attributes = AnalyzerAttributeSymbols.GetCallableAttributes(method)
-            .ToImmutableArray();
+        var attributes = AnalyzerAttributeSymbols.GetCallableAttributes(method).ToImmutableArray();
         var enforcePure = attributes.Any(attribute =>
             AnalyzerAttributeSymbols.Is(attribute, session.Attributes.EnforcePure));
         var zeroAllocations = attributes.Any(attribute =>
             AnalyzerAttributeSymbols.Is(attribute, session.Attributes.ZeroAllocations));
         var doesNotThrow = attributes.Any(attribute =>
             AnalyzerAttributeSymbols.Is(attribute, session.Attributes.DoesNotThrow));
-        var capabilityAttributes = attributes.Where(attribute =>
-            AnalyzerAttributeSymbols.Is(
-                attribute,
-                session.Attributes.AllowedCapabilities)).ToImmutableArray();
-        var exceptionAttributes = attributes.Where(attribute =>
-            AnalyzerAttributeSymbols.Is(
-                attribute,
-                session.Attributes.AllowedExceptions)).ToImmutableArray();
+        var capabilityAttributes =
+            SelectAttributes(attributes, session.Attributes.AllowedCapabilities);
+        var exceptionAttributes =
+            SelectAttributes(attributes, session.Attributes.AllowedExceptions);
         if (!enforcePure &&
             !zeroAllocations &&
             !doesNotThrow &&
@@ -49,11 +56,13 @@ internal static class EffectContractDiagnostics {
         var capabilities = DecodeCapabilities(
             capabilityAttributes,
             location,
+            session,
             reportDiagnostic);
         var exceptions = DecodeAllowedExceptions(
             exceptionAttributes,
             session.Compilation,
             location,
+            session,
             reportDiagnostic);
         cancellationToken.ThrowIfCancellationRequested();
         var result = session.AnalyzeEffects(method, cancellationToken);
@@ -64,15 +73,13 @@ internal static class EffectContractDiagnostics {
             !capabilityAttributes.IsDefaultOrEmpty && !capabilities.IsValid ||
             !exceptionAttributes.IsDefaultOrEmpty && !exceptions.IsValid;
 
-        if (enforcePure) {
-            if (isUnknown || !IsObservablePure(summary))
-                hasUnknown = true;
-            if (isUnknown || !IsObservablePure(summary))
-                reportDiagnostic(
-                    Diagnostic.Create(
-                        GeneratedDiagnosticDescriptors.PurityNotVerifiedRule,
-                        location,
-                        method.Name));
+        if (enforcePure && (isUnknown || !IsObservablePure(summary))) {
+            hasUnknown = true;
+            reportDiagnostic(
+                Diagnostic.Create(
+                    GeneratedDiagnosticDescriptors.PurityNotVerifiedRule,
+                    location,
+                    method.Name));
         }
 
         if (zeroAllocations) {
@@ -155,13 +162,13 @@ internal static class EffectContractDiagnostics {
             }
         }
         return hasUnknown
-            ? AnalyzerSemanticOutcome.Unknown
-            : AnalyzerSemanticOutcome.Proven;
+            ? AnalyzerSemanticOutcome.Unknown : AnalyzerSemanticOutcome.Proven;
     }
 
-    private static DecodedCapabilities DecodeCapabilities(
+    private static (SharpProofCapability Value, bool IsValid) DecodeCapabilities(
         ImmutableArray<AttributeData> attributes,
         Location fallbackLocation,
+        AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic) {
         var value = SharpProofCapability.None;
         foreach (var attribute in attributes) {
@@ -169,57 +176,67 @@ internal static class EffectContractDiagnostics {
                 !TryGetInt64(attribute.ConstructorArguments[0], out var raw) ||
                 raw < 0 ||
                 ((SharpProofCapability)raw & ~AllCapabilities) != 0) {
-                reportDiagnostic(
-                    InvalidContractArgumentDiagnostics.Create(
-                        "[AllowedCapabilities]",
-                        "<invalid>",
-                        "expected a defined SharpProofCapability flags value",
-                        GetLocation(attribute, fallbackLocation)));
-                return DecodedCapabilities.Invalid;
+                if (session.TryMarkAttributeValidated(attribute))
+                    reportDiagnostic(
+                        InvalidContractArgumentDiagnostics.Create(
+                            "[AllowedCapabilities]",
+                            "<invalid>",
+                            "expected a defined SharpProofCapability flags value",
+                            GetLocation(attribute, fallbackLocation)));
+                return (SharpProofCapability.None, false);
             }
             value |= (SharpProofCapability)raw;
         }
-        return new DecodedCapabilities(value, true);
+        return (value, true);
     }
 
-    private static DecodedExceptions DecodeAllowedExceptions(
+    private static (ImmutableArray<INamedTypeSymbol> Types, bool IsValid)
+        DecodeAllowedExceptions(
         ImmutableArray<AttributeData> attributes,
         Compilation compilation,
         Location fallbackLocation,
+        AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic) {
-        var exceptionType = compilation.GetTypeByMetadataName(
-            FrameworkTypeMetadataNames.Exception);
+        var exceptionType = compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
         var types = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
+        var isValid = true;
         foreach (var attribute in attributes) {
-            if (attribute.ConstructorArguments.Length != 1 ||
-                attribute.ConstructorArguments[0].Kind != TypedConstantKind.Array ||
-                attribute.ConstructorArguments[0].Values.IsDefault ||
-                exceptionType == null) {
-                ReportInvalidExceptions(attribute, fallbackLocation, reportDiagnostic);
-                return DecodedExceptions.Invalid;
+            var arguments = attribute.ConstructorArguments;
+            var values = arguments.Length == 1 &&
+                         arguments[0].Kind == TypedConstantKind.Array
+                ? arguments[0].Values : default;
+            if (exceptionType != null &&
+                !values.IsDefault &&
+                values.All(argument =>
+                    argument.Value is INamedTypeSymbol type &&
+                    IsDerivedFrom(type, exceptionType))) {
+                types.AddRange(values.Select(static argument =>
+                    (INamedTypeSymbol)argument.Value!));
+                continue;
             }
-            foreach (var argument in attribute.ConstructorArguments[0].Values) {
-                if (argument.Value is not INamedTypeSymbol type ||
-                    !IsDerivedFrom(type, exceptionType)) {
-                    ReportInvalidExceptions(attribute, fallbackLocation, reportDiagnostic);
-                    return DecodedExceptions.Invalid;
-                }
-                types.Add(type);
-            }
+            ReportInvalidExceptions(
+                attribute,
+                fallbackLocation,
+                session,
+                reportDiagnostic);
+            isValid = false;
         }
-        return new DecodedExceptions(types.ToImmutable(), true);
+        return isValid ? (types.ToImmutable(), true) : ([], false);
     }
 
     private static void ReportInvalidExceptions(
         AttributeData attribute,
         Location fallbackLocation,
-        Action<Diagnostic> reportDiagnostic) =>
-        reportDiagnostic(
-            InvalidContractArgumentDiagnostics.Create(
-                "[AllowedExceptions]",
-                "<invalid>",
-                "expected only System.Exception-derived types",
-                GetLocation(attribute, fallbackLocation)));
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic) {
+        if (session.TryMarkAttributeValidated(attribute))
+            reportDiagnostic(
+                InvalidContractArgumentDiagnostics.Create(
+                    "[AllowedExceptions]",
+                    "<invalid>",
+                    "expected only System.Exception-derived types",
+                    GetLocation(attribute, fallbackLocation)));
+    }
 
     private static bool IsObservablePure(EffectSummary summary) {
         if (IsUnknown(summary) || !summary.Capabilities.IsEmpty)
@@ -294,29 +311,9 @@ internal static class EffectContractDiagnostics {
         attribute.ApplicationSyntaxReference?.SyntaxTree.GetLocation(
             attribute.ApplicationSyntaxReference.Span) ?? fallback;
 
-    private readonly struct DecodedCapabilities {
-        internal DecodedCapabilities(SharpProofCapability value, bool isValid) {
-            Value = value;
-            IsValid = isValid;
-        }
-
-        internal SharpProofCapability Value { get; }
-        internal bool IsValid { get; }
-        internal static DecodedCapabilities Invalid { get; } =
-            new(SharpProofCapability.None, false);
-    }
-
-    private readonly struct DecodedExceptions {
-        internal DecodedExceptions(
-            ImmutableArray<INamedTypeSymbol> types,
-            bool isValid) {
-            Types = types;
-            IsValid = isValid;
-        }
-
-        internal ImmutableArray<INamedTypeSymbol> Types { get; }
-        internal bool IsValid { get; }
-        internal static DecodedExceptions Invalid { get; } =
-            new([], false);
-    }
+    private static ImmutableArray<AttributeData> SelectAttributes(
+        ImmutableArray<AttributeData> attributes,
+        INamedTypeSymbol? expected) =>
+        [.. attributes.Where(attribute =>
+            AnalyzerAttributeSymbols.Is(attribute, expected))];
 }

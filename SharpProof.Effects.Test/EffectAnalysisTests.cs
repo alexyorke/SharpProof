@@ -989,6 +989,39 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
+    public void DefinitelyNonNullReceiverDoesNotAddNullReferenceException() {
+        var result = Analyze(
+            """
+            public static class Sample {
+                public static int Invoke() => new object().GetHashCode();
+            }
+            """,
+            "Sample",
+            "Invoke");
+
+        Assert.That(
+            result.Summary.Throws.Types.Select(static type => type.MetadataName),
+            Does.Not.Contain("NullReferenceException"));
+    }
+
+    [Test]
+    public void TryCastReceiverCanStillThrowNullReferenceException() {
+        var result = Analyze(
+            """
+            public static class Sample {
+                public static int Invoke() =>
+                    (new object() as string)!.Length;
+            }
+            """,
+            "Sample",
+            "Invoke");
+
+        Assert.That(
+            result.Summary.Throws.Types.Select(static type => type.MetadataName),
+            Does.Contain("NullReferenceException"));
+    }
+
+    [Test]
     public void SourceEffectContractCannotOverrideTheBody() {
         var result = Analyze(
             """

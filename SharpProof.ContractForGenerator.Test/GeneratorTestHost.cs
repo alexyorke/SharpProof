@@ -9,6 +9,15 @@ internal static class GeneratorTestHost {
         CreateReferences();
 
     internal static CSharpCompilation CreateCompilation(
+        params (string Path, string Source)[] sources) =>
+        CreateCompilation(References, sources);
+
+    internal static CSharpCompilation CreateCompilationWithoutAttributes(
+        params (string Path, string Source)[] sources) =>
+        CreateCompilation(CreateReferences(includeAttributes: false), sources);
+
+    private static CSharpCompilation CreateCompilation(
+        ImmutableArray<MetadataReference> references,
         params (string Path, string Source)[] sources) {
         var trees = sources.Select(source =>
             CSharpSyntaxTree.ParseText(
@@ -18,7 +27,7 @@ internal static class GeneratorTestHost {
         var compilation = CSharpCompilation.Create(
             "ContractForGeneratorTests",
             trees,
-            References,
+            references,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release,
@@ -78,17 +87,20 @@ internal static class GeneratorTestHost {
                 IncrementalGeneratorOutputKind.None,
                 trackIncrementalGeneratorSteps: true));
 
-    private static ImmutableArray<MetadataReference> CreateReferences() {
+    private static ImmutableArray<MetadataReference> CreateReferences(
+        bool includeAttributes = true) {
         var trustedAssemblies =
             AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string ??
             throw new InvalidOperationException(
                 "The runtime did not expose trusted platform assemblies.");
-        return [.. trustedAssemblies
+        var references = trustedAssemblies
             .Split(Path.PathSeparator)
             .OrderBy(static path => path, StringComparer.Ordinal)
-            .Select(static path => MetadataReference.CreateFromFile(path))
-            .Append(MetadataReference.CreateFromFile(
-                typeof(ContractForAttribute).Assembly.Location))];
+            .Select(static path => MetadataReference.CreateFromFile(path));
+        if (includeAttributes)
+            references = references.Append(MetadataReference.CreateFromFile(
+                typeof(ContractForAttribute).Assembly.Location));
+        return [.. references];
     }
 
     private static void RequireNoErrors(Compilation compilation) {

@@ -9,13 +9,12 @@ internal sealed class CallableVerifier(
     private readonly ProofKernel _kernel =
         new(backend ?? throw new ArgumentNullException(nameof(backend)));
     private readonly IrFactory _factory = new();
+    private ContractBinder? _contractBinder;
     private readonly ResolvedApiSpecTable _apiSpecs =
         new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
     private readonly int _maximumExpressionDepth = maximumExpressionDepth > 0
         ? maximumExpressionDepth
         : throw new ArgumentOutOfRangeException(nameof(maximumExpressionDepth));
-    private readonly INamedTypeSymbol? _contractType =
-        compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract");
     private readonly INamedTypeSymbol? _contractForType =
         compilation.GetTypeByMetadataName(
             "SharpProof.Attributes.ContractForAttribute");
@@ -36,7 +35,7 @@ internal sealed class CallableVerifier(
                     model.GetDeclaredSymbol(declaration) is not IMethodSymbol method ||
                     method.MethodKind is not (
                         MethodKind.Ordinary or MethodKind.Constructor) ||
-                    IsCompanionType(method.ContainingType))
+                    method.PartialImplementationPart != null || IsCompanionType(method.ContainingType))
                     continue;
                 targets.Add(new CallableTarget(
                     method,
@@ -57,8 +56,7 @@ internal sealed class CallableVerifier(
         ArgumentNullException.ThrowIfNull(resourceBudget);
         cancellationToken.ThrowIfCancellationRequested();
         var factory = _factory;
-        var binding = new ContractBinder(_compilation, factory)
-            .Bind(target.Method);
+        var binding = ContractBinder.Bind(target.Method);
         if (!binding.IsSuccess) {
             if (!HasContractSurface(target)) return [];
             return [CreateUnknown(
@@ -71,12 +69,6 @@ internal sealed class CallableVerifier(
             .Where(static clause => clause.Kind == BoundContractKind.Ensures)
             .ToImmutableArray();
         if (ensures.IsDefaultOrEmpty) return [];
-        if (!HasContiguousContractPrologue(contracts))
-            return [.. ensures.Select((_, index) =>
-                CreateUnknown(
-                    target,
-                    index,
-                    WorkerVerificationReason.UnsupportedContract))];
         var body = LowerBody(target, contracts, factory);
         if (!body.IsSuccess)
             return [.. ensures.Select((_, index) =>
@@ -423,79 +415,6 @@ internal sealed class CallableVerifier(
         }
         return true;
     }
-
-    private bool HasContiguousContractPrologue(
-        BoundMethodContracts contracts) {
-        var expectedClauseCount = contracts.Clauses.Count(static clause =>
-            clause.Evidence is
-                BoundContractEvidence.CompilerBoundInvocation or
-                BoundContractEvidence.Companion);
-        if (expectedClauseCount == 0) return true;
-
-        var observedClauseCount = 0;
-        foreach (var syntaxReference in contracts.Source
-                     .DeclaringSyntaxReferences
-                     .OrderBy(static reference =>
-                         reference.SyntaxTree.FilePath,
-                         StringComparer.Ordinal)
-                     .ThenBy(static reference => reference.Span.Start)) {
-            if (syntaxReference.GetSyntax() is not
-                BaseMethodDeclarationSyntax { Body: { } body })
-                continue;
-            var model =
-                SharpProof.Frontend.Host.CompilationModelProvider
-                    .GetSemanticModel(
-                        _compilation,
-                        syntaxReference.SyntaxTree);
-            var inPrologue = true;
-            foreach (var statement in body.Statements) {
-                if (statement is EmptyStatementSyntax) continue;
-                if (TryGetDirectContractClause(
-                        statement,
-                        model,
-                        out var invocation)) {
-                    if (!inPrologue) return false;
-                    observedClauseCount++;
-                    if (invocation.Arguments
-                        .SelectMany(static argument =>
-                            argument.Value.DescendantsAndSelf())
-                        .OfType<IInvocationOperation>()
-                        .Any(IsContractClause))
-                        return false;
-                    continue;
-                }
-
-                inPrologue = false;
-                var operation = model.GetOperation(statement);
-                if (operation != null &&
-                    operation.DescendantsAndSelf()
-                        .OfType<IInvocationOperation>()
-                        .Any(IsContractClause))
-                    return false;
-            }
-        }
-        return observedClauseCount == expectedClauseCount;
-    }
-
-    private bool TryGetDirectContractClause(
-        StatementSyntax statement,
-        SemanticModel model,
-        [NotNullWhen(true)] out IInvocationOperation? invocation) {
-        invocation = statement is ExpressionStatementSyntax expression
-            ? model.GetOperation(expression.Expression) as IInvocationOperation
-            : null;
-        return invocation != null && IsContractClause(invocation);
-    }
-
-    private bool IsContractClause(IInvocationOperation invocation) =>
-        _contractType != null &&
-        SymbolEqualityComparer.Default.Equals(
-            invocation.TargetMethod.ContainingType,
-            _contractType) &&
-        invocation.TargetMethod.Name is
-            nameof(SharpProof.Attributes.Contract.Requires) or
-            nameof(SharpProof.Attributes.Contract.Ensures) or
-            nameof(SharpProof.Attributes.Contract.Assume);
 
     private static void AddResourceLimitRecords(
         ImmutableArray<WorkerVerificationRecord>.Builder records,
@@ -987,7 +906,7 @@ internal sealed class CallableVerifier(
         if (target.Declaration.Body == null) return null;
         foreach (var statement in target.Declaration.Body.Statements) {
             if (statement is EmptyStatementSyntax ||
-                IsContractStatement(statement))
+                IsContractStatement(target, statement))
                 continue;
             return statement.SpanStart;
         }
@@ -1245,22 +1164,19 @@ internal sealed class CallableVerifier(
 
     private bool ContainsOnlyContractStatements(CallableTarget target) =>
         target.Declaration.Body != null &&
-        target.Declaration.Body.Statements.All(IsContractStatement);
+        target.Declaration.Body.Statements.All(statement =>
+            IsContractStatement(target, statement));
 
-    private bool IsContractStatement(StatementSyntax statement) {
+    private bool IsContractStatement(
+        CallableTarget target,
+        StatementSyntax statement) {
         if (statement is EmptyStatementSyntax) return true;
-        if (statement is not ExpressionStatementSyntax expression ||
-            targetOperation(expression) is not IInvocationOperation invocation)
-            return false;
-        return _contractType != null &&
-               SymbolEqualityComparer.Default.Equals(
-                   invocation.TargetMethod.ContainingType,
-                   _contractType);
-
-        IOperation? targetOperation(ExpressionStatementSyntax value) =>
-            SharpProof.Frontend.Host.CompilationModelProvider
-                .GetSemanticModel(_compilation, value.SyntaxTree)
-                .GetOperation(value.Expression);
+        return statement is ExpressionStatementSyntax expression &&
+               ContractBinder.GetClauseInventory(target.Method)
+                   .Clauses.Any(clause =>
+                       clause.Invocation.Syntax.SyntaxTree ==
+                           expression.SyntaxTree &&
+                       clause.Invocation.Syntax.Span == expression.Expression.Span);
     }
 
     private static IrTerm? ApplyEntrySubstitutions(
@@ -1482,16 +1398,8 @@ internal sealed class CallableVerifier(
             target.Method.Parameters.Any(parameter =>
                 parameter.GetAttributes().Any(IsSharpProofAttribute)))
             return true;
-        return target.Declaration.DescendantNodes()
-            .OfType<InvocationExpressionSyntax>()
-            .Select(invocation =>
-                target.SemanticModel.GetOperation(invocation))
-            .OfType<IInvocationOperation>()
-            .Any(invocation =>
-                _contractType != null &&
-                SymbolEqualityComparer.Default.Equals(
-                    invocation.TargetMethod.ContainingType,
-                    _contractType));
+        return ContractBinder.GetClauseInventory(target.Method)
+            .Clauses.Length != 0;
     }
 
     private static bool IsSharpProofAttribute(AttributeData attribute) =>
@@ -1524,10 +1432,16 @@ internal sealed class CallableVerifier(
             ContractBindingFailure.NestedOld or
             ContractBindingFailure.InvalidIntrinsicSignature or
             ContractBindingFailure.NonBooleanCondition or
-            ContractBindingFailure.InvalidClosedAttribute =>
+            ContractBindingFailure.InvalidClosedAttribute or
+            ContractBindingFailure.InvalidClausePlacement =>
                 WorkerVerificationReason.UnsupportedContract,
             _ => WorkerVerificationReason.UnsupportedCallable
         };
+
+    private ContractBinder ContractBinder =>
+        LazyInitializer.EnsureInitialized(
+            ref _contractBinder,
+            () => new ContractBinder(_compilation, _factory));
 
     private static WorkerVerificationReason MapAbstention(
         AbstentionReason reason) => reason switch {

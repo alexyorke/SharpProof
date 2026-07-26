@@ -85,6 +85,57 @@ public sealed class ContractForValidatorGeneratorTests {
         Assert.That(run.Diagnostics, Is.Empty);
     }
 
+    [Test]
+    public void OpenGenericConstraintOrderIsSemanticallyMatched() {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface IFirst {
+            }
+            public interface ISecond {
+            }
+            public interface IRepository<T>
+                where T : IFirst, ISecond {
+                T Select(T value, bool ok);
+            }
+
+            [ContractFor(typeof(IRepository<>))]
+            public static class RepositoryContracts<T>
+                where T : ISecond, IFirst {
+                public static T Select(
+                    IRepository<T> receiver,
+                    T value,
+                    bool ok) => value;
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void TupleElementNamesMatchExactly() {
+        var run = Run(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                (int Left, string? Right) Read(
+                    (int Left, string? Right) value);
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static (int Left, string? Right) Read(
+                    ITarget receiver,
+                    (int Left, string? Right) value) => value;
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
     [TestCase(
         """
         public interface ITarget<T> {
@@ -316,6 +367,60 @@ public sealed class ContractForValidatorGeneratorTests {
             }
         }
         """)]
+    [TestCase(
+        """
+        public interface ITarget {
+            ref int Read(ref int value);
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static int Read(
+                ITarget receiver,
+                ref int value) => value;
+        }
+        """)]
+    [TestCase(
+        """
+        public interface ITarget {
+            void Read(int value = 1);
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static void Read(
+                ITarget receiver,
+                int value) {
+            }
+        }
+        """)]
+    [TestCase(
+        """
+        public interface ITarget {
+            (int Left, int Right) Read((int Left, int Right) value);
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static (int Other, int Right) Read(
+                ITarget receiver,
+                (int Other, int Right) value) => value;
+        }
+        """)]
+    [TestCase(
+        """
+        public sealed class Outer<T> {
+            public sealed class Leaf {
+            }
+        }
+        public interface ITarget {
+            void Read(Outer<int>.Leaf value);
+        }
+        [ContractFor(typeof(ITarget))]
+        public static class TargetContracts {
+            public static void Read(
+                ITarget receiver,
+                Outer<string>.Leaf value) {
+            }
+        }
+        """)]
     public void ExactSignatureMismatchesFailClosed(string declarations) {
         var run = Run(
             """
@@ -330,6 +435,31 @@ public sealed class ContractForValidatorGeneratorTests {
         Assert.That(
             diagnostic.Descriptor.Category,
             Is.EqualTo("SharpProof.ContractFor.Usage"));
+    }
+
+    [Test]
+    public void NestedGenericOwnerScopesDoNotAliasByOrdinal() {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Outer<TOuter> {
+                public interface ITarget<TInner> {
+                    void Read(TOuter value);
+                }
+            }
+
+            [ContractFor(typeof(Outer<>.ITarget<>))]
+            public static class TargetContracts<TContract> {
+                public static void Read(
+                    Outer<TContract>.ITarget<TContract> receiver,
+                    TContract value) {
+                }
+            }
+            """);
+
+        var diagnostic = AssertSingle(run, "SPCF0005");
+        Assert.That(GetLocatedText(diagnostic), Is.EqualTo("Read"));
     }
 
     [Test]
@@ -381,7 +511,37 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void NestedContractClauseIsRejected() {
+    public void BodyDiscoveryDoesNotRequireTheContractClauseApi() {
+        var compilation =
+            GeneratorTestHost.CreateCompilationWithoutAttributes(
+                ("Subject.cs",
+                """
+                using System;
+                using SharpProof.Attributes;
+
+                namespace SharpProof.Attributes {
+                    [AttributeUsage(AttributeTargets.Class)]
+                    public sealed class ContractForAttribute(Type target)
+                        : Attribute {
+                    }
+                }
+
+                public interface ITarget {
+                    void Invoke();
+                }
+
+                [ContractFor(typeof(ITarget))]
+                public static class TargetContracts {
+                    public static void Invoke(ITarget receiver) {
+                    }
+                }
+                """));
+
+        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void EveryInvalidContractClausePlacementIsRejected() {
         var run = Run(
             """
             using SharpProof.Attributes;
@@ -393,18 +553,35 @@ public sealed class ContractForValidatorGeneratorTests {
             [ContractFor(typeof(ITarget))]
             public static class TargetContracts {
                 public static void Invoke(ITarget receiver) {
+                    Contract.Requires(receiver is not null);
+                    if (receiver is not null) {
+                        Contract.Ensures(true);
+                    }
                     void Local() {
-                        Contract.Requires(receiver is not null);
+                        Contract.Assume(true);
                     }
                     Local();
+                    Contract.Ensures(true);
+                    return;
+                    Contract.Requires(true);
                 }
             }
             """);
 
-        var diagnostic = AssertSingle(run, "SPCF0008");
         Assert.That(
-            GetLocatedText(diagnostic),
-            Does.Contain("Contract.Requires"));
+            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SPCF0008", 4)));
+        string[] expectedMessages = [
+            "Contract.Ensures in companion method 'Invoke' has invalid placement: Conditional",
+            "Contract.Assume in companion method 'Invoke' has invalid placement: NestedCallable",
+            "Contract.Ensures in companion method 'Invoke' has invalid placement: Late",
+            "Contract.Requires in companion method 'Invoke' has invalid placement: Unreachable"
+        ];
+        Assert.That(
+            run.Diagnostics.Select(static diagnostic =>
+                diagnostic.GetMessage(
+                    System.Globalization.CultureInfo.InvariantCulture)),
+            Is.EquivalentTo(expectedMessages));
     }
 
     [Test]

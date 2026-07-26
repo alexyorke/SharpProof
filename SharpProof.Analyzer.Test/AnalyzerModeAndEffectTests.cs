@@ -203,6 +203,80 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
+    public async Task ConstructorRequiresProduceAccountableCallSiteOutcomes() {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public sealed class Positive {
+                    public Positive(int value) {
+                        Contract.Requires(value > 0);
+                    }
+                }
+
+                private static int Unknown() => -1;
+
+                public static Positive ProvenConstructor() =>
+                    new Positive(1);
+
+                public static Positive RefutedConstructor() =>
+                    new Positive(-1);
+
+                public static Positive UnknownConstructor() =>
+                    new Positive(Unknown());
+
+                public static Positive ConditionalConstructor(bool condition) {
+                    if (condition) {
+                        return new Positive(-1);
+                    }
+                    return new Positive(1);
+                }
+
+                public static Positive ThrowingPrefix(int denominator) {
+                    _ = 1 / denominator;
+                    return new Positive(-1);
+                }
+
+                private static void PositiveInvocation(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void InvocationNonRegression() =>
+                    PositiveInvocation(-1);
+            }
+            """,
+            "contracts",
+            ["SP0027"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027", "SP0027"]));
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                factory.Outcomes["ProvenConstructor"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["RefutedConstructor"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
+            Assert.That(
+                factory.Outcomes["UnknownConstructor"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["ConditionalConstructor"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["ThrowingPrefix"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["InvocationNonRegression"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
+        }
+    }
+
+    [Test]
     public async Task RequiresChecksOnlyCompilerReachableInvocations() {
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

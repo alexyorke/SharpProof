@@ -35,6 +35,9 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer {
             context.Compilation,
             configuration,
             context.CancellationToken);
+        context.RegisterSymbolAction(
+            symbolContext => AnalyzerFeaturePipeline.ValidateMethodAttributes(symbolContext, session),
+            SymbolKind.Method);
         context.RegisterOperationBlockAction(operationContext =>
             AnalyzerFeaturePipeline.AnalyzeOperationBlock(operationContext, session));
         context.RegisterCompilationEndAction(endContext =>

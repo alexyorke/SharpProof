@@ -13,6 +13,9 @@ internal sealed class AnalyzerAttributeSymbols {
             compilation,
             "SharpProof.Attributes.AllowedExceptionsAttribute");
         EffectContract = Resolve(compilation, "SharpProof.Attributes.EffectContractAttribute");
+        NotNull = Resolve(compilation, "SharpProof.Attributes.NotNullAttribute");
+        Positive = Resolve(compilation, "SharpProof.Attributes.PositiveAttribute");
+        InRange = Resolve(compilation, "SharpProof.Attributes.InRangeAttribute");
         Suppress = Resolve(compilation, "SharpProof.Attributes.SharpProofSuppressAttribute");
         Trusted = Resolve(compilation, "SharpProof.Attributes.SharpProofTrustedAttribute");
     }
@@ -23,6 +26,9 @@ internal sealed class AnalyzerAttributeSymbols {
     internal INamedTypeSymbol? DoesNotThrow { get; }
     internal INamedTypeSymbol? AllowedExceptions { get; }
     internal INamedTypeSymbol? EffectContract { get; }
+    internal INamedTypeSymbol? NotNull { get; }
+    internal INamedTypeSymbol? Positive { get; }
+    internal INamedTypeSymbol? InRange { get; }
     internal INamedTypeSymbol? Suppress { get; }
     internal INamedTypeSymbol? Trusted { get; }
 
