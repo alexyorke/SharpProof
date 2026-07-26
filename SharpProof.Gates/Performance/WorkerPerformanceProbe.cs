@@ -582,8 +582,17 @@ internal static class WorkerPerformanceProbe {
                 internal static class Program {
                     private static int Main(string[] args) {
                         var requestIndex = Array.IndexOf(args, "--request");
-                        if (requestIndex < 0 || requestIndex + 1 >= args.Length)
+                        var startEventIndex = Array.IndexOf(
+                            args,
+                            "--start-event");
+                        if (requestIndex < 0 ||
+                            requestIndex + 1 >= args.Length ||
+                            startEventIndex < 0 ||
+                            startEventIndex + 1 >= args.Length)
                             return 2;
+                        using var startEvent = EventWaitHandle.OpenExisting(
+                            args[startEventIndex + 1]);
+                        startEvent.WaitOne();
                         File.WriteAllText(
                             args[requestIndex + 1] + ".ready",
                             Environment.ProcessId.ToString(

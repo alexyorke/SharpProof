@@ -144,10 +144,10 @@ internal static class Program {
             Terminate(process);
             return 125;
         }
-        startEvent.Set();
         var hardLimit = checked(request.Budgets.ProjectWallTimeMilliseconds +
             arguments.TerminationGraceMilliseconds);
         using var hardBoundary = new CancellationTokenSource(hardLimit);
+        startEvent.Set();
         try {
             await process.WaitForExitAsync(hardBoundary.Token).ConfigureAwait(false);
             return process.ExitCode;
