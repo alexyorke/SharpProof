@@ -141,6 +141,32 @@ public sealed class ContractClauseInventoryTests {
     }
 
     [Test]
+    public void TopLevelDirectClausesUseTheGlobalStatementPrologue() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            Contract.Ensures(true);
+            System.Console.WriteLine();
+            Contract.Ensures(true);
+            """;
+        var compilation = CreateCompilation(
+            source, includeSharpProofReference: true,
+            outputKind: OutputKind.ConsoleApplication);
+        var tree = compilation.SyntaxTrees.Single();
+        var model = compilation.GetSemanticModel(tree);
+        var entry = compilation.GetEntryPoint(CancellationToken.None)!;
+        var inventory = new ContractClauseInventoryBuilder(compilation)
+            .Create(entry, model.GetOperation(tree.GetRoot()));
+        ContractClausePlacement[] expected = [
+            ContractClausePlacement.ValidPrologue,
+            ContractClausePlacement.Late
+        ];
+
+        Assert.That(inventory.Clauses.Select(static clause => clause.Placement),
+            Is.EqualTo(expected));
+    }
+
+    [Test]
     public void ClauseInventoryDoesNotRequireUnrelatedSharpProofApis() {
         const string source =
             """
@@ -219,7 +245,8 @@ public sealed class ContractClauseInventoryTests {
 
     private static CSharpCompilation CreateCompilation(
         string source,
-        bool includeSharpProofReference) {
+        bool includeSharpProofReference,
+        OutputKind outputKind = OutputKind.DynamicallyLinkedLibrary) {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,
             new CSharpParseOptions(
@@ -230,7 +257,7 @@ public sealed class ContractClauseInventoryTests {
             [syntaxTree],
             GetReferences(includeSharpProofReference),
             new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
+                outputKind,
                 nullableContextOptions: NullableContextOptions.Enable));
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>

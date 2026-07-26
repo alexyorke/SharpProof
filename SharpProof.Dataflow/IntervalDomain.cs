@@ -16,10 +16,7 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue> {
         Create(lowerBound, upperBound, 1, 0);
 
     public IntervalValue Create(
-        long? lowerBound,
-        long? upperBound,
-        BigInteger modulus,
-        BigInteger remainder) {
+        long? lowerBound, long? upperBound, BigInteger modulus, BigInteger remainder) {
         if (modulus.Sign < 0) throw new ArgumentOutOfRangeException(nameof(modulus));
         if (lowerBound.HasValue && upperBound.HasValue && lowerBound.Value > upperBound.Value)
             return Bottom;
@@ -36,19 +33,21 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue> {
         var normalizedRemainder = Normalize(remainder, modulus);
         var adjustedLower = lowerBound;
         var adjustedUpper = upperBound;
-        if (!TryFirstCongruentAtOrAbove(
+        if (!TryCongruentBoundary(
                 adjustedLower ?? long.MinValue,
                 modulus,
                 normalizedRemainder,
+                atOrAbove: true,
                 out var first))
             return Bottom;
         if (adjustedLower.HasValue)
             adjustedLower = first;
 
-        if (!TryLastCongruentAtOrBelow(
+        if (!TryCongruentBoundary(
                 adjustedUpper ?? long.MaxValue,
                 modulus,
                 normalizedRemainder,
+                atOrAbove: false,
                 out var last))
             return Bottom;
         if (adjustedUpper.HasValue)
@@ -161,15 +160,11 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue> {
                Normalize(inner.Remainder, outer.Modulus) == outer.Remainder;
     }
 
-    private static long? HullLower(long? left, long? right) {
-        if (!left.HasValue || !right.HasValue) return null;
-        return Math.Min(left.Value, right.Value);
-    }
+    private static long? HullLower(long? left, long? right) =>
+        left.HasValue && right.HasValue ? Math.Min(left.Value, right.Value) : null;
 
-    private static long? HullUpper(long? left, long? right) {
-        if (!left.HasValue || !right.HasValue) return null;
-        return Math.Max(left.Value, right.Value);
-    }
+    private static long? HullUpper(long? left, long? right) =>
+        left.HasValue && right.HasValue ? Math.Max(left.Value, right.Value) : null;
 
     private static bool TryAddBounds(IntervalValue left, IntervalValue right,
         out long? lower, out long? upper) {
@@ -185,35 +180,22 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue> {
         return valid;
     }
 
-    private static bool TryFirstCongruentAtOrAbove(
-        long lower,
+    private static bool TryCongruentBoundary(
+        long boundary,
         BigInteger modulus,
         BigInteger remainder,
+        bool atOrAbove,
         out long result) {
-        var lowerRemainder = Normalize(lower, modulus);
-        var delta = remainder >= lowerRemainder
-            ? remainder - lowerRemainder
-            : modulus - (lowerRemainder - remainder);
-        var candidate = lower + delta;
-        if (candidate > long.MaxValue) {
-            result = default;
-            return false;
-        }
-        result = (long)candidate;
-        return true;
-    }
-
-    private static bool TryLastCongruentAtOrBelow(
-        long upper,
-        BigInteger modulus,
-        BigInteger remainder,
-        out long result) {
-        var upperRemainder = Normalize(upper, modulus);
-        var delta = upperRemainder >= remainder
-            ? upperRemainder - remainder
-            : modulus - (remainder - upperRemainder);
-        var candidate = upper - delta;
-        if (candidate < long.MinValue) {
+        var boundaryRemainder = Normalize(boundary, modulus);
+        var delta = atOrAbove
+            ? remainder >= boundaryRemainder
+                ? remainder - boundaryRemainder
+                : modulus - (boundaryRemainder - remainder)
+            : boundaryRemainder >= remainder
+                ? boundaryRemainder - remainder
+                : modulus - (remainder - boundaryRemainder);
+        var candidate = atOrAbove ? boundary + delta : boundary - delta;
+        if (candidate < long.MinValue || candidate > long.MaxValue) {
             result = default;
             return false;
         }

@@ -4,19 +4,23 @@ The authoritative descriptors are static fields in
 `SharpProof.Analyzer/GeneratedDiagnosticDescriptors.cs` and
 `SharpProof.ContractForGenerator/GeneratedDiagnosticDescriptors.cs`.
 
-The main package defaults to `SharpProofMode=off`, which omits both the analyzer
-and the `ContractFor` generator from compiler analyzer items. Enable a mode in
-the project:
+The main package defaults to advisory analysis with both feature groups:
 
 ```xml
 <PropertyGroup>
-  <SharpProofMode>all-experimental</SharpProofMode>
+  <SharpProofProfile>advisory</SharpProofProfile>
+  <SharpProofFeatures>all</SharpProofFeatures>
 </PropertyGroup>
 ```
 
-Main feature diagnostics are `Info` and disabled by default. Enabling a mode
-selects a pipeline; it does not opt those IDs into editor reporting. Configure
-the IDs you want:
+`SharpProofProfile` is `advisory`, `strict`, or `off`.
+`SharpProofFeatures` is `effects`, `contracts`, or `all`. Main feature
+diagnostics are enabled `Info` diagnostics by default, except SP0027 is a
+Warning. Configure their effective severities with normal Roslyn settings:
+
+The selected feature value also enters the verifier request and filters its
+manifest. Contract-only requests ignore effect-only annotations; effect-only
+requests do not create postcondition claims.
 
 ```ini
 dotnet_diagnostic.SP0002.severity = suggestion
@@ -26,27 +30,28 @@ dotnet_diagnostic.SP0046.severity = suggestion
 dotnet_diagnostic.SP0027.severity = warning
 ```
 
-`SP0024` is an enabled-by-default error and `SP0025` is an
-enabled-by-default warning. The `SPCF` rules are enabled-by-default errors once
-the generator is loaded.
+`SP0024` is an error and `SP0025` is a warning. The `SPCF` rules are errors once
+the generator is loaded. Unsupported unannotated methods are quiet; an
+unsupported explicitly selected method produces SP0047.
 
 ## Main analyzer summary
 
-| ID | Mode | Descriptor default | Emitted now? |
+| ID | Feature/profile | Descriptor default | Emitted now? |
 |---|---|---|---|
-| `SP0002` | `effects` | Info, off | Yes |
-| `SP0013` | `effects` | Info, off | Reserved |
-| `SP0015` | `effects` | Info, off | Reserved |
-| `SP0016` | `effects` | Info, off | Yes |
-| `SP0024` | Any loaded mode | Error, on | Yes |
-| `SP0025` | Invalid loaded configuration | Warning, on | Yes |
-| `SP0027` | `contracts` | Info, off | Yes |
-| `SP0030` | `effects` | Info, off | Reserved |
-| `SP0045` | `effects` | Info, off | Yes |
-| `SP0046` | `effects` | Info, off | Yes |
+| `SP0002` | `effects` | Info, on | Yes |
+| `SP0013` | `effects` | Info, on | Reserved |
+| `SP0015` | `effects` | Info, on | Reserved |
+| `SP0016` | `effects` | Info, on | Yes |
+| `SP0024` | Any non-`off` profile | Error, on | Yes |
+| `SP0025` | Invalid configuration | Warning, on | Yes |
+| `SP0027` | `contracts` | Warning, on | Yes |
+| `SP0030` | `effects` | Info, on | Reserved |
+| `SP0045` | `effects` | Info, on | Yes |
+| `SP0046` | `effects` | Info, on | Yes |
+| `SP0047` | Explicitly selected unsupported method | Info, on | Yes |
 
-`all-experimental` enables both feature pipelines. Unsupported analyzer
-callables abstain silently even when an ID is enabled.
+`SharpProofFeatures=all` enables both feature pipelines. `SharpProofMode` and
+`all-experimental` are deprecated preview compatibility inputs.
 
 <a id="sp0002"></a>
 ## SP0002 - purity not proven
@@ -101,10 +106,13 @@ silently interpreted.
 <a id="sp0025"></a>
 ## SP0025 - invalid analyzer configuration
 
-The compilation-global `sharpproof_mode` option or `SharpProofMode` build
-property is not `off`, `effects`, `contracts`, or `all-experimental`.
-SharpProof reports an enabled-by-default warning and analyzes the compilation
-as `off`.
+The compilation-global `sharpproof_profile`/`SharpProofProfile`,
+`sharpproof_features`/`SharpProofFeatures`, or deprecated
+`sharpproof_mode`/`SharpProofMode` value is invalid. Valid profile values are
+`advisory`, `strict`, and `off`; feature values are `effects`, `contracts`, and
+`all`. The legacy alias temporarily accepts `off`, `effects`, `contracts`, and
+`all-experimental`. SharpProof reports a warning and analyzes an invalid
+configuration as `off`.
 
 Tree-local attempts to set this compilation-global option are also invalid
 unless they exactly match the global value.
@@ -113,8 +121,9 @@ unless they exactly match the global value.
 ## SP0027 - precondition violated
 
 A compiler-bound `Contract.Requires(...)` clause or closed parameter
-precondition evaluates to false for an exact call site. SharpProof reports only
-after exact receiver/argument substitution and concrete IR replay.
+precondition evaluates to false for an exact ordinary invocation or object
+creation. SharpProof reports only after exact receiver/argument substitution
+and concrete IR replay.
 
 Unknown arguments, unsupported expressions, possible receiver/argument/prefix
 throws, and non-definitely-executed calls remain silent.
@@ -130,7 +139,7 @@ static class Example {
     }
 
     internal static void Call() {
-        Positive(0); // SP0027 when contracts mode and SP0027 are enabled.
+        Positive(0); // SP0027 when contract features are enabled.
     }
 }
 ```
@@ -167,6 +176,28 @@ a possibly disallowed exception.
 
 This is a not-proven result. The analyzer reserves definitive SP0030 reporting
 until it has concrete effect-trace replay.
+
+<a id="sp0047"></a>
+## SP0047 - selected analysis incomplete
+
+The analyzer emits SP0047 when a contract or SharpProof annotation explicitly
+selects a method but the method is outside the supported analyzer subset.
+Unannotated unsupported methods remain silent.
+
+The verifier launcher also emits SP0047 when one or more selected callables
+have incomplete coverage or an `Unknown` claim. Its severity comes from
+`SharpProofVerifyPolicy`: `advisory` is information,
+`warn-on-unknown` is a warning, and `require-proven` is an error that fails the
+build. SP0047 never means the method was proven.
+
+<a id="sp0048"></a>
+## SP0048 - user assumption or trusted evidence
+
+SP0048 is a verifier-launcher diagnostic, not a Roslyn analyzer descriptor. It
+reports declared `Contract.Assume` or `[SharpProofTrusted]` evidence recorded
+by the manifest. `SharpProofAssumptionPolicy=allow` reports information,
+`warn` reports a warning, and `error` fails the build. Advisory defaults to
+`allow`; strict defaults to `error`.
 
 <a id="contractfor-generator-diagnostics"></a>
 ## ContractFor generator diagnostics
@@ -258,11 +289,13 @@ describe the target member.
 
 ## What diagnostics do not mean
 
-- Diagnostic silence is not proof. A callable may be unsupported or a feature
-  ID may still be disabled.
+- Diagnostic silence is not proof. Unannotated code may be unsupported or a
+  diagnostic may be suppressed.
 - SP0002, SP0016, SP0045, and SP0046 report inability to prove a contract, not a
   replayed violating execution.
 - SP0027 is stronger: it is emitted only after concrete predicate replay
   evaluates to false.
+- SP0047 is explicit incomplete analysis, and SP0048 is explicit
+  user/trusted evidence; neither is a proof outcome.
 - Worker `Unknown` reasons are protocol records, not Roslyn diagnostics. See
   [Typed abstention reasons](unknown-reasons.md).

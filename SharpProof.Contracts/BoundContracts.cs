@@ -83,13 +83,11 @@ public sealed class BoundMethodContracts {
         IMethodSymbol source,
         ImmutableArray<BoundContractClause> clauses,
         ImmutableArray<BoundContractVariable> variables,
-        bool isPure,
         bool usesCompanion) {
         Target = target;
         Source = source;
         Clauses = clauses;
         Variables = variables;
-        IsPure = isPure;
         UsesCompanion = usesCompanion;
     }
 
@@ -97,7 +95,6 @@ public sealed class BoundMethodContracts {
     public IMethodSymbol Source { get; }
     public ImmutableArray<BoundContractClause> Clauses { get; }
     public ImmutableArray<BoundContractVariable> Variables { get; }
-    public bool IsPure { get; }
     public bool UsesCompanion { get; }
 }
 

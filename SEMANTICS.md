@@ -17,9 +17,13 @@ SharpProof has three semantic outcomes:
   supported language, models, or resource limits.
 
 Unsupported syntax, missing or ambiguous specifications, approximate facts,
-budget exhaustion, solver timeout, encoding failure, native failure, and
-malformed models produce `Unknown`. They never produce `Proven` or `Refuted`.
-Analyzer callables outside the enabled language subset abstain silently.
+budget exhaustion, solver timeout, and unsupported encoding produce
+claim-level `Unknown`. They never produce `Proven` or `Refuted`. Backend
+unavailability, infrastructure failure, malformed backend output, containment
+failure, and failed counterexample replay also prevent a semantic result, but
+protocol version 3 marks the whole run `Failed`; these conditions are fatal
+under every build policy. Unsupported unannotated analyzer callables remain
+silent. Explicitly selected unsupported callables produce SP0047.
 
 Approximate facts cannot be promoted to assumptions. A proof is valid only when
 its evidence core contains lowerings, resolved specifications, verified
@@ -28,9 +32,41 @@ replay against the executable program model. Failed replay is an encoder defect,
 not a program defect.
 
 Caller cancellation remains cancellation. It is propagated by the analyzer and
-does not become a semantic outcome. Cancellation, timeouts, native failures,
-encoding failures, malformed models, budget exhaustion, and all `Unknown`
-outcomes are not reusable proof-cache entries.
+becomes run status `Canceled`, not a semantic claim outcome. A project boundary
+becomes run status `TimedOut`. Cancellation, timeouts, failures, budget
+exhaustion, and all `Unknown` outcomes are not reusable proof-cache entries.
+
+## Accountable selection and worker runs
+
+Worker protocol version 3 separates `WorkerRunStatus` from
+`WorkerClaimOutcome`. The compiler-symbol-based manifest is sealed before
+verification. It contains every selected callable and every discovered
+postcondition with a stable semantic claim ID, evidence kind, dense ordinal,
+and mapped source location. A valid response has exact manifest/result
+equality: no claim may be missing, duplicated, invented, or assigned to the
+wrong callable.
+
+Selection is relative to the request's `WorkerFeatureSet`, which is populated
+from `SharpProofFeatures`. `Contracts` includes contract annotations,
+assumptions, and postcondition claims while excluding effect-only annotations.
+`Effects` includes effect-selected callables while excluding postcondition
+claims and contract assumptions. `All` is their union. Strict accountability
+applies to everything selected by that feature set; disabled features are not
+silently counted as analyzed. Because the current worker does not produce
+effect-proof claims, an effect-selected callable has explicit incomplete
+coverage rather than an empty success.
+
+Every selected callable has explicit `Complete` or `Incomplete` coverage.
+Every manifest claim has exactly one `Proven`, `Refuted`, or `Unknown` result.
+The worker must never fabricate a clause-zero claim to describe a callable
+failure. User assumptions and trusted boundaries have stable evidence IDs and
+remain visible whether or not they enter an individual proof core.
+
+A `Complete` run means the worker finished and produced a structurally valid
+accounting response; it does not mean every claim was proven. `TimedOut`,
+`Canceled`, and `Failed` are run states, not claim outcomes. The launcher's
+verification and assumption policies decide how a valid complete response
+affects the build, but cannot turn a failed run or refutation into success.
 
 ## Abstract-domain concretization
 
@@ -118,18 +154,26 @@ SP0030 diagnostics are reserved until concrete effect-trace replay exists.
 
 ## Analyzer activation and language boundary
 
-Analyzer features are opt-in through the compilation-global `sharpproof_mode`
-option (or MSBuild `SharpProofMode` property):
+Analyzer behavior is selected through the compilation-global
+`sharpproof_profile`/`SharpProofProfile` and
+`sharpproof_features`/`SharpProofFeatures` options:
 
-- `off` (the default) constructs no analysis session and runs no feature
-  pipeline.
-- `effects` enables effect-contract analysis.
-- `contracts` enables experimental contract analysis.
-- `all-experimental` enables both groups.
+- `advisory` is the default profile. It analyzes selected contracts and keeps
+  unsupported unannotated code quiet.
+- `strict` requires the verifier, requires proof by default, and rejects
+  user/trusted evidence by default. Explicitly disabling verification is a
+  configuration error.
+- `off` constructs no analysis session, contributes no analyzer/generator
+  items through the package, and does not run verification.
+- feature value `effects` enables effect contracts, `contracts` enables
+  call-site contract analysis, and `all` (the default) enables both. The
+  package carries the same selection into the worker manifest request.
 
-Feature and proof diagnostics are informational and disabled by default. A host
-must opt into both a mode and the desired diagnostic IDs. Configuration and
-contract-usage errors remain enabled.
+Feature and proof diagnostics are enabled informational diagnostics by default.
+Configuration and contract-usage errors remain enabled at their declared
+warning/error severity. `SharpProofMode`/`sharpproof_mode` and
+`all-experimental` are deprecated preview compatibility aliases and do not
+define the release interface.
 
 A feature diagnostic may be promoted to `Warning` only after at least four
 consecutive weekly corpus cycles with no confirmed false positive, no
@@ -151,3 +195,10 @@ interpolated-string handlers, inline arrays, collection expressions and spread,
 and primary constructors. A closed constructed generic API call is accepted only
 when a specification resolves for that exact call. Every Roslyn `OperationKind`
 is classified by a checked-in decision table; an unknown future kind is rejected.
+
+The current packaged verifier still reconstructs a Roslyn compilation from
+MSBuild source/reference lists. It does not yet consume a closed artifact of
+the final post-generator compiler compilation. Generated trees and other
+compiler-only inputs therefore remain outside the 1.0 accountability boundary
+until that artifact replaces reconstruction. SARIF projection is likewise not
+implemented.

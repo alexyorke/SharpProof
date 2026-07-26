@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" />
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
+    <ProjectReference Include="..\SharpProof.ContractForGenerator\SharpProof.ContractForGenerator.csproj" />
     <ProjectReference Include="..\SharpProof.Worker\SharpProof.Worker.csproj" />
     <ProjectReference Include="..\SharpProof.Worker.Launcher\SharpProof.Worker.Launcher.csproj" />
   </ItemGroup>

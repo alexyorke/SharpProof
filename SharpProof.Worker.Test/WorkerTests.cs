@@ -95,6 +95,25 @@ public sealed class WorkerTests {
     }
 
     [Test]
+    public async Task InvalidRequestStillProducesAWellFormedFailedResponse() {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        request.Budgets.QueryRlimit = 0;
+        using var worker = new SharpProofWorker(new CountingBackend(
+            BackendCheckResult.Unsatisfiable([])));
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.InvalidRequest));
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        }
+    }
+
+    [Test]
     public async Task WorkerCompilationUsesTheRequestedSemanticOptions() {
         using var project = TestProject.Create(TautologySource);
         var request = project.CreateRequest(cacheEnabled: false);
@@ -260,19 +279,18 @@ public sealed class WorkerTests {
         var second = await secondWorker.VerifyAsync(request);
 
         Assert.That(first.Errors, Is.Empty);
-        Assert.That(first.Records.Length, Is.EqualTo(2));
+        Assert.That(first.ClaimResults.Length, Is.EqualTo(2));
         Assert.That(
-            first.Records.Select(static record => record.Status),
+            first.ClaimResults.Select(static record => record.Outcome),
             Is.EquivalentTo(new[] {
-                WorkerVerificationStatus.Proven,
-                WorkerVerificationStatus.Refuted
+                WorkerClaimOutcome.Proven,
+                WorkerClaimOutcome.Refuted
             }));
         Assert.That(
-            first.Records.Select(static record => record.CallableId),
+            first.ClaimResults.Select(record =>
+                GetCallableId(first, record)),
             Is.Ordered);
-        Assert.That(
-            WorkerProtocolJson.SerializeResponse(second),
-            Is.EqualTo(WorkerProtocolJson.SerializeResponse(first)));
+        AssertSemanticallyEquivalent(first, second);
     }
 
     [Test]
@@ -304,28 +322,26 @@ public sealed class WorkerTests {
         var compilation = WorkerCompilation.Create(request, snapshot);
         var backend = new CountingBackend(
             BackendCheckResult.Unsatisfiable([]));
-        var verifier = new CallableVerifier(
-            compilation,
-            backend,
-            request.Budgets.MaximumExpressionDepth);
-
-        var target = verifier.Discover().Single(candidate =>
-            candidate.Method.Name == "Identity");
+        var target = new ClaimManifestBuilder(compilation)
+            .Build()
+            .Targets
+            .Values
+            .Single(candidate => candidate.Method.Name == "Identity");
         using (Assert.EnterMultipleScope()) {
             Assert.That(target.Method.PartialDefinitionPart, Is.Not.Null);
             Assert.That(target.Method.PartialImplementationPart, Is.Null);
             Assert.That(
-                Path.GetFileName(target.Declaration.SyntaxTree.FilePath),
+                Path.GetFileName(target.Declaration!.SyntaxTree.FilePath),
                 Is.EqualTo("Implementation.cs"));
         }
 
         using var worker = new SharpProofWorker(backend);
         var response = await worker.VerifyAsync(request);
         Assert.That(response.Errors, Is.Empty);
-        Assert.That(response.Records, Has.Length.EqualTo(1));
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(1));
         Assert.That(
-            response.Records[0].Status,
-            Is.EqualTo(WorkerVerificationStatus.Proven));
+            response.ClaimResults[0].Outcome,
+            Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(backend.CallCount, Is.EqualTo(1));
     }
 
@@ -340,7 +356,7 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        Assert.That(response.Records, Has.Length.EqualTo(cases.Length));
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(cases.Length));
 
         var runtimeRequest = project.CreateRequest(cacheEnabled: false);
         runtimeRequest.DefineConstants = [];
@@ -371,12 +387,12 @@ public sealed class WorkerTests {
                     "RuntimeContractOracle",
                     throwOnError: true)!;
             foreach (var item in cases) {
-                var record = response.Records.Single(candidate =>
-                    candidate.CallableId.Contains(
+                var record = response.ClaimResults.Single(candidate =>
+                    GetCallableId(response, candidate).Contains(
                         "." + item.MethodName + "(",
                         StringComparison.Ordinal));
                 Assert.That(
-                    record.Status,
+                    record.Outcome,
                     Is.EqualTo(item.ExpectedStatus),
                     item.MethodName);
 
@@ -393,14 +409,14 @@ public sealed class WorkerTests {
                     var holds = item.Ensures(input, result);
                     if (!holds) runtimeWitnesses++;
                     if (item.ExpectedStatus ==
-                        WorkerVerificationStatus.Proven)
+                        WorkerClaimOutcome.Proven)
                         Assert.That(
                             holds,
                             Is.True,
                             $"{item.MethodName}({input})");
                 }
                 if (item.ExpectedStatus ==
-                    WorkerVerificationStatus.Refuted)
+                    WorkerClaimOutcome.Refuted)
                     Assert.That(
                         runtimeWitnesses,
                         Is.GreaterThan(0),
@@ -474,20 +490,20 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        Assert.That(response.Records, Has.Length.EqualTo(8));
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(8));
         Assert.That(
-            response.Records.Select(static record => record.Status),
-            Is.All.EqualTo(WorkerVerificationStatus.Proven));
-        var intIdentity = response.Records.Single(record =>
-            record.CallableId.Contains(
+            response.ClaimResults.Select(static record => record.Outcome),
+            Is.All.EqualTo(WorkerClaimOutcome.Proven));
+        var intIdentity = response.ClaimResults.Single(record =>
+            GetCallableId(response, record).Contains(
                 ".Id(",
                 StringComparison.Ordinal));
         Assert.That(
             intIdentity.ProofCore,
             Is.EqualTo(["domain:parameter:0"]));
         Assert.That(
-            response.Records
-                .Where(record => !record.CallableId.Contains(
+            response.ClaimResults
+                .Where(record => !GetCallableId(response, record).Contains(
                     ".Int64Identity(",
                     StringComparison.Ordinal))
                 .SelectMany(static record => record.ProofCore),
@@ -523,8 +539,49 @@ public sealed class WorkerTests {
             query.Assumptions[1].Justification,
             Is.TypeOf<LoweredJustification>());
         Assert.That(
-            response.Records.Single().ProofCore,
+            response.ClaimResults.Single().ProofCore,
             Is.EqualTo(["domain:parameter:0"]));
+    }
+
+    [Test]
+    public async Task ProofCoreMarksOnlyTheUserAssumptionItUses() {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long Identity(long value) {
+                    Contract.Assume(value >= 0);
+                    Contract.Assume(value <= 10);
+                    Contract.Ensures(Contract.Result<long>() >= 0);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        var snapshot = await WorkerInputSnapshot.LoadAsync(
+            request,
+            CancellationToken.None);
+        var expectedUsedId = new ClaimManifestBuilder(
+                WorkerCompilation.Create(request, snapshot))
+            .Build().Targets.Values.Single().Assumptions
+            .First(static evidence =>
+                evidence.Kind == WorkerAssumptionKind.UserAssume).Id;
+        using var worker = new SharpProofWorker(new CountingBackend(
+            BackendCheckResult.Unsatisfiable([0])));
+
+        var response = await worker.VerifyAsync(request);
+
+        var userAssumptions = response.ClaimResults.Single().Assumptions
+            .Where(static evidence =>
+                evidence.Kind == WorkerAssumptionKind.UserAssume).ToArray();
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                userAssumptions.Count(static evidence => evidence.Used),
+                Is.EqualTo(1));
+            Assert.That(
+                userAssumptions.Single(static evidence => evidence.Used).Id,
+                Is.EqualTo(expectedUsedId));
+        }
     }
 
     [Test]
@@ -547,14 +604,14 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.Records.Single();
+        var record = response.ClaimResults.Single();
         using (Assert.EnterMultipleScope()) {
             Assert.That(
-                record.Status,
-                Is.EqualTo(WorkerVerificationStatus.Proven));
+                record.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 record.Reason,
-                Is.EqualTo(WorkerVerificationReason.None));
+                Is.EqualTo(WorkerClaimReason.None));
             Assert.That(
                 record.ProofCore,
                 Is.EqualTo(["spec:bcl.math.abs.int32"]));
@@ -593,24 +650,24 @@ public sealed class WorkerTests {
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(
-            response.Records,
+            response.ClaimResults,
             Has.Length.EqualTo(3),
             string.Join(
                 Environment.NewLine,
-                response.Records.Select(record =>
-                    record.CallableId + " / " +
-                    record.ContractOrdinal + " / " +
-                    record.Status + " / " +
+                response.ClaimResults.Select(record =>
+                    GetCallableId(response, record) + " / " +
+                    GetClaim(response, record).Ordinal + " / " +
+                    record.Outcome + " / " +
                     record.Reason)));
         Assert.That(
-            response.Records.Select(static record => record.Status),
-            Is.All.EqualTo(WorkerVerificationStatus.Proven));
-        var concat = response.Records.Single(record =>
-            record.CallableId.Contains(
+            response.ClaimResults.Select(static record => record.Outcome),
+            Is.All.EqualTo(WorkerClaimOutcome.Proven));
+        var concat = response.ClaimResults.Single(record =>
+            GetCallableId(response, record).Contains(
                 ".Concat(",
                 StringComparison.Ordinal));
-        var empty = response.Records
-            .Where(record => record.CallableId.Contains(
+        var empty = response.ClaimResults
+            .Where(record => GetCallableId(response, record).Contains(
                 ".Empty",
                 StringComparison.Ordinal))
             .ToArray();
@@ -654,14 +711,14 @@ public sealed class WorkerTests {
                 Environment.NewLine,
                 response.Errors.Select(error =>
                     error.Code + ": " + error.Message)));
-        var record = response.Records.Single();
+        var record = response.ClaimResults.Single();
         using (Assert.EnterMultipleScope()) {
             Assert.That(
-                record.Status,
-                Is.EqualTo(WorkerVerificationStatus.Unknown));
+                record.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 record.Reason,
-                Is.EqualTo(WorkerVerificationReason.UnsupportedBody));
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
             Assert.That(record.ProofCore, Is.Empty);
         }
     }
@@ -691,14 +748,14 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.Records.Single();
+        var record = response.ClaimResults.Single();
         using (Assert.EnterMultipleScope()) {
             Assert.That(
-                record.Status,
-                Is.EqualTo(WorkerVerificationStatus.Unknown));
+                record.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 record.Reason,
-                Is.EqualTo(WorkerVerificationReason.UnsupportedBody));
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
             Assert.That(record.ProofCore, Is.Empty);
         }
     }
@@ -737,13 +794,13 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        Assert.That(response.Records, Has.Length.EqualTo(2));
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
         Assert.That(
-            response.Records.Select(static record => record.Status),
-            Is.All.EqualTo(WorkerVerificationStatus.Proven));
+            response.ClaimResults.Select(static record => record.Outcome),
+            Is.All.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(
-            response.Records.Select(static record => record.Reason),
-            Is.All.EqualTo(WorkerVerificationReason.None));
+            response.ClaimResults.Select(static record => record.Reason),
+            Is.All.EqualTo(WorkerClaimReason.None));
     }
 
     [Test]
@@ -767,14 +824,14 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.Records.Single();
+        var record = response.ClaimResults.Single();
         using (Assert.EnterMultipleScope()) {
             Assert.That(
-                record.Status,
-                Is.EqualTo(WorkerVerificationStatus.Proven));
+                record.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 record.Reason,
-                Is.EqualTo(WorkerVerificationReason.None));
+                Is.EqualTo(WorkerClaimReason.None));
         }
     }
 
@@ -808,13 +865,13 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        Assert.That(response.Records, Has.Length.EqualTo(2));
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
         Assert.That(
-            response.Records.Select(static record => record.Status),
-            Is.All.EqualTo(WorkerVerificationStatus.Unknown));
+            response.ClaimResults.Select(static record => record.Outcome),
+            Is.All.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(
-            response.Records.Select(static record => record.Reason),
-            Is.All.EqualTo(WorkerVerificationReason.UnsupportedBody));
+            response.ClaimResults.Select(static record => record.Reason),
+            Is.All.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
 
     [Test]
@@ -837,14 +894,14 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.Records.Single();
+        var record = response.ClaimResults.Single();
         using (Assert.EnterMultipleScope()) {
             Assert.That(
-                record.Status,
-                Is.EqualTo(WorkerVerificationStatus.Unknown));
+                record.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 record.Reason,
-                Is.EqualTo(WorkerVerificationReason.UnsupportedBody));
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
             Assert.That(record.ProofCore, Is.Empty);
         }
     }
@@ -869,15 +926,22 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.Records.Single();
+        var record = response.ClaimResults.Single();
         using (Assert.EnterMultipleScope()) {
             Assert.That(
-                record.Status,
-                Is.EqualTo(WorkerVerificationStatus.Unknown));
+                response.RunStatus,
+                Is.EqualTo(WorkerRunStatus.Failed));
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(
+                    WorkerRunFailureReason.CounterexampleReplayFailed));
+            Assert.That(
+                record.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 record.Reason,
                 Is.EqualTo(
-                    WorkerVerificationReason.CounterexampleReplayFailed));
+                    WorkerClaimReason.CounterexampleReplayFailed));
             Assert.That(record.ProofCore, Is.Empty);
             Assert.That(record.Model, Is.Empty);
         }
@@ -911,7 +975,7 @@ public sealed class WorkerTests {
         using (Assert.EnterMultipleScope()) {
             Assert.That(response.Errors, Is.Empty);
             Assert.That(
-                response.Records.Single().ProofCore,
+                response.ClaimResults.Single().ProofCore,
                 Is.EqualTo(["spec:bcl.math.abs.int32"]));
             Assert.That(predicate, Is.Not.Null);
             Assert.That(
@@ -944,11 +1008,11 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.Records.Single();
+        var record = response.ClaimResults.Single();
         using (Assert.EnterMultipleScope()) {
             Assert.That(
-                record.Status,
-                Is.EqualTo(WorkerVerificationStatus.Refuted));
+                record.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(
                 record.Model.Single(value =>
                     value.Variable == "parameter:0").Value,
@@ -993,25 +1057,25 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        Assert.That(response.Records, Has.Length.EqualTo(4));
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(4));
         Assert.That(
-            response.Records.Select(static record => record.Status),
-            Is.All.EqualTo(WorkerVerificationStatus.Unknown));
+            response.ClaimResults.Select(static record => record.Outcome),
+            Is.All.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(
-            response.Records
-                .Where(record => record.CallableId.Contains(
+            response.ClaimResults
+                .Where(record => GetCallableId(response, record).Contains(
                     "Contract(",
                     StringComparison.Ordinal))
                 .Select(static record => record.Reason),
             Is.All.EqualTo(
-                WorkerVerificationReason.UnsupportedExpression));
+                WorkerClaimReason.UnsupportedExpression));
         Assert.That(
-            response.Records
-                .Where(record => record.CallableId.Contains(
+            response.ClaimResults
+                .Where(record => GetCallableId(response, record).Contains(
                     "Body(",
                     StringComparison.Ordinal))
                 .Select(static record => record.Reason),
-            Is.All.EqualTo(WorkerVerificationReason.UnsupportedBody));
+            Is.All.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
 
     [Test]
@@ -1038,18 +1102,18 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        Assert.That(response.Records, Has.Length.EqualTo(2));
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
         Assert.That(
-            response.Records.Select(static record => record.Status),
-            Is.All.EqualTo(WorkerVerificationStatus.Proven),
+            response.ClaimResults.Select(static record => record.Outcome),
+            Is.All.EqualTo(WorkerClaimOutcome.Proven),
             string.Join(
                 Environment.NewLine,
-                response.Records.Select(record =>
-                    record.CallableId + ": " +
-                    record.Status + " / " +
+                response.ClaimResults.Select(record =>
+                    GetCallableId(response, record) + ": " +
+                    record.Outcome + " / " +
                     record.Reason)));
         Assert.That(
-            response.Records.SelectMany(static record => record.ProofCore),
+            response.ClaimResults.SelectMany(static record => record.ProofCore),
             Does.Contain("body:normal-completion"));
     }
 
@@ -1072,15 +1136,22 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.Records.Single();
+        var record = response.ClaimResults.Single();
         using (Assert.EnterMultipleScope()) {
             Assert.That(
-                record.Status,
-                Is.EqualTo(WorkerVerificationStatus.Unknown));
+                response.RunStatus,
+                Is.EqualTo(WorkerRunStatus.Failed));
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(
+                    WorkerRunFailureReason.CounterexampleReplayFailed));
+            Assert.That(
+                record.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 record.Reason,
                 Is.EqualTo(
-                    WorkerVerificationReason.CounterexampleReplayFailed));
+                    WorkerClaimReason.CounterexampleReplayFailed));
         }
     }
 
@@ -1104,14 +1175,14 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.Records.Single();
+        var record = response.ClaimResults.Single();
         using (Assert.EnterMultipleScope()) {
             Assert.That(
-                record.Status,
-                Is.EqualTo(WorkerVerificationStatus.Unknown));
+                record.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 record.Reason,
-                Is.EqualTo(WorkerVerificationReason.UnsupportedContract));
+                Is.EqualTo(WorkerClaimReason.UnsupportedContract));
         }
     }
 
@@ -1140,18 +1211,18 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        Assert.That(response.Records, Has.Length.EqualTo(2));
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
         Assert.That(
-            response.Records.Select(static record => record.Status),
-            Is.All.EqualTo(WorkerVerificationStatus.Unknown));
+            response.ClaimResults.Select(static record => record.Outcome),
+            Is.All.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(
-            response.Records.Select(static record => record.Reason),
+            response.ClaimResults.Select(static record => record.Reason),
             Is.All.EqualTo(
-                WorkerVerificationReason.UnsupportedExpression));
+                WorkerClaimReason.UnsupportedExpression));
     }
 
     [Test]
-    public async Task UnsupportedBodyAndDeepEnsuresAbstain() {
+    public async Task UnsupportedBodyAndDeepPostconditionAbstain() {
         using var project = TestProject.Create(
             """
             using SharpProof.Attributes;
@@ -1175,14 +1246,14 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(
-            response.Records.Select(static record => record.Reason),
+            response.ClaimResults.Select(static record => record.Reason),
             Is.EquivalentTo(new[] {
-                WorkerVerificationReason.DeepEnsures,
-                WorkerVerificationReason.UnsupportedBody
+                WorkerClaimReason.DeepPostcondition,
+                WorkerClaimReason.UnsupportedBody
             }));
         Assert.That(
-            response.Records.All(static record =>
-                record.Status == WorkerVerificationStatus.Unknown),
+            response.ClaimResults.All(static record =>
+                record.Outcome == WorkerClaimOutcome.Unknown),
             Is.True);
     }
 
@@ -1205,14 +1276,43 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.Records.Single();
+        var record = response.ClaimResults.Single();
         using (Assert.EnterMultipleScope()) {
             Assert.That(
-                record.Status,
-                Is.EqualTo(WorkerVerificationStatus.Unknown));
+                record.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 record.Reason,
-                Is.EqualTo(WorkerVerificationReason.UnsupportedContract));
+                Is.EqualTo(WorkerClaimReason.UnsupportedContract));
+        }
+    }
+
+    [Test]
+    public async Task EffectOnlySelectionIsVisibleAsIncomplete() {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [DoesNotThrow]
+                public static int Value() => 1;
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(response.Errors, Is.Empty);
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(response.ClaimResults, Is.Empty);
+            Assert.That(response.CallableResults, Has.Length.EqualTo(1));
+            Assert.That(
+                response.CallableResults[0].Coverage,
+                Is.EqualTo(WorkerCallableCoverage.Incomplete));
+            Assert.That(
+                response.CallableResults[0].Reason,
+                Is.EqualTo(WorkerCallableCoverageReason.UnsupportedContract));
         }
     }
 
@@ -1226,18 +1326,14 @@ public sealed class WorkerTests {
         var first = await firstWorker.VerifyAsync(enabled);
         var second = await firstWorker.VerifyAsync(enabled);
         Assert.That(backend.CallCount, Is.EqualTo(1));
-        Assert.That(
-            WorkerProtocolJson.SerializeResponse(second),
-            Is.EqualTo(WorkerProtocolJson.SerializeResponse(first)));
+        AssertSemanticallyEquivalent(first, second);
 
         var disabled = project.CreateRequest(cacheEnabled: false);
         var disabledBackend = new CountingBackend(
             BackendCheckResult.Unsatisfiable([]));
         using var disabledWorker = new SharpProofWorker(disabledBackend);
         var withoutCache = await disabledWorker.VerifyAsync(disabled);
-        Assert.That(
-            WorkerProtocolJson.SerializeResponse(withoutCache),
-            Is.EqualTo(WorkerProtocolJson.SerializeResponse(first)));
+        AssertSemanticallyEquivalent(first, withoutCache);
     }
 
     [Test]
@@ -1253,11 +1349,9 @@ public sealed class WorkerTests {
 
         Assert.That(backend.CallCount, Is.EqualTo(2));
         Assert.That(
-            first.Records.Single().Status,
-            Is.EqualTo(WorkerVerificationStatus.Unknown));
-        Assert.That(
-            WorkerProtocolJson.SerializeResponse(second),
-            Is.EqualTo(WorkerProtocolJson.SerializeResponse(first)));
+            first.ClaimResults.Single().Outcome,
+            Is.EqualTo(WorkerClaimOutcome.Unknown));
+        AssertSemanticallyEquivalent(first, second);
         Assert.That(
             Directory.Exists(project.CacheDirectory)
                 ? Directory.GetFiles(project.CacheDirectory, "*.json")
@@ -1265,58 +1359,161 @@ public sealed class WorkerTests {
             Is.Empty);
     }
 
+    [TestCase(
+        BackendFailureReason.Unavailable,
+        WorkerClaimReason.BackendUnavailable,
+        WorkerRunFailureReason.BackendUnavailable)]
+    [TestCase(
+        BackendFailureReason.InfrastructureFailure,
+        WorkerClaimReason.InfrastructureFailure,
+        WorkerRunFailureReason.InfrastructureFailure)]
+    [TestCase(
+        BackendFailureReason.MalformedResult,
+        WorkerClaimReason.MalformedBackendResult,
+        WorkerRunFailureReason.MalformedResult)]
+    public async Task FatalBackendFailuresFailTheRun(
+        BackendFailureReason backendReason,
+        WorkerClaimReason claimReason,
+        WorkerRunFailureReason runReason) {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = new SharpProofWorker(
+            new CountingBackend(BackendCheckResult.Unknown(backendReason)));
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
+            Assert.That(response.FailureReason, Is.EqualTo(runReason));
+            Assert.That(
+                response.ClaimResults.Single().Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                response.ClaimResults.Single().Reason,
+                Is.EqualTo(claimReason));
+        }
+    }
+
+    [Test]
+    public async Task FatalClaimTakesPrecedenceOverAnotherCallableTimeout() {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long A(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return value;
+                }
+                public static long B(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        request.Budgets.MaxParallelism = 1;
+        request.Budgets.MethodWallTimeMilliseconds = 30;
+        request.Budgets.ProjectWallTimeMilliseconds = 1_000;
+        using var worker = new SharpProofWorker(
+            new UnavailableThenDelayingBackend());
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.BackendUnavailable));
+            Assert.That(
+                response.ClaimResults.Select(static result => result.Reason),
+                Does.Contain(WorkerClaimReason.BackendUnavailable)
+                    .And.Contain(WorkerClaimReason.MethodTimeout));
+        }
+    }
+
     [Test]
     public void CacheableResponseRequiresValidatedTerminalRecords() {
-        var response = new WorkerVerifyResponse {
-            ProtocolVersion = WorkerProtocolVersions.Current,
-            InputHash = new string('a', 64),
-            Records = [
-                new WorkerVerificationRecord {
-                    CallableId = "Subject.M()",
-                    SourcePath = "input.cs",
-                    Status = WorkerVerificationStatus.Proven,
-                    Reason = WorkerVerificationReason.None
-                }
-            ],
-            Errors = []
+        const string callableId = "M:Subject.M";
+        var manifest = new WorkerClaimManifest {
+            Callables = [new WorkerCallableManifestEntry {
+                CallableId = callableId,
+                SelectedFeatures = [WorkerSelectedFeature.Contracts],
+                SelectionReasons = [
+                    WorkerSelectionReason.DiscoveredPostcondition
+                ],
+                Location = TestLocation(),
+                ClaimIds = ["claim"]
+            }],
+            Claims = [new WorkerClaimManifestEntry {
+                ClaimId = "claim",
+                CallableId = callableId,
+                Kind = WorkerClaimKind.Postcondition,
+                Evidence = WorkerClaimEvidence.DirectClause,
+                Location = TestLocation()
+            }]
         };
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = WorkerResultAssembler.Create(
+            new string('a', 64),
+            manifest,
+            WorkerRunStatus.Complete,
+            WorkerRunFailureReason.None,
+            [new WorkerCallableResult {
+                CallableId = callableId,
+                Coverage = WorkerCallableCoverage.Complete,
+                Reason = WorkerCallableCoverageReason.None
+            }],
+            [new WorkerClaimResult {
+                ClaimId = "claim",
+                Outcome = WorkerClaimOutcome.Proven,
+                Reason = WorkerClaimReason.None
+            }],
+            new WorkerBudgets(),
+            WorkerCacheStatus.Miss,
+            0);
 
         Assert.That(
             CacheableWorkerResponse.TryCreate(
                 response,
                 response.InputHash,
+                manifest,
                 out var proven),
             Is.True);
         Assert.That(proven, Is.Not.Null);
 
-        response.Records[0].Status = WorkerVerificationStatus.Refuted;
+        response.ClaimResults[0].Outcome = WorkerClaimOutcome.Refuted;
+        response.Summary.OutcomeCounts[0].Outcome =
+            WorkerClaimOutcome.Refuted;
         Assert.That(
             CacheableWorkerResponse.TryCreate(
                 response,
                 response.InputHash,
+                manifest,
                 out var refuted),
             Is.True);
         Assert.That(refuted, Is.Not.Null);
 
-        response.Records[0].Status = WorkerVerificationStatus.Unknown;
+        response.ClaimResults[0].Outcome = WorkerClaimOutcome.Unknown;
         Assert.That(
             CacheableWorkerResponse.TryCreate(
                 response,
                 response.InputHash,
+                manifest,
                 out _),
             Is.False);
 
-        response.Records[0].Status = WorkerVerificationStatus.Proven;
-        response.Records[0].Reason =
-            WorkerVerificationReason.InfrastructureFailure;
+        response.ClaimResults[0].Outcome = WorkerClaimOutcome.Proven;
+        response.ClaimResults[0].Reason =
+            WorkerClaimReason.InfrastructureFailure;
         Assert.That(
             CacheableWorkerResponse.TryCreate(
                 response,
                 response.InputHash,
+                manifest,
                 out _),
             Is.False);
 
-        response.Records[0].Reason = WorkerVerificationReason.None;
+        response.ClaimResults[0].Reason = WorkerClaimReason.None;
         response.Errors = [
             new WorkerProtocolError {
                 Code = "worker.error",
@@ -1327,18 +1524,21 @@ public sealed class WorkerTests {
             CacheableWorkerResponse.TryCreate(
                 response,
                 response.InputHash,
+                manifest,
                 out _),
             Is.False);
         Assert.That(
             CacheableWorkerResponse.TryCreate(
                 response,
                 new string('b', 64),
+                manifest,
                 out _),
             Is.False);
         Assert.That(
             CacheableWorkerResponse.TryCreate(
                 response,
                 "not-a-sha-256-hash",
+                manifest,
                 out _),
             Is.False);
     }
@@ -1358,9 +1558,7 @@ public sealed class WorkerTests {
         var second = await worker.VerifyAsync(request);
 
         Assert.That(backend.CallCount, Is.EqualTo(2));
-        Assert.That(
-            WorkerProtocolJson.SerializeResponse(second),
-            Is.EqualTo(WorkerProtocolJson.SerializeResponse(first)));
+        AssertSemanticallyEquivalent(first, second);
     }
 
     [Test]
@@ -1397,8 +1595,8 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(
-            response.Records.Single().Status,
-            Is.EqualTo(WorkerVerificationStatus.Refuted));
+            response.ClaimResults.Single().Outcome,
+            Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(
             Directory.GetFiles(project.CacheDirectory, "*.json"),
             Has.Length.EqualTo(1));
@@ -1423,11 +1621,11 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         Assert.That(
-            response.Records.Single().Status,
-            Is.EqualTo(WorkerVerificationStatus.Unknown));
+            response.ClaimResults.Single().Outcome,
+            Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(
-            response.Records.Single().Reason,
-            Is.EqualTo(WorkerVerificationReason.ResourceLimit));
+            response.ClaimResults.Single().Reason,
+            Is.EqualTo(WorkerClaimReason.ResourceLimit));
     }
 
     [Test]
@@ -1444,20 +1642,20 @@ public sealed class WorkerTests {
             backend,
             () => backend.ConsumedResourceCount);
         var response = await worker.VerifyAsync(request);
-        WorkerVerificationStatus[] expectedStatuses = [
-            WorkerVerificationStatus.Proven,
-            WorkerVerificationStatus.Proven,
-            WorkerVerificationStatus.Unknown
+        WorkerClaimOutcome[] expectedStatuses = [
+            WorkerClaimOutcome.Proven,
+            WorkerClaimOutcome.Proven,
+            WorkerClaimOutcome.Unknown
         ];
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(backend.CallCount, Is.EqualTo(2));
         Assert.That(
-            response.Records.Select(static record => record.Status),
+            response.ClaimResults.Select(static record => record.Outcome),
             Is.EqualTo(expectedStatuses));
         Assert.That(
-            response.Records[2].Reason,
-            Is.EqualTo(WorkerVerificationReason.ResourceLimit));
+            response.ClaimResults[2].Reason,
+            Is.EqualTo(WorkerClaimReason.ResourceLimit));
     }
 
     [Test]
@@ -1470,11 +1668,11 @@ public sealed class WorkerTests {
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(
-            response.Records[0].Status,
-            Is.EqualTo(WorkerVerificationStatus.Proven));
+            response.ClaimResults[0].Outcome,
+            Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(
-            response.Records.Skip(1).Select(static record => record.Reason),
-            Is.All.EqualTo(WorkerVerificationReason.ResourceLimit));
+            response.ClaimResults.Skip(1).Select(static record => record.Reason),
+            Is.All.EqualTo(WorkerClaimReason.ResourceLimit));
     }
 
     [Test]
@@ -1491,8 +1689,8 @@ public sealed class WorkerTests {
         Assert.That(response.Errors, Is.Empty);
         Assert.That(backend.CallCount, Is.EqualTo(2));
         Assert.That(
-            response.Records[2].Reason,
-            Is.EqualTo(WorkerVerificationReason.ResourceLimit));
+            response.ClaimResults[2].Reason,
+            Is.EqualTo(WorkerClaimReason.ResourceLimit));
     }
 
     [Test]
@@ -1515,16 +1713,29 @@ public sealed class WorkerTests {
     }
 
     [Test]
-    public void CallerCancellationPropagatesAndIsNotCached() {
+    public async Task CallerCancellationPreservesManifestAndIsNotCached() {
         using var project = TestProject.Create(TautologySource);
         var request = project.CreateRequest(cacheEnabled: true);
         request.Budgets.MethodWallTimeMilliseconds = 5_000;
         using var worker = new SharpProofWorker(new DelayingBackend());
         using var cancellation = new CancellationTokenSource(50);
 
-        Assert.ThrowsAsync<OperationCanceledException>(
-            (Func<Task>)(async () =>
-                await worker.VerifyAsync(request, cancellation.Token)));
+        var response = await worker.VerifyAsync(request, cancellation.Token);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                response.RunStatus,
+                Is.EqualTo(WorkerRunStatus.Canceled));
+            Assert.That(response.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(response.ClaimResults, Has.Length.EqualTo(1));
+            Assert.That(
+                response.ClaimResults[0].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                response.ClaimResults[0].Reason,
+                Is.EqualTo(WorkerClaimReason.Canceled));
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        }
         Assert.That(
             Directory.Exists(project.CacheDirectory)
                 ? Directory.GetFiles(project.CacheDirectory, "*.json")
@@ -1541,8 +1752,8 @@ public sealed class WorkerTests {
         using (var worker = new SharpProofWorker(new DelayingBackend())) {
             var response = await worker.VerifyAsync(methodRequest);
             Assert.That(
-                response.Records.Single().Reason,
-                Is.EqualTo(WorkerVerificationReason.MethodTimeout));
+                response.ClaimResults.Single().Reason,
+                Is.EqualTo(WorkerClaimReason.MethodTimeout));
         }
 
         using var projectProject = TestProject.Create(
@@ -1566,9 +1777,9 @@ public sealed class WorkerTests {
         using var projectWorker = new SharpProofWorker(new DelayingBackend());
         var projectResponse = await projectWorker.VerifyAsync(projectRequest);
         Assert.That(
-            projectResponse.Records,
-            Has.Some.Property(nameof(WorkerVerificationRecord.Reason))
-                .EqualTo(WorkerVerificationReason.ProjectTimeout));
+            projectResponse.ClaimResults,
+            Has.Some.Property(nameof(WorkerClaimResult.Reason))
+                .EqualTo(WorkerClaimReason.ProjectTimeout));
     }
 
     [Test]
@@ -1646,6 +1857,52 @@ public sealed class WorkerTests {
         }
     }
 
+    private static WorkerClaimManifestEntry GetClaim(
+        WorkerVerifyResponse response,
+        WorkerClaimResult result) =>
+        response.Manifest.Claims.Single(claim =>
+            string.Equals(
+                claim.ClaimId,
+                result.ClaimId,
+                StringComparison.Ordinal));
+
+    private static string GetCallableId(
+        WorkerVerifyResponse response,
+        WorkerClaimResult result) =>
+        GetClaim(response, result).CallableId;
+
+    private static WorkerSourceLocation TestLocation() =>
+        new() {
+            Path = "input.cs",
+            Length = 1,
+            Line = 1,
+            Column = 1
+        };
+
+    private static void AssertSemanticallyEquivalent(
+        WorkerVerifyResponse expected,
+        WorkerVerifyResponse actual) {
+        WorkerProtocolJson.Canonicalize(expected);
+        WorkerProtocolJson.Canonicalize(actual);
+        Assert.That(
+            SemanticJson(actual),
+            Is.EqualTo(SemanticJson(expected)));
+
+        static string SemanticJson(WorkerVerifyResponse response) =>
+            JsonSerializer.Serialize(
+                new {
+                    response.ProtocolVersion,
+                    response.InputHash,
+                    response.Manifest,
+                    response.RunStatus,
+                    response.FailureReason,
+                    response.CallableResults,
+                    response.ClaimResults,
+                    response.Errors
+                },
+                WorkerProtocolJson.Options);
+    }
+
     private static RuntimeContractCase[] CreateRuntimeContractCases(
         int seed,
         int count) {
@@ -1677,7 +1934,7 @@ public sealed class WorkerTests {
                     "Contract.Result<long>() == value",
                     static _ => true,
                     static (value, actual) => actual == value,
-                    WorkerVerificationStatus.Proven,
+                    WorkerClaimOutcome.Proven,
                     inputs),
                 1 => new RuntimeContractCase(
                     name,
@@ -1685,7 +1942,7 @@ public sealed class WorkerTests {
                     "Contract.Result<long>() <= value",
                     static _ => true,
                     static (value, actual) => actual <= value,
-                    WorkerVerificationStatus.Proven,
+                    WorkerClaimOutcome.Proven,
                     inputs),
                 2 => new RuntimeContractCase(
                     name,
@@ -1693,7 +1950,7 @@ public sealed class WorkerTests {
                     "Contract.Result<long>() >= value",
                     static _ => true,
                     static (value, actual) => actual >= value,
-                    WorkerVerificationStatus.Proven,
+                    WorkerClaimOutcome.Proven,
                     inputs),
                 3 => new RuntimeContractCase(
                     name,
@@ -1701,7 +1958,7 @@ public sealed class WorkerTests {
                     "Contract.Result<long>() > value",
                     static _ => true,
                     static (value, actual) => actual > value,
-                    WorkerVerificationStatus.Refuted,
+                    WorkerClaimOutcome.Refuted,
                     inputs),
                 4 => new RuntimeContractCase(
                     name,
@@ -1709,7 +1966,7 @@ public sealed class WorkerTests {
                     "Contract.Result<long>() < value",
                     static _ => true,
                     static (value, actual) => actual < value,
-                    WorkerVerificationStatus.Refuted,
+                    WorkerClaimOutcome.Refuted,
                     inputs),
                 5 => new RuntimeContractCase(
                     name,
@@ -1717,7 +1974,7 @@ public sealed class WorkerTests {
                     "Contract.Result<long>() != value",
                     static _ => true,
                     static (value, actual) => actual != value,
-                    WorkerVerificationStatus.Refuted,
+                    WorkerClaimOutcome.Refuted,
                     inputs),
                 6 => new RuntimeContractCase(
                     name,
@@ -1725,7 +1982,7 @@ public sealed class WorkerTests {
                     "Contract.Result<long>() > " + boundaryLiteral,
                     value => value > boundary,
                     (_, actual) => actual > boundary,
-                    WorkerVerificationStatus.Proven,
+                    WorkerClaimOutcome.Proven,
                     inputs),
                 _ => new RuntimeContractCase(
                     name,
@@ -1733,7 +1990,7 @@ public sealed class WorkerTests {
                     "Contract.Result<long>() < " + boundaryLiteral,
                     value => value < boundary,
                     (_, actual) => actual < boundary,
-                    WorkerVerificationStatus.Proven,
+                    WorkerClaimOutcome.Proven,
                     inputs)
             };
         }
@@ -1779,7 +2036,7 @@ public sealed class WorkerTests {
         string EnsuresSource,
         Func<long, bool> Requires,
         Func<long, long, bool> Ensures,
-        WorkerVerificationStatus ExpectedStatus,
+        WorkerClaimOutcome ExpectedStatus,
         long[] Inputs);
 
     private const string TautologySource =
@@ -1844,6 +2101,21 @@ public sealed class WorkerTests {
         public async Task<BackendCheckResult> CheckAsync(
             VerificationQuery query,
             CancellationToken cancellationToken) {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return BackendCheckResult.Unknown(
+                BackendFailureReason.InfrastructureFailure);
+        }
+    }
+
+    private sealed class UnavailableThenDelayingBackend : ISmtBackend {
+        private int _calls;
+
+        public async Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken) {
+            if (Interlocked.Increment(ref _calls) == 1)
+                return BackendCheckResult.Unknown(
+                    BackendFailureReason.Unavailable);
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             return BackendCheckResult.Unknown(
                 BackendFailureReason.InfrastructureFailure);

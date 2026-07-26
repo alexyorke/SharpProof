@@ -17,7 +17,7 @@ internal sealed record WorkerPerformanceMeasurements(
 internal static class WorkerPerformanceProbe {
     private const int CooperativeProjectWallMilliseconds = 100;
     private const int CooperativeTerminationGraceMilliseconds = 10_000;
-    private const int ForcedTerminationProbeHeadroomMilliseconds = 50;
+    private const int ForcedTerminationProbeHeadroomMilliseconds = 100;
     private const int LauncherWorkloadMethods = 384;
 
     internal static async Task<WorkerPerformanceMeasurements> MeasureAsync(
@@ -64,19 +64,33 @@ internal static class WorkerPerformanceProbe {
 
             var stopwatch = Stopwatch.StartNew();
             await cancellation.CancelAsync().ConfigureAwait(false);
-            try {
-                _ = await verification.ConfigureAwait(false);
-                throw new InvalidOperationException(
-                    "The worker ignored a canceled verification request.");
-            }
-            catch (OperationCanceledException)
-                when (cancellation.IsCancellationRequested) {
-            }
+            var response = await verification.ConfigureAwait(false);
             stopwatch.Stop();
+            if (!IsCompleteCancellation(response))
+                throw new InvalidOperationException(
+                    "The worker did not return a complete typed cancellation.");
             latencies[index] = stopwatch.Elapsed.TotalMilliseconds;
         }
         return latencies;
     }
+
+    private static bool IsCompleteCancellation(WorkerVerifyResponse response) =>
+        response.RunStatus == WorkerRunStatus.Canceled &&
+        response.FailureReason == WorkerRunFailureReason.None &&
+        response.Errors.Length == 0 &&
+        response.Manifest.Callables.Length > 0 &&
+        response.Manifest.Claims.Length > 0 &&
+        response.CallableResults.All(static result =>
+            result is {
+                Coverage: WorkerCallableCoverage.Incomplete,
+                Reason: WorkerCallableCoverageReason.Canceled
+            }) &&
+        response.ClaimResults.All(static result =>
+            result is {
+                Outcome: WorkerClaimOutcome.Unknown,
+                Reason: WorkerClaimReason.Canceled
+            }) &&
+        WorkerProtocolJson.Validate(response).IsValid;
 
     private static async Task VerifyCooperativeLauncherCancellationAsync(
         string repositoryRoot,
@@ -100,7 +114,7 @@ internal static class WorkerPerformanceProbe {
                 10_000,
                 cancellationToken)
             .ConfigureAwait(false);
-        if (result.ExitCode != 0)
+        if (result.ExitCode != 124)
             throw new InvalidOperationException(
                 "The real worker did not complete its project-timeout path " +
                 "through the launcher. Exit code: " +
@@ -116,8 +130,12 @@ internal static class WorkerPerformanceProbe {
             throw new InvalidOperationException(
                 "The real worker produced no timeout response.");
         if (response.Errors.Length != 0 ||
-            !response.Records.Any(static record =>
-                record.Reason == WorkerVerificationReason.ProjectTimeout))
+            response.RunStatus != WorkerRunStatus.TimedOut ||
+            !response.ClaimResults.Any(static result =>
+                result.Reason == WorkerClaimReason.ProjectTimeout) &&
+            !response.CallableResults.Any(static result =>
+                result.Reason ==
+                WorkerCallableCoverageReason.ProjectTimeout))
             throw new InvalidOperationException(
                 "The real worker did not report a cooperative project timeout.");
     }
@@ -229,6 +247,9 @@ internal static class WorkerPerformanceProbe {
         AddOption(startInfo, "output-type", "Library");
         AddOption(startInfo, "platform-target", "AnyCPU");
         AddOption(startInfo, "prefer-32-bit", false);
+        AddOption(startInfo, "features", "all");
+        AddOption(startInfo, "verify-policy", "advisory");
+        AddOption(startInfo, "assumption-policy", "allow");
         AddOption(
             startInfo,
             "query-rlimit",

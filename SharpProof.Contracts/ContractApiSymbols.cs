@@ -7,8 +7,7 @@ internal sealed class ContractApiSymbols(
     INamedTypeSymbol contractFor,
     INamedTypeSymbol notNull,
     INamedTypeSymbol positive,
-    INamedTypeSymbol inRange,
-    INamedTypeSymbol? pure) {
+    INamedTypeSymbol inRange) {
     private ContractClauseSymbols Clauses { get; } = clauses;
     internal IMethodSymbol Result { get; } = result;
     internal IMethodSymbol Old { get; } = old;
@@ -16,7 +15,6 @@ internal sealed class ContractApiSymbols(
     internal INamedTypeSymbol NotNull { get; } = notNull;
     internal INamedTypeSymbol Positive { get; } = positive;
     internal INamedTypeSymbol InRange { get; } = inRange;
-    internal INamedTypeSymbol? Pure { get; } = pure;
 
     internal static ContractApiSymbols? TryCreate(Compilation compilation) {
         var clauses = ContractClauseSymbols.TryCreate(compilation);
@@ -28,8 +26,6 @@ internal sealed class ContractApiSymbols(
             "SharpProof.Attributes.PositiveAttribute");
         var inRange = compilation.GetTypeByMetadataName(
             "SharpProof.Attributes.InRangeAttribute");
-        var pure = compilation.GetTypeByMetadataName(
-            "SharpProof.Attributes.PureAttribute");
         if (clauses == null || contractFor == null || notNull == null ||
             positive == null || inRange == null)
             return null;
@@ -45,8 +41,7 @@ internal sealed class ContractApiSymbols(
             contractFor,
             notNull,
             positive,
-            inRange,
-            pure);
+            inRange);
     }
 
     internal BoundContractKind? GetClauseKind(IMethodSymbol method) =>

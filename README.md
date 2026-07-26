@@ -10,16 +10,17 @@ SharpProof has three semantic outcomes:
 - `Refuted`: an executable counterexample or effect trace was replayed.
 - `Unknown`: the language, model, evidence, or resource budget was insufficient.
 
-Unsupported analyzer code normally produces no feature diagnostic. That silence
-is an abstention, not a proof.
+The default `advisory` profile is quiet for unannotated code. Unsupported code
+that is explicitly selected by a SharpProof contract or annotation produces
+SP0047 instead of disappearing. Diagnostic silence is still not a proof.
 
 ## What works today
 
 | Surface | Current capability | User-visible result |
 |---|---|---|
-| Effect analyzer | Checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, and `[AllowedExceptions]` over the admitted source subset | Opt-in "not proven" diagnostics |
+| Effect analyzer | Checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, and `[AllowedExceptions]` over the admitted source subset | Advisory "not proven" diagnostics on selected code |
 | Contract analyzer | Replays definitely executed, compiler-bound `Contract.Requires(...)` clauses with exact call inputs | SP0027 only when the precondition concretely evaluates to false |
-| Worker | Verifies bounded `Contract.Ensures(...)` obligations over acyclic Boolean/integer bodies and a few exact API-result facts | `Proven`, replay-validated `Refuted`, or typed `Unknown` records |
+| Worker | Builds an accountable claim manifest and verifies bounded `Contract.Ensures(...)` obligations over acyclic Boolean/integer bodies and a few exact API-result facts | One `Proven`, replay-validated `Refuted`, or typed `Unknown` result for every manifest claim |
 
 The analyzer does not run SMT or load Z3. General source-callee
 assume/guarantee verification, loops in the worker, mutable-heap
@@ -35,29 +36,37 @@ Reference the preview package:
                   PrivateAssets="all" />
 ```
 
-The package defaults to `off` and does not add its analyzer assemblies to the
-compiler. Enable one compilation-global mode:
+The package defaults to advisory analysis of both implemented feature groups:
 
 ```xml
 <PropertyGroup>
-  <SharpProofMode>all-experimental</SharpProofMode>
+  <SharpProofProfile>advisory</SharpProofProfile>
+  <SharpProofFeatures>all</SharpProofFeatures>
 </PropertyGroup>
 ```
 
-Valid values are:
+`SharpProofProfile` values are:
 
-- `off`: no analyzer feature pipeline; this is the default.
-- `effects`: effect contracts only.
-- `contracts`: concrete call-site `Requires` checking only.
-- `all-experimental`: both analyzer groups.
+- `advisory` (default): analyze selected code and keep unannotated code quiet.
+- `strict`: use the same analyzer features, enable the verifier, default its
+  result policy to `require-proven`, and reject user/trusted evidence by
+  default.
+- `off`: omit the analyzer and generator from compiler analyzer items and skip
+  verification.
 
-A custom analyzer host may instead provide the compilation-global
-`sharpproof_mode` analyzer-config key. A tree-scoped `.editorconfig` value is
-invalid because the mode must be compilation-global.
+`SharpProofFeatures` values are `effects`, `contracts`, and `all` (the
+default). The same value is serialized as the protocol-v3 request feature set
+and filters the worker manifest: `contracts` excludes effect-only annotations,
+`effects` excludes postcondition claims and contract assumptions, and `all`
+selects both surfaces. The current worker has no effect-proof claims, so an
+effect-selected callable remains visible with incomplete callable coverage and
+SP0047 instead of being treated as proven. A custom analyzer host can use the
+compilation-global
+`sharpproof_profile` and `sharpproof_features` analyzer-config keys. Tree-local
+values are invalid because selection is compilation-global.
 
-Mode selection and diagnostic selection are separate opt-ins. Feature
-diagnostics are Info and disabled by default, so enable the IDs you want in
-`.editorconfig`:
+Feature diagnostics are enabled `Info` diagnostics by default. Use normal
+Roslyn configuration to promote, demote, or suppress the IDs:
 
 ```ini
 [*.cs]
@@ -68,15 +77,34 @@ dotnet_diagnostic.SP0045.severity = suggestion
 dotnet_diagnostic.SP0046.severity = suggestion
 ```
 
-SP0024, for malformed supported control/effect arguments, is an enabled Error.
-SP0025, for invalid analyzer configuration, is an enabled Warning. SP0013,
+SP0024, for malformed supported control/effect arguments, is an Error.
+SP0025, for invalid analyzer configuration, is a Warning. SP0013,
 SP0015, and SP0030 are reserved until concrete effect-trace replay exists; the
 current may-effect analyzer does not emit them.
 
+`SharpProofMode` and `sharpproof_mode` remain preview-only compatibility
+aliases with values `off`, `effects`, `contracts`, and `all-experimental`.
+They are deprecated, cannot be combined with the replacement profile/feature
+settings, and are planned for removal before RC.
+
+For strict CI:
+
+```xml
+<PropertyGroup>
+  <SharpProofProfile>strict</SharpProofProfile>
+</PropertyGroup>
+```
+
+This implies `SharpProofVerify=true`,
+`SharpProofVerifyPolicy=require-proven`, and
+`SharpProofAssumptionPolicy=error` unless explicitly overridden. Strict mode
+rejects `SharpProofVerify=false`; use `advisory` when worker execution must
+remain optional.
+
 ## Effect contracts
 
-This test-backed example is accepted without a feature diagnostic in `effects`
-or `all-experimental` mode:
+This test-backed example is accepted without a feature diagnostic when
+`SharpProofFeatures` is `effects` or `all`:
 
 ```csharp
 using SharpProof.Attributes;
@@ -124,8 +152,10 @@ expressions, locals, assignments, direct calls, object and array creation,
 Async, iterators, `foreach`, closures, local functions, delegates, dynamic
 binding, ref parameters or locals, ref returns, ref-like and pointer shapes,
 open generic shapes, patterns, queries, ranges, collection expressions, and
-unknown future Roslyn operation kinds abstain silently. A closed constructed
-generic API call is admitted only when its exact specification resolves.
+unknown future Roslyn operation kinds abstain. Explicitly annotated unsupported
+methods report SP0047; unsupported unannotated methods remain silent. A closed
+constructed generic API call is admitted only when its exact specification
+resolves.
 
 ## Concrete call-site preconditions
 
@@ -140,16 +170,17 @@ public static class Preconditions {
     }
 
     public static void BadCall() {
-        Positive(-1); // SP0027 when contracts mode and SP0027 are enabled
+        Positive(-1); // SP0027 when contract features are enabled
     }
 }
 ```
 
-SP0027 is emitted only when the call is definitely executed, all normally
-evaluated receiver and argument expressions lower exactly, the prefix is known
-not to throw, and the instantiated precondition replays to `false`. Unknown
-arguments, conditional execution, unsupported expressions, and potentially
-throwing prefixes are silent.
+SP0027 covers ordinary invocations and object creation. It is emitted only when
+the call is definitely executed, all normally evaluated receiver and argument
+expressions lower exactly, the prefix is known not to throw, and the
+instantiated precondition replays to `false`. Unknown arguments, conditional
+execution, unsupported expressions, and potentially throwing prefixes are
+silent.
 
 `Contract.Requires`, `Contract.Ensures`, and `Contract.Assume` carry
 `[Conditional("SHARPPROOF_CONTRACTS")]`. Normal builds therefore erase the
@@ -193,37 +224,74 @@ Opt into worker execution on Windows x64:
 dotnet build /p:SharpProofVerify=true
 ```
 
-`SharpProofVerify` is independent of `SharpProofMode` and editor diagnostic
-settings. It runs after compilation, outside design-time builds. The default
-result is written under:
+`SharpProofVerify` remains optional in `advisory`; the `strict` profile
+requires it. It runs after compilation, outside design-time builds. Each
+invocation uses isolated request, result, and input-list paths. After protocol
+validation, a cross-process mutex serializes publication and each stable file
+is atomically replaced; if the second replacement fails, the first is rolled
+back. Completed writers leave a matching pair, but the two files do not change
+at one indivisible instant. The default result is published under:
 
 ```text
 obj/<Configuration>/<TargetFramework>/SharpProof/result.json
 ```
 
-Each `Ensures` clause receives a versioned record:
+Worker protocol version 3 separates the project run from semantic claim
+outcomes. Its `Features` request field applies `SharpProofFeatures` before
+manifest construction. A compiler-symbol-based manifest selects callables and
+assigns stable `spc1:` semantic IDs to direct clauses, companion clauses, and
+return attributes. The manifest uses manifest schema version 1. The response must
+contain exactly one result for every manifest claim: no missing, duplicate,
+invented, or clause-zero placeholder records are valid. Callable coverage is
+separately `Complete` or `Incomplete`, and the run is `Complete`, `TimedOut`,
+`Canceled`, or `Failed`.
+
+Each manifest claim receives:
 
 - `Proven` carries its canonical proof core, which can be empty for a hygienic
   tautology.
 - `Refuted` has a replay-validated concrete model and fails the build with
   worker exit code 5.
-- `Unknown` has a closed reason such as `UnsupportedBody`, `DeepEnsures`,
-  `ResourceLimit`, or `MethodTimeout`. A valid `Unknown` record does not by
-  itself fail the build.
+- `Unknown` has a closed reason such as `UnsupportedBody`,
+  `DeepPostcondition`, `ResourceLimit`, or `MethodTimeout`.
 
-Malformed input, compiler errors, protocol errors, containment failure, and a
-hard worker timeout fail the build. The worker uses deterministic query,
-method, project, expression-depth, memory, process, and parallelism limits. Its
+`SharpProofVerifyPolicy` controls a valid incomplete result:
+
+- `advisory` (default) emits SP0047 as information;
+- `warn-on-unknown` emits SP0047 as a warning;
+- `require-proven` emits SP0047 as an error and fails unless all selected
+  claims are proven.
+
+`SharpProofAssumptionPolicy` is `allow`, `warn`, or `error`. SP0048 reports
+declared `Contract.Assume` and trusted-boundary evidence at the matching
+severity. The advisory default is `allow`; strict defaults to `error`.
+
+Malformed input, compiler errors, protocol/backend/replay errors, containment
+failure, infrastructure failure, and a hard worker timeout fail the build
+under every policy. The worker uses deterministic query, method, project,
+expression-depth, memory, process, and parallelism limits. Its
 content-addressed cache defaults to
 `obj/<Configuration>/<TargetFramework>/SharpProof/cache` in the MSBuild
-integration; only complete terminal `Proven` and replay-validated `Refuted`
-responses are cacheable.
+integration. Cache schema version 3 stores only a semantically complete
+payload whose manifest hash and exact claim set validate against the current
+request and whose outcomes are all `Proven` or replay-validated `Refuted`.
+Timeout, cancellation, `Unknown`, malformed, infrastructure, and failed-replay
+responses are not reusable.
+
+The result includes deterministic JSON counts by outcome and reason, evidence
+counts, cache status, versions, budgets, and elapsed time. SARIF projection is
+not implemented yet.
 
 The current body executor is capped at 64 reachable blocks, 64 return paths,
 and 4,096 execution states. It supports a Boolean/integer SMT proof domain.
 Loops, arbitrary source calls, loads/stores, mutable heap state, unsupported
 conversions, excessive expression depth, and exceeded bounds produce
 `Unknown`.
+
+Manifest discovery also accounts for postconditions in local functions,
+lambdas, anonymous methods, and top-level statements exactly once. Those
+callable forms are not executable by the current verifier and therefore receive
+visible `UnsupportedCallable` results instead of being silently omitted.
 
 The worker also has narrow, spec-justified support for:
 
@@ -234,6 +302,11 @@ The worker also has narrow, spec-justified support for:
 It does not treat `Enumerable.Empty<T>()` as array-backed sequence state, and a
 counterexample involving a spec-modeled call result is withheld when concrete
 replay cannot validate it.
+
+Current replay evaluates the lowered obligation-path IR used to build the SMT
+query. It is not yet the independent whole-body, exact-CFG interpreter required
+by the 1.0 release gate, so the preview must not be treated as production-ready
+counterexample validation.
 
 Within a worker target, `Requires` clauses are entry assumptions; the worker
 does not prove that callers satisfy them. `Assume` clauses are explicit
@@ -262,10 +335,9 @@ The currently consumed closed value attributes are:
 - `[InRange(minimum, maximum)]`
 
 On parameters they become preconditions. On method return values they become
-postconditions. Property and field declarations are not a general active
-closed-contract proof surface, even though the attribute types permit those
-targets. `[Pure]` exists in the attributes package but is not the effect
-enforcement attribute; use `[EnforcePure]` for current analyzer behavior.
+postconditions. The attribute declarations are restricted to parameter and
+return targets. The inactive `[Pure]` attribute has been removed; use
+`[EnforcePure]` for the implemented effect contract.
 
 ## Exact built-in API specifications
 
@@ -292,16 +364,28 @@ The checked-in acceptance contract declares these consumer target frameworks:
 - `net472`
 
 The analyzer and attributes are `netstandard2.0` and contain no verifier, Z3,
-or native solver payload. The packaged `SharpProof.Worker` is a `net8.0` tool with a
-Windows x64 native Z3 payload and mandatory Windows Job Object containment.
+or native solver payload. The current preview package carries
+`SharpProof.Worker` as a `net8.0` tool with a Windows x64 native Z3 payload and
+mandatory Windows Job Object containment.
 `SharpProofVerify=true` on a non-Windows host fails with an explicit
-unsupported-host build error; analyzer modes remain available.
+unsupported-host build error; portable analyzer features remain available.
 
 The full acceptance workflow runs on `windows-latest`. A separate
 package-consumer workflow restores and exercises analyzer consumers on Windows
 x64, Linux x64, and macOS Intel; only Windows x64 enables packaged worker
 verification. Real Visual Studio, Rider, and Windows ARM64 validation remain
 outstanding release gates.
+
+## Important integration gap
+
+The current package target still writes source/reference lists and the worker
+reconstructs a Roslyn compilation. It does not yet consume the final
+post-generator compiler `Compilation` through a closed compiler artifact.
+Consequently generated trees, `AdditionalFiles`, and every other final
+compiler-only input are not yet covered with the accountability required for
+1.0. Building that compiler artifact, deleting reconstruction after parity
+tests, adding SARIF output, and splitting the current preview payload into the
+three planned packages remain future production work.
 
 ## Build and validate this repository
 

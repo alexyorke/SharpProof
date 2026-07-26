@@ -45,28 +45,24 @@ public static class IrSubstitution {
             replacements.TryGetValue(variable.Variable, out var replacement))
             return replacement;
         if (memo.TryGetValue(term.Id, out var existing)) return existing;
+        IrTerm Visit(IrTerm child) => Rewrite(factory, child, replacements, memo);
         var rewritten = term switch {
             IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrNullTerm or IrVariableTerm => term,
             IrOpaqueTerm opaque => RewriteOpaque(factory, opaque, replacements, memo),
-            IrUnaryTerm unary => factory.Unary(
-                unary.Operator,
-                Rewrite(factory, unary.Operand, replacements, memo)),
+            IrUnaryTerm unary => factory.Unary(unary.Operator, Visit(unary.Operand)),
             IrBinaryTerm binary => factory.Binary(
                 binary.Operator,
-                Rewrite(factory, binary.Left, replacements, memo),
-                Rewrite(factory, binary.Right, replacements, memo)),
+                Visit(binary.Left),
+                Visit(binary.Right)),
             IrConditionalTerm conditional => factory.Conditional(
-                Rewrite(factory, conditional.Condition, replacements, memo),
-                Rewrite(factory, conditional.WhenTrue, replacements, memo),
-                Rewrite(factory, conditional.WhenFalse, replacements, memo)),
-            IrCastTerm cast => factory.Cast(
-                cast.Type,
-                Rewrite(factory, cast.Operand, replacements, memo)),
-            IrLengthTerm length => factory.Length(
-                Rewrite(factory, length.Value, replacements, memo)),
+                Visit(conditional.Condition),
+                Visit(conditional.WhenTrue),
+                Visit(conditional.WhenFalse)),
+            IrCastTerm cast => factory.Cast(cast.Type, Visit(cast.Operand)),
+            IrLengthTerm length => factory.Length(Visit(length.Value)),
             IrSequenceAccessTerm access => factory.SequenceAccess(
-                Rewrite(factory, access.Sequence, replacements, memo),
-                Rewrite(factory, access.Index, replacements, memo)),
+                Visit(access.Sequence),
+                Visit(access.Index)),
             _ => throw new InvalidOperationException("Unknown IR term kind: " + term.Kind + ".")
         };
         memo.Add(term.Id, rewritten);

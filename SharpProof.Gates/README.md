@@ -63,14 +63,14 @@ The performance gate reads all limits from
 `eng/acceptance/contract.json`. It refuses to run if the release protocol
 is not exactly five warmups, 30 samples, and 200 IDE edits.
 
-The package smoke gate separately proves that `SharpProofMode=off` contributes
-no analyzer items and that an enabled mode contributes both the analyzer and
-contract generator. The default-off performance path can therefore compare
-two equivalent analyzer-free Roslyn compilations. Samples are interleaved and
-each contains 50 compilation/diagnostic runs to suppress timer quantization
-and scheduler noise. Managed retained memory holds 40 distinct compilation
-graphs live after a full collection. Relative and absolute retained-memory
-limits are enforced independently.
+The package smoke gate separately proves that `SharpProofProfile=off`
+contributes no analyzer items and that advisory/strict profiles contribute both
+the analyzer and contract generator. The off-profile performance path can
+therefore compare two equivalent analyzer-free Roslyn compilations. Samples
+are interleaved and each contains 50 compilation/diagnostic runs to suppress
+timer quantization and scheduler noise. Managed retained memory holds 40
+distinct compilation graphs live after a full collection. Relative and
+absolute retained-memory limits are enforced independently.
 
 An independent enabled-analyzer retention probe analyzes 40 distinct
 effects-enabled compilations. Each compilation is created in a non-inlined
@@ -81,5 +81,11 @@ bounds the process-retained managed-memory increase.
 The IDE gate applies and analyzes 200 single-token edits with effects enabled.
 It enforces p95 and maximum latency. A separate 30-sample worker-core gate
 measures cancel-to-exit latency, while a real launcher process test measures
-the forced-termination deadline independently. The default-off and IDE
+the forced-termination deadline independently. The off-profile and IDE
 analyzer performance paths reference neither SMT nor Z3.
+
+Worker/package tests also exercise protocol version 3 manifest equality,
+stable claim IDs, policy-controlled SP0047/SP0048 output, cache validation
+against the current manifest, and fatal run handling. The compiler artifact
+for the final generated `Compilation` and SARIF projection are not implemented
+release gates yet.

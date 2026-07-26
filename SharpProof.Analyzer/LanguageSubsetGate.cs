@@ -37,136 +37,35 @@ internal readonly struct LanguageSubsetDecision {
 
 internal static class LanguageSubsetGate {
     internal static readonly ImmutableDictionary<OperationKind, bool> OperationKindDecisions =
-        new Dictionary<OperationKind, bool> {
-            [OperationKind.None] = false,
-            [OperationKind.Invalid] = false,
-            [OperationKind.Block] = true,
-            [OperationKind.VariableDeclarationGroup] = true,
-            [OperationKind.Switch] = true,
-            [OperationKind.Loop] = true,
-            [OperationKind.Labeled] = true,
-            [OperationKind.Branch] = true,
-            [OperationKind.Empty] = true,
-            [OperationKind.Return] = true,
-            [OperationKind.YieldBreak] = false,
-            [OperationKind.Lock] = true,
-            [OperationKind.Try] = true,
-            [OperationKind.Using] = true,
-            [OperationKind.YieldReturn] = false,
-            [OperationKind.ExpressionStatement] = true,
-            [OperationKind.LocalFunction] = false,
-            [OperationKind.Stop] = false,
-            [OperationKind.End] = false,
-            [OperationKind.RaiseEvent] = false,
-            [OperationKind.Literal] = true,
-            [OperationKind.Conversion] = true,
-            [OperationKind.Invocation] = true,
-            [OperationKind.ArrayElementReference] = true,
-            [OperationKind.LocalReference] = true,
-            [OperationKind.ParameterReference] = true,
-            [OperationKind.FieldReference] = true,
-            [OperationKind.MethodReference] = false,
-            [OperationKind.PropertyReference] = true,
-            [OperationKind.EventReference] = false,
-            [OperationKind.Unary] = true,
-            [OperationKind.Binary] = true,
-            [OperationKind.Conditional] = true,
-            [OperationKind.Coalesce] = true,
-            [OperationKind.AnonymousFunction] = false,
-            [OperationKind.ObjectCreation] = true,
-            [OperationKind.TypeParameterObjectCreation] = false,
-            [OperationKind.ArrayCreation] = true,
-            [OperationKind.InstanceReference] = true,
-            [OperationKind.IsType] = true,
-            [OperationKind.Await] = false,
-            [OperationKind.SimpleAssignment] = true,
-            [OperationKind.CompoundAssignment] = true,
-            [OperationKind.Parenthesized] = true,
-            [OperationKind.EventAssignment] = false,
-            [OperationKind.ConditionalAccess] = true,
-            [OperationKind.ConditionalAccessInstance] = true,
-            [OperationKind.InterpolatedString] = true,
-            [OperationKind.AnonymousObjectCreation] = false,
-            [OperationKind.ObjectOrCollectionInitializer] = true,
-            [OperationKind.MemberInitializer] = true,
-            // OperationKind.CollectionElementInitializer (52) is obsolete but remains
-            // part of the Roslyn 4.14 enum and must stay explicitly fail-closed.
-            [(OperationKind)52] = false,
-            [OperationKind.NameOf] = true,
-            [OperationKind.Tuple] = false,
-            [OperationKind.DynamicObjectCreation] = false,
-            [OperationKind.DynamicMemberReference] = false,
-            [OperationKind.DynamicInvocation] = false,
-            [OperationKind.DynamicIndexerAccess] = false,
-            [OperationKind.TranslatedQuery] = false,
-            [OperationKind.DelegateCreation] = false,
-            [OperationKind.DefaultValue] = true,
-            [OperationKind.TypeOf] = true,
-            [OperationKind.SizeOf] = false,
-            [OperationKind.AddressOf] = false,
-            [OperationKind.IsPattern] = false,
-            [OperationKind.Increment] = true,
-            [OperationKind.Throw] = true,
-            [OperationKind.Decrement] = true,
-            [OperationKind.DeconstructionAssignment] = false,
-            [OperationKind.DeclarationExpression] = false,
-            [OperationKind.OmittedArgument] = false,
-            [OperationKind.FieldInitializer] = true,
-            [OperationKind.VariableInitializer] = true,
-            [OperationKind.PropertyInitializer] = true,
-            [OperationKind.ParameterInitializer] = true,
-            [OperationKind.ArrayInitializer] = true,
-            [OperationKind.VariableDeclarator] = true,
-            [OperationKind.VariableDeclaration] = true,
-            [OperationKind.Argument] = true,
-            [OperationKind.CatchClause] = true,
-            [OperationKind.SwitchCase] = true,
-            [OperationKind.CaseClause] = true,
-            [OperationKind.InterpolatedStringText] = true,
-            [OperationKind.Interpolation] = true,
-            [OperationKind.ConstantPattern] = false,
-            [OperationKind.DeclarationPattern] = false,
-            [OperationKind.TupleBinary] = false,
-            [OperationKind.MethodBody] = true,
-            [OperationKind.ConstructorBody] = true,
-            [OperationKind.Discard] = true,
-            [OperationKind.FlowCapture] = true,
-            [OperationKind.FlowCaptureReference] = true,
-            [OperationKind.IsNull] = true,
-            [OperationKind.CaughtException] = true,
-            [OperationKind.StaticLocalInitializationSemaphore] = false,
-            [OperationKind.FlowAnonymousFunction] = false,
-            [OperationKind.CoalesceAssignment] = true,
-            [OperationKind.Range] = false,
-            [OperationKind.ReDim] = false,
-            [OperationKind.ReDimClause] = false,
-            [OperationKind.RecursivePattern] = false,
-            [OperationKind.DiscardPattern] = false,
-            [OperationKind.SwitchExpression] = false,
-            [OperationKind.SwitchExpressionArm] = false,
-            [OperationKind.PropertySubpattern] = false,
-            [OperationKind.UsingDeclaration] = true,
-            [OperationKind.NegatedPattern] = false,
-            [OperationKind.BinaryPattern] = false,
-            [OperationKind.TypePattern] = false,
-            [OperationKind.RelationalPattern] = false,
-            [OperationKind.With] = false,
-            [OperationKind.InterpolatedStringHandlerCreation] = false,
-            [OperationKind.InterpolatedStringAddition] = false,
-            [OperationKind.InterpolatedStringAppendLiteral] = false,
-            [OperationKind.InterpolatedStringAppendFormatted] = false,
-            [OperationKind.InterpolatedStringAppendInvalid] = false,
-            [OperationKind.InterpolatedStringHandlerArgumentPlaceholder] = false,
-            [OperationKind.FunctionPointerInvocation] = false,
-            [OperationKind.ListPattern] = false,
-            [OperationKind.SlicePattern] = false,
-            [OperationKind.ImplicitIndexerReference] = false,
-            [OperationKind.Utf8String] = false,
-            [OperationKind.Attribute] = true,
-            [OperationKind.InlineArrayAccess] = false,
-            [OperationKind.CollectionExpression] = false,
-            [OperationKind.Spread] = false
-        }.ToImmutableDictionary();
+        Enum.GetValues(typeof(OperationKind))
+            .Cast<OperationKind>()
+            .Distinct()
+            .ToImmutableDictionary(
+                static kind => kind,
+                static kind => IsSupportedOperationKind(kind));
+
+    private static bool IsSupportedOperationKind(OperationKind kind) =>
+        kind is
+            >= OperationKind.Block and <= OperationKind.Return or
+            >= OperationKind.Lock and <= OperationKind.Using or
+            OperationKind.ExpressionStatement or
+            >= OperationKind.Literal and <= OperationKind.FieldReference or
+            OperationKind.PropertyReference or
+            >= OperationKind.Unary and <= OperationKind.Coalesce or
+            OperationKind.ObjectCreation or
+            >= OperationKind.ArrayCreation and <= OperationKind.IsType or
+            >= OperationKind.SimpleAssignment and <= OperationKind.Parenthesized or
+            >= OperationKind.ConditionalAccess and <= OperationKind.InterpolatedString or
+            >= OperationKind.ObjectOrCollectionInitializer and
+                <= OperationKind.MemberInitializer or
+            OperationKind.NameOf or
+            >= OperationKind.DefaultValue and <= OperationKind.TypeOf or
+            >= OperationKind.Increment and <= OperationKind.Decrement or
+            >= OperationKind.FieldInitializer and <= OperationKind.Interpolation or
+            >= OperationKind.MethodBody and <= OperationKind.CaughtException or
+            OperationKind.CoalesceAssignment or
+            OperationKind.UsingDeclaration or
+            OperationKind.Attribute;
 
     internal static LanguageSubsetDecision ClassifyEffects(
         IMethodSymbol method,
@@ -213,30 +112,21 @@ internal static class LanguageSubsetGate {
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         var root = semanticModel.GetOperation(declaration, cancellationToken);
-        if (root == null)
-            root = declaration switch {
-                BaseMethodDeclarationSyntax { Body: not null } method =>
-                    semanticModel.GetOperation(method.Body, cancellationToken),
-                BaseMethodDeclarationSyntax { ExpressionBody: not null } method =>
-                    semanticModel.GetOperation(
-                        method.ExpressionBody.Expression,
-                        cancellationToken),
-                AccessorDeclarationSyntax { Body: not null } accessor =>
-                    semanticModel.GetOperation(accessor.Body, cancellationToken),
-                AccessorDeclarationSyntax { ExpressionBody: not null } accessor =>
-                    semanticModel.GetOperation(
-                        accessor.ExpressionBody.Expression,
-                        cancellationToken),
-                PropertyDeclarationSyntax { ExpressionBody: not null } property =>
-                    semanticModel.GetOperation(
-                        property.ExpressionBody.Expression,
-                        cancellationToken),
-                IndexerDeclarationSyntax { ExpressionBody: not null } indexer =>
-                    semanticModel.GetOperation(
-                        indexer.ExpressionBody.Expression,
-                        cancellationToken),
-                _ => null
-            };
+        if (root != null) return [root];
+        var fallback = declaration switch {
+            BaseMethodDeclarationSyntax method =>
+                (SyntaxNode?)method.Body ?? method.ExpressionBody?.Expression,
+            AccessorDeclarationSyntax accessor =>
+                (SyntaxNode?)accessor.Body ?? accessor.ExpressionBody?.Expression,
+            PropertyDeclarationSyntax property =>
+                property.ExpressionBody?.Expression,
+            IndexerDeclarationSyntax indexer =>
+                indexer.ExpressionBody?.Expression,
+            _ => null
+        };
+        root = fallback == null
+            ? null
+            : semanticModel.GetOperation(fallback, cancellationToken);
         return root == null ? [] : [root];
     }
 
@@ -344,23 +234,20 @@ internal static class LanguageSubsetGate {
         IsUnsupportedType(method.ReturnType) ||
         method.ContainingType.TypeArguments.Any(IsUnsupportedType);
 
-    private static bool IsUnsupportedType(ITypeSymbol? type) {
-        if (type == null) return false;
-        if (type.TypeKind is
+    private static bool IsUnsupportedType(ITypeSymbol? type) =>
+        type?.TypeKind is
             TypeKind.Delegate or
             TypeKind.Dynamic or
             TypeKind.FunctionPointer or
             TypeKind.Pointer or
-            TypeKind.TypeParameter)
-            return true;
-        return type switch {
+            TypeKind.TypeParameter ||
+        type switch {
             IArrayTypeSymbol array => IsUnsupportedType(array.ElementType),
             INamedTypeSymbol named =>
                 named.IsRefLikeType ||
                 named.TypeArguments.Any(IsUnsupportedType),
             _ => false
         };
-    }
 
     private static bool ContainsUnsafeSyntax(SyntaxNode declaration) =>
         declaration.DescendantNodesAndSelf().Any(static node => node is UnsafeStatementSyntax) ||

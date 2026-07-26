@@ -1,5 +1,4 @@
 namespace SharpProof.Worker;
-
 internal sealed class MethodResourceBudget {
     private readonly Func<long>? _readConsumedResourceCount;
     private readonly long _queryRlimit;

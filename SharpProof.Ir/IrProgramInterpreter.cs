@@ -17,15 +17,9 @@ public sealed class IrProgramExecutionResult {
         IrUnsupportedInfo? unsupported,
         IrExceptionInfo? exception,
         ImmutableDictionary<IrVarId, IrValue> values,
-        int steps) {
-        Status = status;
-        ReturnValue = returnValue;
-        Instruction = instruction;
-        Unsupported = unsupported;
-        Exception = exception;
-        Values = values;
-        Steps = steps;
-    }
+        int steps) =>
+        (Status, ReturnValue, Instruction, Unsupported, Exception, Values, Steps) =
+        (status, returnValue, instruction, unsupported, exception, values, steps);
 
     public IrProgramExecutionStatus Status { get; }
     public IrValue? ReturnValue { get; }
@@ -91,33 +85,21 @@ public sealed class IrProgramInterpreter(IrFactory factory) {
                                 steps);
                         values[assign.Target] = assigned.Value!;
                         break;
-                    case IrAssumeInstruction assume:
-                        var assumed = _terms.Evaluate(assume.Condition, values);
-                        if (assumed.Status != IrEvaluationStatus.Value)
-                            return FromEvaluation(
-                                assumed,
-                                assume,
-                                values,
-                                steps);
-                        if (!assumed.Value!.Boolean)
+                    case IrAssumeInstruction or IrAssertInstruction:
+                        var testedCondition = instruction switch {
+                            IrAssumeInstruction assume => assume.Condition,
+                            IrAssertInstruction assertion => assertion.Condition,
+                            _ => throw new InvalidOperationException()
+                        };
+                        var tested = _terms.Evaluate(testedCondition, values);
+                        if (tested.Status != IrEvaluationStatus.Value)
+                            return FromEvaluation(tested, instruction, values, steps);
+                        if (!tested.Value!.Boolean)
                             return Result(
-                                IrProgramExecutionStatus.AssumptionViolated,
-                                assume,
-                                values,
-                                steps);
-                        break;
-                    case IrAssertInstruction assertion:
-                        var asserted = _terms.Evaluate(assertion.Condition, values);
-                        if (asserted.Status != IrEvaluationStatus.Value)
-                            return FromEvaluation(
-                                asserted,
-                                assertion,
-                                values,
-                                steps);
-                        if (!asserted.Value!.Boolean)
-                            return Result(
-                                IrProgramExecutionStatus.AssertionFailed,
-                                assertion,
+                                instruction is IrAssumeInstruction
+                                    ? IrProgramExecutionStatus.AssumptionViolated
+                                    : IrProgramExecutionStatus.AssertionFailed,
+                                instruction,
                                 values,
                                 steps);
                         break;
@@ -168,38 +150,24 @@ public sealed class IrProgramInterpreter(IrFactory factory) {
                             values,
                             steps,
                             "Concrete execution stopped at nondeterministic havoc.");
-                    case IrLoadInstruction load:
-                        var loadOperands = EvaluateLocationOperands(
-                            load.Location,
-                            storedValue: null,
+                    case IrLoadInstruction or IrStoreInstruction:
+                        var location = instruction is IrLoadInstruction load
+                            ? load.Location
+                            : ((IrStoreInstruction)instruction).Location;
+                        var storedValue = (instruction as IrStoreInstruction)?.Value;
+                        var locationOperands = EvaluateLocationOperands(
+                            location,
+                            storedValue,
                             values);
-                        if (loadOperands != null)
-                            return FromEvaluation(
-                                loadOperands,
-                                load,
-                                values,
-                                steps);
+                        if (locationOperands != null)
+                            return FromEvaluation(locationOperands, instruction, values, steps);
                         return Unsupported(
-                            load,
+                            instruction,
                             values,
                             steps,
-                            "Concrete execution requires a memory host for load.");
-                    case IrStoreInstruction store:
-                        var storeOperands = EvaluateLocationOperands(
-                            store.Location,
-                            store.Value,
-                            values);
-                        if (storeOperands != null)
-                            return FromEvaluation(
-                                storeOperands,
-                                store,
-                                values,
-                                steps);
-                        return Unsupported(
-                            store,
-                            values,
-                            steps,
-                            "Concrete execution requires a memory host for store.");
+                            instruction is IrLoadInstruction
+                                ? "Concrete execution requires a memory host for load."
+                                : "Concrete execution requires a memory host for store.");
                     case IrCallInstruction call:
                         var callOperands = EvaluateCallOperands(
                             call.Receiver,
@@ -267,23 +235,9 @@ public sealed class IrProgramInterpreter(IrFactory factory) {
                     if (storedValueResult.Status != IrEvaluationStatus.Value)
                         return storedValueResult;
                 }
-                if (sequenceResult.Value!.Kind == IrValueKind.Null)
-                    return IrEvaluationResult.FromException(
-                        IrExceptionKind.NullReference,
-                        "Sequence access used a null receiver.");
-                if (sequenceResult.Value.Kind != IrValueKind.Sequence)
-                    return InvalidValue(
-                        "Sequence access requires a sequence value.");
-                if (indexResult.Value!.Kind != IrValueKind.Integer)
-                    return InvalidValue(
-                        "Sequence access requires an integer index.");
-                if (indexResult.Value.Integer < 0 ||
-                    indexResult.Value.Integer >=
-                    sequenceResult.Value.Elements.Length)
-                    return IrEvaluationResult.FromException(
-                        IrExceptionKind.IndexOutOfRange,
-                        "The sequence index is outside the valid range.");
-                return null;
+                return IrInterpreter.ValidateSequenceAccess(
+                    sequenceResult.Value!,
+                    indexResult.Value!);
             default:
                 return IrEvaluationResult.FromUnsupported(
                     IrUnsupportedReason.UnsupportedOperation,
@@ -321,34 +275,21 @@ public sealed class IrProgramInterpreter(IrFactory factory) {
             : null;
     }
 
-    private static IrEvaluationResult InvalidValue(string detail) =>
-        IrEvaluationResult.FromUnsupported(
-            IrUnsupportedReason.InvalidVariableValue,
-            detail);
-
     private static IrProgramExecutionResult FromEvaluation(
         IrEvaluationResult evaluation,
         IrInstruction instruction,
         ImmutableDictionary<IrVarId, IrValue>.Builder values,
         int steps) =>
-        evaluation.Status switch {
-            IrEvaluationStatus.Exception => new IrProgramExecutionResult(
-                IrProgramExecutionStatus.Exception,
-                null,
-                instruction,
-                null,
-                evaluation.Exception,
-                values.ToImmutable(),
-                steps),
-            _ => new IrProgramExecutionResult(
-                IrProgramExecutionStatus.Unsupported,
-                null,
-                instruction,
-                evaluation.Unsupported,
-                null,
-                values.ToImmutable(),
-                steps)
-        };
+        new(
+            evaluation.Status == IrEvaluationStatus.Exception
+                ? IrProgramExecutionStatus.Exception
+                : IrProgramExecutionStatus.Unsupported,
+            null,
+            instruction,
+            evaluation.Status == IrEvaluationStatus.Exception ? null : evaluation.Unsupported,
+            evaluation.Status == IrEvaluationStatus.Exception ? evaluation.Exception : null,
+            values.ToImmutable(),
+            steps);
 
     private static IrProgramExecutionResult Unsupported(
         IrInstruction instruction,

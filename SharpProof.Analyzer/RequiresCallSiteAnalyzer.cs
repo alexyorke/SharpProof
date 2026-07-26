@@ -181,170 +181,118 @@ internal static class RequiresCallSiteAnalyzer {
             if (prior is not (
                     EmptyStatementSyntax or
                     LocalFunctionStatementSyntax) &&
-                !IsDefinitelyNonThrowing(
-                    semanticModel.GetOperation(prior, cancellationToken),
-                    semanticModel.Compilation,
-                    [],
-                    cancellationToken))
+                !new NonThrowingAnalysis(
+                        semanticModel.Compilation,
+                        cancellationToken)
+                    .IsDefinitelyNonThrowing(
+                        semanticModel.GetOperation(prior, cancellationToken)))
                 return false;
         return true;
     }
 
-    private static bool IsDefinitelyNonThrowing(
-        IOperation? operation,
+    private sealed class NonThrowingAnalysis(
         Compilation compilation,
-        HashSet<IMethodSymbol> activeMethods,
         CancellationToken cancellationToken) {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (operation == null) return false;
-        switch (operation) {
-            case ILiteralOperation:
-            case ILocalReferenceOperation:
-            case IParameterReferenceOperation:
-            case IDiscardOperation:
-            case IInstanceReferenceOperation:
-            case IDefaultValueOperation:
-            case ITypeOfOperation:
-            case INameOfOperation:
-                return true;
-            case IInvocationOperation invocation:
-                return !invocation.IsVirtual &&
-                       (invocation.Instance == null ||
-                        invocation.Instance is IInstanceReferenceOperation &&
-                        IsDefinitelyNonThrowing(
-                            invocation.Instance,
-                            compilation,
-                            activeMethods,
-                            cancellationToken)) &&
-                       invocation.Arguments.All(argument =>
-                           IsDefinitelyNonThrowing(
-                               argument.Value,
-                               compilation,
-                               activeMethods,
-                               cancellationToken)) &&
-                       IsDefinitelyNonThrowingSourceMethod(
-                           invocation.TargetMethod,
-                           compilation,
-                           activeMethods,
-                           cancellationToken);
-            case ISimpleAssignmentOperation assignment:
-                return assignment.Target is
-                           ILocalReferenceOperation or
-                           IParameterReferenceOperation or
-                           IDiscardOperation &&
-                       IsDefinitelyNonThrowing(
-                           assignment.Value,
-                           compilation,
-                           activeMethods,
-                           cancellationToken);
-            case IBinaryOperation binary:
-                return binary.OperatorMethod == null &&
-                       !binary.IsChecked &&
-                       binary.OperatorKind is not (
-                           BinaryOperatorKind.Divide or
-                           BinaryOperatorKind.Remainder) &&
-                       ChildrenAreDefinitelyNonThrowing(
-                           binary,
-                           compilation,
-                           activeMethods,
-                           cancellationToken);
-            case IUnaryOperation unary:
-                return unary.OperatorMethod == null &&
-                       !unary.IsChecked &&
-                       ChildrenAreDefinitelyNonThrowing(
-                           unary,
-                           compilation,
-                           activeMethods,
-                           cancellationToken);
-            case IConversionOperation conversion:
-                return conversion.OperatorMethod == null &&
-                       !conversion.IsChecked &&
-                       !conversion.Conversion.IsUserDefined &&
-                       (conversion.Conversion.IsIdentity ||
-                        conversion.Conversion.IsImplicit) &&
-                       IsDefinitelyNonThrowing(
-                           conversion.Operand,
-                           compilation,
-                           activeMethods,
-                           cancellationToken);
-            case IBlockOperation:
-            case IExpressionStatementOperation:
-            case IReturnOperation:
-            case IVariableDeclarationGroupOperation:
-            case IVariableDeclarationOperation:
-            case IVariableDeclaratorOperation:
-            case IVariableInitializerOperation:
-            case IArgumentOperation:
-            case IParenthesizedOperation:
-            case IConditionalOperation:
-                return ChildrenAreDefinitelyNonThrowing(
-                    operation,
-                    compilation,
-                    activeMethods,
-                    cancellationToken);
-            default:
+        private readonly HashSet<IMethodSymbol> _activeMethods = [];
+
+        internal bool IsDefinitelyNonThrowing(IOperation? operation) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (operation == null) return false;
+            switch (operation) {
+                case ILiteralOperation:
+                case ILocalReferenceOperation:
+                case IParameterReferenceOperation:
+                case IDiscardOperation:
+                case IInstanceReferenceOperation:
+                case IDefaultValueOperation:
+                case ITypeOfOperation:
+                case INameOfOperation:
+                    return true;
+                case IInvocationOperation invocation:
+                    return !invocation.IsVirtual &&
+                           (invocation.Instance == null ||
+                            invocation.Instance is IInstanceReferenceOperation &&
+                            IsDefinitelyNonThrowing(invocation.Instance)) &&
+                           invocation.Arguments.All(argument =>
+                               IsDefinitelyNonThrowing(argument.Value)) &&
+                           IsDefinitelyNonThrowingSourceMethod(
+                               invocation.TargetMethod);
+                case ISimpleAssignmentOperation assignment:
+                    return assignment.Target is
+                               ILocalReferenceOperation or
+                               IParameterReferenceOperation or
+                               IDiscardOperation &&
+                           IsDefinitelyNonThrowing(assignment.Value);
+                case IBinaryOperation binary:
+                    return binary.OperatorMethod == null &&
+                           !binary.IsChecked &&
+                           binary.OperatorKind is not (
+                               BinaryOperatorKind.Divide or
+                               BinaryOperatorKind.Remainder) &&
+                           ChildrenAreDefinitelyNonThrowing(binary);
+                case IUnaryOperation unary:
+                    return unary.OperatorMethod == null &&
+                           !unary.IsChecked &&
+                           ChildrenAreDefinitelyNonThrowing(unary);
+                case IConversionOperation conversion:
+                    return conversion.OperatorMethod == null &&
+                           !conversion.IsChecked &&
+                           !conversion.Conversion.IsUserDefined &&
+                           (conversion.Conversion.IsIdentity ||
+                            conversion.Conversion.IsImplicit) &&
+                           IsDefinitelyNonThrowing(conversion.Operand);
+                case IBlockOperation:
+                case IExpressionStatementOperation:
+                case IReturnOperation:
+                case IVariableDeclarationGroupOperation:
+                case IVariableDeclarationOperation:
+                case IVariableDeclaratorOperation:
+                case IVariableInitializerOperation:
+                case IArgumentOperation:
+                case IParenthesizedOperation:
+                case IConditionalOperation:
+                    return ChildrenAreDefinitelyNonThrowing(operation);
+                default:
+                    return false;
+            }
+        }
+
+        private bool ChildrenAreDefinitelyNonThrowing(IOperation operation) =>
+            operation.ChildOperations.All(IsDefinitelyNonThrowing);
+
+        private bool IsDefinitelyNonThrowingSourceMethod(IMethodSymbol method) {
+            var normalized = method.OriginalDefinition;
+            if (normalized.DeclaringSyntaxReferences.Length != 1 ||
+                !_activeMethods.Add(normalized))
                 return false;
-        }
-    }
-
-    private static bool ChildrenAreDefinitelyNonThrowing(
-        IOperation operation,
-        Compilation compilation,
-        HashSet<IMethodSymbol> activeMethods,
-        CancellationToken cancellationToken) =>
-        operation.ChildOperations.All(child =>
-            IsDefinitelyNonThrowing(
-                child,
-                compilation,
-                activeMethods,
-                cancellationToken));
-
-    private static bool IsDefinitelyNonThrowingSourceMethod(
-        IMethodSymbol method,
-        Compilation compilation,
-        HashSet<IMethodSymbol> activeMethods,
-        CancellationToken cancellationToken) {
-        var normalized = method.OriginalDefinition;
-        if (normalized.DeclaringSyntaxReferences.Length != 1 ||
-            !activeMethods.Add(normalized))
-            return false;
-        try {
-            var declaration = normalized.DeclaringSyntaxReferences[0]
-                .GetSyntax(cancellationToken);
-            var semanticModel =
-                SharpProof.Frontend.Host.CompilationModelProvider
-                    .GetSemanticModel(
-                        compilation,
-                        declaration.SyntaxTree);
-            var body = declaration switch {
-                BaseMethodDeclarationSyntax {
-                    Body: { } block
-                } => semanticModel.GetOperation(block, cancellationToken),
-                BaseMethodDeclarationSyntax {
-                    ExpressionBody.Expression: { } expression
-                } => semanticModel.GetOperation(expression, cancellationToken),
-                AccessorDeclarationSyntax {
-                    Body: { } block
-                } => semanticModel.GetOperation(block, cancellationToken),
-                AccessorDeclarationSyntax {
-                    ExpressionBody.Expression: { } expression
-                } => semanticModel.GetOperation(expression, cancellationToken),
-                LocalFunctionStatementSyntax {
-                    Body: { } block
-                } => semanticModel.GetOperation(block, cancellationToken),
-                LocalFunctionStatementSyntax {
-                    ExpressionBody.Expression: { } expression
-                } => semanticModel.GetOperation(expression, cancellationToken),
-                _ => null
-            };
-            return IsDefinitelyNonThrowing(
-                body,
-                compilation,
-                activeMethods,
-                cancellationToken);
-        }
-        finally {
-            activeMethods.Remove(normalized);
+            try {
+                var declaration = normalized.DeclaringSyntaxReferences[0]
+                    .GetSyntax(cancellationToken);
+                var semanticModel =
+                    SharpProof.Frontend.Host.CompilationModelProvider
+                        .GetSemanticModel(
+                            compilation,
+                            declaration.SyntaxTree);
+                var body = declaration switch {
+                    BaseMethodDeclarationSyntax methodDeclaration =>
+                        (SyntaxNode?)methodDeclaration.Body ??
+                        methodDeclaration.ExpressionBody?.Expression,
+                    AccessorDeclarationSyntax accessor =>
+                        (SyntaxNode?)accessor.Body ??
+                        accessor.ExpressionBody?.Expression,
+                    LocalFunctionStatementSyntax localFunction =>
+                        (SyntaxNode?)localFunction.Body ??
+                        localFunction.ExpressionBody?.Expression,
+                    _ => null
+                };
+                return IsDefinitelyNonThrowing(
+                    body == null
+                        ? null
+                        : semanticModel.GetOperation(body, cancellationToken));
+            }
+            finally {
+                _activeMethods.Remove(normalized);
+            }
         }
     }
 
@@ -441,11 +389,13 @@ internal static class RequiresCallSiteAnalyzer {
         var lowerer = new RoslynOperationLowerer(
             factory,
             isKnownPure);
-        var inputs = ImmutableArray.CreateBuilder<InvocationReplayInput>();
+        var inputs = ImmutableArray.CreateBuilder<(
+            IrTerm Term,
+            bool IsReceiver)>();
         if (callSite.Instance != null) {
             var receiver = lowerer.Lower(callSite.Instance);
             if (!receiver.IsExact) return null;
-            inputs.Add(new InvocationReplayInput(receiver.Term, true));
+            inputs.Add((receiver.Term, true));
         }
         foreach (var argument in callSite.Arguments
                      .OrderBy(static argument =>
@@ -457,9 +407,7 @@ internal static class RequiresCallSiteAnalyzer {
             cancellationToken.ThrowIfCancellationRequested();
             var loweredArgument = lowerer.Lower(argument.Value);
             if (!loweredArgument.IsExact) return null;
-            inputs.Add(new InvocationReplayInput(
-                loweredArgument.Term,
-                false));
+            inputs.Add((loweredArgument.Term, false));
         }
         var substitutions = new Dictionary<IrVarId, IrTerm>();
         foreach (var variable in contracts.Variables) {
@@ -502,17 +450,10 @@ internal static class RequiresCallSiteAnalyzer {
 
     private sealed class InvocationReplayPlan(
         IReadOnlyDictionary<IrVarId, IrTerm> substitutions,
-        ImmutableArray<InvocationReplayInput> inputs) {
+        ImmutableArray<(IrTerm Term, bool IsReceiver)> inputs) {
         internal IReadOnlyDictionary<IrVarId, IrTerm> Substitutions { get; } =
             substitutions;
-        internal ImmutableArray<InvocationReplayInput> Inputs { get; } =
+        internal ImmutableArray<(IrTerm Term, bool IsReceiver)> Inputs { get; } =
             inputs;
-    }
-
-    private readonly struct InvocationReplayInput(
-        IrTerm term,
-        bool isReceiver) {
-        internal IrTerm Term { get; } = term;
-        internal bool IsReceiver { get; } = isReceiver;
     }
 }

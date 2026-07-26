@@ -68,6 +68,14 @@ internal static class AnalyzerFeaturePipeline {
                 session.HasResolvedApiSpec,
                 context.CancellationToken);
         if (!subset.IsSupported) {
+            if (IsSelected(method, session))
+                context.ReportDiagnostic(Diagnostic.Create(
+                    GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+                    AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(declaration),
+                    method.Name,
+                    subset.OperationKind is { } operation
+                        ? subset.Reason + " (" + operation + ")"
+                        : subset.Reason.ToString()));
             session.RecordSemanticOutcome(
                 method,
                 AnalyzerSemanticOutcome.Abstained);
@@ -75,8 +83,7 @@ internal static class AnalyzerFeaturePipeline {
         }
 
         var outcome = AnalyzerSemanticOutcome.NotApplicable;
-        if (session.Configuration.Mode is
-            SharpProofMode.Effects or SharpProofMode.AllExperimental)
+        if (session.Configuration.EffectsEnabled)
             outcome = AnalyzerSemanticOutcomes.Combine(
                 outcome,
                 EffectContractDiagnostics.Analyze(
@@ -86,8 +93,7 @@ internal static class AnalyzerFeaturePipeline {
                     context.ReportDiagnostic,
                     context.CancellationToken));
 
-        if (session.Configuration.Mode is
-            SharpProofMode.Contracts or SharpProofMode.AllExperimental)
+        if (session.Configuration.ContractsEnabled)
             outcome = AnalyzerSemanticOutcomes.Combine(
                 outcome,
                 RequiresCallSiteAnalyzer.Analyze(
@@ -125,6 +131,32 @@ internal static class AnalyzerFeaturePipeline {
                     clause.Location));
         }
     }
+
+    private static bool IsSelected(IMethodSymbol method, AnalyzerSession session) {
+        if (session.Configuration.ContractsEnabled &&
+            (!session.GetContractClauses(method).Clauses.IsEmpty ||
+             method.Parameters.Any(parameter =>
+                 parameter.GetAttributes().Any(attribute =>
+                     IsClosedContract(attribute, session.Attributes))) ||
+             method.GetReturnTypeAttributes().Any(attribute =>
+                 IsClosedContract(attribute, session.Attributes))))
+            return true;
+        if (!session.Configuration.EffectsEnabled) return false;
+        return AnalyzerAttributeSymbols.GetCallableAttributes(method).Any(attribute =>
+            AnalyzerAttributeSymbols.Is(attribute, session.Attributes.EnforcePure) ||
+            AnalyzerAttributeSymbols.Is(attribute, session.Attributes.ZeroAllocations) ||
+            AnalyzerAttributeSymbols.Is(attribute, session.Attributes.AllowedCapabilities) ||
+            AnalyzerAttributeSymbols.Is(attribute, session.Attributes.DoesNotThrow) ||
+            AnalyzerAttributeSymbols.Is(attribute, session.Attributes.AllowedExceptions) ||
+            AnalyzerAttributeSymbols.Is(attribute, session.Attributes.EffectContract));
+    }
+
+    private static bool IsClosedContract(
+        AttributeData attribute,
+        AnalyzerAttributeSymbols symbols) =>
+        AnalyzerAttributeSymbols.Is(attribute, symbols.NotNull) ||
+        AnalyzerAttributeSymbols.Is(attribute, symbols.Positive) ||
+        AnalyzerAttributeSymbols.Is(attribute, symbols.InRange);
 
     private static SyntaxNode? FindDeclaration(
         IMethodSymbol method,

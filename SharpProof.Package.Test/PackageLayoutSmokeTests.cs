@@ -498,7 +498,7 @@ public sealed class PackageLayoutSmokeTests {
                     }
                 }
                 """,
-                "effects",
+                "all-experimental",
                 "SP0045");
 
         internal void WriteAnalyzerConsumer(

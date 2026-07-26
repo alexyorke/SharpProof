@@ -23,8 +23,7 @@ public sealed class ApiSpecTable {
     private readonly long _scope;
 
     private ApiSpecTable(long scope, ImmutableArray<ApiSpecTemplate> templates) {
-        _scope = scope;
-        Templates = templates;
+        (_scope, Templates) = (scope, templates);
         _byId = templates.ToImmutableDictionary(static template => template.Id);
         _byWitness = templates.ToImmutableDictionary(
             static template => template.Target.WitnessIdentifier,
@@ -77,32 +76,17 @@ public sealed class ApiSpecTable {
     private static ApiSpecTemplate CompileTemplate(SpecId id, ApiSpecDeclaration declaration) {
         ValidateDeclaration(declaration);
         var variables = ImmutableArray.CreateBuilder<SpecVariableInfo>();
-        SpecVarId? receiver = null;
-        if (declaration.Target.ReceiverType.HasValue) {
-            receiver = AddVariable(
-                id,
-                variables,
-                SpecVariableRole.Receiver,
-                -1,
-                declaration.Target.ReceiverType.Value);
-        }
+        var receiver = AddOptionalVariable(
+            id, variables, SpecVariableRole.Receiver,
+            declaration.Target.ReceiverType);
         var parameters = ImmutableArray.CreateBuilder<SpecVarId>(declaration.Target.ParameterTypes.Length);
         for (var ordinal = 0; ordinal < declaration.Target.ParameterTypes.Length; ordinal++)
             parameters.Add(AddVariable(
-                id,
-                variables,
-                SpecVariableRole.Parameter,
-                ordinal,
+                id, variables, SpecVariableRole.Parameter, ordinal,
                 declaration.Target.ParameterTypes[ordinal]));
-        SpecVarId? result = null;
-        if (declaration.Target.ResultType.HasValue) {
-            result = AddVariable(
-                id,
-                variables,
-                SpecVariableRole.Result,
-                -1,
-                declaration.Target.ResultType.Value);
-        }
+        var result = AddOptionalVariable(
+            id, variables, SpecVariableRole.Result,
+            declaration.Target.ResultType);
         var variableArray = variables.ToImmutable();
         var bySlot = variableArray.ToImmutableDictionary(
             static variable => (variable.Role, variable.Ordinal));
@@ -116,26 +100,25 @@ public sealed class ApiSpecTable {
             return new SpecPostcondition(condition, postcondition.Evidence);
         }).ToImmutableArray();
         return new ApiSpecTemplate(
-            id,
-            declaration.Target,
-            NormalizeFacets(declaration.Facets),
-            variableArray,
-            receiver,
-            parameters.MoveToImmutable(),
-            result,
+            id, declaration.Target, NormalizeFacets(declaration.Facets),
+            variableArray, receiver, parameters.MoveToImmutable(), result,
             postconditions);
     }
 
     private static SpecVarId AddVariable(
-        SpecId id,
-        ImmutableArray<SpecVariableInfo>.Builder variables,
-        SpecVariableRole role,
-        int ordinal,
-        SpecValueType type) {
+        SpecId id, ImmutableArray<SpecVariableInfo>.Builder variables,
+        SpecVariableRole role, int ordinal, SpecValueType type) {
         var variable = new SpecVarId(id, variables.Count);
         variables.Add(new SpecVariableInfo(variable, role, ordinal, type));
         return variable;
     }
+
+    private static SpecVarId? AddOptionalVariable(
+        SpecId id, ImmutableArray<SpecVariableInfo>.Builder variables,
+        SpecVariableRole role, SpecValueType? type) =>
+        type.HasValue
+            ? AddVariable(id, variables, role, -1, type.Value)
+            : null;
 
     private static SpecTerm CompileTerm(
         SpecTermDeclaration declaration,
@@ -278,33 +261,29 @@ public sealed class ApiSpecTable {
         ValidateEvidence(facets.Throws?.Evidence, nameof(facets));
         ValidateEvidence(facets.Nullness?.Evidence, nameof(facets));
         ValidateEvidence(facets.Cardinality?.Evidence, nameof(facets));
-        if (facets.Effects == null ||
-            facets.Allocation == null ||
-            facets.Throws == null ||
-            facets.Nullness == null ||
-            facets.Cardinality == null)
-            throw new ArgumentException("Every closed spec facet is required.", nameof(facets));
-        if ((facets.Effects.Effects & ~DefinedEffects) != 0)
+        var (effects, allocation, throws, nullness, cardinality) =
+            (facets.Effects!, facets.Allocation!, facets.Throws!, facets.Nullness!, facets.Cardinality!);
+        if ((effects.Effects & ~DefinedEffects) != 0)
             throw new ArgumentException("The effect facet contains undefined flags.", nameof(facets));
-        if ((facets.Effects.Effects & SpecEffect.Unknown) != 0 &&
-            facets.Effects.Effects != SpecEffect.Unknown)
+        if ((effects.Effects & SpecEffect.Unknown) != 0 &&
+            effects.Effects != SpecEffect.Unknown)
             throw new ArgumentException("Unknown effects cannot be combined with known effects.", nameof(facets));
-        ValidateDefined(facets.Allocation.Behavior, nameof(facets));
-        ValidateDefined(facets.Throws.Behavior, nameof(facets));
-        ValidateDefined(facets.Nullness.Result, nameof(facets));
-        ValidateDefined(facets.Cardinality.Result, nameof(facets));
-        if (facets.Throws.ExceptionMetadataNames.IsDefault)
+        ValidateDefined(allocation.Behavior, nameof(facets));
+        ValidateDefined(throws.Behavior, nameof(facets));
+        ValidateDefined(nullness.Result, nameof(facets));
+        ValidateDefined(cardinality.Result, nameof(facets));
+        if (throws.ExceptionMetadataNames.IsDefault)
             throw new ArgumentException("Throw exception names must be initialized.", nameof(facets));
-        if (facets.Throws.ExceptionMetadataNames.Any(static name => string.IsNullOrWhiteSpace(name)))
+        if (throws.ExceptionMetadataNames.Any(static name => string.IsNullOrWhiteSpace(name)))
             throw new ArgumentException("Throw exception names cannot be blank.", nameof(facets));
-        if (facets.Throws.Behavior != SpecThrowBehavior.MayThrow &&
-            !facets.Throws.ExceptionMetadataNames.IsDefaultOrEmpty)
+        if (throws.Behavior != SpecThrowBehavior.MayThrow &&
+            !throws.ExceptionMetadataNames.IsDefaultOrEmpty)
             throw new ArgumentException("Only MayThrow facets can list exception types.", nameof(facets));
-        if (facets.Cardinality.Result == SpecCardinality.Exact) {
-            if (facets.Cardinality.ExactCount is < 0 or null)
+        if (cardinality.Result == SpecCardinality.Exact) {
+            if (cardinality.ExactCount is < 0 or null)
                 throw new ArgumentException("Exact cardinality requires a non-negative count.", nameof(facets));
         }
-        else if (facets.Cardinality.ExactCount.HasValue) {
+        else if (cardinality.ExactCount.HasValue) {
             throw new ArgumentException("Only exact cardinality can carry a count.", nameof(facets));
         }
         return facets;
@@ -334,296 +313,191 @@ public sealed class ApiSpecTable {
     private static ImmutableArray<ApiSpecDeclaration> CreateDefaultDeclarations() {
         var documented = new SpecEvidence(SpecEvidenceKind.Documented, "dotnet-api-contract");
         var observed = new SpecEvidence(SpecEvidenceKind.Observed, "supported-runtime-observation");
-        var typeInitialization = new SpecEvidence(SpecEvidenceKind.Documented, "dotnet-generic-cache-type-initialization-boundary");
+        var typeInitialization = new SpecEvidence(
+            SpecEvidenceKind.Documented, "dotnet-generic-cache-type-initialization-boundary");
         var contractSemantics = new SpecEvidence(
-            SpecEvidenceKind.Documented,
-            "sharpproof-compiler-bound-ghost-contract");
+            SpecEvidenceKind.Documented, "sharpproof-compiler-bound-ghost-contract");
         return [
-            new ApiSpecDeclaration(
-                new ApiSpecTarget(
-                    "bcl.array.empty", "M:System.Array.Empty``1", "System.Array",
-                    SpecTargetMemberKind.Method, "Empty", true, 1, null, [],
-                    SpecValueType.Sequence),
+            Declaration(
+                "bcl.array.empty", "M:System.Array.Empty``1",
+                "System.Array", "Empty", null, [], SpecValueType.Sequence,
                 Facets(
                     SpecEffect.Unknown, typeInitialization,
                     SpecAllocationBehavior.Unknown, observed,
                     SpecThrowBehavior.DoesNotThrow, [], documented,
                     SpecNullness.NonNull, documented,
                     SpecCardinality.Empty, documented),
-                []),
-            new ApiSpecDeclaration(
-                new ApiSpecTarget(
-                    "bcl.object.ctor",
-                    "M:System.Object.#ctor",
-                    "System.Object",
-                    SpecTargetMemberKind.Constructor,
-                    ".ctor",
-                    false,
-                    0,
-                    SpecValueType.Reference,
-                    [],
-                    null),
+                genericArity: 1),
+            Declaration(
+                "bcl.object.ctor", "M:System.Object.#ctor",
+                "System.Object", ".ctor", SpecValueType.Reference, [], null,
                 Facets(
-                    SpecEffect.None,
-                    observed,
-                    SpecAllocationBehavior.None,
-                    observed,
-                    SpecThrowBehavior.DoesNotThrow,
-                    [],
-                    observed,
-                    SpecNullness.NotApplicable,
-                    documented,
-                    SpecCardinality.NotApplicable,
-                    documented),
-                []),
+                    SpecEffect.None, observed,
+                    SpecAllocationBehavior.None, observed,
+                    SpecThrowBehavior.DoesNotThrow, [], observed,
+                    SpecNullness.NotApplicable, documented,
+                    SpecCardinality.NotApplicable, documented),
+                memberKind: SpecTargetMemberKind.Constructor),
             GhostContract(
-                "contract.assume",
-                "M:SharpProof.Attributes.Contract.Assume(System.Boolean)",
-                "Assume",
-                0,
-                [SpecValueType.Boolean],
-                null,
-                contractSemantics),
+                "contract.assume", "M:SharpProof.Attributes.Contract.Assume(System.Boolean)",
+                "Assume", 0, [SpecValueType.Boolean], null, contractSemantics),
             GhostContract(
-                "contract.ensures",
-                "M:SharpProof.Attributes.Contract.Ensures(System.Boolean)",
-                "Ensures",
-                0,
-                [SpecValueType.Boolean],
-                null,
-                contractSemantics),
+                "contract.ensures", "M:SharpProof.Attributes.Contract.Ensures(System.Boolean)",
+                "Ensures", 0, [SpecValueType.Boolean], null, contractSemantics),
             GhostContract(
-                "contract.old",
-                "M:SharpProof.Attributes.Contract.Old``1(``0)",
-                "Old",
-                1,
-                [SpecValueType.Reference],
-                SpecValueType.Reference,
-                contractSemantics,
+                "contract.old", "M:SharpProof.Attributes.Contract.Old``1(``0)",
+                "Old", 1, [SpecValueType.Reference], SpecValueType.Reference, contractSemantics,
                 throwsOnDirectInvocation: true),
             GhostContract(
-                "contract.requires",
-                "M:SharpProof.Attributes.Contract.Requires(System.Boolean)",
-                "Requires",
-                0,
-                [SpecValueType.Boolean],
-                null,
-                contractSemantics),
+                "contract.requires", "M:SharpProof.Attributes.Contract.Requires(System.Boolean)",
+                "Requires", 0, [SpecValueType.Boolean], null, contractSemantics),
             GhostContract(
-                "contract.result",
-                "M:SharpProof.Attributes.Contract.Result``1",
-                "Result",
-                1,
-                [],
-                SpecValueType.Reference,
-                contractSemantics,
+                "contract.result", "M:SharpProof.Attributes.Contract.Result``1",
+                "Result", 1, [], SpecValueType.Reference, contractSemantics,
                 throwsOnDirectInvocation: true),
-            new ApiSpecDeclaration(
-                new ApiSpecTarget(
-                    "bcl.string.length",
-                    "P:System.String.Length",
-                    "System.String",
-                    SpecTargetMemberKind.PropertyGet,
-                    "Length",
-                    false,
-                    0,
-                    SpecValueType.String,
-                    [],
-                    SpecValueType.Integer),
+            Declaration(
+                "bcl.string.length", "P:System.String.Length",
+                "System.String", "Length", SpecValueType.String, [], SpecValueType.Integer,
                 Facets(
-                    SpecEffect.ReadsReceiverState,
-                    documented,
-                    SpecAllocationBehavior.None,
-                    observed,
-                    SpecThrowBehavior.DoesNotThrow,
-                    [],
-                    observed,
-                    SpecNullness.NotApplicable,
-                    documented,
-                    SpecCardinality.NotApplicable,
-                    documented),
+                    SpecEffect.ReadsReceiverState, documented,
+                    SpecAllocationBehavior.None, observed,
+                    SpecThrowBehavior.DoesNotThrow, [], observed,
+                    SpecNullness.NotApplicable, documented,
+                    SpecCardinality.NotApplicable, documented),
                 [
-                    new SpecPostconditionDeclaration(
-                        new SpecBinaryDeclaration(
-                            SpecBinaryOperator.Equal,
-                            new SpecVariableDeclaration(
-                                SpecVariableRole.Result,
-                                -1,
-                                SpecValueType.Integer),
-                            new SpecLengthDeclaration(
-                                new SpecVariableDeclaration(
-                                    SpecVariableRole.Receiver,
-                                    -1,
-                                    SpecValueType.String)),
-                            SpecValueType.Boolean),
+                    Postcondition(
+                        SpecBinaryOperator.Equal,
+                        Variable(SpecVariableRole.Result, SpecValueType.Integer),
+                        new SpecLengthDeclaration(
+                            Variable(SpecVariableRole.Receiver, SpecValueType.String)),
+                        documented)
+                ],
+                memberKind: SpecTargetMemberKind.PropertyGet),
+            Declaration(
+                "bcl.string.concat.string-string",
+                "M:System.String.Concat(System.String,System.String)",
+                "System.String", "Concat", null,
+                [SpecValueType.String, SpecValueType.String], SpecValueType.String,
+                Facets(
+                    SpecEffect.None, observed,
+                    SpecAllocationBehavior.MayAllocate, documented,
+                    SpecThrowBehavior.DoesNotThrow, [], documented,
+                    SpecNullness.NonNull, documented,
+                    SpecCardinality.NotApplicable, documented)),
+            Declaration(
+                "bcl.list.add", "M:System.Collections.Generic.List`1.Add(`0)",
+                "System.Collections.Generic.List`1", "Add", SpecValueType.Reference,
+                [SpecValueType.Reference], null,
+                Facets(
+                    SpecEffect.WritesReceiverState, documented,
+                    SpecAllocationBehavior.MayAllocate, observed,
+                    SpecThrowBehavior.Unknown, [], documented,
+                    SpecNullness.NotApplicable, documented,
+                    SpecCardinality.NotApplicable, documented)),
+            Declaration(
+                "bcl.math.abs.int32", "M:System.Math.Abs(System.Int32)",
+                "System.Math", "Abs", null, [SpecValueType.Integer], SpecValueType.Integer,
+                Facets(
+                    SpecEffect.None, observed,
+                    SpecAllocationBehavior.None, observed,
+                    SpecThrowBehavior.MayThrow, ["System.OverflowException"], documented,
+                    SpecNullness.NotApplicable, documented,
+                    SpecCardinality.NotApplicable, documented),
+                [
+                    Postcondition(
+                        SpecBinaryOperator.GreaterThanOrEqual,
+                        Variable(SpecVariableRole.Result, SpecValueType.Integer),
+                        new SpecIntegerDeclaration(0),
                         documented)
                 ]),
-            new ApiSpecDeclaration(
-                new ApiSpecTarget(
-                    "bcl.string.concat.string-string",
-                    "M:System.String.Concat(System.String,System.String)",
-                    "System.String",
-                    SpecTargetMemberKind.Method,
-                    "Concat",
-                    true,
-                    0,
-                    null,
-                    [SpecValueType.String, SpecValueType.String],
-                    SpecValueType.String),
+            Declaration(
+                "bcl.enumerable.empty", "M:System.Linq.Enumerable.Empty``1",
+                "System.Linq.Enumerable", "Empty", null, [], SpecValueType.Sequence,
                 Facets(
-                    SpecEffect.None,
-                    observed,
-                    SpecAllocationBehavior.MayAllocate,
-                    documented,
-                    SpecThrowBehavior.DoesNotThrow,
-                    [],
-                    documented,
-                    SpecNullness.NonNull,
-                    documented,
-                    SpecCardinality.NotApplicable,
-                    documented),
-                []),
-            new ApiSpecDeclaration(
-                new ApiSpecTarget(
-                    "bcl.list.add",
-                    "M:System.Collections.Generic.List`1.Add(`0)",
-                    "System.Collections.Generic.List`1",
-                    SpecTargetMemberKind.Method,
-                    "Add",
-                    false,
-                    0,
-                    SpecValueType.Reference,
-                    [SpecValueType.Reference],
-                    null),
-                Facets(
-                    SpecEffect.WritesReceiverState,
-                    documented,
-                    SpecAllocationBehavior.MayAllocate,
-                    observed,
-                    SpecThrowBehavior.Unknown,
-                    [],
-                    documented,
-                    SpecNullness.NotApplicable,
-                    documented,
-                    SpecCardinality.NotApplicable,
-                    documented),
-                []),
-            new ApiSpecDeclaration(
-                new ApiSpecTarget(
-                    "bcl.math.abs.int32",
-                    "M:System.Math.Abs(System.Int32)",
-                    "System.Math",
-                    SpecTargetMemberKind.Method,
-                    "Abs",
-                    true,
-                    0,
-                    null,
-                    [SpecValueType.Integer],
-                    SpecValueType.Integer),
-                Facets(
-                    SpecEffect.None,
-                    observed,
-                    SpecAllocationBehavior.None,
-                    observed,
-                    SpecThrowBehavior.MayThrow,
-                    ["System.OverflowException"],
-                    documented,
-                    SpecNullness.NotApplicable,
-                    documented,
-                    SpecCardinality.NotApplicable,
-                    documented),
-                [
-                    new SpecPostconditionDeclaration(
-                        new SpecBinaryDeclaration(
-                            SpecBinaryOperator.GreaterThanOrEqual,
-                            new SpecVariableDeclaration(
-                                SpecVariableRole.Result,
-                                -1,
-                                SpecValueType.Integer),
-                            new SpecIntegerDeclaration(0),
-                            SpecValueType.Boolean),
-                        documented)
-                ]),
-            new ApiSpecDeclaration(
-                new ApiSpecTarget(
-                    "bcl.enumerable.empty",
-                    "M:System.Linq.Enumerable.Empty``1",
-                    "System.Linq.Enumerable",
-                    SpecTargetMemberKind.Method,
-                    "Empty",
-                    true,
-                    1,
-                    null,
-                    [],
-                    SpecValueType.Sequence),
-                Facets(
-                    SpecEffect.Unknown,
-                    typeInitialization,
-                    SpecAllocationBehavior.Unknown,
-                    observed,
-                    SpecThrowBehavior.DoesNotThrow,
-                    [],
-                    observed,
-                    SpecNullness.NonNull,
-                    documented,
-                    SpecCardinality.Empty,
-                    documented),
-                [])
+                    SpecEffect.Unknown, typeInitialization,
+                    SpecAllocationBehavior.Unknown, observed,
+                    SpecThrowBehavior.DoesNotThrow, [], observed,
+                    SpecNullness.NonNull, documented,
+                    SpecCardinality.Empty, documented),
+                genericArity: 1)
         ];
     }
 
-    private static ApiSpecDeclaration GhostContract(
-        string witnessIdentifier,
-        string documentationCommentId,
-        string memberName,
-        int genericArity,
-        ImmutableArray<SpecValueType> parameterTypes,
-        SpecValueType? resultType,
-        SpecEvidence evidence,
-        bool throwsOnDirectInvocation = false) =>
+    private static ApiSpecDeclaration Declaration(
+        string witnessIdentifier, string documentationCommentId,
+        string containingTypeMetadataName, string memberName,
+        SpecValueType? receiverType, ImmutableArray<SpecValueType> parameterTypes,
+        SpecValueType? resultType, ApiSpecFacets facets,
+        ImmutableArray<SpecPostconditionDeclaration> postconditions = default,
+        SpecTargetMemberKind memberKind = SpecTargetMemberKind.Method,
+        int genericArity = 0) =>
         new(
             new ApiSpecTarget(
-                witnessIdentifier,
-                documentationCommentId,
-                "SharpProof.Attributes.Contract",
-                SpecTargetMemberKind.Method,
-                memberName,
-                true,
-                genericArity,
-                null,
-                parameterTypes,
-                resultType),
+                witnessIdentifier, documentationCommentId, containingTypeMetadataName,
+                memberKind, memberName, !receiverType.HasValue, genericArity,
+                receiverType, parameterTypes, resultType),
+            facets,
+            postconditions.IsDefault ? [] : postconditions);
+
+    private static SpecPostconditionDeclaration Postcondition(
+        SpecBinaryOperator @operator, SpecTermDeclaration left,
+        SpecTermDeclaration right, SpecEvidence evidence) =>
+        new(
+            new SpecBinaryDeclaration(
+                @operator, left, right, SpecValueType.Boolean),
+            evidence);
+
+    private static SpecVariableDeclaration Variable(
+        SpecVariableRole role, SpecValueType type) =>
+        new(role, -1, type);
+
+    private static ApiSpecDeclaration GhostContract(
+        string witnessIdentifier, string documentationCommentId,
+        string memberName, int genericArity,
+        ImmutableArray<SpecValueType> parameterTypes, SpecValueType? resultType,
+        SpecEvidence evidence,
+        bool throwsOnDirectInvocation = false) =>
+        Declaration(
+            witnessIdentifier,
+            documentationCommentId,
+            "SharpProof.Attributes.Contract",
+            memberName,
+            null,
+            parameterTypes,
+            resultType,
             Facets(
                 SpecEffect.None,
-                evidence,
                 throwsOnDirectInvocation
                     ? SpecAllocationBehavior.MayAllocate
                     : SpecAllocationBehavior.None,
-                evidence,
                 throwsOnDirectInvocation
                     ? SpecThrowBehavior.MayThrow
                     : SpecThrowBehavior.DoesNotThrow,
                 throwsOnDirectInvocation
                     ? ["System.InvalidOperationException"]
                     : [],
-                evidence,
                 SpecNullness.NotApplicable,
-                evidence,
                 SpecCardinality.NotApplicable,
                 evidence),
-            []);
+            genericArity: genericArity);
 
     private static ApiSpecFacets Facets(
-        SpecEffect effects,
-        SpecEvidence effectEvidence,
-        SpecAllocationBehavior allocation,
-        SpecEvidence allocationEvidence,
-        SpecThrowBehavior throws,
-        ImmutableArray<string> exceptionNames,
-        SpecEvidence throwEvidence,
-        SpecNullness nullness,
-        SpecEvidence nullnessEvidence,
-        SpecCardinality cardinality,
+        SpecEffect effects, SpecAllocationBehavior allocation,
+        SpecThrowBehavior throws, ImmutableArray<string> exceptionNames,
+        SpecNullness nullness, SpecCardinality cardinality, SpecEvidence evidence) =>
+        Facets(
+            effects, evidence,
+            allocation, evidence,
+            throws, exceptionNames, evidence,
+            nullness, evidence,
+            cardinality, evidence);
+
+    private static ApiSpecFacets Facets(
+        SpecEffect effects, SpecEvidence effectEvidence,
+        SpecAllocationBehavior allocation, SpecEvidence allocationEvidence,
+        SpecThrowBehavior throws, ImmutableArray<string> exceptionNames,
+        SpecEvidence throwEvidence, SpecNullness nullness,
+        SpecEvidence nullnessEvidence, SpecCardinality cardinality,
         SpecEvidence cardinalityEvidence) => new(
         new SpecEffectFacet(effects, effectEvidence),
         new SpecAllocationFacet(allocation, allocationEvidence),

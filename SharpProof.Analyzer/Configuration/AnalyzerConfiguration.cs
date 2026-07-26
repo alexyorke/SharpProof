@@ -2,32 +2,48 @@ namespace SharpProof.Analyzer.Configuration;
 
 internal sealed class AnalyzerConfiguration {
     private AnalyzerConfiguration(
-        SharpProofMode mode,
+        SharpProofProfile profile,
+        SharpProofFeatures features,
         ImmutableArray<InvalidAnalyzerConfigurationValue> invalidConfigurationValues) {
-        Mode = mode;
+        Profile = profile;
+        Features = features;
         InvalidConfigurationValues = invalidConfigurationValues;
     }
 
-    internal SharpProofMode Mode { get; }
+    internal SharpProofProfile Profile { get; }
+    internal SharpProofFeatures Features { get; }
+    internal bool EffectsEnabled => Features is SharpProofFeatures.Effects or SharpProofFeatures.All;
+    internal bool ContractsEnabled => Features is SharpProofFeatures.Contracts or SharpProofFeatures.All;
     internal ImmutableArray<InvalidAnalyzerConfigurationValue> InvalidConfigurationValues { get; }
 
     public static AnalyzerConfiguration FromOptions(AnalyzerOptions options) {
         var invalidConfigurationValues = GetInvalidGlobalConfigurationValues(options);
-        var mode = invalidConfigurationValues.Any(static value =>
-            string.Equals(value.Key, "sharpproof_mode", StringComparison.Ordinal))
-            ? SharpProofMode.Off
-            : GetMode(options);
-        return new AnalyzerConfiguration(mode, invalidConfigurationValues);
+        if (!invalidConfigurationValues.IsEmpty)
+            return new(
+                SharpProofProfile.Off,
+                SharpProofFeatures.All,
+                invalidConfigurationValues);
+        var hasProfile = TryGetGlobalOption(options, AnalyzerConfigurationOptionRegistry.All[0], out var profile);
+        var hasFeatures = TryGetGlobalOption(options, AnalyzerConfigurationOptionRegistry.All[1], out var features);
+        var hasLegacy = TryGetGlobalOption(options, AnalyzerConfigurationOptionRegistry.All[2], out var legacy);
+        var useLegacy = hasLegacy && !hasProfile && !hasFeatures;
+        return new(
+            ParseProfile(hasProfile ? profile : useLegacy && Is(legacy, "off") ? "off" : "advisory"),
+            ParseFeatures(hasFeatures ? features : useLegacy ? legacy : "all"),
+            invalidConfigurationValues);
     }
 
     private static ImmutableArray<InvalidAnalyzerConfigurationValue> GetInvalidGlobalConfigurationValues(AnalyzerOptions options) {
         var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
-        foreach (var option in AnalyzerConfigurationOptionRegistry.All)
-            ValidateOption(
-                builder,
-                (AnalyzerConfigurationOption candidate, out string value) =>
-                    TryGetGlobalOption(options, candidate, out value),
-                option);
+        foreach (var option in AnalyzerConfigurationOptionRegistry.All) {
+            if (!TryGetGlobalOption(options, option, out var value) ||
+                AnalyzerConfigurationOptionRegistry.IsAcceptedValue(option, value))
+                continue;
+            builder.Add(new(
+                option.Key,
+                value.Trim(),
+                "expected one of: " + string.Join(", ", option.AllowedValues)));
+        }
         return builder.ToImmutable();
     }
     internal static ImmutableArray<InvalidAnalyzerConfigurationValue> GetInvalidTreeConfigurationValues(
@@ -35,7 +51,11 @@ internal sealed class AnalyzerConfiguration {
         AnalyzerConfigOptions? globalOptions = null) {
         var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
         foreach (var option in AnalyzerConfigurationOptionRegistry.All) {
-            if (!TryGetAnalyzerConfigOption(options, option.Key, out var value)) continue;
+            if (!AnalyzerConfigurationValueReader.TryGetNonEmpty(
+                    options,
+                    option.Key,
+                    out var value))
+                continue;
             if (TryGetMatchingGlobalOption(globalOptions, option, value)) continue;
             builder.Add(new InvalidAnalyzerConfigurationValue(
                 option.Key,
@@ -44,105 +64,26 @@ internal sealed class AnalyzerConfiguration {
         }
         return builder.ToImmutable();
     }
-    private static void ValidateOption(
-        ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder,
-        TryGetConfigurationOption tryGetOption,
-        AnalyzerConfigurationOption option) {
-        if (!tryGetOption(option, out var value)) return;
-        var reason = option.ValueKind switch {
-            AnalyzerConfigurationValueKind.Bool when !TryParseBool(value) =>
-                "expected a boolean value",
-            AnalyzerConfigurationValueKind.NonNegativeInteger =>
-                GetIntegerError(value, 0, "expected a non-negative integer"),
-            AnalyzerConfigurationValueKind.PositiveInteger =>
-                GetIntegerError(value, 1, "expected a positive integer"),
-            AnalyzerConfigurationValueKind.Choice when !AnalyzerConfigurationOptionRegistry.IsAcceptedValue(option, value) =>
-                "expected one of: " + string.Join(", ", option.AllowedValues),
-            _ => null
-        };
-        if (reason != null)
-            builder.Add(new InvalidAnalyzerConfigurationValue(option.Key, value.Trim(), reason));
-    }
-    private static bool TryParseBool(string value) =>
-        value.Trim().ToUpperInvariant() is
-            "1" or "TRUE" or "YES" or "ON" or
-            "0" or "FALSE" or "NO" or "OFF";
-    private static string? GetIntegerError(string value, int minimum, string reason) =>
-        int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) &&
-        parsed >= minimum
-            ? null
-            : reason;
     private static bool TryGetMatchingGlobalOption(
         AnalyzerConfigOptions? globalOptions,
         AnalyzerConfigurationOption option,
-        string treeValue) {
-        if (globalOptions == null) return false;
-        if (TryGetGlobalOption(globalOptions, option, out var value))
-            return AreEquivalent(option, value, treeValue);
-        return false;
-    }
-    private static bool AreEquivalent(
-        AnalyzerConfigurationOption option,
-        string left,
-        string right) => option.ValueKind switch {
-            AnalyzerConfigurationValueKind.Bool =>
-                TryParseBool(left, out var leftBool) &&
-                TryParseBool(right, out var rightBool) &&
-                leftBool == rightBool,
-            AnalyzerConfigurationValueKind.NonNegativeInteger or
-                AnalyzerConfigurationValueKind.PositiveInteger =>
-                int.TryParse(
-                    left.Trim(),
-                    NumberStyles.Integer,
-                    CultureInfo.InvariantCulture,
-                    out var leftInteger) &&
-                int.TryParse(
-                    right.Trim(),
-                    NumberStyles.Integer,
-                    CultureInfo.InvariantCulture,
-                    out var rightInteger) &&
-                leftInteger == rightInteger,
-            AnalyzerConfigurationValueKind.Choice =>
-                string.Equals(
-                    left.Trim(),
-                    right.Trim(),
-                    StringComparison.OrdinalIgnoreCase),
-            _ => string.Equals(
-                left.Trim(),
-                right.Trim(),
-                StringComparison.Ordinal)
-        };
-    private static bool TryParseBool(string value, out bool parsed) {
-        switch (value.Trim().ToUpperInvariant()) {
-            case "1":
-            case "TRUE":
-            case "YES":
-            case "ON":
-                parsed = true;
-                return true;
-            case "0":
-            case "FALSE":
-            case "NO":
-            case "OFF":
-                parsed = false;
-                return true;
-            default:
-                parsed = false;
-                return false;
-        }
-    }
-    private static bool TryGetAnalyzerConfigOption(AnalyzerConfigOptions options, string key, out string value)
-        => AnalyzerConfigurationValueReader.TryGetNonEmpty(options, key, out value);
-    private static SharpProofMode GetMode(AnalyzerOptions options) {
-        var option = AnalyzerConfigurationOptionRegistry.All[0];
-        if (!TryGetGlobalOption(options, option, out var value)) return SharpProofMode.Off;
-        return value.Trim().ToUpperInvariant() switch {
-            "EFFECTS" => SharpProofMode.Effects,
-            "CONTRACTS" => SharpProofMode.Contracts,
-            "ALL-EXPERIMENTAL" => SharpProofMode.AllExperimental,
-            _ => SharpProofMode.Off
-        };
-    }
+        string treeValue) =>
+        globalOptions != null &&
+        TryGetGlobalOption(globalOptions, option, out var value) &&
+        string.Equals(
+                value.Trim(),
+                treeValue.Trim(),
+                StringComparison.OrdinalIgnoreCase);
+    private static SharpProofProfile ParseProfile(string value) =>
+        Is(value, "off") ? SharpProofProfile.Off :
+        Is(value, "strict") ? SharpProofProfile.Strict :
+        SharpProofProfile.Advisory;
+    private static SharpProofFeatures ParseFeatures(string value) =>
+        Is(value, "effects") ? SharpProofFeatures.Effects :
+        Is(value, "contracts") ? SharpProofFeatures.Contracts :
+        SharpProofFeatures.All;
+    private static bool Is(string value, string expected) =>
+        string.Equals(value.Trim(), expected, StringComparison.OrdinalIgnoreCase);
     private static bool TryGetGlobalOption(
         AnalyzerOptions options,
         AnalyzerConfigurationOption option,
@@ -173,36 +114,21 @@ internal sealed class AnalyzerConfiguration {
     private static bool TryGetBuildProperty(
         AnalyzerConfigOptions options,
         AnalyzerConfigurationOption option,
-        out string value) {
-        if (option.BuildPropertyName != null &&
-            AnalyzerConfigurationValueReader.TryGetNonEmpty(
-                options,
-                "build_property." + option.BuildPropertyName,
-                out value))
-            return true;
-        value = string.Empty;
-        return false;
-    }
-    private delegate bool TryGetConfigurationOption(
-        AnalyzerConfigurationOption option,
-        out string value);
+        out string value) =>
+        AnalyzerConfigurationValueReader.TryGetNonEmpty(
+            options,
+            "build_property." + option.BuildPropertyName,
+            out value);
 }
 
-internal readonly struct InvalidAnalyzerConfigurationValue {
-    internal InvalidAnalyzerConfigurationValue(string key, string value, string reason) {
-        Key = key;
-        Value = value;
-        Reason = reason;
-    }
-
-    internal string Key { get; }
-    internal string Value { get; }
-    internal string Reason { get; }
+internal readonly struct InvalidAnalyzerConfigurationValue(
+    string key,
+    string value,
+    string reason) {
+    internal string Key { get; } = key;
+    internal string Value { get; } = value;
+    internal string Reason { get; } = reason;
 }
 
-internal enum SharpProofMode {
-    Off,
-    Effects,
-    Contracts,
-    AllExperimental
-}
+internal enum SharpProofProfile { Advisory, Strict, Off }
+internal enum SharpProofFeatures { Effects, Contracts, All }

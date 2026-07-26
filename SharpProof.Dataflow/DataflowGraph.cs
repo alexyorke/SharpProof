@@ -1,26 +1,21 @@
 namespace SharpProof.Dataflow;
 
-public sealed class DataflowBlock<T> {
-    public DataflowBlock(int id, Func<T, T> transfer) {
-        if (id < 0) throw new ArgumentOutOfRangeException(nameof(id));
-        Id = id;
-        Transfer = transfer ?? throw new ArgumentNullException(nameof(transfer));
-    }
-
-    public int Id { get; }
-    public Func<T, T> Transfer { get; }
+public sealed class DataflowBlock<T>(int id, Func<T, T> transfer) {
+    public int Id { get; } = id >= 0
+        ? id
+        : throw new ArgumentOutOfRangeException(nameof(id));
+    public Func<T, T> Transfer { get; } =
+        transfer ?? throw new ArgumentNullException(nameof(transfer));
 }
 
-public readonly struct DataflowEdge : IEquatable<DataflowEdge> {
-    public DataflowEdge(int sourceId, int targetId) {
-        if (sourceId < 0) throw new ArgumentOutOfRangeException(nameof(sourceId));
-        if (targetId < 0) throw new ArgumentOutOfRangeException(nameof(targetId));
-        SourceId = sourceId;
-        TargetId = targetId;
-    }
-
-    public int SourceId { get; }
-    public int TargetId { get; }
+public readonly struct DataflowEdge(int sourceId, int targetId)
+    : IEquatable<DataflowEdge> {
+    public int SourceId { get; } = sourceId >= 0
+        ? sourceId
+        : throw new ArgumentOutOfRangeException(nameof(sourceId));
+    public int TargetId { get; } = targetId >= 0
+        ? targetId
+        : throw new ArgumentOutOfRangeException(nameof(targetId));
 
     public bool Equals(DataflowEdge other) =>
         SourceId == other.SourceId && TargetId == other.TargetId;
@@ -94,14 +89,17 @@ public sealed class DataflowGraph<T> {
         return Blocks[blockId];
     }
 
-    public ImmutableArray<int> GetPredecessors(int blockId) {
-        ValidateBlockId(blockId);
-        return _predecessors[blockId];
-    }
+    public ImmutableArray<int> GetPredecessors(int blockId) =>
+        GetNeighbors(blockId, _predecessors);
 
-    public ImmutableArray<int> GetSuccessors(int blockId) {
+    public ImmutableArray<int> GetSuccessors(int blockId) =>
+        GetNeighbors(blockId, _successors);
+
+    private ImmutableArray<int> GetNeighbors(
+        int blockId,
+        ImmutableArray<ImmutableArray<int>> adjacency) {
         ValidateBlockId(blockId);
-        return _successors[blockId];
+        return adjacency[blockId];
     }
 
     public bool IsCyclicBlock(int blockId) {

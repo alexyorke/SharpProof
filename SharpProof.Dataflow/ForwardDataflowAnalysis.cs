@@ -1,15 +1,14 @@
 namespace SharpProof.Dataflow;
 
-public sealed class ForwardDataflowAnalysisOptions {
-    public ForwardDataflowAnalysisOptions(int widenAfter = 2, int maxIterations = 10_000) {
-        if (widenAfter < 0) throw new ArgumentOutOfRangeException(nameof(widenAfter));
-        if (maxIterations <= 0) throw new ArgumentOutOfRangeException(nameof(maxIterations));
-        WidenAfter = widenAfter;
-        MaxIterations = maxIterations;
-    }
-
-    public int WidenAfter { get; }
-    public int MaxIterations { get; }
+public sealed class ForwardDataflowAnalysisOptions(
+    int widenAfter = 2,
+    int maxIterations = 10_000) {
+    public int WidenAfter { get; } = widenAfter >= 0
+        ? widenAfter
+        : throw new ArgumentOutOfRangeException(nameof(widenAfter));
+    public int MaxIterations { get; } = maxIterations > 0
+        ? maxIterations
+        : throw new ArgumentOutOfRangeException(nameof(maxIterations));
 }
 
 public sealed class DataflowAnalysisResult<T> {
@@ -134,13 +133,14 @@ public static class ForwardDataflowAnalysis {
     private static void ValidatePermutation(
         ImmutableArray<int> original,
         ImmutableArray<int> reordered) {
+        const string message = "The worklist test hook must return a permutation.";
         if (original.Length != reordered.Length)
-            throw new InvalidOperationException("The worklist test hook must return a permutation.");
+            throw new InvalidOperationException(message);
         var expected = new HashSet<int>(original);
         foreach (var blockId in reordered)
             if (!expected.Remove(blockId))
-                throw new InvalidOperationException("The worklist test hook must return a permutation.");
+                throw new InvalidOperationException(message);
         if (expected.Count != 0)
-            throw new InvalidOperationException("The worklist test hook must return a permutation.");
+            throw new InvalidOperationException(message);
     }
 }

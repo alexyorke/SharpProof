@@ -15,19 +15,13 @@ public enum SpecInstantiationFailureKind {
 }
 
 public sealed record SpecInstantiationFailure(
-    SpecInstantiationFailureKind Kind,
-    SpecVarId? Variable,
-    string Detail);
+    SpecInstantiationFailureKind Kind, SpecVarId? Variable, string Detail);
 
 public sealed class SpecInstantiationResult {
     private SpecInstantiationResult(
-        SpecInstantiationStatus status,
-        ImmutableArray<IrTerm> postconditions,
-        SpecInstantiationFailure? failure) {
-        Status = status;
-        Postconditions = postconditions;
-        Failure = failure;
-    }
+        SpecInstantiationStatus status, ImmutableArray<IrTerm> postconditions,
+        SpecInstantiationFailure? failure) =>
+        (Status, Postconditions, Failure) = (status, postconditions, failure);
 
     public SpecInstantiationStatus Status { get; }
     public ImmutableArray<IrTerm> Postconditions { get; }
@@ -42,8 +36,7 @@ public sealed class SpecInstantiationResult {
 
 public static class ApiSpecInstantiator {
     public static SpecInstantiationResult InstantiatePostconditions(
-        ApiSpecTemplate template,
-        IrFactory factory,
+        ApiSpecTemplate template, IrFactory factory,
         IReadOnlyDictionary<SpecVarId, IrTerm> substitutions) {
         if (template == null) throw new ArgumentNullException(nameof(template));
         if (factory == null) throw new ArgumentNullException(nameof(factory));
@@ -76,8 +69,7 @@ public static class ApiSpecInstantiator {
     }
 
     private static (IrTerm? Term, SpecInstantiationFailure? Failure) InstantiateTerm(
-        SpecTerm term,
-        IrFactory factory,
+        SpecTerm term, IrFactory factory,
         IReadOnlyDictionary<SpecVarId, IrTerm> substitutions) {
         try {
             switch (term) {
@@ -123,8 +115,7 @@ public static class ApiSpecInstantiator {
     }
 
     private static (IrTerm? Term, SpecInstantiationFailure? Failure) InstantiateNull(
-        SpecNullTerm nullValue,
-        IrFactory factory) {
+        SpecNullTerm nullValue, IrFactory factory) {
         var type = nullValue.Type switch {
             SpecValueType.String => factory.StringType,
             SpecValueType.Reference => factory.ObjectType,
@@ -139,50 +130,31 @@ public static class ApiSpecInstantiator {
     }
 
     private static (IrTerm? Term, SpecInstantiationFailure? Failure) InstantiateUnary(
-        SpecUnaryTerm unary,
-        IrFactory factory,
+        SpecUnaryTerm unary, IrFactory factory,
         IReadOnlyDictionary<SpecVarId, IrTerm> substitutions) {
         var operand = InstantiateTerm(unary.Operand, factory, substitutions);
         if (operand.Failure != null) return operand;
-        var @operator = unary.Operator switch {
-            SpecUnaryOperator.Not => IrUnaryOperator.Not,
-            SpecUnaryOperator.Negate => IrUnaryOperator.Negate,
-            _ => throw new ArgumentOutOfRangeException(nameof(unary))
-        };
+        if (!Enum.IsDefined(typeof(SpecUnaryOperator), unary.Operator))
+            throw new ArgumentOutOfRangeException(nameof(unary));
+        var @operator = (IrUnaryOperator)(int)unary.Operator;
         return (factory.Unary(@operator, operand.Term!), null);
     }
 
     private static (IrTerm? Term, SpecInstantiationFailure? Failure) InstantiateBinary(
-        SpecBinaryTerm binary,
-        IrFactory factory,
+        SpecBinaryTerm binary, IrFactory factory,
         IReadOnlyDictionary<SpecVarId, IrTerm> substitutions) {
         var left = InstantiateTerm(binary.Left, factory, substitutions);
         if (left.Failure != null) return left;
         var right = InstantiateTerm(binary.Right, factory, substitutions);
         if (right.Failure != null) return right;
-        var @operator = binary.Operator switch {
-            SpecBinaryOperator.Add => IrBinaryOperator.Add,
-            SpecBinaryOperator.Subtract => IrBinaryOperator.Subtract,
-            SpecBinaryOperator.Multiply => IrBinaryOperator.Multiply,
-            SpecBinaryOperator.Divide => IrBinaryOperator.Divide,
-            SpecBinaryOperator.Remainder => IrBinaryOperator.Remainder,
-            SpecBinaryOperator.AndAlso => IrBinaryOperator.AndAlso,
-            SpecBinaryOperator.OrElse => IrBinaryOperator.OrElse,
-            SpecBinaryOperator.Equal => IrBinaryOperator.Equal,
-            SpecBinaryOperator.NotEqual => IrBinaryOperator.NotEqual,
-            SpecBinaryOperator.LessThan => IrBinaryOperator.LessThan,
-            SpecBinaryOperator.LessThanOrEqual => IrBinaryOperator.LessThanOrEqual,
-            SpecBinaryOperator.GreaterThan => IrBinaryOperator.GreaterThan,
-            SpecBinaryOperator.GreaterThanOrEqual => IrBinaryOperator.GreaterThanOrEqual,
-            SpecBinaryOperator.StringConcat => IrBinaryOperator.StringConcat,
-            _ => throw new ArgumentOutOfRangeException(nameof(binary))
-        };
+        if (!Enum.IsDefined(typeof(SpecBinaryOperator), binary.Operator))
+            throw new ArgumentOutOfRangeException(nameof(binary));
+        var @operator = (IrBinaryOperator)(int)binary.Operator;
         return (factory.Binary(@operator, left.Term!, right.Term!), null);
     }
 
     private static (IrTerm? Term, SpecInstantiationFailure? Failure) InstantiateConditional(
-        SpecConditionalTerm conditional,
-        IrFactory factory,
+        SpecConditionalTerm conditional, IrFactory factory,
         IReadOnlyDictionary<SpecVarId, IrTerm> substitutions) {
         var condition = InstantiateTerm(conditional.Condition, factory, substitutions);
         if (condition.Failure != null) return condition;
@@ -221,8 +193,6 @@ public static class ApiSpecInstantiator {
     }
 
     private static SpecInstantiationResult Failure(
-        SpecInstantiationFailureKind kind,
-        SpecVarId variable,
-        string detail) =>
+        SpecInstantiationFailureKind kind, SpecVarId variable, string detail) =>
         SpecInstantiationResult.Failed(new SpecInstantiationFailure(kind, variable, detail));
 }

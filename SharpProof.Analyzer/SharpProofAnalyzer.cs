@@ -25,7 +25,7 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer {
     private void InitializeCompilation(CompilationStartAnalysisContext context) {
         var configuration = AnalyzerConfiguration.FromOptions(context.Options);
         context.RegisterSyntaxTreeAction(AnalyzeTreeConfiguration);
-        if (configuration.Mode == SharpProofMode.Off) {
+        if (configuration.Profile == SharpProofProfile.Off) {
             context.RegisterCompilationEndAction(endContext =>
                 ReportInvalidConfiguration(endContext, configuration));
             return;

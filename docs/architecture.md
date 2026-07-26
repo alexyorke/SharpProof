@@ -95,28 +95,67 @@ Proof evidence is type-safe. Approximations cannot construct an assumption.
 `Refuted` is created only after the executable IR replays a SAT model and
 observes the goal fail.
 
-## Determinism, budgets, and cache
+## Manifest, protocol, determinism, and cache
 
 IR identity is structural and factory-scoped. Solver names are canonical
 indices. Formula construction, worklists, specs, proof cores, diagnostics, and
 serialized responses are stably ordered. Z3 uses resource limits; wall time is
 an outer process kill boundary.
 
-The versioned worker protocol carries real source and reference paths plus
-explicit budgets. On the supported Windows x64 worker host, the launcher
-applies a Job Object with process and memory limits. Its content-addressed cache
-includes semantic, protocol, tool, compilation, reference, option,
-target-framework, and spec identity. Only complete hygienic `Proven` and
-replay-validated `Refuted` results are cacheable.
+Protocol version 3 first builds a manifest from compiler symbols. Stable
+semantic IDs identify selected callables, postcondition claims, and
+user/trusted evidence independently of formatting. The protocol separates run
+status, callable coverage, and per-claim outcome. Central validation requires
+the response to match the sealed manifest exactly, including dense ordinals,
+claim ownership, summary counts, evidence summaries, and allowed payloads.
+
+The request carries real source and reference paths plus explicit compilation
+options, feature selection, policies, and budgets. `WorkerFeatureSet` applies
+the same `effects`/`contracts`/`all` selection before manifest discovery:
+contract-only requests exclude effect annotations and effect-only requests
+exclude postcondition claims. On the supported Windows x64 worker host, the
+launcher creates a startup barrier, assigns the worker to a Job Object with
+process and memory limits, and only then releases verification work. Concurrent
+builds use isolated request/result paths. After validating a response, a
+cross-process mutex serializes publication; each stable file is atomically
+replaced, and the request replacement is rolled back if result publication
+fails. Completed writers leave a consistent pair, though readers can observe
+the narrow interval between the two replacements. The
+content-addressed cache includes semantic, protocol, tool, compilation,
+reference, option, target-framework, and spec identity. Cache schema version 3
+stores only the validated semantic payload. A hit is accepted only when its
+manifest hash and complete result set match the current manifest. Only
+complete callables whose claims are hygienic `Proven` or replay-validated
+`Refuted` are cacheable.
+
+One important production boundary is not complete: MSBuild still sends
+source/reference lists and the worker reconstructs a compilation. It does not
+yet observe the final post-generator Roslyn `Compilation`, generated-tree
+checksums, `AdditionalFiles`, or a closed compiler artifact. That collector and
+artifact are future work; documentation does not treat generated claims as
+accounted for today. Deterministic JSON is emitted, but SARIF projection is
+also future work. Counterexample replay currently re-evaluates the lowered
+obligation-path IR; an independent whole-body interpreter over the exact CFG is
+also still required before 1.0.
 
 ## Activation and release gates
 
-`SharpProofMode` accepts `off`, `effects`, `contracts`, and
-`all-experimental`; the package default is `off` and conditionally omits its
-analyzers from the compiler. A custom host that loads the analyzer can use the
-equivalent compilation-global `sharpproof_mode` key; `off` constructs no
-session. Feature diagnostics are Info and disabled by default. Unsupported
-analyzer callables are silent.
+`SharpProofProfile` accepts `advisory`, `strict`, and `off`; the package
+default is `advisory`. `SharpProofFeatures` accepts `effects`, `contracts`, and
+`all`; the default is `all`. A custom host can provide the equivalent
+compilation-global `sharpproof_profile` and `sharpproof_features` keys. The
+`off` profile omits analyzer/generator items and constructs no analysis
+session. Unsupported unannotated analyzer callables are silent, while
+unsupported explicitly selected callables report SP0047.
+
+The verifier is optional in advisory builds and mandatory in strict builds;
+explicitly setting `SharpProofVerify=false` with `strict` is a configuration
+error. `SharpProofVerifyPolicy` controls incomplete selected analysis;
+`SharpProofAssumptionPolicy` controls SP0048 reporting for user assumptions and
+trusted evidence. A refutation, malformed response, backend/replay failure,
+containment failure, or other infrastructure failure is fatal regardless of
+policy. `SharpProofMode` and `all-experimental` remain deprecated preview
+compatibility inputs only.
 
 The current gate includes:
 
@@ -132,11 +171,12 @@ The current gate includes:
 - worker/package consumer smoke checks;
 - fixed-seed fuzzing and performance budgets.
 
-Default-off latency samples alternate real baseline and SharpProof-imported
+Off-profile latency samples alternate real baseline and SharpProof-imported
 MSBuild rebuilds. A separate loaded-but-off analyzer canary covers session
-creation and retained state, while the package policy proves that the shipped
-default omits analyzer items and verifier invocation. The worker remains in the
-package's opt-in tools payload. The corpus reports explicit, silent, and total
-semantic Unknown rates as metrics; none is a release gate.
+creation and retained state, while the package policy proves that
+`SharpProofProfile=off` omits analyzer items and verifier invocation. The worker
+remains in the current preview package's opt-in tools payload. The corpus
+reports explicit, silent, and total semantic Unknown rates as metrics; none is
+a release gate.
 
 The active contract is `eng/acceptance`.

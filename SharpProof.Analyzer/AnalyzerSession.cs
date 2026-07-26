@@ -48,7 +48,7 @@ internal sealed class AnalyzerSession {
             IrFactory,
             _contractClauses);
         _apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
-        if (configuration.Mode is SharpProofMode.Effects or SharpProofMode.AllExperimental)
+        if (configuration.EffectsEnabled)
             _effects = new EffectAnalysisSession(compilation, _apiSpecs);
     }
 

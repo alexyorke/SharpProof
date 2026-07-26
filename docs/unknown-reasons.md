@@ -6,7 +6,8 @@ cache identity use the typed values below.
 
 `Unknown` is not failure converted into proof. It means SharpProof did not
 establish `Proven` or replay-validated `Refuted` within the admitted model and
-budgets. Unsupported analyzer callables usually abstain silently; worker
+budgets. Unsupported unannotated analyzer callables abstain silently;
+unsupported explicitly selected callables report SP0047, and worker
 verification returns an explicit typed record.
 
 ## Frontend expression and program lowering
@@ -105,26 +106,84 @@ after executable replay. Any failed check becomes `Unknown`.
 
 ## Worker verification records
 
-`SharpProof.Worker.Protocol.WorkerVerificationStatus` is exactly:
+Protocol version 3 separates run state, callable coverage, and claim outcome.
+Every enum reserves `Unspecified` as its zero value; a valid request or response
+must use a permitted nonzero value where the field is required.
 
-- `Proven`
-- `Refuted`
-- `Unknown`
+The request `WorkerFeatureSet` is exactly:
 
-`WorkerVerificationReason` has these exact values:
+- `Unspecified` - invalid placeholder;
+- `Effects` - select effect annotations and exclude postcondition claims; the
+  current worker reports these callables as incomplete because it has no
+  effect-proof claim kind;
+- `Contracts` - select contract annotations, assumptions, and postcondition
+  claims while excluding effect-only annotations; and
+- `All` - select both surfaces.
+
+`WorkerVerifyPolicy` is `Unspecified`, `Advisory`, `WarnOnUnknown`, or
+`RequireProven`. `WorkerAssumptionPolicy` is `Unspecified`, `Allow`, `Warn`, or
+`Error`. `Unspecified` is invalid in a request. The launcher maps the other
+values to SP0047/SP0048 severity and build behavior; policy never changes a
+claim outcome or makes a failed run successful.
+
+`WorkerRunStatus` is exactly:
 
 | Value | Meaning |
 |---|---|
+| `Unspecified` | Invalid placeholder; rejected by protocol validation |
+| `Complete` | Verification finished and the exact accounting response is structurally complete; claims may still be `Unknown` |
+| `TimedOut` | The project boundary expired |
+| `Canceled` | Caller cancellation stopped the run |
+| `Failed` | Input, compilation, backend, replay, containment, protocol, or infrastructure processing failed |
+
+`WorkerRunFailureReason` is exactly:
+
+| Value | Meaning |
+|---|---|
+| `Unspecified` | Invalid placeholder |
+| `None` | Required for a `Complete`, `TimedOut`, or `Canceled` run |
+| `InvalidRequest` | The request failed schema or value validation |
+| `InputUnavailable` | A required source/reference/input could not be read |
+| `CompilationFailure` | Roslyn could not construct a valid compilation |
+| `BackendUnavailable` | The configured SMT backend or native payload is unavailable |
+| `InfrastructureFailure` | A non-semantic worker component failed |
+| `MalformedResult` | A backend, cache, or assembled response failed structural validation |
+| `CounterexampleReplayFailed` | A candidate refutation did not replay |
+| `ContainmentFailure` | Required process/resource containment could not be established |
+
+`WorkerCallableCoverage` is `Unspecified`, `Complete`, or `Incomplete`.
+`WorkerCallableCoverageReason` is exactly:
+
+- `Unspecified`
+- `None`
+- `UnsupportedCallable`
+- `UnsupportedContract`
+- `SemanticUnknown`
+- `MissingClaimResult`
+- `MethodTimeout`
+- `ProjectTimeout`
+- `Canceled`
+- `InfrastructureFailure`
+
+`WorkerClaimOutcome` is `Unspecified`, `Proven`, `Refuted`, or `Unknown`.
+Every manifest claim has exactly one non-`Unspecified` outcome.
+
+`WorkerClaimReason` has these exact values:
+
+| Value | Meaning |
+|---|---|
+| `Unspecified` | Invalid placeholder |
 | `None` | A terminal `Proven` or `Refuted` record has no abstention |
 | `UnsupportedCallable` | Callable kind, target, companion, or contract binding target is unsupported |
 | `UnsupportedContract` | Contract structure or intrinsic use is invalid/unsupported |
 | `UnsupportedBody` | The bounded acyclic body executor cannot model the body |
 | `UnsupportedExpression` | Contract/body expression, spec application, or proof encoding is unsupported |
-| `DeepEnsures` | The constructed obligation exceeds `MaximumExpressionDepth`; it does not mean general deep verification is implemented |
+| `DeepPostcondition` | The constructed obligation exceeds `MaximumExpressionDepth`; it does not mean general deep verification is implemented |
 | `MissingReturnValue` | A result-dependent postcondition has a normal path without a usable return value |
 | `ResourceLimit` | Per-query or per-method resource allowance is exhausted |
 | `MethodTimeout` | The method wall boundary is reached |
 | `ProjectTimeout` | The project boundary leaves the record unfinished |
+| `Canceled` | Caller cancellation stopped this claim after its manifest was sealed |
 | `BackendUnavailable` | Z3/backend loading or availability failed |
 | `InfrastructureFailure` | Non-semantic worker infrastructure failed |
 | `MalformedBackendResult` | The backend result cannot pass structural/kernel validation |
@@ -136,6 +195,25 @@ proof `UnsupportedOperation`, `ApproximationTouchedGoal`,
 `UnsupportedExpression`. Contract binding failures map to
 `UnsupportedContract`, `UnsupportedExpression`, or `UnsupportedCallable`
 according to their closed failure kind.
+
+The callable record prevents a zero-claim selected method from disappearing.
+The sealed manifest and response must have exact callable/result and
+claim/result equality: missing, duplicate, invented, out-of-range, or
+mis-owned claims make the response malformed rather than successful.
+
+`WorkerCacheStatus` is exactly:
+
+- `Unspecified`
+- `Disabled`
+- `Miss`
+- `Hit`
+- `Written`
+- `Rejected`
+- `Unavailable`
+
+The response summary includes counts for every claim outcome and reason,
+user/trusted evidence, cache state, protocol/manifest/cache/tool/spec versions,
+effective budgets, and elapsed time.
 
 ## Protocol errors are separate
 
@@ -152,14 +230,14 @@ response `errors` array as typed string codes such as:
 - `input.unavailable`; and
 - `compiler.<diagnostic-id>`.
 
-These errors are not `WorkerVerificationReason` values and are not semantic
+These errors are not `WorkerClaimReason` values and are not semantic
 answers.
 
 ## Cancellation, diagnostics, and caching
 
-Caller cancellation remains cancellation and propagates across audited
-boundaries; it is not converted to a reason or cached response. Outer launcher
-termination is likewise infrastructure control, not a proof.
+Caller cancellation remains run status `Canceled`; it is not converted to a
+claim reason or cached response. Outer launcher termination is likewise
+infrastructure control, not a proof.
 
 An analyzer not-proven diagnostic and a worker `Unknown` record are different
 interfaces. Diagnostic silence can also mean disabled reporting or silent
@@ -169,5 +247,7 @@ admitted product subset.
 
 Unknown outcomes, protocol errors, cancellation, timeout, malformed results,
 backend failures, and failed replay are never semantic cache entries. Only a
-complete validated project response whose records are hygienic `Proven` or
-replay-validated `Refuted` is cacheable.
+`Complete`, exact-manifest response with complete callable coverage and claims
+that are hygienic `Proven` or replay-validated `Refuted` is cacheable. Cache
+schema version 3 stores the semantic payload; every read revalidates it against
+the complete current manifest.

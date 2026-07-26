@@ -36,25 +36,19 @@ public sealed class NullnessDomain : ClosedAbstractDomain<NullnessValue> {
         return value == NullnessValue.Bottom ? Bottom : Top;
     }
 
-    public NullnessValue AssumeNull(NullnessValue value) {
-        Validate(value);
-        return value switch {
-            NullnessValue.Bottom => Bottom,
-            NullnessValue.Null => NullnessValue.Null,
-            NullnessValue.NonNull => Bottom,
-            NullnessValue.MaybeNull => NullnessValue.Null,
-            _ => throw new ArgumentOutOfRangeException(nameof(value))
-        };
-    }
+    public NullnessValue AssumeNull(NullnessValue value) =>
+        Assume(value, NullnessValue.Null);
 
-    public NullnessValue AssumeNonNull(NullnessValue value) {
+    public NullnessValue AssumeNonNull(NullnessValue value) =>
+        Assume(value, NullnessValue.NonNull);
+
+    private NullnessValue Assume(NullnessValue value, NullnessValue expected) {
         Validate(value);
         return value switch {
             NullnessValue.Bottom => Bottom,
-            NullnessValue.Null => Bottom,
-            NullnessValue.NonNull => NullnessValue.NonNull,
-            NullnessValue.MaybeNull => NullnessValue.NonNull,
-            _ => throw new ArgumentOutOfRangeException(nameof(value))
+            NullnessValue.MaybeNull => expected,
+            _ when value == expected => expected,
+            _ => Bottom
         };
     }
 

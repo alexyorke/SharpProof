@@ -100,8 +100,20 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         return status switch {
             Status.UNSATISFIABLE => CreateUnsatisfiable(solver, tracked),
             Status.SATISFIABLE => CreateSatisfiable(query, encoder, solver),
-            _ => BackendCheckResult.Unknown(BackendFailureReason.ResourceLimit)
+            _ => BackendCheckResult.Unknown(
+                ClassifyUnknown(solver.ReasonUnknown))
         };
+    }
+
+    private static BackendFailureReason ClassifyUnknown(string? reason) {
+        if (reason?.IndexOf("timeout", StringComparison.OrdinalIgnoreCase) >= 0)
+            return BackendFailureReason.Timeout;
+        if (reason?.IndexOf("resource", StringComparison.OrdinalIgnoreCase) >= 0 ||
+            reason?.IndexOf("rlimit", StringComparison.OrdinalIgnoreCase) >= 0 ||
+            reason?.IndexOf("max. memory", StringComparison.OrdinalIgnoreCase) >= 0 ||
+            string.Equals(reason, "canceled", StringComparison.OrdinalIgnoreCase))
+            return BackendFailureReason.ResourceLimit;
+        return BackendFailureReason.InfrastructureFailure;
     }
 
     private void AccountResources(Solver solver) {

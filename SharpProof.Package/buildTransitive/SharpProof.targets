@@ -6,12 +6,36 @@
     <SharpProofLauncherPath Condition="'$(SharpProofLauncherPath)' == ''">$(_SharpProofToolsDirectory)\SharpProof.Worker.Launcher.dll</SharpProofLauncherPath>
     <_SharpProofWorkerPath>$([System.IO.Path]::GetFullPath('$(SharpProofWorkerPath)'))</_SharpProofWorkerPath>
     <_SharpProofLauncherPath>$([System.IO.Path]::GetFullPath('$(SharpProofLauncherPath)'))</_SharpProofLauncherPath>
-    <_SharpProofModeNormalized>$([System.String]::Copy('$(SharpProofMode)').ToLowerInvariant())</_SharpProofModeNormalized>
+    <_SharpProofProfileProvided Condition="'$(SharpProofProfile)' != ''">true</_SharpProofProfileProvided>
+    <_SharpProofFeaturesProvided Condition="'$(SharpProofFeatures)' != ''">true</_SharpProofFeaturesProvided>
+    <_SharpProofLegacyModeProvided Condition="'$(SharpProofMode)' != ''">true</_SharpProofLegacyModeProvided>
+    <_SharpProofLegacyModeValue>$(SharpProofMode)</_SharpProofLegacyModeValue>
+    <_SharpProofLegacyModeNormalized>$([System.String]::Copy('$(SharpProofMode)').ToLowerInvariant())</_SharpProofLegacyModeNormalized>
+    <SharpProofProfile Condition="'$(SharpProofProfile)' == '' AND '$(_SharpProofLegacyModeNormalized)' == 'off'">off</SharpProofProfile>
+    <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
+    <SharpProofFeatures Condition="'$(SharpProofFeatures)' == '' AND '$(_SharpProofLegacyModeNormalized)' == 'effects'">effects</SharpProofFeatures>
+    <SharpProofFeatures Condition="'$(SharpProofFeatures)' == '' AND '$(_SharpProofLegacyModeNormalized)' == 'contracts'">contracts</SharpProofFeatures>
+    <SharpProofFeatures Condition="'$(SharpProofFeatures)' == ''">all</SharpProofFeatures>
+    <_SharpProofProfileNormalized>$([System.String]::Copy('$(SharpProofProfile)').ToLowerInvariant())</_SharpProofProfileNormalized>
+    <_SharpProofFeaturesNormalized>$([System.String]::Copy('$(SharpProofFeatures)').ToLowerInvariant())</_SharpProofFeaturesNormalized>
+    <_SharpProofEffectiveLegacyMode Condition="'$(_SharpProofProfileNormalized)' == 'off'">off</_SharpProofEffectiveLegacyMode>
+    <_SharpProofEffectiveLegacyMode Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofFeaturesNormalized)' == 'effects'">effects</_SharpProofEffectiveLegacyMode>
+    <_SharpProofEffectiveLegacyMode Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofFeaturesNormalized)' == 'contracts'">contracts</_SharpProofEffectiveLegacyMode>
+    <_SharpProofEffectiveLegacyMode Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofFeaturesNormalized)' == 'all'">all-experimental</_SharpProofEffectiveLegacyMode>
+    <SharpProofMode>$(_SharpProofEffectiveLegacyMode)</SharpProofMode>
+    <SharpProofVerifyPolicy Condition="'$(SharpProofVerifyPolicy)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">require-proven</SharpProofVerifyPolicy>
+    <SharpProofVerifyPolicy Condition="'$(SharpProofVerifyPolicy)' == ''">advisory</SharpProofVerifyPolicy>
+    <SharpProofAssumptionPolicy Condition="'$(SharpProofAssumptionPolicy)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">error</SharpProofAssumptionPolicy>
+    <SharpProofAssumptionPolicy Condition="'$(SharpProofAssumptionPolicy)' == ''">allow</SharpProofAssumptionPolicy>
+    <SharpProofVerify Condition="'$(SharpProofVerify)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">true</SharpProofVerify>
+    <SharpProofVerify Condition="'$(SharpProofVerify)' == ''">false</SharpProofVerify>
+    <_SharpProofVerifyPolicyNormalized>$([System.String]::Copy('$(SharpProofVerifyPolicy)').ToLowerInvariant())</_SharpProofVerifyPolicyNormalized>
+    <_SharpProofAssumptionPolicyNormalized>$([System.String]::Copy('$(SharpProofAssumptionPolicy)').ToLowerInvariant())</_SharpProofAssumptionPolicyNormalized>
   </PropertyGroup>
-  <ItemGroup Condition="'$(_SharpProofModeNormalized)' != 'off'">
+  <ItemGroup Condition="'$(_SharpProofProfileNormalized)' != 'off'">
     <Analyzer Include="
         $(_SharpProofAnalyzerDirectory)/SharpProof.Analyzer.dll;
-        $(_SharpProofAnalyzerDirectory)/SharpProof.ContractForGenerator.dll">
+        $(SharpProofContractForGeneratorPath)">
       <SharpProofAnalyzerRole>EntryPoint</SharpProofAnalyzerRole>
     </Analyzer>
     <!--
@@ -41,16 +65,39 @@
     </Analyzer>
   </ItemGroup>
 
+  <Target Name="_SharpProofValidateConfiguration"
+          BeforeTargets="CoreCompile"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="'$(_SharpProofLegacyModeProvided)' == 'true' AND '$(_SharpProofLegacyModeNormalized)' != 'off' AND '$(_SharpProofLegacyModeNormalized)' != 'effects' AND '$(_SharpProofLegacyModeNormalized)' != 'contracts' AND '$(_SharpProofLegacyModeNormalized)' != 'all-experimental'"
+           Text="SharpProofMode must be off, effects, contracts, or all-experimental while the preview compatibility alias remains available." />
+    <Error Condition="'$(_SharpProofLegacyModeProvided)' == 'true' AND ('$(_SharpProofProfileProvided)' == 'true' OR '$(_SharpProofFeaturesProvided)' == 'true')"
+           Text="Do not combine deprecated SharpProofMode with SharpProofProfile or SharpProofFeatures." />
+    <Error Condition="'$(_SharpProofProfileNormalized)' != 'advisory' AND '$(_SharpProofProfileNormalized)' != 'strict' AND '$(_SharpProofProfileNormalized)' != 'off'"
+           Text="SharpProofProfile must be advisory, strict, or off." />
+    <Error Condition="'$(_SharpProofFeaturesNormalized)' != 'effects' AND '$(_SharpProofFeaturesNormalized)' != 'contracts' AND '$(_SharpProofFeaturesNormalized)' != 'all'"
+           Text="SharpProofFeatures must be effects, contracts, or all." />
+    <Error Condition="'$(SharpProofVerify)' != 'true' AND '$(SharpProofVerify)' != 'false'"
+           Text="SharpProofVerify must be true or false." />
+    <Error Condition="'$(_SharpProofProfileNormalized)' == 'strict' AND '$(SharpProofVerify)' != 'true'"
+           Text="SharpProofProfile=strict requires SharpProofVerify=true; use the advisory profile to make verification optional." />
+    <Warning Condition="'$(_SharpProofLegacyModeProvided)' == 'true'"
+             Text="SharpProofMode='$(_SharpProofLegacyModeValue)' is deprecated during preview. Use SharpProofProfile and SharpProofFeatures; all-experimental maps to SharpProofFeatures=all." />
+  </Target>
+
   <Target Name="_SharpProofInitializeVerify">
     <PropertyGroup>
       <_SharpProofVerifyDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(IntermediateOutputPath)SharpProof'))</_SharpProofVerifyDirectory>
       <SharpProofVerifyRequestFile Condition="'$(SharpProofVerifyRequestFile)' == ''">$(_SharpProofVerifyDirectory)\request.json</SharpProofVerifyRequestFile>
       <SharpProofVerifyResultFile Condition="'$(SharpProofVerifyResultFile)' == ''">$(_SharpProofVerifyDirectory)\result.json</SharpProofVerifyResultFile>
       <SharpProofVerifyCacheDirectory Condition="'$(SharpProofVerifyCacheDirectory)' == ''">$(_SharpProofVerifyDirectory)\cache</SharpProofVerifyCacheDirectory>
-      <_SharpProofSourceList>$(_SharpProofVerifyDirectory)\sources.list</_SharpProofSourceList>
-      <_SharpProofReferenceList>$(_SharpProofVerifyDirectory)\references.list</_SharpProofReferenceList>
-      <_SharpProofConstantList>$(_SharpProofVerifyDirectory)\constants.list</_SharpProofConstantList>
-      <_SharpProofOptionsInput>$(_SharpProofVerifyDirectory)\options.input</_SharpProofOptionsInput>
+      <_SharpProofInvocationId Condition="'$(_SharpProofInvocationId)' == ''">$([System.Guid]::NewGuid().ToString('N'))</_SharpProofInvocationId>
+      <_SharpProofInvocationDirectory>$(_SharpProofVerifyDirectory)\runs\$(_SharpProofInvocationId)</_SharpProofInvocationDirectory>
+      <_SharpProofInvocationRequestFile>$(_SharpProofInvocationDirectory)\request.json</_SharpProofInvocationRequestFile>
+      <_SharpProofInvocationResultFile>$(_SharpProofInvocationDirectory)\result.json</_SharpProofInvocationResultFile>
+      <_SharpProofSourceList>$(_SharpProofInvocationDirectory)\sources.list</_SharpProofSourceList>
+      <_SharpProofReferenceList>$(_SharpProofInvocationDirectory)\references.list</_SharpProofReferenceList>
+      <_SharpProofConstantList>$(_SharpProofInvocationDirectory)\constants.list</_SharpProofConstantList>
+      <_SharpProofOptionsInput>$(_SharpProofInvocationDirectory)\options.input</_SharpProofOptionsInput>
       <_SharpProofNullable>$(Nullable)</_SharpProofNullable>
       <_SharpProofNullable Condition="'$(_SharpProofNullable)' == ''">disable</_SharpProofNullable>
       <_SharpProofCheckedOverflow>$(CheckForOverflowUnderflow)</_SharpProofCheckedOverflow>
@@ -72,9 +119,9 @@
 
   <Target Name="_SharpProofWriteOptionsInput"
           DependsOnTargets="_SharpProofInitializeVerify">
-    <MakeDir Directories="$(_SharpProofVerifyDirectory)" />
+    <MakeDir Directories="$(_SharpProofInvocationDirectory)" />
     <WriteLinesToFile File="$(_SharpProofOptionsInput)"
-                      Lines="target-framework=$(TargetFramework);language-version=$(LangVersion);nullable=$(_SharpProofNullable);checked-overflow=$(_SharpProofCheckedOverflow);optimize=$(_SharpProofOptimize);allow-unsafe=$(_SharpProofAllowUnsafe);deterministic=$(_SharpProofDeterministic);output-type=$(_SharpProofOutputType);platform-target=$(_SharpProofPlatformTarget);prefer-32-bit=$(_SharpProofPrefer32Bit);constants=$(DefineConstants);query-rlimit=$(SharpProofVerifyQueryRlimit);method-rlimit=$(SharpProofVerifyMethodRlimit);method-wall-ms=$(SharpProofVerifyMethodWallTimeMilliseconds);project-wall-ms=$(SharpProofVerifyProjectWallTimeMilliseconds);max-parallelism=$(SharpProofVerifyMaxParallelism);max-expression-depth=$(SharpProofVerifyMaximumExpressionDepth);process-memory-bytes=$(SharpProofVerifyProcessMemoryLimitBytes);max-worker-processes=$(SharpProofVerifyMaxWorkerProcesses);termination-grace-ms=$(SharpProofVerifyTerminationGraceMilliseconds)"
+                      Lines="target-framework=$(TargetFramework);language-version=$(LangVersion);nullable=$(_SharpProofNullable);checked-overflow=$(_SharpProofCheckedOverflow);optimize=$(_SharpProofOptimize);allow-unsafe=$(_SharpProofAllowUnsafe);deterministic=$(_SharpProofDeterministic);output-type=$(_SharpProofOutputType);platform-target=$(_SharpProofPlatformTarget);prefer-32-bit=$(_SharpProofPrefer32Bit);constants=$(DefineConstants);profile=$(_SharpProofProfileNormalized);features=$(_SharpProofFeaturesNormalized);verify-policy=$(_SharpProofVerifyPolicyNormalized);assumption-policy=$(_SharpProofAssumptionPolicyNormalized);query-rlimit=$(SharpProofVerifyQueryRlimit);method-rlimit=$(SharpProofVerifyMethodRlimit);method-wall-ms=$(SharpProofVerifyMethodWallTimeMilliseconds);project-wall-ms=$(SharpProofVerifyProjectWallTimeMilliseconds);max-parallelism=$(SharpProofVerifyMaxParallelism);max-expression-depth=$(SharpProofVerifyMaximumExpressionDepth);process-memory-bytes=$(SharpProofVerifyProcessMemoryLimitBytes);max-worker-processes=$(SharpProofVerifyMaxWorkerProcesses);termination-grace-ms=$(SharpProofVerifyTerminationGraceMilliseconds)"
                       Overwrite="true"
                       WriteOnlyWhenDifferent="true" />
   </Target>
@@ -85,6 +132,10 @@
            Text="SharpProof verification requires an explicit target framework identity." />
     <Error Condition="'$(LangVersion)' == ''"
            Text="SharpProof verification requires an explicit effective C# language version." />
+    <Error Condition="'$(_SharpProofVerifyPolicyNormalized)' != 'advisory' AND '$(_SharpProofVerifyPolicyNormalized)' != 'warn-on-unknown' AND '$(_SharpProofVerifyPolicyNormalized)' != 'require-proven'"
+           Text="SharpProofVerifyPolicy must be advisory, warn-on-unknown, or require-proven." />
+    <Error Condition="'$(_SharpProofAssumptionPolicyNormalized)' != 'allow' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'warn' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'error'"
+           Text="SharpProofAssumptionPolicy must be allow, warn, or error." />
     <Error Condition="!Exists('$(_SharpProofLauncherPath)')"
            Text="SharpProof verifier launcher was not found at '$(_SharpProofLauncherPath)'." />
     <Error Condition="!Exists('$(_SharpProofWorkerPath)')"
@@ -110,10 +161,17 @@
                       Lines="@(_SharpProofConstant)"
                       Overwrite="true"
                       WriteOnlyWhenDifferent="true" />
-    <Exec Command="&quot;$(SharpProofDotNetHost)&quot; &quot;$(_SharpProofLauncherPath)&quot; verify --worker &quot;$(_SharpProofWorkerPath)&quot; --request &quot;$(SharpProofVerifyRequestFile)&quot; --result &quot;$(SharpProofVerifyResultFile)&quot; --project-directory &quot;$(MSBuildProjectDirectory)&quot; --assembly-name &quot;$(AssemblyName)&quot; --sources &quot;$(_SharpProofSourceList)&quot; --references &quot;$(_SharpProofReferenceList)&quot; --constants &quot;$(_SharpProofConstantList)&quot; --target-framework &quot;$(TargetFramework)&quot; --language-version &quot;$(LangVersion)&quot; --nullable &quot;$(_SharpProofNullable)&quot; --checked-overflow &quot;$(_SharpProofCheckedOverflow)&quot; --optimize &quot;$(_SharpProofOptimize)&quot; --allow-unsafe &quot;$(_SharpProofAllowUnsafe)&quot; --deterministic &quot;$(_SharpProofDeterministic)&quot; --output-type &quot;$(_SharpProofOutputType)&quot; --platform-target &quot;$(_SharpProofPlatformTarget)&quot; --prefer-32-bit &quot;$(_SharpProofPrefer32Bit)&quot; --query-rlimit &quot;$(SharpProofVerifyQueryRlimit)&quot; --method-rlimit &quot;$(SharpProofVerifyMethodRlimit)&quot; --method-wall-ms &quot;$(SharpProofVerifyMethodWallTimeMilliseconds)&quot; --project-wall-ms &quot;$(SharpProofVerifyProjectWallTimeMilliseconds)&quot; --max-parallelism &quot;$(SharpProofVerifyMaxParallelism)&quot; --max-expression-depth &quot;$(SharpProofVerifyMaximumExpressionDepth)&quot; --process-memory-bytes &quot;$(SharpProofVerifyProcessMemoryLimitBytes)&quot; --max-worker-processes &quot;$(SharpProofVerifyMaxWorkerProcesses)&quot; --termination-grace-ms &quot;$(SharpProofVerifyTerminationGraceMilliseconds)&quot; --cache-enabled &quot;$(SharpProofVerifyCacheEnabled)&quot; --cache-directory &quot;$(SharpProofVerifyCacheDirectory)&quot; --cache-maximum-bytes &quot;$(SharpProofVerifyCacheMaximumBytes)&quot;"
+    <Exec Command="&quot;$(SharpProofDotNetHost)&quot; &quot;$(_SharpProofLauncherPath)&quot; verify --worker &quot;$(_SharpProofWorkerPath)&quot; --request &quot;$(_SharpProofInvocationRequestFile)&quot; --result &quot;$(_SharpProofInvocationResultFile)&quot; --publish-request &quot;$(SharpProofVerifyRequestFile)&quot; --publish-result &quot;$(SharpProofVerifyResultFile)&quot; --project-directory &quot;$(MSBuildProjectDirectory)&quot; --assembly-name &quot;$(AssemblyName)&quot; --sources &quot;$(_SharpProofSourceList)&quot; --references &quot;$(_SharpProofReferenceList)&quot; --constants &quot;$(_SharpProofConstantList)&quot; --target-framework &quot;$(TargetFramework)&quot; --language-version &quot;$(LangVersion)&quot; --nullable &quot;$(_SharpProofNullable)&quot; --checked-overflow &quot;$(_SharpProofCheckedOverflow)&quot; --optimize &quot;$(_SharpProofOptimize)&quot; --allow-unsafe &quot;$(_SharpProofAllowUnsafe)&quot; --deterministic &quot;$(_SharpProofDeterministic)&quot; --output-type &quot;$(_SharpProofOutputType)&quot; --platform-target &quot;$(_SharpProofPlatformTarget)&quot; --prefer-32-bit &quot;$(_SharpProofPrefer32Bit)&quot; --features &quot;$(_SharpProofFeaturesNormalized)&quot; --verify-policy &quot;$(_SharpProofVerifyPolicyNormalized)&quot; --assumption-policy &quot;$(_SharpProofAssumptionPolicyNormalized)&quot; --query-rlimit &quot;$(SharpProofVerifyQueryRlimit)&quot; --method-rlimit &quot;$(SharpProofVerifyMethodRlimit)&quot; --method-wall-ms &quot;$(SharpProofVerifyMethodWallTimeMilliseconds)&quot; --project-wall-ms &quot;$(SharpProofVerifyProjectWallTimeMilliseconds)&quot; --max-parallelism &quot;$(SharpProofVerifyMaxParallelism)&quot; --max-expression-depth &quot;$(SharpProofVerifyMaximumExpressionDepth)&quot; --process-memory-bytes &quot;$(SharpProofVerifyProcessMemoryLimitBytes)&quot; --max-worker-processes &quot;$(SharpProofVerifyMaxWorkerProcesses)&quot; --termination-grace-ms &quot;$(SharpProofVerifyTerminationGraceMilliseconds)&quot; --cache-enabled &quot;$(SharpProofVerifyCacheEnabled)&quot; --cache-directory &quot;$(SharpProofVerifyCacheDirectory)&quot; --cache-maximum-bytes &quot;$(SharpProofVerifyCacheMaximumBytes)&quot;"
           WorkingDirectory="$(MSBuildProjectDirectory)"
           StandardOutputImportance="High"
-          StandardErrorImportance="High" />
+          StandardErrorImportance="High"
+          IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode"
+              PropertyName="_SharpProofVerifierExitCode" />
+    </Exec>
+    <RemoveDir Directories="$(_SharpProofInvocationDirectory)" />
+    <Error Condition="'$(_SharpProofVerifierExitCode)' != '0'"
+           Text="SharpProof verifier failed with exit code $(_SharpProofVerifierExitCode)." />
     <Message Importance="High"
              Text="SharpProof verifier result: $(SharpProofVerifyResultFile)" />
   </Target>
@@ -121,11 +179,11 @@
   <Target Name="SharpProofVerify"
           AfterTargets="CoreCompile"
           DependsOnTargets="_SharpProofInitializeVerify;_SharpProofVerifyCore"
-          Condition="'$(SharpProofVerify)' == 'true' AND '$(OS)' == 'Windows_NT' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'" />
+          Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(OS)' == 'Windows_NT' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'" />
 
   <Target Name="SharpProofRejectUnsupportedWorkerHost"
           AfterTargets="CoreCompile"
-          Condition="'$(SharpProofVerify)' == 'true' AND '$(OS)' != 'Windows_NT' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
-    <Error Text="SharpProof out-of-process verification is supported only on Windows. Analyzer modes remain available on this host." />
+           Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(OS)' != 'Windows_NT' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+    <Error Text="SharpProof out-of-process verification is supported only on Windows x64. Portable analyzer profiles remain available on this host." />
   </Target>
 </Project>

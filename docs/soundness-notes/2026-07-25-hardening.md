@@ -1,5 +1,10 @@
 # SharpProof hardening audit - 2026-07-25
 
+> Dated evidence: this note records the state reviewed on 2026-07-25. The
+> current package now defaults to the advisory/all profile and uses accountable
+> worker protocol version 3. See [Coverage and limits](../coverage-and-limits.md)
+> and [Typed abstention reasons](../unknown-reasons.md) for current behavior.
+
 This note records the soundness-focused follow-up to commit
 `d2cd1dc03ce64eb01556075985b9c3d998e988bd`. It does not claim that elapsed-time,
 human-review, hardware-matrix, or explicitly deferred roadmap checkpoints have

@@ -15,12 +15,10 @@ public readonly struct EffectProjection(
         IsComplete == other.IsComplete;
     public override bool Equals(object? obj) =>
         obj is EffectProjection other && Equals(other);
-    public override int GetHashCode() {
-        unchecked {
-            return (((int)Effects * 397) ^ (int)Capabilities) * 397 ^
-                   (IsComplete ? 1 : 0);
-        }
-    }
+    public override int GetHashCode() =>
+        unchecked(
+            (((int)Effects * 397) ^ (int)Capabilities) * 397 ^
+            (IsComplete ? 1 : 0));
     public static bool operator ==(EffectProjection left, EffectProjection right) =>
         left.Equals(right);
     public static bool operator !=(EffectProjection left, EffectProjection right) =>
@@ -32,9 +30,7 @@ public static class EffectSummaryProjector {
         if (summary == null) throw new ArgumentNullException(nameof(summary));
         if (summary.IsBottom)
             return new EffectProjection(
-                SharpProofEffect.None,
-                SharpProofCapability.None,
-                isComplete: true);
+                SharpProofEffect.None, SharpProofCapability.None, isComplete: true);
 
         var effects = ProjectRegions(summary.Reads, isWrite: false) |
                       ProjectRegions(summary.Writes, isWrite: true);
@@ -72,8 +68,7 @@ public static class EffectSummaryProjector {
     }
 
     private static SharpProofEffect ProjectRegions(
-        EffectRegionSet regions,
-        bool isWrite) {
+        EffectRegionSet regions, bool isWrite) {
         if (regions.IsUnknown)
             return SharpProofEffect.None;
         var result = SharpProofEffect.None;
@@ -83,8 +78,7 @@ public static class EffectSummaryProjector {
     }
 
     private static SharpProofEffect ProjectRegion(
-        EffectRegionKind kind,
-        bool isWrite) =>
+        EffectRegionKind kind, bool isWrite) =>
         (kind, isWrite) switch {
             (EffectRegionKind.Receiver, false) => SharpProofEffect.ReadsReceiverState,
             (EffectRegionKind.Parameter, false) => SharpProofEffect.ReadsArgumentState,

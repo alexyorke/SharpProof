@@ -56,7 +56,8 @@ internal static class GeneratedDiagnosticDescriptors {
         "Precondition Violated",
         "Call to '{0}' violates precondition '{1}'",
         "Contracts",
-        "Reports only compiler-bound preconditions that concretely replay as false.");
+        "Reports only compiler-bound preconditions that concretely replay as false.",
+        severity: DiagnosticSeverity.Warning);
 
     internal static readonly DiagnosticDescriptor ExceptionContractViolationRule = Create(
         "SP0030",
@@ -79,6 +80,13 @@ internal static class GeneratedDiagnosticDescriptors {
         "ExceptionFlow",
         "Reports exception contracts whose rich effect summary remains unknown.");
 
+    internal static readonly DiagnosticDescriptor SelectedAnalysisIncompleteRule = Create(
+        "SP0047",
+        "Selected Analysis Incomplete",
+        "SharpProof could not completely analyze selected method '{0}': {1}",
+        "Verification",
+        "Reports selected methods outside the supported analyzer subset.");
+
     internal static readonly ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics = [
         PurityNotVerifiedRule,
         AllocationInZeroAllocationMethodRule,
@@ -89,7 +97,8 @@ internal static class GeneratedDiagnosticDescriptors {
         RequiresNotProvenRule,
         ExceptionContractViolationRule,
         ZeroAllocationsNotVerifiedRule,
-        ExceptionContractNotVerifiedRule
+        ExceptionContractNotVerifiedRule,
+        SelectedAnalysisIncompleteRule
     ];
 
     private static DiagnosticDescriptor Create(
@@ -98,7 +107,7 @@ internal static class GeneratedDiagnosticDescriptors {
         string message,
         string category,
         string description,
-        bool isEnabledByDefault = false,
+        bool isEnabledByDefault = true,
         DiagnosticSeverity severity = DiagnosticSeverity.Info) =>
         new(
             id,

@@ -34,64 +34,41 @@ public enum IrExceptionKind {
 public sealed class IrValue {
     private readonly object? _value;
 
-    private IrValue(IrTypeId type, IrValueKind kind, object? value) {
-        Type = type;
-        Kind = kind;
-        _value = value;
-    }
+    private IrValue(IrTypeId type, IrValueKind kind, object? value) =>
+        (Type, Kind, _value) = (type, kind, value);
 
     public IrTypeId Type { get; }
     public IrValueKind Kind { get; }
-    public bool Boolean => Kind == IrValueKind.Boolean
-        ? (bool)_value!
-        : throw new InvalidOperationException("The IR value is not boolean.");
-    public long Integer => Kind == IrValueKind.Integer
-        ? (long)_value!
-        : throw new InvalidOperationException("The IR value is not an integer.");
-    public string String => Kind == IrValueKind.String
-        ? (string)_value!
-        : throw new InvalidOperationException("The IR value is not a string.");
-    public object Reference => Kind == IrValueKind.Reference
-        ? _value!
-        : throw new InvalidOperationException("The IR value is not a reference.");
-    public ImmutableArray<IrValue> Elements => Kind == IrValueKind.Sequence
-        ? (ImmutableArray<IrValue>)_value!
-        : throw new InvalidOperationException("The IR value is not a sequence.");
+    public bool Boolean => Get<bool>(IrValueKind.Boolean, "The IR value is not boolean.");
+    public long Integer => Get<long>(IrValueKind.Integer, "The IR value is not an integer.");
+    public string String => Get<string>(IrValueKind.String, "The IR value is not a string.");
+    public object Reference => Get<object>(IrValueKind.Reference, "The IR value is not a reference.");
+    public ImmutableArray<IrValue> Elements =>
+        Get<ImmutableArray<IrValue>>(IrValueKind.Sequence, "The IR value is not a sequence.");
 
-    internal static IrValue CreateBoolean(IrTypeId type, bool value) =>
-        new(type, IrValueKind.Boolean, value);
-
-    internal static IrValue CreateInteger(IrTypeId type, long value) =>
-        new(type, IrValueKind.Integer, value);
-
-    internal static IrValue CreateString(IrTypeId type, string value) =>
-        new(type, IrValueKind.String, value);
-
-    internal static IrValue CreateNull(IrTypeId type) =>
-        new(type, IrValueKind.Null, null);
-
-    internal static IrValue CreateReference(IrTypeId type, object value) =>
-        new(type, IrValueKind.Reference, value);
-
+    internal static IrValue CreateBoolean(IrTypeId type, bool value) => new(type, IrValueKind.Boolean, value);
+    internal static IrValue CreateInteger(IrTypeId type, long value) => new(type, IrValueKind.Integer, value);
+    internal static IrValue CreateString(IrTypeId type, string value) => new(type, IrValueKind.String, value);
+    internal static IrValue CreateNull(IrTypeId type) => new(type, IrValueKind.Null, null);
+    internal static IrValue CreateReference(IrTypeId type, object value) => new(type, IrValueKind.Reference, value);
     internal static IrValue CreateSequence(IrTypeId type, ImmutableArray<IrValue> elements) =>
         new(type, IrValueKind.Sequence, elements);
+
+    private T Get<T>(IrValueKind expectedKind, string message) =>
+        Kind == expectedKind ? (T)_value! : throw new InvalidOperationException(message);
 }
 
 public sealed class IrUnsupportedInfo {
-    internal IrUnsupportedInfo(IrUnsupportedReason reason, string detail) {
-        Reason = reason;
-        Detail = detail;
-    }
+    internal IrUnsupportedInfo(IrUnsupportedReason reason, string detail) =>
+        (Reason, Detail) = (reason, detail);
 
     public IrUnsupportedReason Reason { get; }
     public string Detail { get; }
 }
 
 public sealed class IrExceptionInfo {
-    internal IrExceptionInfo(IrExceptionKind kind, string detail) {
-        Kind = kind;
-        Detail = detail;
-    }
+    internal IrExceptionInfo(IrExceptionKind kind, string detail) =>
+        (Kind, Detail) = (kind, detail);
 
     public IrExceptionKind Kind { get; }
     public string Detail { get; }
@@ -102,12 +79,8 @@ public sealed class IrEvaluationResult {
         IrEvaluationStatus status,
         IrValue? value,
         IrUnsupportedInfo? unsupported,
-        IrExceptionInfo? exception) {
-        Status = status;
-        Value = value;
-        Unsupported = unsupported;
-        Exception = exception;
-    }
+        IrExceptionInfo? exception) =>
+        (Status, Value, Unsupported, Exception) = (status, value, unsupported, exception);
 
     public IrEvaluationStatus Status { get; }
     public IrValue? Value { get; }
@@ -139,38 +112,25 @@ public sealed class IrInterpreter(IrFactory factory) {
 
     private IrEvaluationResult EvaluateCore(
         IrTerm term,
-        IReadOnlyDictionary<IrVarId, IrValue> variables) {
-        switch (term) {
-            case IrBooleanTerm boolean:
-                return IrEvaluationResult.FromValue(_factory.CreateBooleanValue(boolean.Value));
-            case IrIntegerTerm integer:
-                return IrEvaluationResult.FromValue(_factory.CreateIntegerValue(integer.Value));
-            case IrStringTerm text:
-                return IrEvaluationResult.FromValue(_factory.CreateStringValue(_factory.GetString(text.Value)));
-            case IrNullTerm:
-                return IrEvaluationResult.FromValue(_factory.CreateNullValue(term.Type));
-            case IrVariableTerm variable:
-                return EvaluateVariable(variable, variables);
-            case IrOpaqueTerm opaque:
-                return EvaluateOpaque(opaque, variables);
-            case IrUnaryTerm unary:
-                return EvaluateUnary(unary, variables);
-            case IrBinaryTerm binary:
-                return EvaluateBinary(binary, variables);
-            case IrConditionalTerm conditional:
-                return EvaluateConditional(conditional, variables);
-            case IrCastTerm cast:
-                return EvaluateCast(cast, variables);
-            case IrLengthTerm length:
-                return EvaluateLength(length, variables);
-            case IrSequenceAccessTerm access:
-                return EvaluateSequenceAccess(access, variables);
-            default:
-                return IrEvaluationResult.FromUnsupported(
-                    IrUnsupportedReason.UnsupportedOperation,
-                    "Unknown IR term kind: " + term.Kind + ".");
-        }
-    }
+        IReadOnlyDictionary<IrVarId, IrValue> variables) =>
+        term switch {
+            IrBooleanTerm boolean => IrEvaluationResult.FromValue(_factory.CreateBooleanValue(boolean.Value)),
+            IrIntegerTerm integer => IrEvaluationResult.FromValue(_factory.CreateIntegerValue(integer.Value)),
+            IrStringTerm text => IrEvaluationResult.FromValue(
+                _factory.CreateStringValue(_factory.GetString(text.Value))),
+            IrNullTerm => IrEvaluationResult.FromValue(_factory.CreateNullValue(term.Type)),
+            IrVariableTerm variable => EvaluateVariable(variable, variables),
+            IrOpaqueTerm opaque => EvaluateOpaque(opaque, variables),
+            IrUnaryTerm unary => EvaluateUnary(unary, variables),
+            IrBinaryTerm binary => EvaluateBinary(binary, variables),
+            IrConditionalTerm conditional => EvaluateConditional(conditional, variables),
+            IrCastTerm cast => EvaluateCast(cast, variables),
+            IrLengthTerm length => EvaluateLength(length, variables),
+            IrSequenceAccessTerm access => EvaluateSequenceAccess(access, variables),
+            _ => IrEvaluationResult.FromUnsupported(
+                IrUnsupportedReason.UnsupportedOperation,
+                "Unknown IR term kind: " + term.Kind + ".")
+        };
 
     private static IrEvaluationResult EvaluateVariable(
         IrVariableTerm variable,
@@ -253,19 +213,16 @@ public sealed class IrInterpreter(IrFactory factory) {
         var right = EvaluateCore(binary.Right, variables);
         if (right.Status != IrEvaluationStatus.Value) return right;
         return binary.Operator switch {
-            IrBinaryOperator.Add => EvaluateIntegerArithmetic(binary.Operator, left.Value!, right.Value!),
-            IrBinaryOperator.Subtract => EvaluateIntegerArithmetic(binary.Operator, left.Value!, right.Value!),
-            IrBinaryOperator.Multiply => EvaluateIntegerArithmetic(binary.Operator, left.Value!, right.Value!),
-            IrBinaryOperator.Divide => EvaluateIntegerArithmetic(binary.Operator, left.Value!, right.Value!),
-            IrBinaryOperator.Remainder => EvaluateIntegerArithmetic(binary.Operator, left.Value!, right.Value!),
-            IrBinaryOperator.AndAlso => EvaluateBooleanBinary(binary.Operator, left.Value!, right.Value!),
-            IrBinaryOperator.OrElse => EvaluateBooleanBinary(binary.Operator, left.Value!, right.Value!),
+            IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply
+                or IrBinaryOperator.Divide or IrBinaryOperator.Remainder =>
+                EvaluateIntegerArithmetic(binary.Operator, left.Value!, right.Value!),
+            IrBinaryOperator.AndAlso or IrBinaryOperator.OrElse =>
+                EvaluateBooleanBinary(binary.Operator, left.Value!, right.Value!),
             IrBinaryOperator.Equal => EvaluateEquality(left.Value!, right.Value!, negate: false),
             IrBinaryOperator.NotEqual => EvaluateEquality(left.Value!, right.Value!, negate: true),
-            IrBinaryOperator.LessThan => EvaluateIntegerComparison(binary.Operator, left.Value!, right.Value!),
-            IrBinaryOperator.LessThanOrEqual => EvaluateIntegerComparison(binary.Operator, left.Value!, right.Value!),
-            IrBinaryOperator.GreaterThan => EvaluateIntegerComparison(binary.Operator, left.Value!, right.Value!),
-            IrBinaryOperator.GreaterThanOrEqual => EvaluateIntegerComparison(binary.Operator, left.Value!, right.Value!),
+            IrBinaryOperator.LessThan or IrBinaryOperator.LessThanOrEqual
+                or IrBinaryOperator.GreaterThan or IrBinaryOperator.GreaterThanOrEqual =>
+                EvaluateIntegerComparison(binary.Operator, left.Value!, right.Value!),
             IrBinaryOperator.StringConcat => EvaluateStringConcat(left.Value!, right.Value!),
             _ => IrEvaluationResult.FromUnsupported(
                 IrUnsupportedReason.UnsupportedOperation,
@@ -424,19 +381,25 @@ public sealed class IrInterpreter(IrFactory factory) {
         if (sequence.Status != IrEvaluationStatus.Value) return sequence;
         var index = EvaluateCore(access.Index, variables);
         if (index.Status != IrEvaluationStatus.Value) return index;
-        if (sequence.Value!.Kind == IrValueKind.Null)
+        var invalid = ValidateSequenceAccess(sequence.Value!, index.Value!);
+        return invalid ?? IrEvaluationResult.FromValue(
+            sequence.Value!.Elements[(int)index.Value!.Integer]);
+    }
+
+    internal static IrEvaluationResult? ValidateSequenceAccess(IrValue sequence, IrValue index) {
+        if (sequence.Kind == IrValueKind.Null)
             return IrEvaluationResult.FromException(
                 IrExceptionKind.NullReference,
                 "Sequence access used a null receiver.");
-        if (sequence.Value.Kind != IrValueKind.Sequence)
+        if (sequence.Kind != IrValueKind.Sequence)
             return InvalidValue("Sequence access requires a sequence value.");
-        if (index.Value!.Kind != IrValueKind.Integer)
+        if (index.Kind != IrValueKind.Integer)
             return InvalidValue("Sequence access requires an integer index.");
-        if (index.Value.Integer < 0 || index.Value.Integer >= sequence.Value.Elements.Length)
+        if (index.Integer < 0 || index.Integer >= sequence.Elements.Length)
             return IrEvaluationResult.FromException(
                 IrExceptionKind.IndexOutOfRange,
                 "The sequence index is outside the valid range.");
-        return IrEvaluationResult.FromValue(sequence.Value.Elements[(int)index.Value.Integer]);
+        return null;
     }
 
     private static IrEvaluationResult InvalidValue(string detail) =>

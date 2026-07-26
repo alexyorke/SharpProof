@@ -134,17 +134,29 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation) {
         SyntaxNode body,
         out ContractClausePlacement placement) {
         var syntax = invocation.Syntax;
-        if (body is not BlockSyntax block) {
+        if (body is not BlockSyntax and not CompilationUnitSyntax) {
             placement = ContractClausePlacement.ValidPrologue;
             return HasSameSite(syntax, body);
         }
-        if (syntax.Parent is not ExpressionStatementSyntax statement ||
-            statement.Parent is not BlockSyntax parent ||
-            !HasSameSite(parent, block)) {
+        if (syntax.Parent is not ExpressionStatementSyntax statement) {
             placement = default;
             return false;
         }
-        foreach (var prior in block.Statements) {
+        IEnumerable<StatementSyntax> statements;
+        if (body is BlockSyntax block &&
+            statement.Parent is BlockSyntax parent &&
+            HasSameSite(parent, block))
+            statements = block.Statements;
+        else if (body is CompilationUnitSyntax unit &&
+                 statement.Parent is GlobalStatementSyntax global &&
+                 HasSameSite(global.Parent!, unit))
+            statements = unit.Members.OfType<GlobalStatementSyntax>()
+                .Select(static member => member.Statement);
+        else {
+            placement = default;
+            return false;
+        }
+        foreach (var prior in statements) {
             if (HasSameSite(prior, statement)) break;
             if (prior is not EmptyStatementSyntax &&
                 !TryGetDirectClause(model, prior, out _)) {

@@ -2,15 +2,11 @@ namespace SharpProof.Effects;
 
 public sealed class EffectSummary : IEquatable<EffectSummary> {
     private EffectSummary(bool isBottom) {
-        IsBottom = isBottom;
-        Reads = EffectRegionSet.Empty;
-        Writes = EffectRegionSet.Empty;
-        Allocation = EffectAllocationKind.None;
-        Capabilities = EffectCapabilitySet.Empty;
-        Throws = EffectThrowSet.Empty;
-        Termination = EffectTermination.Bottom;
-        Completeness = EffectCompleteness.Complete;
-        Uncertainty = EffectUncertainty.None;
+        (IsBottom, Reads, Writes, Allocation) =
+            (isBottom, EffectRegionSet.Empty, EffectRegionSet.Empty, EffectAllocationKind.None);
+        (Capabilities, Throws, Termination, Completeness, Uncertainty) =
+            (EffectCapabilitySet.Empty, EffectThrowSet.Empty, EffectTermination.Bottom,
+                EffectCompleteness.Complete, EffectUncertainty.None);
     }
 
     internal EffectSummary(
@@ -34,36 +30,25 @@ public sealed class EffectSummary : IEquatable<EffectSummary> {
         if ((uncertainty & uncertaintyMarker) != 0 &&
             uncertainty != EffectUncertainty.Unknown)
             throw new ArgumentOutOfRangeException(nameof(uncertainty));
-        Reads = reads;
-        Writes = writes;
-        Allocation = allocation;
-        Capabilities = capabilities;
-        Throws = throws;
-        Termination = termination;
-        Completeness = completeness;
-        Uncertainty = uncertainty;
+        (Reads, Writes, Allocation, Capabilities) =
+            (reads, writes, allocation, capabilities);
+        (Throws, Termination, Completeness, Uncertainty) =
+            (throws, termination, completeness, uncertainty);
     }
 
     public static EffectSummary Bottom { get; } = new(true);
 
     public static EffectSummary Empty { get; } = new(
-        EffectRegionSet.Empty,
-        EffectRegionSet.Empty,
-        EffectAllocationKind.None,
-        EffectCapabilitySet.Empty,
-        EffectThrowSet.Empty,
-        EffectTermination.Terminates,
+        EffectRegionSet.Empty, EffectRegionSet.Empty,
+        EffectAllocationKind.None, EffectCapabilitySet.Empty,
+        EffectThrowSet.Empty, EffectTermination.Terminates,
         EffectCompleteness.Complete);
 
     public static EffectSummary Top { get; } = new(
-        EffectRegionSet.Unknown,
-        EffectRegionSet.Unknown,
-        EffectAllocationKind.Unknown,
-        EffectCapabilitySet.Unknown,
-        EffectThrowSet.Unknown,
-        EffectTermination.Unknown,
-        EffectCompleteness.Incomplete,
-        EffectUncertainty.Unknown);
+        EffectRegionSet.Unknown, EffectRegionSet.Unknown,
+        EffectAllocationKind.Unknown, EffectCapabilitySet.Unknown,
+        EffectThrowSet.Unknown, EffectTermination.Unknown,
+        EffectCompleteness.Incomplete, EffectUncertainty.Unknown);
 
     public bool IsBottom { get; }
     public EffectRegionSet Reads { get; }
@@ -151,10 +136,8 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary> {
         if (left.IsBottom) return right;
         if (right.IsBottom) return left;
         return new EffectSummary(
-            left.Reads.Union(right.Reads),
-            left.Writes.Union(right.Writes),
-            left.Allocation | right.Allocation,
-            left.Capabilities.Union(right.Capabilities),
+            left.Reads.Union(right.Reads), left.Writes.Union(right.Writes),
+            left.Allocation | right.Allocation, left.Capabilities.Union(right.Capabilities),
             left.Throws.Union(right.Throws),
             JoinTermination(left.Termination, right.Termination),
             left.Completeness > right.Completeness
@@ -172,17 +155,14 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary> {
     }
 
     private static bool AllocationLessThanOrEqual(
-        EffectAllocationKind left,
-        EffectAllocationKind right) =>
+        EffectAllocationKind left, EffectAllocationKind right) =>
         (left & ~right) == 0;
 
     private static bool TerminationLessThanOrEqual(
-        EffectTermination left,
-        EffectTermination right) =>
+        EffectTermination left, EffectTermination right) =>
         left <= right;
 
     private static EffectTermination JoinTermination(
-        EffectTermination left,
-        EffectTermination right) =>
+        EffectTermination left, EffectTermination right) =>
         left > right ? left : right;
 }

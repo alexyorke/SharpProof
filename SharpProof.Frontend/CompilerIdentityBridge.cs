@@ -196,9 +196,6 @@ public static class CompilerIdentityBridge {
     private sealed class OperationReferenceComparer : IEqualityComparer<IOperation> {
         internal static OperationReferenceComparer Instance { get; } = new();
 
-        private OperationReferenceComparer() {
-        }
-
         public bool Equals(IOperation? left, IOperation? right) =>
             ReferenceEquals(left, right);
 
@@ -207,26 +204,15 @@ public static class CompilerIdentityBridge {
                 operation);
     }
 
-    private readonly struct OperationSemanticIdentity
+    private readonly struct OperationSemanticIdentity(
+        OperationKind kind, IrIdentityId type, int variant,
+        bool isChecked, bool isLifted)
         : IEquatable<OperationSemanticIdentity> {
-        internal OperationSemanticIdentity(
-            OperationKind kind,
-            IrIdentityId type,
-            int variant,
-            bool isChecked,
-            bool isLifted) {
-            Kind = kind;
-            Type = type;
-            Variant = variant;
-            IsChecked = isChecked;
-            IsLifted = isLifted;
-        }
-
-        private OperationKind Kind { get; }
-        private IrIdentityId Type { get; }
-        private int Variant { get; }
-        private bool IsChecked { get; }
-        private bool IsLifted { get; }
+        private OperationKind Kind { get; } = kind;
+        private IrIdentityId Type { get; } = type;
+        private int Variant { get; } = variant;
+        private bool IsChecked { get; } = isChecked;
+        private bool IsLifted { get; } = isLifted;
 
         public bool Equals(OperationSemanticIdentity other) =>
             Kind == other.Kind &&
