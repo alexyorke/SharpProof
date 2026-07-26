@@ -7,35 +7,34 @@ internal static class WorkerCompilation {
                 request.Compilation.LanguageVersion,
                 out var languageVersion))
             throw new ArgumentException(
-                "The C# language version is invalid.",
-                nameof(request));
+                "The C# language version is invalid.", nameof(request));
         var parseOptions = new CSharpParseOptions(
             languageVersion,
-            preprocessorSymbols: request.DefineConstants
-                .OrderBy(static value => value, StringComparer.Ordinal));
+            preprocessorSymbols: request.DefineConstants.OrderBy(
+                static value => value, StringComparer.Ordinal));
         var trees = snapshot.Sources.Select(source =>
             CSharpSyntaxTree.ParseText(
-                SourceText.From(
-                    source.Text,
-                    Encoding.UTF8,
+                SourceText.From(source.Text, Encoding.UTF8,
                     SourceHashAlgorithm.Sha256),
                 parseOptions,
                 source.Path));
         var references = snapshot.References.Select(reference =>
             MetadataReference.CreateFromImage(
-                ImmutableArray.Create(reference.Image),
-                filePath: reference.Path));
+                ImmutableArray.Create(reference.Image), filePath: reference.Path));
         return CSharpCompilation.Create(
             request.AssemblyName,
             trees,
             references,
             new CSharpCompilationOptions(
-                MapOutputKind(request.Compilation.OutputKind),
-                optimizationLevel: MapOptimization(
-                    request.Compilation.Optimization),
+                MapEnum<WorkerOutputKind, OutputKind>(
+                    request.Compilation.OutputKind),
+                optimizationLevel:
+                    MapEnum<WorkerOptimizationLevel, OptimizationLevel>(
+                        request.Compilation.Optimization),
                 checkOverflow: request.Compilation.CheckOverflow!.Value,
                 allowUnsafe: request.Compilation.AllowUnsafe!.Value,
-                platform: MapPlatform(request.Compilation.Platform),
+                platform: MapEnum<WorkerPlatform, Platform>(
+                    request.Compilation.Platform),
                 nullableContextOptions: MapNullable(
                     request.Compilation.NullableContext),
                 deterministic: request.Compilation.Deterministic!.Value,
@@ -47,13 +46,6 @@ internal static class WorkerCompilation {
             WorkerNullableContext.Enabled => NullableContextOptions.Enable,
             _ => MapEnum<WorkerNullableContext, NullableContextOptions>(value)
         };
-    private static OptimizationLevel MapOptimization(WorkerOptimizationLevel value) =>
-        MapEnum<WorkerOptimizationLevel, OptimizationLevel>(value);
-    private static OutputKind MapOutputKind(WorkerOutputKind value) =>
-        MapEnum<WorkerOutputKind, OutputKind>(value);
-
-    private static Platform MapPlatform(WorkerPlatform value) =>
-        MapEnum<WorkerPlatform, Platform>(value);
 
     private static TTarget MapEnum<TSource, TTarget>(TSource value)
         where TSource : struct, Enum
