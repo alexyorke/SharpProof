@@ -192,12 +192,16 @@ internal static class WorkerPerformanceProbe {
                     boundary.Token)
                 .ConfigureAwait(false);
             var stopwatch = Stopwatch.StartNew();
-            await process.WaitForExitAsync(boundary.Token)
-                .ConfigureAwait(false);
-            await WaitForProcessExitAsync(
-                    workerProcessId,
-                    boundary.Token)
-                .ConfigureAwait(false);
+            var waitLimit = checked(
+                (int)contract.ForcedTerminationMilliseconds + 10_000);
+#pragma warning disable CA1849 // The deadline probe intentionally uses kernel waits.
+            if (!process.WaitForExit(waitLimit))
+                throw new TimeoutException(
+                    "The launcher did not reach its hard deadline.");
+            WaitForProcessExit(
+                workerProcessId,
+                Math.Max(0, waitLimit - (int)stopwatch.ElapsedMilliseconds));
+#pragma warning restore CA1849
             stopwatch.Stop();
             var output = await standardOutput.ConfigureAwait(false);
             var error = await standardError.ConfigureAwait(false);
@@ -357,15 +361,18 @@ internal static class WorkerPerformanceProbe {
         }
     }
 
-    private static async Task WaitForProcessExitAsync(
+    private static void WaitForProcessExit(
         int processId,
-        CancellationToken cancellationToken) {
+        int timeoutMilliseconds) {
         Process? worker = null;
         try {
             worker = Process.GetProcessById(processId);
-            if (!worker.HasExited)
-                await worker.WaitForExitAsync(cancellationToken)
-                    .ConfigureAwait(false);
+#pragma warning disable CA1849 // The deadline probe intentionally uses kernel waits.
+            if (!worker.HasExited &&
+                !worker.WaitForExit(timeoutMilliseconds))
+                throw new TimeoutException(
+                    "The worker process tree did not terminate.");
+#pragma warning restore CA1849
         }
         catch (ArgumentException) {
         }
