@@ -88,7 +88,7 @@ public sealed class PerformanceGateTests {
     }
 
     [Test]
-    public void DefaultOffMeasurementRunsTheAnalyzerDriverWithoutASession() {
+    public void AdvisoryMeasurementRunsTheAnalyzerAndStaysQuiet() {
         var measurement = PerformanceGate.MeasureDefaultOffAnalyzerBatch(
             "public static class Subject { public static int M() => 1; }",
             "DefaultOffProbe",
@@ -98,17 +98,17 @@ public sealed class PerformanceGateTests {
             Assert.That(measurement.MeanMilliseconds, Is.GreaterThan(0));
             Assert.That(measurement.AnalyzerDriverRunCount, Is.EqualTo(3));
             Assert.That(measurement.DiagnosticCount, Is.Zero);
-            Assert.That(measurement.AnalysisSessionCreateCount, Is.Zero);
+            Assert.That(measurement.AnalysisSessionCreateCount, Is.EqualTo(3));
         }
     }
 
     [Test]
-    public void DefaultOffPackagePolicyOmitsAnalyzerAndVerifierWork() =>
-        PerformanceGate.ValidateDefaultOffPackagePolicy(
+    public void AdvisoryPackagePolicyRunsAnalyzerAndOmitsVerifierWork() =>
+        PerformanceGate.ValidateAdvisoryPackagePolicy(
             RepositoryLayout.FindRoot());
 
     [Test]
-    public void DefaultOffPolicyRejectsAWidenedVerifierCondition() {
+    public void AdvisoryPolicyRejectsAWidenedVerifierCondition() {
         var root = RepositoryLayout.FindRoot();
         var props = XDocument.Load(Path.Combine(
             root,
@@ -132,7 +132,7 @@ public sealed class PerformanceGateTests {
 
         Assert.Throws<InvalidDataException>(
             (Action)(() =>
-                PerformanceGate.ValidateDefaultOffPackagePolicy(
+                PerformanceGate.ValidateAdvisoryPackagePolicy(
                     props,
                     targets)));
     }

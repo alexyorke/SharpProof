@@ -156,7 +156,6 @@ public sealed class ContractBinder(
                 source,
                 clauses.ToImmutable(),
                 canonical.ToBoundVariables(),
-                attributeResult.IsPure,
                 usesCompanion));
     }
 
@@ -525,14 +524,8 @@ public sealed class ContractBinder(
             if (result != ContractBindingFailure.None)
                 return ClosedAttributeBindingResult.Fail(result);
         }
-        var pureCount = target.GetAttributes()
-            .Count(attribute => ContractApiSymbols.IsAttribute(attribute, _api!.Pure));
-        if (pureCount > 1)
-            return ClosedAttributeBindingResult.Fail(
-                ContractBindingFailure.InvalidClosedAttribute);
         return new ClosedAttributeBindingResult(
             clauses.ToImmutable(),
-            pureCount == 1,
             ContractBindingFailure.None);
     }
 
@@ -652,14 +645,13 @@ public sealed class ContractBinder(
     }
 
     private readonly struct ClosedAttributeBindingResult(
-        ImmutableArray<BoundContractClause> clauses, bool isPure,
+        ImmutableArray<BoundContractClause> clauses,
         ContractBindingFailure failure) {
         internal ImmutableArray<BoundContractClause> Clauses { get; } = clauses;
-        internal bool IsPure { get; } = isPure;
         internal ContractBindingFailure Failure { get; } = failure;
         internal static ClosedAttributeBindingResult Fail(
             ContractBindingFailure failure) =>
-            new([], false, failure);
+            new([], failure);
     }
 
     private sealed class CanonicalVariables {

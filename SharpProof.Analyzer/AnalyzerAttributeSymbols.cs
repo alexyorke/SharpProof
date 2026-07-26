@@ -3,21 +3,17 @@ namespace SharpProof.Analyzer;
 internal sealed class AnalyzerAttributeSymbols {
     internal AnalyzerAttributeSymbols(Compilation compilation) {
         if (compilation == null) throw new ArgumentNullException(nameof(compilation));
-        EnforcePure = Resolve(compilation, "SharpProof.Attributes.EnforcePureAttribute");
-        ZeroAllocations = Resolve(compilation, "SharpProof.Attributes.ZeroAllocationsAttribute");
-        AllowedCapabilities = Resolve(
-            compilation,
-            "SharpProof.Attributes.AllowedCapabilitiesAttribute");
-        DoesNotThrow = Resolve(compilation, "SharpProof.Attributes.DoesNotThrowAttribute");
-        AllowedExceptions = Resolve(
-            compilation,
-            "SharpProof.Attributes.AllowedExceptionsAttribute");
-        EffectContract = Resolve(compilation, "SharpProof.Attributes.EffectContractAttribute");
-        NotNull = Resolve(compilation, "SharpProof.Attributes.NotNullAttribute");
-        Positive = Resolve(compilation, "SharpProof.Attributes.PositiveAttribute");
-        InRange = Resolve(compilation, "SharpProof.Attributes.InRangeAttribute");
-        Suppress = Resolve(compilation, "SharpProof.Attributes.SharpProofSuppressAttribute");
-        Trusted = Resolve(compilation, "SharpProof.Attributes.SharpProofTrustedAttribute");
+        EnforcePure = Resolve(compilation, "EnforcePure");
+        ZeroAllocations = Resolve(compilation, "ZeroAllocations");
+        AllowedCapabilities = Resolve(compilation, "AllowedCapabilities");
+        DoesNotThrow = Resolve(compilation, "DoesNotThrow");
+        AllowedExceptions = Resolve(compilation, "AllowedExceptions");
+        EffectContract = Resolve(compilation, "EffectContract");
+        NotNull = Resolve(compilation, "NotNull");
+        Positive = Resolve(compilation, "Positive");
+        InRange = Resolve(compilation, "InRange");
+        Suppress = Resolve(compilation, "SharpProofSuppress");
+        Trusted = Resolve(compilation, "SharpProofTrusted");
     }
 
     internal INamedTypeSymbol? EnforcePure { get; }
@@ -51,6 +47,7 @@ internal sealed class AnalyzerAttributeSymbols {
 
     private static INamedTypeSymbol? Resolve(
         Compilation compilation,
-        string metadataName) =>
-        compilation.GetTypeByMetadataName(metadataName);
+        string attributeName) =>
+        compilation.GetTypeByMetadataName(
+            "SharpProof.Attributes." + attributeName + "Attribute");
 }

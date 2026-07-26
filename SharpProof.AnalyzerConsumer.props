@@ -1,5 +1,7 @@
 <Project>
   <ItemGroup>
+    <CompilerVisibleProperty Include="SharpProofProfile" />
+    <CompilerVisibleProperty Include="SharpProofFeatures" />
     <CompilerVisibleProperty Include="SharpProofMode" />
   </ItemGroup>
 

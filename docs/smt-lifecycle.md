@@ -16,16 +16,28 @@ cancellation.
 
 A SAT result becomes `Refuted` only when the extracted assignments replay
 through the executable IR and falsify the goal. An UNSAT result becomes
-`Proven` only when every core item has admissible justification. Backend
-unavailability, malformed backend results, replay failure, resource limits,
-and method/project budgets produce typed `Unknown` records. An ordinary
-`Unknown` record does not fail the build. Invalid protocol responses, worker
-errors, containment failure, and hard launcher termination do fail the build
-command.
+`Proven` only when every core item has admissible justification. Unsupported
+encoding, resource limits, and method boundaries produce typed claim-level
+`Unknown` results. Backend unavailability, malformed backend results, replay
+failure, containment failure, and infrastructure failure make the protocol
+version 3 run `Failed` and fail the build under every policy. Project timeout
+and caller cancellation use the separate `TimedOut` and `Canceled` run
+statuses.
 
-Only complete `Proven` and replay-validated `Refuted` project results enter the
-content-addressed disk cache. Cache keys include protocol, semantics, tool,
-target framework, compilation inputs, references, options, and spec versions.
+The current replay executes the lowered obligation path. Independent
+whole-body replay over the exact compiler CFG remains a 1.0 release gate.
+
+`SharpProofVerifyPolicy` controls whether otherwise valid incomplete selected
+analysis is informational, warning, or error SP0047 output.
+`SharpProofAssumptionPolicy` similarly controls SP0048 for declared user or
+trusted evidence. Neither policy changes solver semantics or converts a failed
+run into success.
+
+Only exact-manifest, complete `Proven` and replay-validated `Refuted` project
+results enter the content-addressed disk cache. Cache keys include protocol,
+semantics, tool, target framework, compilation inputs, references, options, and
+spec versions. Cache schema version 3 revalidates the stored semantic payload
+against the complete current manifest.
 
 See [Typed abstention reasons](unknown-reasons.md) for exact statuses and
 reasons, and [Analysis limits](analysis-limits.md) for configured and fixed

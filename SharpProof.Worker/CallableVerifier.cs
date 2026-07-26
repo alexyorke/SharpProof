@@ -15,60 +15,31 @@ internal sealed class CallableVerifier(
     private readonly int _maximumExpressionDepth = maximumExpressionDepth > 0
         ? maximumExpressionDepth
         : throw new ArgumentOutOfRangeException(nameof(maximumExpressionDepth));
-    private readonly INamedTypeSymbol? _contractForType =
-        compilation.GetTypeByMetadataName(
-            "SharpProof.Attributes.ContractForAttribute");
-
-    internal ImmutableArray<CallableTarget> Discover() {
-        var targets = ImmutableArray.CreateBuilder<CallableTarget>();
-        foreach (var tree in _compilation.SyntaxTrees
-                     .OrderBy(static tree => tree.FilePath, StringComparer.Ordinal)) {
-            var model =
-                SharpProof.Frontend.Host.CompilationModelProvider
-                    .GetSemanticModel(_compilation, tree);
-            foreach (var declaration in tree.GetRoot()
-                         .DescendantNodes()
-                         .OfType<BaseMethodDeclarationSyntax>()) {
-                if (declaration is not (
-                        MethodDeclarationSyntax or
-                        ConstructorDeclarationSyntax) ||
-                    model.GetDeclaredSymbol(declaration) is not IMethodSymbol method ||
-                    method.MethodKind is not (
-                        MethodKind.Ordinary or MethodKind.Constructor) ||
-                    method.PartialImplementationPart != null || IsCompanionType(method.ContainingType))
-                    continue;
-                targets.Add(new CallableTarget(
-                    method,
-                    declaration,
-                    model,
-                    CreateCallableId(method)));
-            }
-        }
-        return [.. targets
-            .OrderBy(static target => target.CallableId, StringComparer.Ordinal)
-            .ThenBy(static target => target.Declaration.SpanStart)];
-    }
-
-    internal async Task<ImmutableArray<WorkerVerificationRecord>> VerifyAsync(
-        CallableTarget target,
+    internal async Task<ImmutableArray<WorkerClaimResult>> VerifyAsync(
+        ManifestCallableTarget target,
         MethodResourceBudget resourceBudget,
         CancellationToken cancellationToken) {
         ArgumentNullException.ThrowIfNull(resourceBudget);
         cancellationToken.ThrowIfCancellationRequested();
         var factory = _factory;
         var binding = ContractBinder.Bind(target.Method);
-        if (!binding.IsSuccess) {
-            if (!HasContractSurface(target)) return [];
-            return [CreateUnknown(
-                target,
-                0,
-                MapBindingFailure(binding.Failure))];
-        }
+        if (!binding.IsSuccess)
+            return CreateUnknowns(target, MapBindingFailure(binding.Failure));
         var contracts = binding.Contracts!;
         var ensures = contracts.Clauses
             .Where(static clause => clause.Kind == BoundContractKind.Ensures)
             .ToImmutableArray();
+        if (ensures.Length != target.Claims.Length)
+            return CreateUnknowns(
+                target,
+                WorkerClaimReason.UnsupportedContract);
         if (ensures.IsDefaultOrEmpty) return [];
+        var userAssumptionEvidence = target.Assumptions.Where(static evidence =>
+            evidence.Kind == WorkerAssumptionKind.UserAssume).ToImmutableArray();
+        if (contracts.Clauses.Count(static clause =>
+                clause.Kind == BoundContractKind.Assume) !=
+            userAssumptionEvidence.Length)
+            return CreateUnknowns(target, WorkerClaimReason.UnsupportedContract);
         var body = LowerBody(target, contracts, factory);
         if (!body.IsSuccess)
             return [.. ensures.Select((_, index) =>
@@ -77,7 +48,10 @@ internal sealed class CallableVerifier(
         var assumptions = ImmutableArray.CreateBuilder<Assumption>();
         var assumptionLabels = new Dictionary<ProofJustification, string>(
             ReferenceEqualityComparer.Instance);
+        var userAssumptionIds = new Dictionary<ProofJustification, string>(
+            ReferenceEqualityComparer.Instance);
         var assumptionOrdinal = 0;
+        var userAssumptionOrdinal = 0;
         foreach (var clause in contracts.Clauses) {
             if (clause.Kind == BoundContractKind.Ensures) continue;
             var predicate = ApplyEntrySubstitutions(
@@ -90,7 +64,7 @@ internal sealed class CallableVerifier(
                     CreateUnknown(
                         target,
                         index,
-                        WorkerVerificationReason.UnsupportedExpression))];
+                        WorkerClaimReason.UnsupportedExpression))];
             ProofJustification justification = clause.Kind ==
                 BoundContractKind.Assume
                 ? new UserAssumedJustification(
@@ -100,6 +74,10 @@ internal sealed class CallableVerifier(
                 factory,
                 predicate,
                 justification));
+            if (clause.Kind == BoundContractKind.Assume)
+                userAssumptionIds.Add(
+                    justification,
+                    userAssumptionEvidence[userAssumptionOrdinal++].Id);
             assumptionLabels.Add(
                 justification,
                 clause.Kind.ToString().ToLowerInvariant() + ":" +
@@ -118,7 +96,7 @@ internal sealed class CallableVerifier(
                         CreateUnknown(
                             target,
                             index,
-                            WorkerVerificationReason.UnsupportedExpression))];
+                            WorkerClaimReason.UnsupportedExpression))];
                 ProofJustification justification =
                     new SpecJustification(specAssumption.Spec);
                 assumptions.Add(new Assumption(
@@ -140,7 +118,7 @@ internal sealed class CallableVerifier(
                 CreateUnknown(
                     target,
                     index,
-                    WorkerVerificationReason.UnsupportedExpression))];
+                    WorkerClaimReason.UnsupportedExpression))];
         AddNormalCompletionAssumption(
             factory,
             body.Paths,
@@ -152,11 +130,11 @@ internal sealed class CallableVerifier(
                 CreateUnknown(
                     target,
                     index,
-                    WorkerVerificationReason.UnsupportedExpression))];
+                    WorkerClaimReason.UnsupportedExpression))];
         var assumptionsUseSupportedDomain = assumptions.All(assumption =>
             IsSupportedProofDomain(factory, assumption.Predicate));
 
-        var records = ImmutableArray.CreateBuilder<WorkerVerificationRecord>(
+        var records = ImmutableArray.CreateBuilder<WorkerClaimResult>(
             ensures.Length);
         for (var index = 0; index < ensures.Length; index++) {
             cancellationToken.ThrowIfCancellationRequested();
@@ -184,7 +162,7 @@ internal sealed class CallableVerifier(
                 records.Add(CreateUnknown(
                     target,
                     index,
-                    WorkerVerificationReason.MissingReturnValue));
+                    WorkerClaimReason.MissingReturnValue));
                 continue;
             }
             var condition = Conjoin(factory, pathObligations);
@@ -192,7 +170,7 @@ internal sealed class CallableVerifier(
                 records.Add(CreateUnknown(
                     target,
                     index,
-                    WorkerVerificationReason.DeepEnsures));
+                    WorkerClaimReason.DeepPostcondition));
                 continue;
             }
             if (!assumptionsUseSupportedDomain ||
@@ -200,7 +178,7 @@ internal sealed class CallableVerifier(
                 records.Add(CreateUnknown(
                     target,
                     index,
-                    WorkerVerificationReason.UnsupportedExpression));
+                    WorkerClaimReason.UnsupportedExpression));
                 continue;
             }
             if (!resourceBudget.TryStartQuery()) {
@@ -236,6 +214,7 @@ internal sealed class CallableVerifier(
                 outcome,
                 contracts,
                 assumptionLabels,
+                userAssumptionIds,
                 body.UsesSpecModeledCallResult));
         }
         return records.ToImmutable();
@@ -417,19 +396,19 @@ internal sealed class CallableVerifier(
     }
 
     private static void AddResourceLimitRecords(
-        ImmutableArray<WorkerVerificationRecord>.Builder records,
-        CallableTarget target,
+        ImmutableArray<WorkerClaimResult>.Builder records,
+        ManifestCallableTarget target,
         int start,
         int count) {
         for (var index = start; index < count; index++)
             records.Add(CreateUnknown(
                 target,
                 index,
-                WorkerVerificationReason.ResourceLimit));
+                WorkerClaimReason.ResourceLimit));
     }
 
     private BodyLoweringResult LowerBody(
-        CallableTarget target,
+        ManifestCallableTarget target,
         BoundMethodContracts contracts,
         IrFactory factory) {
         const int maximumBodyBlocks = 64;
@@ -439,32 +418,32 @@ internal sealed class CallableVerifier(
         if (target.Method.Parameters.Any(static parameter =>
                 parameter.RefKind != RefKind.None))
             return BodyLoweringResult.Fail(
-                WorkerVerificationReason.UnsupportedBody);
+                WorkerClaimReason.UnsupportedBody);
         if (target.Method.ReturnsVoid ||
             target.Method.MethodKind == MethodKind.Constructor) {
             return ContainsOnlyContractStatements(target)
                 ? BodyLoweringResult.Single(factory, null)
                 : BodyLoweringResult.Fail(
-                    WorkerVerificationReason.UnsupportedBody);
+                    WorkerClaimReason.UnsupportedBody);
         }
 
         var bodyStart = FindExecutableBodyStart(target);
         if (!bodyStart.HasValue)
             return BodyLoweringResult.Fail(
-                WorkerVerificationReason.UnsupportedBody);
+                WorkerClaimReason.UnsupportedBody);
         Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph? graph;
         try {
             graph = Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(
-                target.Declaration,
-                target.SemanticModel);
+                target.VerifierDeclaration,
+                target.VerifierSemanticModel);
         }
         catch (ArgumentException) {
             return BodyLoweringResult.Fail(
-                WorkerVerificationReason.UnsupportedBody);
+                WorkerClaimReason.UnsupportedBody);
         }
         if (graph == null)
             return BodyLoweringResult.Fail(
-                WorkerVerificationReason.UnsupportedBody);
+                WorkerClaimReason.UnsupportedBody);
 
         var lowering = new RoslynProgramLowerer(
             factory,
@@ -474,13 +453,13 @@ internal sealed class CallableVerifier(
                 lowering.Program,
                 out var groups))
             return BodyLoweringResult.Fail(
-                WorkerVerificationReason.UnsupportedBody);
+                WorkerClaimReason.UnsupportedBody);
 
         var start = groups.FirstOrDefault(group =>
             IsAtOrAfterBodyStart(group.Source, bodyStart.Value));
         if (start == null)
             return BodyLoweringResult.Fail(
-                WorkerVerificationReason.UnsupportedBody);
+                WorkerClaimReason.UnsupportedBody);
 
         var groupsByOperation = groups
             .ToDictionary(static group => group.Operation);
@@ -490,7 +469,7 @@ internal sealed class CallableVerifier(
                     out var group) ||
                 IsAtOrAfterBodyStart(group.Source, bodyStart.Value))
                 return BodyLoweringResult.Fail(
-                    WorkerVerificationReason.UnsupportedBody);
+                    WorkerClaimReason.UnsupportedBody);
         }
 
         if (!TryCreateCallBindings(
@@ -499,14 +478,14 @@ internal sealed class CallableVerifier(
                     IsAtOrAfterBodyStart(group.Source, bodyStart.Value)),
                 out var callBindings))
             return BodyLoweringResult.Fail(
-                WorkerVerificationReason.UnsupportedBody);
+                WorkerClaimReason.UnsupportedBody);
 
         if (!TryValidateAcyclicBody(
                 lowering.Program,
                 start.Block,
                 maximumBodyBlocks))
             return BodyLoweringResult.Fail(
-                WorkerVerificationReason.UnsupportedBody);
+                WorkerClaimReason.UnsupportedBody);
         if (!TryCreateInitialEnvironment(
                 target,
                 contracts,
@@ -515,7 +494,7 @@ internal sealed class CallableVerifier(
                 out var initialEnvironment,
                 out var parameterBindings))
             return BodyLoweringResult.Fail(
-                WorkerVerificationReason.UnsupportedBody);
+                WorkerClaimReason.UnsupportedBody);
 
         return ExecuteAcyclicBody(
             contracts,
@@ -552,7 +531,7 @@ internal sealed class CallableVerifier(
         while (pending.Count != 0) {
             if (++executionStates > maximumExecutionStates)
                 return BodyLoweringResult.Fail(
-                    WorkerVerificationReason.UnsupportedBody);
+                    WorkerClaimReason.UnsupportedBody);
             var state = pending.Pop();
             var block = program.GetBlock(state.Block);
             var environment = state.Environment;
@@ -570,7 +549,7 @@ internal sealed class CallableVerifier(
                         havoc.Operation == expectedOperation && havoc.HavocKind == IrHavocKind.Memory &&
                         havoc.Variables.IsEmpty)
                         continue;
-                    return BodyLoweringResult.Fail(WorkerVerificationReason.UnsupportedBody);
+                    return BodyLoweringResult.Fail(WorkerClaimReason.UnsupportedBody);
                 }
                 switch (instruction) {
                     case IrAssignInstruction assign:
@@ -581,7 +560,7 @@ internal sealed class CallableVerifier(
                                 out var assigned) ||
                             GetDepth(assigned) > _maximumExpressionDepth)
                             return BodyLoweringResult.Fail(
-                                WorkerVerificationReason.UnsupportedBody);
+                                WorkerClaimReason.UnsupportedBody);
                         environment = environment.SetItem(
                             assign.Target,
                             assigned);
@@ -600,7 +579,7 @@ internal sealed class CallableVerifier(
                                 out var resultProjection,
                                 out var consumesMemoryHavoc))
                             return BodyLoweringResult.Fail(
-                                WorkerVerificationReason.UnsupportedBody);
+                                WorkerClaimReason.UnsupportedBody);
                         environment = environment.SetItem(
                             call.Target!.Value,
                             resultTerm);
@@ -622,7 +601,7 @@ internal sealed class CallableVerifier(
                             condition.Type != factory.BooleanType ||
                             GetDepth(condition) > _maximumExpressionDepth)
                             return BodyLoweringResult.Fail(
-                                WorkerVerificationReason.UnsupportedBody);
+                                WorkerClaimReason.UnsupportedBody);
                         if (condition is IrBooleanTerm literal) {
                             pending.Push(new SymbolicExecutionState(
                                 literal.Value
@@ -650,7 +629,7 @@ internal sealed class CallableVerifier(
                                 GetDepth(whenFalse) >
                                     _maximumExpressionDepth)
                                 return BodyLoweringResult.Fail(
-                                    WorkerVerificationReason.UnsupportedBody);
+                                    WorkerClaimReason.UnsupportedBody);
                             pending.Push(new SymbolicExecutionState(
                                 branch.WhenFalse,
                                 0,
@@ -688,7 +667,7 @@ internal sealed class CallableVerifier(
                             GetDepth(returnTerm) >
                                 _maximumExpressionDepth)
                             return BodyLoweringResult.Fail(
-                                WorkerVerificationReason.UnsupportedBody);
+                                WorkerClaimReason.UnsupportedBody);
                         paths.Add(new BodyPath(
                             state.PathCondition,
                             returnTerm,
@@ -701,7 +680,7 @@ internal sealed class CallableVerifier(
                             specAssumptions));
                         if (paths.Count > maximumBodyPaths)
                             return BodyLoweringResult.Fail(
-                                WorkerVerificationReason.UnsupportedBody);
+                                WorkerClaimReason.UnsupportedBody);
                         transferred = true;
                         break;
                     case IrLoadInstruction:
@@ -711,17 +690,17 @@ internal sealed class CallableVerifier(
                     case IrAssertInstruction:
                     default:
                         return BodyLoweringResult.Fail(
-                            WorkerVerificationReason.UnsupportedBody);
+                            WorkerClaimReason.UnsupportedBody);
                 }
                 if (transferred) break;
             }
             if (!transferred)
                 return BodyLoweringResult.Fail(
-                    WorkerVerificationReason.UnsupportedBody);
+                    WorkerClaimReason.UnsupportedBody);
         }
         return paths.Count == 0
             ? BodyLoweringResult.Fail(
-                WorkerVerificationReason.UnsupportedBody)
+                WorkerClaimReason.UnsupportedBody)
             : BodyLoweringResult.Success(paths.ToImmutable());
     }
 
@@ -901,10 +880,11 @@ internal sealed class CallableVerifier(
         }
     }
 
-    private int? FindExecutableBodyStart(CallableTarget target) {
-        if (target.Declaration.ExpressionBody != null) return target.Declaration.ExpressionBody.Expression.SpanStart;
-        if (target.Declaration.Body == null) return null;
-        foreach (var statement in target.Declaration.Body.Statements) {
+    private int? FindExecutableBodyStart(ManifestCallableTarget target) {
+        if (target.VerifierDeclaration.ExpressionBody != null)
+            return target.VerifierDeclaration.ExpressionBody.Expression.SpanStart;
+        if (target.VerifierDeclaration.Body == null) return null;
+        foreach (var statement in target.VerifierDeclaration.Body.Statements) {
             if (statement is EmptyStatementSyntax ||
                 IsContractStatement(target, statement))
                 continue;
@@ -1080,7 +1060,7 @@ internal sealed class CallableVerifier(
         };
 
     private static bool TryCreateInitialEnvironment(
-        CallableTarget target,
+        ManifestCallableTarget target,
         BoundMethodContracts contracts,
         IrFactory factory,
         ImmutableArray<FrontendVariableBinding> variables,
@@ -1162,13 +1142,13 @@ internal sealed class CallableVerifier(
         }
     }
 
-    private bool ContainsOnlyContractStatements(CallableTarget target) =>
-        target.Declaration.Body != null &&
-        target.Declaration.Body.Statements.All(statement =>
+    private bool ContainsOnlyContractStatements(ManifestCallableTarget target) =>
+        target.VerifierDeclaration.Body != null &&
+        target.VerifierDeclaration.Body.Statements.All(statement =>
             IsContractStatement(target, statement));
 
     private bool IsContractStatement(
-        CallableTarget target,
+        ManifestCallableTarget target,
         StatementSyntax statement) {
         if (statement is EmptyStatementSyntax) return true;
         return statement is ExpressionStatementSyntax expression &&
@@ -1287,18 +1267,20 @@ internal sealed class CallableVerifier(
         }
     }
 
-    private static WorkerVerificationRecord CreateRecord(
-        CallableTarget target,
+    private static WorkerClaimResult CreateRecord(
+        ManifestCallableTarget target,
         int contractOrdinal,
         ProofOutcome outcome,
         BoundMethodContracts contracts,
         Dictionary<ProofJustification, string> assumptionLabels,
+        Dictionary<ProofJustification, string> userAssumptionIds,
         bool usesSpecModeledCallResult) {
         var record = CreateBaseRecord(target, contractOrdinal);
+        var usedUserAssumptions = new HashSet<string>(StringComparer.Ordinal);
         switch (outcome) {
             case ProvenOutcome proven:
-                record.Status = WorkerVerificationStatus.Proven;
-                record.Reason = WorkerVerificationReason.None;
+                record.Outcome = WorkerClaimOutcome.Proven;
+                record.Reason = WorkerClaimReason.None;
                 record.ProofCore = [.. proven.Core
                     .Select(justification =>
                         assumptionLabels.TryGetValue(justification, out var label)
@@ -1306,27 +1288,37 @@ internal sealed class CallableVerifier(
                             : "hygienic")
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(static label => label, StringComparer.Ordinal)];
+                foreach (var justification in proven.Core)
+                    if (userAssumptionIds.TryGetValue(justification, out var id))
+                        usedUserAssumptions.Add(id);
                 break;
             case RefutedOutcome when usesSpecModeledCallResult:
-                record.Status = WorkerVerificationStatus.Unknown;
+                record.Outcome = WorkerClaimOutcome.Unknown;
                 record.Reason =
-                    WorkerVerificationReason.CounterexampleReplayFailed;
+                    WorkerClaimReason.CounterexampleReplayFailed;
                 break;
             case RefutedOutcome refuted:
-                record.Status = WorkerVerificationStatus.Refuted;
-                record.Reason = WorkerVerificationReason.None;
+                record.Outcome = WorkerClaimOutcome.Refuted;
+                record.Reason = WorkerClaimReason.None;
                 record.Model = CreateModel(refuted, contracts);
                 break;
             case UnknownOutcome unknown:
-                record.Status = WorkerVerificationStatus.Unknown;
+                record.Outcome = WorkerClaimOutcome.Unknown;
                 record.Reason = MapAbstention(unknown.Reason);
                 break;
             default:
-                record.Status = WorkerVerificationStatus.Unknown;
+                record.Outcome = WorkerClaimOutcome.Unknown;
                 record.Reason =
-                    WorkerVerificationReason.MalformedBackendResult;
+                    WorkerClaimReason.MalformedBackendResult;
                 break;
         }
+        record.Assumptions = [.. target.Assumptions.Select(evidence =>
+            new WorkerAssumptionEvidence {
+                Id = evidence.Id,
+                Kind = evidence.Kind,
+                Used = evidence.Kind == WorkerAssumptionKind.UserAssume &&
+                       usedUserAssumptions.Contains(evidence.Id)
+            })];
         return record;
     }
 
@@ -1367,66 +1359,36 @@ internal sealed class CallableVerifier(
         _ => "<opaque>"
     };
 
-    private static WorkerVerificationRecord CreateUnknown(
-        CallableTarget target,
+    private static WorkerClaimResult CreateUnknown(
+        ManifestCallableTarget target,
         int contractOrdinal,
-        WorkerVerificationReason reason) {
+        WorkerClaimReason reason) {
         var record = CreateBaseRecord(target, contractOrdinal);
-        record.Status = WorkerVerificationStatus.Unknown;
+        record.Outcome = WorkerClaimOutcome.Unknown;
         record.Reason = reason;
         return record;
     }
 
-    private static WorkerVerificationRecord CreateBaseRecord(
-        CallableTarget target,
-        int contractOrdinal) {
-        var location = target.Method.Locations
-            .FirstOrDefault(static location => location.IsInSource);
-        return new WorkerVerificationRecord {
-            CallableId = target.CallableId,
-            ContractOrdinal = contractOrdinal,
-            SourcePath = location?.SourceTree?.FilePath ?? string.Empty,
-            SourceStart = location?.SourceSpan.Start ?? target.Declaration.SpanStart,
-            Status = WorkerVerificationStatus.Unknown,
-            Reason = WorkerVerificationReason.InfrastructureFailure
+    private static ImmutableArray<WorkerClaimResult> CreateUnknowns(
+        ManifestCallableTarget target,
+        WorkerClaimReason reason) =>
+        [.. target.Claims.Select((_, index) =>
+            CreateUnknown(target, index, reason))];
+
+    private static WorkerClaimResult CreateBaseRecord(
+        ManifestCallableTarget target,
+        int contractOrdinal) =>
+        new() {
+            ClaimId = target.Claims[contractOrdinal].Entry.ClaimId,
+            Outcome = WorkerClaimOutcome.Unknown,
+            Reason = WorkerClaimReason.InfrastructureFailure,
+            Assumptions = [.. target.Assumptions]
         };
-    }
 
-    private bool HasContractSurface(CallableTarget target) {
-        if (target.Method.GetAttributes().Any(IsSharpProofAttribute) ||
-            target.Method.GetReturnTypeAttributes().Any(IsSharpProofAttribute) ||
-            target.Method.Parameters.Any(parameter =>
-                parameter.GetAttributes().Any(IsSharpProofAttribute)))
-            return true;
-        return ContractBinder.GetClauseInventory(target.Method)
-            .Clauses.Length != 0;
-    }
-
-    private static bool IsSharpProofAttribute(AttributeData attribute) =>
-        string.Equals(
-            attribute.AttributeClass?.ContainingNamespace?.Name,
-            "Attributes",
-            StringComparison.Ordinal) &&
-        string.Equals(
-            attribute.AttributeClass?.ContainingNamespace?.ContainingNamespace?.Name,
-            "SharpProof",
-            StringComparison.Ordinal);
-
-    private bool IsCompanionType(INamedTypeSymbol type) =>
-        _contractForType != null &&
-        type.GetAttributes().Any(attribute =>
-            SymbolEqualityComparer.Default.Equals(
-                attribute.AttributeClass?.OriginalDefinition,
-                _contractForType));
-
-    private static string CreateCallableId(IMethodSymbol method) =>
-        DocumentationCommentId.CreateDeclarationId(method) ??
-        method.ContainingType.MetadataName + "." + method.MetadataName;
-
-    private static WorkerVerificationReason MapBindingFailure(
+    private static WorkerClaimReason MapBindingFailure(
         ContractBindingFailure failure) => failure switch {
             ContractBindingFailure.UnsupportedExpression =>
-                WorkerVerificationReason.UnsupportedExpression,
+                WorkerClaimReason.UnsupportedExpression,
             ContractBindingFailure.ResultOutsideEnsures or
             ContractBindingFailure.OldOutsideEnsures or
             ContractBindingFailure.NestedOld or
@@ -1434,8 +1396,8 @@ internal sealed class CallableVerifier(
             ContractBindingFailure.NonBooleanCondition or
             ContractBindingFailure.InvalidClosedAttribute or
             ContractBindingFailure.InvalidClausePlacement =>
-                WorkerVerificationReason.UnsupportedContract,
-            _ => WorkerVerificationReason.UnsupportedCallable
+                WorkerClaimReason.UnsupportedContract,
+            _ => WorkerClaimReason.UnsupportedCallable
         };
 
     private ContractBinder ContractBinder =>
@@ -1443,25 +1405,25 @@ internal sealed class CallableVerifier(
             ref _contractBinder,
             () => new ContractBinder(_compilation, _factory));
 
-    private static WorkerVerificationReason MapAbstention(
+    private static WorkerClaimReason MapAbstention(
         AbstentionReason reason) => reason switch {
             AbstentionReason.UnsupportedOperation =>
-                WorkerVerificationReason.UnsupportedExpression,
+                WorkerClaimReason.UnsupportedExpression,
             AbstentionReason.UnsupportedEncoding =>
-                WorkerVerificationReason.UnsupportedExpression,
+                WorkerClaimReason.UnsupportedExpression,
             AbstentionReason.ResourceLimit =>
-                WorkerVerificationReason.ResourceLimit,
+                WorkerClaimReason.ResourceLimit,
             AbstentionReason.Timeout =>
-                WorkerVerificationReason.MethodTimeout,
+                WorkerClaimReason.MethodTimeout,
             AbstentionReason.BackendUnavailable =>
-                WorkerVerificationReason.BackendUnavailable,
+                WorkerClaimReason.BackendUnavailable,
             AbstentionReason.InfrastructureFailure =>
-                WorkerVerificationReason.InfrastructureFailure,
+                WorkerClaimReason.InfrastructureFailure,
             AbstentionReason.MalformedBackendResult =>
-                WorkerVerificationReason.MalformedBackendResult,
+                WorkerClaimReason.MalformedBackendResult,
             AbstentionReason.CounterexampleReplayFailed =>
-                WorkerVerificationReason.CounterexampleReplayFailed,
-            _ => WorkerVerificationReason.UnsupportedExpression
+                WorkerClaimReason.CounterexampleReplayFailed,
+            _ => WorkerClaimReason.UnsupportedExpression
         };
 
     private bool IsKnownPure(IMethodSymbol method) =>
@@ -1516,7 +1478,7 @@ internal sealed class CallableVerifier(
     private readonly struct BodyLoweringResult {
         private BodyLoweringResult(
             ImmutableArray<BodyPath> paths,
-            WorkerVerificationReason reason,
+            WorkerClaimReason reason,
             bool isSuccess) {
             Paths = paths;
             Reason = reason;
@@ -1526,7 +1488,7 @@ internal sealed class CallableVerifier(
         internal ImmutableArray<BodyPath> Paths { get; }
         internal bool UsesSpecModeledCallResult =>
             Paths.Any(path => !path.SpecAssumptions.IsDefaultOrEmpty);
-        internal WorkerVerificationReason Reason { get; }
+        internal WorkerClaimReason Reason { get; }
         internal bool IsSuccess { get; }
         internal static BodyLoweringResult Single(
             IrFactory factory,
@@ -1541,9 +1503,9 @@ internal sealed class CallableVerifier(
             ]);
         internal static BodyLoweringResult Success(
             ImmutableArray<BodyPath> paths) =>
-            new(paths, WorkerVerificationReason.None, true);
+            new(paths, WorkerClaimReason.None, true);
         internal static BodyLoweringResult Fail(
-            WorkerVerificationReason reason) =>
+            WorkerClaimReason reason) =>
             new([], reason, false);
     }
 
@@ -1593,15 +1555,4 @@ internal sealed class CallableVerifier(
         SpecId Spec,
         string WitnessIdentifier,
         IrTerm Predicate);
-}
-
-internal sealed class CallableTarget(
-    IMethodSymbol method,
-    BaseMethodDeclarationSyntax declaration,
-    SemanticModel semanticModel,
-    string callableId) {
-    internal IMethodSymbol Method { get; } = method;
-    internal BaseMethodDeclarationSyntax Declaration { get; } = declaration;
-    internal SemanticModel SemanticModel { get; } = semanticModel;
-    internal string CallableId { get; } = callableId;
 }

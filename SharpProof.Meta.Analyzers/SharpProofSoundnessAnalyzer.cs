@@ -425,8 +425,27 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
             method.Parameters[7].Name != "callerCancellation" ||
             !IsSameType(
                 method.Parameters[7].Type,
-                knownSymbols.CancellationToken) ||
-            clause.Block.Statements.FirstOrDefault() is not
+                knownSymbols.CancellationToken))
+            return false;
+
+        return ThrowsIfCallerCancellationRequested(
+                   clause,
+                   context,
+                   method,
+                   knownSymbols) ||
+               ReifiesCallerCancellation(
+                   clause,
+                   context,
+                   method,
+                   knownSymbols);
+    }
+
+    private static bool ThrowsIfCallerCancellationRequested(
+        CatchClauseSyntax clause,
+        SyntaxNodeAnalysisContext context,
+        IMethodSymbol method,
+        KnownSymbols knownSymbols) {
+        if (clause.Block.Statements.FirstOrDefault() is not
                 ExpressionStatementSyntax expression ||
             context.SemanticModel.GetOperation(
                 expression.Expression,
@@ -439,13 +458,103 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
                 knownSymbols.CancellationToken))
             return false;
 
-        IOperation? receiver = invocation.Instance;
+        return ReferencesParameter(
+            invocation.Instance,
+            method.Parameters[7]);
+    }
+
+    private static bool ReifiesCallerCancellation(
+        CatchClauseSyntax clause,
+        SyntaxNodeAnalysisContext context,
+        IMethodSymbol method,
+        KnownSymbols knownSymbols) {
+        if (clause.Block.Statements.FirstOrDefault() is not
+                IfStatementSyntax { Else: null } cancellationIf ||
+            context.SemanticModel.GetOperation(
+                cancellationIf.Condition,
+                context.CancellationToken) is not
+                IPropertyReferenceOperation cancellationRequested ||
+            cancellationRequested.Property.Name !=
+                "IsCancellationRequested" ||
+            !IsSameType(
+                cancellationRequested.Property.ContainingType,
+                knownSymbols.CancellationToken) ||
+            !ReferencesParameter(
+                cancellationRequested.Instance,
+                method.Parameters[7]) ||
+            SoleReturn(cancellationIf.Statement)?.Expression is not
+                ExpressionSyntax returnExpression ||
+            context.SemanticModel.GetOperation(
+                returnExpression,
+                context.CancellationToken) is not
+                IInvocationOperation invocation ||
+            invocation.TargetMethod is not {
+                Name: "Unknown",
+                IsStatic: true,
+                Parameters.Length: 3
+            } ||
+            !IsSameType(
+                invocation.TargetMethod.ContainingType,
+                knownSymbols.SharpProofWorker) ||
+            !IsSameType(
+                invocation.TargetMethod.ReturnType,
+                knownSymbols.CallableVerificationResult))
+            return false;
+
+        var target = invocation.Arguments.FirstOrDefault(candidate =>
+            candidate.Parameter?.Ordinal == 0);
+        return ReferencesParameter(target?.Value, method.Parameters[1]) &&
+               IsCanceledReasonArgument(
+                   invocation,
+                   1,
+                   knownSymbols.WorkerClaimReason) &&
+               IsCanceledReasonArgument(
+                   invocation,
+                   2,
+                   knownSymbols.WorkerCallableCoverageReason);
+    }
+
+    private static ReturnStatementSyntax? SoleReturn(
+        StatementSyntax statement) =>
+        statement switch {
+            ReturnStatementSyntax direct => direct,
+            BlockSyntax { Statements.Count: 1 } block =>
+                block.Statements[0] as ReturnStatementSyntax,
+            _ => null
+        };
+
+    private static bool IsCanceledReasonArgument(
+        IInvocationOperation invocation,
+        int parameterOrdinal,
+        INamedTypeSymbol? expectedType) {
+        if (expectedType == null ||
+            !IsSameType(
+                invocation.TargetMethod.Parameters[parameterOrdinal].Type,
+                expectedType))
+            return false;
+
+        var argument = invocation.Arguments.FirstOrDefault(candidate =>
+            candidate.Parameter?.Ordinal == parameterOrdinal);
+        IOperation? value = argument?.Value;
+        while (value is IConversionOperation conversion)
+            value = conversion.Operand;
+        return value is IFieldReferenceOperation field &&
+               field.Field is {
+                   Name: "Canceled",
+                   IsStatic: true
+               } &&
+               IsSameType(field.Field.ContainingType, expectedType);
+    }
+
+    private static bool ReferencesParameter(
+        IOperation? receiver,
+        IParameterSymbol parameter) {
         while (receiver is IConversionOperation conversion)
             receiver = conversion.Operand;
-        return receiver is IParameterReferenceOperation parameter &&
+        return receiver is IParameterReferenceOperation parameterReference &&
                SymbolEqualityComparer.Default.Equals(
-                   parameter.Parameter,
-                   method.Parameters[7]);
+                   parameterReference.Parameter,
+                   parameter);
     }
 
     private static bool IsAuditedWorkerMain(
@@ -570,16 +679,16 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
                 "System.Threading.Tasks.Task`1");
             TaskOfInt32 = task?.Construct(compilation.GetSpecialType(
                 SpecialType.System_Int32));
-            var immutableArray = compilation.GetTypeByMetadataName(
-                "System.Collections.Immutable.ImmutableArray`1");
-            var workerRecord = compilation.GetTypeByMetadataName(
-                "SharpProof.Worker.Protocol.WorkerVerificationRecord");
+            CallableVerificationResult = compilation.GetTypeByMetadataName(
+                "SharpProof.Worker.SharpProofWorker+CallableVerificationResult");
+            WorkerClaimReason = compilation.GetTypeByMetadataName(
+                "SharpProof.Worker.Protocol.WorkerClaimReason");
+            WorkerCallableCoverageReason = compilation.GetTypeByMetadataName(
+                "SharpProof.Worker.Protocol.WorkerCallableCoverageReason");
             VerifyTargetTask =
                 task != null &&
-                immutableArray != null &&
-                workerRecord != null
-                    ? task.Construct(
-                        immutableArray.Construct(workerRecord))
+                CallableVerificationResult != null
+                    ? task.Construct(CallableVerificationResult)
                     : null;
         }
 
@@ -607,6 +716,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
         internal INamedTypeSymbol? WorkerProgram { get; }
         internal INamedTypeSymbol? WorkerLauncherProgram { get; }
         internal INamedTypeSymbol? SharpProofWorker { get; }
+        internal INamedTypeSymbol? CallableVerificationResult { get; }
+        internal INamedTypeSymbol? WorkerClaimReason { get; }
+        internal INamedTypeSymbol? WorkerCallableCoverageReason { get; }
         internal INamedTypeSymbol? TaskOfInt32 { get; }
         internal INamedTypeSymbol? VerifyTargetTask { get; }
     }

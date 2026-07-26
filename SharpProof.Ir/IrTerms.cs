@@ -51,12 +51,8 @@ public enum IrOpaquePurity {
 }
 
 public sealed class IrTypeInfo {
-    internal IrTypeInfo(IrTypeId id, IrStringId name, IrTypeKind kind, IrTypeId? elementType) {
-        Id = id;
-        Name = name;
-        Kind = kind;
-        ElementType = elementType;
-    }
+    internal IrTypeInfo(IrTypeId id, IrStringId name, IrTypeKind kind, IrTypeId? elementType) =>
+        (Id, Name, Kind, ElementType) = (id, name, kind, elementType);
 
     public IrTypeId Id { get; }
     public IrStringId Name { get; }
@@ -65,11 +61,8 @@ public sealed class IrTypeInfo {
 }
 
 public sealed class IrVariableInfo {
-    internal IrVariableInfo(IrVarId id, IrStringId name, IrTypeId type) {
-        Id = id;
-        Name = name;
-        Type = type;
-    }
+    internal IrVariableInfo(IrVarId id, IrStringId name, IrTypeId type) =>
+        (Id, Name, Type) = (id, name, type);
 
     public IrVarId Id { get; }
     public IrStringId Name { get; }
@@ -78,21 +71,11 @@ public sealed class IrVariableInfo {
 
 public sealed class IrMemberInfo {
     internal IrMemberInfo(
-        IrMemberId id,
-        IrIdentityId identity,
-        IrTypeId declaringType,
-        IrStringId name,
-        IrTypeId returnType,
-        bool isStatic,
-        ImmutableArray<IrTypeId> parameterTypes) {
-        Id = id;
-        Identity = identity;
-        DeclaringType = declaringType;
-        Name = name;
-        ReturnType = returnType;
-        IsStatic = isStatic;
-        ParameterTypes = parameterTypes;
-    }
+        IrMemberId id, IrIdentityId identity, IrTypeId declaringType,
+        IrStringId name, IrTypeId returnType, bool isStatic,
+        ImmutableArray<IrTypeId> parameterTypes) =>
+        (Id, Identity, DeclaringType, Name, ReturnType, IsStatic, ParameterTypes) =
+        (id, identity, declaringType, name, returnType, isStatic, parameterTypes);
 
     public IrMemberId Id { get; }
     public IrIdentityId Identity { get; }
@@ -104,21 +87,16 @@ public sealed class IrMemberInfo {
 }
 
 public sealed class IrOperationInfo {
-    internal IrOperationInfo(OperationId id, IrStringId? description) {
-        Id = id;
-        Description = description;
-    }
+    internal IrOperationInfo(OperationId id, IrStringId? description) =>
+        (Id, Description) = (id, description);
 
     public OperationId Id { get; }
     public IrStringId? Description { get; }
 }
 
 public abstract class IrTerm {
-    private protected IrTerm(IrId id, IrTypeId type, IrTermKind kind) {
-        Id = id;
-        Type = type;
-        Kind = kind;
-    }
+    private protected IrTerm(IrId id, IrTypeId type, IrTermKind kind) =>
+        (Id, Type, Kind) = (id, type, kind);
 
     public IrId Id { get; }
     public IrTypeId Type { get; }
@@ -126,55 +104,44 @@ public abstract class IrTerm {
 }
 
 public sealed class IrBooleanTerm : IrTerm {
-    internal IrBooleanTerm(IrId id, IrTypeId type, bool value)
-        : base(id, type, IrTermKind.Boolean) => Value = value;
+    internal IrBooleanTerm(IrId id, IrTypeId type, bool value) :
+        base(id, type, IrTermKind.Boolean) => Value = value;
 
     public bool Value { get; }
 }
 
 public sealed class IrIntegerTerm : IrTerm {
-    internal IrIntegerTerm(IrId id, IrTypeId type, long value)
-        : base(id, type, IrTermKind.Integer) => Value = value;
+    internal IrIntegerTerm(IrId id, IrTypeId type, long value) :
+        base(id, type, IrTermKind.Integer) => Value = value;
 
     public long Value { get; }
 }
 
 public sealed class IrStringTerm : IrTerm {
-    internal IrStringTerm(IrId id, IrTypeId type, IrStringId value)
-        : base(id, type, IrTermKind.String) => Value = value;
+    internal IrStringTerm(IrId id, IrTypeId type, IrStringId value) :
+        base(id, type, IrTermKind.String) => Value = value;
 
     public IrStringId Value { get; }
 }
 
 public sealed class IrNullTerm : IrTerm {
-    internal IrNullTerm(IrId id, IrTypeId type)
-        : base(id, type, IrTermKind.Null) {
-    }
+    internal IrNullTerm(IrId id, IrTypeId type) : base(id, type, IrTermKind.Null) { }
 }
 
 public sealed class IrVariableTerm : IrTerm {
-    internal IrVariableTerm(IrId id, IrTypeId type, IrVarId variable)
-        : base(id, type, IrTermKind.Variable) => Variable = variable;
+    internal IrVariableTerm(IrId id, IrTypeId type, IrVarId variable) :
+        base(id, type, IrTermKind.Variable) => Variable = variable;
 
     public IrVarId Variable { get; }
 }
 
 public sealed class IrOpaqueTerm : IrTerm {
     internal IrOpaqueTerm(
-        IrId id,
-        IrTypeId type,
-        IrMemberId member,
-        IrTerm? receiver,
-        ImmutableArray<IrTerm> arguments,
-        IrOpaquePurity purity,
-        OperationId operation)
-        : base(id, type, IrTermKind.Opaque) {
-        Member = member;
-        Receiver = receiver;
-        Arguments = arguments;
-        Purity = purity;
-        Operation = operation;
-    }
+        IrId id, IrTypeId type, IrMemberId member, IrTerm? receiver,
+        ImmutableArray<IrTerm> arguments, IrOpaquePurity purity, OperationId operation)
+        : base(id, type, IrTermKind.Opaque) =>
+        (Member, Receiver, Arguments, Purity, Operation) =
+        (member, receiver, arguments, purity, operation);
 
     public IrMemberId Member { get; }
     public IrTerm? Receiver { get; }
@@ -184,11 +151,8 @@ public sealed class IrOpaqueTerm : IrTerm {
 }
 
 public sealed class IrUnaryTerm : IrTerm {
-    internal IrUnaryTerm(IrId id, IrTypeId type, IrUnaryOperator @operator, IrTerm operand)
-        : base(id, type, IrTermKind.Unary) {
-        Operator = @operator;
-        Operand = operand;
-    }
+    internal IrUnaryTerm(IrId id, IrTypeId type, IrUnaryOperator @operator, IrTerm operand) :
+        base(id, type, IrTermKind.Unary) => (Operator, Operand) = (@operator, operand);
 
     public IrUnaryOperator Operator { get; }
     public IrTerm Operand { get; }
@@ -196,16 +160,9 @@ public sealed class IrUnaryTerm : IrTerm {
 
 public sealed class IrBinaryTerm : IrTerm {
     internal IrBinaryTerm(
-        IrId id,
-        IrTypeId type,
-        IrBinaryOperator @operator,
-        IrTerm left,
-        IrTerm right)
-        : base(id, type, IrTermKind.Binary) {
-        Operator = @operator;
-        Left = left;
-        Right = right;
-    }
+        IrId id, IrTypeId type, IrBinaryOperator @operator, IrTerm left, IrTerm right)
+        : base(id, type, IrTermKind.Binary) =>
+        (Operator, Left, Right) = (@operator, left, right);
 
     public IrBinaryOperator Operator { get; }
     public IrTerm Left { get; }
@@ -214,16 +171,9 @@ public sealed class IrBinaryTerm : IrTerm {
 
 public sealed class IrConditionalTerm : IrTerm {
     internal IrConditionalTerm(
-        IrId id,
-        IrTypeId type,
-        IrTerm condition,
-        IrTerm whenTrue,
-        IrTerm whenFalse)
-        : base(id, type, IrTermKind.Conditional) {
-        Condition = condition;
-        WhenTrue = whenTrue;
-        WhenFalse = whenFalse;
-    }
+        IrId id, IrTypeId type, IrTerm condition, IrTerm whenTrue, IrTerm whenFalse)
+        : base(id, type, IrTermKind.Conditional) =>
+        (Condition, WhenTrue, WhenFalse) = (condition, whenTrue, whenFalse);
 
     public IrTerm Condition { get; }
     public IrTerm WhenTrue { get; }
@@ -231,25 +181,22 @@ public sealed class IrConditionalTerm : IrTerm {
 }
 
 public sealed class IrCastTerm : IrTerm {
-    internal IrCastTerm(IrId id, IrTypeId type, IrTerm operand)
-        : base(id, type, IrTermKind.Cast) => Operand = operand;
+    internal IrCastTerm(IrId id, IrTypeId type, IrTerm operand) :
+        base(id, type, IrTermKind.Cast) => Operand = operand;
 
     public IrTerm Operand { get; }
 }
 
 public sealed class IrLengthTerm : IrTerm {
-    internal IrLengthTerm(IrId id, IrTypeId type, IrTerm value)
-        : base(id, type, IrTermKind.Length) => Value = value;
+    internal IrLengthTerm(IrId id, IrTypeId type, IrTerm value) :
+        base(id, type, IrTermKind.Length) => Value = value;
 
     public IrTerm Value { get; }
 }
 
 public sealed class IrSequenceAccessTerm : IrTerm {
-    internal IrSequenceAccessTerm(IrId id, IrTypeId type, IrTerm sequence, IrTerm index)
-        : base(id, type, IrTermKind.SequenceAccess) {
-        Sequence = sequence;
-        Index = index;
-    }
+    internal IrSequenceAccessTerm(IrId id, IrTypeId type, IrTerm sequence, IrTerm index) :
+        base(id, type, IrTermKind.SequenceAccess) => (Sequence, Index) = (sequence, index);
 
     public IrTerm Sequence { get; }
     public IrTerm Index { get; }

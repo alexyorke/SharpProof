@@ -293,16 +293,15 @@ internal static class EffectContractDiagnostics {
     }
 
     private static bool TryGetInt64(TypedConstant argument, out long value) {
-        switch (argument.Value) {
-            case sbyte number: value = number; return true;
-            case byte number: value = number; return true;
-            case short number: value = number; return true;
-            case ushort number: value = number; return true;
-            case int number: value = number; return true;
-            case uint number: value = number; return true;
-            case long number: value = number; return true;
-            default: value = 0; return false;
+        if (argument.Value is
+            sbyte or byte or short or ushort or int or uint or long) {
+            value = Convert.ToInt64(
+                argument.Value,
+                CultureInfo.InvariantCulture);
+            return true;
         }
+        value = 0;
+        return false;
     }
 
     private static Location GetLocation(

@@ -20,26 +20,10 @@ public sealed class IrFactory {
 
     public IrFactory() {
         _scope = Interlocked.Increment(ref s_nextScope);
-        BooleanType = GetOrCreateTypeCore(
-            CreateIdentityCore(),
-            "bool",
-            IrTypeKind.Boolean,
-            null);
-        IntegerType = GetOrCreateTypeCore(
-            CreateIdentityCore(),
-            "int",
-            IrTypeKind.Integer,
-            null);
-        StringType = GetOrCreateTypeCore(
-            CreateIdentityCore(),
-            "string",
-            IrTypeKind.String,
-            null);
-        ObjectType = GetOrCreateTypeCore(
-            CreateIdentityCore(),
-            "object",
-            IrTypeKind.Reference,
-            null);
+        BooleanType = CreateBuiltInType("bool", IrTypeKind.Boolean);
+        IntegerType = CreateBuiltInType("int", IrTypeKind.Integer);
+        StringType = CreateBuiltInType("string", IrTypeKind.String);
+        ObjectType = CreateBuiltInType("object", IrTypeKind.Reference);
     }
 
     public IrTypeId BooleanType { get; }
@@ -77,10 +61,7 @@ public sealed class IrFactory {
     }
 
     public string GetString(IrStringId id) {
-        lock (_gate) {
-            EnsureScope(id.Scope, nameof(id));
-            return GetAt(_strings, id.Value, nameof(id));
-        }
+        lock (_gate) return GetScoped(id.Scope, id.Value, _strings, nameof(id));
     }
 
     public IrTypeId GetOrCreateReferenceType(
@@ -144,10 +125,7 @@ public sealed class IrFactory {
     }
 
     public IrVariableInfo GetVariableInfo(IrVarId id) {
-        lock (_gate) {
-            EnsureScope(id.Scope, nameof(id));
-            return GetAt(_variables, id.Value, nameof(id));
-        }
+        lock (_gate) return GetVariableInfoCore(id, nameof(id));
     }
 
     public IrMemberId GetOrCreateMember(
@@ -189,10 +167,7 @@ public sealed class IrFactory {
     }
 
     public IrMemberInfo GetMemberInfo(IrMemberId id) {
-        lock (_gate) {
-            EnsureScope(id.Scope, nameof(id));
-            return GetAt(_members, id.Value, nameof(id));
-        }
+        lock (_gate) return GetMemberInfoCore(id, nameof(id));
     }
 
     public OperationId CreateOperation(string? description = null) {
@@ -207,17 +182,11 @@ public sealed class IrFactory {
     }
 
     public IrOperationInfo GetOperationInfo(OperationId id) {
-        lock (_gate) {
-            EnsureScope(id.Scope, nameof(id));
-            return GetAt(_operations, id.Value, nameof(id));
-        }
+        lock (_gate) return GetOperationInfoCore(id, nameof(id));
     }
 
     public IrTerm GetTerm(IrId id) {
-        lock (_gate) {
-            EnsureScope(id.Scope, nameof(id));
-            return GetAt(_terms, id.Value, nameof(id));
-        }
+        lock (_gate) return GetScoped(id.Scope, id.Value, _terms, nameof(id));
     }
 
     public IrValue CreateBooleanValue(bool value) => IrValue.CreateBoolean(BooleanType, value);
@@ -613,13 +582,14 @@ public sealed class IrFactory {
         return id;
     }
 
-    private string GetStringCore(IrStringId id) {
-        EnsureScope(id.Scope, nameof(id));
-        return GetAt(_strings, id.Value, nameof(id));
-    }
+    private string GetStringCore(IrStringId id) =>
+        GetScoped(id.Scope, id.Value, _strings, nameof(id));
 
     private IrIdentityId CreateIdentityCore() =>
         new(_scope, _identityCount++);
+
+    private IrTypeId CreateBuiltInType(string name, IrTypeKind kind) =>
+        GetOrCreateTypeCore(CreateIdentityCore(), name, kind, null);
 
     private IrTypeId GetOrCreateTypeCore(
         IrIdentityId identity,
@@ -638,25 +608,17 @@ public sealed class IrFactory {
         return id;
     }
 
-    private IrTypeInfo GetTypeInfoCore(IrTypeId id, string parameterName) {
-        EnsureScope(id.Scope, parameterName);
-        return GetAt(_types, id.Value, parameterName);
-    }
+    private IrTypeInfo GetTypeInfoCore(IrTypeId id, string parameterName) =>
+        GetScoped(id.Scope, id.Value, _types, parameterName);
 
-    private IrVariableInfo GetVariableInfoCore(IrVarId id, string parameterName) {
-        EnsureScope(id.Scope, parameterName);
-        return GetAt(_variables, id.Value, parameterName);
-    }
+    private IrVariableInfo GetVariableInfoCore(IrVarId id, string parameterName) =>
+        GetScoped(id.Scope, id.Value, _variables, parameterName);
 
-    private IrMemberInfo GetMemberInfoCore(IrMemberId id, string parameterName) {
-        EnsureScope(id.Scope, parameterName);
-        return GetAt(_members, id.Value, parameterName);
-    }
+    private IrMemberInfo GetMemberInfoCore(IrMemberId id, string parameterName) =>
+        GetScoped(id.Scope, id.Value, _members, parameterName);
 
-    private IrOperationInfo GetOperationInfoCore(OperationId id, string parameterName) {
-        EnsureScope(id.Scope, parameterName);
-        return GetAt(_operations, id.Value, parameterName);
-    }
+    private IrOperationInfo GetOperationInfoCore(OperationId id, string parameterName) =>
+        GetScoped(id.Scope, id.Value, _operations, parameterName);
 
     private void EnsureTermCore(IrTerm term, string parameterName) {
         if (term.Id.Scope != _scope ||
@@ -686,44 +648,38 @@ public sealed class IrFactory {
         return items[index];
     }
 
-    private sealed class TypeKey : IEquatable<TypeKey> {
-        internal TypeKey(IrTypeKind kind, int identity, int elementType) {
-            Kind = kind;
-            Identity = identity;
-            ElementType = elementType;
-        }
+    private T GetScoped<T>(
+        long scope, int value, IReadOnlyList<T> items, string parameterName) {
+        EnsureScope(scope, parameterName);
+        return GetAt(items, value, parameterName);
+    }
+
+    private readonly record struct TypeKey {
+        internal TypeKey(IrTypeKind kind, int identity, int elementType) =>
+            (Kind, Identity, ElementType) = (kind, identity, elementType);
 
         private IrTypeKind Kind { get; }
         private int Identity { get; }
         private int ElementType { get; }
 
-        public bool Equals(TypeKey? other) =>
-            other != null &&
+        public bool Equals(TypeKey other) =>
             Kind == other.Kind &&
             Identity == other.Identity &&
             ElementType == other.ElementType;
 
-        public override bool Equals(object? obj) => Equals(obj as TypeKey);
-        public override int GetHashCode() {
-            unchecked {
-                return (((int)Kind * 397) ^ Identity) * 397 ^ ElementType;
-            }
-        }
+        public override int GetHashCode() =>
+            unchecked((((int)Kind * 397) ^ Identity) * 397 ^ ElementType);
     }
 
-    private sealed class MemberKey : IEquatable<MemberKey> {
+    private readonly record struct MemberKey {
         internal MemberKey(
             int identity,
             int declaringType,
             int returnType,
             bool isStatic,
-            ImmutableArray<int> parameterTypes) {
-            Identity = identity;
-            DeclaringType = declaringType;
-            ReturnType = returnType;
-            IsStatic = isStatic;
-            ParameterTypes = parameterTypes;
-        }
+            ImmutableArray<int> parameterTypes) =>
+            (Identity, DeclaringType, ReturnType, IsStatic, ParameterTypes) =
+            (identity, declaringType, returnType, isStatic, parameterTypes);
 
         private int Identity { get; }
         private int DeclaringType { get; }
@@ -731,15 +687,13 @@ public sealed class IrFactory {
         private bool IsStatic { get; }
         private ImmutableArray<int> ParameterTypes { get; }
 
-        public bool Equals(MemberKey? other) =>
-            other != null &&
+        public bool Equals(MemberKey other) =>
             Identity == other.Identity &&
             DeclaringType == other.DeclaringType &&
             ReturnType == other.ReturnType &&
             IsStatic == other.IsStatic &&
             SequenceEqual(ParameterTypes, other.ParameterTypes);
 
-        public override bool Equals(object? obj) => Equals(obj as MemberKey);
         public override int GetHashCode() {
             unchecked {
                 var hash = Identity;
@@ -781,7 +735,7 @@ public sealed class IrFactory {
         }
     }
 
-    private sealed class TermKey : IEquatable<TermKey> {
+    private readonly record struct TermKey {
         internal TermKey(
             IrTermKind kind,
             int type,
@@ -790,12 +744,8 @@ public sealed class IrFactory {
             int third = 0,
             long number = 0,
             ImmutableArray<int> children = default) {
-            Kind = kind;
-            Type = type;
-            First = first;
-            Second = second;
-            Third = third;
-            Number = number;
+            (Kind, Type, First, Second, Third, Number) =
+                (kind, type, first, second, third, number);
             Children = children.IsDefault ? [] : children;
         }
 
@@ -807,8 +757,7 @@ public sealed class IrFactory {
         private long Number { get; }
         private ImmutableArray<int> Children { get; }
 
-        public bool Equals(TermKey? other) =>
-            other != null &&
+        public bool Equals(TermKey other) =>
             Kind == other.Kind &&
             Type == other.Type &&
             First == other.First &&
@@ -817,7 +766,6 @@ public sealed class IrFactory {
             Number == other.Number &&
             SequenceEqual(Children, other.Children);
 
-        public override bool Equals(object? obj) => Equals(obj as TermKey);
         public override int GetHashCode() {
             unchecked {
                 var hash = (int)Kind;
@@ -827,13 +775,15 @@ public sealed class IrFactory {
                 hash = hash * 397 ^ Third;
                 hash = hash * 397 ^ (int)Number;
                 hash = hash * 397 ^ (int)(Number >> 32);
-                foreach (var child in Children) hash = hash * 397 ^ child;
+                if (!Children.IsDefaultOrEmpty)
+                    foreach (var child in Children) hash = hash * 397 ^ child;
                 return hash;
             }
         }
     }
 
     private static bool SequenceEqual(ImmutableArray<int> left, ImmutableArray<int> right) {
+        if (left.IsDefaultOrEmpty && right.IsDefaultOrEmpty) return true;
         if (left.Length != right.Length) return false;
         for (var index = 0; index < left.Length; index++)
             if (left[index] != right[index])

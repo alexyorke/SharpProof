@@ -1,65 +1,75 @@
 namespace SharpProof.Worker;
-
-internal sealed class CacheableWorkerResponse {
-    private CacheableWorkerResponse(
-        string inputHash,
-        string payload) {
-        InputHash = inputHash;
-        Payload = payload;
-    }
-
-    internal string InputHash { get; }
-    internal string Payload { get; }
+internal sealed record CacheableWorkerResponse(
+    string InputHash,
+    string Payload,
+    WorkerCallableResult[] CallableResults,
+    WorkerClaimResult[] ClaimResults) {
 
     internal static bool TryCreate(
         WorkerVerifyResponse? response,
         string expectedInputHash,
+        WorkerClaimManifest expectedManifest,
         [NotNullWhen(true)]
         out CacheableWorkerResponse? cacheable) {
         cacheable = null;
         if (response == null ||
-            !IsSha256(expectedInputHash) ||
-            !string.Equals(
-                response.ProtocolVersion,
-                WorkerProtocolVersions.Current,
-                StringComparison.Ordinal) ||
-            !string.Equals(
-                response.InputHash,
-                expectedInputHash,
-                StringComparison.Ordinal) ||
+            response.RunStatus != WorkerRunStatus.Complete ||
             response.Errors is not { Length: 0 } ||
-            response.Records is not { Length: > 0 } ||
-            response.Records.Any(static record => !IsValidRecord(record))) {
+            response.CallableResults.Any(static result => result.Coverage != WorkerCallableCoverage.Complete ||
+                result.Reason != WorkerCallableCoverageReason.None) ||
+            response.ClaimResults.Any(static result => result.Outcome is not
+                (WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted)) ||
+            !WorkerProtocolJson.Validate(response, expectedInputHash, expectedManifest).IsValid)
             return false;
-        }
-
-        var payload = WorkerProtocolJson.SerializeResponse(response);
+        var payload = JsonSerializer.Serialize(new CachePayload(
+            expectedManifest.Hash, response.CallableResults, response.ClaimResults), WorkerProtocolJson.Options);
         cacheable = new CacheableWorkerResponse(
-            response.InputHash,
-            payload);
+            expectedInputHash,
+            payload,
+            response.CallableResults,
+            response.ClaimResults);
         return true;
     }
 
-    private static bool IsSha256(string? value) =>
-        value is { Length: 64 } &&
-        value.All(static character => Uri.IsHexDigit(character));
+    internal static bool TryParse(
+        string? payload,
+        string expectedInputHash,
+        WorkerClaimManifest expectedManifest,
+        WorkerBudgets budgets,
+        [NotNullWhen(true)]
+        out CacheableWorkerResponse? cacheable) {
+        cacheable = null;
+        CachePayload? decoded;
+        try {
+            decoded = JsonSerializer.Deserialize<CachePayload>(payload ?? string.Empty, WorkerProtocolJson.Options);
+        }
+        catch (JsonException) {
+            return false;
+        }
+        if (decoded == null ||
+            !string.Equals(decoded.ManifestHash, expectedManifest.Hash, StringComparison.Ordinal) ||
+            decoded.CallableResults == null ||
+            decoded.ClaimResults == null)
+            return false;
+        var response = WorkerResultAssembler.Create(
+            expectedInputHash,
+            expectedManifest,
+            WorkerRunStatus.Complete,
+            WorkerRunFailureReason.None,
+            decoded.CallableResults,
+            decoded.ClaimResults,
+            budgets,
+            WorkerCacheStatus.Hit,
+            0);
+        return TryCreate(
+            response,
+            expectedInputHash,
+            expectedManifest,
+            out cacheable);
+    }
 
-    private static bool IsValidRecord(WorkerVerificationRecord? record) =>
-        record != null &&
-        !string.IsNullOrEmpty(record.CallableId) &&
-        record.ContractOrdinal >= 0 &&
-        record.SourcePath != null &&
-        record.SourceStart >= 0 &&
-        record.Status is
-            WorkerVerificationStatus.Proven or
-            WorkerVerificationStatus.Refuted &&
-        record.Reason == WorkerVerificationReason.None &&
-        record.ProofCore is not null &&
-        record.ProofCore.All(static value => value != null) &&
-        record.Model is not null &&
-        record.Model.All(static value =>
-            value != null &&
-            value.Variable != null &&
-            value.Kind != null &&
-            value.Value != null);
+    private sealed record CachePayload(
+        string ManifestHash,
+        WorkerCallableResult[] CallableResults,
+        WorkerClaimResult[] ClaimResults);
 }

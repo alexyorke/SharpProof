@@ -279,13 +279,12 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void ClosedAttributesProduceTypedConditionsAndPureFacet() {
+    public void ClosedAttributesProduceTypedConditions() {
         const string source =
             """
             using SharpProof.Attributes;
             public static class Target {
                 [return: NotNull]
-                [Pure]
                 public static string Read(
                     [NotNull] string text,
                     [Positive, InRange(1L, 10L)] long count) => text;
@@ -294,8 +293,7 @@ public sealed class ContractBinderTests {
         using var subject = ContractSubject.Create(source);
         var result = subject.Bind("Target", "Read");
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
-        Assert.That(result.Contracts!.IsPure, Is.True);
-        Assert.That(result.Contracts.Clauses.Length, Is.EqualTo(4));
+        Assert.That(result.Contracts!.Clauses.Length, Is.EqualTo(4));
         Assert.That(
             result.Contracts.Clauses.Count(static clause =>
                 clause.Kind == BoundContractKind.Requires),

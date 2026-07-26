@@ -9,9 +9,9 @@ jobs; they are not interchangeable sources of truth.
 |---|---|---|
 | [Project README](../README.md) | Package users | Installation, activation, examples, and the short product overview |
 | [Coverage and limits](coverage-and-limits.md) | Users and contributors | Authoritative inventory of the currently implemented analyzer, worker, language, contract, and API-spec surface |
-| [Diagnostics](diagnostic-examples.md) | Analyzer users | Current `SP` and `SPCF` diagnostics, defaults, configuration, and examples |
-| [Analysis limits](analysis-limits.md) | Build and CI owners | Shipping worker properties, protocol bounds, and acceptance-only budgets |
-| [Typed abstention reasons](unknown-reasons.md) | Tool integrators | Exact typed reasons used by the frontend, analyzer, proof kernel, backend, and worker |
+| [Diagnostics](diagnostic-examples.md) | Analyzer and verifier users | Current `SP`, `SPCF`, SP0047, and SP0048 diagnostics, defaults, policies, and examples |
+| [Analysis limits](analysis-limits.md) | Build and CI owners | Shipping profile/feature/policy properties, worker bounds, and acceptance-only budgets |
+| [Typed abstention reasons](unknown-reasons.md) | Tool integrators | Exact typed reasons, run statuses, callable coverage, claim outcomes, and cache states |
 
 ## Normative and architectural documents
 
@@ -31,11 +31,13 @@ The implementation remains the authority for enumerated surfaces:
 - `SharpProof.Analyzer/GeneratedDiagnosticDescriptors.cs` and
   `SharpProof.ContractForGenerator/GeneratedDiagnosticDescriptors.cs` declare
   diagnostic IDs, severities, defaults, and messages.
-- `SharpProof.Worker.Protocol/ProtocolModel.cs` declares worker statuses,
-  reasons, and protocol defaults.
+- `SharpProof.Worker.Protocol/ProtocolModel.cs` declares protocol version 3,
+  manifest schema version 1, cache schema version 3, policies, run statuses,
+  callable coverage, claim outcomes/reasons, and summary records.
 - `eng/acceptance/contract.json` declares release-gate budgets. Package
   defaults that are not release-gate fields live in
-  `SharpProof.Package/buildTransitive/SharpProof.props`.
+  `SharpProof.Package/buildTransitive/SharpProof.props` and
+  `SharpProof.targets`.
 
 ## Acceptance and evidence
 
@@ -50,6 +52,16 @@ The implementation remains the authority for enumerated surfaces:
 Soundness notes record what was reviewed at a point in time. They do not replace
 the current coverage inventory or normative semantics.
 
+## Known production gaps
+
+The current preview's accountable manifest is built from a worker-reconstructed
+compilation. A build-only collector and closed artifact for the final
+post-generator Roslyn `Compilation` are not implemented yet, so generated trees
+and other compiler-only inputs are not claimed as 1.0-complete. SARIF
+projection and the planned three-package split are also future work. Current
+behavior and limits are recorded in
+[Coverage and limits](coverage-and-limits.md#current-compilation-integration-gap).
+
 ## Machine-owned Markdown
 
 - `SharpProof.Analyzer/AnalyzerReleases.Shipped.md` and
@@ -60,8 +72,9 @@ the current coverage inventory or normative semantics.
 ## Maintenance
 
 Markdown is hand-maintained. `scripts/Generate-Readme.ps1 -Verify` validates
-code-derived versions, modes, diagnostics, API-spec IDs, worker properties and
-reasons, local links, anchors, line endings, and BOM policy; it does not
+code-derived versions, configuration values, diagnostics, API-spec IDs, worker
+properties, protocol enums/versions, local links, anchors, line endings, and
+BOM policy; it does not
 generate these files. When behavior changes, update the relevant source-owned
 table first, then update the coverage, diagnostic, limit, or reason reference
 that mirrors it.

@@ -25,10 +25,8 @@ public enum IrHavocKind {
 }
 
 public abstract class IrLocation {
-    private protected IrLocation(IrTypeId type, IrLocationKind kind) {
-        Type = type;
-        Kind = kind;
-    }
+    private protected IrLocation(IrTypeId type, IrLocationKind kind) =>
+        (Type, Kind) = (type, kind);
 
     public IrTypeId Type { get; }
     public IrLocationKind Kind { get; }
@@ -36,15 +34,9 @@ public abstract class IrLocation {
 
 public sealed class IrMemberLocation : IrLocation {
     internal IrMemberLocation(
-        IrTypeId type,
-        IrMemberId member,
-        IrTerm? receiver,
-        ImmutableArray<IrTerm> arguments)
-        : base(type, IrLocationKind.Member) {
-        Member = member;
-        Receiver = receiver;
-        Arguments = arguments;
-    }
+        IrTypeId type, IrMemberId member, IrTerm? receiver, ImmutableArray<IrTerm> arguments) :
+        base(type, IrLocationKind.Member) =>
+        (Member, Receiver, Arguments) = (member, receiver, arguments);
 
     public IrMemberId Member { get; }
     public IrTerm? Receiver { get; }
@@ -52,14 +44,9 @@ public sealed class IrMemberLocation : IrLocation {
 }
 
 public sealed class IrSequenceLocation : IrLocation {
-    internal IrSequenceLocation(
-        IrTypeId type,
-        IrTerm sequence,
-        IrTerm index)
-        : base(type, IrLocationKind.Sequence) {
-        Sequence = sequence;
-        Index = index;
-    }
+    internal IrSequenceLocation(IrTypeId type, IrTerm sequence, IrTerm index) :
+        base(type, IrLocationKind.Sequence) =>
+        (Sequence, Index) = (sequence, index);
 
     public IrTerm Sequence { get; }
     public IrTerm Index { get; }
@@ -67,33 +54,21 @@ public sealed class IrSequenceLocation : IrLocation {
 
 public abstract class IrInstruction {
     private protected IrInstruction(
-        IrInstructionId id,
-        IrInstructionKind kind,
-        OperationId operation) {
-        Id = id;
-        Kind = kind;
-        Operation = operation;
-    }
+        IrInstructionId id, IrInstructionKind kind, OperationId operation) =>
+        (Id, Kind, Operation) = (id, kind, operation);
 
     public IrInstructionId Id { get; }
     public IrInstructionKind Kind { get; }
     public OperationId Operation { get; }
-    public bool IsTerminal =>
-        Kind is IrInstructionKind.Branch or
-            IrInstructionKind.Goto or
-            IrInstructionKind.Return;
+    public bool IsTerminal => Kind is IrInstructionKind.Branch
+        or IrInstructionKind.Goto or IrInstructionKind.Return;
 }
 
 public sealed class IrAssignInstruction : IrInstruction {
     internal IrAssignInstruction(
-        IrInstructionId id,
-        OperationId operation,
-        IrVarId target,
-        IrTerm value)
-        : base(id, IrInstructionKind.Assign, operation) {
-        Target = target;
-        Value = value;
-    }
+        IrInstructionId id, OperationId operation, IrVarId target, IrTerm value) :
+        base(id, IrInstructionKind.Assign, operation) =>
+        (Target, Value) = (target, value);
 
     public IrVarId Target { get; }
     public IrTerm Value { get; }
@@ -101,14 +76,9 @@ public sealed class IrAssignInstruction : IrInstruction {
 
 public sealed class IrLoadInstruction : IrInstruction {
     internal IrLoadInstruction(
-        IrInstructionId id,
-        OperationId operation,
-        IrVarId target,
-        IrLocation location)
-        : base(id, IrInstructionKind.Load, operation) {
-        Target = target;
-        Location = location;
-    }
+        IrInstructionId id, OperationId operation, IrVarId target, IrLocation location) :
+        base(id, IrInstructionKind.Load, operation) =>
+        (Target, Location) = (target, location);
 
     public IrVarId Target { get; }
     public IrLocation Location { get; }
@@ -116,14 +86,9 @@ public sealed class IrLoadInstruction : IrInstruction {
 
 public sealed class IrStoreInstruction : IrInstruction {
     internal IrStoreInstruction(
-        IrInstructionId id,
-        OperationId operation,
-        IrLocation location,
-        IrTerm value)
-        : base(id, IrInstructionKind.Store, operation) {
-        Location = location;
-        Value = value;
-    }
+        IrInstructionId id, OperationId operation, IrLocation location, IrTerm value) :
+        base(id, IrInstructionKind.Store, operation) =>
+        (Location, Value) = (location, value);
 
     public IrLocation Location { get; }
     public IrTerm Value { get; }
@@ -131,18 +96,10 @@ public sealed class IrStoreInstruction : IrInstruction {
 
 public sealed class IrCallInstruction : IrInstruction {
     internal IrCallInstruction(
-        IrInstructionId id,
-        OperationId operation,
-        IrVarId? target,
-        IrMemberId member,
-        IrTerm? receiver,
-        ImmutableArray<IrTerm> arguments)
-        : base(id, IrInstructionKind.Call, operation) {
-        Target = target;
-        Member = member;
-        Receiver = receiver;
-        Arguments = arguments;
-    }
+        IrInstructionId id, OperationId operation, IrVarId? target,
+        IrMemberId member, IrTerm? receiver, ImmutableArray<IrTerm> arguments) :
+        base(id, IrInstructionKind.Call, operation) =>
+        (Target, Member, Receiver, Arguments) = (target, member, receiver, arguments);
 
     public IrVarId? Target { get; }
     public IrMemberId Member { get; }
@@ -152,10 +109,8 @@ public sealed class IrCallInstruction : IrInstruction {
 
 public sealed class IrAssumeInstruction : IrInstruction {
     internal IrAssumeInstruction(
-        IrInstructionId id,
-        OperationId operation,
-        IrTerm condition)
-        : base(id, IrInstructionKind.Assume, operation) =>
+        IrInstructionId id, OperationId operation, IrTerm condition) :
+        base(id, IrInstructionKind.Assume, operation) =>
         Condition = condition;
 
     public IrTerm Condition { get; }
@@ -163,10 +118,8 @@ public sealed class IrAssumeInstruction : IrInstruction {
 
 public sealed class IrAssertInstruction : IrInstruction {
     internal IrAssertInstruction(
-        IrInstructionId id,
-        OperationId operation,
-        IrTerm condition)
-        : base(id, IrInstructionKind.Assert, operation) =>
+        IrInstructionId id, OperationId operation, IrTerm condition) :
+        base(id, IrInstructionKind.Assert, operation) =>
         Condition = condition;
 
     public IrTerm Condition { get; }
@@ -174,14 +127,10 @@ public sealed class IrAssertInstruction : IrInstruction {
 
 public sealed class IrHavocInstruction : IrInstruction {
     internal IrHavocInstruction(
-        IrInstructionId id,
-        OperationId operation,
-        IrHavocKind havocKind,
-        ImmutableArray<IrVarId> variables)
-        : base(id, IrInstructionKind.Havoc, operation) {
-        HavocKind = havocKind;
-        Variables = variables;
-    }
+        IrInstructionId id, OperationId operation,
+        IrHavocKind havocKind, ImmutableArray<IrVarId> variables) :
+        base(id, IrInstructionKind.Havoc, operation) =>
+        (HavocKind, Variables) = (havocKind, variables);
 
     public IrHavocKind HavocKind { get; }
     public ImmutableArray<IrVarId> Variables { get; }
@@ -189,16 +138,10 @@ public sealed class IrHavocInstruction : IrInstruction {
 
 public sealed class IrBranchInstruction : IrInstruction {
     internal IrBranchInstruction(
-        IrInstructionId id,
-        OperationId operation,
-        IrTerm condition,
-        IrBlockId whenTrue,
-        IrBlockId whenFalse)
-        : base(id, IrInstructionKind.Branch, operation) {
-        Condition = condition;
-        WhenTrue = whenTrue;
-        WhenFalse = whenFalse;
-    }
+        IrInstructionId id, OperationId operation, IrTerm condition,
+        IrBlockId whenTrue, IrBlockId whenFalse) :
+        base(id, IrInstructionKind.Branch, operation) =>
+        (Condition, WhenTrue, WhenFalse) = (condition, whenTrue, whenFalse);
 
     public IrTerm Condition { get; }
     public IrBlockId WhenTrue { get; }
@@ -207,10 +150,8 @@ public sealed class IrBranchInstruction : IrInstruction {
 
 public sealed class IrGotoInstruction : IrInstruction {
     internal IrGotoInstruction(
-        IrInstructionId id,
-        OperationId operation,
-        IrBlockId target)
-        : base(id, IrInstructionKind.Goto, operation) =>
+        IrInstructionId id, OperationId operation, IrBlockId target) :
+        base(id, IrInstructionKind.Goto, operation) =>
         Target = target;
 
     public IrBlockId Target { get; }
@@ -218,10 +159,8 @@ public sealed class IrGotoInstruction : IrInstruction {
 
 public sealed class IrReturnInstruction : IrInstruction {
     internal IrReturnInstruction(
-        IrInstructionId id,
-        OperationId operation,
-        IrTerm? value)
-        : base(id, IrInstructionKind.Return, operation) =>
+        IrInstructionId id, OperationId operation, IrTerm? value) :
+        base(id, IrInstructionKind.Return, operation) =>
         Value = value;
 
     public IrTerm? Value { get; }
@@ -229,13 +168,8 @@ public sealed class IrReturnInstruction : IrInstruction {
 
 public sealed class IrBasicBlock {
     internal IrBasicBlock(
-        IrBlockId id,
-        IrStringId? name,
-        ImmutableArray<IrInstruction> instructions) {
-        Id = id;
-        Name = name;
-        Instructions = instructions;
-    }
+        IrBlockId id, IrStringId? name, ImmutableArray<IrInstruction> instructions) =>
+        (Id, Name, Instructions) = (id, name, instructions);
 
     public IrBlockId Id { get; }
     public IrStringId? Name { get; }
@@ -247,14 +181,8 @@ public sealed class IrProgram {
     private readonly ImmutableDictionary<IrBlockId, IrBasicBlock> _blocksById;
 
     internal IrProgram(
-        IrFactory factory,
-        long scope,
-        IrBlockId entry,
-        ImmutableArray<IrBasicBlock> blocks) {
-        Factory = factory;
-        Scope = scope;
-        Entry = entry;
-        Blocks = blocks;
+        IrFactory factory, long scope, IrBlockId entry, ImmutableArray<IrBasicBlock> blocks) {
+        (Factory, Scope, Entry, Blocks) = (factory, scope, entry, blocks);
         _blocksById = blocks.ToImmutableDictionary(static block => block.Id);
     }
 

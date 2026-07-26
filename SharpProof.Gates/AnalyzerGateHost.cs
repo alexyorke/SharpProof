@@ -33,7 +33,8 @@ internal static class AnalyzerGateHost {
         "SP0027",
         "SP0030",
         "SP0045",
-        "SP0046"
+        "SP0046",
+        "SP0047"
     ];
 
     private static readonly Lazy<ImmutableArray<MetadataReference>> References =

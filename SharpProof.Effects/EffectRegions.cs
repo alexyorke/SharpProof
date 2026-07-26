@@ -11,8 +11,7 @@ public enum EffectRegionKind {
 }
 
 public readonly struct EffectRegionId :
-    IEquatable<EffectRegionId>,
-    IComparable<EffectRegionId> {
+    IEquatable<EffectRegionId>, IComparable<EffectRegionId> {
     public EffectRegionId(EffectRegionKind kind, int ordinal = 0) {
         if (!Enum.IsDefined(typeof(EffectRegionKind), kind))
             throw new ArgumentOutOfRangeException(nameof(kind));
@@ -42,21 +41,18 @@ public readonly struct EffectRegionId :
     public EffectRegionKind Kind { get; }
     public int Ordinal { get; }
 
-    public int CompareTo(EffectRegionId other) {
-        var kind = Kind.CompareTo(other.Kind);
-        return kind != 0 ? kind : Ordinal.CompareTo(other.Ordinal);
-    }
+    public int CompareTo(EffectRegionId other) =>
+        Kind.CompareTo(other.Kind) is var kind && kind != 0
+            ? kind
+            : Ordinal.CompareTo(other.Ordinal);
 
     public bool Equals(EffectRegionId other) =>
         Kind == other.Kind && Ordinal == other.Ordinal;
 
     public override bool Equals(object? obj) => obj is EffectRegionId other && Equals(other);
 
-    public override int GetHashCode() {
-        unchecked {
-            return ((int)Kind * 397) ^ Ordinal;
-        }
-    }
+    public override int GetHashCode() =>
+        unchecked(((int)Kind * 397) ^ Ordinal);
 
     public static bool operator ==(EffectRegionId left, EffectRegionId right) => left.Equals(right);
     public static bool operator !=(EffectRegionId left, EffectRegionId right) => !left.Equals(right);
@@ -97,10 +93,7 @@ public readonly struct EffectRegionSet : IEquatable<EffectRegionSet> {
     public bool IsSubsetOf(EffectRegionSet other) {
         if (IsEmpty || other.IsUnknown) return true;
         if (IsUnknown) return false;
-        foreach (var region in Regions)
-            if (!other.Contains(region))
-                return false;
-        return true;
+        return Regions.All(other.Contains);
     }
 
     public EffectRegionSet Union(EffectRegionSet other) {
@@ -115,14 +108,10 @@ public readonly struct EffectRegionSet : IEquatable<EffectRegionSet> {
 
     public override bool Equals(object? obj) => obj is EffectRegionSet other && Equals(other);
 
-    public override int GetHashCode() {
-        unchecked {
-            var hash = 17;
-            foreach (var region in Regions)
-                hash = hash * 31 + region.GetHashCode();
-            return hash;
-        }
-    }
+    public override int GetHashCode() =>
+        Regions.Aggregate(
+            17,
+            static (hash, region) => unchecked(hash * 31 + region.GetHashCode()));
 
     public static bool operator ==(EffectRegionSet left, EffectRegionSet right) => left.Equals(right);
     public static bool operator !=(EffectRegionSet left, EffectRegionSet right) => !left.Equals(right);

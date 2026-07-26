@@ -9,10 +9,8 @@ public enum ApiSpecResolutionFailureKind {
 }
 
 public sealed record ApiSpecResolutionFailure(
-    SpecId Spec,
-    string WitnessIdentifier,
-    ApiSpecResolutionFailureKind Kind,
-    string Detail);
+    SpecId Spec, string WitnessIdentifier,
+    ApiSpecResolutionFailureKind Kind, string Detail);
 
 public sealed record ResolvedApiSpec(ApiSpecTemplate Template, ISymbol Symbol);
 
@@ -26,19 +24,12 @@ public enum ApiSpecLookupFailureKind {
 }
 
 public sealed record ApiSpecLookupFailure(
-    ApiSpecLookupFailureKind Kind,
-    string SymbolIdentifier,
-    string Detail);
+    ApiSpecLookupFailureKind Kind, string SymbolIdentifier, string Detail);
 
 public sealed class ApiSpecLookupResult {
     private ApiSpecLookupResult(
-        ApiSpecLookupStatus status,
-        ResolvedApiSpec? spec,
-        ApiSpecLookupFailure? failure) {
-        Status = status;
-        Spec = spec;
-        Failure = failure;
-    }
+        ApiSpecLookupStatus status, ResolvedApiSpec? spec, ApiSpecLookupFailure? failure) =>
+        (Status, Spec, Failure) = (status, spec, failure);
 
     public ApiSpecLookupStatus Status { get; }
     public ResolvedApiSpec? Spec { get; }
@@ -56,10 +47,8 @@ public sealed class ResolvedApiSpecTable {
 
     internal ResolvedApiSpecTable(
         ImmutableDictionary<ISymbol, ResolvedApiSpec> specs,
-        ImmutableArray<ApiSpecResolutionFailure> failures) {
-        _specs = specs;
-        Failures = failures;
-    }
+        ImmutableArray<ApiSpecResolutionFailure> failures) =>
+        (_specs, Failures) = (specs, failures);
 
     public ImmutableArray<ResolvedApiSpec> Specs => [.. _specs.Values
         .OrderBy(static spec => spec.Template.Id.Value)];
@@ -145,8 +134,7 @@ public sealed class ApiSpecResolver(ApiSpecTable table) {
     }
 
     private static (ISymbol? Symbol, ApiSpecResolutionFailure? Failure) ResolveTemplate(
-        Compilation compilation,
-        ApiSpecTemplate template) {
+        Compilation compilation, ApiSpecTemplate template) {
         var target = template.Target;
         var containingType = compilation.GetTypeByMetadataName(target.ContainingTypeMetadataName);
         if (containingType == null) {
@@ -210,9 +198,7 @@ public sealed class ApiSpecResolver(ApiSpecTable table) {
     };
 
     private static ApiSpecResolutionFailure Failure(
-        ApiSpecTemplate template,
-        ApiSpecResolutionFailureKind kind,
-        string detail) => new(
+        ApiSpecTemplate template, ApiSpecResolutionFailureKind kind, string detail) => new(
         template.Id,
         template.Target.WitnessIdentifier,
         kind,

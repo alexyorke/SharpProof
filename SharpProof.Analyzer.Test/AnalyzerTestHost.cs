@@ -18,7 +18,9 @@ internal static class AnalyzerTestHost {
         string? mode,
         IEnumerable<string> enabledIds,
         DiagnosticAnalyzer? analyzer = null,
-        IEnumerable<MetadataReference>? additionalReferences = null) {
+        IEnumerable<MetadataReference>? additionalReferences = null,
+        string? profile = null,
+        string? features = null) {
         var compilation = CreateCompilation(
             source,
             enabledIds,
@@ -26,7 +28,9 @@ internal static class AnalyzerTestHost {
         return await AnalyzeAsync(
                 compilation,
                 mode,
-                analyzer)
+                analyzer,
+                profile,
+                features)
             .ConfigureAwait(false);
     }
 
@@ -39,28 +43,38 @@ internal static class AnalyzerTestHost {
             source,
             ParseOptions,
             "input.cs");
+        var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
+        if (!enabled.IsEmpty)
+            options = options.WithSpecificDiagnosticOptions(
+                new SharpProofAnalyzer().SupportedDiagnostics.ToImmutableDictionary(
+                    static descriptor => descriptor.Id,
+                    descriptor => enabled.Contains(descriptor.Id)
+                        ? ReportDiagnostic.Warn
+                        : ReportDiagnostic.Suppress,
+                    StringComparer.Ordinal));
         return CSharpCompilation.Create(
             "AnalyzerFixture",
             [tree],
             additionalReferences == null
                 ? References.Value
                 : References.Value.AddRange(additionalReferences),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-                .WithSpecificDiagnosticOptions(
-                    enabled.ToImmutableDictionary(
-                        static id => id,
-                        static _ => ReportDiagnostic.Warn,
-                        StringComparer.Ordinal)));
+            options);
     }
 
     internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         CSharpCompilation compilation,
         string? mode,
-        DiagnosticAnalyzer? analyzer = null) {
+        DiagnosticAnalyzer? analyzer = null,
+        string? profile = null,
+        string? features = null) {
         var values = new Dictionary<string, string>(
             StringComparer.OrdinalIgnoreCase);
         if (mode != null)
             values.Add("sharpproof_mode", mode);
+        if (profile != null)
+            values.Add("build_property.SharpProofProfile", profile);
+        if (features != null)
+            values.Add("build_property.SharpProofFeatures", features);
         var analyzerOptions = new AnalyzerOptions(
             [],
             new TestOptionsProvider(values));

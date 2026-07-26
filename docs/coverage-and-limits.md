@@ -13,11 +13,11 @@ unsupported expressions, approximate facts, and exhausted budgets remain
 
 | Surface | Runs where | Implemented behavior | Current boundary |
 |---|---|---|---|
-| Effect contracts | Opt-in analyzer, `effects` or `all-experimental` mode | Computes path-insensitive may summaries for reads, writes, allocation, capabilities, exceptions, termination, and completeness; checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, and `[AllowedExceptions]` | A possible or unresolved violation produces a not-proven diagnostic, not a definitive effect witness |
-| Call-site preconditions | Opt-in analyzer, `contracts` or `all-experimental` mode | Binds source `Contract.Requires` clauses and closed parameter attributes with compiler symbols; reports only when receiver, arguments, and required prefix evaluation are exact and non-throwing and the instantiated predicate concretely evaluates to false | Unknown values, unsupported contracts, possible throws, and unsupported callables are silent |
-| Postconditions | Opt-in Windows x64 worker | Binds `Contract.Ensures`, return attributes, `Contract.Result`, and `Contract.Old`; proves bounded obligations over normal-return paths with Boolean/integer SMT and replay-gated counterexamples | This is bounded `Ensures` verification, not arbitrary deep, recursive, looping, heap, or sequence verification |
+| Effect contracts | Analyzer with `SharpProofFeatures=effects` or `all` | Computes path-insensitive may summaries for reads, writes, allocation, capabilities, exceptions, termination, and completeness; checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, and `[AllowedExceptions]` | A possible or unresolved violation produces a not-proven diagnostic, not a definitive effect witness |
+| Call-site preconditions | Analyzer with `SharpProofFeatures=contracts` or `all` | Binds source `Contract.Requires` clauses and closed parameter attributes with compiler symbols for ordinary calls and object creation; reports only when receiver, arguments, and required prefix evaluation are exact and non-throwing and the instantiated predicate concretely evaluates to false | Unknown values and possible throws remain silent at unannotated sites; unsupported explicitly selected methods report SP0047 |
+| Postconditions | Optional Windows x64 worker with `SharpProofFeatures=contracts` or `all`; strict enables the worker by default | Manifests `Contract.Ensures` and return attributes, including directly owned local-function, lambda, anonymous-method, and top-level claims, then proves admitted bounded obligations over normal-return paths with Boolean/integer SMT and replay-gated counterexamples | The additional callable forms are currently visible as `UnsupportedCallable`; `effects` excludes postcondition claims; this is bounded `Ensures` verification, not arbitrary deep, recursive, looping, heap, or sequence verification |
 | Worker body execution | Opt-in Windows x64 worker | Executes a bounded acyclic CFG model with locals, reassignment, branches, multiple returns, entry-state `Old`, supported expressions, and eligible resolved API specs | Loops, stateful instructions outside the narrow admitted model, unresolved calls, unsupported mutation, and exceeded bounds abstain |
-| `ContractFor` validation | Incremental generator loaded with any non-`off` package mode | Validates companion type and member identity, including receiver, overload, generic constraints, ref/scoped kinds, nullability, defaults, and return shape | It validates and binds existing source; it emits no generated source and does not make an unsupported contract provable |
+| `ContractFor` validation | Incremental generator loaded with any non-`off` profile | Validates companion type and member identity, including receiver, overload, generic constraints, ref/scoped kinds, nullability, defaults, and return shape | It validates and binds existing source; it emits no generated source and does not make an unsupported contract provable |
 | External calls | Analyzer and worker | Both resolve exact original symbols against `ApiSpecTable`; effect analysis can additionally consume an explicitly trusted complete effect contract | The worker does not turn arbitrary trusted metadata contracts into proof facts; missing, ambiguous, untrusted, incomplete, or target-framework-inapplicable models fail closed |
 | SMT | Worker only | Encodes supported Boolean and signed-integer obligations; creates `Proven` only after unsat-core hygiene and `Refuted` only after executable replay | No Z3 or verifier payload is loaded into the IDE analyzer |
 
@@ -85,12 +85,11 @@ constructors:
 | `[Positive]` on a return value | `result > 0` integer postcondition | Worker |
 | `[InRange(min, max)]` on a parameter | Inclusive integer precondition `min <= parameter && parameter <= max` | Analyzer call-site replay and worker entry assumptions |
 | `[InRange(min, max)]` on a return value | Inclusive integer postcondition | Worker |
-| `[Pure]` on an ordinary method or constructor | Captured as `BoundMethodContracts.IsPure` metadata | No current proof-producing consumer; it does not replace `[EnforcePure]`, an `ApiSpec`, or a trusted complete effect contract |
 
-Duplicate `[Pure]`, invalid value types, invalid ranges, and malformed intrinsic
-use make contract binding fail closed. Although attribute declarations allow
-some property and field placements, the current method binder consumes
-parameter and return-value closed clauses only.
+Invalid value types, invalid ranges, and malformed intrinsic use make contract
+binding fail closed. The three closed attributes are declared only for
+parameter and return-value targets. The inactive `[Pure]` attribute has been
+removed; `[EnforcePure]` is the implemented effect contract.
 
 `[ContractFor(typeof(Target))]` permits a static companion class to hold
 compiler-bound clauses for a target type. Instance target members use an
@@ -135,18 +134,44 @@ The table also contains compiler-bound ghost rows for `Contract.Requires`,
 contract semantics and the throwing behavior of direct `Result`/`Old`
 invocation; they are not BCL coverage.
 
-## Outcomes and cache boundary
+## Outcomes, accountability, and cache boundary
 
 - `Proven` requires a hygienic core containing only lowered facts, resolved
   specs, verified contracts, or explicit user assumptions.
 - `Refuted` requires executable replay of the candidate model. The analyzer's
   current effect may-analysis does not produce definitive effect refutations.
-- `Unknown` covers unsupported, unresolved, approximate, malformed, timed-out,
-  or exhausted analysis. Unsupported analyzer callables are silent.
-- Caller cancellation remains cancellation rather than becoming `Unknown`.
-- Only complete, validated terminal project responses are cacheable. Unknown,
-  cancellation, timeout, protocol error, malformed result, infrastructure
-  failure, and failed replay are not semantic cache entries.
+  Worker replay currently uses the lowered obligation path, not the independent
+  whole-body exact-CFG interpreter required by the 1.0 release gate.
+- `Unknown` covers unsupported, unresolved, approximate, method-time-limited,
+  or resource-exhausted claim analysis. Unsupported unannotated analyzer
+  callables are silent; unsupported selected callables produce SP0047.
+- Protocol version 3 separately records run status, callable coverage, and one
+  outcome for each stable manifest claim ID. Exact manifest/result equality is
+  mandatory.
+- The request carries `SharpProofFeatures` as `WorkerFeatureSet`.
+  `contracts` excludes effect-only annotations, `effects` excludes
+  postcondition claims and contract assumptions, and `all` selects both. The
+  current worker has no effect-proof claim kind, so an effect-selected callable
+  is explicitly incomplete rather than vacuously complete.
+- Caller cancellation is run status `Canceled`, project timeout is
+  `TimedOut`, and infrastructure/protocol/backend/replay failure is `Failed`.
+  None is a successful claim outcome.
+- Cache schema version 3 stores only complete validated payloads. Cache reads
+  are checked against the entire current manifest. Unknown, cancellation,
+  timeout, malformed result, infrastructure failure, and failed replay are not
+  semantic cache entries.
+- `SharpProofVerifyPolicy` maps incomplete selected analysis to informational,
+  warning, or error SP0047 reporting. `SharpProofAssumptionPolicy` maps user or
+  trusted evidence to SP0048. These policies do not make fatal runs successful.
+
+## Current compilation-integration gap
+
+The worker currently reconstructs a compilation from MSBuild source and
+reference lists. It does not consume the final compiler `Compilation` after
+generators. Generated trees, `AdditionalFiles`, aliases, and other compiler-only
+state are therefore not yet closed into the manifest artifact required for
+1.0. The planned compiler collector/artifact and SARIF projection are not
+implemented.
 
 See [Typed abstention reasons](unknown-reasons.md) for the exact enums and
 [Analysis limits](analysis-limits.md) for configured budgets.

@@ -6,8 +6,11 @@ The current contract is outcome-based. It intentionally does not freeze individu
 test files, public metadata, diagnostic severities, or package layout. A change
 is acceptable only when:
 
-- the supported-language gate is exhaustive and unsupported analyzer methods
-  emit no feature diagnostics;
+- the supported-language gate is exhaustive, unsupported unannotated analyzer
+  methods remain quiet, and unsupported explicitly selected methods report
+  SP0047;
+- protocol version 3 manifests every selected callable and postcondition with a
+  stable semantic ID, and every response has exact manifest/result equality;
 - every new `Proven` outcome is backed by hygienic evidence and every
   `Refuted` outcome has a replay-validated witness;
 - proof-kernel evidence and outcome construction stays within the explicit
@@ -15,8 +18,8 @@ is acceptable only when:
 - replaced frontend, dataflow, effects, and proof-kernel algorithm files stay
   within the physical-file and Roslyn member-size ratchets declared in
   `algorithm-size-ratchets.json`;
-- `Unknown`, timeout, cancellation, malformed, and infrastructure results are
-  never cached as semantic answers;
+- `Unknown`, timeout, cancellation, malformed, backend/replay, containment, and
+  infrastructure results are never cached as semantic answers;
 - cache, worklist, formatting, renaming, and concurrency variants produce the
   same canonical outcomes;
 - the snapshot includes 200-500 distinct methods from pinned, licensed OSS
@@ -37,6 +40,23 @@ constructs are outside the current contract. `Ensures` verification is limited t
 the bounded subset admitted by the worker's acyclic CFG executor; deep or
 otherwise unsupported postconditions abstain.
 
+The package defaults to `SharpProofProfile=advisory` and
+`SharpProofFeatures=all`; unannotated code remains quiet.
+The same feature selection enters the worker request and filters manifest
+discovery, so contract-only requests exclude effect annotations and effect-only
+requests exclude postcondition claims.
+`SharpProofProfile=strict` enables verification, defaults
+`SharpProofVerifyPolicy` to `require-proven`, and defaults
+`SharpProofAssumptionPolicy` to `error`. Fatal run states and refutations fail
+under every policy. `SharpProofMode` is a deprecated preview compatibility
+alias.
+
+This acceptance contract does not yet claim the final generated compiler
+compilation: the worker still reconstructs from source/reference lists. The
+planned compiler artifact, generated-tree accountability, SARIF projection,
+three-package split, protected publishing, and independent human release
+reviews remain open production gates.
+
 Changes to the trusted-kernel paths, assumption construction, complete effect
 summaries, API specifications, or proof-producing outcome construction require
 two human reviewers and a soundness note identifying the executable regression
@@ -52,7 +72,7 @@ Run the active local gate from the repository root:
 The verifier checks contract invariants and the production-size ceiling, builds
 the repository under the bounded Job Object wrapper, and runs every current
 architecture, semantic, corpus, fuzz, worker, package, cancellation, and
-performance gate. Default-off performance compares real baseline and
+performance gate. Off-profile performance compares real baseline and
 SharpProof-imported MSBuild rebuilds and separately checks the loaded-but-off
 analyzer retention boundary. The full acceptance job currently runs on Windows
 x64. Separate package-consumer CI exercises the analyzer on Windows x64, Linux

@@ -83,8 +83,8 @@ public sealed class CorpusGateTests {
             Assert.That(result.OpenSourceMethodCount, Is.EqualTo(200));
             Assert.That(result.OpenSourceFileCount, Is.EqualTo(87));
             Assert.That(result.SyntheticSeedCount, Is.EqualTo(28));
-            Assert.That(result.UnknownCount, Is.EqualTo(118));
-            Assert.That(result.SilentUnknownCount, Is.EqualTo(191));
+            Assert.That(result.UnknownCount, Is.EqualTo(299));
+            Assert.That(result.SilentUnknownCount, Is.EqualTo(10));
             Assert.That(result.TotalUnknownCount, Is.EqualTo(309));
             Assert.That(
                 result.UnknownRate,
@@ -142,9 +142,9 @@ public sealed class CorpusGateTests {
             Assert.That(silentUnknown[2], Is.EqualTo("Unknown"));
             Assert.That(silentUnknown[3], Is.Empty);
             Assert.That(openSource, Has.Length.EqualTo(4));
-            Assert.That(
-                openSource[1],
-                Is.AnyOf("Proven", "Unknown", "SilentUnknown"));
+            Assert.That(openSource[1], Is.EqualTo("Unknown"));
+            Assert.That(openSource[2], Is.EqualTo("Abstained"));
+            Assert.That(openSource[3], Does.StartWith("SP0047@Warning@"));
         }
     }
 }

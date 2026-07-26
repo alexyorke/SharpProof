@@ -96,47 +96,31 @@ public sealed record SpecEvidence(SpecEvidenceKind Kind, string Source);
 
 public sealed record SpecEffectFacet(SpecEffect Effects, SpecEvidence Evidence);
 
-public sealed record SpecAllocationFacet(
-    SpecAllocationBehavior Behavior,
-    SpecEvidence Evidence);
+public sealed record SpecAllocationFacet(SpecAllocationBehavior Behavior, SpecEvidence Evidence);
 
 public sealed record SpecThrowFacet(
-    SpecThrowBehavior Behavior,
-    ImmutableArray<string> ExceptionMetadataNames,
-    SpecEvidence Evidence);
+    SpecThrowBehavior Behavior, ImmutableArray<string> ExceptionMetadataNames, SpecEvidence Evidence);
 
 public sealed record SpecNullnessFacet(SpecNullness Result, SpecEvidence Evidence);
 
 public sealed record SpecCardinalityFacet(
-    SpecCardinality Result,
-    int? ExactCount,
-    SpecEvidence Evidence);
+    SpecCardinality Result, int? ExactCount, SpecEvidence Evidence);
 
 public sealed record ApiSpecFacets(
-    SpecEffectFacet Effects,
-    SpecAllocationFacet Allocation,
-    SpecThrowFacet Throws,
-    SpecNullnessFacet Nullness,
+    SpecEffectFacet Effects, SpecAllocationFacet Allocation,
+    SpecThrowFacet Throws, SpecNullnessFacet Nullness,
     SpecCardinalityFacet Cardinality);
 
 public sealed record ApiSpecTarget(
-    string WitnessIdentifier,
-    string DocumentationCommentId,
-    string ContainingTypeMetadataName,
-    SpecTargetMemberKind MemberKind,
-    string MemberName,
-    bool IsStatic,
-    int GenericArity,
-    SpecValueType? ReceiverType,
-    ImmutableArray<SpecValueType> ParameterTypes,
+    string WitnessIdentifier, string DocumentationCommentId,
+    string ContainingTypeMetadataName, SpecTargetMemberKind MemberKind,
+    string MemberName, bool IsStatic, int GenericArity,
+    SpecValueType? ReceiverType, ImmutableArray<SpecValueType> ParameterTypes,
     SpecValueType? ResultType);
 
 public abstract record SpecTermDeclaration(SpecValueType Type);
 
-public sealed record SpecVariableDeclaration(
-    SpecVariableRole Role,
-    int Ordinal,
-    SpecValueType Type)
+public sealed record SpecVariableDeclaration(SpecVariableRole Role, int Ordinal, SpecValueType Type)
     : SpecTermDeclaration(Type);
 
 public sealed record SpecBooleanDeclaration(bool Value)
@@ -152,42 +136,30 @@ public sealed record SpecNullDeclaration(SpecValueType Type)
     : SpecTermDeclaration(Type);
 
 public sealed record SpecUnaryDeclaration(
-    SpecUnaryOperator Operator,
-    SpecTermDeclaration Operand,
-    SpecValueType Type)
+    SpecUnaryOperator Operator, SpecTermDeclaration Operand, SpecValueType Type)
     : SpecTermDeclaration(Type);
 
 public sealed record SpecBinaryDeclaration(
-    SpecBinaryOperator Operator,
-    SpecTermDeclaration Left,
-    SpecTermDeclaration Right,
-    SpecValueType Type)
+    SpecBinaryOperator Operator, SpecTermDeclaration Left,
+    SpecTermDeclaration Right, SpecValueType Type)
     : SpecTermDeclaration(Type);
 
 public sealed record SpecConditionalDeclaration(
-    SpecTermDeclaration Condition,
-    SpecTermDeclaration WhenTrue,
-    SpecTermDeclaration WhenFalse,
-    SpecValueType Type)
+    SpecTermDeclaration Condition, SpecTermDeclaration WhenTrue,
+    SpecTermDeclaration WhenFalse, SpecValueType Type)
     : SpecTermDeclaration(Type);
 
 public sealed record SpecLengthDeclaration(SpecTermDeclaration Value)
     : SpecTermDeclaration(SpecValueType.Integer);
 
-public sealed record SpecPostconditionDeclaration(
-    SpecTermDeclaration Condition,
-    SpecEvidence Evidence);
+public sealed record SpecPostconditionDeclaration(SpecTermDeclaration Condition, SpecEvidence Evidence);
 
 public sealed record ApiSpecDeclaration(
-    ApiSpecTarget Target,
-    ApiSpecFacets Facets,
+    ApiSpecTarget Target, ApiSpecFacets Facets,
     ImmutableArray<SpecPostconditionDeclaration> Postconditions);
 
 public sealed record SpecVariableInfo(
-    SpecVarId Id,
-    SpecVariableRole Role,
-    int Ordinal,
-    SpecValueType Type);
+    SpecVarId Id, SpecVariableRole Role, int Ordinal, SpecValueType Type);
 
 public abstract record SpecTerm(SpecValueType Type);
 
@@ -206,24 +178,15 @@ public sealed record SpecStringTerm(string Value)
 public sealed record SpecNullTerm(SpecValueType Type)
     : SpecTerm(Type);
 
-public sealed record SpecUnaryTerm(
-    SpecUnaryOperator Operator,
-    SpecTerm Operand,
-    SpecValueType Type)
+public sealed record SpecUnaryTerm(SpecUnaryOperator Operator, SpecTerm Operand, SpecValueType Type)
     : SpecTerm(Type);
 
 public sealed record SpecBinaryTerm(
-    SpecBinaryOperator Operator,
-    SpecTerm Left,
-    SpecTerm Right,
-    SpecValueType Type)
+    SpecBinaryOperator Operator, SpecTerm Left, SpecTerm Right, SpecValueType Type)
     : SpecTerm(Type);
 
 public sealed record SpecConditionalTerm(
-    SpecTerm Condition,
-    SpecTerm WhenTrue,
-    SpecTerm WhenFalse,
-    SpecValueType Type)
+    SpecTerm Condition, SpecTerm WhenTrue, SpecTerm WhenFalse, SpecValueType Type)
     : SpecTerm(Type);
 
 public sealed record SpecLengthTerm(SpecTerm Value)
@@ -233,22 +196,13 @@ public sealed record SpecPostcondition(SpecTerm Condition, SpecEvidence Evidence
 
 public sealed class ApiSpecTemplate {
     internal ApiSpecTemplate(
-        SpecId id,
-        ApiSpecTarget target,
-        ApiSpecFacets facets,
-        ImmutableArray<SpecVariableInfo> variables,
-        SpecVarId? receiver,
-        ImmutableArray<SpecVarId> parameters,
-        SpecVarId? result,
+        SpecId id, ApiSpecTarget target, ApiSpecFacets facets,
+        ImmutableArray<SpecVariableInfo> variables, SpecVarId? receiver,
+        ImmutableArray<SpecVarId> parameters, SpecVarId? result,
         ImmutableArray<SpecPostcondition> postconditions) {
-        Id = id;
-        Target = target;
-        Facets = facets;
-        Variables = variables;
-        Receiver = receiver;
-        Parameters = parameters;
-        Result = result;
-        Postconditions = postconditions;
+        (Id, Target, Facets, Variables) = (id, target, facets, variables);
+        (Receiver, Parameters, Result, Postconditions) =
+            (receiver, parameters, result, postconditions);
     }
 
     public SpecId Id { get; }

@@ -1,9 +1,8 @@
 <Project>
   <PropertyGroup>
-    <SharpProofMode Condition="'$(SharpProofMode)' == ''">off</SharpProofMode>
     <SharpProofAnalyzerDirectory Condition="'$(SharpProofAnalyzerDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/analyzers/dotnet/cs'))</SharpProofAnalyzerDirectory>
     <_SharpProofAnalyzerDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>
-    <SharpProofVerify Condition="'$(SharpProofVerify)' == ''">false</SharpProofVerify>
+    <SharpProofContractForGeneratorPath Condition="'$(SharpProofContractForGeneratorPath)' == ''">$(_SharpProofAnalyzerDirectory)/SharpProof.ContractForGenerator.dll</SharpProofContractForGeneratorPath>
     <SharpProofVerifyQueryRlimit Condition="'$(SharpProofVerifyQueryRlimit)' == ''">3000000</SharpProofVerifyQueryRlimit>
     <SharpProofVerifyMethodRlimit Condition="'$(SharpProofVerifyMethodRlimit)' == ''">20000000</SharpProofVerifyMethodRlimit>
     <SharpProofVerifyMethodWallTimeMilliseconds Condition="'$(SharpProofVerifyMethodWallTimeMilliseconds)' == ''">10000</SharpProofVerifyMethodWallTimeMilliseconds>
@@ -18,6 +17,10 @@
     <SharpProofDotNetHost Condition="'$(SharpProofDotNetHost)' == ''">dotnet</SharpProofDotNetHost>
   </PropertyGroup>
   <ItemGroup>
+    <CompilerVisibleProperty Include="SharpProofProfile" />
+    <CompilerVisibleProperty Include="SharpProofFeatures" />
+    <CompilerVisibleProperty Include="SharpProofVerifyPolicy" />
+    <CompilerVisibleProperty Include="SharpProofAssumptionPolicy" />
     <CompilerVisibleProperty Include="SharpProofMode" />
   </ItemGroup>
 </Project>

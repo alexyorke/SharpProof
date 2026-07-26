@@ -18,8 +18,7 @@ internal sealed class ExternalEffectResolver {
     private readonly INamedTypeSymbol? _trustedAttribute;
 
     internal ExternalEffectResolver(
-        Compilation compilation,
-        ApiSpecTable apiSpecs)
+        Compilation compilation, ApiSpecTable apiSpecs)
         : this(
             compilation,
             new ApiSpecResolver(
@@ -30,8 +29,7 @@ internal sealed class ExternalEffectResolver {
     }
 
     internal ExternalEffectResolver(
-        Compilation compilation,
-        ResolvedApiSpecTable apiSpecs) {
+        Compilation compilation, ResolvedApiSpecTable apiSpecs) {
         _compilation = compilation ??
             throw new ArgumentNullException(nameof(compilation));
         _effectContractAttribute = compilation.GetTypeByMetadataName(
@@ -66,8 +64,7 @@ internal sealed class ExternalEffectResolver {
     }
 
     private bool TryResolveContract(
-        IMethodSymbol method,
-        out EffectSummary summary) {
+        IMethodSymbol method, out EffectSummary summary) {
         var attributes = EnumerateDirectContractAttributes(method).ToImmutableArray();
         if (attributes.IsDefaultOrEmpty || !HasValidTrustReason(method)) {
             summary = EffectSummary.Bottom;
@@ -75,12 +72,8 @@ internal sealed class ExternalEffectResolver {
         }
         EffectSummary? resolved = null;
         foreach (var attribute in attributes) {
-            if (!TryDecodeContract(method, attribute, out var candidate)) {
-                summary = EffectSummaryOperations.UnknownBoundary(
-                    EffectUncertainty.InvalidContract);
-                return true;
-            }
-            if (resolved != null && !resolved.Equals(candidate)) {
+            if (!TryDecodeContract(method, attribute, out var candidate) ||
+                resolved != null && !resolved.Equals(candidate)) {
                 summary = EffectSummaryOperations.UnknownBoundary(
                     EffectUncertainty.InvalidContract);
                 return true;
@@ -115,20 +108,16 @@ internal sealed class ExternalEffectResolver {
     }
 
     private IEnumerable<AttributeData> EnumerateDirectContractAttributes(
-        IMethodSymbol method) {
-        foreach (var attribute in method.GetAttributes())
-            if (IsEffectContract(attribute))
-                yield return attribute;
-        if (method.AssociatedSymbol is IPropertySymbol property)
-            foreach (var attribute in property.GetAttributes())
-                if (IsEffectContract(attribute))
-                    yield return attribute;
-    }
+        IMethodSymbol method) =>
+        method.GetAttributes()
+            .Concat(
+                method.AssociatedSymbol is IPropertySymbol property
+                    ? property.GetAttributes()
+                    : [])
+            .Where(IsEffectContract);
 
     private bool TryDecodeContract(
-        IMethodSymbol method,
-        AttributeData attribute,
-        out EffectSummary summary) {
+        IMethodSymbol method, AttributeData attribute, out EffectSummary summary) {
         summary = EffectSummary.Top;
         if (attribute.ConstructorArguments.Length != 1 ||
             attribute.ConstructorArguments[0].Value == null ||
@@ -206,21 +195,26 @@ internal sealed class ExternalEffectResolver {
         if ((effects & SharpProofEffect.UsesReflection) != 0)
             capabilityKinds |= EffectCapabilityKind.Reflection;
         summary = new EffectSummary(
-            reads,
-            writes,
-            allocation,
-            new EffectCapabilitySet(capabilityKinds),
-            EffectThrowSet.Create(exceptionTypes),
-            EffectTermination.Unknown,
-            EffectCompleteness.Complete,
-            EffectUncertainty.None);
+            reads, writes, allocation, new EffectCapabilitySet(capabilityKinds),
+            EffectThrowSet.Create(exceptionTypes), EffectTermination.Unknown,
+            EffectCompleteness.Complete, EffectUncertainty.None);
         return true;
     }
 
     private EffectSummary ResolveSpec(ApiSpecTemplate spec) {
         var effects = spec.Facets.Effects.Effects;
-        var reads = EffectRegionSet.Empty;
-        var writes = EffectRegionSet.Empty;
+        var reads = SpecRegions(
+            effects,
+            SpecEffect.ReadsReceiverState,
+            SpecEffect.ReadsArgumentState,
+            SpecEffect.ReadsAmbientState,
+            spec.Target.ParameterTypes.Length);
+        var writes = SpecRegions(
+            effects,
+            SpecEffect.WritesReceiverState,
+            SpecEffect.WritesArgumentState,
+            SpecEffect.WritesAmbientState,
+            spec.Target.ParameterTypes.Length);
         var capabilities = EffectCapabilityKind.None;
         var completeness = EffectCompleteness.Complete;
         if ((effects & SpecEffect.Unknown) != 0) {
@@ -230,20 +224,6 @@ internal sealed class ExternalEffectResolver {
             completeness = EffectCompleteness.Incomplete;
         }
         else {
-            if ((effects & SpecEffect.ReadsReceiverState) != 0)
-                reads = reads.Union(
-                    EffectRegionSet.Create(EffectRegionId.Receiver));
-            if ((effects & SpecEffect.ReadsArgumentState) != 0)
-                reads = reads.Union(ParameterRegions(spec.Target.ParameterTypes.Length));
-            if ((effects & SpecEffect.ReadsAmbientState) != 0)
-                reads = reads.Union(EffectRegionSet.Create(EffectRegionId.Ambient));
-            if ((effects & SpecEffect.WritesReceiverState) != 0)
-                writes = writes.Union(
-                    EffectRegionSet.Create(EffectRegionId.Receiver));
-            if ((effects & SpecEffect.WritesArgumentState) != 0)
-                writes = writes.Union(ParameterRegions(spec.Target.ParameterTypes.Length));
-            if ((effects & SpecEffect.WritesAmbientState) != 0)
-                writes = writes.Union(EffectRegionSet.Create(EffectRegionId.Ambient));
             if ((effects & SpecEffect.InputOutput) != 0) {
                 reads = reads.Union(EffectRegionSet.Create(EffectRegionId.Ambient));
                 writes = writes.Union(EffectRegionSet.Create(EffectRegionId.Ambient));
@@ -267,49 +247,50 @@ internal sealed class ExternalEffectResolver {
         };
         if (allocation == EffectAllocationKind.Unknown)
             completeness = EffectCompleteness.Incomplete;
-        EffectThrowSet throws;
-        switch (spec.Facets.Throws.Behavior) {
-            case SpecThrowBehavior.DoesNotThrow:
-                throws = EffectThrowSet.Empty;
-                break;
-            case SpecThrowBehavior.MayThrow:
-                throws = ResolveExceptionSet(
-                    spec.Facets.Throws.ExceptionMetadataNames);
-                if (throws.IsEmpty || throws.IncludesUnknown) {
-                    throws = EffectThrowSet.Unknown;
-                    completeness = EffectCompleteness.Incomplete;
-                }
-                break;
-            case SpecThrowBehavior.Unknown:
-                throws = EffectThrowSet.Unknown;
-                completeness = EffectCompleteness.Incomplete;
-                break;
-            default:
-                throws = EffectThrowSet.Unknown;
-                completeness = EffectCompleteness.Incomplete;
-                break;
+        var throwBehavior = spec.Facets.Throws.Behavior;
+        var throws = throwBehavior switch {
+            SpecThrowBehavior.DoesNotThrow => EffectThrowSet.Empty,
+            SpecThrowBehavior.MayThrow => ResolveExceptionSet(
+                spec.Facets.Throws.ExceptionMetadataNames),
+            _ => EffectThrowSet.Unknown
+        };
+        if (throwBehavior != SpecThrowBehavior.DoesNotThrow &&
+            (throwBehavior != SpecThrowBehavior.MayThrow ||
+             throws.IsEmpty ||
+             throws.IncludesUnknown)) {
+            throws = EffectThrowSet.Unknown;
+            completeness = EffectCompleteness.Incomplete;
         }
         return new EffectSummary(
-            reads,
-            writes,
-            allocation,
-            new EffectCapabilitySet(capabilities),
-            throws,
-            EffectTermination.Unknown,
-            completeness);
+            reads, writes, allocation, new EffectCapabilitySet(capabilities),
+            throws, EffectTermination.Unknown, completeness);
+    }
+
+    private static EffectRegionSet SpecRegions(
+        SpecEffect effects, SpecEffect receiverEffect,
+        SpecEffect argumentEffect, SpecEffect ambientEffect, int parameterCount) {
+        var regions = EffectRegionSet.Empty;
+        if ((effects & receiverEffect) != 0)
+            regions = regions.Union(EffectRegionSet.Create(EffectRegionId.Receiver));
+        if ((effects & argumentEffect) != 0)
+            regions = regions.Union(ParameterRegions(parameterCount));
+        if ((effects & ambientEffect) != 0)
+            regions = regions.Union(EffectRegionSet.Create(EffectRegionId.Ambient));
+        return regions;
     }
 
     private bool IsEffectContract(AttributeData attribute) =>
-        _effectContractAttribute != null &&
-        SymbolEqualityComparer.Default.Equals(
-            attribute.AttributeClass?.OriginalDefinition,
-            _effectContractAttribute.OriginalDefinition);
+        IsAttribute(attribute, _effectContractAttribute);
 
     private bool IsTrusted(AttributeData attribute) =>
-        _trustedAttribute != null &&
+        IsAttribute(attribute, _trustedAttribute);
+
+    private static bool IsAttribute(
+        AttributeData attribute, INamedTypeSymbol? attributeType) =>
+        attributeType != null &&
         SymbolEqualityComparer.Default.Equals(
             attribute.AttributeClass?.OriginalDefinition,
-            _trustedAttribute.OriginalDefinition);
+            attributeType.OriginalDefinition);
 
     private bool IsException(INamedTypeSymbol type) {
         if (_exceptionType == null) return false;
@@ -322,9 +303,7 @@ internal sealed class ExternalEffectResolver {
     }
 
     private static EffectRegionSet ContractRegions(
-        IMethodSymbol method,
-        SharpProofEffect effects,
-        bool isWrite) {
+        IMethodSymbol method, SharpProofEffect effects, bool isWrite) {
         var result = EffectRegionSet.Empty;
         var receiverFlag = isWrite
             ? SharpProofEffect.WritesReceiverState
@@ -366,37 +345,34 @@ internal sealed class ExternalEffectResolver {
         (EffectCapabilityKind)(int)capabilities;
 
     private static bool TryConvertEffects(
-        object value,
-        out SharpProofEffect effects) {
-        try {
-            effects = (SharpProofEffect)Convert.ToInt64(
-                value,
-                CultureInfo.InvariantCulture);
-            return true;
-        }
-        catch (Exception exception) when (
-            exception is InvalidCastException or
-            FormatException or
-            OverflowException) {
-            effects = SharpProofEffect.None;
-            return false;
-        }
+        object value, out SharpProofEffect effects) {
+        var converted = TryConvertEnumValue(value, wide: true, out var result);
+        effects = converted ? (SharpProofEffect)result : SharpProofEffect.None;
+        return converted;
     }
 
     private static bool TryConvertCapabilities(
-        object value,
-        out SharpProofCapability capabilities) {
+        object value, out SharpProofCapability capabilities) {
+        var converted = TryConvertEnumValue(value, wide: false, out var result);
+        capabilities = converted
+            ? (SharpProofCapability)result
+            : SharpProofCapability.None;
+        return converted;
+    }
+
+    private static bool TryConvertEnumValue(
+        object value, bool wide, out long result) {
         try {
-            capabilities = (SharpProofCapability)Convert.ToInt32(
-                value,
-                CultureInfo.InvariantCulture);
+            result = wide
+                ? Convert.ToInt64(value, CultureInfo.InvariantCulture)
+                : Convert.ToInt32(value, CultureInfo.InvariantCulture);
             return true;
         }
         catch (Exception exception) when (
             exception is InvalidCastException or
             FormatException or
             OverflowException) {
-            capabilities = SharpProofCapability.None;
+            result = 0;
             return false;
         }
     }

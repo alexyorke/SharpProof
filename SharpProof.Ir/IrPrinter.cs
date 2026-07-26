@@ -23,29 +23,23 @@ public sealed class IrPrinter(IrFactory factory) {
                 AppendQuoted(builder, _factory.GetString(text.Value));
                 break;
             case IrNullTerm:
-                builder.Append("((");
-                builder.Append(GetTypeName(term.Type));
-                builder.Append(")null)");
+                builder.Append("((").Append(GetTypeName(term.Type)).Append(")null)");
                 break;
             case IrVariableTerm variable:
-                builder.Append('v');
-                builder.Append(variable.Variable.Value.ToString(CultureInfo.InvariantCulture));
+                builder.Append('v').Append(variable.Variable.Value.ToString(CultureInfo.InvariantCulture));
                 break;
             case IrOpaqueTerm opaque:
                 AppendOpaque(builder, opaque);
                 break;
             case IrUnaryTerm unary:
-                builder.Append('(');
-                builder.Append(unary.Operator == IrUnaryOperator.Not ? '!' : '-');
+                builder.Append('(').Append(unary.Operator == IrUnaryOperator.Not ? '!' : '-');
                 Append(builder, unary.Operand);
                 builder.Append(')');
                 break;
             case IrBinaryTerm binary:
                 builder.Append('(');
                 Append(builder, binary.Left);
-                builder.Append(' ');
-                builder.Append(GetBinaryToken(binary.Operator));
-                builder.Append(' ');
+                builder.Append(' ').Append(GetBinaryToken(binary.Operator)).Append(' ');
                 Append(builder, binary.Right);
                 builder.Append(')');
                 break;
@@ -59,9 +53,7 @@ public sealed class IrPrinter(IrFactory factory) {
                 builder.Append(')');
                 break;
             case IrCastTerm cast:
-                builder.Append("((");
-                builder.Append(GetTypeName(cast.Type));
-                builder.Append(')');
+                builder.Append("((").Append(GetTypeName(cast.Type)).Append(')');
                 Append(builder, cast.Operand);
                 builder.Append(')');
                 break;
@@ -82,16 +74,11 @@ public sealed class IrPrinter(IrFactory factory) {
     }
 
     private void AppendOpaque(StringBuilder builder, IrOpaqueTerm opaque) {
-        if (opaque.Purity == IrOpaquePurity.Pure) {
-            builder.Append("pure:");
-        }
+        if (opaque.Purity == IrOpaquePurity.Pure) builder.Append("pure:");
         else {
-            builder.Append("impure:");
-            builder.Append(opaque.Operation);
-            builder.Append(':');
+            builder.Append("impure:").Append(opaque.Operation).Append(':');
         }
-        builder.Append(opaque.Member);
-        builder.Append('(');
+        builder.Append(opaque.Member).Append('(');
         if (opaque.Receiver != null) {
             Append(builder, opaque.Receiver);
             if (!opaque.Arguments.IsDefaultOrEmpty) builder.Append("; ");
@@ -129,32 +116,22 @@ public sealed class IrPrinter(IrFactory factory) {
     private static void AppendQuoted(StringBuilder builder, string value) {
         builder.Append('"');
         foreach (var character in value) {
-            switch (character) {
-                case '"':
-                    builder.Append("\\\"");
-                    break;
-                case '\\':
-                    builder.Append("\\\\");
-                    break;
-                case '\n':
-                    builder.Append("\\n");
-                    break;
-                case '\r':
-                    builder.Append("\\r");
-                    break;
-                case '\t':
-                    builder.Append("\\t");
-                    break;
-                default:
-                    if (character is < ' ' or > '~') {
-                        builder.Append("\\u");
-                        builder.Append(((int)character).ToString("X4", CultureInfo.InvariantCulture));
-                    }
-                    else {
-                        builder.Append(character);
-                    }
-                    break;
+            var escape = character switch {
+                '"' => "\\\"",
+                '\\' => "\\\\",
+                '\n' => "\\n",
+                '\r' => "\\r",
+                '\t' => "\\t",
+                _ => null
+            };
+            if (escape != null) {
+                builder.Append(escape);
+                continue;
             }
+            if (character is < ' ' or > '~')
+                builder.Append("\\u").Append(
+                    ((int)character).ToString("X4", CultureInfo.InvariantCulture));
+            else builder.Append(character);
         }
         builder.Append('"');
     }

@@ -40,10 +40,8 @@ public sealed class IrProgramBuilder(IrFactory factory) {
     }
 
     public IrSequenceLocation SequenceLocation(IrTerm sequence, IrTerm index) {
-        if (sequence == null) throw new ArgumentNullException(nameof(sequence));
-        if (index == null) throw new ArgumentNullException(nameof(index));
-        _factory.EnsureTerm(sequence, nameof(sequence));
-        _factory.EnsureTerm(index, nameof(index));
+        ValidateTerm(sequence, nameof(sequence));
+        ValidateTerm(index, nameof(index));
         var sequenceType = _factory.GetTypeInfo(sequence.Type);
         if (sequenceType.Kind != IrTypeKind.Sequence ||
             sequenceType.ElementType == null)
@@ -68,10 +66,9 @@ public sealed class IrProgramBuilder(IrFactory factory) {
         var variable = _factory.GetVariableInfo(target);
         ValidateOperation(operation);
         ValidateTerm(value, nameof(value));
-        if (variable.Type != value.Type)
-            throw new ArgumentException(
-                "The assigned value does not match the target type.",
-                nameof(value));
+        RequireSameType(
+            variable.Type, value.Type,
+            "The assigned value does not match the target type.", nameof(value));
         return Append(
             block,
             id => new IrAssignInstruction(id, operation, target, value));
@@ -85,10 +82,9 @@ public sealed class IrProgramBuilder(IrFactory factory) {
         var variable = _factory.GetVariableInfo(target);
         ValidateOperation(operation);
         ValidateLocation(location);
-        if (variable.Type != location.Type)
-            throw new ArgumentException(
-                "The loaded location does not match the target type.",
-                nameof(location));
+        RequireSameType(
+            variable.Type, location.Type,
+            "The loaded location does not match the target type.", nameof(location));
         return Append(
             block,
             id => new IrLoadInstruction(id, operation, target, location));
@@ -102,10 +98,9 @@ public sealed class IrProgramBuilder(IrFactory factory) {
         ValidateOperation(operation);
         ValidateLocation(location);
         ValidateTerm(value, nameof(value));
-        if (location.Type != value.Type)
-            throw new ArgumentException(
-                "The stored value does not match the location type.",
-                nameof(value));
+        RequireSameType(
+            location.Type, value.Type,
+            "The stored value does not match the location type.", nameof(value));
         return Append(
             block,
             id => new IrStoreInstruction(id, operation, location, value));
@@ -284,10 +279,9 @@ public sealed class IrProgramBuilder(IrFactory factory) {
                     member.Receiver,
                     member.Arguments,
                     nameof(location));
-                if (memberInfo.ReturnType != member.Type)
-                    throw new ArgumentException(
-                        "The member location has an invalid type.",
-                        nameof(location));
+                RequireSameType(
+                    memberInfo.ReturnType, member.Type,
+                    "The member location has an invalid type.", nameof(location));
                 break;
             case IrSequenceLocation sequence:
                 ValidateTerm(sequence.Sequence, nameof(location));
@@ -357,6 +351,11 @@ public sealed class IrProgramBuilder(IrFactory factory) {
 
     private void ValidateOperation(OperationId operation) =>
         _factory.GetOperationInfo(operation);
+
+    private static void RequireSameType(
+        IrTypeId actual, IrTypeId expected, string detail, string parameterName) {
+        if (actual != expected) throw new ArgumentException(detail, parameterName);
+    }
 
     private void EnsureMutable() {
         if (_built)

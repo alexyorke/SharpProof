@@ -6,18 +6,24 @@ SharpProof has two kinds of limits:
 - acceptance-only thresholds used to decide whether the repository is
   releasable.
 
-They have different sources. `SharpProof.Package/buildTransitive/SharpProof.props`
-defines package defaults. `SharpProof.Worker.Protocol/ProtocolModel.cs` defines
-matching protocol defaults and validation bounds. The release gate mirrors
-selected values in `eng/acceptance/contract.json` and verifies that they
-agree.
+They have different sources.
+`SharpProof.Package/buildTransitive/SharpProof.props` defines fixed worker
+defaults and compiler-visible properties; `SharpProof.targets` resolves profile,
+feature, and policy defaults. `SharpProof.Worker.Protocol/ProtocolModel.cs`
+defines matching protocol defaults and validation bounds. The release gate
+mirrors selected values in `eng/acceptance/contract.json` and verifies that
+they agree.
 
 ## Package and worker defaults
 
 | MSBuild property | Default | Purpose | Authoritative source |
 |---|---:|---|---|
-| `SharpProofMode` | `off` | Analyzer activation mode | `SharpProof.props`; mirrored by `contract.json` |
-| `SharpProofVerify` | `false` | Opt-in worker execution | `SharpProof.props` |
+| `SharpProofProfile` | `advisory` | Analyzer/build posture: `advisory`, `strict`, or `off` | `SharpProof.targets`; mirrored by `contract.json` |
+| `SharpProofFeatures` | `all` | Analyzer and worker-manifest features: `effects`, `contracts`, or `all` | `SharpProof.targets`; mirrored by `contract.json` |
+| `SharpProofVerifyPolicy` | `advisory`; strict defaults to `require-proven` | Incomplete selected-analysis policy: `advisory`, `warn-on-unknown`, or `require-proven` | `SharpProof.targets`; mirrored by `contract.json` |
+| `SharpProofAssumptionPolicy` | `allow`; strict defaults to `error` | User/trusted evidence policy: `allow`, `warn`, or `error` | `SharpProof.targets`; mirrored by `contract.json` |
+| `SharpProofMode` | unset | Deprecated preview alias for profile/features | `SharpProof.targets` |
+| `SharpProofVerify` | `false`; strict requires `true` | Optional advisory worker execution; mandatory in strict | `SharpProof.targets` |
 | `SharpProofVerifyQueryRlimit` | `3000000` | Z3 resource limit for one query | `SharpProof.props` and `WorkerBudgets`; mirrored by `contract.json` |
 | `SharpProofVerifyMethodRlimit` | `20000000` | Aggregate resource allowance for one method | `SharpProof.props` and `WorkerBudgets`; mirrored by `contract.json` |
 | `SharpProofVerifyMethodWallTimeMilliseconds` | `10000` | Outer method wall boundary | `SharpProof.props` and `WorkerBudgets`; mirrored as 10 seconds by `contract.json` |
@@ -35,13 +41,20 @@ agree.
 the project's intermediate output, normally
 `obj/<Configuration>/<TargetFramework>/SharpProof/cache`.
 `SharpProofVerifyRequestFile` and `SharpProofVerifyResultFile` are initialized
-beside it.
+beside it. Concurrent builds use isolated invocation paths beneath
+`SharpProof/runs`. Validated writers are serialized by a cross-process mutex;
+each stable file is atomically replaced, with rollback if the second replacement
+fails. This preserves the completed pair but is not an instantaneous two-file
+transaction.
 
-The package accepts `SharpProofMode` values `off`, `effects`, `contracts`, and
-`all-experimental`. `SharpProofVerify=true` invokes the packaged worker target
-only for non-design-time Windows builds; the shipped native payload is
-supported on Windows x64. Non-Windows hosts receive an explicit
-unsupported-host build error; analyzer modes remain available.
+`SharpProofMode` values `off`, `effects`, `contracts`, and `all-experimental`
+remain deprecated compatibility inputs during preview. Do not combine the
+alias with `SharpProofProfile` or `SharpProofFeatures`.
+`SharpProofVerify=true` invokes the packaged worker target only for
+non-design-time Windows builds; the shipped native payload is supported on
+Windows x64. Non-Windows hosts receive an explicit unsupported-host build
+error; portable analyzer features remain available. Strict rejects
+`SharpProofVerify=false`.
 
 ## Protocol validation bounds
 
@@ -63,7 +76,13 @@ process boundary.
 
 Every effective compilation option and budget participates in worker input and
 cache identity. Changing a limit cannot reuse an answer produced under a
-different limit.
+different limit. Verification and assumption policy are reporting/build
+policies, not semantic proof inputs, so they do not alter the semantic cache
+payload.
+
+`SharpProofFeatures` is a semantic request input. `contracts` excludes
+effect-only annotations from the manifest; `effects` excludes postcondition
+claims and contract assumptions; `all` includes both.
 
 ## Fixed worker body bounds
 
@@ -80,6 +99,12 @@ Crossing one of these bounds returns `Unknown` with `UnsupportedBody`; it does
 not produce a partial proof. Loops are rejected by the acyclic-body check
 before symbolic execution.
 
+The manifest discovers local functions, lambdas, anonymous methods, and the
+top-level entry point, including their directly owned postconditions. These
+forms currently remain outside worker execution and produce
+`UnsupportedCallable`; nested clauses are assigned only to their owning
+callable.
+
 ## Acceptance-only thresholds
 
 These values come from `eng/acceptance/contract.json`. They are repository
@@ -94,8 +119,8 @@ release gates, not end-user MSBuild defaults.
 | Forced termination | At most 1,000 ms |
 | Performance warmups | 5 |
 | Performance samples | 30 |
-| Default-off median ratio | At most 1.10 |
-| Default-off p95 ratio | At most 1.20 |
+| Off-profile median ratio | At most 1.10 |
+| Off-profile p95 ratio | At most 1.20 |
 | Retained-memory ratio | At most 1.05 |
 | Retained-memory absolute increase | At most 32 MiB |
 | Enabled analyzer retained compilations | 0 |
@@ -104,9 +129,9 @@ release gates, not end-user MSBuild defaults.
 | IDE edit p95 | At most 100 ms |
 | IDE edit maximum | At most 250 ms |
 
-The active contract also fixes protocol version 2, cache schema version 2, the
-trusted-kernel path/LOC boundary, and the reference surfaces
-`netstandard2.0`, `net8.0`, and `net472`.
+The active contract also fixes protocol version 3, cache schema version 3, and
+manifest schema version 1, along with the trusted-kernel path/LOC boundary and
+the reference surfaces `netstandard2.0`, `net8.0`, and `net472`.
 
 Unknown rate is reported by the corpus as explicit, silent, and total metrics;
 it is not a release threshold.
@@ -115,10 +140,12 @@ it is not a release threshold.
 
 No timeout, resource exhaustion, unsupported encoding, malformed result,
 backend failure, or exceeded expression depth is promoted to `Proven` or
-`Refuted`. A method-level boundary becomes a typed worker `Unknown`; a
-project-level boundary marks unfinished records with `ProjectTimeout`.
-Caller cancellation remains cancellation.
+`Refuted`. A method-level semantic boundary becomes a typed claim `Unknown`.
+Project timeout and caller cancellation use separate `TimedOut` and `Canceled`
+run statuses. Malformed output, backend/replay failure, containment failure,
+and infrastructure failure make the run `Failed` and fail the build under
+every policy.
 
-Only complete hygienic `Proven` and replay-validated `Refuted` project
-responses can enter the semantic cache. See
+Only exact-manifest, complete hygienic `Proven` and replay-validated `Refuted`
+project responses can enter the semantic cache. See
 [Typed abstention reasons](unknown-reasons.md) for exact reason values.

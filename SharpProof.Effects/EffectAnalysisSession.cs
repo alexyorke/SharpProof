@@ -1,11 +1,9 @@
 namespace SharpProof.Effects;
 
 public sealed class EffectMethodResult {
-    internal EffectMethodResult(IMethodSymbol method, EffectSummary summary) {
-        Method = method;
-        Summary = summary;
-        Projection = EffectSummaryProjector.Project(summary);
-    }
+    internal EffectMethodResult(IMethodSymbol method, EffectSummary summary) =>
+        (Method, Summary, Projection) =
+            (method, summary, EffectSummaryProjector.Project(summary));
 
     public IMethodSymbol Method { get; }
     public EffectSummary Summary { get; }
@@ -26,8 +24,7 @@ public sealed class EffectAnalysisSession {
     private ImmutableArray<IMethodSymbol> _orderedMethods;
 
     public EffectAnalysisSession(
-        Compilation compilation,
-        ApiSpecTable? apiSpecs = null)
+        Compilation compilation, ApiSpecTable? apiSpecs = null)
         : this(
             compilation,
             new ApiSpecResolver(apiSpecs ?? ApiSpecTable.Default)
@@ -37,8 +34,7 @@ public sealed class EffectAnalysisSession {
     }
 
     internal EffectAnalysisSession(
-        Compilation compilation,
-        ResolvedApiSpecTable apiSpecs) {
+        Compilation compilation, ResolvedApiSpecTable apiSpecs) {
         _compilation = compilation ??
             throw new ArgumentNullException(nameof(compilation));
         _conditionalAttribute = compilation.GetTypeByMetadataName(
@@ -52,8 +48,7 @@ public sealed class EffectAnalysisSession {
     internal ResolvedApiSpecTable ApiSpecs => _external.ApiSpecs;
 
     public EffectMethodResult Analyze(
-        IMethodSymbol method,
-        CancellationToken cancellationToken = default) {
+        IMethodSymbol method, CancellationToken cancellationToken = default) {
         if (method == null) throw new ArgumentNullException(nameof(method));
         cancellationToken.ThrowIfCancellationRequested();
         var normalized = NormalizeMethod(method);
@@ -78,10 +73,8 @@ public sealed class EffectAnalysisSession {
     }
 
     internal EffectSummary ResolveCall(
-        IMethodSymbol target,
-        EffectRegionSet receiver,
-        ImmutableArray<EffectRegionSet> arguments,
-        bool dispatchUncertain,
+        IMethodSymbol target, EffectRegionSet receiver,
+        ImmutableArray<EffectRegionSet> arguments, bool dispatchUncertain,
         List<EffectCallSite> sourceCalls) {
         if (target.ReducedFrom != null) {
             arguments = [receiver, .. arguments];
@@ -133,8 +126,7 @@ public sealed class EffectAnalysisSession {
     }
 
     private ImmutableHashSet<string> GetDefinedPreprocessorSymbols(
-        SyntaxTree tree,
-        Microsoft.CodeAnalysis.CSharp.CSharpParseOptions options) {
+        SyntaxTree tree, Microsoft.CodeAnalysis.CSharp.CSharpParseOptions options) {
         if (_definedPreprocessorSymbols.TryGetValue(tree, out var cached))
             return cached;
         var definedSymbols = options.PreprocessorSymbolNames
@@ -171,8 +163,7 @@ public sealed class EffectAnalysisSession {
     }
 
     internal EffectSummary ResolveStaticFieldTypeInitialization(
-        IMethodSymbol caller,
-        IFieldSymbol field) {
+        IMethodSymbol caller, IFieldSymbol field) {
         var normalizedTarget = field.ContainingType.OriginalDefinition;
         if (caller.MethodKind == MethodKind.StaticConstructor &&
             SymbolEqualityComparer.Default.Equals(
@@ -293,8 +284,7 @@ public sealed class EffectAnalysisSession {
     }
 
     private EffectMethodNode BuildNode(
-        IMethodSymbol method,
-        CancellationToken cancellationToken) {
+        IMethodSymbol method, CancellationToken cancellationToken) {
         var calls = new List<EffectCallSite>();
         var root = GetOperationRoot(method, cancellationToken);
         if (root == null)
@@ -305,36 +295,28 @@ public sealed class EffectAnalysisSession {
                 []);
         var scanner = new OperationEffectScanner(this, method, calls, root);
         var graph = TryCreateControlFlowGraph(root, cancellationToken);
-        EffectSummary localSummary;
-        if (graph == null) {
-            localSummary = EffectSummaryDomain.Instance.Join(
+        var localSummary = graph == null
+            ? EffectSummaryOperations.Join(
                 scanner.Scan(root),
-                EffectSummaryOperations.Unsupported());
-        }
-        else {
-            localSummary = AnalyzeControlFlowGraph(graph, scanner);
-        }
-        localSummary = EffectSummaryDomain.Instance.Join(
+                EffectSummaryOperations.Unsupported())
+            : AnalyzeControlFlowGraph(graph, scanner);
+        localSummary = EffectSummaryOperations.Join(
             localSummary,
-            scanner.ScanLexicalControlEffects(root));
-        localSummary = EffectSummaryDomain.Instance.Join(
-            localSummary,
+            scanner.ScanLexicalControlEffects(root),
             ScanConstructorMemberInitializers(
                 method,
                 scanner,
-                cancellationToken));
-        if (CanTriggerOwnTypeInitialization(method) &&
-            HasPotentialStaticInitialization(method.ContainingType))
-            localSummary = EffectSummaryDomain.Instance.Join(
-                localSummary,
-                EffectSummaryOperations.UnknownBoundary(
-                    EffectUncertainty.UnmodeledCall));
+                cancellationToken),
+            CanTriggerOwnTypeInitialization(method) &&
+            HasPotentialStaticInitialization(method.ContainingType)
+                ? EffectSummaryOperations.UnknownBoundary(
+                    EffectUncertainty.UnmodeledCall)
+                : EffectSummary.Empty);
         return new EffectMethodNode(method, localSummary, [.. calls]);
     }
 
     private EffectSummary ScanConstructorMemberInitializers(
-        IMethodSymbol method,
-        OperationEffectScanner scanner,
+        IMethodSymbol method, OperationEffectScanner scanner,
         CancellationToken cancellationToken) {
         var staticInitializers = method.MethodKind == MethodKind.StaticConstructor;
         if (!staticInitializers &&
@@ -379,16 +361,14 @@ public sealed class EffectAnalysisSession {
         return summary;
     }
 
-    private static bool HasPotentialStaticInitialization(INamedTypeSymbol type) {
-        foreach (var constructor in type.StaticConstructors)
-            if (!constructor.IsImplicitlyDeclared)
-                return true;
-        return type.GetMembers().Any(member =>
+    private static bool HasPotentialStaticInitialization(INamedTypeSymbol type) =>
+        type.StaticConstructors.Any(static constructor =>
+            !constructor.IsImplicitlyDeclared) ||
+        type.GetMembers().Any(member =>
             !member.IsImplicitlyDeclared &&
             IsInitializableMember(member, staticInitializers: true) &&
             member.DeclaringSyntaxReferences.Any(reference =>
                 GetInitializerExpression(reference.GetSyntax()) != null));
-    }
 
     private static bool CanTriggerOwnTypeInitialization(IMethodSymbol method) =>
         method.MethodKind == MethodKind.Constructor ||
@@ -396,8 +376,7 @@ public sealed class EffectAnalysisSession {
         method.MethodKind != MethodKind.StaticConstructor;
 
     private static bool IsInitializableMember(
-        ISymbol member,
-        bool staticInitializers) =>
+        ISymbol member, bool staticInitializers) =>
         member switch {
             IFieldSymbol field =>
                 !field.IsConst &&
@@ -419,28 +398,24 @@ public sealed class EffectAnalysisSession {
         };
 
     private static EffectSummary AnalyzeControlFlowGraph(
-        ControlFlowGraph graph,
-        OperationEffectScanner scanner) {
+        ControlFlowGraph graph, OperationEffectScanner scanner) {
         var blocks = new List<DataflowBlock<EffectSummary>>(graph.Blocks.Length);
         var edges = new List<DataflowEdge>();
         foreach (var block in graph.Blocks) {
             var blockSummary = EffectSummary.Empty;
             if (block.IsReachable) {
-                foreach (var operation in block.Operations)
-                    blockSummary = EffectSummaryDomain.Instance.Join(
-                        blockSummary,
-                        scanner.Scan(operation));
+                blockSummary = EffectSummaryOperations.JoinFrom(
+                    EffectSummary.Empty,
+                    block.Operations.Select(scanner.Scan));
                 if (block.BranchValue != null)
-                    blockSummary = EffectSummaryDomain.Instance.Join(
+                    blockSummary = EffectSummaryOperations.Join(
                         blockSummary,
                         scanner.Scan(block.BranchValue));
-                blockSummary = EffectSummaryDomain.Instance.Join(
+                blockSummary = EffectSummaryOperations.Join(
                     blockSummary,
                     scanner.ScanExceptionalBranch(
                         block.FallThroughSuccessor,
-                        block.BranchValue));
-                blockSummary = EffectSummaryDomain.Instance.Join(
-                    blockSummary,
+                        block.BranchValue),
                     scanner.ScanExceptionalBranch(
                         block.ConditionalSuccessor,
                         block.BranchValue));
@@ -462,29 +437,26 @@ public sealed class EffectAnalysisSession {
             dataflowGraph,
             EffectSummaryDomain.Instance,
             EffectSummary.Empty);
-        var summary = EffectSummary.Empty;
-        foreach (var output in result.OutputStates)
-            summary = EffectSummaryDomain.Instance.Join(summary, output);
+        var summary = EffectSummaryOperations.JoinFrom(
+            EffectSummary.Empty,
+            result.OutputStates);
         if (graph.Blocks.Any(block =>
                 block.IsReachable &&
                 dataflowGraph.IsCyclicBlock(block.Ordinal)))
-            summary = EffectSummaryDomain.Instance.Join(
+            summary = EffectSummaryOperations.Join(
                 summary,
                 EffectSummaryOperations.MayDiverge());
         return summary;
     }
 
     private static void AddEdge(
-        int source,
-        BasicBlock? destination,
-        List<DataflowEdge> edges) {
+        int source, BasicBlock? destination, List<DataflowEdge> edges) {
         if (destination != null)
             edges.Add(new DataflowEdge(source, destination.Ordinal));
     }
 
     private IOperation? GetOperationRoot(
-        IMethodSymbol method,
-        CancellationToken cancellationToken) {
+        IMethodSymbol method, CancellationToken cancellationToken) {
         foreach (var syntaxReference in method.DeclaringSyntaxReferences
                      .OrderBy(static reference => reference.SyntaxTree.FilePath, StringComparer.Ordinal)
                      .ThenBy(static reference => reference.Span.Start)) {
@@ -508,8 +480,7 @@ public sealed class EffectAnalysisSession {
     }
 
     private static ControlFlowGraph? TryCreateControlFlowGraph(
-        IOperation root,
-        CancellationToken cancellationToken) {
+        IOperation root, CancellationToken cancellationToken) {
         try {
             return root switch {
                 IMethodBodyOperation method =>
@@ -592,19 +563,13 @@ public sealed class EffectAnalysisSession {
     }
 }
 
-internal sealed class EffectMethodNode {
-    internal EffectMethodNode(
-        IMethodSymbol method,
-        EffectSummary localSummary,
-        ImmutableArray<EffectCallSite> calls) {
-        Method = method;
-        LocalSummary = localSummary;
-        Calls = calls;
-    }
-
-    internal IMethodSymbol Method { get; }
-    internal EffectSummary LocalSummary { get; }
-    internal ImmutableArray<EffectCallSite> Calls { get; }
+internal sealed class EffectMethodNode(
+    IMethodSymbol method,
+    EffectSummary localSummary,
+    ImmutableArray<EffectCallSite> calls) {
+    internal IMethodSymbol Method { get; } = method;
+    internal EffectSummary LocalSummary { get; } = localSummary;
+    internal ImmutableArray<EffectCallSite> Calls { get; } = calls;
 }
 
 internal sealed class EffectMethodComparer : IComparer<IMethodSymbol> {

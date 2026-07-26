@@ -231,6 +231,19 @@ $repositoryDocumentPrefix =
 foreach ($relativePath in $maintainedDocuments) {
     Assert-LfUtf8Document $relativePath
     Assert-MarkdownLinks $relativePath
+    $maintainedText = Get-RequiredText $relativePath
+    foreach ($obsoleteWorkerTerm in @(
+            'WorkerVerificationStatus',
+            'WorkerVerificationReason',
+            'DeepEnsures')) {
+        if ($maintainedText.Contains(
+                $obsoleteWorkerTerm,
+                [StringComparison]::Ordinal)) {
+            throw (
+                "Maintained documentation still uses obsolete worker term " +
+                "'$obsoleteWorkerTerm': $relativePath")
+        }
+    }
 }
 foreach ($relativePath in @(
         'SharpProof.Analyzer\GeneratedDiagnosticDescriptors.cs',
@@ -249,19 +262,32 @@ $packageVersion = $versionExpression.Replace(
 $readme = Get-RequiredText 'README.md'
 $requiredReadmeText = @(
     $packageVersion,
-    'sharpproof_mode',
+    'SharpProofProfile',
+    'SharpProofFeatures',
+    'SharpProofVerifyPolicy',
+    'SharpProofAssumptionPolicy',
     'SharpProofVerify=true',
     'SharpProof.Worker',
+    'SP0047',
+    'SP0048',
     'SP0027',
     'Proven',
     'Refuted',
     'Unknown',
     'SHARPPROOF_CONTRACTS',
     'Windows x64',
+    'protocol version 3',
+    'compiler artifact',
+    'SARIF',
     'docs/README.md'
 )
 $forbiddenReadmeText = @(
-    'Deep Ensures'
+    'Deep Ensures',
+    'DeepEnsures',
+    'WorkerVerificationStatus',
+    'WorkerVerificationReason',
+    'protocol version 2',
+    'cache schema version 2'
 )
 foreach ($required in $requiredReadmeText) {
     if (-not $readme.Contains($required, [StringComparison]::Ordinal)) {
@@ -276,23 +302,27 @@ foreach ($forbidden in $forbiddenReadmeText) {
 
 $configurationSource = Get-RequiredText (
     'SharpProof.Analyzer\Configuration\AnalyzerConfigurationOptionRegistry.cs')
-$configurationMatch = [regex]::Match(
+$configurationOptions = [regex]::Matches(
     $configurationSource,
-    '"sharpproof_mode"\s*,\s*\[(?<values>[^\]]+)\]',
+    'new\("(?<key>sharpproof_[^"]+)"\s*,\s*\[(?<values>[^\]]+)\]',
     [System.Text.RegularExpressions.RegexOptions]::Singleline)
-if (-not $configurationMatch.Success) {
-    throw 'Could not derive sharpproof_mode values from the analyzer registry.'
+if ($configurationOptions.Count -eq 0) {
+    throw 'Could not derive analyzer options from the analyzer registry.'
 }
-$modes = @(
-    [regex]::Matches(
-        $configurationMatch.Groups['values'].Value,
+foreach ($option in $configurationOptions) {
+    $key = $option.Groups['key'].Value
+    if (-not $readme.Contains($key, [StringComparison]::Ordinal)) {
+        throw "README.md is missing analyzer option '$key'."
+    }
+    $values = [regex]::Matches(
+        $option.Groups['values'].Value,
         '"(?<value>[^"]+)"') |
         ForEach-Object { $_.Groups['value'].Value }
-)
-foreach ($mode in $modes) {
-    $modeMarker = '`' + $mode + '`'
-    if (-not $readme.Contains($modeMarker, [StringComparison]::Ordinal)) {
-        throw "README.md is missing analyzer mode '$mode'."
+    foreach ($value in $values) {
+        $valueMarker = '`' + $value + '`'
+        if (-not $readme.Contains($valueMarker, [StringComparison]::Ordinal)) {
+            throw "README.md is missing '$key' value '$value'."
+        }
     }
 }
 
@@ -315,6 +345,16 @@ foreach ($descriptorSource in $descriptorSources) {
             [StringComparison]::OrdinalIgnoreCase)) {
             throw "Diagnostic catalog is missing '$id' and its help anchor."
         }
+    }
+}
+foreach ($launcherDiagnostic in @('SP0047', 'SP0048')) {
+    $anchor = '<a id="' + $launcherDiagnostic.ToLowerInvariant() + '"></a>'
+    if (-not $diagnosticCatalog.Contains(
+            $anchor,
+            [StringComparison]::OrdinalIgnoreCase)) {
+        throw (
+            "Diagnostic catalog is missing launcher diagnostic " +
+            "'$launcherDiagnostic' and its help anchor.")
     }
 }
 
@@ -341,6 +381,12 @@ $limitReference = Get-RequiredText 'docs\analysis-limits.md'
 $packageProps = [xml](Get-RequiredText (
     'SharpProof.Package\buildTransitive\SharpProof.props'))
 $workerPropertyNames = @(
+    'SharpProofProfile',
+    'SharpProofFeatures',
+    'SharpProofVerifyPolicy',
+    'SharpProofAssumptionPolicy',
+    'SharpProofMode',
+    'SharpProofVerify'
     $packageProps.SelectNodes(
         '//PropertyGroup/*[starts-with(local-name(), "SharpProofVerify")]') |
         ForEach-Object { $_.Name } |
@@ -385,19 +431,56 @@ foreach ($entry in $fixedBodyBounds.GetEnumerator()) {
 $unknownReference = Get-RequiredText 'docs\unknown-reasons.md'
 $protocolSource = Get-RequiredText (
     'SharpProof.Worker.Protocol\ProtocolModel.cs')
-$workerReasons = Get-EnumMembers $protocolSource 'WorkerVerificationReason'
-foreach ($reason in $workerReasons) {
-    if (-not $unknownReference.Contains(
-        $reason,
-        [StringComparison]::Ordinal)) {
-        throw "Unknown-reason reference is missing worker reason '$reason'."
+foreach ($enumName in @(
+        'WorkerFeatureSet',
+        'WorkerVerifyPolicy',
+        'WorkerAssumptionPolicy',
+        'WorkerRunStatus',
+        'WorkerRunFailureReason',
+        'WorkerCallableCoverage',
+        'WorkerCallableCoverageReason',
+        'WorkerClaimOutcome',
+        'WorkerClaimReason',
+        'WorkerCacheStatus')) {
+    foreach ($value in Get-EnumMembers $protocolSource $enumName) {
+        if (-not $unknownReference.Contains(
+                $value,
+                [StringComparison]::Ordinal)) {
+            throw (
+                "Unknown-reason reference is missing '$enumName' value " +
+                "'$value'.")
+        }
+    }
+}
+
+$protocolVersion = [regex]::Match(
+    $protocolSource,
+    'WorkerProtocolVersions\s*\{\s*public const string Current = "(?<value>\d+)"')
+$cacheVersion = [regex]::Match(
+    $protocolSource,
+    'WorkerCacheVersions\s*\{\s*public const int Current = (?<value>\d+)')
+$manifestVersion = [regex]::Match(
+    $protocolSource,
+    'WorkerManifestVersions\s*\{\s*public const int Current = (?<value>\d+)')
+if (-not $protocolVersion.Success -or
+    -not $cacheVersion.Success -or
+    -not $manifestVersion.Success) {
+    throw 'Could not derive worker protocol, cache, and manifest versions.'
+}
+foreach ($expected in @(
+        "protocol version $($protocolVersion.Groups['value'].Value)",
+        "cache schema version $($cacheVersion.Groups['value'].Value)",
+        "manifest schema version $($manifestVersion.Groups['value'].Value)")) {
+    if (-not $readme.Contains($expected, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "README.md is missing code-derived worker text: $expected"
     }
 }
 
 if ($Verify) {
     Write-Host (
-        "SharpProof documentation matches code-derived version, modes, " +
-        'diagnostics, API specs, worker options, reasons, links, and anchors.')
+        "SharpProof documentation matches code-derived version, configuration, " +
+        'diagnostics, API specs, worker options, protocol enums, versions, ' +
+        'links, and anchors.')
 }
 else {
     Write-Host 'SharpProof documentation validation passed.'

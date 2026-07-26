@@ -96,11 +96,8 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet> {
     private readonly ImmutableArray<INamedTypeSymbol> _types;
 
     private EffectThrowSet(
-        ImmutableArray<INamedTypeSymbol> types,
-        bool includesUnknown) {
-        _types = types;
-        IncludesUnknown = includesUnknown;
-    }
+        ImmutableArray<INamedTypeSymbol> types, bool includesUnknown) =>
+        (_types, IncludesUnknown) = (types, includesUnknown);
 
     public static EffectThrowSet Empty => default;
     public static EffectThrowSet Unknown { get; } =
@@ -112,8 +109,7 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet> {
     public bool IsEmpty => !IncludesUnknown && _types.IsDefaultOrEmpty;
 
     public static EffectThrowSet Create(
-        IEnumerable<INamedTypeSymbol> types,
-        bool includesUnknown = false) {
+        IEnumerable<INamedTypeSymbol> types, bool includesUnknown = false) {
         if (types == null) throw new ArgumentNullException(nameof(types));
         var distinct = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
         foreach (var type in types)
@@ -153,14 +149,11 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet> {
             IncludesUnknown || other.IncludesUnknown);
     }
 
-    public bool Equals(EffectThrowSet other) {
-        if (IncludesUnknown != other.IncludesUnknown) return false;
-        if (Types.Length != other.Types.Length) return false;
-        for (var index = 0; index < Types.Length; index++)
-            if (!SymbolEqualityComparer.Default.Equals(Types[index], other.Types[index]))
-                return false;
-        return true;
-    }
+    public bool Equals(EffectThrowSet other) =>
+        IncludesUnknown == other.IncludesUnknown &&
+        Types.AsEnumerable().SequenceEqual(
+            other.Types,
+            SymbolEqualityComparer.Default);
 
     public override bool Equals(object? obj) => obj is EffectThrowSet other && Equals(other);
 

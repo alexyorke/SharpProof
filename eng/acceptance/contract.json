@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "flagship": "effects",
   "releaseLine": "0.2.0-preview",
   "supportedTargetFrameworks": [
@@ -8,13 +8,17 @@
     "net472"
   ],
   "analyzer": {
-    "defaultMode": "off",
+    "defaultProfile": "advisory",
+    "defaultFeatures": "all",
+    "defaultVerifyPolicy": "advisory",
+    "defaultAssumptionPolicy": "allow",
     "defaultDiagnosticSeverity": "Info",
-    "diagnosticsEnabledByDefault": false,
-    "unsupportedCallableBehavior": "silent"
+    "diagnosticsEnabledByDefault": true,
+    "unsupportedUnannotatedCallableBehavior": "silent",
+    "unsupportedSelectedCallableDiagnostic": "SP0047"
   },
   "worker": {
-    "protocolVersion": 2,
+    "protocolVersion": 3,
     "maximumParallelism": 4,
     "maximumMemoryMiB": 2048,
     "queryRlimit": 3000000,
@@ -25,7 +29,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "maximumMiB": 512,
     "cacheableOutcomes": [
       "Proven",

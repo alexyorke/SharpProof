@@ -317,12 +317,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
         const string source =
             """
             using System;
-            using System.Collections.Immutable;
             using System.Threading;
             using System.Threading.Tasks;
-            namespace SharpProof.Worker.Protocol {
-                public sealed class WorkerVerificationRecord { }
-            }
             namespace SharpProof.Worker {
                 static class Program {
                     internal static async Task<int> Main(string[] args) {
@@ -333,8 +329,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
                 }
 
                 sealed class SharpProofWorker {
-                    private static async Task<ImmutableArray<
-                        SharpProof.Worker.Protocol.WorkerVerificationRecord>>
+                    private sealed class CallableVerificationResult { }
+                    private static async Task<CallableVerificationResult>
                         VerifyTargetAsync(
                             object verifier,
                             object target,
@@ -348,9 +344,7 @@ public sealed class SharpProofSoundnessAnalyzerTests {
                         try { throw new OperationCanceledException(); }
                         catch (OperationCanceledException) {
                             callerCancellation.ThrowIfCancellationRequested();
-                            return ImmutableArray<
-                                SharpProof.Worker.Protocol.WorkerVerificationRecord>
-                                .Empty;
+                            return new CallableVerificationResult();
                         }
                     }
                 }
@@ -362,20 +356,26 @@ public sealed class SharpProofSoundnessAnalyzerTests {
     }
 
     [Test]
-    public async Task AuditedWorkerTimeoutBoundaryMustGuardCallerCancellation() {
+    public async Task AllowsAuditedWorkerTypedCancellationReification() {
         const string source =
             """
             using System;
-            using System.Collections.Immutable;
             using System.Threading;
             using System.Threading.Tasks;
             namespace SharpProof.Worker.Protocol {
-                public sealed class WorkerVerificationRecord { }
+                enum WorkerClaimReason { ProjectTimeout, Canceled }
+                enum WorkerCallableCoverageReason { ProjectTimeout, Canceled }
             }
             namespace SharpProof.Worker {
+                using SharpProof.Worker.Protocol;
                 sealed class SharpProofWorker {
-                    private static async Task<ImmutableArray<
-                        SharpProof.Worker.Protocol.WorkerVerificationRecord>>
+                    private sealed class CallableVerificationResult { }
+                    private static CallableVerificationResult Unknown(
+                        object target,
+                        WorkerClaimReason claimReason,
+                        WorkerCallableCoverageReason callableReason) =>
+                        new();
+                    private static async Task<CallableVerificationResult>
                         VerifyTargetAsync(
                             object verifier,
                             object target,
@@ -388,9 +388,145 @@ public sealed class SharpProofSoundnessAnalyzerTests {
                         await Task.Yield();
                         try { throw new OperationCanceledException(); }
                         catch (OperationCanceledException) {
-                            return ImmutableArray<
-                                SharpProof.Worker.Protocol.WorkerVerificationRecord>
-                                .Empty;
+                            if (callerCancellation.IsCancellationRequested)
+                                return Unknown(
+                                    target,
+                                    WorkerClaimReason.Canceled,
+                                    WorkerCallableCoverageReason.Canceled);
+                            return Unknown(
+                                target,
+                                WorkerClaimReason.ProjectTimeout,
+                                WorkerCallableCoverageReason.ProjectTimeout);
+                        }
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [TestCase(
+        "unrelatedCancellation",
+        "target",
+        "WorkerClaimReason.Canceled",
+        "WorkerCallableCoverageReason.Canceled",
+        "Unknown")]
+    [TestCase(
+        "callerCancellation",
+        "target",
+        "WorkerClaimReason.ProjectTimeout",
+        "WorkerCallableCoverageReason.Canceled",
+        "Unknown")]
+    [TestCase(
+        "callerCancellation",
+        "target",
+        "WorkerClaimReason.Canceled",
+        "WorkerCallableCoverageReason.ProjectTimeout",
+        "Unknown")]
+    [TestCase(
+        "callerCancellation",
+        "target",
+        "WorkerClaimReason.Canceled",
+        "WorkerCallableCoverageReason.Canceled",
+        "CancellationReifier.Unknown")]
+    [TestCase(
+        "callerCancellation",
+        "new object()",
+        "WorkerClaimReason.Canceled",
+        "WorkerCallableCoverageReason.Canceled",
+        "Unknown")]
+    public async Task AuditedWorkerTypedCancellationReificationMustBeExact(
+        string cancellationReceiver,
+        string targetArgument,
+        string claimReason,
+        string callableReason,
+        string unknownHelper) {
+        var source =
+            $$"""
+            using System;
+            using System.Threading;
+            using System.Threading.Tasks;
+            namespace SharpProof.Worker.Protocol {
+                enum WorkerClaimReason { ProjectTimeout, Canceled }
+                enum WorkerCallableCoverageReason { ProjectTimeout, Canceled }
+            }
+            namespace SharpProof.Worker {
+                using SharpProof.Worker.Protocol;
+                sealed class SharpProofWorker {
+                    private sealed class CallableVerificationResult { }
+                    private static CallableVerificationResult Unknown(
+                        object target,
+                        WorkerClaimReason claimReason,
+                        WorkerCallableCoverageReason callableReason) =>
+                        new();
+                    private static class CancellationReifier {
+                        internal static CallableVerificationResult Unknown(
+                            object target,
+                            WorkerClaimReason claimReason,
+                            WorkerCallableCoverageReason callableReason) =>
+                            new();
+                    }
+                    private static async Task<CallableVerificationResult>
+                        VerifyTargetAsync(
+                            object verifier,
+                            object target,
+                            object budgets,
+                            object parallelism,
+                            object resourceGate,
+                            object resourceCount,
+                            CancellationToken unrelatedCancellation,
+                            CancellationToken callerCancellation) {
+                        await Task.Yield();
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) {
+                            if ({{cancellationReceiver}}.IsCancellationRequested)
+                                return {{unknownHelper}}(
+                                    {{targetArgument}},
+                                    {{claimReason}},
+                                    {{callableReason}});
+                            return Unknown(
+                                target,
+                                WorkerClaimReason.ProjectTimeout,
+                                WorkerCallableCoverageReason.ProjectTimeout);
+                        }
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task AuditedWorkerTimeoutBoundaryMustGuardCallerCancellation() {
+        const string source =
+            """
+            using System;
+            using System.Threading;
+            using System.Threading.Tasks;
+            namespace SharpProof.Worker {
+                sealed class SharpProofWorker {
+                    private sealed class CallableVerificationResult { }
+                    private static async Task<CallableVerificationResult>
+                        VerifyTargetAsync(
+                            object verifier,
+                            object target,
+                            object budgets,
+                            object parallelism,
+                            object resourceGate,
+                            object resourceCount,
+                            object projectBoundary,
+                            CancellationToken callerCancellation) {
+                        await Task.Yield();
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) {
+                            return new CallableVerificationResult();
                         }
                     }
                 }

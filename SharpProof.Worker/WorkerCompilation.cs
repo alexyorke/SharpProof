@@ -1,5 +1,4 @@
 namespace SharpProof.Worker;
-
 internal static class WorkerCompilation {
     internal static CSharpCompilation Create(
         WorkerVerifyRequest request,
@@ -42,55 +41,24 @@ internal static class WorkerCompilation {
                 deterministic: request.Compilation.Deterministic!.Value,
                 concurrentBuild: false));
     }
-
-    private static NullableContextOptions MapNullable(
-        WorkerNullableContext value) =>
+    private static NullableContextOptions MapNullable(WorkerNullableContext value) =>
         value switch {
-            WorkerNullableContext.Disabled =>
-                NullableContextOptions.Disable,
-            WorkerNullableContext.Warnings =>
-                NullableContextOptions.Warnings,
-            WorkerNullableContext.Annotations =>
-                NullableContextOptions.Annotations,
-            WorkerNullableContext.Enabled =>
-                NullableContextOptions.Enable,
-            _ => throw new ArgumentOutOfRangeException(nameof(value))
+            WorkerNullableContext.Disabled => NullableContextOptions.Disable,
+            WorkerNullableContext.Enabled => NullableContextOptions.Enable,
+            _ => MapEnum<WorkerNullableContext, NullableContextOptions>(value)
         };
-
-    private static OptimizationLevel MapOptimization(
-        WorkerOptimizationLevel value) =>
-        value switch {
-            WorkerOptimizationLevel.Debug => OptimizationLevel.Debug,
-            WorkerOptimizationLevel.Release => OptimizationLevel.Release,
-            _ => throw new ArgumentOutOfRangeException(nameof(value))
-        };
-
+    private static OptimizationLevel MapOptimization(WorkerOptimizationLevel value) =>
+        MapEnum<WorkerOptimizationLevel, OptimizationLevel>(value);
     private static OutputKind MapOutputKind(WorkerOutputKind value) =>
-        value switch {
-            WorkerOutputKind.ConsoleApplication =>
-                OutputKind.ConsoleApplication,
-            WorkerOutputKind.WindowsApplication =>
-                OutputKind.WindowsApplication,
-            WorkerOutputKind.DynamicallyLinkedLibrary =>
-                OutputKind.DynamicallyLinkedLibrary,
-            WorkerOutputKind.NetModule => OutputKind.NetModule,
-            WorkerOutputKind.WindowsRuntimeMetadata =>
-                OutputKind.WindowsRuntimeMetadata,
-            WorkerOutputKind.WindowsRuntimeApplication =>
-                OutputKind.WindowsRuntimeApplication,
-            _ => throw new ArgumentOutOfRangeException(nameof(value))
-        };
+        MapEnum<WorkerOutputKind, OutputKind>(value);
 
     private static Platform MapPlatform(WorkerPlatform value) =>
-        value switch {
-            WorkerPlatform.AnyCpu => Platform.AnyCpu,
-            WorkerPlatform.AnyCpu32BitPreferred =>
-                Platform.AnyCpu32BitPreferred,
-            WorkerPlatform.X86 => Platform.X86,
-            WorkerPlatform.X64 => Platform.X64,
-            WorkerPlatform.Arm => Platform.Arm,
-            WorkerPlatform.Arm64 => Platform.Arm64,
-            WorkerPlatform.Itanium => Platform.Itanium,
-            _ => throw new ArgumentOutOfRangeException(nameof(value))
-        };
+        MapEnum<WorkerPlatform, Platform>(value);
+
+    private static TTarget MapEnum<TSource, TTarget>(TSource value)
+        where TSource : struct, Enum
+        where TTarget : struct, Enum =>
+        Enum.TryParse(value.ToString(), out TTarget mapped)
+            ? mapped
+            : throw new ArgumentOutOfRangeException(nameof(value));
 }

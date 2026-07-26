@@ -35,11 +35,16 @@ rewrite the method body, signature, containing type, or dependencies. All 200
 targets are analyzed in one compilation of the pinned upstream source.
 
 The snapshot records each target's internal semantic outcome independently
-from its canonical diagnostics. Unsupported real-world methods therefore
-remain explicit `SilentUnknown`/`Abstained` entries rather than being omitted
-or counted as proofs. Gate output reports explicit Unknown, silent Unknown, and
-their combined semantic Unknown count and rate. These are visibility metrics,
-not thresholds.
+from its canonical diagnostics. Because corpus targets are explicitly selected
+with `[EnforcePure]`, unsupported methods can now carry SP0047 while remaining
+explicit `Abstained` semantic entries; they are never omitted or counted as
+proofs. The separate silent-Unknown metric still covers unannotated/internal
+cases. Gate output reports explicit Unknown, silent Unknown, and their combined
+semantic Unknown count and rate. These are visibility metrics, not thresholds.
+
+Corpus compilation uses the current advisory profile with effect features.
+Strict worker claim-accountability is covered by worker/package integration
+tests rather than by this analyzer-only source corpus.
 
 ## Reproducible update
 

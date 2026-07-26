@@ -9,7 +9,7 @@ internal static class SharpProofControlAttributePolicy {
         var suppress = false;
         foreach (var symbol in EnumerateScopes(method)) {
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (var attribute in GetAttributes(symbol, method)) {
+            foreach (var attribute in symbol.GetAttributes()) {
                 if (AnalyzerAttributeSymbols.Is(
                         attribute,
                         session.Attributes.Suppress)) {
@@ -52,13 +52,6 @@ internal static class SharpProofControlAttributePolicy {
         if (method.ContainingAssembly != null)
             yield return method.ContainingAssembly;
     }
-
-    private static ImmutableArray<AttributeData> GetAttributes(
-        ISymbol symbol,
-        IMethodSymbol method) =>
-        SymbolEqualityComparer.Default.Equals(symbol, method)
-            ? method.GetAttributes()
-            : symbol.GetAttributes();
 
     private static bool TryGetReason(AttributeData attribute, out string reason) {
         reason = attribute.ConstructorArguments.Length == 1 &&

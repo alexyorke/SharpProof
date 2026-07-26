@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
@@ -27,16 +28,27 @@ public sealed class AnalyzerModeAndEffectTests {
         """;
 
     [Test]
-    public async Task DefaultOffCreatesNoAnalysisSession() {
+    public async Task ProfileOffCreatesNoAnalysisSession() {
         var factory = new ThrowingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             ModeFixture,
             mode: null,
             ["SP0045", "SP0027"],
-            new SharpProofAnalyzer(factory));
+            new SharpProofAnalyzer(factory),
+            profile: "off");
 
         Assert.That(diagnostics, Is.Empty);
         Assert.That(factory.CreateCount, Is.Zero);
+    }
+
+    [Test]
+    public async Task DefaultAdvisoryAllKeepsUnannotatedCodeQuiet() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            "public static class Fixture { public static int Add(int x) => x + 1; }",
+            mode: null,
+            []);
+
+        Assert.That(diagnostics, Is.Empty);
     }
 
     [Test]
@@ -54,32 +66,46 @@ public sealed class AnalyzerModeAndEffectTests {
             Is.SameAs(factory.Session.ApiSpecs));
     }
 
-    [Test]
-    public async Task InvalidModeReportsConfigurationAndFailsClosed() {
+    [TestCase(null, "everything", null, "advisory, strict, off")]
+    [TestCase(null, null, "everything", "effects, contracts, all")]
+    [TestCase("everything", null, null, "off, effects, contracts, all-experimental")]
+    public async Task InvalidConfigurationReportsAllowedValuesAndFailsClosed(
+        string? mode,
+        string? profile,
+        string? features,
+        string allowedValues) {
         var factory = new ThrowingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             ModeFixture,
-            "everything",
+            mode,
             ["SP0045", "SP0025"],
-            new SharpProofAnalyzer(factory));
+            new SharpProofAnalyzer(factory),
+            profile: profile,
+            features: features);
 
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(["SP0025"]));
+        Assert.That(
+            diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+            Does.Contain(allowedValues));
         Assert.That(factory.CreateCount, Is.Zero);
     }
 
-    [TestCase("off", new string[0])]
-    [TestCase("effects", new[] { "SP0045" })]
-    [TestCase("contracts", new[] { "SP0027" })]
-    [TestCase("all-experimental", new[] { "SP0045", "SP0027" })]
-    public async Task ModesSelectOnlyTheirFeaturePipeline(
-        string mode,
+    [TestCase("off", "all", new string[0])]
+    [TestCase("advisory", "effects", new[] { "SP0045" })]
+    [TestCase("strict", "contracts", new[] { "SP0027" })]
+    [TestCase("advisory", "all", new[] { "SP0045", "SP0027" })]
+    public async Task ProfileAndFeaturesSelectOnlyTheirPipeline(
+        string profile,
+        string features,
         string[] expected) {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             ModeFixture,
-            mode,
-            ["SP0045", "SP0027"]);
+            mode: null,
+            ["SP0045", "SP0027"],
+            profile: profile,
+            features: features);
 
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
@@ -426,25 +452,75 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public void FeatureDescriptorsRemainInfoAndDisabled() {
-        var descriptors = new SharpProofAnalyzer().SupportedDiagnostics;
-        var features = descriptors.Where(static descriptor =>
-            descriptor.Id is not ("SP0024" or "SP0025"));
+    public async Task UnsupportedSelectedMethodIsVisibleButUnannotatedPeerIsQuiet() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [ZeroAllocations]
+                public static int Selected() {
+                    Func<int> value = () => 1;
+                    return value();
+                }
+
+                public static int Unannotated() {
+                    Func<int> value = () => 1;
+                    return value();
+                }
+            }
+            """,
+            mode: null,
+            []);
 
         Assert.That(
-            features.Select(static descriptor => descriptor.DefaultSeverity),
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0047"]));
+        Assert.That(
+            diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+            Does.Contain("'Selected'"));
+    }
+
+    [Test]
+    public async Task EffectContractSelectsUnsupportedMethod() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [EffectContract(SharpProofEffect.None)]
+                public static int Selected() {
+                    Func<int> value = () => 1;
+                    return value();
+                }
+            }
+            """,
+            mode: null,
+            []);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0047"]));
+    }
+
+    [Test]
+    public void AdvisoryDescriptorsUseProductionDefaults() {
+        var descriptors = new SharpProofAnalyzer().SupportedDiagnostics;
+        var informational = descriptors.Where(static descriptor =>
+            descriptor.Id is not ("SP0024" or "SP0025" or "SP0027"));
+
+        Assert.That(
+            informational.Select(static descriptor => descriptor.DefaultSeverity),
             Is.All.EqualTo(DiagnosticSeverity.Info));
         Assert.That(
-            features.Select(static descriptor => descriptor.IsEnabledByDefault),
-            Is.All.False);
+            descriptors.Select(static descriptor => descriptor.IsEnabledByDefault),
+            Is.All.True);
         Assert.That(
-            descriptors.Single(static descriptor => descriptor.Id == "SP0024")
-                .IsEnabledByDefault,
-            Is.True);
-        Assert.That(
-            descriptors.Single(static descriptor => descriptor.Id == "SP0025")
-                .IsEnabledByDefault,
-            Is.True);
+            descriptors.Single(static descriptor => descriptor.Id == "SP0027")
+                .DefaultSeverity,
+            Is.EqualTo(DiagnosticSeverity.Warning));
     }
 
     private sealed class ThrowingSessionFactory : IAnalyzerSessionFactory {
@@ -458,7 +534,7 @@ public sealed class AnalyzerModeAndEffectTests {
             CancellationToken cancellationToken) {
             Interlocked.Increment(ref _createCount);
             throw new InvalidOperationException(
-                "The default-off analyzer must not construct a session.");
+                "The profile-off analyzer must not construct a session.");
         }
     }
 

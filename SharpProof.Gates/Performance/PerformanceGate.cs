@@ -42,7 +42,7 @@ internal static class PerformanceGate {
         var contract = AcceptancePerformanceContract.Load(repositoryRoot);
         ValidateContract(contract);
         var source = CreateDefaultOffSource(320);
-        ValidateDefaultOffPackagePolicy(repositoryRoot);
+        ValidateAdvisoryPackagePolicy(repositoryRoot);
         var configurationProbe = MeasureDefaultOffAnalyzerBatch(
             source,
             "DefaultOffConfigurationProbe",
@@ -170,7 +170,7 @@ internal static class PerformanceGate {
             int iterations,
             CancellationToken cancellationToken = default) {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
-        var sessionFactory = new RejectingSessionFactory();
+        var sessionFactory = new CountingSessionFactory();
         var analyzer = new SharpProofAnalyzer(sessionFactory);
         var diagnosticCount = 0;
         var stopwatch = Stopwatch.StartNew();
@@ -187,10 +187,10 @@ internal static class PerformanceGate {
                 cancellationToken);
         }
         stopwatch.Stop();
-        if (diagnosticCount != 0 || sessionFactory.CreateCount != 0)
+        if (diagnosticCount != 0 || sessionFactory.CreateCount != iterations)
             throw new InvalidOperationException(
-                "Default-off analysis produced diagnostics or created an " +
-                "analysis session.");
+                "Unannotated advisory analysis must stay quiet and create " +
+                "exactly one analysis session per compilation.");
         return new DefaultOffBatchMeasurement(
             stopwatch.Elapsed.TotalMilliseconds / iterations,
             iterations,
@@ -294,15 +294,18 @@ internal static class PerformanceGate {
             source,
             new UTF8Encoding(false));
         var props = System.Security.SecurityElement.Escape(Path.Combine(
-            repositoryRoot,
-            "SharpProof.Package",
+            repositoryRoot, "SharpProof.Package",
             "buildTransitive",
             "SharpProof.props"));
         var targets = System.Security.SecurityElement.Escape(Path.Combine(
-            repositoryRoot,
-            "SharpProof.Package",
+            repositoryRoot, "SharpProof.Package",
             "buildTransitive",
             "SharpProof.targets"));
+        var configuration = new DirectoryInfo(
+            AppContext.BaseDirectory.TrimEnd(
+                Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)).Parent!.Name;
+        var analyzerDirectory = EscapeAnalyzerDirectory(repositoryRoot, configuration);
+        var generatorPath = EscapePath(AppContext.BaseDirectory, "SharpProof.ContractForGenerator.dll");
         var imports = importSharpProof
             ? ($"""<Import Project="{props}" />""" + Environment.NewLine,
                Environment.NewLine + $"""<Import Project="{targets}" />""")
@@ -312,17 +315,26 @@ internal static class PerformanceGate {
             project,
             $"""
             <Project Sdk="Microsoft.NET.Sdk">
-              {imports.Item1}<PropertyGroup>
+              <PropertyGroup>
                 <TargetFramework>net8.0</TargetFramework>
                 <LangVersion>12.0</LangVersion>
                 <Deterministic>true</Deterministic>
                 <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
-              </PropertyGroup>{imports.Item2}
+                <SharpProofAnalyzerDirectory>{analyzerDirectory}</SharpProofAnalyzerDirectory>
+                <SharpProofContractForGeneratorPath>{generatorPath}</SharpProofContractForGeneratorPath>
+              </PropertyGroup>
+              {imports.Item1}{imports.Item2}
             </Project>
             """,
             new UTF8Encoding(false));
         return project;
     }
+
+    private static string? EscapeAnalyzerDirectory(string root, string configuration) =>
+        EscapePath(root, "SharpProof.Analyzer", "bin", configuration, "netstandard2.0");
+
+    private static string? EscapePath(params string[] segments) =>
+        System.Security.SecurityElement.Escape(Path.Combine(segments));
 
     private static async Task<PackageBuildPair> RunBuildPairAsync(
         string baselineProject,
@@ -419,7 +431,7 @@ internal static class PerformanceGate {
         string source,
         int warmups,
         CancellationToken cancellationToken) {
-        var sessionFactory = new RejectingSessionFactory();
+        var sessionFactory = new CountingSessionFactory();
         var analyzer = new SharpProofAnalyzer(sessionFactory);
         for (var index = 0; index < warmups; index++) {
             var baseline = AnalyzerGateHost.CreateCompilation(
@@ -435,9 +447,9 @@ internal static class PerformanceGate {
                 analyzer,
                 cancellationToken);
         }
-        if (sessionFactory.CreateCount != 0)
+        if (sessionFactory.CreateCount != warmups)
             throw new InvalidOperationException(
-                "Default-off retention warmup created an analysis session.");
+                "Advisory retention warmup created an unexpected number of sessions.");
         ForceCollection();
     }
 
@@ -469,7 +481,7 @@ internal static class PerformanceGate {
         ForceCollection();
         var before = GC.GetTotalMemory(forceFullCollection: true);
         var retained = new List<Compilation>(RetainedCompilationCount);
-        var sessionFactory = new RejectingSessionFactory();
+        var sessionFactory = new CountingSessionFactory();
         var analyzer = new SharpProofAnalyzer(sessionFactory);
         var diagnosticCount = 0;
         for (var index = 0; index < RetainedCompilationCount; index++) {
@@ -484,10 +496,11 @@ internal static class PerformanceGate {
                 cancellationToken);
             retained.Add(compilation);
         }
-        if (diagnosticCount != 0 || sessionFactory.CreateCount != 0)
+        if (diagnosticCount != 0 ||
+            sessionFactory.CreateCount != RetainedCompilationCount)
             throw new InvalidOperationException(
-                "Default-off retention produced diagnostics or created an " +
-                "analysis session.");
+                "Unannotated advisory retention must stay quiet and create " +
+                "exactly one analysis session per compilation.");
         ForceCollection();
         var after = GC.GetTotalMemory(forceFullCollection: true);
         GC.KeepAlive(retained);
@@ -812,7 +825,7 @@ internal static class PerformanceGate {
                 "The performance limits must be positive.");
     }
 
-    internal static void ValidateDefaultOffPackagePolicy(
+    internal static void ValidateAdvisoryPackagePolicy(
         string repositoryRoot) {
         var packageRoot = Path.Combine(
             repositoryRoot,
@@ -824,19 +837,28 @@ internal static class PerformanceGate {
         var targets = XDocument.Load(Path.Combine(
             packageRoot,
             "SharpProof.targets"));
-        ValidateDefaultOffPackagePolicy(props, targets);
+        ValidateAdvisoryPackagePolicy(props, targets);
     }
 
-    internal static void ValidateDefaultOffPackagePolicy(
+    internal static void ValidateAdvisoryPackagePolicy(
         XDocument props,
         XDocument targets) {
-        var mode = props.Descendants("SharpProofMode").SingleOrDefault(
+        var visibleProperties = props.Descendants("CompilerVisibleProperty")
+            .Select(static element => (string?)element.Attribute("Include"))
+            .ToHashSet(StringComparer.Ordinal);
+        var profile = targets.Descendants("SharpProofProfile").SingleOrDefault(
             static element =>
                 string.Equals(
                     (string?)element.Attribute("Condition"),
-                    "'$(SharpProofMode)' == ''",
+                    "'$(SharpProofProfile)' == ''",
                     StringComparison.Ordinal));
-        var verify = props.Descendants("SharpProofVerify").SingleOrDefault(
+        var features = targets.Descendants("SharpProofFeatures").SingleOrDefault(
+            static element =>
+                string.Equals(
+                    (string?)element.Attribute("Condition"),
+                    "'$(SharpProofFeatures)' == ''",
+                    StringComparison.Ordinal));
+        var verify = targets.Descendants("SharpProofVerify").SingleOrDefault(
             static element =>
                 string.Equals(
                     (string?)element.Attribute("Condition"),
@@ -862,7 +884,8 @@ internal static class PerformanceGate {
         var normalizedVerifierCondition = NormalizeMsBuildCondition(
             (string?)verifierTarget?.Attribute("Condition"));
         const string expectedVerifierCondition =
-            "'$(SharpProofVerify)'=='true'AND'$(OS)'=='Windows_NT'AND" +
+            "'$(SharpProofVerify)'=='true'AND'$(_SharpProofProfileNormalized)'!='off'AND" +
+            "'$(OS)'=='Windows_NT'AND" +
             "'$(DesignTimeBuild)'!='true'AND'$(BuildingProject)'!='false'";
         var unexpectedCoreDependency = targets.Descendants("Target")
             .Where(target => !ReferenceEquals(target, verifierTarget))
@@ -878,11 +901,14 @@ internal static class PerformanceGate {
                     "_SharpProofVerifyCore",
                     StringComparer.Ordinal));
         var verifierExec = targets.Descendants("Exec").ToArray();
-        if (!string.Equals(mode?.Value, "off", StringComparison.Ordinal) ||
+        if (!visibleProperties.Contains("SharpProofProfile") ||
+            !visibleProperties.Contains("SharpProofFeatures") ||
+            !string.Equals(profile?.Value, "advisory", StringComparison.Ordinal) ||
+            !string.Equals(features?.Value, "all", StringComparison.Ordinal) ||
             !string.Equals(verify?.Value, "false", StringComparison.Ordinal) ||
             !string.Equals(
                 normalizedCondition,
-                "'$(_SharpProofModeNormalized)'!='off'",
+                "'$(_SharpProofProfileNormalized)'!='off'",
                 StringComparison.Ordinal) ||
             !string.Equals(
                 normalizedVerifierCondition,
@@ -906,8 +932,8 @@ internal static class PerformanceGate {
                 verifierExec[0].Ancestors("Target").SingleOrDefault(),
                 verifierCore)) {
             throw new InvalidDataException(
-                "The package must omit the analyzer and verifier in its " +
-                "default-off configuration.");
+                "The package must run advisory analysis but omit the verifier " +
+                "by default.");
         }
     }
 
@@ -946,7 +972,7 @@ internal static class PerformanceGate {
         double[] Latencies,
         ImmutableArray<string> DiagnosticFailures);
 
-    private sealed class RejectingSessionFactory : IAnalyzerSessionFactory {
+    private sealed class CountingSessionFactory : IAnalyzerSessionFactory {
         internal int CreateCount { get; private set; }
 
         public AnalyzerSession Create(
@@ -954,8 +980,10 @@ internal static class PerformanceGate {
             SharpProof.Analyzer.Configuration.AnalyzerConfiguration configuration,
             CancellationToken cancellationToken) {
             CreateCount++;
-            throw new InvalidOperationException(
-                "Default-off analysis must not create an analysis session.");
+            return new AnalyzerSession(
+                compilation,
+                configuration,
+                cancellationToken);
         }
     }
 

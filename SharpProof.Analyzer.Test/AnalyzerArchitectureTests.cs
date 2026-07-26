@@ -190,7 +190,7 @@ public sealed class AnalyzerArchitectureTests {
             Assert.That(
                 unshipped.Keys,
                 Is.EquivalentTo(descriptors.Keys));
-            Assert.That(unshipped, Has.Count.EqualTo(10));
+            Assert.That(unshipped, Has.Count.EqualTo(11));
         }
         foreach (var descriptor in descriptors.Values) {
             var rule = unshipped[descriptor.Id];

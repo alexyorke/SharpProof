@@ -18,6 +18,10 @@ $packagePropsPath = Join-Path `
     $repositoryRoot `
     'SharpProof.Package\buildTransitive\SharpProof.props'
 [xml]$packageProps = Get-Content -LiteralPath $packagePropsPath -Raw
+$packageTargetsPath = Join-Path `
+    $repositoryRoot `
+    'SharpProof.Package\buildTransitive\SharpProof.targets'
+[xml]$packageTargets = Get-Content -LiteralPath $packageTargetsPath -Raw
 
 function Assert-Equal {
     param(
@@ -50,6 +54,23 @@ function Get-MsBuildProperty {
     return $node.InnerText
 }
 
+function Get-MsBuildDefault {
+    param([Parameter(Mandatory = $true)][string]$Name)
+
+    $apostrophe = [char]39
+    $condition = $apostrophe + '$(' + $Name + ')' + $apostrophe +
+        ' == ' + $apostrophe + $apostrophe
+    $nodes = @(
+        @($packageTargets.SelectNodes(
+            "/Project/PropertyGroup/$Name")) |
+            Where-Object { $_.GetAttribute('Condition') -eq $condition }
+    )
+    if ($nodes.Count -ne 1) {
+        throw "Required package default '$Name' is missing."
+    }
+    return $nodes[0].InnerText
+}
+
 function Invoke-SharpProofDotnet {
     param(
         [Parameter(Mandatory = $true)]
@@ -67,15 +88,23 @@ function Invoke-SharpProofDotnet {
     }
 }
 
-Assert-Equal $contract.schemaVersion 2 'schemaVersion'
+Assert-Equal $contract.schemaVersion 3 'schemaVersion'
 Assert-Equal $contract.releaseLine '0.2.0-preview' 'releaseLine'
 Assert-Equal $contract.flagship 'effects' 'flagship'
-Assert-Equal $contract.analyzer.defaultMode 'off' 'analyzer.defaultMode'
+Assert-Equal $contract.analyzer.defaultProfile 'advisory' 'analyzer.defaultProfile'
+Assert-Equal $contract.analyzer.defaultFeatures 'all' 'analyzer.defaultFeatures'
+Assert-Equal $contract.analyzer.defaultVerifyPolicy 'advisory' 'analyzer.defaultVerifyPolicy'
+Assert-Equal $contract.analyzer.defaultAssumptionPolicy 'allow' 'analyzer.defaultAssumptionPolicy'
 Assert-Equal $contract.analyzer.defaultDiagnosticSeverity 'Info' 'analyzer.defaultDiagnosticSeverity'
-Assert-Equal $contract.analyzer.diagnosticsEnabledByDefault $false 'analyzer.diagnosticsEnabledByDefault'
-Assert-Equal $contract.analyzer.unsupportedCallableBehavior 'silent' 'analyzer.unsupportedCallableBehavior'
+Assert-Equal $contract.analyzer.diagnosticsEnabledByDefault $true 'analyzer.diagnosticsEnabledByDefault'
+Assert-Equal $contract.analyzer.unsupportedUnannotatedCallableBehavior 'silent' 'analyzer.unsupportedUnannotatedCallableBehavior'
+Assert-Equal $contract.analyzer.unsupportedSelectedCallableDiagnostic 'SP0047' 'analyzer.unsupportedSelectedCallableDiagnostic'
+Assert-Equal (Get-MsBuildDefault 'SharpProofProfile') $contract.analyzer.defaultProfile 'SharpProofProfile'
+Assert-Equal (Get-MsBuildDefault 'SharpProofFeatures') $contract.analyzer.defaultFeatures 'SharpProofFeatures'
+Assert-Equal (Get-MsBuildDefault 'SharpProofVerifyPolicy') $contract.analyzer.defaultVerifyPolicy 'SharpProofVerifyPolicy'
+Assert-Equal (Get-MsBuildDefault 'SharpProofAssumptionPolicy') $contract.analyzer.defaultAssumptionPolicy 'SharpProofAssumptionPolicy'
 Assert-Equal ($contract.supportedTargetFrameworks -join ',') 'netstandard2.0,net8.0,net472' 'supportedTargetFrameworks'
-Assert-Equal $contract.worker.protocolVersion 2 'worker.protocolVersion'
+Assert-Equal $contract.worker.protocolVersion 3 'worker.protocolVersion'
 Assert-Equal $contract.worker.maximumParallelism 4 'worker.maximumParallelism'
 Assert-Equal $contract.worker.maximumMemoryMiB 2048 'worker.maximumMemoryMiB'
 Assert-Equal $contract.worker.queryRlimit 3000000 'worker.queryRlimit'
@@ -83,7 +112,7 @@ Assert-Equal $contract.worker.methodRlimit 20000000 'worker.methodRlimit'
 Assert-Equal $contract.worker.maximumMethodWallSeconds 10 'worker.maximumMethodWallSeconds'
 Assert-Equal $contract.worker.maximumProjectWallSeconds 300 'worker.maximumProjectWallSeconds'
 Assert-Equal $contract.worker.forcedTerminationMilliseconds 1000 'worker.forcedTerminationMilliseconds'
-Assert-Equal $contract.cache.schemaVersion 2 'cache.schemaVersion'
+Assert-Equal $contract.cache.schemaVersion 3 'cache.schemaVersion'
 Assert-Equal $contract.cache.maximumMiB 512 'cache.maximumMiB'
 Assert-Equal ($contract.cache.cacheableOutcomes -join ',') 'Proven,Refuted' 'cache.cacheableOutcomes'
 Assert-Equal `

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using NUnit.Framework;
 using SharpProof.Attributes;
 
@@ -65,6 +66,24 @@ internal sealed class ContractApiTests {
         var range = new InRangeAttribute(-1, 3);
         Assert.That(range.Minimum, Is.EqualTo(-1));
         Assert.That(range.Maximum, Is.EqualTo(3));
+    }
+
+    [Test]
+    public void ClosedContractsTargetOnlyParametersAndReturns() {
+        foreach (var type in new[] {
+                     typeof(NotNullAttribute),
+                     typeof(PositiveAttribute),
+                     typeof(InRangeAttribute)
+                 })
+            Assert.That(
+                type.GetCustomAttribute<AttributeUsageAttribute>()!.ValidOn,
+                Is.EqualTo(
+                    AttributeTargets.Parameter |
+                    AttributeTargets.ReturnValue));
+        Assert.That(
+            typeof(Contract).Assembly.GetType(
+                "SharpProof.Attributes.PureAttribute"),
+            Is.Null);
     }
 
     [Test]
