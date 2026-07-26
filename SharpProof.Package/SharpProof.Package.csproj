@@ -1,58 +1,102 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
+  <Import Project="..\SharpProof.PackageMetadata.props" />
   <PropertyGroup>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
     <TargetFramework>netstandard2.0</TargetFramework>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <NoWarn>$(NoWarn);NU5128</NoWarn>
   </PropertyGroup>
-
   <PropertyGroup>
     <PackageId>SharpProof</PackageId>
-    <PackageVersion>0.1.0-preview.1</PackageVersion>
-    <Authors>Alex Yorke</Authors>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/alexyorke/SharpProof</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/alexyorke/SharpProof</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <Title>SharpProof</Title>
-    <Description>SharpProof bounded symbolic C# analysis platform for purity, zero-allocation and capability contracts, invariants, runtime hazards, complexity queries, and Z3-backed proofs.</Description>
-    <PackageReleaseNotes>Public preview release with the canonical typed semantic pipeline. Breaking preview changes include evidence schema v2, effect-summary schema v5 structural identities, canonical configured-member keys, and strict SMT/runtime-hazard mode values; diagnostic IDs and attribute type names remain stable.</PackageReleaseNotes>
+    <Title>$(SharpProofProductName)</Title>
+    <Description>$(SharpProofProductDescription)</Description>
+    <PackageReleaseNotes>Breaking 0.2 preview with opt-in effect analysis, compiler-bound preconditions, fail-closed language gating, and conservative external boundaries.</PackageReleaseNotes>
     <Copyright>Copyright (c) Alex Yorke</Copyright>
-    <PackageTags>SharpProof;Roslyn;Analyzer;CodeFix;Purity;StaticAnalysis;SymbolicAnalysis;SMT;Z3;Invariants;RuntimeHazards;Capabilities;Complexity</PackageTags>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>SharpProof;Roslyn;Analyzer;Purity;StaticAnalysis;MethodEffects;Capabilities;ZeroAllocations;ExceptionContracts;Preconditions;Contracts;SMT;Z3</PackageTags>
     <NoPackageAnalysis>true</NoPackageAnalysis>
-
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_AddAnalyzersToOutput</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
-
   <ItemGroup>
-    <ProjectReference Include="..\SharpProof.CodeFixes\SharpProof.CodeFixes.csproj" />
-    <PackageReference Include="Microsoft.Z3" Version="4.12.2" GeneratePathProperty="true" PrivateAssets="all" />
+    <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" />
+    <ProjectReference Include="..\SharpProof.ContractForGenerator\SharpProof.ContractForGenerator.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      PrivateAssets="all" />
+    <ProjectReference Include="..\SharpProof.Worker\SharpProof.Worker.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      PrivateAssets="all" />
+    <ProjectReference Include="..\SharpProof.Worker.Launcher\SharpProof.Worker.Launcher.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      PrivateAssets="all" />
   </ItemGroup>
-
   <ItemGroup>
-    <None Update="tools\*.ps1" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="tools\%(Filename)%(Extension)" />
+    <None Include="buildTransitive/SharpProof.props" Pack="true" PackagePath="buildTransitive/SharpProof.props" />
     <None Include="buildTransitive/SharpProof.targets" Pack="true" PackagePath="buildTransitive/SharpProof.targets" />
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="\" />
   </ItemGroup>
-
+  <PropertyGroup>
+    <AnalyzerPayloadDirectory>..\SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0</AnalyzerPayloadDirectory>
+    <ContractForGeneratorPayloadPath>..\SharpProof.ContractForGenerator\bin\$(Configuration)\netstandard2.0\SharpProof.ContractForGenerator.dll</ContractForGeneratorPayloadPath>
+    <AttributesPayloadPath>..\SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.dll</AttributesPayloadPath>
+    <WorkerPayloadDirectory>..\SharpProof.Worker\bin\$(Configuration)\net8.0</WorkerPayloadDirectory>
+    <LauncherPayloadDirectory>..\SharpProof.Worker.Launcher\bin\$(Configuration)\net8.0</LauncherPayloadDirectory>
+  </PropertyGroup>
   <Target Name="_AddAnalyzersToOutput">
     <ItemGroup>
-      <TfmSpecificPackageFile Include="..\SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\SharpProof.Analyzer.dll" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="..\SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\SharpProof.Symbolic.dll" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="..\SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\SearchLib.dll" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="$(PkgMicrosoft_Z3)/lib/netstandard2.0/Microsoft.Z3.dll" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="$(PkgMicrosoft_Z3)/runtimes/win-x64/native/libz3.dll" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="$(PkgMicrosoft_Z3)/runtimes/osx-x64/native/libz3.dylib" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="SharpProof.NativeSmtLocator.txt" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="..\SharpProof.CodeFixes\bin\$(Configuration)\netstandard2.0\SharpProof.CodeFixes.dll" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="..\SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.dll" PackagePath="analyzers/dotnet/cs" />
-      <TfmSpecificPackageFile Include="..\SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.dll" PackagePath="lib/netstandard2.0" />
+      <TfmSpecificPackageFile Include="
+          $(AnalyzerPayloadDirectory)\SharpProof.Analyzer.dll;
+          $(ContractForGeneratorPayloadPath);
+          $(AnalyzerPayloadDirectory)\SharpProof.Attributes.dll;
+          $(AnalyzerPayloadDirectory)\SharpProof.Contracts.dll;
+          $(AnalyzerPayloadDirectory)\SharpProof.Dataflow.dll;
+          $(AnalyzerPayloadDirectory)\SharpProof.Effects.dll;
+          $(AnalyzerPayloadDirectory)\SharpProof.Frontend.dll;
+          $(AnalyzerPayloadDirectory)\SharpProof.Ir.dll;
+          $(AnalyzerPayloadDirectory)\SharpProof.Specs.dll;
+          $(AnalyzerPayloadDirectory)\Microsoft.CodeAnalysis.AnalyzerUtilities.dll;
+          $(AnalyzerPayloadDirectory)\System.Buffers.dll;
+          $(AnalyzerPayloadDirectory)\System.Collections.Immutable.dll;
+          $(AnalyzerPayloadDirectory)\System.Memory.dll;
+          $(AnalyzerPayloadDirectory)\System.Numerics.Vectors.dll;
+          $(AnalyzerPayloadDirectory)\System.Reflection.Metadata.dll;
+          $(AnalyzerPayloadDirectory)\System.Runtime.CompilerServices.Unsafe.dll;
+          $(AnalyzerPayloadDirectory)\System.Text.Encoding.CodePages.dll;
+          $(AnalyzerPayloadDirectory)\System.Threading.Tasks.Extensions.dll"
+                                 PackagePath="tools/analyzers/dotnet/cs" />
+      <TfmSpecificPackageFile Include="$(AttributesPayloadPath)" PackagePath="lib/netstandard2.0" />
+      <TfmSpecificPackageFile Include="
+          $(WorkerPayloadDirectory)\Microsoft.CodeAnalysis.AnalyzerUtilities.dll;
+          $(WorkerPayloadDirectory)\Microsoft.CodeAnalysis.CSharp.dll;
+          $(WorkerPayloadDirectory)\Microsoft.CodeAnalysis.dll;
+          $(WorkerPayloadDirectory)\Microsoft.Z3.dll;
+          $(WorkerPayloadDirectory)\SharpProof.Attributes.dll;
+          $(WorkerPayloadDirectory)\SharpProof.Contracts.dll;
+          $(WorkerPayloadDirectory)\SharpProof.Dataflow.dll;
+          $(WorkerPayloadDirectory)\SharpProof.Frontend.dll;
+          $(WorkerPayloadDirectory)\SharpProof.Ir.dll;
+          $(WorkerPayloadDirectory)\SharpProof.Smt.dll;
+          $(WorkerPayloadDirectory)\SharpProof.Specs.dll;
+          $(WorkerPayloadDirectory)\SharpProof.Verify.dll;
+          $(WorkerPayloadDirectory)\SharpProof.Worker.Protocol.dll;
+          $(WorkerPayloadDirectory)\SharpProof.Worker.dll;
+          $(WorkerPayloadDirectory)\SharpProof.Worker.deps.json;
+          $(WorkerPayloadDirectory)\SharpProof.Worker.runtimeconfig.json;
+          $(WorkerPayloadDirectory)\System.Collections.Immutable.dll;
+          $(WorkerPayloadDirectory)\System.IO.Pipelines.dll;
+          $(WorkerPayloadDirectory)\System.Reflection.Metadata.dll;
+          $(WorkerPayloadDirectory)\System.Text.Encodings.Web.dll;
+          $(WorkerPayloadDirectory)\System.Text.Json.dll"
+                              PackagePath="tools/net8" />
+      <TfmSpecificPackageFile Include="$(WorkerPayloadDirectory)\runtimes\win-x64\native\libz3.dll"
+                              PackagePath="tools/net8/runtimes/win-x64/native" />
+      <TfmSpecificPackageFile Include="$(LauncherPayloadDirectory)\SharpProof.Worker.Launcher.dll;$(LauncherPayloadDirectory)\SharpProof.Worker.Launcher.deps.json;$(LauncherPayloadDirectory)\SharpProof.Worker.Launcher.runtimeconfig.json"
+                              PackagePath="tools/net8" />
     </ItemGroup>
   </Target>
-
 </Project>

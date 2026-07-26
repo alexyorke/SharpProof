@@ -1,0 +1,156 @@
+namespace SharpProof.Dataflow.Test;
+
+[TestFixture]
+public sealed class ForwardDataflowAnalysisTests {
+    [Test]
+    public void DiamondJoinsPredecessorStates() {
+        var domain = NullnessDomain.Instance;
+        var graph = new DataflowGraph<NullnessValue>(
+            [
+                new(0, value => value),
+                new(1, domain.AssumeNull),
+                new(2, domain.AssumeNonNull),
+                new(3, value => value)
+            ],
+            [
+                new(0, 1),
+                new(0, 2),
+                new(1, 3),
+                new(2, 3)
+            ]);
+
+        var result = ForwardDataflowAnalysis.Analyze(
+            graph,
+            domain,
+            NullnessValue.MaybeNull);
+
+        Assert.That(result.GetOutputState(1), Is.EqualTo(NullnessValue.Null));
+        Assert.That(result.GetOutputState(2), Is.EqualTo(NullnessValue.NonNull));
+        Assert.That(result.GetInputState(3), Is.EqualTo(NullnessValue.MaybeNull));
+        Assert.That(result.GetOutputState(3), Is.EqualTo(NullnessValue.MaybeNull));
+    }
+
+    [Test]
+    public void LoopUsesWideningAndTerminates() {
+        var domain = IntervalDomain.Instance;
+        var graph = CreateAscendingIntervalGraph(domain);
+        var options = new ForwardDataflowAnalysisOptions(widenAfter: 1, maxIterations: 100);
+
+        var result = ForwardDataflowAnalysis.Analyze(
+            graph,
+            domain,
+            IntervalValue.Constant(0),
+            options);
+
+        Assert.That(result.Iterations, Is.LessThan(100));
+        Assert.That(result.GetInputState(3).UpperBound, Is.Null);
+        Assert.That(result.GetOutputState(4).UpperBound, Is.Null);
+    }
+
+    [Test]
+    public void AcyclicJoinsDoNotWiden() {
+        var domain = IntervalDomain.Instance;
+        var graph = new DataflowGraph<IntervalValue>(
+            [
+                new(0, value => value),
+                new(1, value => domain.AddConstant(value, 1)),
+                new(2, value => domain.AddConstant(value, 1)),
+                new(3, value => domain.AddConstant(value, 1)),
+                new(4, value => value)
+            ],
+            [
+                new(0, 1),
+                new(0, 2),
+                new(1, 4),
+                new(2, 3),
+                new(3, 4)
+            ]);
+
+        var result = ForwardDataflowAnalysis.Analyze(
+            graph,
+            domain,
+            IntervalValue.Constant(0),
+            new ForwardDataflowAnalysisOptions(widenAfter: 0));
+
+        Assert.That(graph.IsCyclicBlock(4), Is.False);
+        Assert.That(result.GetInputState(4), Is.EqualTo(IntervalValue.Range(1, 2)));
+    }
+
+    [Test]
+    public void RandomizedBatchOrderDoesNotChangeFixpoint() {
+        var domain = IntervalDomain.Instance;
+        var graph = CreateAscendingIntervalGraph(domain);
+        var options = new ForwardDataflowAnalysisOptions(widenAfter: 1, maxIterations: 100);
+        var expected = ForwardDataflowAnalysis.Analyze(
+            graph,
+            domain,
+            IntervalValue.Constant(0),
+            options);
+
+        for (var seed = 0; seed < 32; seed++) {
+            var random = new Random(seed);
+            var actual = ForwardDataflowAnalysis.AnalyzeWithWorklistOrderForTesting(
+                graph,
+                domain,
+                IntervalValue.Constant(0),
+                options,
+                pending => [.. pending.OrderBy(_ => random.Next())]);
+
+            Assert.That(actual.Iterations, Is.EqualTo(expected.Iterations));
+            for (var blockId = 0; blockId < graph.Blocks.Length; blockId++) {
+                Assert.That(
+                    domain.AreEquivalent(
+                        actual.GetInputState(blockId),
+                        expected.GetInputState(blockId)),
+                    Is.True,
+                    $"Input state differs at block {blockId} for seed {seed}.");
+                Assert.That(
+                    domain.AreEquivalent(
+                        actual.GetOutputState(blockId),
+                        expected.GetOutputState(blockId)),
+                    Is.True,
+                    $"Output state differs at block {blockId} for seed {seed}.");
+            }
+        }
+    }
+
+    [Test]
+    public void GraphCanonicalizesEdgesAndRejectsNonContiguousBlocks() {
+        var graph = new DataflowGraph<NullnessValue>(
+            [
+                new(0, value => value),
+                new(1, value => value)
+            ],
+            [
+                new(0, 1),
+                new(0, 1)
+            ]);
+
+        Assert.That(graph.Edges, Has.Length.EqualTo(1));
+        Assert.Throws<ArgumentException>((Action)(() => new DataflowGraph<NullnessValue>(
+                [
+                    new(0, value => value),
+                    new(2, value => value)
+                ],
+                [])));
+    }
+
+    private static DataflowGraph<IntervalValue> CreateAscendingIntervalGraph(
+        IntervalDomain domain) =>
+        new(
+            [
+                new(0, value => value),
+                new(1, value => domain.AddConstant(value, 1)),
+                new(2, value => domain.AddConstant(value, 2)),
+                new(3, value => domain.AddConstant(value, 1)),
+                new(4, value => value)
+            ],
+            [
+                new(0, 1),
+                new(0, 2),
+                new(1, 3),
+                new(2, 3),
+                new(3, 3),
+                new(3, 4)
+            ]);
+}

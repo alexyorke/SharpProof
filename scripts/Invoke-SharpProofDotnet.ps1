@@ -17,28 +17,30 @@ $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'JobObjectHelpers.ps1')
 
-$effectiveDotnetArgs = [System.Collections.Generic.List[string]]::new()
-foreach ($argument in $DotnetArgs)
-{
-    $effectiveDotnetArgs.Add($argument)
-}
+$effectiveDotnetArgs = [System.Collections.Generic.List[string]]::new([string[]]$DotnetArgs)
 
 if ($effectiveDotnetArgs.Count -gt 0)
 {
-    $msbuildBackedCommands = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($commandName in @('build', 'clean', 'msbuild', 'pack', 'publish', 'restore', 'test'))
-    {
-        [void]$msbuildBackedCommands.Add($commandName)
-    }
+    $msbuildBackedCommands = [System.Collections.Generic.HashSet[string]]::new(
+        [string[]]@('build', 'clean', 'msbuild', 'pack', 'publish', 'restore', 'test'),
+        [StringComparer]::OrdinalIgnoreCase)
 
     if ($msbuildBackedCommands.Contains($effectiveDotnetArgs[0]))
     {
-        if (-not $effectiveDotnetArgs.Contains('/nodeReuse:false'))
+        $hasNodeReuseSetting = $effectiveDotnetArgs | Where-Object {
+            $_.Equals('/nodeReuse:false', [StringComparison]::OrdinalIgnoreCase) -or
+            $_.Equals('-nodeReuse:false', [StringComparison]::OrdinalIgnoreCase)
+        }
+        if (-not $hasNodeReuseSetting)
         {
             $effectiveDotnetArgs.Add('/nodeReuse:false')
         }
 
-        if (-not $effectiveDotnetArgs.Contains('-p:UseSharedCompilation=false'))
+        $hasSharedCompilationSetting = $effectiveDotnetArgs | Where-Object {
+            $_.StartsWith('-p:UseSharedCompilation=', [StringComparison]::OrdinalIgnoreCase) -or
+            $_.StartsWith('/p:UseSharedCompilation=', [StringComparison]::OrdinalIgnoreCase)
+        }
+        if (-not $hasSharedCompilationSetting)
         {
             $effectiveDotnetArgs.Add('-p:UseSharedCompilation=false')
         }

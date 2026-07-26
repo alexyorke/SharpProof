@@ -1,44 +1,29 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-
 namespace SharpProof.Analyzer;
 
-internal static class AnalyzerSyntaxHelpers
-{
-    internal static bool IsBodylessAutoPropertyGetter(MethodBodyAnalysisContext context)
-    {
-        return context.MethodSymbol.MethodKind == MethodKind.PropertyGet &&
-               !context.MethodSymbol.IsAbstract &&
-               context.MethodSymbol.ContainingType?.TypeKind != TypeKind.Interface &&
-               context.Node is AccessorDeclarationSyntax accessor &&
-               accessor.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.GetAccessorDeclaration) &&
-               accessor.Body == null &&
-               accessor.ExpressionBody == null &&
-               !accessor.SemicolonToken.IsMissing;
-    }
-
-    internal static Location GetCallableDeclarationLocation(SyntaxNode node)
-    {
-        return node switch
-        {
-            MethodDeclarationSyntax methodDeclaration => methodDeclaration.Identifier.GetLocation(),
-            LocalFunctionStatementSyntax localFunctionStatement => localFunctionStatement.Identifier.GetLocation(),
-            ConstructorDeclarationSyntax constructorDeclaration => constructorDeclaration.Identifier.GetLocation(),
-            AccessorDeclarationSyntax accessorDeclaration => accessorDeclaration.Keyword.GetLocation(),
-            OperatorDeclarationSyntax operatorDeclaration => operatorDeclaration.OperatorToken.GetLocation(),
-            ConversionOperatorDeclarationSyntax conversionOperatorDeclaration => conversionOperatorDeclaration.Type
-                .GetLocation(),
+internal static class AnalyzerSyntaxHelpers {
+    internal static Location GetCallableDeclarationLocation(SyntaxNode node) =>
+        node switch {
+            MethodDeclarationSyntax method => method.Identifier.GetLocation(),
+            PropertyDeclarationSyntax property => property.Identifier.GetLocation(),
+            IndexerDeclarationSyntax indexer => indexer.ThisKeyword.GetLocation(),
+            ConstructorDeclarationSyntax constructor => constructor.Identifier.GetLocation(),
+            AccessorDeclarationSyntax accessor => accessor.Parent?.Parent switch {
+                PropertyDeclarationSyntax property => property.Identifier.GetLocation(),
+                IndexerDeclarationSyntax indexer => indexer.ThisKeyword.GetLocation(),
+                _ => accessor.Keyword.GetLocation()
+            },
+            OperatorDeclarationSyntax operation => operation.OperatorToken.GetLocation(),
+            ConversionOperatorDeclarationSyntax conversion =>
+                conversion.ImplicitOrExplicitKeyword.GetLocation(),
             _ => node.GetLocation()
         };
-    }
 
     internal static Location GetCallableDeclarationLocation(
-        IMethodSymbol methodSymbol,
-        CancellationToken cancellationToken)
-    {
-        var syntaxReference = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
-        return syntaxReference == null
-            ? methodSymbol.Locations.First()
-            : GetCallableDeclarationLocation(syntaxReference.GetSyntax(cancellationToken));
+        IMethodSymbol method,
+        CancellationToken cancellationToken) {
+        var reference = method.DeclaringSyntaxReferences.FirstOrDefault();
+        return reference == null
+            ? method.Locations.FirstOrDefault() ?? Location.None
+            : GetCallableDeclarationLocation(reference.GetSyntax(cancellationToken));
     }
 }

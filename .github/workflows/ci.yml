@@ -10,130 +10,36 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Setup .NET 8.0
+      - name: Setup required .NET SDKs
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
+          global-json-file: global.json
 
       - name: Restore dependencies
-        run: dotnet restore
+        shell: pwsh
+        run: .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
 
-      - name: Verify generated README
+      - name: Verify maintained documentation
         shell: pwsh
         run: .\scripts\Generate-Readme.ps1 -Verify
 
-      - name: Verify generated analyzer configuration reference
+      - name: Run the acceptance contract
         shell: pwsh
-        run: .\scripts\Generate-ConfigurationReference.ps1 -Verify
-
-      - name: Validate shipping projects warning-free
-        shell: pwsh
-        run: .\scripts\Invoke-SharpProofReleaseValidation.ps1 -Configuration Release -NoRestore
-
-      - name: Build solution
-        run: dotnet build SharpProof.sln --configuration Release --no-restore
-
-      - name: Test lanes
-        shell: pwsh
-        run: .\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane All -SequentialLanes
-
-      - name: Build VSIX project
-        run: |
-          dotnet build SharpProof.Vsix/SharpProof.Vsix.csproj --configuration Release /p:EnableVsixPackaging=true
-
-      - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: vsix-package
-          path: SharpProof.Vsix/bin/Release/*.vsix
-          if-no-files-found: warn
+        run: .\eng\acceptance\Verify.ps1 -Configuration Release
 
       - name: Package NuGet packages
-        run: |
-          dotnet pack SharpProof.Package/SharpProof.Package.csproj --configuration Release --no-build --output nupkgs
-          dotnet pack SharpProof.Attributes/SharpProof.Attributes.csproj --configuration Release --no-build --output nupkgs
-          dotnet pack SharpProof.Symbolic/SharpProof.Symbolic.csproj --configuration Release --no-build --output nupkgs
-
-      - name: Validate NuGet package contents
         shell: pwsh
         run: |
-          $analyzerPackages = @(Get-ChildItem nupkgs -Filter SharpProof.*.nupkg -File |
-            Where-Object {
-              $_.Name -notlike "SharpProof.Attributes.*" -and
-              $_.Name -notlike "SharpProof.Symbolic.*"
-            } |
-            Sort-Object Name)
-          $attributePackages = @(Get-ChildItem nupkgs -Filter SharpProof.Attributes.*.nupkg -File |
-            Sort-Object Name)
-          $symbolicPackages = @(Get-ChildItem nupkgs -Filter SharpProof.Symbolic.*.nupkg -File |
-            Sort-Object Name)
-
-          if ($analyzerPackages.Count -ne 1) {
-            $found = if ($analyzerPackages.Count -eq 0) { "<none>" } else { $analyzerPackages.Name -join ", " }
-            throw "Expected exactly one SharpProof analyzer package, found $($analyzerPackages.Count): $found"
-          }
-
-          if ($attributePackages.Count -ne 1) {
-            $found = if ($attributePackages.Count -eq 0) { "<none>" } else { $attributePackages.Name -join ", " }
-            throw "Expected exactly one SharpProof.Attributes package, found $($attributePackages.Count): $found"
-          }
-
-          if ($symbolicPackages.Count -ne 1) {
-            $found = if ($symbolicPackages.Count -eq 0) { "<none>" } else { $symbolicPackages.Name -join ", " }
-            throw "Expected exactly one SharpProof.Symbolic package, found $($symbolicPackages.Count): $found"
-          }
-
-          $package = $analyzerPackages[0]
-          $entries = tar -tf $package.FullName
-          $requiredEntries = @(
-            "README.md",
-            "analyzers/dotnet/cs/SharpProof.Analyzer.dll",
-            "analyzers/dotnet/cs/SharpProof.CodeFixes.dll",
-            "analyzers/dotnet/cs/Microsoft.Z3.dll",
-            "analyzers/dotnet/cs/libz3.dll",
-            "analyzers/dotnet/cs/libz3.dylib",
-            "buildTransitive/SharpProof.targets",
-            "lib/netstandard2.0/SharpProof.Attributes.dll",
-            "THIRD-PARTY-NOTICES.txt",
-            "tools/install.ps1",
-            "tools/uninstall.ps1"
-          )
-
-          foreach ($entry in $requiredEntries) {
-            if ($entries -notcontains $entry) {
-              throw "Package $($package.Name) is missing required entry: $entry"
-            }
-          }
-
-          $attributesPackage = $attributePackages[0]
-          $attributesEntries = tar -tf $attributesPackage.FullName
-          $requiredAttributeEntries = @(
-            "README.md",
-            "lib/netstandard2.0/SharpProof.Attributes.dll"
-          )
-
-          foreach ($entry in $requiredAttributeEntries) {
-            if ($attributesEntries -notcontains $entry) {
-              throw "Package $($attributesPackage.Name) is missing required entry: $entry"
-            }
-          }
-
-          $symbolicBaseline = Get-Content SharpProof.Symbolic/PackageBaseline.json -Raw | ConvertFrom-Json
-          $symbolicPackage = $symbolicPackages[0]
-          $expectedSymbolicName = "$($symbolicBaseline.packageId).$($symbolicBaseline.packageVersion).nupkg"
-          if ($symbolicPackage.Name -ne $expectedSymbolicName) {
-            throw "Expected symbolic package $expectedSymbolicName, found $($symbolicPackage.Name)"
-          }
-
-          $symbolicEntries = tar -tf $symbolicPackage.FullName
-          foreach ($entry in $symbolicBaseline.requiredEntries) {
-            if ($symbolicEntries -notcontains $entry) {
-              throw "Package $($symbolicPackage.Name) is missing baseline entry: $entry"
-            }
+          $manifest = Get-Content scripts/package-projects.json -Raw | ConvertFrom-Json
+          foreach ($project in $manifest.projects) {
+            .\scripts\Invoke-SharpProofDotnet.ps1 pack $project --configuration Release --no-build --output nupkgs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
       - name: Upload NuGet artifact

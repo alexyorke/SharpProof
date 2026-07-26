@@ -2,12 +2,23 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
-    <LangVersion>preview</LangVersion>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+    <!-- The executable deliberately uses seeded non-cryptographic randomness,
+         IR sort names, explicit argument guards with stable messages, and
+         console-oriented async/output behavior. It has no public API contract. -->
+    <NoWarn>$(NoWarn);CA1510;CA1512;CA1515;CA1720;CA1849;CA2007;CA5394</NoWarn>
   </PropertyGroup>
-
   <ItemGroup>
-    <ProjectReference Include="..\SharpProof.Fuzz.Core\SharpProof.Fuzz.Core.csproj" />
+    <PackageReference Include="Microsoft.Z3" Version="$(MicrosoftZ3PackageVersion)" />
+    <PackageReference Include="System.Text.Json" Version="9.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\SharpProof.Ir\SharpProof.Ir.csproj" />
+    <ProjectReference Include="..\..\SharpProof.Frontend\SharpProof.Frontend.csproj" />
+    <ProjectReference Include="..\..\SharpProof.Smt\SharpProof.Smt.csproj" />
+    <ProjectReference Include="..\..\SharpProof.Testing\SharpProof.Testing.csproj" />
+    <ProjectReference Include="..\..\SharpProof.Verify\SharpProof.Verify.csproj" />
   </ItemGroup>
 </Project>

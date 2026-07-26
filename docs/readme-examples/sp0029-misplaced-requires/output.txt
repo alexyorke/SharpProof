@@ -1,1 +1,0 @@
-SP0029 Error docs/readme-examples/sp0029-misplaced-requires/input.cs:6:6 The [Requires] attribute can only be applied to method-like declarations

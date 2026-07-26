@@ -1,20 +1,45 @@
 <Project>
+  <Import Project="$(MSBuildThisFileDirectory)SharpProof.Release.props" />
   <PropertyGroup>
-    
+    <MicrosoftZ3PackageVersion>4.12.2</MicrosoftZ3PackageVersion>
+    <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
+    <ImplicitUsings Condition="'$(ImplicitUsings)' == ''">enable</ImplicitUsings>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <!-- Run every built-in .NET analyzer rule, including rules disabled by default. -->
+    <AnalysisLevel>latest-all</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <WarningsAsErrors>$(WarningsAsErrors);CA1811;CS8019;IDE0051;IDE0052;IDE0060</WarningsAsErrors>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-
-    
-    <EnableVsixPackaging Condition="'$(EnableVsixPackaging)' == 'true'">true</EnableVsixPackaging>
-    <EnableVsixPackaging Condition="'$(EnableVsixPackaging)' != 'true' AND '$(BuildingInsideVisualStudio)' == 'true'">true</EnableVsixPackaging>
-    <EnableVsixPackaging Condition="'$(EnableVsixPackaging)' != 'true' AND '$(BuildingInsideVisualStudio)' != 'true'">false</EnableVsixPackaging>
-    
-    
-    <IsPackable Condition="'$(MSBuildProjectName)' == 'SharpProof.Vsix'">false</IsPackable>
-    
-    
-    <NoWarn Condition="'$(MSBuildProjectName)' == 'SharpProof.Vsix'">$(NoWarn);NU5026</NoWarn>
-    
-    
-    <DefaultItemExcludes Condition="'$(MSBuildProjectExtension)' == '.sln'">$(DefaultItemExcludes);SharpProof.Vsix\**</DefaultItemExcludes>
   </PropertyGroup>
-</Project> 
+
+  <PropertyGroup>
+    <SharpProofProductionProject Condition="
+      '$(MSBuildProjectName)' == 'SharpProof.Analyzer' Or
+      '$(MSBuildProjectName)' == 'SharpProof.Attributes' Or
+      '$(MSBuildProjectName)' == 'SharpProof.ContractForGenerator' Or
+      '$(MSBuildProjectName)' == 'SharpProof.Contracts' Or
+      '$(MSBuildProjectName)' == 'SharpProof.Dataflow' Or
+      '$(MSBuildProjectName)' == 'SharpProof.Effects' Or
+      '$(MSBuildProjectName)' == 'SharpProof.Frontend' Or
+      '$(MSBuildProjectName)' == 'SharpProof.Ir' Or
+      '$(MSBuildProjectName)' == 'SharpProof.Meta.Analyzers' Or
+      '$(MSBuildProjectName)' == 'SharpProof.Smt' Or
+      '$(MSBuildProjectName)' == 'SharpProof.Specs' Or
+      '$(MSBuildProjectName)' == 'SharpProof.Verify' Or
+      '$(MSBuildProjectName)' == 'SharpProof.Worker' Or
+      '$(MSBuildProjectName)' == 'SharpProof.Worker.Launcher' Or
+      '$(MSBuildProjectName)' == 'SharpProof.Worker.Protocol'">true</SharpProofProductionProject>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(SharpProofProductionProject)' == 'true'">
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers"
+                      Version="3.3.4"
+                      PrivateAssets="all" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt"
+                     Link="BannedSymbols.txt" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(SharpProofProductionProject)' == 'true'">
+    <WarningsAsErrors>$(WarningsAsErrors);RS0030</WarningsAsErrors>
+  </PropertyGroup>
+</Project>

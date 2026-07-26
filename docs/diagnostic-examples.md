@@ -1,1159 +1,263 @@
-<!-- Generated from docs/diagnostic-examples.source.md by scripts/Generate-Readme.ps1. -->
+# SharpProof diagnostics
 
-# SharpProof Diagnostic Example Gallery
+The authoritative descriptors are static fields in
+`SharpProof.Analyzer/GeneratedDiagnosticDescriptors.cs` and
+`SharpProof.ContractForGenerator/GeneratedDiagnosticDescriptors.cs`.
 
-This page is generated from committed example inputs and committed output
-snapshots. It is the per-rule evidence catalog for the current public analyzer
-surface.
+The main package defaults to `SharpProofMode=off`, which omits both the analyzer
+and the `ContractFor` generator from compiler analyzer items. Enable a mode in
+the project:
 
-Every example below is backed by a regression test. When the analyzer behavior
-changes, the generator and the tests force this page to stay in sync.
+```xml
+<PropertyGroup>
+  <SharpProofMode>all-experimental</SharpProofMode>
+</PropertyGroup>
+```
 
-## Coverage
+Main feature diagnostics are `Info` and disabled by default. Enabling a mode
+selects a pipeline; it does not opt those IDs into editor reporting. Configure
+the IDs you want:
 
-The catalog intentionally includes at least one example for every public rule
-from `SP0002` through `SP0040`.
+```ini
+dotnet_diagnostic.SP0002.severity = suggestion
+dotnet_diagnostic.SP0016.severity = suggestion
+dotnet_diagnostic.SP0045.severity = suggestion
+dotnet_diagnostic.SP0046.severity = suggestion
+dotnet_diagnostic.SP0027.severity = warning
+```
+
+`SP0024` is an enabled-by-default error and `SP0025` is an
+enabled-by-default warning. The `SPCF` rules are enabled-by-default errors once
+the generator is loaded.
+
+## Main analyzer summary
+
+| ID | Mode | Descriptor default | Emitted now? |
+|---|---|---|---|
+| `SP0002` | `effects` | Info, off | Yes |
+| `SP0013` | `effects` | Info, off | Reserved |
+| `SP0015` | `effects` | Info, off | Reserved |
+| `SP0016` | `effects` | Info, off | Yes |
+| `SP0024` | Any loaded mode | Error, on | Yes |
+| `SP0025` | Invalid loaded configuration | Warning, on | Yes |
+| `SP0027` | `contracts` | Info, off | Yes |
+| `SP0030` | `effects` | Info, off | Reserved |
+| `SP0045` | `effects` | Info, off | Yes |
+| `SP0046` | `effects` | Info, off | Yes |
+
+`all-experimental` enables both feature pipelines. Unsupported analyzer
+callables abstain silently even when an ID is enabled.
 
 <a id="sp0002"></a>
+## SP0002 - purity not proven
 
-### SP0002 - Purity not verified
+`[EnforcePure]` cannot be established because the method summary is incomplete
+or includes observable reads, writes, capabilities, or other effects forbidden
+by observable purity.
 
-The analyzer rejects ambient clock reads inside `[EnforcePure]` methods.
-
-Backed by test: `ReadmeGeneratedExamplesTests.PurityAnalyzerExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/purity-clock/input.cs`):
-
-```csharp
-using System;
-using SharpProof.Attributes;
-
-public sealed class Example
-{
-    [EnforcePure]
-    public int ReadClock()
-    {
-        return DateTime.Now.Second;
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0002 Error docs/readme-examples/purity-clock/input.cs:7:16 Method 'ReadClock' is marked [EnforcePure]/[Pure], but its body contains operations the analyzer cannot prove pure
-```
-
-<a id="sp0003"></a>
-
-### SP0003 - Misplaced [EnforcePure]
-
-Purity contracts accept method-like declarations and getter-bearing property/indexer aliases while rejecting unrelated targets.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0003_MisplacedEnforcePureExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0003-misplaced-enforce-pure/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-[EnforcePure]
-public sealed class TestClass
-{
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0003 Error docs/readme-examples/sp0003-misplaced-enforce-pure/input.cs:4:2 The [EnforcePure]/[Pure] attributes can only be applied to method-like declarations or getter-bearing properties and indexers
-```
-
-<a id="sp0004"></a>
-
-### SP0004 - Missing [EnforcePure]
-
-Pure-looking methods can be suggested for explicit purity contracts.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0004_MissingEnforcePureExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0004-missing-enforce-pure/input.cs`):
-
-```csharp
-public sealed class TestClass
-{
-    public int Add(int left, int right)
-    {
-        return left + right;
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0004 Warning docs/readme-examples/sp0004-missing-enforce-pure/input.cs:3:16 Method 'Add' appears to be pure but is not marked with [EnforcePure]. Consider adding the attribute to enforce and document its purity.
-```
-
-<a id="sp0005"></a>
-
-### SP0005 - Conflicting purity attributes
-
-Contradictory method contracts are reported directly.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0005_ConflictingPurityAttributesExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0005-conflicting-purity-attributes/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [EnforcePure]
-    [Impure]
-    public int Value()
-    {
-        return 1;
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0002 Error docs/readme-examples/sp0005-conflicting-purity-attributes/input.cs:8:16 Method 'Value' is marked [EnforcePure]/[Pure], but its body contains operations the analyzer cannot prove pure
-SP0005 Warning docs/readme-examples/sp0005-conflicting-purity-attributes/input.cs:8:16 Method 'Value' has conflicting purity attributes applied
-```
-
-<a id="sp0006"></a>
-
-### SP0006 - [AllowSynchronization] without a purity contract
-
-Synchronization exceptions only make sense on methods participating in purity analysis.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0006_AllowSynchronizationWithoutPurityExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0006-allow-sync-without-purity/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [AllowSynchronization]
-    public void Work()
-    {
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0006 Warning docs/readme-examples/sp0006-allow-sync-without-purity/input.cs:7:17 Method 'Work' is marked with [AllowSynchronization] but is not marked with [EnforcePure] or [Pure]
-```
-
-<a id="sp0007"></a>
-
-### SP0007 - Misplaced [AllowSynchronization]
-
-Placement errors for synchronization allowances are explicit.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0007_MisplacedAllowSynchronizationExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0007-misplaced-allow-synchronization/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-[AllowSynchronization]
-public sealed class TestClass
-{
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0007 Error docs/readme-examples/sp0007-misplaced-allow-synchronization/input.cs:4:2 The [AllowSynchronization] attribute can only be applied to method declarations
-```
-
-<a id="sp0008"></a>
-
-### SP0008 - Redundant [AllowSynchronization]
-
-The analyzer can flag unnecessary synchronization allowances.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0008_RedundantAllowSynchronizationExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0008-redundant-allow-synchronization/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [EnforcePure]
-    [AllowSynchronization]
-    public int Add(int left, int right)
-    {
-        return left + right;
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0008 Info docs/readme-examples/sp0008-redundant-allow-synchronization/input.cs:8:16 Method 'Add' is marked with [AllowSynchronization] but contains no synchronization constructs
-```
-
-<a id="sp0009"></a>
-
-### SP0009 - Purity explanation
-
-Optional explanation diagnostics can expose why the purity result was reached.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0009_PurityExplanationExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0009-purity-explanation/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using System;
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [EnforcePure]
-    public void Log()
-    {
-        Console.WriteLine("hello");
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0002 Error docs/readme-examples/sp0009-purity-explanation/input.cs:8:17 Method 'Log' is marked [EnforcePure]/[Pure], but its body contains operations the analyzer cannot prove pure
-SP0009 Info docs/readme-examples/sp0009-purity-explanation/input.cs:8:17 Purity analysis for 'Log': catalog_hit at static System.Console.WriteLine(string?)
-```
-
-<a id="sp0010"></a>
-
-### SP0010 - Exception summary
-
-Method-level exception summaries can be emitted independently of point hazards.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0010_ExceptionSummaryExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0010-exception-summary/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-public sealed class TestClass
-{
-    public int Divide(int value)
-    {
-        return value / 0;
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0010 Info docs/readme-examples/sp0010-exception-summary/input.cs:4:16 Method 'Divide' can throw: System.DivideByZeroException
-```
-
-<a id="sp0011"></a>
-
-### SP0011 - Operation-site runtime hazard
-
-The analyzer can point at the exact operation that may throw under the current facts.
-
-Backed by test: `ReadmeGeneratedExamplesTests.RuntimeHazardCliExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/runtime-hazard-divide-by-zero/input.cs`):
-
-```csharp
-public static class Example
-{
-    public static int Divide(int divisor)
-    {
-        if (divisor == 0)
-        {
-            return 10 / divisor;
-        }
-
-        return 0;
-    }
-}
-```
-
-CLI output:
-
-```text
-docs/readme-examples/runtime-hazard-divide-by-zero/input.cs
-Line: 7
-Runtime hazards: 1
-Hazard status summary: Proven=1
-Hazard exception summary: System.DivideByZeroException=1
-Hazard category summary: definite_divide_by_zero=1
-
-docs/readme-examples/runtime-hazard-divide-by-zero/input.cs:7:20 DivideByZero Proven
-Exception: System.DivideByZeroException
-Category: definite_divide_by_zero
-Reason: ir_state_contains_condition
-Node: DivideExpression <offset-range>
-Operation: 10 / divisor
-Trigger: divisor == 0
-Invariant: divisor == 0
-SMT:
-  Mode: Bounded
-  Enabled: True
-  Query timeout ms: 750
-  Method budget ms: 5000
-  Max path conditions: 192
-  Max expression nodes: 2048
-  Executed queries: 1
-  Cache entries: 1
-  Health: Ready
-  Permanently unavailable: False
-  Transient retries: 0
-  Recovered transient failures: 0
-  Context recycles: 0
-  Context generation: 0
-  Max transient retries: 1
-  Recycle context on transient failure: True
-  Dispose context with service: False
-```
-
-<a id="sp0012"></a>
-
-### SP0012 - BCL fallback guess
-
-When stronger evidence is missing, SharpProof can emit an explicitly non-authoritative BCL fallback guess.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0012_BclFallbackGuessExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0012-bcl-fallback-guess/input.cs`):
-
-```csharp
-using SharpProof.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public int TestMethod(int value)
-    {
-        return System.Experimental.NumericFacts.Normalize(value);
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0002 Error docs/readme-examples/sp0012-bcl-fallback-guess/input.cs:6:16 Method 'TestMethod' is marked [EnforcePure]/[Pure], but its body contains operations the analyzer cannot prove pure
-SP0012 Info docs/readme-examples/sp0012-bcl-fallback-guess/input.cs:6:16 BCL purity fallback for 'TestMethod': probably_pure (member returns a value-like result without ref or out parameters)
-```
+This is a not-proven diagnostic. It does not claim a replayed impure trace.
 
 <a id="sp0013"></a>
+## SP0013 - allocation in a zero-allocation method
 
-### SP0013 - Allocation in [ZeroAllocations] body
+Reserved for a future replay-validated allocation witness. The current
+path-insensitive may-effect analyzer never emits SP0013.
 
-Zero-allocation contracts report each direct heap allocation site separately.
-
-Backed by test: `ReadmeGeneratedExamplesTests.ZeroAllocationsAnalyzerExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/zero-allocations/input.cs`):
-
-```csharp
-using SharpProof.Attributes;
-
-public sealed class Example
-{
-    [Impure]
-    [ZeroAllocations]
-    public object Create()
-    {
-        return new object();
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0013 Warning docs/readme-examples/zero-allocations/input.cs:9:16 Method 'Create' is marked [ZeroAllocations], but operation 'new object()' allocates
-```
-
-<a id="sp0014"></a>
-
-### SP0014 - Misplaced [ZeroAllocations]
-
-Zero-allocation contracts accept method-like declarations and getter-bearing property/indexer aliases while rejecting unrelated targets.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0014_MisplacedZeroAllocationsExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0014-misplaced-zero-allocations/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-[ZeroAllocations]
-public sealed class TestClass
-{
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0014 Error docs/readme-examples/sp0014-misplaced-zero-allocations/input.cs:4:2 The [ZeroAllocations] attribute can only be applied to method-like declarations or getter-bearing properties and indexers
-```
+A possible allocation is reported as SP0045 instead.
 
 <a id="sp0015"></a>
+## SP0015 - disallowed capability
 
-### SP0015 - Disallowed capability use
+Reserved for a future replay-validated capability witness. The current
+path-insensitive may-effect analyzer never emits SP0015.
 
-Capability contracts report concrete operations that exceed the allowed set.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0015_CapabilityViolationExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0015-capability-violation/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using System;
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [AllowedCapabilities(SharpProofCapability.None)]
-    public void TestMethod()
-    {
-        Console.WriteLine("hello");
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0015 Warning docs/readme-examples/sp0015-capability-violation/input.cs:10:9 Method 'TestMethod' is marked [AllowedCapabilities], but operation 'Console.WriteLine("hello")' requires capabilities: IO, Console
-```
+A possibly disallowed capability is reported as SP0016 instead.
 
 <a id="sp0016"></a>
-
-### SP0016 - Capability contract not fully verified
-
-Unknown or unsupported capability cases stay conservative instead of being silently accepted.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0016_CapabilityUnknownExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0016-capability-unknown/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [AllowedCapabilities(SharpProofCapability.None)]
-    public void TestMethod(dynamic value)
-    {
-        value.ToString();
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0016 Warning docs/readme-examples/sp0016-capability-unknown/input.cs:9:9 Method 'TestMethod' is marked [AllowedCapabilities], but operation 'value.ToString()' could not be capability-verified: DynamicDispatch
-```
-
-<a id="sp0017"></a>
-
-### SP0017 - Misplaced [AllowedCapabilities]
-
-Capability contracts accept method-like declarations and getter-bearing property/indexer aliases while rejecting unrelated targets.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0017_MisplacedAllowedCapabilitiesExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0017-misplaced-capabilities/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [AllowedCapabilities(SharpProofCapability.None)]
-    public int Value = 42;
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0017 Error docs/readme-examples/sp0017-misplaced-capabilities/input.cs:6:6 The [AllowedCapabilities] attribute can only be applied to method-like declarations or getter-bearing properties and indexers
-```
-
-<a id="sp0018"></a>
-
-### SP0018 - Postcondition not proven
-
-Method-level symbolic postconditions report the exact reachable return site that violated the declared contract.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0018_EnsuresNotProvenExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0018-ensures-failing-return/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [Ensures("result > 0")]
-    public int Identity()
-    {
-        return 0;
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0018 Warning docs/readme-examples/sp0018-ensures-failing-return/input.cs:9:16 Method 'Identity' is marked [Ensures], but return site '0' does not prove postcondition 'result > 0'
-```
-
-<a id="sp0019"></a>
-
-### SP0019 - Postcondition could not be verified
-
-Unsupported or out-of-scope `[Ensures]` conditions stay conservative and report why verification stopped.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0019_EnsuresUnsupportedExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0019-ensures-unsupported/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [Ensures("local > 0")]
-    public int Value(int input)
-    {
-        var local = input + 1;
-        return local;
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0019 Warning docs/readme-examples/sp0019-ensures-unsupported/input.cs:6:6 Method 'Value' is marked [Ensures], but postcondition 'local > 0' could not be verified: local variables are not supported in [Ensures] conditions
-```
-
-<a id="sp0020"></a>
-
-### SP0020 - Misplaced [Ensures]
-
-Postconditions accept method-like declarations and getter-bearing property/indexer aliases while rejecting unrelated targets.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0020_MisplacedEnsuresExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0020-misplaced-ensures/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [Ensures("true")]
-    public int Value = 42;
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0020 Error docs/readme-examples/sp0020-misplaced-ensures/input.cs:6:6 The [Ensures] attribute can only be applied to method-like declarations or getter-bearing properties and indexers
-```
-
-<a id="sp0021"></a>
-
-### SP0021 - Expected complexity exceeded
-
-Complexity contracts report when the best proven asymptotic bound exceeds the declared maximum.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0021_ComplexityExceededExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0021-complexity-exceeded/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public static class TestClass
-{
-    [ExpectedComplexity(ComplexityKind.Linear)]
-    public static int SumPairs(int n)
-    {
-        var sum = 0;
-        for (var i = 0; i < n; i++)
-        {
-            for (var j = 0; j < n; j++)
-            {
-                sum += i + j;
-            }
-        }
-
-        return sum;
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0021 Warning docs/readme-examples/sp0021-complexity-exceeded/input.cs:7:23 Method 'SumPairs' is marked [ExpectedComplexity(O(n))], but inferred complexity 'O(n^2)' exceeds the declared bound
-```
-
-<a id="sp0022"></a>
-
-### SP0022 - Expected complexity could not be verified
-
-Unsupported or unbounded loop shapes stay conservative instead of being treated as verified.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0022_ComplexityUnknownExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0022-complexity-unknown/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using System;
-using SharpProof.Attributes;
-
-public static class TestClass
-{
-    [ExpectedComplexity(ComplexityKind.Linear)]
-    public static int Work(int n)
-    {
-        _ = Environment.GetEnvironmentVariable("PATH");
-        return n;
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0022 Warning docs/readme-examples/sp0022-complexity-unknown/input.cs:8:23 Method 'Work' is marked [ExpectedComplexity(O(n))], but the declared bound could not be verified conservatively: ExternalCallee
-```
-
-<a id="sp0023"></a>
-
-### SP0023 - Misplaced [ExpectedComplexity]
-
-Complexity contracts accept method-like declarations and getter-bearing property/indexer aliases while rejecting unrelated targets.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0023_MisplacedExpectedComplexityExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0023-misplaced-expected-complexity/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [ExpectedComplexity(ComplexityKind.Constant)]
-    public int Value = 42;
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0023 Error docs/readme-examples/sp0023-misplaced-expected-complexity/input.cs:6:6 The [ExpectedComplexity] attribute can only be applied to method-like declarations or getter-bearing properties and indexers
-```
+## SP0016 - capability contract not proven
+
+`[AllowedCapabilities(...)]` cannot be established because the capability
+summary is incomplete, unknown, or includes a capability outside the declared
+set. This is conservative may-analysis output, not a definitive capability
+trace.
 
 <a id="sp0024"></a>
+## SP0024 - invalid contract argument
 
-### SP0024 - Invalid contract argument
+A SharpProof contract or control attribute has a malformed argument. The
+current analyzer reports SP0024 for:
 
-Malformed contract arguments are reported at the contract instead of falling back to a later proof diagnostic.
+- a missing or blank `[SharpProofTrusted]` or `[SharpProofSuppress]` reason;
+- an undefined `[AllowedCapabilities]` flag value;
+- malformed or non-exception `[AllowedExceptions]` types.
 
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0024_InvalidContractArgumentExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0024-invalid-contract-argument/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [Ensures("")]
-    public int Value()
-    {
-        return 1;
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0024 Error docs/readme-examples/sp0024-invalid-contract-argument/input.cs:6:6 SharpProof contract '[Ensures]' has invalid argument '""': condition must not be empty
-```
+SP0024 is an enabled-by-default error because invalid control data cannot be
+silently interpreted.
 
 <a id="sp0025"></a>
+## SP0025 - invalid analyzer configuration
 
-### SP0025 - Invalid analyzer configuration
+The compilation-global `sharpproof_mode` option or `SharpProofMode` build
+property is not `off`, `effects`, `contracts`, or `all-experimental`.
+SharpProof reports an enabled-by-default warning and analyzes the compilation
+as `off`.
 
-Invalid `sharpproof_*` analyzer option values are reported instead of silently falling back to defaults.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0025_InvalidAnalyzerConfigurationExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0025-invalid-analyzer-configuration/input.cs`):
-
-```csharp
-public sealed class TestClass
-{
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0025 Warning <no-location>:1:1 SharpProof analyzer option 'sharpproof_smt_mode' has invalid value 'turbo': expected one of: disabled, bounded, deep
-```
-
-<a id="sp0026"></a>
-
-### SP0026 - Unrecognized attribute identity
-
-SharpProof-looking attribute names from unaccepted namespaces are reported and ignored as contracts.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0026_UnrecognizedAttributeIdentityExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0026-unrecognized-attribute-identity/input.cs`):
-
-```csharp
-using System;
-
-namespace ExternalContracts
-{
-    [AttributeUsage(AttributeTargets.Method)]
-    public sealed class EnforcePureAttribute : Attribute
-    {
-    }
-}
-
-public sealed class TestClass
-{
-    [ExternalContracts.EnforcePure]
-    public void NotSharpProof()
-    {
-        Console.WriteLine("not analyzed as a SharpProof contract");
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0026 Warning docs/readme-examples/sp0026-unrecognized-attribute-identity/input.cs:13:6 Attribute 'EnforcePureAttribute' looks like a SharpProof contract, but type 'ExternalContracts.EnforcePureAttribute' is not in an accepted SharpProof attribute namespace
-```
+Tree-local attempts to set this compilation-global option are also invalid
+unless they exactly match the global value.
 
 <a id="sp0027"></a>
+## SP0027 - precondition violated
 
-### SP0027 - Precondition not proven
+A compiler-bound `Contract.Requires(...)` clause or closed parameter
+precondition evaluates to false for an exact call site. SharpProof reports only
+after exact receiver/argument substitution and concrete IR replay.
 
-Calls to methods with `[Requires]` must prove the declared precondition at the call site.
+Unknown arguments, unsupported expressions, possible receiver/argument/prefix
+throws, and non-definitely-executed calls remain silent.
 
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0027_RequiresNotProvenExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0027-requires-not-proven/input.cs`):
+Example:
 
 ```csharp
-#pragma warning disable SP0004
 using SharpProof.Attributes;
 
-public sealed class Calculator
-{
-    [Requires("value > 0")]
-    public static int Identity(int value) => value;
+static class Example {
+    private static void Positive(int value) {
+        Contract.Requires(value > 0);
+    }
 
-    public static int Demo()
-    {
-        return Identity(0);
+    internal static void Call() {
+        Positive(0); // SP0027 when contracts mode and SP0027 are enabled.
     }
 }
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0027 Warning docs/readme-examples/sp0027-requires-not-proven/input.cs:11:16 Call to 'Calculator.Identity(int)' does not prove precondition 'value > 0'
-```
-
-<a id="sp0028"></a>
-
-### SP0028 - Precondition could not be verified
-
-Unsupported `[Requires]` conditions remain conservative and report why verification stopped.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0028_RequiresUnsupportedExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0028-requires-unsupported/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class Calculator
-{
-    [Requires("result > 0")]
-    public static int Identity(int value) => value;
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0028 Warning docs/readme-examples/sp0028-requires-unsupported/input.cs:6:6 Precondition 'result > 0' for 'Calculator.Identity(int)' could not be verified: result placeholder is not supported in [Requires] conditions
-```
-
-<a id="sp0029"></a>
-
-### SP0029 - Misplaced [Requires]
-
-Preconditions are restricted to method-like declarations.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0029_MisplacedRequiresExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0029-misplaced-requires/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class Calculator
-{
-    [Requires("true")]
-    public int Value => 42;
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0029 Error docs/readme-examples/sp0029-misplaced-requires/input.cs:6:6 The [Requires] attribute can only be applied to method-like declarations
 ```
 
 <a id="sp0030"></a>
+## SP0030 - exception contract violated
 
-### SP0030 - Exception contract violation
+Reserved for a future replay-validated escaping-exception witness. The current
+path-insensitive may-effect analyzer never emits SP0030.
 
-Exception contracts reject escaping exceptions that are not allowed by `[DoesNotThrow]` or `[AllowedExceptions]`.
+A possible or unknown disallowed exception is reported as SP0046 instead.
 
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0030_ExceptionContractViolationExample_MatchesSnapshot`.
+<a id="sp0045"></a>
+## SP0045 - zero-allocation contract not proven
 
-Source (`docs/readme-examples/sp0030-exception-contract-violation/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using System;
-using SharpProof.Attributes;
-
-public sealed class Worker
-{
-    [DoesNotThrow]
-    public void Run()
-    {
-        throw new InvalidOperationException();
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0030 Warning docs/readme-examples/sp0030-exception-contract-violation/input.cs:10:9 Method 'Run' is marked [DoesNotThrow], but operation 'throw new InvalidOperationException();' can throw disallowed exceptions: System.InvalidOperationException
-```
-
-<a id="sp0031"></a>
-
-### SP0031 - Misplaced exception contract
-
-Exception contracts accept method-like declarations and getter-bearing property/indexer aliases while rejecting unrelated targets.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0031_MisplacedExceptionContractExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0031-misplaced-exception-contract/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class Worker
-{
-    [DoesNotThrow]
-    public int Value = 42;
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0031 Error docs/readme-examples/sp0031-misplaced-exception-contract/input.cs:6:6 The [DoesNotThrow] and [AllowedExceptions] attributes can only be applied to method-like declarations or getter-bearing properties and indexers
-```
-
-<a id="sp0032"></a>
-
-### SP0032 - Invalid analyzer input file
-
-Malformed or partially ignored analyzer AdditionalFiles are reported instead of silently dropped.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0032_InvalidAnalyzerInputExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0032-invalid-analyzer-input/input.cs`):
-
-```csharp
-public sealed class Demo
-{
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0032 Warning <no-location>:1:1 SharpProof analyzer input file 'SharpProof.EffectSummary.json' is invalid: malformed effect-summary JSON
-```
-
-<a id="sp0033"></a>
-
-### SP0033 - Unknown runtime-hazard candidate
-
-Opt-in informational diagnostics expose source-visible hazard candidates whose bounded proof remains unknown.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0033_UnknownRuntimeHazardExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0033-unknown-runtime-hazard/input.cs`):
-
-```csharp
-public sealed class Demo
-{
-    public int Divide(int divisor) => 10 / divisor;
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0033 Info docs/readme-examples/sp0033-unknown-runtime-hazard/input.cs:3:39 Runtime hazard candidate 'DivideByZero' at operation '10 / divisor' could not be proven: branch_reachable
-```
-
-<a id="sp0034"></a>
-
-### SP0034 - Inferred ZeroAllocations contract
-
-Opt-in high-confidence adoption hints identify methods with no source-visible allocation sites.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0034_SuggestZeroAllocationsExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0034-suggest-zero-allocations/input.cs`):
-
-```csharp
-public static class AllocationCandidate
-{
-    public static int Identity(int value) => value;
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0034 Info docs/readme-examples/sp0034-suggest-zero-allocations/input.cs:3:23 Method 'Identity' has no source-visible allocation sites; consider adding [ZeroAllocations] (high confidence)
-```
-
-<a id="sp0035"></a>
-
-### SP0035 - Inferred AllowedCapabilities contract
-
-Opt-in high-confidence adoption hints report exact capability sets only when no capability site is unknown.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0035_SuggestCapabilitiesExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0035-suggest-capabilities/input.cs`):
-
-```csharp
-using System;
-
-public static class CapabilityCandidate
-{
-    public static void Write() => Console.WriteLine(1);
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0035 Info docs/readme-examples/sp0035-suggest-capabilities/input.cs:5:24 Method 'Write' has the exact capability set IO, Console and no unknown capability sites; consider adding [AllowedCapabilities(SharpProofCapability.IO | SharpProofCapability.Console)] (high confidence)
-```
-
-<a id="sp0036"></a>
-
-### SP0036 - Inferred ExpectedComplexity contract
-
-Opt-in high-confidence adoption hints turn exact non-conservative complexity results into reviewable bounds.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0036_SuggestComplexityExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0036-suggest-complexity/input.cs`):
-
-```csharp
-public static class ComplexityCandidate
-{
-    public static int Work(int n)
-    {
-        var sum = 0;
-        for (var i = 0; i < n; i++)
-        for (var j = 0; j < n; j++)
-            sum += i + j;
-        return sum;
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0036 Info docs/readme-examples/sp0036-suggest-complexity/input.cs:3:23 Method 'Work' has bounded symbolic complexity O(n^2) with no unknown drivers; consider adding [ExpectedComplexity(ComplexityKind.Quadratic)] (high confidence)
-```
-
-<a id="sp0037"></a>
-
-### SP0037 - Inferred exception contract
-
-Opt-in hints suggest DoesNotThrow for trivial closed bodies and medium-confidence AllowedExceptions for finite resolved sets.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0037_SuggestExceptionContractExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0037-suggest-exception-contract/input.cs`):
-
-```csharp
-public static class ExceptionCandidate
-{
-    public static int Identity(int value) => value;
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0037 Info docs/readme-examples/sp0037-suggest-exception-contract/input.cs:3:23 Method 'Identity' has a trivial closed body with no exception evidence; consider adding [DoesNotThrow] (high confidence)
-```
-
-<a id="sp0038"></a>
-
-### SP0038 - Inferred Ensures contract
-
-Opt-in high-confidence adoption hints infer simple postconditions shared by every visible return.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0038_SuggestEnsuresExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0038-suggest-ensures/input.cs`):
-
-```csharp
-public static class PostconditionCandidate
-{
-    public static int Identity(int value) => value;
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0038 Info docs/readme-examples/sp0038-suggest-ensures/input.cs:3:23 Method 'Identity' has a postcondition proved by every visible return: result == value; consider adding [Ensures("result == value")] (high confidence)
-```
-
-<a id="sp0039"></a>
-
-### SP0039 - Inferred Requires contract
-
-Opt-in high-confidence adoption hints infer simple preconditions from leading parameter guards that throw.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0039_SuggestRequiresExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0039-suggest-requires/input.cs`):
-
-```csharp
-using System;
-
-public static class PreconditionCandidate
-{
-    public static int Positive(int value)
-    {
-        if (value <= 0) throw new ArgumentOutOfRangeException(nameof(value));
-        return value;
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0039 Info docs/readme-examples/sp0039-suggest-requires/input.cs:5:23 Method 'Positive' has a leading throw guard whose normal-entry condition is value > 0; consider adding [Requires("value > 0")] (high confidence)
-```
-
-<a id="sp0040"></a>
-
-### SP0040 - Trusted purity boundary review
-
-Opt-in review evidence identifies the exact pure trust shortcut selected for a referenced boundary and can also expose overridden candidates.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0040_TrustedBoundaryReviewExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0040-trusted-boundary-review/input.cs`):
+`[ZeroAllocations]` cannot be established because allocation behavior is
+incomplete or the may summary includes possible allocation.
 
 ```csharp
 using SharpProof.Attributes;
 
-public static class TrustedBoundary
-{
-    public static int Value(int value) => value;
-}
-
-public sealed class Consumer
-{
-    [EnforcePure]
-    public int Read() => TrustedBoundary.Value(1);
+static class Example {
+    [ZeroAllocations]
+    internal static object Create() => new object(); // SP0045, not SP0013.
 }
 ```
 
-Expected analyzer diagnostics:
+<a id="sp0046"></a>
+## SP0046 - exception contract not proven
 
-```text
-SP0040 Info docs/readme-examples/sp0040-trusted-boundary-review/input.cs:11:26 Purity trust source 'config_known_pure_method' for 'TrustedBoundary.Value(int)' was applied
+`[DoesNotThrow]` or `[AllowedExceptions(...)]` cannot be established because
+the exception summary is incomplete, contains unknown exceptions, or includes
+a possibly disallowed exception.
+
+This is a not-proven result. The analyzer reserves definitive SP0030 reporting
+until it has concrete effect-trace replay.
+
+<a id="contractfor-generator-diagnostics"></a>
+## ContractFor generator diagnostics
+
+The incremental `ContractFor` generator validates companions and emits no
+source. All eight rules are enabled-by-default errors once the generator is
+loaded.
+
+A valid instance-member companion uses a static class and an explicit receiver
+parameter:
+
+```csharp
+#nullable enable
+using SharpProof.Attributes;
+
+public interface IService {
+    string? Find(string key);
+}
+
+[ContractFor(typeof(IService))]
+public static class IServiceContracts {
+    public static string? Find(IService receiver, string key) {
+        Contract.Requires(receiver is not null);
+        Contract.Requires(key.Length > 0);
+        Contract.Ensures(
+            Contract.Result<string?>() is null or not null);
+        return null;
+    }
+}
 ```
+
+The companion method is contract source, not an implementation and not
+generated code. Its generic arity/constraints, receiver, parameters, ref and
+scoped kinds, nullability, defaults, and return shape must match exactly.
+
+<a id="spcf0001"></a>
+### SPCF0001 - invalid ContractFor target
+
+The companion's `[ContractFor(...)]` argument does not identify one resolvable
+named target type. Missing, error, ambiguous, and non-named targets are
+rejected.
+
+<a id="spcf0002"></a>
+### SPCF0002 - duplicate ContractFor companion
+
+More than one companion targets the same type. Exactly one companion is
+allowed, so each duplicate declaration is diagnosed.
+
+<a id="spcf0003"></a>
+### SPCF0003 - invalid ContractFor companion type
+
+The companion is not a static class, or its generic arity and constraints do
+not exactly match the target type.
+
+<a id="spcf0004"></a>
+### SPCF0004 - missing ContractFor member
+
+A target ordinary method has no exact companion member. A companion that is
+intended to describe the target surface must cover each required ordinary
+member.
+
+<a id="spcf0005"></a>
+### SPCF0005 - ContractFor member signature mismatch
+
+A named companion method does not exactly match a target overload. Matching
+includes the explicit receiver where required, generic constraints, ref/scoped
+kinds, nullability, defaults, parameter types, and return type.
+
+<a id="spcf0006"></a>
+### SPCF0006 - ambiguous ContractFor member
+
+A companion method shape can map to more than one target member, so symbol
+identity cannot be established uniquely.
+
+<a id="spcf0007"></a>
+### SPCF0007 - ContractFor member body required
+
+The companion member has no compiler-bound source body. Abstract, extern, or
+otherwise bodyless declarations cannot carry executable compiler-bound
+clauses.
+
+<a id="spcf0008"></a>
+### SPCF0008 - nested contract clause
+
+A `Contract.Requires`, `Ensures`, or `Assume` call is inside a lambda, local
+function, or other nested function rather than being directly owned by the
+companion member. Nested clauses do not describe the target member.
+
+## What diagnostics do not mean
+
+- Diagnostic silence is not proof. A callable may be unsupported or a feature
+  ID may still be disabled.
+- SP0002, SP0016, SP0045, and SP0046 report inability to prove a contract, not a
+  replayed violating execution.
+- SP0027 is stronger: it is emitted only after concrete predicate replay
+  evaluates to false.
+- Worker `Unknown` reasons are protocol records, not Roslyn diagnostics. See
+  [Typed abstention reasons](unknown-reasons.md).

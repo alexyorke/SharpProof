@@ -1,10 +1,6 @@
-using System;
-
 namespace SharpProof.Attributes;
-
 [Flags]
-public enum SharpProofCapability
-{
+public enum SharpProofCapability {
     None = 0,
     IO = 1 << 0,
     FileRead = 1 << 1,

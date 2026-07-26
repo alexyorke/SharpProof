@@ -1,0 +1,74 @@
+root = true
+[*.cs]
+max_line_length = 140
+csharp_new_line_before_open_brace = none
+dotnet_diagnostic.IDE0055.severity = warning
+csharp_style_expression_bodied_accessors = true:warning
+csharp_style_expression_bodied_constructors = true:warning
+csharp_style_expression_bodied_indexers = true:warning
+csharp_style_expression_bodied_lambdas = true:warning
+csharp_style_expression_bodied_local_functions = true:warning
+csharp_style_expression_bodied_methods = true:warning
+csharp_style_expression_bodied_operators = true:warning
+csharp_style_expression_bodied_properties = true:warning
+csharp_style_implicit_object_creation_when_type_is_apparent = true:warning
+csharp_style_prefer_primary_constructors = true:warning
+dotnet_style_prefer_collection_expression = true:warning
+[{SharpProof.Analyzer,SharpProof.Attributes,Tools}/**/*.cs]
+csharp_prefer_braces = false:warning
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_style_prefer_simple_using_statement = true:warning
+csharp_style_prefer_switch_expression = true:warning
+dotnet_style_collection_initializer = true:warning
+dotnet_style_object_initializer = true:warning
+[SharpProof.Testing/*.cs]
+csharp_new_line_before_open_brace = none
+dotnet_diagnostic.IDE0055.severity = none
+[SharpProof.Testing/**/*.cs]
+csharp_new_line_before_open_brace = none
+dotnet_diagnostic.IDE0055.severity = none
+
+# Intentional stable wire/API shapes under AnalysisLevel=latest-all.
+[SharpProof.Analyzer/GeneratedDiagnosticDescriptors.cs]
+dotnet_diagnostic.CA1308.severity = none
+
+[SharpProof.Dataflow/IntervalDomain.cs]
+dotnet_diagnostic.CA1822.severity = none
+
+[SharpProof.Effects/EffectRegions.cs]
+dotnet_diagnostic.CA1036.severity = none
+
+[SharpProof.Effects/EffectValues.cs]
+dotnet_diagnostic.CA2217.severity = none
+
+[SharpProof.Frontend/FrontendSubset.cs]
+dotnet_diagnostic.CA1815.severity = none
+
+[SharpProof.Smt/IrSmtBackend.cs]
+dotnet_diagnostic.CA1032.severity = none
+dotnet_diagnostic.CA1064.severity = none
+dotnet_diagnostic.CA2000.severity = none
+
+[SharpProof.Specs/ApiSpecModel.cs]
+dotnet_diagnostic.CA1720.severity = none
+
+[SharpProof.Worker.Launcher/Program.cs]
+dotnet_diagnostic.CA1849.severity = none
+
+[SharpProof.Worker.Protocol/ProtocolModel.cs]
+dotnet_diagnostic.CA1819.severity = none
+
+[SharpProof.Worker/CallableVerifier.cs]
+dotnet_diagnostic.CA1308.severity = none
+
+[SharpProof.Worker/Program.cs]
+dotnet_diagnostic.CA1849.severity = none
+
+[SharpProof.Worker/SharpProofWorker.cs]
+dotnet_diagnostic.CA1515.severity = none
+
+[SharpProof.Worker/VerificationCache.cs]
+dotnet_diagnostic.CA1308.severity = none
+
+[SharpProof.Worker/WorkerInputSnapshot.cs]
+dotnet_diagnostic.CA1308.severity = none

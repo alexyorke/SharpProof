@@ -1,0 +1,44 @@
+# Roslyn compilation mutation and whole-compilation symbol search are outside
+# the SharpProof compiler host boundary.
+M:Microsoft.CodeAnalysis.Compilation.ReplaceSyntaxTree(Microsoft.CodeAnalysis.SyntaxTree,Microsoft.CodeAnalysis.SyntaxTree);Do not mutate a compilation during analysis.
+M:Microsoft.CodeAnalysis.Compilation.AddSyntaxTrees(Microsoft.CodeAnalysis.SyntaxTree[]);Do not synthesize syntax trees during analysis.
+M:Microsoft.CodeAnalysis.Compilation.AddSyntaxTrees(System.Collections.Generic.IEnumerable{Microsoft.CodeAnalysis.SyntaxTree});Do not synthesize syntax trees during analysis.
+M:Microsoft.CodeAnalysis.Compilation.GetSymbolsWithName(System.Func{System.String,System.Boolean},Microsoft.CodeAnalysis.SymbolFilter,System.Threading.CancellationToken);Use compiler-bound symbols reachable from the analyzed operation.
+M:Microsoft.CodeAnalysis.Compilation.GetSymbolsWithName(System.String,Microsoft.CodeAnalysis.SymbolFilter,System.Threading.CancellationToken);Use compiler-bound symbols reachable from the analyzed operation.
+
+# Semantic models may only be obtained by the audited host adapter.
+M:Microsoft.CodeAnalysis.Compilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,System.Boolean);Use SharpProof.Frontend.Host.CompilationModelProvider.
+M:Microsoft.CodeAnalysis.CSharp.CSharpCompilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,Microsoft.CodeAnalysis.SemanticModelOptions);Use SharpProof.Frontend.Host.CompilationModelProvider.
+M:Microsoft.CodeAnalysis.SemanticModel.GetDiagnostics(System.Nullable{Microsoft.CodeAnalysis.Text.TextSpan},System.Threading.CancellationToken);Do not make proof behavior depend on semantic-model diagnostics.
+M:Microsoft.CodeAnalysis.SemanticModel.GetSpeculativeSymbolInfo(System.Int32,Microsoft.CodeAnalysis.SyntaxNode,Microsoft.CodeAnalysis.SpeculativeBindingOption);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.SemanticModel.GetSpeculativeTypeInfo(System.Int32,Microsoft.CodeAnalysis.SyntaxNode,Microsoft.CodeAnalysis.SpeculativeBindingOption);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.SemanticModel.GetSpeculativeAliasInfo(System.Int32,Microsoft.CodeAnalysis.SyntaxNode,Microsoft.CodeAnalysis.SpeculativeBindingOption);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel.TryGetSpeculativeSemanticModelForMethodBody(System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.BaseMethodDeclarationSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel.TryGetSpeculativeSemanticModelForMethodBody(System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.AccessorDeclarationSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel.TryGetSpeculativeSemanticModel(System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax,Microsoft.CodeAnalysis.SemanticModel@,Microsoft.CodeAnalysis.SpeculativeBindingOption);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel.TryGetSpeculativeSemanticModel(System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.StatementSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel.TryGetSpeculativeSemanticModel(System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.EqualsValueClauseSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel.TryGetSpeculativeSemanticModel(System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.ArrowExpressionClauseSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel.TryGetSpeculativeSemanticModel(System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.ConstructorInitializerSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel.TryGetSpeculativeSemanticModel(System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.PrimaryConstructorBaseTypeSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel.TryGetSpeculativeSemanticModel(System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.CrefSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel.TryGetSpeculativeSemanticModel(System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.AttributeSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpExtensions.TryGetSpeculativeSemanticModelForMethodBody(Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.BaseMethodDeclarationSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpExtensions.TryGetSpeculativeSemanticModelForMethodBody(Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.AccessorDeclarationSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpExtensions.TryGetSpeculativeSemanticModel(Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax,Microsoft.CodeAnalysis.SemanticModel@,Microsoft.CodeAnalysis.SpeculativeBindingOption);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpExtensions.TryGetSpeculativeSemanticModel(Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.CrefSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpExtensions.TryGetSpeculativeSemanticModel(Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.StatementSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpExtensions.TryGetSpeculativeSemanticModel(Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.EqualsValueClauseSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpExtensions.TryGetSpeculativeSemanticModel(Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.ArrowExpressionClauseSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpExtensions.TryGetSpeculativeSemanticModel(Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.ConstructorInitializerSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpExtensions.TryGetSpeculativeSemanticModel(Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.PrimaryConstructorBaseTypeSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+M:Microsoft.CodeAnalysis.CSharp.CSharpExtensions.TryGetSpeculativeSemanticModel(Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.CSharp.Syntax.AttributeSyntax,Microsoft.CodeAnalysis.SemanticModel@);Do not use speculative semantic binding.
+
+# Reparsed source text is outside the compiler-bound semantic boundary.
+M:Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseStatement(System.String,System.Int32,Microsoft.CodeAnalysis.ParseOptions,System.Boolean);Use compiler-bound Roslyn operations instead of reparsing source text.
+M:Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression(System.String,System.Int32,Microsoft.CodeAnalysis.ParseOptions,System.Boolean);Use compiler-bound Roslyn operations instead of reparsing source text.
+M:Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTypeName(System.String,System.Int32,System.Boolean);Use compiler-bound Roslyn operations instead of reparsing source text.
+M:Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTypeName(System.String,System.Int32,Microsoft.CodeAnalysis.ParseOptions,System.Boolean);Use compiler-bound Roslyn operations instead of reparsing source text.
+
+# Display text is presentation only and must not become a semantic identity.
+M:Microsoft.CodeAnalysis.ISymbol.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat);Use typed symbols or an explicit structural identity.

@@ -1,50 +1,10 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using SharpProof.Analyzer.Configuration;
-
 namespace SharpProof.Analyzer;
-
-internal static class InvalidContractArgumentDiagnostics
-{
-    internal static Diagnostic Create(
-        string attributeName,
-        string argument,
-        string reason,
-        Location location,
-        ISymbol? baselineSymbol = null,
-        SyntaxTree? syntaxTree = null)
-    {
-        var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.ContractAttributeProperty, attributeName)
-            .Add(SharpProofDiagnostics.ContractArgumentProperty, argument)
-            .Add(SharpProofDiagnostics.ContractInvalidReasonProperty, reason);
-
-        if (baselineSymbol != null && syntaxTree != null)
-            properties = BaselineDiagnosticProperties.Add(
-                properties,
-                baselineSymbol,
-                syntaxTree,
-                "InvalidContractArgument",
-                argument,
-                attributeName + ":" + argument + ":" + reason);
-
-        properties = ExplainDiagnosticProperties.Add(
-            properties,
+internal static class InvalidContractArgumentDiagnostics {
+    internal static Diagnostic Create(string attributeName, string argument, string reason, Location location)
+        => Diagnostic.Create(
+            GeneratedDiagnosticDescriptors.InvalidContractArgumentRule,
             location,
+            attributeName,
             argument,
-            "invalid",
             reason);
-
-        return Diagnostic.Create(
-            SharpProofDiagnostics.InvalidContractArgumentRule,
-            location,
-            null,
-            properties,
-            new object[]
-            {
-                attributeName,
-                argument,
-                reason
-            });
-    }
 }

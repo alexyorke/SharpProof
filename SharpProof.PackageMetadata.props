@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <Version>$(SharpProofPackageVersion)</Version>
+    <Authors>$(SharpProofPublisher)</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>$(SharpProofProjectUrl)</PackageProjectUrl>
+    <RepositoryUrl>$(SharpProofProjectUrl)</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,63 @@
+# Open-source analyzer corpus
+
+The release corpus contains 200 methods copied from a real, buildable
+open-source C# library. These are separate from the small synthetic suite used
+for metamorphic invariance checks; transformed synthetic cases never count
+toward the 200-method release floor.
+
+## Pinned source and license
+
+- Repository: `https://github.com/aalhour/C-Sharp-Algorithms`
+- Commit: `b82432474a916ac784cd1446eabcba615c333463`
+- License: MIT
+- Included source roots: `Algorithms/` and `DataStructures/`
+
+`oss-methods.json` contains the exact upstream text of every C# file needed to
+compile those two projects together. Each file has a SHA-256 hash. Each selected
+method records its upstream path, one-based line range, name, and a SHA-256 hash
+of the declaration. The importer selects 200 distinct declarations round-robin
+across source files; the checked-in selection currently spans 87 files. The
+gate requires 200-500 methods, at least 25 source files, unique source
+locations, unique declaration hashes, a full Git commit, and a matching
+checked-in license hash.
+
+The source bundle is intentionally plain JSON rather than a binary archive so
+reviewers can inspect and diff the vendored code. It is under 1 MiB. The
+upstream MIT notice is preserved in
+`third-party/aalhour-C-Sharp-Algorithms-LICENSE.txt`.
+
+## Analyzer instrumentation
+
+The stored source is byte-for-byte stable after line endings are normalized to
+LF. At test time the runner adds only
+`[SharpProof.Attributes.EnforcePure]` to each selected declaration. It does not
+rewrite the method body, signature, containing type, or dependencies. All 200
+targets are analyzed in one compilation of the pinned upstream source.
+
+The snapshot records each target's internal semantic outcome independently
+from its canonical diagnostics. Unsupported real-world methods therefore
+remain explicit `SilentUnknown`/`Abstained` entries rather than being omitted
+or counted as proofs. Gate output reports explicit Unknown, silent Unknown, and
+their combined semantic Unknown count and rate. These are visibility metrics,
+not thresholds.
+
+## Reproducible update
+
+The importer accepts only a clean checkout whose `origin` is the repository
+above. To reproduce the current source lock:
+
+```powershell
+git clone https://github.com/aalhour/C-Sharp-Algorithms `
+    C:\work\C-Sharp-Algorithms
+git -C C:\work\C-Sharp-Algorithms checkout `
+    b82432474a916ac784cd1446eabcba615c333463
+.\SharpProof.Gates\Corpus\Import-OssCorpus.ps1 `
+    -UpstreamRoot C:\work\C-Sharp-Algorithms
+```
+
+The command regenerates the source/provenance manifest, copied license, reviewed
+semantic expectations, and canonical analyzer snapshot using LF without a BOM.
+Updating to another upstream commit is deliberate: check out that commit, run
+the same importer, review the manifest/snapshot diff, and update this document's
+pin. A normal `corpus-update` without the importer updates only observations; it
+does not silently replace the upstream source lock.

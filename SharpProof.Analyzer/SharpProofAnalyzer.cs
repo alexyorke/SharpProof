@@ -1,223 +1,71 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Text;
-using SharpProof.Analyzer.Configuration;
-using SharpProof.Symbolic.Smt;
-
 namespace SharpProof.Analyzer;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public class SharpProofAnalyzer : DiagnosticAnalyzer
-{
-    public const string SP0002 = SharpProofDiagnostics.PurityNotVerifiedId;
-    public const string SP0004 = SharpProofDiagnostics.MissingEnforcePureAttributeId;
+public sealed class SharpProofAnalyzer : DiagnosticAnalyzer {
+    private readonly IAnalyzerSessionFactory _sessionFactory;
 
     public SharpProofAnalyzer()
-        : this(AnalyzerFeatures.All)
-    {
+        : this(DefaultAnalyzerSessionFactory.Instance) {
     }
 
-    internal SharpProofAnalyzer(AnalyzerFeatures features)
-    {
-        Features = AnalyzerFeatureDependencies.Expand(features);
-    }
-
-    internal AnalyzerFeatures Features { get; }
+    internal SharpProofAnalyzer(IAnalyzerSessionFactory sessionFactory) =>
+        _sessionFactory = sessionFactory ??
+            throw new ArgumentNullException(nameof(sessionFactory));
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-        ImmutableArray.Create(SharpProofDiagnostics.PurityNotVerifiedRule,
-            SharpProofDiagnostics.MisplacedAttributeRule,
-            SharpProofDiagnostics.MissingEnforcePureAttributeRule,
-            SharpProofDiagnostics.ConflictingPurityAttributesRule,
-            SharpProofDiagnostics.AllowSynchronizationWithoutPurityAttributeRule,
-            SharpProofDiagnostics.MisplacedAllowSynchronizationAttributeRule,
-            SharpProofDiagnostics.RedundantAllowSynchronizationRule,
-            SharpProofDiagnostics.PurityExplanationRule,
-            SharpProofDiagnostics.ExceptionSummaryRule,
-            SharpProofDiagnostics.UncaughtExceptionSiteRule,
-            SharpProofDiagnostics.UnknownRuntimeHazardRule,
-            SharpProofDiagnostics.BclFallbackGuessRule,
-            SharpProofDiagnostics.AllocationInZeroAllocationMethodRule,
-            SharpProofDiagnostics.MisplacedZeroAllocationsAttributeRule,
-            SharpProofDiagnostics.CapabilityViolationRule,
-            SharpProofDiagnostics.CapabilityUnknownRule,
-            SharpProofDiagnostics.MisplacedAllowedCapabilitiesAttributeRule,
-            SharpProofDiagnostics.EnsuresNotProvenRule,
-            SharpProofDiagnostics.EnsuresUnsupportedRule,
-            SharpProofDiagnostics.MisplacedEnsuresAttributeRule,
-            SharpProofDiagnostics.ComplexityExceededRule,
-            SharpProofDiagnostics.ComplexityCouldNotBeVerifiedRule,
-            SharpProofDiagnostics.MisplacedExpectedComplexityAttributeRule,
-            SharpProofDiagnostics.InvalidContractArgumentRule,
-            SharpProofDiagnostics.InvalidAnalyzerConfigurationRule,
-            SharpProofDiagnostics.InvalidAdditionalFileRule,
-            SharpProofDiagnostics.UnrecognizedAttributeIdentityRule,
-            SharpProofDiagnostics.RequiresNotProvenRule,
-            SharpProofDiagnostics.RequiresUnsupportedRule,
-            SharpProofDiagnostics.MisplacedRequiresAttributeRule,
-            SharpProofDiagnostics.ExceptionContractViolationRule,
-            SharpProofDiagnostics.MisplacedExceptionContractAttributeRule,
-            SharpProofDiagnostics.SuggestZeroAllocationsRule,
-            SharpProofDiagnostics.SuggestAllowedCapabilitiesRule,
-            SharpProofDiagnostics.SuggestExpectedComplexityRule,
-            SharpProofDiagnostics.SuggestExceptionContractRule,
-            SharpProofDiagnostics.SuggestEnsuresRule,
-            SharpProofDiagnostics.SuggestRequiresRule,
-            SharpProofDiagnostics.TrustedBoundaryReviewRule);
+        GeneratedDiagnosticDescriptors.SupportedDiagnostics;
 
-    public override void Initialize(AnalysisContext context)
-    {
+    public override void Initialize(AnalysisContext context) {
+        if (context == null) throw new ArgumentNullException(nameof(context));
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-
-        context.RegisterCompilationStartAction(startContext =>
-        {
-            SmtNativeLibraryBootstrap.TryLoadFromAnalyzerLocatorPaths(
-                startContext.Options.AdditionalFiles.Select(static file => file.Path));
-            var additionalFileIssues = AnalyzerAdditionalFileValidator.Validate(
-                startContext.Options,
-                startContext.CancellationToken);
-            var session = new AnalyzerSession(
-                startContext.Compilation,
-                startContext.Options,
-                startContext.CancellationToken,
-                Features);
-
-            startContext.RegisterCompilationEndAction(endContext =>
-            {
-                try
-                {
-                    foreach (var invalidConfigurationValue in session.Configuration.InvalidConfigurationValues)
-                    {
-                        var diagnostic = CreateInvalidConfigurationDiagnostic(invalidConfigurationValue);
-                        if (!session.Baseline.IsSuppressed(diagnostic)) endContext.ReportDiagnostic(diagnostic);
-                    }
-
-                    foreach (var additionalFileIssue in additionalFileIssues)
-                        endContext.ReportDiagnostic(CreateInvalidAdditionalFileDiagnostic(additionalFileIssue));
-
-                    foreach (var compatibilityIssue in session.EffectSummaryCompatibilityReporter.GetIssues())
-                        endContext.ReportDiagnostic(CreateInvalidAdditionalFileDiagnostic(compatibilityIssue));
-
-                    TrustedBoundaryReviewAnalyzer.ReportDiagnostics(endContext, session);
-                }
-                finally
-                {
-                    session.Dispose();
-                }
-            });
-
-            if ((session.Features & AnalyzerFeatures.Callable) != 0)
-            {
-                startContext.RegisterOperationBlockAction(
-                    c => AnalyzerFeaturePipeline.AnalyzeOperationBlock(c, session));
-                startContext.RegisterSyntaxNodeAction(
-                    c => AnalyzerFeaturePipeline.AnalyzeSyntaxFallback(c, session),
-                    SyntaxKind.AddAccessorDeclaration,
-                    SyntaxKind.MethodDeclaration,
-                    SyntaxKind.GetAccessorDeclaration,
-                    SyntaxKind.InitAccessorDeclaration,
-                    SyntaxKind.IndexerDeclaration,
-                    SyntaxKind.RemoveAccessorDeclaration,
-                    SyntaxKind.PropertyDeclaration,
-                    SyntaxKind.SetAccessorDeclaration,
-                    SyntaxKind.ConstructorDeclaration,
-                    SyntaxKind.ConversionOperatorDeclaration,
-                    SyntaxKind.OperatorDeclaration,
-                    SyntaxKind.LocalFunctionStatement);
-            }
-
-            if (session.Features.Includes(AnalyzerFeatures.Placement))
-                startContext.RegisterSyntaxNodeAction(
-                    c => AttributePlacementAnalyzer.AnalyzeNonMethodDeclaration(
-                        c,
-                        session.Baseline,
-                        session.AttributePolicy),
-                    SyntaxKind.AttributeList);
-
-            if (session.Features.Includes(AnalyzerFeatures.Requires))
-                startContext.RegisterSyntaxNodeAction(
-                    c => MethodRequiresAnalyzer.AnalyzeCallSiteForRequires(
-                        c,
-                        session.PurityService,
-                        session.Baseline,
-                        session.AttributePolicy),
-                    SyntaxKind.InvocationExpression,
-                    SyntaxKind.ObjectCreationExpression);
-
-            startContext.RegisterSyntaxTreeAction(c => AnalyzeTreeConfiguration(c, session.Baseline));
-        });
+        context.RegisterCompilationStartAction(InitializeCompilation);
     }
 
-    private static void AnalyzeTreeConfiguration(
-        SyntaxTreeAnalysisContext context,
-        DiagnosticBaseline baseline)
-    {
+    private void InitializeCompilation(CompilationStartAnalysisContext context) {
+        var configuration = AnalyzerConfiguration.FromOptions(context.Options);
+        context.RegisterSyntaxTreeAction(AnalyzeTreeConfiguration);
+        if (configuration.Mode == SharpProofMode.Off) {
+            context.RegisterCompilationEndAction(endContext =>
+                ReportInvalidConfiguration(endContext, configuration));
+            return;
+        }
+
+        var session = _sessionFactory.Create(
+            context.Compilation,
+            configuration,
+            context.CancellationToken);
+        context.RegisterOperationBlockAction(operationContext =>
+            AnalyzerFeaturePipeline.AnalyzeOperationBlock(operationContext, session));
+        context.RegisterCompilationEndAction(endContext =>
+            ReportInvalidConfiguration(endContext, configuration));
+    }
+
+    private static void ReportInvalidConfiguration(
+        CompilationAnalysisContext context,
+        AnalyzerConfiguration configuration) {
+        foreach (var invalidValue in configuration.InvalidConfigurationValues)
+            context.ReportDiagnostic(CreateInvalidConfigurationDiagnostic(invalidValue));
+    }
+
+    private static void AnalyzeTreeConfiguration(SyntaxTreeAnalysisContext context) {
         var options = context.Options.AnalyzerConfigOptionsProvider.GetOptions(context.Tree);
-        var invalidConfigurationValues = AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
+        var invalidValues = AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
             options,
             context.Options.AnalyzerConfigOptionsProvider.GlobalOptions);
         var location = Location.Create(context.Tree, new TextSpan(0, 0));
-        foreach (var invalidConfigurationValue in invalidConfigurationValues)
-        {
-            var diagnostic = CreateInvalidConfigurationDiagnostic(invalidConfigurationValue, location, context.Tree);
-            if (!baseline.IsSuppressed(diagnostic)) context.ReportDiagnostic(diagnostic);
-        }
+        foreach (var invalidValue in invalidValues)
+            context.ReportDiagnostic(
+                CreateInvalidConfigurationDiagnostic(invalidValue, location));
     }
 
     private static Diagnostic CreateInvalidConfigurationDiagnostic(
-        InvalidAnalyzerConfigurationValue invalidConfigurationValue,
-        Location? location = null,
-        SyntaxTree? syntaxTree = null)
-    {
-        var path = syntaxTree?.FilePath ?? "<global>";
-        var properties = BaselineDiagnosticProperties.Add(
-            ImmutableDictionary<string, string?>.Empty
-                .Add(SharpProofDiagnostics.ConfigurationKeyProperty, invalidConfigurationValue.Key)
-                .Add(SharpProofDiagnostics.ConfigurationValueProperty, invalidConfigurationValue.Value)
-                .Add(SharpProofDiagnostics.ConfigurationInvalidReasonProperty, invalidConfigurationValue.Reason),
-            "<configuration>",
-            path,
-            "AnalyzerConfiguration",
-            invalidConfigurationValue.Key,
-            invalidConfigurationValue.Key + ":" + invalidConfigurationValue.Value + ":" +
-            invalidConfigurationValue.Reason);
-        properties = ExplainDiagnosticProperties.Add(
-            properties,
-            location,
-            invalidConfigurationValue.Key,
-            "invalid",
-            invalidConfigurationValue.Reason);
-
-        return Diagnostic.Create(
-            SharpProofDiagnostics.InvalidAnalyzerConfigurationRule,
+        InvalidAnalyzerConfigurationValue invalidValue,
+        Location? location = null) =>
+        Diagnostic.Create(
+            GeneratedDiagnosticDescriptors.InvalidAnalyzerConfigurationRule,
             location ?? Location.None,
-            null,
-            properties,
-            new object[]
-            {
-                invalidConfigurationValue.Key,
-                invalidConfigurationValue.Value,
-                invalidConfigurationValue.Reason
-            });
-    }
-
-    private static Diagnostic CreateInvalidAdditionalFileDiagnostic(
-        AnalyzerAdditionalFileIssue issue)
-    {
-        var path = string.IsNullOrWhiteSpace(issue.Path) ? "<unknown>" : issue.Path;
-        var properties = ImmutableDictionary<string, string?>.Empty
-            .Add(SharpProofDiagnostics.AdditionalFilePathProperty, path)
-            .Add(SharpProofDiagnostics.AdditionalFileReasonProperty, issue.Reason)
-            .Add(SharpProofDiagnostics.AdditionalFileReasonCodeProperty, issue.ReasonCode);
-
-        return Diagnostic.Create(
-            SharpProofDiagnostics.InvalidAdditionalFileRule,
-            Location.None,
-            null,
-            properties,
-            new object[] { path, issue.Reason });
-    }
+            invalidValue.Key,
+            invalidValue.Value,
+            invalidValue.Reason);
 }

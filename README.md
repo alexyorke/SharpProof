@@ -1,730 +1,348 @@
-<!-- Generated from README.source.md by scripts/Generate-Readme.ps1. -->
+# SharpProof
 
-# SharpProof - Symbolic C# Contracts Backed By Bounded Proof
+SharpProof 0.2.0-preview.1 is a soundness-first Roslyn analyzer and bounded
+out-of-process verifier for C#. It deliberately supports a narrow,
+compiler-bound subset.
 
-SharpProof is a beta Roslyn analyzer for enforceable C# contracts. You add
-attributes such as `[EnforcePure]`, `[Requires]`, `[Ensures]`,
-`[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`,
-`[AllowedExceptions]`, or `[ExpectedComplexity]`; the analyzer reports build
-diagnostics; the CLI and .NET API let you inspect the bounded proof evidence.
+SharpProof has three semantic outcomes:
 
-## Preview Status
+- `Proven`: the goal follows from exact lowering and accountable evidence.
+- `Refuted`: an executable counterexample or effect trace was replayed.
+- `Unknown`: the language, model, evidence, or resource budget was insufficient.
 
-> [!WARNING]
-> SharpProof is still preview software. Treat the current branch and packages
-> as alpha/beta quality rather than production-hardened tooling.
->
-> The project has also been developed through rapid AI-assisted iteration, or
-> "vibe-coded" development in the informal sense: broad feature growth, fast
-> refactoring, and heavy test coverage, but not the kind of long-lived
-> stabilization and compatibility discipline you would expect from a mature
-> analysis platform.
->
-> Expect rough edges:
-> - analyzer false positives and false negatives
-> - unsupported C# or library shapes that stay conservative or unknown
-> - public API, CLI, configuration, and diagnostic-surface changes between preview releases
->
-> The analyzer does not execute user code and does not attempt unbounded
-> whole-program proof. When it cannot prove a fact within the implemented rules
-> and budgets, it stays conservative.
+Unsupported analyzer code normally produces no feature diagnostic. That silence
+is an abstention, not a proof.
 
-## What SharpProof Does
+## What works today
 
-SharpProof is more than just a purity checker. Its intended developer workflow
-is:
+| Surface | Current capability | User-visible result |
+|---|---|---|
+| Effect analyzer | Checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, and `[AllowedExceptions]` over the admitted source subset | Opt-in "not proven" diagnostics |
+| Contract analyzer | Replays definitely executed, compiler-bound `Contract.Requires(...)` clauses with exact call inputs | SP0027 only when the precondition concretely evaluates to false |
+| Worker | Verifies bounded `Contract.Ensures(...)` obligations over acyclic Boolean/integer bodies and a few exact API-result facts | `Proven`, replay-validated `Refuted`, or typed `Unknown` records |
 
-```text
-Write contracts -> build gets diagnostics -> inspect proof/evidence -> query deeper with CLI/API
+The analyzer does not run SMT or load Z3. General source-callee
+assume/guarantee verification, loops in the worker, mutable-heap
+postconditions, points-to analysis, and broad reference or sequence reasoning
+are not implemented.
+
+## Install and enable
+
+Reference the preview package:
+
+```xml
+<PackageReference Include="SharpProof" Version="0.2.0-preview.1"
+                  PrivateAssets="all" />
 ```
 
-The analyzer answers contract questions during normal builds:
+The package defaults to `off` and does not add its analyzer assemblies to the
+compiler. Enable one compilation-global mode:
 
-- can this method be proven pure?
-- do calls satisfy declared `[Requires("...")]` preconditions?
-- which direct allocation sites violate `[ZeroAllocations]`?
-- which capability categories does this method use?
-- does every return satisfy `[Ensures("...")]`?
-- can this method only throw its declared exception set?
-- is the method within the declared `[ExpectedComplexity(...)]` bound?
-
-The CLI and library API answer proof-inspection questions:
-
-- what facts hold at this line?
-- is this branch reachable?
-- can this operation provably throw at runtime?
-- what asymptotic complexity can be justified conservatively?
-
-Under the hood the intended spine is:
-
-```text
-Roslyn/C# -> Symbolic IR -> normalized symbolic state -> proof service -> Z3-backed conclusions -> analyzer/API/CLI outputs
+```xml
+<PropertyGroup>
+  <SharpProofMode>all-experimental</SharpProofMode>
+</PropertyGroup>
 ```
 
-## Who It Is For
+Valid values are:
 
-SharpProof is for .NET developers who want static guarantees or conservative
-evidence around behavior without running the code:
+- `off`: no analyzer feature pipeline; this is the default.
+- `effects`: effect contracts only.
+- `contracts`: concrete call-site `Requires` checking only.
+- `all-experimental`: both analyzer groups.
 
-- library authors enforcing purity or low-allocation contracts
-- teams auditing runtime hazards and side effects during builds
-- engineers exploring invariants and proof results from a CLI or .NET API
-- contributors expanding symbolic reasoning over C# and the .NET SDK
+A custom analyzer host may instead provide the compilation-global
+`sharpproof_mode` analyzer-config key. A tree-scoped `.editorconfig` value is
+invalid because the mode must be compilation-global.
 
-Use something else if you need whole-program execution prediction, exact
-performance profiling, or a full borrow checker today.
+Mode selection and diagnostic selection are separate opt-ins. Feature
+diagnostics are Info and disabled by default, so enable the IDs you want in
+`.editorconfig`:
 
-## Quick Start
-
-The intended public packages are `SharpProof` and `SharpProof.Attributes`, both
-at `0.1.0-preview.1`, but they are not published to NuGet.org yet.
-
-For local preview use, build a local feed from this repo and install from it:
-
-```powershell
-.\build-nuget.ps1 -Configuration Release
-dotnet add package SharpProof --version 0.1.0-preview.1 --source .\artifacts\nuget
+```ini
+[*.cs]
+dotnet_diagnostic.SP0002.severity = suggestion
+dotnet_diagnostic.SP0016.severity = suggestion
+dotnet_diagnostic.SP0027.severity = suggestion
+dotnet_diagnostic.SP0045.severity = suggestion
+dotnet_diagnostic.SP0046.severity = suggestion
 ```
 
-The main analyzer package already includes the attributes assembly for normal
-consumers. Add `SharpProof.Attributes` separately only when you want the
-attributes without the analyzer package:
+SP0024, for malformed supported control/effect arguments, is an enabled Error.
+SP0025, for invalid analyzer configuration, is an enabled Warning. SP0013,
+SP0015, and SP0030 are reserved until concrete effect-trace replay exists; the
+current may-effect analyzer does not emit them.
 
-```powershell
-dotnet add package SharpProof.Attributes --version 0.1.0-preview.1 --source .\artifacts\nuget
-```
+## Effect contracts
 
-Minimal source example:
+This test-backed example is accepted without a feature diagnostic in `effects`
+or `all-experimental` mode:
 
 ```csharp
-using System;
 using SharpProof.Attributes;
 
-public sealed class Calculator
-{
+public static class Arithmetic {
     [EnforcePure]
-    public int Add(int left, int right) => left + right;
-
-    [EnforcePure]
-    public int ReadClock() => DateTime.Now.Second; // SP0002
-}
-```
-
-## Selected Examples
-
-These curated blocks are generated from committed example inputs and committed
-output snapshots. Each example is backed by a regression test so the README can
-fail fast when the public behavior or documentation drifts.
-
-### Purity contract catches ambient clock access
-
-`[EnforcePure]` does not treat ambient time reads as pure. A direct read of `DateTime.Now` still produces `SP0002`.
-
-Backed by test: `ReadmeGeneratedExamplesTests.PurityAnalyzerExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/purity-clock/input.cs`):
-
-```csharp
-using System;
-using SharpProof.Attributes;
-
-public sealed class Example
-{
-    [EnforcePure]
-    public int ReadClock()
-    {
-        return DateTime.Now.Second;
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0002 Error docs/readme-examples/purity-clock/input.cs:7:16 Method 'ReadClock' is marked [EnforcePure]/[Pure], but its body contains operations the analyzer cannot prove pure
-```
-
-### Pure-looking code without a contract gets a suggestion
-
-When a method looks pure but is not explicitly marked, SharpProof suggests adding `[EnforcePure]` with `SP0004`.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0004_MissingEnforcePureExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0004-missing-enforce-pure/input.cs`):
-
-```csharp
-public sealed class TestClass
-{
-    public int Add(int left, int right)
-    {
-        return left + right;
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0004 Warning docs/readme-examples/sp0004-missing-enforce-pure/input.cs:3:16 Method 'Add' appears to be pure but is not marked with [EnforcePure]. Consider adding the attribute to enforce and document its purity.
-```
-
-### [AllowSynchronization] without purity attribute warns
-
-`[AllowSynchronization]` without `[EnforcePure]` or `[Pure]` produces `SP0006` because synchronization contracts depend on a purity baseline.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0006_AllowSynchronizationWithoutPurityExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0006-allow-sync-without-purity/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [AllowSynchronization]
-    public void Work()
-    {
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0006 Warning docs/readme-examples/sp0006-allow-sync-without-purity/input.cs:7:17 Method 'Work' is marked with [AllowSynchronization] but is not marked with [EnforcePure] or [Pure]
-```
-
-### Misplaced [AllowSynchronization] on a type
-
-`[AllowSynchronization]` is only valid on method-like declarations. Applying it to a class produces `SP0007`.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0007_MisplacedAllowSynchronizationExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0007-misplaced-allow-synchronization/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-[AllowSynchronization]
-public sealed class TestClass
-{
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0007 Error docs/readme-examples/sp0007-misplaced-allow-synchronization/input.cs:4:2 The [AllowSynchronization] attribute can only be applied to method declarations
-```
-
-### Redundant [AllowSynchronization] without locks
-
-`[AllowSynchronization]` on a method with `[EnforcePure]` but no `lock` statement is reported as `SP0008` since the attribute has no effect.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0008_RedundantAllowSynchronizationExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0008-redundant-allow-synchronization/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
-    [EnforcePure]
-    [AllowSynchronization]
-    public int Add(int left, int right)
-    {
-        return left + right;
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0008 Info docs/readme-examples/sp0008-redundant-allow-synchronization/input.cs:8:16 Method 'Add' is marked with [AllowSynchronization] but contains no synchronization constructs
-```
-
-### Method-level exception summaries
-
-With runtime-hazard summaries enabled, SharpProof can report the exception types that may escape a method body.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0010_ExceptionSummaryExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0010-exception-summary/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-public sealed class TestClass
-{
-    public int Divide(int value)
-    {
-        return value / 0;
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0010 Info docs/readme-examples/sp0010-exception-summary/input.cs:4:16 Method 'Divide' can throw: System.DivideByZeroException
-```
-
-### Runtime hazard query proves guarded divide-by-zero
-
-The runtime-hazard query surface can prove a concrete exception path from source guards without executing the method.
-
-Backed by test: `ReadmeGeneratedExamplesTests.RuntimeHazardCliExample_MatchesSnapshot`.
-
-Command:
-
-```powershell
-dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/runtime-hazard-divide-by-zero/input.cs --line 7 --runtime-hazards
-```
-
-Source (`docs/readme-examples/runtime-hazard-divide-by-zero/input.cs`):
-
-```csharp
-public static class Example
-{
-    public static int Divide(int divisor)
-    {
-        if (divisor == 0)
-        {
-            return 10 / divisor;
-        }
-
-        return 0;
-    }
-}
-```
-
-CLI output:
-
-```text
-docs/readme-examples/runtime-hazard-divide-by-zero/input.cs
-Line: 7
-Runtime hazards: 1
-Hazard status summary: Proven=1
-Hazard exception summary: System.DivideByZeroException=1
-Hazard category summary: definite_divide_by_zero=1
-
-docs/readme-examples/runtime-hazard-divide-by-zero/input.cs:7:20 DivideByZero Proven
-Exception: System.DivideByZeroException
-Category: definite_divide_by_zero
-Reason: ir_state_contains_condition
-Node: DivideExpression <offset-range>
-Operation: 10 / divisor
-Trigger: divisor == 0
-Invariant: divisor == 0
-SMT:
-  Mode: Bounded
-  Enabled: True
-  Query timeout ms: 750
-  Method budget ms: 5000
-  Max path conditions: 192
-  Max expression nodes: 2048
-  Executed queries: 1
-  Cache entries: 1
-  Health: Ready
-  Permanently unavailable: False
-  Transient retries: 0
-  Recovered transient failures: 0
-  Context recycles: 0
-  Context generation: 0
-  Max transient retries: 1
-  Recycle context on transient failure: True
-  Dispose context with service: False
-```
-
-### Direct allocation sites under [ZeroAllocations]
-
-`[ZeroAllocations]` reports each direct heap allocation site inside the annotated method-like body instead of collapsing everything into one method-level warning.
-
-Backed by test: `ReadmeGeneratedExamplesTests.ZeroAllocationsAnalyzerExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/zero-allocations/input.cs`):
-
-```csharp
-using SharpProof.Attributes;
-
-public sealed class Example
-{
-    [Impure]
     [ZeroAllocations]
-    public object Create()
-    {
-        return new object();
-    }
-}
-```
-
-Expected analyzer diagnostics:
-
-```text
-SP0013 Warning docs/readme-examples/zero-allocations/input.cs:9:16 Method 'Create' is marked [ZeroAllocations], but operation 'new object()' allocates
-```
-
-### Capability contracts catch disallowed side effects
-
-`[AllowedCapabilities]` is separate from purity. Here it rejects console I/O directly at the violating call site.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0015_CapabilityViolationExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0015-capability-violation/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
-using System;
-using SharpProof.Attributes;
-
-public sealed class TestClass
-{
+    [DoesNotThrow]
     [AllowedCapabilities(SharpProofCapability.None)]
-    public void TestMethod()
-    {
-        Console.WriteLine("hello");
-    }
+    public static int Identity(int value) => value;
 }
 ```
 
-Expected analyzer diagnostics:
+Effect analysis is a path-insensitive may analysis. A possible allocation,
+observable state access, disallowed capability, escaping exception, or
+incomplete boundary prevents proof. It does not become a definitive violation
+without a replayable effect trace.
 
-```text
-SP0015 Warning docs/readme-examples/sp0015-capability-violation/input.cs:10:9 Method 'TestMethod' is marked [AllowedCapabilities], but operation 'Console.WriteLine("hello")' requires capabilities: IO, Console
-```
+Observable purity permits fresh allocation and writes confined to fresh owned
+state; `[ZeroAllocations]` does not. Implicit exceptions from dereferences,
+indexing, division, casts, checked arithmetic, and similar operations count
+toward exception contracts.
 
-### Invariant query proves a branch-local fact
-
-At a specific program point, the symbolic CLI can report the merged invariant, prove reachability, and check whether the current facts imply another condition.
-
-Backed by test: `ReadmeGeneratedExamplesTests.InvariantsCliExample_MatchesSnapshot`.
-
-Command:
-
-```powershell
-dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/invariants-positive/input.cs --line 7 --column 13 --check-reachability --implies "value > 0"
-```
-
-Source (`docs/readme-examples/invariants-positive/input.cs`):
+An external metadata call is modeled only when an exact built-in `ApiSpec`
+resolves, or when the boundary has both:
 
 ```csharp
-public static class Example
-{
-    public static int UseValue(int value)
-    {
-        if (value > 0)
-        {
-            return value;
-        }
-
-        return 0;
-    }
-}
+[SharpProofTrusted("Reviewed against the external implementation.")]
+[EffectContract(
+    SharpProofEffect.ReadsAmbientState,
+    Complete = true,
+    IsDeterministic = true)]
+public static extern int ReadExternalState();
 ```
 
-CLI output:
+Trust without an explicit complete contract proves nothing. A
+`[SharpProofSuppress("reason")]` changes reporting only; it does not add facts.
 
-```text
-docs/readme-examples/invariants-positive/input.cs:7:13
-Node: ReturnStatement
-Program point kind: Statement
-Requested location: docs/readme-examples/invariants-positive/input.cs:7:13 position=<offset> distance=0 contained=True
-Method: UseValue
-Merged invariant: value > 0
-Invariant merge: Conjunction
-Path conditions: 1
-Conservative unknown conditions: 0
-Invariant query: Must=1, Maybe=0, Unknown=0, CandidatePoints=1, UnreachablePoints=0
-Invariant query text: value > 0
-Invariant query status: Exact
-Invariant query status reason: all_candidate_program_points_exact
-Invariant query summary: Invariant query is exact for the selected reachable program points.
-Invariant query must facts: value > 0
-Invariant query target: value status=Exact reason=target_exact code=SP-SYM-TARGET-EXACT must=1 maybe=0 unknown=0
-Invariant query target summary: All selected reachable program points agree on the facts for this target.
-Invariant query target path: value conditions=1 smt=1 points=1 reachablePoints=1 proofs=1 unknownProofs=0 reason=target_has_path_conditions code=SP-SYM-TARGET-PATH-CONDITIONS
-Invariant query target path summary: This target has source-location path conditions available for invariant queries.
-Invariant query target path conditions: value > 0
-Invariant conditions:
-  [0] value > 0 target=value kind=SmtBinary
-Reachability: Reachable
-Reachability reason: branch_reachable
-Implies 'value > 0' target=value kind=SmtBinary: ProvenTrue
-Implication formula: value > 0
-Implication source: docs/readme-examples/invariants-positive/input.cs:7:13 position=<offset> node=ReturnStatement programPointKind=Statement span=<offset-range>
-Implication requested location: docs/readme-examples/invariants-positive/input.cs:7:13 position=<offset> distance=0 contained=True
-Implication reason: ir_state_contains_condition
-Proof outcomes: Total=1, ProvenTrue=1, ProvenFalse=0, Unreachable=0, Unknown=0
-SMT:
-  Mode: Bounded
-  Enabled: True
-  Query timeout ms: 750
-  Method budget ms: 5000
-  Max path conditions: 192
-  Max expression nodes: 2048
-  Executed queries: 1
-  Cache entries: 1
-  Health: Ready
-  Permanently unavailable: False
-  Transient retries: 0
-  Recovered transient failures: 0
-  Context recycles: 0
-  Context generation: 0
-  Max transient retries: 1
-  Recycle context on transient failure: True
-  Dispose context with service: False
-Facts:
-  value > 0
-```
+The analyzer admits a checked subset of ordinary methods, explicit
+constructors, static constructors, and accessors. It covers common primitive
+expressions, locals, assignments, direct calls, object and array creation,
+`if`, ordinary `for`/`while`/`do` loops, constant `switch`, exception handling,
+`using`, `lock`, conditional access, and ordinary interpolation.
 
-### Capability query for console I/O
+Async, iterators, `foreach`, closures, local functions, delegates, dynamic
+binding, ref parameters or locals, ref returns, ref-like and pointer shapes,
+open generic shapes, patterns, queries, ranges, collection expressions, and
+unknown future Roslyn operation kinds abstain silently. A closed constructed
+generic API call is admitted only when its exact specification resolves.
 
-The symbolic CLI can classify proven side-effect capability categories at a point inside a method, including derived umbrella categories such as `IO`.
+## Concrete call-site preconditions
 
-Backed by test: `ReadmeGeneratedExamplesTests.CapabilitiesCliExample_MatchesSnapshot`.
-
-Command:
-
-```powershell
-dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/capabilities-console/input.cs --line 7 --capabilities
-```
-
-Source (`docs/readme-examples/capabilities-console/input.cs`):
+Contracts are normal C# expressions bound by compiler symbol identity:
 
 ```csharp
-using System;
-
-public static class Example
-{
-    public static void Log()
-    {
-        Console.WriteLine("hello");
-    }
-}
-```
-
-CLI output:
-
-```text
-docs/readme-examples/capabilities-console/input.cs
-Method: Example.Log()
-Declaration kind: MethodDeclarationSyntax
-Span: 5:5-8:6
-Capabilities: IO, Console
-Conservative: False
-Sites:
-  - [invocation] IO, Console via System.Console.WriteLine(System.String? value) @ 7:9
-```
-
-### Conservative method complexity query
-
-The complexity query surface reports the best proven asymptotic cost for the containing method-like body and explains the structural drivers that established it.
-
-Backed by test: `ReadmeGeneratedExamplesTests.ComplexityCliExample_MatchesSnapshot`.
-
-Command:
-
-```powershell
-dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- --file docs/readme-examples/complexity-linear/input.cs --line 10 --complexity
-```
-
-Source (`docs/readme-examples/complexity-linear/input.cs`):
-
-```csharp
-public static class Example
-{
-    public static int Sum(int n)
-    {
-        var sum = 0;
-        for (var i = 0; i < n; i++)
-        {
-            sum += i;
-        }
-
-        return sum;
-    }
-}
-```
-
-CLI output:
-
-```text
-docs/readme-examples/complexity-linear/input.cs
-Method: int Example.Sum(int n)
-Declaration kind: method
-Span: 3:5-12:6
-Complexity: O(n)
-Kind: Linear
-Conservative: False
-Drivers:
-  - [ForLoop] for-loop bound O(n) from n @ 6:9
-```
-
-### Symbolic postconditions at method exits
-
-`[Ensures]` uses the bounded proof pipeline at each reachable return site and reports the exact exit that failed the declared postcondition.
-
-Backed by test: `ReadmeGeneratedExamplesTests.Sp0018_EnsuresNotProvenExample_MatchesSnapshot`.
-
-Source (`docs/readme-examples/sp0018-ensures-failing-return/input.cs`):
-
-```csharp
-#pragma warning disable SP0004
 using SharpProof.Attributes;
 
-public sealed class TestClass
-{
-    [Ensures("result > 0")]
-    public int Identity()
-    {
-        return 0;
+public static class Preconditions {
+    public static void Positive(int value) {
+        Contract.Requires(value > 0);
+    }
+
+    public static void BadCall() {
+        Positive(-1); // SP0027 when contracts mode and SP0027 are enabled
     }
 }
 ```
 
-Expected analyzer diagnostics:
+SP0027 is emitted only when the call is definitely executed, all normally
+evaluated receiver and argument expressions lower exactly, the prefix is known
+not to throw, and the instantiated precondition replays to `false`. Unknown
+arguments, conditional execution, unsupported expressions, and potentially
+throwing prefixes are silent.
 
-```text
-SP0018 Warning docs/readme-examples/sp0018-ensures-failing-return/input.cs:9:16 Method 'Identity' is marked [Ensures], but return site '0' does not prove postcondition 'result > 0'
-```
+`Contract.Requires`, `Contract.Ensures`, and `Contract.Assume` carry
+`[Conditional("SHARPPROOF_CONTRACTS")]`. Normal builds therefore erase the
+calls and do not evaluate their arguments. They are static-analysis contracts,
+not runtime guards.
 
-For the full generated galleries:
+Do not define `SHARPPROOF_CONTRACTS` in an ordinary application or test build.
+Doing so emits the contract calls and evaluates their arguments.
+`Contract.Result<T>()` and `Contract.Old(...)` throw
+`InvalidOperationException` when directly executed.
 
-- [Diagnostic example gallery](docs/diagnostic-examples.md)
-- [Symbolic query examples](docs/symbolic-query-examples.md)
+`Contract.Assume(...)` is explicit user-supplied proof evidence. It can affect a
+worker proof and is reported as an assumption in the proof core; use it only
+when the assumption itself is justified.
 
-## How To Inspect Proof Results
+## Bounded worker postconditions
 
-Use analyzer diagnostics for build enforcement, then use the symbolic CLI when
-you need the reason behind a result:
-
-```powershell
-dotnet run --project .\Tools\SharpProof.SymbolicCli\SharpProof.SymbolicCli.csproj -- explain --file Example.cs --line 42
-```
-
-The `explain` mode summarizes nearby invariants, reachability, runtime hazards,
-capabilities, and complexity for the selected line or position. Add `--json`,
-`--sarif`, or `--markdown` for one bounded report that also cross-links project
-analyzer diagnostics. Lower-level
-query modes such as `--runtime-hazards`, `--capabilities`, `--complexity`,
-`--check-reachability`, and `--implies` remain available for focused output and
-JSON automation.
-
-For applications and tooling that need direct queries, install the supported
-library package:
-
-```powershell
-dotnet add package SharpProof.Symbolic --version 0.1.0-preview.1
-```
+The worker can verify small acyclic bodies with locals, reassignment, branches,
+and multiple returns. This example is covered end to end:
 
 ```csharp
-using SharpProof.Symbolic;
+using SharpProof.Attributes;
 
-var result = new SymbolicQueryService().Query(
-    new SymbolicQueryRequest(
-        SymbolicSourceInput.FromText(sourceText, "Example.cs"),
-        SymbolicQueryTarget.Point(line: 42)));
+public static class Choices {
+    public static bool Choose(bool chooseLeft, bool left, bool right) {
+        Contract.Ensures(
+            Contract.Result<bool>() == (chooseLeft ? left : right));
+
+        if (chooseLeft) {
+            return left;
+        }
+
+        return right;
+    }
+}
 ```
 
-The package includes XML documentation, nullable API annotations, portable
-Source Link symbols, and an executable sample under
-`samples/SharpProof.Symbolic`.
-
-Native SMT is bundled for Windows x64 and macOS x64. Linux, arm64, and other
-unsupported package/RID combinations remain usable with conservative unknown
-results when no compatible host-provided Z3 library is available.
-
-## What It Can Prove Today
-
-- Analyzer contracts:
-  `[EnforcePure]`, `[Pure]`, `[ZeroAllocations]`,
-  `[AllowedCapabilities(...)]`, `[Requires(...)]`, `[Ensures(...)]`,
-  `[DoesNotThrow]`, `[AllowedExceptions(...)]`, `[ExpectedComplexity(...)]`,
-  and related diagnostics from `SP0002` through `SP0040`.
-- Symbolic queries:
-  line/position invariants, implication checks, reachability checks, runtime
-  hazards, capability summaries, and conservative complexity queries.
-- Runtime hazards:
-  direct throws, divide-by-zero, null dereference, nullable value access,
-  index/range issues, checked overflow, negative lengths, and other bounded
-  source-visible hazards when the current evidence supports them.
-- Summary-backed metadata reasoning:
-  generated built-in effect summaries embedded during build/test plus optional
-  external `*.SharpProof.EffectSummary.json` additional files.
-- Conservative fallback behavior:
-  unsupported library shapes, unknown external calls, unsupported regex or
-  pattern shapes, and budget/time-limit cases stay unknown or unproven rather
-  than being upgraded optimistically.
-
-## Deeper Docs
-
-- [Contracts and analyzer diagnostics](docs/contracts.md)
-- [Purity classification policy, precedence, and audit](docs/purity-policy.md)
-- [Opt-in trusted-boundary review diagnostics](docs/trusted-boundary-review.md)
-- [Opt-in exact-proof suppression of external diagnostics](docs/proven-diagnostic-suppression.md)
-- [Complete analyzer configuration reference](docs/configuration-reference.md)
-- [Migration, audit, CI, and strict configuration profiles](docs/configuration-profiles.md)
-- [Proof query CLI and API workflow](docs/proof-queries.md)
-- [Machine-readable JSON, SARIF, and Markdown explain reports](docs/explain-reports.md)
-- [Project-aware MSBuild proof queries](docs/project-aware-queries.md)
-- [Standalone editor, stdin, and JSON query inputs](docs/standalone-query-inputs.md)
-- [CI exit-code gates for symbolic queries](docs/ci-exit-gates.md)
-- [Typed symbolic API/CLI errors and JSON envelopes](docs/error-model.md)
-- [Configurable bounded-analysis limits and truncation evidence](docs/analysis-limits.md)
-- [SMT solver lifecycle, recovery, and health](docs/smt-lifecycle.md)
-- [Native Z3 packaging and Windows/Linux/macOS support](docs/native-smt-packaging.md)
-- [Solver witnesses and conservative input domains](docs/input-witnesses.md)
-- [Stable unknown-reason taxonomy](docs/unknown-reasons.md)
-- [Shared nullable-flow facts and CodeAnalysis contracts](docs/nullable-flow-facts.md)
-- [Proof/evidence schema and compatibility policy](docs/evidence-schema.md)
-- [Semantic pipeline preview migration and breaking changes](docs/semantic-pipeline-migration.md)
-- [Coverage, limits, and conservative fallback](docs/coverage-and-limits.md)
-- [Modern C# language-surface tracking matrix](docs/modern-csharp-surface.md)
-- [Diagnostic example gallery](docs/diagnostic-examples.md)
-- [Symbolic query examples](docs/symbolic-query-examples.md)
-- [Symbolic invariants and runtime-hazard query behavior](docs/symbolic-invariants.md)
-- [Capability analysis and `[AllowedCapabilities]`](docs/capability-analysis.md)
-- [Complexity query behavior](docs/complexity-queries.md)
-- [Effect summaries and generated metadata behavior](docs/effect-summary.md)
-
-## Current Limits
-
-- SharpProof is bounded and conservative, not a whole-program execution engine.
-- There is no meaningful "percent of the .NET SDK covered" claim yet; coverage
-  is member-level and evidence-backed.
-- Regex support is partial.
-- Ownership and mutation reasoning is useful but still local; there is no full
-  Rust-style borrow checker.
-- Deep dispatch, hidden runtime behavior, reflection-heavy flows, dynamic
-  behavior, and unsupported Roslyn shapes can remain conservative.
-
-## Development And Validation
-
-Use the repo wrappers for local validation so long-running .NET work runs under
-the expected Windows Job Object:
+Opt into worker execution on Windows x64:
 
 ```powershell
-.\scripts\Invoke-SharpProofDotnet.ps1 build SharpProof.sln --configuration Release
-.\scripts\Invoke-SharpProofTests.ps1 -Configuration Release -NoBuild -TestLane All
+dotnet build /p:SharpProofVerify=true
 ```
 
-The impacted-test wrapper can accelerate local loops, but full CI remains the
-truth source before merge:
+`SharpProofVerify` is independent of `SharpProofMode` and editor diagnostic
+settings. It runs after compilation, outside design-time builds. The default
+result is written under:
+
+```text
+obj/<Configuration>/<TargetFramework>/SharpProof/result.json
+```
+
+Each `Ensures` clause receives a versioned record:
+
+- `Proven` carries its canonical proof core, which can be empty for a hygienic
+  tautology.
+- `Refuted` has a replay-validated concrete model and fails the build with
+  worker exit code 5.
+- `Unknown` has a closed reason such as `UnsupportedBody`, `DeepEnsures`,
+  `ResourceLimit`, or `MethodTimeout`. A valid `Unknown` record does not by
+  itself fail the build.
+
+Malformed input, compiler errors, protocol errors, containment failure, and a
+hard worker timeout fail the build. The worker uses deterministic query,
+method, project, expression-depth, memory, process, and parallelism limits. Its
+content-addressed cache defaults to
+`obj/<Configuration>/<TargetFramework>/SharpProof/cache` in the MSBuild
+integration; only complete terminal `Proven` and replay-validated `Refuted`
+responses are cacheable.
+
+The current body executor is capped at 64 reachable blocks, 64 return paths,
+and 4,096 execution states. It supports a Boolean/integer SMT proof domain.
+Loops, arbitrary source calls, loads/stores, mutable heap state, unsupported
+conversions, excessive expression depth, and exceeded bounds produce
+`Unknown`.
+
+The worker also has narrow, spec-justified support for:
+
+- `Math.Abs(int)` normal-return non-negativity;
+- `string.Concat(string, string)` result non-nullness;
+- `Array.Empty<T>()` result non-nullness and zero array length.
+
+It does not treat `Enumerable.Empty<T>()` as array-backed sequence state, and a
+counterexample involving a spec-modeled call result is withheld when concrete
+replay cannot validate it.
+
+Within a worker target, `Requires` clauses are entry assumptions; the worker
+does not prove that callers satisfy them. `Assume` clauses are explicit
+user-supplied assumptions. Only `Ensures` clauses produce verification records.
+
+## Compiler-bound companions and closed attributes
+
+`[ContractFor(typeof(TargetType))]` can place compiler-bound contracts in a
+source companion for a target type. The companion must be one static class with
+the same generic arity and constraints as the target. Each companion member
+must be an ordinary static method with an exact compiler-symbol match,
+including receiver placement for instance targets, generic constraints, ref
+kinds, nullability, and return type. SPCF0001-SPCF0008 are enabled Error
+diagnostics for invalid companion declarations when the package analyzer
+payload is loaded.
+
+Direct `Contract.Requires`, `Ensures`, and `Assume` clauses used by the worker
+must be direct expression statements in one contiguous method-body prologue.
+`Result<T>` is valid only inside `Ensures`; `Old(...)` is valid only inside
+`Ensures` and cannot be nested.
+
+The currently consumed closed value attributes are:
+
+- `[NotNull]`
+- `[Positive]`
+- `[InRange(minimum, maximum)]`
+
+On parameters they become preconditions. On method return values they become
+postconditions. Property and field declarations are not a general active
+closed-contract proof surface, even though the attribute types permit those
+targets. `[Pure]` exists in the attributes package but is not the effect
+enforcement attribute; use `[EnforcePure]` for current analyzer behavior.
+
+## Exact built-in API specifications
+
+The default table contains these seven BCL rows:
+
+| API | Current modeled facts |
+|---|---|
+| `Array.Empty<T>()` | Effects and allocation unknown across type initialization; does not throw; non-null empty array result |
+| `object` constructor | Call boundary has no effects or allocation and does not throw; `new object()` still allocates the object |
+| `string.Length` | Reads receiver state; no allocation; does not throw inside the resolved call boundary |
+| `string.Concat(string, string)` | No side effects; may allocate; does not throw; non-null result |
+| `List<T>.Add(T)` | Writes receiver state; may allocate; throw behavior unknown |
+| `Math.Abs(int)` | No side effects or allocation; may throw `OverflowException`; normal result is non-negative |
+| `Enumerable.Empty<T>()` | Effects and allocation unknown across type initialization; does not throw; non-null empty enumerable fact |
+
+Missing, ambiguous, or target-framework-inapplicable rows fail closed.
+
+## Target frameworks and hosts
+
+The checked-in acceptance contract declares these consumer target frameworks:
+
+- `netstandard2.0`
+- `net8.0`
+- `net472`
+
+The analyzer and attributes are `netstandard2.0` and contain no verifier, Z3,
+or native solver payload. The packaged `SharpProof.Worker` is a `net8.0` tool with a
+Windows x64 native Z3 payload and mandatory Windows Job Object containment.
+`SharpProofVerify=true` on a non-Windows host fails with an explicit
+unsupported-host build error; analyzer modes remain available.
+
+The full acceptance workflow runs on `windows-latest`. A separate
+package-consumer workflow restores and exercises analyzer consumers on Windows
+x64, Linux x64, and macOS Intel; only Windows x64 enables packaged worker
+verification. Real Visual Studio, Rider, and Windows ARM64 validation remain
+outstanding release gates.
+
+## Build and validate this repository
+
+Run long-lived .NET commands through the repository wrapper:
 
 ```powershell
-.\scripts\Invoke-SharpProofImpactedTests.ps1 -NoBuild -ListOnly -Explain
-.\scripts\Invoke-SharpProofImpactedTests.ps1 -NoBuild
+.\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
+.\scripts\Generate-Readme.ps1 -Verify
+.\eng\acceptance\Verify.ps1 -Configuration Release
 ```
 
-## Help And Feedback
+The acceptance gate enforces the dependency graph and trusted-kernel size,
+builds the solution, runs architecture and banned-API checks, lattice and
+finite-CFG laws, runtime and differential oracles, worker/package integration,
+cache/concurrency/cancellation tests, the pinned corpus, a fixed-seed
+1,000-case fuzz run, and performance budgets.
 
-- Open a bug report or feature request in the
-  [GitHub issue tracker](https://github.com/alexyorke/SharpProof/issues).
-- Use pull requests for fixes, test additions, and analyzer/symbolic
-  improvements.
-- Treat the current README as a landing page; the linked docs are the better
-  place for detailed behavior and edge-case reference.
+## Documentation
+
+- [Documentation index](https://github.com/alexyorke/SharpProof/blob/master/docs/README.md)
+  is the complete maintained-doc map.
+- [SEMANTICS.md](https://github.com/alexyorke/SharpProof/blob/master/SEMANTICS.md)
+  is the normative soundness boundary and wins if another document conflicts
+  with it.
+- [Architecture](https://github.com/alexyorke/SharpProof/blob/master/docs/architecture.md)
+  describes the production dependency graph and proof boundary.
+- [Coverage and limits](https://github.com/alexyorke/SharpProof/blob/master/docs/coverage-and-limits.md)
+  summarizes admitted and rejected product areas.
+- [Analysis limits](https://github.com/alexyorke/SharpProof/blob/master/docs/analysis-limits.md)
+  lists shipping worker and performance budgets.
+- [Diagnostics](https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md)
+  documents analyzer and `ContractFor` generator IDs.
+- [Typed Unknown reasons](https://github.com/alexyorke/SharpProof/blob/master/docs/unknown-reasons.md)
+  explains fail-closed abstentions.
+- [Native SMT packaging](https://github.com/alexyorke/SharpProof/blob/master/docs/native-smt-packaging.md)
+  describes analyzer and worker payload separation.
+- [SMT lifecycle](https://github.com/alexyorke/SharpProof/blob/master/docs/smt-lifecycle.md)
+  describes solver ownership and disposal.
+- [API result domains](https://github.com/alexyorke/SharpProof/blob/master/docs/soundness-notes/2026-07-25-api-spec-result-domains.md)
+  records the bounded nullness/cardinality integration.
+- [Hardening audit](https://github.com/alexyorke/SharpProof/blob/master/docs/soundness-notes/2026-07-25-hardening.md)
+  records validation evidence and outstanding checkpoints.
+- [Acceptance contract](https://github.com/alexyorke/SharpProof/blob/master/eng/acceptance/README.md)
+  describes the active release gate.

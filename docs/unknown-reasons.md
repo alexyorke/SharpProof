@@ -1,150 +1,173 @@
-# Stable Unknown-Reason Taxonomy
+# Typed abstention reasons
 
-SharpProof exposes one additive unknown-reason descriptor across proof,
-capability, complexity, runtime-hazard, purity, and `[Ensures]` results. Existing
-family enums and free-form reason strings remain available for compatibility;
-the descriptor gives automation a stable code and a shared category.
+SharpProof represents semantic uncertainty with closed enums. Display text can
+explain a result, but semantic branching, proof evidence, serialization, and
+cache identity use the typed values below.
 
-## Public Contract
+`Unknown` is not failure converted into proof. It means SharpProof did not
+establish `Proven` or replay-validated `Refuted` within the admitted model and
+budgets. Unsupported analyzer callables usually abstain silently; worker
+verification returns an explicit typed record.
 
-`SymbolicUnknownReasonInfo` contains:
+## Frontend expression and program lowering
 
-- `Source`: `Proof`, `Capability`, `Complexity`, `RuntimeHazard`, `Purity`, or
-  `Ensures`
-- `Category`: the cross-family classification
-- `Code`: a stable lower-case dotted identifier
-- `RawReason`: the existing enum name or reason string
-- `IsRetryable`: whether retrying after an external-state or budget change may
-  help
-- `IsConfigurationRelated`: whether solver enablement or a configured bound is
-  directly involved
-- `IsUnknown`: false only for the family's `.none` descriptor
+`SharpProof.Frontend.FrontendAbstention` has these exact values:
 
-The descriptor is exposed through:
+| Value | Meaning |
+|---|---|
+| `None` | The classification is exact; this is not an abstention |
+| `UnsupportedOperationKind` | A known Roslyn operation kind is outside the frontend subset |
+| `UnsupportedType` | The IR has no exact admitted type mapping |
+| `ErrorOperation` | Roslyn produced an error operation |
+| `InvalidOperation` | Roslyn produced an invalid/none operation |
+| `UserDefinedOperator` | Operator semantics depend on user code |
+| `LiftedOperator` | Nullable lifted operator semantics are not modeled exactly |
+| `UncheckedOverflowSemantics` | The requested unchecked behavior cannot be preserved exactly |
+| `ConversionMayChangeValue` | A conversion is not proven value-preserving in the admitted IR |
+| `UnsupportedMemberAccess` | The member observation has no exact lowering |
+| `UnsupportedInvocationShape` | Receiver, arguments, reduction, defaults, or call shape is unsupported |
+| `UnsupportedControlFlow` | Program control flow is outside the lowerer subset |
+| `UnsupportedStatement` | A statement has no exact program lowering |
+| `UnsupportedMutation` | A mutation has no exact state model |
+| `UnknownOperationKind` | A future numeric Roslyn operation kind is not in the closed table |
 
-- `SymbolicProofInfo.UnknownReasonInfo`
-- `SymbolicCapabilitySite.UnknownReasonInfo` and
-  `SymbolicCapabilityResult.UnknownReasonDetails`
-- `SymbolicComplexityCalleeInfo.UnknownReasonInfo` and
-  `SymbolicComplexityResult.UnknownReasonDetails`
-- `SymbolicRuntimeHazard.UnknownReasonInfo`
-- the public compact capability, complexity, and runtime-hazard projections
+An exact expression result carries `None`. A closed abstention must carry one
+of the other values. Program lowering also records the exact `OperationId` that
+caused each abstention.
 
-Condition/implication results expose the proof descriptor through their
-`Proof`. Purity and `[Ensures]` analyzer results carry the same taxonomy in
-diagnostic properties.
+## Analyzer language gate
 
-## Shared Categories
+`SharpProof.Analyzer.LanguageSubsetAbstentionReason` is internal and has these
+exact values:
 
-| Category | Meaning |
-| --- | --- |
-| `UnsupportedSyntax` | The selected source or symbolic shape is outside the supported lowering surface. |
-| `UnsupportedOperation` | The syntax was understood, but the operation cannot be modeled safely. |
-| `UnsupportedLibraryModel` | Required framework, metadata, or callee behavior has no authoritative model. |
-| `DynamicDispatch` | The runtime target cannot be bounded to a supported implementation. |
-| `ExternalBoundary` | Analysis reached source or metadata outside the available proof boundary. |
-| `RecursiveAnalysis` | A recursive or cyclic analysis boundary prevented a finite result. |
-| `SolverDisabled` | SMT analysis was not enabled. |
-| `SolverBudget` | Method, path-condition, or expression-node budget was exhausted. |
-| `SolverTimeout` | The bounded solver timed out. |
-| `NativeSolverFailure` | Z3/native loading or availability failed. |
-| `SolverEncodingFailure` | A supported proof request could not be encoded for the solver. |
-| `Cancellation` | The caller canceled analysis. |
-| `InvalidInput` | A contract or query condition could not be parsed or bound. |
-| `AnalysisUnavailable` | The family query itself failed before classification. |
-| `Unknown` | No more specific conservative classification is justified. |
+- `None`
+- `UnsupportedCallable`
+- `MissingOperationRoot`
+- `UnsupportedOperationKind`
+- `UnsupportedType`
+- `UnsupportedOperationShape`
 
-`None` is used only when the result is not unknown.
+This gate runs before feature analysis. Unsupported analyzer callables emit no
+feature diagnostic. Corpus instrumentation records their internal semantic
+status so silence is not counted as proof.
 
-## Stable Codes
+## Approximation provenance
 
-Proof codes distinguish the solver failure modes directly:
+Facts that over-approximate execution use
+`SharpProof.Verify.ApproximationReason`:
 
-| Code | Category |
-| --- | --- |
-| `proof.unsupported_ir_encoding` | `UnsupportedSyntax` |
-| `proof.solver_disabled` | `SolverDisabled` |
-| `proof.native_solver_failure` | `NativeSolverFailure` |
-| `proof.solver_timeout` | `SolverTimeout` |
-| `proof.solver_method_budget` | `SolverBudget` |
-| `proof.solver_path_condition_budget` | `SolverBudget` |
-| `proof.solver_expression_budget` | `SolverBudget` |
-| `proof.solver_encoding_failure` | `SolverEncodingFailure` |
-| `proof.canceled` | `Cancellation` |
-| `proof.unknown` | `Unknown` |
+- `UnsupportedOperation`
+- `UnresolvedApi`
+- `AbstractJoin`
+- `Widening`
+- `Budget`
+- `ExternalBoundary`
 
-An exhausted transient retry uses raw reason `smt_transient_failure` and maps
-to the retryable `proof.native_solver_failure` code. A service-level permanent
-native failure uses raw reason `smt_unavailable` and the same stable proof code;
-inspect `SmtAnalysisHealth` to distinguish recovered, degraded, and permanent
-service state.
+An `ApproximatedJustification` is deliberately not a `ProofJustification`.
+Approximate facts therefore cannot be promoted into assumptions or appear as
+evidence authorizing `Proven`.
 
-Runtime hazards and `[Ensures]` reuse these suffixes with
-`runtime_hazard.` or `ensures.` prefixes. They also define family boundaries
-such as `runtime_hazard.unsupported_typed_projection`,
-`ensures.invalid_condition`, and `ensures.unsupported_condition`.
+## SMT backend failures
 
-Capability codes include:
+`SharpProof.Verify.BackendFailureReason` has these exact values:
 
-- `capability.unsupported_target`
-- `capability.no_containing_method_body`
-- `capability.dynamic_dispatch`
-- `capability.library_model_unavailable`
-- `capability.unsupported_operation`
-- `capability.recursive_source_cycle`
-- `capability.external_source_boundary`
-- `capability.canceled`
-- `capability.unknown`
+- `None`
+- `UnsupportedEncoding`
+- `ResourceLimit`
+- `Timeout`
+- `Unavailable`
+- `MalformedResult`
+- `InfrastructureFailure`
 
-Complexity codes include:
+`None` accompanies satisfiable or unsatisfiable backend results. Every other
+value accompanies backend `Unknown` and is mapped through the proof kernel.
 
-- `complexity.unsupported_target`
-- `complexity.no_containing_method_body`
-- `complexity.unsupported_loop_shape`
-- `complexity.unsupported_while_loop`
-- `complexity.unknown_callee`
-- `complexity.external_callee`
-- `complexity.dynamic_dispatch`
-- `complexity.recursive_cycle`
-- `complexity.unsupported_operation`
-- `complexity.canceled`
-- `complexity.analysis_failure`
-- `complexity.unknown`
+## Proof-kernel abstention
 
-Purity evidence uses `purity.library_model_fallback`,
-`purity.unsupported_operation`, `purity.dynamic_dispatch`,
-`purity.external_boundary`, `purity.recursive_analysis`, `purity.canceled`, or
-`purity.unknown` only when the evidence is conservative. Known impurity evidence
-uses `purity.none`; its existing impurity category remains the authoritative
-cause.
+`SharpProof.Verify.AbstentionReason` has these exact values:
 
-## Diagnostic Properties
+| Value | Boundary |
+|---|---|
+| `UnsupportedOperation` | The proof query contains an operation outside the verified subset |
+| `ApproximationTouchedGoal` | Establishing the goal would depend on approximate evidence |
+| `MissingApiSpecification` | An external member has no exact resolved spec |
+| `UnsupportedEncoding` | The active SMT backend cannot encode the query |
+| `ResourceLimit` | A deterministic solver or method resource allowance was exhausted |
+| `Timeout` | The method wall boundary was reached |
+| `BackendUnavailable` | The configured backend or native dependency is unavailable |
+| `InfrastructureFailure` | Non-semantic worker/backend infrastructure failed |
+| `MalformedBackendResult` | Status, core, or model shape is invalid |
+| `CounterexampleReplayFailed` | A SAT model did not replay to an observed goal failure |
 
-Unknown analyzer diagnostics add the following versioned properties:
+Only the proof kernel constructs proof outcomes. Backend UNSAT becomes
+`Proven` only after evidence-core hygiene. Backend SAT becomes `Refuted` only
+after executable replay. Any failed check becomes `Unknown`.
 
-| Property | Value |
-| --- | --- |
-| `sharpproof.unknown.code` | Stable dotted code |
-| `sharpproof.unknown.category` | `SymbolicUnknownReasonCategory` name |
-| `sharpproof.unknown.source` | `SymbolicUnknownReasonSource` name |
-| `sharpproof.unknown.raw_reason` | Existing raw reason |
-| `sharpproof.unknown.retryable` | Boolean text |
-| `sharpproof.unknown.configuration_related` | Boolean text |
+## Worker verification records
 
-These fields are emitted for capability, complexity, unknown runtime hazards,
-purity fallback/unsupported evidence, and unsupported or unknown `[Ensures]`
-results. Family-specific properties such as
-`sharpproof.runtime_hazard.unknown_reason` and
-`sharpproof.ensures.failure_reason` are retained.
+`SharpProof.Worker.Protocol.WorkerVerificationStatus` is exactly:
 
-## Compatibility Rules
+- `Proven`
+- `Refuted`
+- `Unknown`
 
-- Codes documented here are stable identifiers. Their display wording may
-  improve without changing the code.
-- New codes and enum values are additive. Consumers must tolerate unknown
-  future values.
-- `RawReason` is evidence and debugging context, not a stable branching key.
-- A more specific category may replace `Unknown` in a future additive release;
-  an existing specific code must not silently change meaning.
-- Persisted consumers should also record the proof/evidence schema fields
-  described in [the evidence compatibility policy](evidence-schema.md).
+`WorkerVerificationReason` has these exact values:
+
+| Value | Meaning |
+|---|---|
+| `None` | A terminal `Proven` or `Refuted` record has no abstention |
+| `UnsupportedCallable` | Callable kind, target, companion, or contract binding target is unsupported |
+| `UnsupportedContract` | Contract structure or intrinsic use is invalid/unsupported |
+| `UnsupportedBody` | The bounded acyclic body executor cannot model the body |
+| `UnsupportedExpression` | Contract/body expression, spec application, or proof encoding is unsupported |
+| `DeepEnsures` | The constructed obligation exceeds `MaximumExpressionDepth`; it does not mean general deep verification is implemented |
+| `MissingReturnValue` | A result-dependent postcondition has a normal path without a usable return value |
+| `ResourceLimit` | Per-query or per-method resource allowance is exhausted |
+| `MethodTimeout` | The method wall boundary is reached |
+| `ProjectTimeout` | The project boundary leaves the record unfinished |
+| `BackendUnavailable` | Z3/backend loading or availability failed |
+| `InfrastructureFailure` | Non-semantic worker infrastructure failed |
+| `MalformedBackendResult` | The backend result cannot pass structural/kernel validation |
+| `CounterexampleReplayFailed` | A candidate refutation could not be reproduced by the executable IR |
+
+The worker intentionally coalesces some lower-layer distinctions. For example,
+proof `UnsupportedOperation`, `ApproximationTouchedGoal`,
+`MissingApiSpecification`, and `UnsupportedEncoding` map to worker
+`UnsupportedExpression`. Contract binding failures map to
+`UnsupportedContract`, `UnsupportedExpression`, or `UnsupportedCallable`
+according to their closed failure kind.
+
+## Protocol errors are separate
+
+Malformed requests, invalid compilation settings, missing input files,
+compilation errors, and project construction failures are serialized in the
+response `errors` array as typed string codes such as:
+
+- `request.null`, `request.malformed`, and `protocol.unsupported`;
+- `project.sources`, `project.references`, and `project.invalid_input`;
+- `compilation.language_version`, `compilation.nullable`, and other explicit
+  compilation-option codes;
+- `budgets.rlimit`, `budgets.expression_depth`, and other budget codes;
+- `cache.maximum_bytes`;
+- `input.unavailable`; and
+- `compiler.<diagnostic-id>`.
+
+These errors are not `WorkerVerificationReason` values and are not semantic
+answers.
+
+## Cancellation, diagnostics, and caching
+
+Caller cancellation remains cancellation and propagates across audited
+boundaries; it is not converted to a reason or cached response. Outer launcher
+termination is likewise infrastructure control, not a proof.
+
+An analyzer not-proven diagnostic and a worker `Unknown` record are different
+interfaces. Diagnostic silence can also mean disabled reporting or silent
+language-gate abstention. See [Diagnostics](diagnostic-examples.md) for the
+reporting surface and [Coverage and limits](coverage-and-limits.md) for the
+admitted product subset.
+
+Unknown outcomes, protocol errors, cancellation, timeout, malformed results,
+backend failures, and failed replay are never semantic cache entries. Only a
+complete validated project response whose records are hygienic `Proven` or
+replay-validated `Refuted` is cacheable.

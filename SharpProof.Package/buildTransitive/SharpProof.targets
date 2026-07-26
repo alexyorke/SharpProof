@@ -1,14 +1,131 @@
 <Project>
-  <Target Name="_SharpProofExcludeNativeAnalyzerAssets"
-          BeforeTargets="CoreCompile">
+  <PropertyGroup>
+    <SharpProofToolsDirectory Condition="'$(SharpProofToolsDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\tools\net8'))</SharpProofToolsDirectory>
+    <_SharpProofToolsDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofToolsDirectory)'))</_SharpProofToolsDirectory>
+    <SharpProofWorkerPath Condition="'$(SharpProofWorkerPath)' == ''">$(_SharpProofToolsDirectory)\SharpProof.Worker.dll</SharpProofWorkerPath>
+    <SharpProofLauncherPath Condition="'$(SharpProofLauncherPath)' == ''">$(_SharpProofToolsDirectory)\SharpProof.Worker.Launcher.dll</SharpProofLauncherPath>
+    <_SharpProofWorkerPath>$([System.IO.Path]::GetFullPath('$(SharpProofWorkerPath)'))</_SharpProofWorkerPath>
+    <_SharpProofLauncherPath>$([System.IO.Path]::GetFullPath('$(SharpProofLauncherPath)'))</_SharpProofLauncherPath>
+    <_SharpProofModeNormalized>$([System.String]::Copy('$(SharpProofMode)').ToLowerInvariant())</_SharpProofModeNormalized>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(_SharpProofModeNormalized)' != 'off'">
+    <Analyzer Include="
+        $(_SharpProofAnalyzerDirectory)/SharpProof.Analyzer.dll;
+        $(_SharpProofAnalyzerDirectory)/SharpProof.ContractForGenerator.dll">
+      <SharpProofAnalyzerRole>EntryPoint</SharpProofAnalyzerRole>
+    </Analyzer>
+    <!--
+      Roslyn registers dependency locations only for compiler analyzer
+      references. Keep this list explicit and managed-only; the previous
+      backslash wildcard was not portable to non-Windows hosts.
+    -->
+    <Analyzer Include="
+        $(_SharpProofAnalyzerDirectory)/Microsoft.CodeAnalysis.AnalyzerUtilities.dll;
+        $(_SharpProofAnalyzerDirectory)/SharpProof.Attributes.dll;
+        $(_SharpProofAnalyzerDirectory)/SharpProof.Contracts.dll;
+        $(_SharpProofAnalyzerDirectory)/SharpProof.Dataflow.dll;
+        $(_SharpProofAnalyzerDirectory)/SharpProof.Effects.dll;
+        $(_SharpProofAnalyzerDirectory)/SharpProof.Frontend.dll;
+        $(_SharpProofAnalyzerDirectory)/SharpProof.Ir.dll;
+        $(_SharpProofAnalyzerDirectory)/SharpProof.Specs.dll;
+        $(_SharpProofAnalyzerDirectory)/System.Buffers.dll;
+        $(_SharpProofAnalyzerDirectory)/System.Collections.Immutable.dll;
+        $(_SharpProofAnalyzerDirectory)/System.Memory.dll;
+        $(_SharpProofAnalyzerDirectory)/System.Numerics.Vectors.dll;
+        $(_SharpProofAnalyzerDirectory)/System.Reflection.Metadata.dll;
+        $(_SharpProofAnalyzerDirectory)/System.Runtime.CompilerServices.Unsafe.dll;
+        $(_SharpProofAnalyzerDirectory)/System.Text.Encoding.CodePages.dll;
+        $(_SharpProofAnalyzerDirectory)/System.Threading.Tasks.Extensions.dll">
+      <SharpProofAnalyzerRole>Dependency</SharpProofAnalyzerRole>
+      <Visible>false</Visible>
+    </Analyzer>
+  </ItemGroup>
+
+  <Target Name="_SharpProofInitializeVerify">
+    <PropertyGroup>
+      <_SharpProofVerifyDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(IntermediateOutputPath)SharpProof'))</_SharpProofVerifyDirectory>
+      <SharpProofVerifyRequestFile Condition="'$(SharpProofVerifyRequestFile)' == ''">$(_SharpProofVerifyDirectory)\request.json</SharpProofVerifyRequestFile>
+      <SharpProofVerifyResultFile Condition="'$(SharpProofVerifyResultFile)' == ''">$(_SharpProofVerifyDirectory)\result.json</SharpProofVerifyResultFile>
+      <SharpProofVerifyCacheDirectory Condition="'$(SharpProofVerifyCacheDirectory)' == ''">$(_SharpProofVerifyDirectory)\cache</SharpProofVerifyCacheDirectory>
+      <_SharpProofSourceList>$(_SharpProofVerifyDirectory)\sources.list</_SharpProofSourceList>
+      <_SharpProofReferenceList>$(_SharpProofVerifyDirectory)\references.list</_SharpProofReferenceList>
+      <_SharpProofConstantList>$(_SharpProofVerifyDirectory)\constants.list</_SharpProofConstantList>
+      <_SharpProofOptionsInput>$(_SharpProofVerifyDirectory)\options.input</_SharpProofOptionsInput>
+      <_SharpProofNullable>$(Nullable)</_SharpProofNullable>
+      <_SharpProofNullable Condition="'$(_SharpProofNullable)' == ''">disable</_SharpProofNullable>
+      <_SharpProofCheckedOverflow>$(CheckForOverflowUnderflow)</_SharpProofCheckedOverflow>
+      <_SharpProofCheckedOverflow Condition="'$(_SharpProofCheckedOverflow)' == ''">false</_SharpProofCheckedOverflow>
+      <_SharpProofOptimize>$(Optimize)</_SharpProofOptimize>
+      <_SharpProofOptimize Condition="'$(_SharpProofOptimize)' == ''">false</_SharpProofOptimize>
+      <_SharpProofAllowUnsafe>$(AllowUnsafeBlocks)</_SharpProofAllowUnsafe>
+      <_SharpProofAllowUnsafe Condition="'$(_SharpProofAllowUnsafe)' == ''">false</_SharpProofAllowUnsafe>
+      <_SharpProofDeterministic>$(Deterministic)</_SharpProofDeterministic>
+      <_SharpProofDeterministic Condition="'$(_SharpProofDeterministic)' == ''">true</_SharpProofDeterministic>
+      <_SharpProofOutputType>$(OutputType)</_SharpProofOutputType>
+      <_SharpProofOutputType Condition="'$(_SharpProofOutputType)' == ''">Library</_SharpProofOutputType>
+      <_SharpProofPlatformTarget>$(PlatformTarget)</_SharpProofPlatformTarget>
+      <_SharpProofPlatformTarget Condition="'$(_SharpProofPlatformTarget)' == ''">AnyCPU</_SharpProofPlatformTarget>
+      <_SharpProofPrefer32Bit>$(Prefer32Bit)</_SharpProofPrefer32Bit>
+      <_SharpProofPrefer32Bit Condition="'$(_SharpProofPrefer32Bit)' == ''">false</_SharpProofPrefer32Bit>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="_SharpProofWriteOptionsInput"
+          DependsOnTargets="_SharpProofInitializeVerify">
+    <MakeDir Directories="$(_SharpProofVerifyDirectory)" />
+    <WriteLinesToFile File="$(_SharpProofOptionsInput)"
+                      Lines="target-framework=$(TargetFramework);language-version=$(LangVersion);nullable=$(_SharpProofNullable);checked-overflow=$(_SharpProofCheckedOverflow);optimize=$(_SharpProofOptimize);allow-unsafe=$(_SharpProofAllowUnsafe);deterministic=$(_SharpProofDeterministic);output-type=$(_SharpProofOutputType);platform-target=$(_SharpProofPlatformTarget);prefer-32-bit=$(_SharpProofPrefer32Bit);constants=$(DefineConstants);query-rlimit=$(SharpProofVerifyQueryRlimit);method-rlimit=$(SharpProofVerifyMethodRlimit);method-wall-ms=$(SharpProofVerifyMethodWallTimeMilliseconds);project-wall-ms=$(SharpProofVerifyProjectWallTimeMilliseconds);max-parallelism=$(SharpProofVerifyMaxParallelism);max-expression-depth=$(SharpProofVerifyMaximumExpressionDepth);process-memory-bytes=$(SharpProofVerifyProcessMemoryLimitBytes);max-worker-processes=$(SharpProofVerifyMaxWorkerProcesses);termination-grace-ms=$(SharpProofVerifyTerminationGraceMilliseconds)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+  </Target>
+
+  <Target Name="_SharpProofVerifyCore"
+          DependsOnTargets="ResolveReferences;_SharpProofWriteOptionsInput">
+    <Error Condition="'$(TargetFramework)' == ''"
+           Text="SharpProof verification requires an explicit target framework identity." />
+    <Error Condition="'$(LangVersion)' == ''"
+           Text="SharpProof verification requires an explicit effective C# language version." />
+    <Error Condition="!Exists('$(_SharpProofLauncherPath)')"
+           Text="SharpProof verifier launcher was not found at '$(_SharpProofLauncherPath)'." />
+    <Error Condition="!Exists('$(_SharpProofWorkerPath)')"
+           Text="SharpProof verifier worker was not found at '$(_SharpProofWorkerPath)'." />
+    <MakeDir Directories="$(_SharpProofVerifyDirectory)" />
     <ItemGroup>
-      <_SharpProofNativeAnalyzer Include="@(Analyzer)"
-                                 Condition="'%(Analyzer.Filename)%(Analyzer.Extension)' == 'libz3.dll'" />
-      <Analyzer Remove="@(_SharpProofNativeAnalyzer)" />
-      <_SharpProofNativeSmtLocator
-          Include="$(MSBuildThisFileDirectory)../analyzers/dotnet/cs/SharpProof.NativeSmtLocator.txt"
-          Condition="Exists('$(MSBuildThisFileDirectory)../analyzers/dotnet/cs/SharpProof.NativeSmtLocator.txt')" />
-      <AdditionalFiles Include="@(_SharpProofNativeSmtLocator)" />
+      <_SharpProofSource Include="@(Compile->'%(FullPath)')" />
+      <_SharpProofReference Include="@(ReferencePathWithRefAssemblies->'%(FullPath)')" />
+      <_SharpProofReference Include="@(ReferencePath->'%(FullPath)')"
+                            Condition="'@(_SharpProofReference)' == ''" />
+      <_SharpProofConstant Include="$(DefineConstants)"
+                           Condition="'$(DefineConstants)' != ''" />
     </ItemGroup>
+    <WriteLinesToFile File="$(_SharpProofSourceList)"
+                      Lines="@(_SharpProofSource)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_SharpProofReferenceList)"
+                      Lines="@(_SharpProofReference)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_SharpProofConstantList)"
+                      Lines="@(_SharpProofConstant)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+    <Exec Command="&quot;$(SharpProofDotNetHost)&quot; &quot;$(_SharpProofLauncherPath)&quot; verify --worker &quot;$(_SharpProofWorkerPath)&quot; --request &quot;$(SharpProofVerifyRequestFile)&quot; --result &quot;$(SharpProofVerifyResultFile)&quot; --project-directory &quot;$(MSBuildProjectDirectory)&quot; --assembly-name &quot;$(AssemblyName)&quot; --sources &quot;$(_SharpProofSourceList)&quot; --references &quot;$(_SharpProofReferenceList)&quot; --constants &quot;$(_SharpProofConstantList)&quot; --target-framework &quot;$(TargetFramework)&quot; --language-version &quot;$(LangVersion)&quot; --nullable &quot;$(_SharpProofNullable)&quot; --checked-overflow &quot;$(_SharpProofCheckedOverflow)&quot; --optimize &quot;$(_SharpProofOptimize)&quot; --allow-unsafe &quot;$(_SharpProofAllowUnsafe)&quot; --deterministic &quot;$(_SharpProofDeterministic)&quot; --output-type &quot;$(_SharpProofOutputType)&quot; --platform-target &quot;$(_SharpProofPlatformTarget)&quot; --prefer-32-bit &quot;$(_SharpProofPrefer32Bit)&quot; --query-rlimit &quot;$(SharpProofVerifyQueryRlimit)&quot; --method-rlimit &quot;$(SharpProofVerifyMethodRlimit)&quot; --method-wall-ms &quot;$(SharpProofVerifyMethodWallTimeMilliseconds)&quot; --project-wall-ms &quot;$(SharpProofVerifyProjectWallTimeMilliseconds)&quot; --max-parallelism &quot;$(SharpProofVerifyMaxParallelism)&quot; --max-expression-depth &quot;$(SharpProofVerifyMaximumExpressionDepth)&quot; --process-memory-bytes &quot;$(SharpProofVerifyProcessMemoryLimitBytes)&quot; --max-worker-processes &quot;$(SharpProofVerifyMaxWorkerProcesses)&quot; --termination-grace-ms &quot;$(SharpProofVerifyTerminationGraceMilliseconds)&quot; --cache-enabled &quot;$(SharpProofVerifyCacheEnabled)&quot; --cache-directory &quot;$(SharpProofVerifyCacheDirectory)&quot; --cache-maximum-bytes &quot;$(SharpProofVerifyCacheMaximumBytes)&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          StandardOutputImportance="High"
+          StandardErrorImportance="High" />
+    <Message Importance="High"
+             Text="SharpProof verifier result: $(SharpProofVerifyResultFile)" />
+  </Target>
+
+  <Target Name="SharpProofVerify"
+          AfterTargets="CoreCompile"
+          DependsOnTargets="_SharpProofInitializeVerify;_SharpProofVerifyCore"
+          Condition="'$(SharpProofVerify)' == 'true' AND '$(OS)' == 'Windows_NT' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'" />
+
+  <Target Name="SharpProofRejectUnsupportedWorkerHost"
+          AfterTargets="CoreCompile"
+          Condition="'$(SharpProofVerify)' == 'true' AND '$(OS)' != 'Windows_NT' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+    <Error Text="SharpProof out-of-process verification is supported only on Windows. Analyzer modes remain available on this host." />
   </Target>
 </Project>

@@ -1,101 +1,152 @@
-# SharpProof Coverage And Limits
+# Coverage and limits
 
-SharpProof is beta software. It is useful for enforcing and inspecting bounded
-static contracts, but it is not a whole-program execution engine.
+This document is the authoritative inventory of SharpProof 0.2's implemented
+product surface. [SEMANTICS.md](../SEMANTICS.md) remains normative: if a
+semantic rule here conflicts with it, `SEMANTICS.md` wins.
 
-## What Coverage Means
+SharpProof admits code through explicit gates and then analyzes it
+conservatively. Admission does not guarantee a proof. Missing models,
+unsupported expressions, approximate facts, and exhausted budgets remain
+`Unknown` or silent abstentions.
 
-Coverage is evidence-backed and member-level. SharpProof should not claim a
-single percent of the .NET SDK as covered until the effect-summary and BCL
-classification data can report that number directly.
+## Product capability matrix
 
-The analyzer combines:
+| Surface | Runs where | Implemented behavior | Current boundary |
+|---|---|---|---|
+| Effect contracts | Opt-in analyzer, `effects` or `all-experimental` mode | Computes path-insensitive may summaries for reads, writes, allocation, capabilities, exceptions, termination, and completeness; checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, and `[AllowedExceptions]` | A possible or unresolved violation produces a not-proven diagnostic, not a definitive effect witness |
+| Call-site preconditions | Opt-in analyzer, `contracts` or `all-experimental` mode | Binds source `Contract.Requires` clauses and closed parameter attributes with compiler symbols; reports only when receiver, arguments, and required prefix evaluation are exact and non-throwing and the instantiated predicate concretely evaluates to false | Unknown values, unsupported contracts, possible throws, and unsupported callables are silent |
+| Postconditions | Opt-in Windows x64 worker | Binds `Contract.Ensures`, return attributes, `Contract.Result`, and `Contract.Old`; proves bounded obligations over normal-return paths with Boolean/integer SMT and replay-gated counterexamples | This is bounded `Ensures` verification, not arbitrary deep, recursive, looping, heap, or sequence verification |
+| Worker body execution | Opt-in Windows x64 worker | Executes a bounded acyclic CFG model with locals, reassignment, branches, multiple returns, entry-state `Old`, supported expressions, and eligible resolved API specs | Loops, stateful instructions outside the narrow admitted model, unresolved calls, unsupported mutation, and exceeded bounds abstain |
+| `ContractFor` validation | Incremental generator loaded with any non-`off` package mode | Validates companion type and member identity, including receiver, overload, generic constraints, ref/scoped kinds, nullability, defaults, and return shape | It validates and binds existing source; it emits no generated source and does not make an unsupported contract provable |
+| External calls | Analyzer and worker | Both resolve exact original symbols against `ApiSpecTable`; effect analysis can additionally consume an explicitly trusted complete effect contract | The worker does not turn arbitrary trusted metadata contracts into proof facts; missing, ambiguous, untrusted, incomplete, or target-framework-inapplicable models fail closed |
+| SMT | Worker only | Encodes supported Boolean and signed-integer obligations; creates `Proven` only after unsat-core hygiene and `Refuted` only after executable replay | No Z3 or verifier payload is loaded into the IDE analyzer |
 
-- Roslyn operation and control-flow analysis
-- symbolic IR facts
-- generated build-time effect summaries
-- bounded SMT/Z3 proof queries
-- conservative fallback for unsupported behavior
+Not active as 0.2 product features:
 
-## Current Limits
+- complexity classification or complexity diagnostics;
+- regex-to-SMT translation;
+- metadata IL effect inference;
+- standalone runtime-hazard queries;
+- nullable-contract diagnostics;
+- general source-callee assume/guarantee verification;
+- a mutable heap or general points-to model;
+- arbitrary loops, recursion, reference equality, sequence elements, or broad
+  SMT theories.
 
-- Unsupported C# and library shapes can remain unknown or unproven.
-- Unknown results distinguish unsupported syntax, unsupported operations,
-  missing library models, dynamic, external, and recursive boundaries, solver
-  disablement, budgets, timeouts, native failures, cancellation, and invalid
-  contract input through the [stable unknown-reason taxonomy](unknown-reasons.md).
-- Regex and string reasoning are partial.
-- Solver assignments are examples, not exhaustive input sets. Regex domains,
-  opaque non-null references, disjunctions, and alternative-path merges are
-  explicitly approximate; unsupported model shapes remain visible.
-- Ownership and mutation reasoning are local; there is no full Rust-style borrow
-  checker yet.
-- Nullable-flow facts combine Roslyn flow state with the supported CodeAnalysis
-  contracts through one [shared fact model](nullable-flow-facts.md). Attributes
-  are trusted contracts; they do not verify that an annotated implementation
-  keeps its promise.
-- Runtime hazards are source-visible and bounded, not a guarantee that every
-  possible runtime exception is modeled.
-- Fact collection, structural null-state inspection, and control-flow/state
-  merges have configurable positive caps. Exceeded caps emit stable evidence
-  instead of disappearing; see [bounded analysis limits](analysis-limits.md).
-- Known runtime-hazard coverage gaps have explicit acceptance criteria and
-  executable current-behavior regressions in
-  [the runtime-hazard backlog](runtime-hazard-backlog.md).
-- Complexity is asymptotic CPU-work classification for supported method shapes,
-  not wall-clock timing, allocation complexity, or JIT/cache behavior.
-- External calls, dynamic dispatch, reflection-heavy flows, native interop, and
-  hidden framework behavior can force conservative results.
-- Transient Z3 failures retry with a recycled context by default; permanent
-  native availability failures and explicit thread-context maintenance remain
-  visible through [SMT lifecycle health](smt-lifecycle.md).
-- The public packages bundle Z3 native assets for Windows x64 and macOS x64.
-  Linux, arm64, and other unsupported RIDs retain a permanent conservative
-  fallback instead of crashing the analyzer or query host. See
-  [native SMT packaging and platform support](native-smt-packaging.md).
+## Analyzer language gate
 
-## Common Runtime-Hazard Shapes
+The exact decision table is `SharpProof.Analyzer/LanguageSubsetGate.cs`. The
+following matrix summarizes that checked table.
 
-The bounded model includes direct `Count` guards for count-backed indexers and
-for empty `Queue<T>`, `Stack<T>`, and `PriorityQueue<TElement, TPriority>`
-`Peek`/`Pop`/`Dequeue` operations. A guard that proves the collection non-empty
-prunes the candidate; a path that proves `Count == 0` reports
-`InvalidCollectionCardinality` and `InvalidOperationException` evidence.
+| Category | Admitted | Rejected |
+|---|---|---|
+| Callable kinds | Non-generic ordinary methods, instance and static constructors, property getters/setters, event add/remove accessors, and explicit interface implementations | Async methods, generic source methods, ref returns, ref parameters, declarations without an operation root, and unsupported method kinds |
+| Types | Primitive and admitted named/reference types, strings, and arrays whose element type is admitted | Open type parameters, delegates, dynamic, pointers, function pointers, ref-like types, and admitted containers whose nested type is unsupported |
+| Statements and flow | Blocks, locals, assignments, return/throw, `if`, `for`, `while`, `do`, constant-clause `switch`, `try`/`catch`/`finally`, `using`, `lock`, labels/branches, object and array initialization | `foreach`, async/iterator flow, local functions, closures, event raising, queries, deconstruction, switch expressions, patterns, `with`, ranges, inline arrays, collection expressions, and spread |
+| Expressions | Literals, locals/parameters/instance, fields/properties, array access, built-in unary/binary/conversion operations, conditional/coalesce, `is` type, `typeof`, `nameof`, ordinary interpolation, object/array creation, and direct calls that pass shape checks | User-defined operators or conversions, delegates, dynamic operations, function pointers, anonymous objects, tuples, unsafe/address operations, custom interpolated-string handlers, implicit indexers, and future unknown Roslyn operation kinds |
+| Calls | Direct non-delegate calls without ref arguments; closed constructed generic calls only when an exact `ApiSpec` resolves | Local/delegate/function-pointer calls, ref arguments, open generic shapes, and closed generic calls with no exact resolved spec |
 
-Nullable result facts flow through `Nullable<T>.HasValue`, `.Value`, explicit
-casts, coalescing, and conditional access. They also flow through known
-completed async shapes: `Task.FromResult`, `ValueTask.FromResult`, the
-`ValueTask<T>(T)` constructor, `await`, `.Result`, and
-`GetAwaiter().GetResult()`. These models expose the wrapped value; they do not
-claim to predict arbitrary task scheduling, cancellation, faults, or custom
-awaiters.
+The frontend has a second, expression-level exactness classifier. For example,
+an operation kind can pass the analyzer gate while a lifted operator, narrowing
+conversion, unsupported member access, or unsupported invocation form still
+causes frontend abstention. The effect scanner can likewise return an
+incomplete summary for admitted syntax.
 
-Known bounded-integral `System.Math` calls also lower to typed symbolic IR.
-`Math.Min` and `Math.Max` preserve their bound relationships, `Math.Abs`
-preserves non-negativity while exposing signed-minimum `OverflowException`
-hazards, and `Math.Clamp` preserves ordered constant, equal, or type-extremum
-bounds. Floating-point overloads and clamp bounds whose order is not
-intrinsically proven stay on the conservative compatibility path.
+The worker body subset is narrower than the analyzer gate: its executor is
+acyclic and bounded and accepts only instructions it can substitute and model
+exactly. Analyzer admission must not be read as worker support.
 
-Runtime-hazard trigger facts are carried as typed
-`SymbolicExceptionPreconditionAtom` IR. Formula-shaped compatibility inputs are
-projected when the candidate is created. An input that cannot be represented in
-typed IR becomes an `Unsupported` fact, returns `Unknown` with
-`unsupported_typed_projection`, and renders source-like evidence as
-`unknown(...)`. Formula provenance is metadata only; it is not proof control
-flow.
+## Contract surface
 
-Unknown candidates stay opt-in in analyzer builds. Set
-`sharpproof_runtime_hazard_mode = unknowns` for informational `SP0033` only,
-`sites-and-unknowns` for warning-level proven sites plus informational unknowns,
-or `all-and-unknowns` to add method summaries. SP0033 has its own diagnostic ID,
-structured proof and trigger properties, explain metadata, and exact baseline
-evidence, so it can be suppressed with normal `.editorconfig`, pragma, or
-`SharpProof.Baseline.json` controls without hiding proven SP0011 hazards.
+### Compiler-bound calls
 
-## Soundness Rule
+| Contract | Binding and use |
+|---|---|
+| `Contract.Requires(condition)` | A precondition. The analyzer can replay it at exact call sites. The worker can use a bound precondition as a justified entry assumption. |
+| `Contract.Ensures(condition)` | A normal-return postcondition and worker proof goal. The analyzer does not prove postconditions. |
+| `Contract.Assume(condition)` | Explicit user evidence. It remains visible as a user-assumed proof justification. |
+| `Contract.Result<T>()` | Valid only inside `Ensures`; substitutes the callable's normal return value. A direct runtime call throws. |
+| `Contract.Old(value)` | Valid only inside `Ensures`; substitutes the entry-state value. Nested or otherwise invalid uses fail closed. A direct runtime call throws. |
 
-When SharpProof cannot justify a proof, it must not silently upgrade the result
-to proven. Unsupported, timed-out, canceled, native-load-failed, or over-budget
-proof obligations should remain conservative and should surface an unknown or
-unsupported reason where the public surface supports it.
+The compiler elides `Requires`, `Ensures`, and `Assume` calls unless
+`SHARPPROOF_CONTRACTS` is defined. SharpProof binds their compiler operations;
+it does not parse free-form contract strings.
+
+### Closed attributes
+
+The binder currently consumes these attributes on ordinary methods and
+constructors:
+
+| Attribute placement | Bound clause | Current consumer |
+|---|---|---|
+| `[NotNull]` on a parameter | `parameter != null` precondition for reference, string, or sequence IR values | Analyzer call-site replay and worker entry assumptions |
+| `[NotNull]` on a return value | `result != null` postcondition | Worker |
+| `[Positive]` on a parameter | `parameter > 0` integer precondition | Analyzer call-site replay and worker entry assumptions |
+| `[Positive]` on a return value | `result > 0` integer postcondition | Worker |
+| `[InRange(min, max)]` on a parameter | Inclusive integer precondition `min <= parameter && parameter <= max` | Analyzer call-site replay and worker entry assumptions |
+| `[InRange(min, max)]` on a return value | Inclusive integer postcondition | Worker |
+| `[Pure]` on an ordinary method or constructor | Captured as `BoundMethodContracts.IsPure` metadata | No current proof-producing consumer; it does not replace `[EnforcePure]`, an `ApiSpec`, or a trusted complete effect contract |
+
+Duplicate `[Pure]`, invalid value types, invalid ranges, and malformed intrinsic
+use make contract binding fail closed. Although attribute declarations allow
+some property and field placements, the current method binder consumes
+parameter and return-value closed clauses only.
+
+`[ContractFor(typeof(Target))]` permits a static companion class to hold
+compiler-bound clauses for a target type. Instance target members use an
+explicit first receiver parameter. The generator validates exact symbol shape;
+see [Diagnostics](diagnostic-examples.md#contractfor-generator-diagnostics).
+
+## Resolved API specification inventory
+
+The default table has seven BCL rows. Every row resolves by documentation
+comment ID and original symbol identity across the supported reference
+surfaces. Effects, allocation, throws, nullness, and cardinality are separate
+facets; an exact fact in one facet does not make an unknown facet exact.
+
+| Spec ID and row | Effects | Allocation | Throws | Result fact |
+|---|---|---|---|---|
+| `bcl.array.empty` - `System.Array.Empty<T>()` | Unknown because the generic cache can trigger type initialization | Unknown | Does not throw | Non-null, empty sequence |
+| `bcl.object.ctor` - `System.Object..ctor()` | None at the call boundary | None at the call boundary | Does not throw | None |
+| `bcl.string.length` - `System.String.Length` getter | Reads receiver state | None | Does not throw | Result equals receiver length |
+| `bcl.string.concat.string-string` - `System.String.Concat(string, string)` | None | May allocate | Does not throw | Non-null string |
+| `bcl.list.add` - `List<T>.Add(T)` | Writes receiver state | May allocate | Unknown | None |
+| `bcl.math.abs.int32` - `Math.Abs(int)` | None | None | May throw `OverflowException` | Result is non-negative on normal return |
+| `bcl.enumerable.empty` - `Enumerable.Empty<T>()` | Unknown because the generic cache can trigger type initialization | Unknown | Does not throw | Non-null, empty sequence |
+
+These seven rows are the complete supported built-in BCL surface. Anything
+outside this table, or any row that does not resolve exactly for the current
+target framework, fails closed.
+
+The worker projects validated call-result facets only into bounded proxies:
+
+- null equality for exact string, reference, and array call results;
+- direct `Length` observations for array results;
+- source-width and cardinality bounds represented as integer facts.
+
+`Array.Empty<T>()` has one narrow normal-return path that consumes its adjacent
+memory-only havoc and uses non-null/empty array facts without claiming the call
+is pure. `Enumerable.Empty<T>()` remains unsupported for cardinality proof
+because `IEnumerable<T>` is not array-backed sequence IR. There is no general
+reference/sequence SMT sort, alias analysis, element model, or heap model.
+
+The table also contains compiler-bound ghost rows for `Contract.Requires`,
+`Ensures`, `Assume`, `Result`, and `Old`. Those rows describe compiler-elided
+contract semantics and the throwing behavior of direct `Result`/`Old`
+invocation; they are not BCL coverage.
+
+## Outcomes and cache boundary
+
+- `Proven` requires a hygienic core containing only lowered facts, resolved
+  specs, verified contracts, or explicit user assumptions.
+- `Refuted` requires executable replay of the candidate model. The analyzer's
+  current effect may-analysis does not produce definitive effect refutations.
+- `Unknown` covers unsupported, unresolved, approximate, malformed, timed-out,
+  or exhausted analysis. Unsupported analyzer callables are silent.
+- Caller cancellation remains cancellation rather than becoming `Unknown`.
+- Only complete, validated terminal project responses are cacheable. Unknown,
+  cancellation, timeout, protocol error, malformed result, infrastructure
+  failure, and failed replay are not semantic cache entries.
+
+See [Typed abstention reasons](unknown-reasons.md) for the exact enums and
+[Analysis limits](analysis-limits.md) for configured budgets.

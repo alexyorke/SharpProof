@@ -1,98 +1,124 @@
-# Bounded Analysis Limits
+# Analysis limits
 
-SharpProof bounds fact collection and state merging so analyzer hosts and
-interactive queries cannot grow without limit. A bound is conservative: when
-it is exceeded, SharpProof drops the excess proof facts and records stable
-truncation evidence. A truncated result must not be treated as a complete
-proof merely because the remaining facts are consistent.
+SharpProof has two kinds of limits:
 
-## Limits
+- shipping defaults passed by the NuGet build-transitive integration; and
+- acceptance-only thresholds used to decide whether the repository is
+  releasable.
 
-| API property | Analyzer configuration key | CLI `--analysis-limit` name | Default | Event code |
-| --- | --- | --- | ---: | --- |
-| `MaxMergedIfElseFacts` | `sharpproof_analysis_max_merged_if_else_facts` | `merged-if-else-facts` | 16 | `analysis_limit.if_else_fact_merge` |
-| `MaxMergedSwitchFacts` | `sharpproof_analysis_max_merged_switch_facts` | `merged-switch-facts` | 32 | `analysis_limit.switch_fact_merge` |
-| `MaxMergedTryFacts` | `sharpproof_analysis_max_merged_try_facts` | `merged-try-facts` | 16 | `analysis_limit.try_fact_merge` |
-| `MaxTryCompletionBranches` | `sharpproof_analysis_max_try_completion_branches` | `try-completion-branches` | 8 | `analysis_limit.try_completion_branches` |
-| `MaxFiniteForeachElementFacts` | `sharpproof_analysis_max_finite_foreach_element_facts` | `finite-foreach-element-facts` | 8 | `analysis_limit.foreach_element_facts` |
-| `MaxScopedBlockCompletionStatements` | `sharpproof_analysis_max_scoped_block_completion_statements` | `scoped-block-completion-statements` | 32 | `analysis_limit.scoped_block_completion_statements` |
-| `MaxStructuralNullStateDepth` | `sharpproof_analysis_max_structural_null_state_depth` | `structural-null-state-depth` | 4 | `analysis_limit.structural_null_state_depth` |
-| `MaxMergedPathConditions` | `sharpproof_analysis_max_merged_path_conditions` | `merged-path-conditions` | 32 | `analysis_limit.merged_path_conditions` |
-| `MaxMergeableFactsPerTargetPerState` | `sharpproof_analysis_max_mergeable_facts_per_target_per_state` | `mergeable-facts-per-target-per-state` | 4 | `analysis_limit.mergeable_facts_per_target_per_state` |
-| `MaxFactChoiceCombinationsPerTarget` | `sharpproof_analysis_max_fact_choice_combinations_per_target` | `fact-choice-combinations-per-target` | 64 | `analysis_limit.fact_choice_combinations_per_target` |
-| `MaxGuardFactsPerTargetPerState` | `sharpproof_analysis_max_guard_facts_per_target_per_state` | `guard-facts-per-target-per-state` | 6 | `analysis_limit.guard_facts_per_target_per_state` |
+They have different sources. `SharpProof.Package/buildTransitive/SharpProof.props`
+defines package defaults. `SharpProof.Worker.Protocol/ProtocolModel.cs` defines
+matching protocol defaults and validation bounds. The release gate mirrors
+selected values in `eng/acceptance/contract.json` and verifies that they
+agree.
 
-All values must be positive. SharpProof records an event only when work would
-exceed a limit, not merely when the retained count equals it. Raising limits
-can improve proof precision, but also increases analyzer time and memory use.
-These controls are separate from SMT timeout, expression-node, and solver path
-condition budgets.
+## Package and worker defaults
 
-## Analyzer Configuration
+| MSBuild property | Default | Purpose | Authoritative source |
+|---|---:|---|---|
+| `SharpProofMode` | `off` | Analyzer activation mode | `SharpProof.props`; mirrored by `contract.json` |
+| `SharpProofVerify` | `false` | Opt-in worker execution | `SharpProof.props` |
+| `SharpProofVerifyQueryRlimit` | `3000000` | Z3 resource limit for one query | `SharpProof.props` and `WorkerBudgets`; mirrored by `contract.json` |
+| `SharpProofVerifyMethodRlimit` | `20000000` | Aggregate resource allowance for one method | `SharpProof.props` and `WorkerBudgets`; mirrored by `contract.json` |
+| `SharpProofVerifyMethodWallTimeMilliseconds` | `10000` | Outer method wall boundary | `SharpProof.props` and `WorkerBudgets`; mirrored as 10 seconds by `contract.json` |
+| `SharpProofVerifyProjectWallTimeMilliseconds` | `300000` | Outer project wall boundary | `SharpProof.props` and `WorkerBudgets`; mirrored as 300 seconds by `contract.json` |
+| `SharpProofVerifyMaxParallelism` | `4` | Maximum concurrent worker method verification | `SharpProof.props` and `WorkerBudgets`; mirrored by `contract.json` |
+| `SharpProofVerifyMaximumExpressionDepth` | `64` | Maximum proof-obligation term depth | `SharpProof.props` and `WorkerBudgets`; not present in `contract.json` |
+| `SharpProofVerifyProcessMemoryLimitBytes` | `2147483648` | Windows Job Object memory limit | `SharpProof.props` and `WorkerBudgets`; mirrored as 2048 MiB by `contract.json` |
+| `SharpProofVerifyMaxWorkerProcesses` | `4` | Windows Job Object active-process limit | `SharpProof.props` and `WorkerBudgets`; not present in `contract.json` |
+| `SharpProofVerifyTerminationGraceMilliseconds` | `1000` | Grace added to the project boundary before forced termination | `SharpProof.props` and `WorkerLauncherDefaults`; mirrored by `contract.json` |
+| `SharpProofVerifyCacheEnabled` | `true` | Enables the content-addressed disk cache | `SharpProof.props` and `WorkerCacheOptions`; not present in `contract.json` |
+| `SharpProofVerifyCacheMaximumBytes` | `536870912` | Maximum cache size, 512 MiB | `SharpProof.props` and `WorkerCacheOptions`; mirrored by `contract.json` |
+| `SharpProofDotNetHost` | `dotnet` | Host used to start the launcher | `SharpProof.props` |
 
-Analysis limits are compilation-global because the analyzer shares purity,
-state, and solver services across syntax callbacks. Configure them in a global
-AnalyzerConfig section or through matching MSBuild properties:
+`SharpProofVerifyCacheDirectory` is initialized by `SharpProof.targets` beneath
+the project's intermediate output, normally
+`obj/<Configuration>/<TargetFramework>/SharpProof/cache`.
+`SharpProofVerifyRequestFile` and `SharpProofVerifyResultFile` are initialized
+beside it.
 
-```ini
-is_global = true
+The package accepts `SharpProofMode` values `off`, `effects`, `contracts`, and
+`all-experimental`. `SharpProofVerify=true` invokes the packaged worker target
+only for non-design-time Windows builds; the shipped native payload is
+supported on Windows x64. Non-Windows hosts receive an explicit
+unsupported-host build error; analyzer modes remain available.
 
-sharpproof_analysis_max_merged_if_else_facts = 32
-sharpproof_analysis_max_finite_foreach_element_facts = 16
-sharpproof_analysis_max_structural_null_state_depth = 6
-sharpproof_analysis_max_merged_path_conditions = 64
-```
+## Protocol validation bounds
 
-Invalid, zero, or negative values produce `SP0025` and the corresponding
-default remains active. When truncated evidence contributes to a contract
-diagnostic, its properties include:
+The worker rejects malformed budgets before analysis:
 
-- `sharpproof.analysis.truncated = True`
-- `sharpproof.analysis.limit_codes`, a comma-separated stable code set
-- `sharpproof.analysis.limit_events`, with
-  `code|limit|observed|spanStart|provenance` entries
+- query and method rlimits must be positive, and query rlimit cannot exceed
+  method rlimit;
+- method and project wall times must be positive, and method time cannot exceed
+  project time;
+- parallelism and the Job Object process limit must each be from 1 through 4;
+- expression depth must be from 1 through 256;
+- process memory must be positive;
+- cache size must be from 1 byte through 512 MiB.
 
-## .NET API
+The configured method and project wall values are fail-closed outer boundaries,
+not proof facts. Z3 queries use deterministic resource limits. The launcher
+uses the project wall limit plus the termination grace to enforce a final
+process boundary.
 
-Create an immutable override set and attach it to query options:
+Every effective compilation option and budget participates in worker input and
+cache identity. Changing a limit cannot reuse an answer produced under a
+different limit.
 
-```csharp
-var limits = SymbolicAnalysisLimits.Default.WithOverrides(
-    maxFiniteForeachElementFacts: 16,
-    maxMergedPathConditions: 64);
+## Fixed worker body bounds
 
-var options = new SymbolicQueryOptions()
-    .WithAnalysisLimits(limits);
+`SharpProof.Worker/CallableVerifier.cs` also has three fixed, non-configurable
+bounds for one admitted acyclic body:
 
-var result = new SymbolicQueryService().Query(
-    new SymbolicQueryRequest(source, target, options));
+| Bound | Limit |
+|---|---:|
+| Reachable CFG blocks | 64 |
+| Normal-return paths | 64 |
+| Symbolic execution states | 4,096 |
 
-if (result.AnalysisTruncation.IsTruncated)
-{
-    foreach (var item in result.AnalysisTruncation.Events)
-        Console.WriteLine($"{item.Code}: {item.Observed} > {item.Limit}");
-}
-```
+Crossing one of these bounds returns `Unknown` with `UnsupportedBody`; it does
+not produce a partial proof. Loops are rejected by the acyclic-body check
+before symbolic execution.
 
-`AnalysisTruncation` is exposed on unified, point, line, span, file, condition
-proof, runtime-hazard, and compact result objects. Each event includes its
-stable `Code`, typed `Kind`, retained `Limit`, attempted or observed count,
-proof `Provenance`, and source span start when available. Aggregate results
-deduplicate the same event while preserving the largest observed count.
+## Acceptance-only thresholds
 
-## CLI
+These values come from `eng/acceptance/contract.json`. They are repository
+release gates, not end-user MSBuild defaults.
 
-Repeat `--analysis-limit <name>=<positive-integer>` to override one or more
-limits:
+| Gate | Current threshold |
+|---|---:|
+| Pull-request fuzz cases | 1,000 |
+| Nightly fuzz cases | 10,000 |
+| Fuzz parallelism | At most 4 |
+| Cancellation p95 | At most 250 ms |
+| Forced termination | At most 1,000 ms |
+| Performance warmups | 5 |
+| Performance samples | 30 |
+| Default-off median ratio | At most 1.10 |
+| Default-off p95 ratio | At most 1.20 |
+| Retained-memory ratio | At most 1.05 |
+| Retained-memory absolute increase | At most 32 MiB |
+| Enabled analyzer retained compilations | 0 |
+| Enabled analyzer retained-memory increase | At most 32 MiB |
+| Simulated IDE edits | 200 |
+| IDE edit p95 | At most 100 ms |
+| IDE edit maximum | At most 250 ms |
 
-```powershell
-SharpProof.SymbolicCli --file Example.cs --all-lines `
-  --analysis-limit finite-foreach-element-facts=16 `
-  --analysis-limit structural-null-state-depth=6 `
-  --compact-json
-```
+The active contract also fixes protocol version 2, cache schema version 2, the
+trusted-kernel path/LOC boundary, and the reference surfaces
+`netstandard2.0`, `net8.0`, and `net472`.
 
-Text output prints an `Analysis limits hit` section. Full and compact JSON
-include `analysisTruncation.isTruncated` and the complete event array. Runtime
-hazard entries also retain the truncation evidence for the individual
-candidate analysis.
+Unknown rate is reported by the corpus as explicit, silent, and total metrics;
+it is not a release threshold.
+
+## Outcome behavior at a limit
+
+No timeout, resource exhaustion, unsupported encoding, malformed result,
+backend failure, or exceeded expression depth is promoted to `Proven` or
+`Refuted`. A method-level boundary becomes a typed worker `Unknown`; a
+project-level boundary marks unfinished records with `ProjectTimeout`.
+Caller cancellation remains cancellation.
+
+Only complete hygienic `Proven` and replay-validated `Refuted` project
+responses can enter the semantic cache. See
+[Typed abstention reasons](unknown-reasons.md) for exact reason values.

@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "projects": [
+    "SharpProof.Package/SharpProof.Package.csproj",
+    "SharpProof.Attributes/SharpProof.Attributes.csproj"
+  ]
+}

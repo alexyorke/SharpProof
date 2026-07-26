@@ -1,1 +1,0 @@
-SP0037 Info docs/readme-examples/sp0037-suggest-exception-contract/input.cs:3:23 Method 'Identity' has a trivial closed body with no exception evidence; consider adding [DoesNotThrow] (high confidence)

@@ -115,6 +115,10 @@ namespace SharpProof
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool TerminateJobObject(IntPtr hJob, uint uExitCode);
 
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool TerminateProcess(IntPtr hProcess, uint uExitCode);
+
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool CreateProcess(
@@ -223,6 +227,7 @@ function Invoke-ProcessUnderJobObject {
     $processInformation = New-Object SharpProof.JobObjectNative+PROCESS_INFORMATION
     $processHandleOwned = $false
     $threadHandleOwned = $false
+    $processAssignedToJob = $false
     try {
         [Runtime.InteropServices.Marshal]::StructureToPtr($limitInfo, $limitInfoBuffer, $false)
         if (-not [SharpProof.JobObjectNative]::SetInformationJobObject(
@@ -255,13 +260,14 @@ function Invoke-ProcessUnderJobObject {
 
         $processHandleOwned = $true
         $threadHandleOwned = $true
+        $process = [System.Diagnostics.Process]::GetProcessById([int]$processInformation.dwProcessId)
         if (-not [SharpProof.JobObjectNative]::AssignProcessToJobObject($jobHandle, $processInformation.hProcess)) {
             $win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-            [void][SharpProof.JobObjectNative]::TerminateJobObject($jobHandle, 124)
+            [void][SharpProof.JobObjectNative]::TerminateProcess($processInformation.hProcess, 124)
             throw "AssignProcessToJobObject failed with Win32 error $win32Error."
         }
 
-        $process = [System.Diagnostics.Process]::GetProcessById([int]$processInformation.dwProcessId)
+        $processAssignedToJob = $true
         $resumeResult = [SharpProof.JobObjectNative]::ResumeThread($processInformation.hThread)
         if ($resumeResult -eq [uint32]::MaxValue) {
             $win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
@@ -294,7 +300,12 @@ function Invoke-ProcessUnderJobObject {
     }
     finally {
         if ($null -ne $process -and -not $process.HasExited) {
-            [void][SharpProof.JobObjectNative]::TerminateJobObject($jobHandle, 124)
+            if ($processAssignedToJob) {
+                [void][SharpProof.JobObjectNative]::TerminateJobObject($jobHandle, 124)
+            }
+            else {
+                [void][SharpProof.JobObjectNative]::TerminateProcess($processInformation.hProcess, 124)
+            }
         }
 
         [Runtime.InteropServices.Marshal]::FreeHGlobal($limitInfoBuffer)

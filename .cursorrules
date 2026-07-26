@@ -1,9 +1,6 @@
 ## Comments
-
 # Avoid adding comments that merely restate the code.
 # Focus comments on explaining the 'why' behind non-obvious logic or design decisions.
-
 ## Commented-out Code
-
 # Do not leave commented-out code in the final version.
 # Use version control (like Git) to track history instead of commenting out old code. 

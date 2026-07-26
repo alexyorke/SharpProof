@@ -1,37 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
+  <Import Project="..\SharpProof.PackageMetadata.props" />
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>latest</LangVersion>
-    <Nullable>enable</Nullable>
-    
     <IsPackable>true</IsPackable> 
-    
-    
-    
     <PackageId>SharpProof.Attributes</PackageId>
-    <Version>0.1.0-preview.1</Version>
-    <Authors>Alex Yorke</Authors>
-    <Description>Contains SharpProof contract attributes for bounded symbolic C# analysis, including EnforcePureAttribute, PureAttribute, PureExternalAttribute, ImpureAttribute, AllowSynchronizationAttribute, ZeroAllocationsAttribute, AllowedCapabilitiesAttribute, DoesNotThrowAttribute, AllowedExceptionsAttribute, ExpectedComplexityAttribute, ComplexityKind, and SharpProofCapability.</Description>
-    <PackageTags>SharpProof;Attributes;Roslyn;Analyzer;Purity;StaticAnalysis;SymbolicAnalysis;Capabilities;ZeroAllocations;Exceptions;Complexity</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Description>Contains SharpProof contracts for compiler-bound Requires, Ensures, Assume, Result, and Old expressions; closed contract attributes; suppressions and trust declarations; and composable method effects.</Description>
+    <PackageTags>SharpProof;Attributes;Contracts;Purity;StaticAnalysis;MethodEffects;Capabilities;ZeroAllocations;Exceptions;Preconditions;Postconditions</PackageTags>
     <Title>SharpProof Attributes</Title>
-    <PackageProjectUrl>https://github.com/alexyorke/SharpProof</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/alexyorke/SharpProof</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Public preview release of the SharpProof contract attributes package, including purity, synchronization, zero-allocation, capability-contract, exception-contract, symbolic postcondition, and complexity-contract attributes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Breaking soundness-first preview with compiler-bound Contract APIs, closed contract attributes, explicit suppression and trust declarations, and the effect-contract flagship.</PackageReleaseNotes>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild> 
-    
-
   </PropertyGroup>
-
   <ItemGroup>
     <None Include="..\README.md">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
   </ItemGroup>
-
 </Project> 
