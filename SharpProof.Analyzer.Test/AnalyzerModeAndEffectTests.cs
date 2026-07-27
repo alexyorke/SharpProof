@@ -509,7 +509,7 @@ public sealed class AnalyzerModeAndEffectTests {
     public void AdvisoryDescriptorsUseProductionDefaults() {
         var descriptors = new SharpProofAnalyzer().SupportedDiagnostics;
         var informational = descriptors.Where(static descriptor =>
-            descriptor.Id is not ("SP0024" or "SP0025" or "SP0027"));
+            descriptor.Id is not ("SP0024" or "SP0025" or "SP0027" or "SP0049"));
 
         Assert.That(
             informational.Select(static descriptor => descriptor.DefaultSeverity),
@@ -521,6 +521,10 @@ public sealed class AnalyzerModeAndEffectTests {
             descriptors.Single(static descriptor => descriptor.Id == "SP0027")
                 .DefaultSeverity,
             Is.EqualTo(DiagnosticSeverity.Warning));
+        Assert.That(
+            descriptors.Single(static descriptor => descriptor.Id == "SP0049")
+                .DefaultSeverity,
+            Is.EqualTo(DiagnosticSeverity.Error));
     }
 
     private sealed class ThrowingSessionFactory : IAnalyzerSessionFactory {

@@ -3,11 +3,9 @@ internal sealed record WorkerInputSnapshot(
     ImmutableArray<WorkerInputSnapshot.SourceInput> Sources,
     ImmutableArray<WorkerInputSnapshot.ReferenceInput> References,
     string InputHash) {
-
     internal static async Task<WorkerInputSnapshot> LoadAsync(
         WorkerVerifyRequest request, CancellationToken cancellationToken) =>
         await LoadAsync(request, WorkerCacheIdentity.Current, cancellationToken).ConfigureAwait(false);
-
     internal static async Task<WorkerInputSnapshot> LoadAsync(
         WorkerVerifyRequest request, WorkerCacheIdentity cacheIdentity,
         CancellationToken cancellationToken) {
@@ -71,7 +69,6 @@ internal sealed record WorkerInputSnapshot(
             references.MoveToImmutable(),
             hash.Finish());
     }
-
     private static string ResolvePath(string projectDirectory, string path) {
         var resolved = Path.IsPathFullyQualified(path)
             ? Path.GetFullPath(path)
@@ -80,7 +77,6 @@ internal sealed record WorkerInputSnapshot(
             throw new FileNotFoundException("A verifier input file was not found.", resolved);
         return resolved;
     }
-
     private static string DecodeUtf8(byte[] bytes, string path) {
         try {
             var offset = bytes.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }) ? 3 : 0;
@@ -90,9 +86,7 @@ internal sealed record WorkerInputSnapshot(
             throw new InvalidDataException("Source files must be valid UTF-8: " + path, exception);
         }
     }
-
     internal readonly record struct SourceInput(string Path, string Text);
-
     internal readonly record struct ReferenceInput(string Path, byte[] Image);
 }
 
@@ -102,58 +96,19 @@ internal sealed class WorkerCacheIdentity(
     string apiSpecIdentity,
     string apiSpecVersion) {
     internal const string CurrentToolIdentity = "SharpProof.Worker";
-
     internal static WorkerCacheIdentity Current { get; } = new(
         CurrentToolIdentity, ReadToolVersion(),
         ApiSpecTable.DefaultTableIdentity, ApiSpecTable.DefaultTableVersion);
-
     internal string ToolIdentity { get; } = Required(toolIdentity, nameof(toolIdentity));
     internal string ToolVersion { get; } = Required(toolVersion, nameof(toolVersion));
     internal string ApiSpecIdentity { get; } = Required(apiSpecIdentity, nameof(apiSpecIdentity));
     internal string ApiSpecVersion { get; } = Required(apiSpecVersion, nameof(apiSpecVersion));
-
     private static string ReadToolVersion() =>
         typeof(SharpProofWorker).Assembly
-            .GetCustomAttributes(
-                typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
-            .Cast<System.Reflection.AssemblyInformationalVersionAttribute>()
-            .SingleOrDefault()?.InformationalVersion ??
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion ??
         throw new InvalidOperationException("The worker tool version is unavailable.");
-
     private static string Required(string value, string parameterName) =>
         !string.IsNullOrWhiteSpace(value) ? value :
         throw new ArgumentException("Cache identity values cannot be blank.", parameterName);
-}
-
-internal sealed class CanonicalHashWriter : IDisposable {
-    private readonly IncrementalHash _hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-    private bool _finished;
-
-    internal CanonicalHashWriter Add(bool value) => Add(value ? "true" : "false");
-
-    internal CanonicalHashWriter Add(int value) => Add(value.ToString(CultureInfo.InvariantCulture));
-
-    internal CanonicalHashWriter Add(long value) => Add(value.ToString(CultureInfo.InvariantCulture));
-
-    internal CanonicalHashWriter Add(string value) => Add(Encoding.UTF8.GetBytes(value));
-
-    internal CanonicalHashWriter Add(byte[] bytes) {
-        ObjectDisposedException.ThrowIf(_finished, this);
-        Span<byte> length = stackalloc byte[4];
-        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(length, bytes.Length);
-        _hash.AppendData(length);
-        _hash.AppendData(bytes);
-        return this;
-    }
-
-    internal string Finish() {
-        ObjectDisposedException.ThrowIf(_finished, this);
-        _finished = true;
-        return Convert.ToHexString(_hash.GetHashAndReset()).ToLowerInvariant();
-    }
-
-    public void Dispose() {
-        _finished = true;
-        _hash.Dispose();
-    }
 }

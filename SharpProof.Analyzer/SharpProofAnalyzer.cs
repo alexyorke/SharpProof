@@ -40,8 +40,10 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer {
             SymbolKind.Method);
         context.RegisterOperationBlockAction(operationContext =>
             AnalyzerFeaturePipeline.AnalyzeOperationBlock(operationContext, session));
-        context.RegisterCompilationEndAction(endContext =>
-            ReportInvalidConfiguration(endContext, configuration));
+        context.RegisterCompilationEndAction(endContext => {
+            ReportInvalidConfiguration(endContext, configuration);
+            FinalCompilationCollector.Collect(endContext, configuration);
+        });
     }
 
     private static void ReportInvalidConfiguration(

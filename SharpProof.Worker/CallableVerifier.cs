@@ -390,7 +390,7 @@ internal sealed class CallableVerifier(
             if (term is IrLengthTerm length &&
                 length.Value.Type == factory.StringType)
                 return false;
-            foreach (var child in GetChildren(term)) pending.Push(child);
+            foreach (var child in IrTraversal.GetChildren(term)) pending.Push(child);
         }
         return true;
     }
@@ -1124,7 +1124,7 @@ internal sealed class CallableVerifier(
         IrTerm term,
         IReadOnlyDictionary<IrVarId, IrTerm> environment,
         [NotNullWhen(true)] out IrTerm? substituted) {
-        foreach (var variable in CollectVariables(term)) {
+        foreach (var variable in IrTraversal.CollectVariables(term)) {
             if (environment.ContainsKey(variable)) continue;
             substituted = null;
             return false;
@@ -1201,7 +1201,7 @@ internal sealed class CallableVerifier(
             else if (variable.Role == BoundContractVariableRole.Result) {
                 if (returnTerm == null) {
                     if (!allowMissingResult &&
-                        CollectVariables(term).Contains(variable.Variable))
+                        IrTraversal.CollectVariables(term).Contains(variable.Variable))
                         return null;
                 }
                 else {
@@ -1435,7 +1435,7 @@ internal sealed class CallableVerifier(
 
         int Visit(IrTerm term) {
             if (memo.TryGetValue(term.Id, out var existing)) return existing;
-            var children = GetChildren(term);
+            var children = IrTraversal.GetChildren(term);
             var depth = children.Length == 0
                 ? 1
                 : 1 + children.Max(Visit);
@@ -1443,37 +1443,6 @@ internal sealed class CallableVerifier(
             return depth;
         }
     }
-
-    private static ImmutableHashSet<IrVarId> CollectVariables(IrTerm root) {
-        var result = ImmutableHashSet.CreateBuilder<IrVarId>();
-        var pending = new Stack<IrTerm>();
-        var visited = new HashSet<IrId>();
-        pending.Push(root);
-        while (pending.Count != 0) {
-            var term = pending.Pop();
-            if (!visited.Add(term.Id)) continue;
-            if (term is IrVariableTerm variable)
-                result.Add(variable.Variable);
-            foreach (var child in GetChildren(term)) pending.Push(child);
-        }
-        return result.ToImmutable();
-    }
-
-    private static ImmutableArray<IrTerm> GetChildren(IrTerm term) =>
-        term switch {
-            IrOpaqueTerm opaque =>
-                [.. opaque.Receiver == null
-                    ? opaque.Arguments
-                    : opaque.Arguments.Insert(0, opaque.Receiver)],
-            IrUnaryTerm unary => [unary.Operand],
-            IrBinaryTerm binary => [binary.Left, binary.Right],
-            IrConditionalTerm conditional =>
-                [conditional.Condition, conditional.WhenTrue, conditional.WhenFalse],
-            IrCastTerm cast => [cast.Operand],
-            IrLengthTerm length => [length.Value],
-            IrSequenceAccessTerm access => [access.Sequence, access.Index],
-            _ => []
-        };
 
     private readonly struct BodyLoweringResult {
         private BodyLoweringResult(

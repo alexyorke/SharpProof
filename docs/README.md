@@ -9,7 +9,7 @@ jobs; they are not interchangeable sources of truth.
 |---|---|---|
 | [Project README](../README.md) | Package users | Installation, activation, examples, and the short product overview |
 | [Coverage and limits](coverage-and-limits.md) | Users and contributors | Authoritative inventory of the currently implemented analyzer, worker, language, contract, and API-spec surface |
-| [Diagnostics](diagnostic-examples.md) | Analyzer and verifier users | Current `SP`, `SPCF`, SP0047, and SP0048 diagnostics, defaults, policies, and examples |
+| [Diagnostics](diagnostic-examples.md) | Analyzer and verifier users | Current `SP`, `SPCF`, SP0047, SP0048, and SP0049 diagnostics, defaults, policies, and examples |
 | [Analysis limits](analysis-limits.md) | Build and CI owners | Shipping profile/feature/policy properties, worker bounds, and acceptance-only budgets |
 | [Typed abstention reasons](unknown-reasons.md) | Tool integrators | Exact typed reasons, run statuses, callable coverage, claim outcomes, and cache states |
 
@@ -54,12 +54,14 @@ the current coverage inventory or normative semantics.
 
 ## Known production gaps
 
-The current preview's accountable manifest is built from a worker-reconstructed
-compilation. A build-only collector and closed artifact for the final
-post-generator Roslyn `Compilation` are not implemented yet, so generated trees
-and other compiler-only inputs are not claimed as 1.0-complete. SARIF
-projection and the planned three-package split are also future work. Current
-behavior and limits are recorded in
+During Windows verification, the production analyzer emits a deterministic
+seal of the final post-generator Roslyn `Compilation`. The seal is parity and
+diagnostic evidence only: the accountable manifest is still built from a
+worker-reconstructed compilation, not from a closed compiler artifact.
+Generated claims and other compiler-only inputs are not claimed as
+1.0-complete, so production-plan Step 4 remains incomplete. SARIF projection
+and the planned three-package split are also future work. Current behavior and
+limits are recorded in
 [Coverage and limits](coverage-and-limits.md#current-compilation-integration-gap).
 
 ## Machine-owned Markdown

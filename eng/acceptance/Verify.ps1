@@ -216,7 +216,12 @@ try {
             throw "Required test project is missing: $testProject"
         }
 
-        Invoke-SharpProofDotnet -Arguments @(
+        $testTimeoutSeconds = if ($testProject -like 'SharpProof.Package.Test*') {
+            600
+        } else {
+            300
+        }
+        Invoke-SharpProofDotnet -TimeoutSeconds $testTimeoutSeconds -Arguments @(
             'test',
             $testProject,
             '-c',

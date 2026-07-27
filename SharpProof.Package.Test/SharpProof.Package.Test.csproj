@@ -12,6 +12,8 @@
     <PackageReference Include="NUnit3TestAdapter" Version="6.2.0" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj"
+                      ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
     <ProjectReference Include="..\SharpProof.CompilerProbe.TestAsset\SharpProof.CompilerProbe.TestAsset.csproj" />
     <ProjectReference Include="..\SharpProof.Worker.Launcher\SharpProof.Worker.Launcher.csproj" />

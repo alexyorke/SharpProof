@@ -1,7 +1,7 @@
 name: Cross-platform package consumers
 on:
   push:
-    branches: ["**"]
+    branches: [master]
   pull_request:
     branches: ["**"]
   workflow_dispatch:

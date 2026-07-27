@@ -75,8 +75,20 @@ internal static class AnalyzerTestHost {
             values.Add("build_property.SharpProofProfile", profile);
         if (features != null)
             values.Add("build_property.SharpProofFeatures", features);
+        return await AnalyzeAsync(
+                compilation,
+                values,
+                analyzer: analyzer)
+            .ConfigureAwait(false);
+    }
+
+    internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        CSharpCompilation compilation,
+        IReadOnlyDictionary<string, string> values,
+        ImmutableArray<AdditionalText> additionalFiles = default,
+        DiagnosticAnalyzer? analyzer = null) {
         var analyzerOptions = new AnalyzerOptions(
-            [],
+            additionalFiles.IsDefault ? [] : additionalFiles,
             new TestOptionsProvider(values));
         var withAnalyzers = compilation.WithAnalyzers(
             [analyzer ?? new SharpProofAnalyzer()],
