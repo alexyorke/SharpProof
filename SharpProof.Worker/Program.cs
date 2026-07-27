@@ -97,9 +97,10 @@ internal static class Program {
                         Code = backendUnavailable
                             ? "backend.unavailable"
                             : "worker.infrastructure",
-                        Message = backendUnavailable
+                        Message = (backendUnavailable
                             ? "The native SMT backend is unavailable."
-                            : "The worker failed before producing a semantic result."
+                            : "The worker failed before producing a semantic result.") +
+                            " " + exception.GetBaseException().Message
                     }],
                     request?.Budgets ?? new WorkerBudgets()))
                 .ConfigureAwait(false);
@@ -174,25 +175,9 @@ internal static class Program {
         return false;
     }
 
-    private static async Task WriteResponseAtomicAsync(
+    private static Task WriteResponseAtomicAsync(
         string path,
-        WorkerVerifyResponse response) {
-        var fullPath = Path.GetFullPath(path);
-        Directory.CreateDirectory(
-            Path.GetDirectoryName(fullPath) ??
-            throw new InvalidOperationException(
-                "The result path has no directory."));
-        var temporary = fullPath + "." +
-                        Guid.NewGuid().ToString("N") + ".tmp";
-        try {
-            await File.WriteAllTextAsync(
-                temporary,
-                WorkerProtocolJson.SerializeResponse(response),
-                new UTF8Encoding(false)).ConfigureAwait(false);
-            File.Move(temporary, fullPath, overwrite: true);
-        }
-        finally {
-            if (File.Exists(temporary)) File.Delete(temporary);
-        }
-    }
+        WorkerVerifyResponse response) =>
+        AtomicFile.WriteUtf8Async(
+            path, WorkerProtocolJson.SerializeResponse(response));
 }

@@ -1,12 +1,14 @@
-namespace SharpProof.Worker;
+namespace SharpProof.CompilerArtifact;
 internal sealed class ClaimManifestBuilder(
     CSharpCompilation compilation,
-    WorkerFeatureSet enabledFeatures = WorkerFeatureSet.All) {
+    WorkerFeatureSet enabledFeatures = WorkerFeatureSet.All,
+    CancellationToken cancellationToken = default) {
     private readonly CSharpCompilation _compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
     private readonly ContractClauseInventoryBuilder _clauses = new(compilation);
     private readonly SelectedAttributeSymbols _attributes = new(compilation);
-    private readonly ImmutableArray<CompanionDescriptor> _companions = DiscoverCompanions(compilation);
+    private readonly ImmutableArray<CompanionDescriptor> _companions = DiscoverCompanions(compilation, cancellationToken);
     internal ClaimManifestBuildResult Build() {
+        cancellationToken.ThrowIfCancellationRequested();
         var discovered = DiscoverMethods().Select(CreateSeed).ToImmutableArray();
         var callableIds = CreateCallableIds(discovered);
         var targets = ImmutableDictionary.CreateBuilder<IMethodSymbol, ManifestCallableTarget>(SymbolEqualityComparer.Default);
@@ -14,6 +16,7 @@ internal sealed class ClaimManifestBuilder(
         var claims = ImmutableArray.CreateBuilder<WorkerClaimManifestEntry>();
         foreach (var seed in discovered.OrderBy(
                      seed => callableIds[seed.Method], StringComparer.Ordinal)) {
+            cancellationToken.ThrowIfCancellationRequested();
             var target = BuildTarget(seed, callableIds[seed.Method]);
             if (target == null) continue;
             targets.Add(seed.Method, target);
@@ -36,12 +39,13 @@ internal sealed class ClaimManifestBuilder(
         var usesCompanion = false;
         if (inventory.Clauses.IsDefaultOrEmpty &&
             TryResolveCompanion(target, out var companion)) {
-            source = companion;
+            source = companion!;
             inventory = _clauses.Create(source);
             usesCompanion = true;
         }
         var candidates = ImmutableArray.CreateBuilder<ClaimCandidate>();
         foreach (var occurrence in inventory.Clauses) {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!ContractsEnabled ||
                 occurrence.Kind != BoundContractKind.Ensures ||
                 occurrence.Placement == ContractClausePlacement.NestedCallable)
@@ -65,7 +69,7 @@ internal sealed class ClaimManifestBuilder(
         if (candidates.Count == 0 && selected.IsDefaultOrEmpty && assumptions.IsDefaultOrEmpty)
             return null;
         var claims = CreateClaims(candidates.ToImmutable(), callableId, _compilation.Assembly.Identity.Name);
-        var features = selected.ToHashSet();
+        var features = new HashSet<WorkerSelectedFeature>(selected);
         if (claims.Length != 0 ||
             assumptions.Any(static evidence => evidence.Kind == WorkerAssumptionKind.UserAssume))
             features.Add(WorkerSelectedFeature.Contracts);
@@ -78,11 +82,12 @@ internal sealed class ClaimManifestBuilder(
         var callableLocation = GetCallableLocation(target, declaration);
         var entry = new WorkerCallableManifestEntry {
             CallableId = callableId,
-            SelectedFeatures = [.. features.Order()],
+            SelectedFeatures = [.. features.OrderBy(static value => value)],
             SelectionReasons = reasons.ToArray(),
             Location = callableLocation.IsInSource ? ToSourceLocation(callableLocation) :
                 claims.FirstOrDefault()?.Entry.Location ?? new WorkerSourceLocation(),
-            ClaimIds = [.. claims.Select(static claim => claim.Entry.ClaimId)]
+            ClaimIds = [.. claims.Select(static claim => claim.Entry.ClaimId)],
+            Assumptions = [.. assumptions]
         };
         var supported = declaration is MethodDeclarationSyntax or ConstructorDeclarationSyntax
             && target.MethodKind is MethodKind.Ordinary or MethodKind.Constructor;
@@ -101,6 +106,7 @@ internal sealed class ClaimManifestBuilder(
         var candidates = ImmutableArray.CreateBuilder<AssumptionCandidate>();
         if (ContractsEnabled)
             foreach (var occurrence in inventory.Clauses) {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (occurrence.Kind != BoundContractKind.Assume ||
                     occurrence.Placement == ContractClausePlacement.NestedCallable)
                     continue;
@@ -115,6 +121,7 @@ internal sealed class ClaimManifestBuilder(
         var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
         var result = ImmutableArray.CreateBuilder<WorkerAssumptionEvidence>(candidates.Count);
         foreach (var candidate in candidates) {
+            cancellationToken.ThrowIfCancellationRequested();
             var key = candidate.Kind + ":" + candidate.Fingerprint;
             ranks.TryGetValue(key, out var rank);
             ranks[key] = rank + 1;
@@ -127,13 +134,14 @@ internal sealed class ClaimManifestBuilder(
         }
         return result.MoveToImmutable();
     }
-    private static ImmutableArray<ManifestClaim> CreateClaims(
+    private ImmutableArray<ManifestClaim> CreateClaims(
         ImmutableArray<ClaimCandidate> candidates,
         string callableId,
         string assemblyName) {
         var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
         var claims = ImmutableArray.CreateBuilder<ManifestClaim>(candidates.Length);
         for (var ordinal = 0; ordinal < candidates.Length; ordinal++) {
+            cancellationToken.ThrowIfCancellationRequested();
             var candidate = candidates[ordinal];
             ranks.TryGetValue(candidate.PredicateFingerprint, out var rank);
             ranks[candidate.PredicateFingerprint] = rank + 1;
@@ -154,20 +162,21 @@ internal sealed class ClaimManifestBuilder(
         var methods = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
         foreach (var tree in _compilation.SyntaxTrees) {
             var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(_compilation, tree);
-            foreach (var node in tree.GetRoot().DescendantNodesAndSelf()) {
+            foreach (var node in tree.GetRoot(cancellationToken).DescendantNodesAndSelf()) {
+                cancellationToken.ThrowIfCancellationRequested();
                 switch (node) {
                     case BaseMethodDeclarationSyntax:
                     case AccessorDeclarationSyntax:
                     case LocalFunctionStatementSyntax:
-                        Add(model.GetDeclaredSymbol(node) as IMethodSymbol); break;
+                        Add(model.GetDeclaredSymbol(node, cancellationToken) as IMethodSymbol); break;
                     case AnonymousFunctionExpressionSyntax anonymous:
-                        Add((model.GetOperation(anonymous) as IAnonymousFunctionOperation)?.Symbol);
+                        Add((model.GetOperation(anonymous, cancellationToken) as IAnonymousFunctionOperation)?.Symbol);
                         break;
                     case GlobalStatementSyntax global:
-                        Add(model.GetEnclosingSymbol(global.SpanStart) as IMethodSymbol);
+                        Add(model.GetEnclosingSymbol(global.SpanStart, cancellationToken) as IMethodSymbol);
                         break;
                     case BasePropertyDeclarationSyntax property:
-                        switch (model.GetDeclaredSymbol(property)) {
+                        switch (model.GetDeclaredSymbol(property, cancellationToken)) {
                             case IPropertySymbol propertySymbol:
                                 Add(propertySymbol.GetMethod);
                                 Add(propertySymbol.SetMethod);
@@ -182,9 +191,11 @@ internal sealed class ClaimManifestBuilder(
                 }
             }
         }
-        foreach (var companion in _companions)
+        foreach (var companion in _companions) {
+            cancellationToken.ThrowIfCancellationRequested();
             foreach (var method in companion.Target.GetMembers().OfType<IMethodSymbol>().Where(IsExplicitOrdinaryMethod))
                 methods.Add(NormalizePartial(method));
+        }
         return methods.ToImmutableArray();
         void Add(IMethodSymbol? method) {
             if (method != null && !IsCompanionType(method.ContainingType))
@@ -192,15 +203,16 @@ internal sealed class ClaimManifestBuilder(
         }
     }
     private CallableSeed CreateSeed(IMethodSymbol method) {
+        cancellationToken.ThrowIfCancellationRequested();
         var declaration = GetDeclaration(method);
         var model = declaration == null ? null :
             SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
                 _compilation, declaration.SyntaxTree);
         var body = declaration switch {
             AnonymousFunctionExpressionSyntax when
-                model?.GetOperation(declaration) is IAnonymousFunctionOperation anonymous =>
+                model?.GetOperation(declaration, cancellationToken) is IAnonymousFunctionOperation anonymous =>
                 anonymous.Body,
-            CompilationUnitSyntax when model?.GetOperation(declaration) is { } operation =>
+            CompilationUnitSyntax when model?.GetOperation(declaration, cancellationToken) is { } operation =>
                 operation,
             _ => null
         };
@@ -209,7 +221,8 @@ internal sealed class ClaimManifestBuilder(
     private ImmutableDictionary<IMethodSymbol, string> CreateCallableIds(
         ImmutableArray<CallableSeed> callables) {
         var trees = _compilation.SyntaxTrees.Select(
-            static (tree, ordinal) => (tree, ordinal)).ToDictionary();
+            static (tree, ordinal) => (tree, ordinal)).ToDictionary(
+            static value => value.tree, static value => value.ordinal);
         var ordinals = new Dictionary<IMethodSymbol, int>(SymbolEqualityComparer.Default);
         foreach (var group in callables
                      .Where(static seed => seed.Method.MethodKind is
@@ -227,6 +240,7 @@ internal sealed class ClaimManifestBuilder(
         return ids.ToImmutableDictionary(SymbolEqualityComparer.Default);
 
         string Resolve(IMethodSymbol method) {
+            cancellationToken.ThrowIfCancellationRequested();
             method = NormalizePartial(method);
             if (ids.TryGetValue(method, out var id)) return id;
             if (method.MethodKind is not
@@ -244,7 +258,7 @@ internal sealed class ClaimManifestBuilder(
             return id;
         }
     }
-    private bool TryResolveCompanion(IMethodSymbol target, [NotNullWhen(true)] out IMethodSymbol? source) {
+    private bool TryResolveCompanion(IMethodSymbol target, out IMethodSymbol? source) {
         source = null;
         if (target.MethodKind != MethodKind.Ordinary) return false;
         var companions = _companions
@@ -274,11 +288,13 @@ internal sealed class ClaimManifestBuilder(
             companion.Type.OriginalDefinition, type.OriginalDefinition));
     private static bool IsExplicitOrdinaryMethod(IMethodSymbol method) =>
         method.MethodKind == MethodKind.Ordinary && !method.IsImplicitlyDeclared;
-    private static ImmutableArray<CompanionDescriptor> DiscoverCompanions(Compilation compilation) {
+    private static ImmutableArray<CompanionDescriptor> DiscoverCompanions(
+        Compilation compilation, CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
         var contractFor = compilation.GetTypeByMetadataName(ContractForSymbolMatcher.AttributeMetadataName);
         if (contractFor == null) return [];
         var companions = ImmutableArray.CreateBuilder<CompanionDescriptor>();
-        foreach (var type in GetAllTypes(compilation.Assembly.GlobalNamespace)) {
+        foreach (var type in GetAllTypes(compilation.Assembly.GlobalNamespace, cancellationToken)) {
             var attributes = ContractForSymbolMatcher.GetAttributes(type, contractFor);
             if (attributes.Length == 1 &&
                 ContractForSymbolMatcher.TryGetTarget(attributes[0], out var target))
@@ -286,26 +302,28 @@ internal sealed class ClaimManifestBuilder(
         }
         return companions.ToImmutable();
     }
-    private static IEnumerable<INamedTypeSymbol> GetAllTypes(INamespaceOrTypeSymbol value) {
+    private static IEnumerable<INamedTypeSymbol> GetAllTypes(
+        INamespaceOrTypeSymbol value, CancellationToken cancellationToken) {
         foreach (var type in value.GetTypeMembers()) {
+            cancellationToken.ThrowIfCancellationRequested();
             yield return type;
-            foreach (var nested in GetAllTypes(type)) yield return nested;
+            foreach (var nested in GetAllTypes(type, cancellationToken)) yield return nested;
         }
         if (value is INamespaceSymbol @namespace)
             foreach (var child in @namespace.GetNamespaceMembers())
-                foreach (var type in GetAllTypes(child))
+                foreach (var type in GetAllTypes(child, cancellationToken))
                     yield return type;
     }
-    private static SyntaxNode? GetDeclaration(IMethodSymbol method) =>
+    private SyntaxNode? GetDeclaration(IMethodSymbol method) =>
         method.DeclaringSyntaxReferences
-            .Select(static reference => reference.GetSyntax())
+            .Select(reference => reference.GetSyntax(cancellationToken))
             .OrderBy(static syntax => syntax.SyntaxTree.FilePath, StringComparer.Ordinal)
             .ThenBy(static syntax => syntax.SpanStart)
             .FirstOrDefault();
     private static Location GetCallableLocation(IMethodSymbol method, SyntaxNode? declaration) =>
         declaration?.GetLocation() ?? method.Locations.FirstOrDefault(static location => location.IsInSource) ?? Location.None;
-    private static Location GetAttributeLocation(AttributeData attribute, IMethodSymbol target) =>
-        attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
+    private Location GetAttributeLocation(AttributeData attribute, IMethodSymbol target) =>
+        attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation()
         ?? target.Locations.FirstOrDefault(static location => location.IsInSource)
         ?? Location.None;
     private static (string Path, int Start) GetAttributeOrder(AttributeData attribute) {

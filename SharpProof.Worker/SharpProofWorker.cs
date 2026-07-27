@@ -1,57 +1,93 @@
 namespace SharpProof.Worker;
 public sealed class SharpProofWorker : IDisposable {
-    private readonly ISmtBackend _backend;
+    private readonly Lazy<ISmtBackend> _backend;
     private readonly Func<long>? _readConsumedResourceCount;
+    private readonly bool _ownsBackend;
     private readonly SemaphoreSlim _methodResourceGate = new(1, 1);
-    private readonly IrSmtBackend? _ownedBackend;
     private bool _disposed;
     public SharpProofWorker(ISmtBackend backend)
         : this(backend, backend is IrSmtBackend concrete ? () => concrete.ConsumedResourceCount : null) {
     }
     internal SharpProofWorker(ISmtBackend backend, Func<long>? readConsumedResourceCount) {
-        _backend = backend ?? throw new ArgumentNullException(nameof(backend));
+        ArgumentNullException.ThrowIfNull(backend);
+        _backend = new(() => backend);
         _readConsumedResourceCount = readConsumedResourceCount;
     }
-    private SharpProofWorker(IrSmtBackend backend)
-        : this(backend, () => backend.ConsumedResourceCount) =>
-        _ownedBackend = backend;
+    internal SharpProofWorker(Func<ISmtBackend> backendFactory) {
+        ArgumentNullException.ThrowIfNull(backendFactory);
+        _backend = new(() => backendFactory() ??
+            throw new InvalidOperationException("The backend factory returned null."));
+        _ownsBackend = true;
+    }
     public static SharpProofWorker Create(WorkerBudgets budgets) {
         ArgumentNullException.ThrowIfNull(budgets);
-        return new SharpProofWorker(new IrSmtBackend(new IrSmtBackendOptions(budgets.QueryRlimit)));
+        return new SharpProofWorker(() =>
+            new IrSmtBackend(new IrSmtBackendOptions(budgets.QueryRlimit)));
     }
     public async Task<WorkerVerifyResponse> VerifyAsync(
         WorkerVerifyRequest request,
         CancellationToken cancellationToken = default) {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        cancellationToken.ThrowIfCancellationRequested();
         var started = Stopwatch.GetTimestamp();
         var validation = WorkerProtocolJson.Validate(request);
         if (!validation.IsValid)
             return Failure(string.Empty, WorkerRunFailureReason.InvalidRequest, new WorkerBudgets(), started, validation.Errors);
         ArgumentNullException.ThrowIfNull(request);
+        var requestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        WorkerVerifyResponse Failed(WorkerRunFailureReason reason, string code, string message, string inputHash = "") =>
+            Failure(inputHash, reason, request.Budgets, started,
+                Error(code, message), requestHash);
+        WorkerVerifyResponse Interrupted(WorkerInputSnapshot? input = null) {
+            var canceled = input == null || cancellationToken.IsCancellationRequested;
+            return WorkerResultAssembler.CreateIncomplete(
+                input?.InputHash ?? WorkerResultAssembler.EmptyInputHash, requestHash,
+                input?.CompilerManifest.Manifest ?? WorkerResultAssembler.EmptyManifest(), request.Budgets,
+                canceled ? WorkerRunStatus.Canceled : WorkerRunStatus.TimedOut, WorkerRunFailureReason.None,
+                canceled ? WorkerCallableCoverageReason.Canceled : WorkerCallableCoverageReason.ProjectTimeout,
+                canceled ? WorkerClaimReason.Canceled : WorkerClaimReason.ProjectTimeout,
+                versions: Versions(), elapsedMilliseconds: Elapsed(started));
+        }
         WorkerInputSnapshot snapshot;
         try {
-            snapshot = await WorkerInputSnapshot.LoadAsync(request, cancellationToken).ConfigureAwait(false);
+            snapshot = await WorkerInputSnapshot.LoadAsync(request, cancellationToken.IsCancellationRequested
+                ? CancellationToken.None : cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) {
-            throw;
+        catch (OperationCanceledException) { return Interrupted(); }
+        catch (IOException exception) when (exception.Message == WorkerInputSnapshot.ManifestUnavailable) {
+            return Failed(WorkerRunFailureReason.InputUnavailable,
+                "compiler_manifest.unavailable", "The compiler manifest could not be loaded.");
         }
-        catch (Exception exception) when (exception is
-            IOException or UnauthorizedAccessException or ArgumentException) {
-            return Failure(
-                string.Empty, WorkerRunFailureReason.InputUnavailable, request.Budgets, started,
-                Error("input.unavailable", "A source or reference input could not be loaded."));
+        catch (IOException exception) when (exception.Message == WorkerInputSnapshot.ManifestInvalid) {
+            return Failed(WorkerRunFailureReason.CompilerManifestMismatch,
+                "compiler_manifest.invalid", "The compiler manifest digest or schema is invalid.");
         }
-        CSharpCompilation compilation;
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException) {
+            return Failed(WorkerRunFailureReason.InputUnavailable,
+                "input.unavailable", "The compiler artifact or a referenced image could not be loaded.");
+        }
+        WorkerVerifyResponse FailedAfterManifest(
+            WorkerRunFailureReason reason, IEnumerable<WorkerProtocolError> errors,
+            WorkerClaimReason claimReason = WorkerClaimReason.InfrastructureFailure) =>
+            ManifestFailure(snapshot.InputHash, snapshot.CompilerManifest.Manifest,
+                request.Budgets, started, reason, errors, requestHash, claimReason);
+        if (cancellationToken.IsCancellationRequested) return Interrupted(snapshot);
+        using var projectBoundary = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        projectBoundary.CancelAfter(request.Budgets.ProjectWallTimeMilliseconds);
         try {
-            compilation = WorkerCompilation.Create(request, snapshot);
-        }
-        catch (Exception exception) when (exception is ArgumentException or BadImageFormatException) {
-            return Failure(
-                snapshot.InputHash, WorkerRunFailureReason.CompilationFailure, request.Budgets, started,
-                Error("project.invalid_input", "A parse option or reference assembly is invalid."));
-        }
-        var compilerErrors = compilation.GetDiagnostics(cancellationToken)
+            CSharpCompilation compilation;
+            try {
+                compilation = CompilerManifestArtifactJson.CreateCompilation(
+                    snapshot.CompilerManifest, projectBoundary.Token);
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException and not OperationCanceledException) {
+                return FailedAfterManifest(
+                    WorkerRunFailureReason.CompilerManifestMismatch,
+                    Error("compiler_manifest.compilation",
+                        "The closed compiler snapshot could not be reconstructed: " +
+                        exception.GetBaseException().Message));
+            }
+            projectBoundary.Token.ThrowIfCancellationRequested();
+            WorkerProtocolError[] compilerErrors = [.. compilation.GetDiagnostics(projectBoundary.Token)
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .OrderBy(static diagnostic => diagnostic.Location.SourceTree?.FilePath, StringComparer.Ordinal)
             .ThenBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
@@ -59,140 +95,112 @@ public sealed class SharpProofWorker : IDisposable {
             .Select(static diagnostic => new WorkerProtocolError {
                 Code = "compiler." + diagnostic.Id,
                 Message = diagnostic.GetMessage(CultureInfo.InvariantCulture)
-            })
-            .ToArray();
-        if (compilerErrors.Length != 0)
-            return Failure(
-                snapshot.InputHash, WorkerRunFailureReason.CompilationFailure,
-                request.Budgets, started, compilerErrors);
-        ClaimManifestBuildResult discovery;
-        try {
-            discovery = new ClaimManifestBuilder(compilation, request.Features).Build();
-        }
-        catch (Exception exception) when (exception is not
-            OutOfMemoryException and not StackOverflowException) {
-            return Failure(
-                snapshot.InputHash, WorkerRunFailureReason.InfrastructureFailure, request.Budgets, started,
-                Error("manifest.failed", "The selected claim manifest could not be produced."));
-        }
-        WorkerVerifyResponse Assemble(
-            WorkerRunStatus status,
-            WorkerRunFailureReason reason,
-            IEnumerable<WorkerCallableResult> callables,
-            IEnumerable<WorkerClaimResult> claims,
-            WorkerCacheStatus resultCacheStatus,
-            IEnumerable<WorkerProtocolError>? errors = null) =>
-            WorkerResultAssembler.Create(
-                snapshot.InputHash, discovery.Manifest, status, reason, callables, claims,
-                request.Budgets, resultCacheStatus, Elapsed(started), errors);
-        WorkerVerifyResponse Canceled(WorkerCacheStatus status) {
-            var lanes = discovery.Targets.Values.Select(target => Unknown(
-                target,
-                WorkerClaimReason.Canceled,
-                WorkerCallableCoverageReason.Canceled)).ToArray();
-            return Assemble(
-                WorkerRunStatus.Canceled,
-                WorkerRunFailureReason.None,
-                lanes.Select(static lane => lane.Callable),
-                lanes.SelectMany(static lane => lane.Claims),
-                status);
-        }
-        using var cache = CreateCacheIfEnabled(request, out var cacheStatus);
-        if (cache != null) {
+            })];
+            projectBoundary.Token.ThrowIfCancellationRequested();
+            if (compilerErrors.Length != 0)
+                return FailedAfterManifest(
+                    WorkerRunFailureReason.CompilationFailure, compilerErrors);
+            ClaimManifestBuildResult discovery;
+            try {
+                discovery = new ClaimManifestBuilder(
+                    compilation, snapshot.CompilerManifest.Features,
+                    projectBoundary.Token).Build();
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException and not OperationCanceledException) {
+                return FailedAfterManifest(WorkerRunFailureReason.InfrastructureFailure,
+                    Error("manifest.failed",
+                        "The selected claim manifest could not be produced."));
+            }
+            projectBoundary.Token.ThrowIfCancellationRequested();
+            if (!CompilerManifestMatches(
+                    compilation, discovery, snapshot.CompilerManifest))
+                return FailedAfterManifest(WorkerRunFailureReason.CompilerManifestMismatch,
+                    Error("compiler_manifest.mismatch",
+                        "The reconstructed compilation does not match the authoritative compiler manifest."));
+            WorkerVerifyResponse Assemble(WorkerRunStatus status, WorkerRunFailureReason reason,
+                IEnumerable<WorkerCallableResult> callables, IEnumerable<WorkerClaimResult> claims,
+                WorkerCacheStatus resultCacheStatus,
+                IEnumerable<WorkerProtocolError>? errors = null) =>
+                WorkerResultAssembler.Create(snapshot.InputHash, discovery.Manifest, status, reason, callables, claims,
+                    request.Budgets, resultCacheStatus, Elapsed(started), errors,
+                    requestHash, Versions());
+            WorkerVerifyResponse Canceled(WorkerCacheStatus status) {
+                var lanes = discovery.Targets.Values.Select(target => Unknown(
+                    target, WorkerClaimReason.Canceled, WorkerCallableCoverageReason.Canceled)).ToArray();
+                return Assemble(WorkerRunStatus.Canceled, WorkerRunFailureReason.None,
+                    lanes.Select(static lane => lane.Callable), lanes.SelectMany(static lane => lane.Claims), status);
+            }
+            using var cache = CreateCacheIfEnabled(
+                request, snapshot.CompilerManifest.Compilation.ProjectDirectory,
+                out var cacheStatus);
+            if (cache != null) {
+                var cached = await cache.TryReadAsync(
+                    snapshot.InputHash, discovery.Manifest, request.Budgets, projectBoundary.Token).ConfigureAwait(false);
+                projectBoundary.Token.ThrowIfCancellationRequested();
+                if (cached != null)
+                    return Assemble(WorkerRunStatus.Complete, WorkerRunFailureReason.None,
+                        cached.CallableResults, cached.ClaimResults, WorkerCacheStatus.Hit);
+            }
+            ISmtBackend backend;
+            try { backend = _backend.Value; }
+            catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException and not OperationCanceledException) {
+                return FailedAfterManifest(WorkerRunFailureReason.BackendUnavailable,
+                    Error("backend.unavailable", "The native SMT backend is unavailable: " +
+                        exception.GetBaseException().Message),
+                    WorkerClaimReason.BackendUnavailable);
+            }
+            var readResources = _readConsumedResourceCount ??
+                (backend is IrSmtBackend concrete ? () => concrete.ConsumedResourceCount : null);
+            var verifier = new CallableVerifier(compilation, backend, request.Budgets.MaximumExpressionDepth);
+            using var parallelism = new SemaphoreSlim(request.Budgets.MaxParallelism, request.Budgets.MaxParallelism);
+            var tasks = discovery.Targets.Values
+                .OrderBy(static target => target.Entry.CallableId, StringComparer.Ordinal)
+                .Select(target => VerifyTargetAsync(verifier, target, request.Budgets,
+                    parallelism, _methodResourceGate, readResources, projectBoundary, cancellationToken))
+                .ToArray();
+            var lanes = await Task.WhenAll(tasks).ConfigureAwait(false);
             if (cancellationToken.IsCancellationRequested) return Canceled(cacheStatus);
-            var cached = await cache.TryReadAsync(
-                snapshot.InputHash, discovery.Manifest, request.Budgets, CancellationToken.None).ConfigureAwait(false);
-            if (cancellationToken.IsCancellationRequested) return Canceled(cacheStatus);
-            if (cached != null)
-                return Assemble(
-                    WorkerRunStatus.Complete,
-                    WorkerRunFailureReason.None,
-                    cached.CallableResults,
-                    cached.ClaimResults,
-                    WorkerCacheStatus.Hit);
+            var callableResults = lanes.Select(static lane => lane.Callable).ToArray();
+            var claimResults = lanes.SelectMany(static lane => lane.Claims).ToArray();
+            var (runStatus, failureReason) = Classify(callableResults, claimResults);
+            var response = Assemble(runStatus, failureReason, callableResults, claimResults, cacheStatus);
+            var responseValidation = WorkerProtocolJson.Validate(response, snapshot.InputHash, discovery.Manifest);
+            if (!responseValidation.IsValid) {
+                var malformed = discovery.Targets.Values.Select(target => Unknown(target,
+                    WorkerClaimReason.InfrastructureFailure, WorkerCallableCoverageReason.MissingClaimResult)).ToArray();
+                return Assemble(WorkerRunStatus.Failed, WorkerRunFailureReason.MalformedResult,
+                    malformed.Select(static lane => lane.Callable),
+                    malformed.SelectMany(static lane => lane.Claims),
+                    WorkerCacheStatus.Rejected, responseValidation.Errors);
+            }
+            if (cache != null &&
+                CacheableWorkerResponse.TryCreate(response, snapshot.InputHash, discovery.Manifest, out var cacheable)) {
+                var written = await cache.TryWriteAsync(
+                    cacheable, projectBoundary.Token).ConfigureAwait(false);
+                projectBoundary.Token.ThrowIfCancellationRequested();
+                response = Assemble(runStatus, failureReason, callableResults, claimResults,
+                    written ? WorkerCacheStatus.Written : WorkerCacheStatus.Unavailable);
+            }
+            return response;
         }
-        var verifier = new CallableVerifier(compilation, _backend, request.Budgets.MaximumExpressionDepth);
-        using var projectBoundary = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        projectBoundary.CancelAfter(request.Budgets.ProjectWallTimeMilliseconds);
-        using var parallelism = new SemaphoreSlim(
-            request.Budgets.MaxParallelism,
-            request.Budgets.MaxParallelism);
-        var tasks = discovery.Targets.Values
-            .OrderBy(static target => target.Entry.CallableId, StringComparer.Ordinal)
-            .Select(target => VerifyTargetAsync(
-                verifier,
-                target,
-                request.Budgets,
-                parallelism,
-                _methodResourceGate,
-                _readConsumedResourceCount,
-                projectBoundary,
-                cancellationToken))
-            .ToArray();
-        var lanes = await Task.WhenAll(tasks).ConfigureAwait(false);
-        if (cancellationToken.IsCancellationRequested) return Canceled(cacheStatus);
-        var callableResults = lanes.Select(static lane => lane.Callable).ToArray();
-        var claimResults = lanes.SelectMany(static lane => lane.Claims).ToArray();
-        var (runStatus, failureReason) = Classify(callableResults, claimResults);
-        var response = Assemble(
-            runStatus, failureReason, callableResults, claimResults, cacheStatus);
-        var responseValidation = WorkerProtocolJson.Validate(response, snapshot.InputHash, discovery.Manifest);
-        if (!responseValidation.IsValid) {
-            var malformed = discovery.Targets.Values.Select(target => Unknown(
-                target,
-                WorkerClaimReason.InfrastructureFailure,
-                WorkerCallableCoverageReason.MissingClaimResult)).ToArray();
-            return Assemble(
-                WorkerRunStatus.Failed,
-                WorkerRunFailureReason.MalformedResult,
-                malformed.Select(static lane => lane.Callable),
-                malformed.SelectMany(static lane => lane.Claims),
-                WorkerCacheStatus.Rejected,
-                responseValidation.Errors);
-        }
-        if (cache != null &&
-            CacheableWorkerResponse.TryCreate(
-                response,
-                snapshot.InputHash,
-                discovery.Manifest,
-            out var cacheable)) {
-            if (cancellationToken.IsCancellationRequested) return Canceled(cacheStatus);
-            var written = await cache.TryWriteAsync(
-                cacheable, CancellationToken.None).ConfigureAwait(false);
-            if (cancellationToken.IsCancellationRequested)
-                return Canceled(written
-                    ? WorkerCacheStatus.Written
-                    : WorkerCacheStatus.Unavailable);
-            response = Assemble(
-                runStatus,
-                failureReason,
-                callableResults,
-                claimResults,
-                written
-                    ? WorkerCacheStatus.Written
-                    : WorkerCacheStatus.Unavailable);
-        }
-        return response;
+        catch (OperationCanceledException) { return Interrupted(snapshot); }
     }
     public void Dispose() {
         if (_disposed) return;
         _disposed = true;
-        _ownedBackend?.Dispose();
+        if (_ownsBackend && _backend.IsValueCreated &&
+            _backend.Value is IDisposable owned) owned.Dispose();
         _methodResourceGate.Dispose();
     }
     private static async Task<CallableVerificationResult> VerifyTargetAsync(
-        CallableVerifier verifier,
-        ManifestCallableTarget target,
-        WorkerBudgets budgets,
-        SemaphoreSlim parallelism,
-        SemaphoreSlim methodResourceGate,
+        CallableVerifier verifier, ManifestCallableTarget target, WorkerBudgets budgets,
+        SemaphoreSlim parallelism, SemaphoreSlim methodResourceGate,
         Func<long>? readConsumedResourceCount,
         CancellationTokenSource projectBoundary,
         CancellationToken callerCancellation) {
         if (callerCancellation.IsCancellationRequested)
             return Unknown(target, WorkerClaimReason.Canceled, WorkerCallableCoverageReason.Canceled);
-        if (!target.IsVerifierSupported ||
-            target.Declaration is not BaseMethodDeclarationSyntax ||
+        if (!target.IsVerifierSupported || target.Declaration is not BaseMethodDeclarationSyntax ||
             target.SemanticModel == null)
             return Unknown(target, WorkerClaimReason.UnsupportedCallable, WorkerCallableCoverageReason.UnsupportedCallable);
         var ownsParallelLane = false;
@@ -216,30 +224,23 @@ public sealed class SharpProofWorker : IDisposable {
             try {
                 var resourceBudget = new MethodResourceBudget(
                     readConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
-                var records = await verifier.VerifyAsync(
-                    target, resourceBudget, methodBoundary.Token).ConfigureAwait(false);
+                var records = await verifier.VerifyAsync(target, resourceBudget, methodBoundary.Token).ConfigureAwait(false);
                 foreach (var record in records)
                     record.Assumptions = MergeAssumptions(target.Assumptions, record.Assumptions);
                 var unsupportedEffects = target.Entry.SelectedFeatures.Contains(WorkerSelectedFeature.Effects);
                 var hasUnknown = records.Any(static record => record.Outcome == WorkerClaimOutcome.Unknown);
-                var reason = unsupportedEffects
-                    ? WorkerCallableCoverageReason.UnsupportedContract
-                    : hasUnknown
-                        ? WorkerCallableCoverageReason.SemanticUnknown
-                        : WorkerCallableCoverageReason.None;
+                var reason = unsupportedEffects ? WorkerCallableCoverageReason.UnsupportedContract
+                    : hasUnknown ? WorkerCallableCoverageReason.SemanticUnknown : WorkerCallableCoverageReason.None;
                 return Result(target, reason, records);
             }
             catch (OperationCanceledException) {
                 if (callerCancellation.IsCancellationRequested)
                     return Unknown(target, WorkerClaimReason.Canceled, WorkerCallableCoverageReason.Canceled);
                 var project = projectBoundary.IsCancellationRequested;
-                return Unknown(
-                    target,
-                    project ? WorkerClaimReason.ProjectTimeout : WorkerClaimReason.MethodTimeout,
+                return Unknown(target, project ? WorkerClaimReason.ProjectTimeout : WorkerClaimReason.MethodTimeout,
                     project ? WorkerCallableCoverageReason.ProjectTimeout : WorkerCallableCoverageReason.MethodTimeout);
             }
-            catch (Exception exception) when (exception is not
-                OutOfMemoryException and not StackOverflowException) {
+            catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException) {
                 return Unknown(target, WorkerClaimReason.InfrastructureFailure, WorkerCallableCoverageReason.InfrastructureFailure);
             }
         }
@@ -249,48 +250,35 @@ public sealed class SharpProofWorker : IDisposable {
         }
     }
     private static CallableVerificationResult Unknown(
-        ManifestCallableTarget target,
-        WorkerClaimReason claimReason,
+        ManifestCallableTarget target, WorkerClaimReason claimReason,
         WorkerCallableCoverageReason callableReason) =>
-        Result(
-            target,
-            callableReason,
+        Result(target, callableReason,
             [.. target.Claims.Select(claim => new WorkerClaimResult {
-                ClaimId = claim.Entry.ClaimId,
-                Outcome = WorkerClaimOutcome.Unknown,
-                Reason = claimReason,
+                ClaimId = claim.Entry.ClaimId, Outcome = WorkerClaimOutcome.Unknown, Reason = claimReason,
                 Assumptions = [.. target.Assumptions]
             })]);
     private static CallableVerificationResult Result(
-        ManifestCallableTarget target,
-        WorkerCallableCoverageReason reason,
+        ManifestCallableTarget target, WorkerCallableCoverageReason reason,
         ImmutableArray<WorkerClaimResult> claims) =>
-        new(
-            new WorkerCallableResult {
-                CallableId = target.Entry.CallableId,
-                Coverage = reason == WorkerCallableCoverageReason.None
-                    ? WorkerCallableCoverage.Complete
-                    : WorkerCallableCoverage.Incomplete,
-                Reason = reason,
-                Assumptions = [.. target.Assumptions]
-            },
-            claims);
+        new(new WorkerCallableResult {
+            CallableId = target.Entry.CallableId,
+            Coverage = reason == WorkerCallableCoverageReason.None
+                ? WorkerCallableCoverage.Complete : WorkerCallableCoverage.Incomplete,
+            Reason = reason,
+            Assumptions = [.. target.Assumptions]
+        }, claims);
     private static WorkerAssumptionEvidence[] MergeAssumptions(
-        IEnumerable<WorkerAssumptionEvidence> declared,
-        IEnumerable<WorkerAssumptionEvidence>? observed) =>
+        IEnumerable<WorkerAssumptionEvidence> declared, IEnumerable<WorkerAssumptionEvidence>? observed) =>
         [.. declared
             .Concat(observed ?? [])
             .GroupBy(static evidence => evidence.Id, StringComparer.Ordinal)
             .Select(static group => new WorkerAssumptionEvidence {
-                Id = group.Key,
-                Kind = group.Select(static evidence =>
-                    evidence.Kind).First(),
+                Id = group.Key, Kind = group.Select(static evidence => evidence.Kind).First(),
                 Used = group.Any(static evidence => evidence.Used)
             })
             .OrderBy(static evidence => evidence.Id, StringComparer.Ordinal)];
     private static (WorkerRunStatus Status, WorkerRunFailureReason Failure) Classify(
-        IEnumerable<WorkerCallableResult> callables,
-        IEnumerable<WorkerClaimResult> claims) {
+        IEnumerable<WorkerCallableResult> callables, IEnumerable<WorkerClaimResult> claims) {
         var coverageReasons = callables.Select(static callable => callable.Reason).ToArray();
         if (coverageReasons.Contains(WorkerCallableCoverageReason.InfrastructureFailure))
             return (WorkerRunStatus.Failed, WorkerRunFailureReason.InfrastructureFailure);
@@ -305,27 +293,26 @@ public sealed class SharpProofWorker : IDisposable {
                  })
             if (reasons.Contains(mapping.Item1))
                 return (WorkerRunStatus.Failed, mapping.Item2);
-        if (coverageReasons.Contains(WorkerCallableCoverageReason.Canceled) ||
-            reasons.Contains(WorkerClaimReason.Canceled))
+        if (coverageReasons.Contains(WorkerCallableCoverageReason.Canceled) || reasons.Contains(WorkerClaimReason.Canceled))
             return (WorkerRunStatus.Canceled, WorkerRunFailureReason.None);
         var timedOut = coverageReasons.Any(static reason => reason is
-                WorkerCallableCoverageReason.MethodTimeout or WorkerCallableCoverageReason.ProjectTimeout)
-            || reasons.Any(static reason => reason is
-                WorkerClaimReason.MethodTimeout or WorkerClaimReason.ProjectTimeout);
+                WorkerCallableCoverageReason.MethodTimeout or WorkerCallableCoverageReason.ProjectTimeout) ||
+            reasons.Any(static reason => reason is WorkerClaimReason.MethodTimeout or WorkerClaimReason.ProjectTimeout);
         return timedOut
             ? (WorkerRunStatus.TimedOut, WorkerRunFailureReason.None)
             : (WorkerRunStatus.Complete, WorkerRunFailureReason.None);
     }
 
     private static VerificationCache? CreateCacheIfEnabled(
-        WorkerVerifyRequest request, out WorkerCacheStatus status) {
+        WorkerVerifyRequest request, string projectDirectory,
+        out WorkerCacheStatus status) {
         if (!request.Cache.Enabled) {
             status = WorkerCacheStatus.Disabled;
             return null;
         }
         try {
             status = WorkerCacheStatus.Miss;
-            var projectDirectory = Path.GetFullPath(request.ProjectDirectory);
+            projectDirectory = Path.GetFullPath(projectDirectory);
             var directory = string.IsNullOrWhiteSpace(request.Cache.Directory)
                 ? Path.Combine(projectDirectory, "obj", "SharpProof", "cache")
                 : Path.IsPathFullyQualified(request.Cache.Directory)
@@ -333,30 +320,45 @@ public sealed class SharpProofWorker : IDisposable {
                     : Path.GetFullPath(request.Cache.Directory, projectDirectory);
             return new VerificationCache(directory, request.Cache.MaximumBytes);
         }
-        catch (Exception exception) when (exception is
-            ArgumentException or NotSupportedException) {
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException) {
             status = WorkerCacheStatus.Unavailable;
             return null;
         }
     }
 
+    private static bool CompilerManifestMatches(
+        CSharpCompilation compilation, ClaimManifestBuildResult discovery,
+        CompilerManifestArtifact artifact) =>
+        artifact.Compilation.AssemblyIdentity ==
+            compilation.Assembly.Identity.ToString() &&
+            CompilerManifestArtifactJson.ManifestsEqual(
+                artifact.Manifest, discovery.Manifest);
+
+    private static WorkerVerifyResponse ManifestFailure(
+        string inputHash, WorkerClaimManifest manifest, WorkerBudgets budgets,
+        long started, WorkerRunFailureReason reason,
+        IEnumerable<WorkerProtocolError> errors, string requestHash,
+        WorkerClaimReason claimReason = WorkerClaimReason.InfrastructureFailure) =>
+        WorkerResultAssembler.CreateIncomplete(
+            inputHash, requestHash, manifest, budgets,
+            WorkerRunStatus.Failed, reason,
+            WorkerCallableCoverageReason.InfrastructureFailure,
+            claimReason, errors, Versions(),
+            Elapsed(started));
+
     private static WorkerVerifyResponse Failure(
-        string inputHash,
-        WorkerRunFailureReason reason,
-        WorkerBudgets budgets,
-        long started,
-        IEnumerable<WorkerProtocolError> errors) =>
+        string inputHash, WorkerRunFailureReason reason, WorkerBudgets budgets, long started,
+        IEnumerable<WorkerProtocolError> errors, string? requestHash = null) =>
         WorkerResultAssembler.Create(
             string.IsNullOrEmpty(inputHash) ? WorkerResultAssembler.EmptyInputHash : inputHash,
-            WorkerResultAssembler.EmptyManifest(),
-            WorkerRunStatus.Failed,
-            reason,
-            [],
-            [],
-            budgets,
-            WorkerCacheStatus.Disabled,
-            Elapsed(started),
-            errors);
+            WorkerResultAssembler.EmptyManifest(), WorkerRunStatus.Failed, reason,
+            [], [], budgets, WorkerCacheStatus.Disabled, Elapsed(started), errors,
+            requestHash, Versions());
+
+    private static WorkerVersionSummary Versions() => new() {
+        WorkerVersion = WorkerCacheIdentity.Current.ToolVersion,
+        ApiSpecVersion = WorkerCacheIdentity.Current.ApiSpecVersion
+    };
 
     private static WorkerProtocolError[] Error(string code, string message) =>
         [new WorkerProtocolError { Code = code, Message = message }];

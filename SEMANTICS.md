@@ -21,7 +21,7 @@ budget exhaustion, solver timeout, and unsupported encoding produce
 claim-level `Unknown`. They never produce `Proven` or `Refuted`. Backend
 unavailability, infrastructure failure, malformed backend output, containment
 failure, and failed counterexample replay also prevent a semantic result, but
-protocol version 3 marks the whole run `Failed`; these conditions are fatal
+protocol version 5 marks the whole run `Failed`; these conditions are fatal
 under every build policy. Unsupported unannotated analyzer callables remain
 silent. Explicitly selected unsupported callables produce SP0047.
 
@@ -38,7 +38,7 @@ exhaustion, and all `Unknown` outcomes are not reusable proof-cache entries.
 
 ## Accountable selection and worker runs
 
-Worker protocol version 3 separates `WorkerRunStatus` from
+Worker protocol version 5 separates `WorkerRunStatus` from
 `WorkerClaimOutcome`. The compiler-symbol-based manifest is sealed before
 verification. It contains every selected callable and every discovered
 postcondition with a stable semantic claim ID, evidence kind, dense ordinal,
@@ -46,8 +46,8 @@ and mapped source location. A valid response has exact manifest/result
 equality: no claim may be missing, duplicated, invented, or assigned to the
 wrong callable.
 
-Selection is relative to the request's `WorkerFeatureSet`, which is populated
-from `SharpProofFeatures`. `Contracts` includes contract annotations,
+Selection is relative to the compiler artifact's `WorkerFeatureSet`, which is
+populated from `SharpProofFeatures`. `Contracts` includes contract annotations,
 assumptions, and postcondition claims while excluding effect-only annotations.
 `Effects` includes effect-selected callables while excluding postcondition
 claims and contract assumptions. `All` is their union. Strict accountability
@@ -167,7 +167,7 @@ Analyzer behavior is selected through the compilation-global
   items through the package, and does not run verification.
 - feature value `effects` enables effect contracts, `contracts` enables
   call-site contract analysis, and `all` (the default) enables both. The
-  package carries the same selection into the worker manifest request.
+  package carries the same selection into the compiler artifact and its manifest.
 
 Feature and proof diagnostics are enabled informational diagnostics by default.
 Configuration and contract-usage errors remain enabled at their declared
@@ -196,9 +196,10 @@ and primary constructors. A closed constructed generic API call is accepted only
 when a specification resolves for that exact call. Every Roslyn `OperationKind`
 is classified by a checked-in decision table; an unknown future kind is rejected.
 
-The current packaged verifier still reconstructs a Roslyn compilation from
-MSBuild source/reference lists. It does not yet consume a closed artifact of
-the final post-generator compiler compilation. Generated trees and other
-compiler-only inputs therefore remain outside the 1.0 accountability boundary
-until that artifact replaces reconstruction. SARIF projection is likewise not
-implemented.
+The packaged verifier consumes schema-2 compiler evidence containing the final
+handwritten and generated tree text, a bounded captured parse/compilation-option set,
+reference identities and image hashes, and the sealed selected-claim manifest.
+It does not reread project source or MSBuild input lists. It currently recreates
+Roslyn symbols from that evidence under an exact compiler-version gate; the
+final lowered-IR artifact that removes compiler reconstruction is still a 1.0
+gate. SARIF projection is likewise not implemented.

@@ -55,13 +55,13 @@ The package defaults to advisory analysis of both implemented feature groups:
   verification.
 
 `SharpProofFeatures` values are `effects`, `contracts`, and `all` (the
-default). The same value is serialized as the protocol-v3 request feature set
-and filters the worker manifest: `contracts` excludes effect-only annotations,
-`effects` excludes postcondition claims and contract assumptions, and `all`
-selects both surfaces. The current worker has no effect-proof claims, so an
-effect-selected callable remains visible with incomplete callable coverage and
-SP0047 instead of being treated as proven. A custom analyzer host can use the
-compilation-global
+default). The effective selection is sealed into the schema-2 compiler
+artifact and filters its manifest: `contracts` excludes effect-only
+annotations, `effects` excludes postcondition claims and contract assumptions,
+and `all` selects both surfaces. The current worker has no effect-proof claims,
+so an effect-selected callable remains visible with incomplete callable
+coverage and SP0047 instead of being treated as proven. A custom analyzer host
+can use the compilation-global
 `sharpproof_profile` and `sharpproof_features` analyzer-config keys. Tree-local
 values are invalid because selection is compilation-global.
 
@@ -226,25 +226,26 @@ dotnet build /p:SharpProofVerify=true
 
 `SharpProofVerify` remains optional in `advisory`; the `strict` profile
 requires it. It runs after compilation, outside design-time builds. Each
-invocation uses isolated request, result, and input-list paths. After protocol
-validation, a cross-process mutex serializes publication and each stable file
-is atomically replaced; if the second replacement fails, the first is rolled
-back. Completed writers leave a matching pair, but the two files do not change
-at one indivisible instant. The default result is published under:
+invocation uses isolated compiler-artifact, request, and result paths. After
+protocol validation, a cross-process mutex serializes publication. The stable
+result is removed first; the manifest and request are atomically replaced, and
+the validated result is written last as the commit marker. An interrupted
+publication therefore leaves no successful result that can be mistaken for a
+current manifest/request/result set. The default result is published under:
 
 ```text
 obj/<Configuration>/<TargetFramework>/SharpProof/result.json
 ```
 
-Worker protocol version 3 separates the project run from semantic claim
-outcomes. Its `Features` request field applies `SharpProofFeatures` before
-manifest construction. A compiler-symbol-based manifest selects callables and
-assigns stable `spc1:` semantic IDs to direct clauses, companion clauses, and
-return attributes. The manifest uses manifest schema version 1. The response must
-contain exactly one result for every manifest claim: no missing, duplicate,
-invented, or clause-zero placeholder records are valid. Callable coverage is
-separately `Complete` or `Incomplete`, and the run is `Complete`, `TimedOut`,
-`Canceled`, or `Failed`.
+Worker protocol version 5 separates the project run from semantic claim
+outcomes. The compiler artifact records the effective `SharpProofFeatures`
+selection before manifest construction. A compiler-symbol-based manifest
+selects callables and assigns stable `spc1:` semantic IDs to direct clauses,
+companion clauses, and return attributes. The selected-claim manifest uses
+manifest schema version 2. The response must contain exactly one result for
+every manifest claim: no missing, duplicate, invented, or clause-zero
+placeholder records are valid. Callable coverage is separately `Complete` or
+`Incomplete`, and the run is `Complete`, `TimedOut`, `Canceled`, or `Failed`.
 
 Each manifest claim receives:
 
@@ -272,13 +273,13 @@ under every policy. The worker uses deterministic query, method, project,
 expression-depth, memory, process, and parallelism limits. Its
 content-addressed cache defaults to
 `obj/<Configuration>/<TargetFramework>/SharpProof/cache` in the MSBuild
-integration. Cache schema version 3 stores only a semantically complete
+integration. Cache schema version 5 stores only a semantically complete
 payload whose manifest hash and exact claim set validate against the current
 request and whose outcomes are all `Proven` or replay-validated `Refuted`.
 Timeout, cancellation, `Unknown`, malformed, infrastructure, and failed-replay
 responses are not reusable.
 
-The result includes deterministic JSON counts by outcome and reason, evidence
+The result includes deterministic JSON counts by outcome and reason, assumption
 counts, cache status, versions, budgets, and elapsed time. SARIF projection is
 not implemented yet.
 
@@ -365,27 +366,40 @@ The checked-in acceptance contract declares these consumer target frameworks:
 
 The analyzer and attributes are `netstandard2.0` and contain no verifier, Z3,
 or native solver payload. The current preview package carries
-`SharpProof.Worker` as a `net8.0` tool with a Windows x64 native Z3 payload and
+`SharpProof.Worker` as a `net9.0` tool with a Windows x64 native Z3 payload and
 mandatory Windows Job Object containment.
 `SharpProofVerify=true` on a non-Windows host fails with an explicit
 unsupported-host build error; portable analyzer features remain available.
 
 The full acceptance workflow runs on `windows-latest`. A separate
 package-consumer workflow restores and exercises analyzer consumers on Windows
-x64, Linux x64, and macOS Intel; only Windows x64 enables packaged worker
-verification. Real Visual Studio, Rider, and Windows ARM64 validation remain
-outstanding release gates.
+x64, Linux x64, macOS x64, and macOS ARM64; only Windows x64 enables packaged
+worker verification. Real Visual Studio, Rider, and Windows ARM64 validation
+remain outstanding release gates.
 
-## Important integration gap
+## Remaining compiler integration gap
 
-The current package target still writes source/reference lists and the worker
-reconstructs a Roslyn compilation. It does not yet consume the final
-post-generator compiler `Compilation` through a closed compiler artifact.
-Consequently generated trees, `AdditionalFiles`, and every other final
-compiler-only input are not yet covered with the accountability required for
-1.0. Building that compiler artifact, deleting reconstruction after parity
-tests, adding SARIF output, and splitting the current preview payload into the
-three planned packages remain future production work.
+The build-only collector now embeds the final handwritten and generated syntax
+tree text, the schema's bounded parse/compilation-option set, assembly and
+target identities, exact compiler build identities, reference
+paths/aliases/identities/image hashes, feature selection, and the sealed claim
+manifest in compiler artifact schema version 2. Only readable, file-backed
+`PortableExecutableReference` inputs can enter this bridge; inability to
+capture one is fatal SP0049. The compiler artifact is the worker's sole
+compilation input. The worker verifies its digest, requires exact compiler-build
+equality, rebuilds from the embedded trees and hash-verified reference images,
+and requires independent manifest equality before cache lookup or a solver
+query. Generated contracts are therefore visible and verifiable through this
+bridge.
+
+This is not yet the final lowered-IR artifact required for 1.0. Raw
+`AdditionalFiles` and analyzer configuration are represented only by their
+observable final-compilation effects, the snapshot does not claim to serialize
+every Roslyn option, and reference image bytes remain file-backed. The package
+is built on Roslyn 4.14, but matching an assembly version number alone is not
+enough: the exact Roslyn Common and C# compiler build identities must match or
+verification fails closed. Lowered obligation IR, SARIF output, and the
+three-package release split remain production work.
 
 ## Build and validate this repository
 
@@ -397,7 +411,8 @@ Run long-lived .NET commands through the repository wrapper:
 .\eng\acceptance\Verify.ps1 -Configuration Release
 ```
 
-The acceptance gate enforces the dependency graph and trusted-kernel size,
+The acceptance gate enforces the dependency graph and proof-kernel-only size
+ratchet,
 builds the solution, runs architecture and banned-API checks, lattice and
 finite-CFG laws, runtime and differential oracles, worker/package integration,
 cache/concurrency/cancellation tests, the pinned corpus, a fixed-seed

@@ -409,7 +409,10 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
             IsAuditedWorkerMain(
                 method,
                 knownSymbols.WorkerLauncherProgram,
-                knownSymbols.TaskOfInt32))
+                knownSymbols.TaskOfInt32) ||
+            SymbolEqualityComparer.Default.Equals(
+                method,
+                knownSymbols.WorkerVerifyAsync))
             return true;
         if (method is not {
             Name: "VerifyTargetAsync",
@@ -690,6 +693,11 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
                 CallableVerificationResult != null
                     ? task.Construct(CallableVerificationResult)
                     : null;
+            var workerRequest = compilation.GetTypeByMetadataName("SharpProof.Worker.Protocol.WorkerVerifyRequest");
+            var workerResponse = compilation.GetTypeByMetadataName("SharpProof.Worker.Protocol.WorkerVerifyResponse");
+            var workerTask = task != null && workerResponse != null ? task.Construct(workerResponse) : null;
+            WorkerVerifyAsync = SharpProofWorker?.GetMembers("VerifyAsync").OfType<IMethodSymbol>()
+                .SingleOrDefault(candidate => candidate is { IsStatic: false, Arity: 0, Parameters.Length: 2 } && SymbolEqualityComparer.Default.Equals(candidate.ReturnType, workerTask) && candidate.Parameters[0] is { Name: "request", Type: var requestType } && IsSameType(requestType, workerRequest) && candidate.Parameters[1] is { Name: "cancellationToken", Type: var cancellationType } && IsSameType(cancellationType, CancellationToken));
         }
 
         internal INamedTypeSymbol? Compilation { get; }
@@ -721,5 +729,6 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
         internal INamedTypeSymbol? WorkerCallableCoverageReason { get; }
         internal INamedTypeSymbol? TaskOfInt32 { get; }
         internal INamedTypeSymbol? VerifyTargetTask { get; }
+        internal IMethodSymbol? WorkerVerifyAsync { get; }
     }
 }

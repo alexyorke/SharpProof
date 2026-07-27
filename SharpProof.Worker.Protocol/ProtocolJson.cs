@@ -11,10 +11,10 @@ namespace SharpProof.Worker.Protocol;
 public static class WorkerProtocolJson {
     private static readonly JsonSerializerOptions s_options = CreateOptions();
     private static readonly string[] s_requestProperties = [
-        "protocolVersion", "projectDirectory", "assemblyName", "sourceFiles",
-        "referenceAssemblies", "defineConstants", "compilation", "budgets", "cache", "features", "verifyPolicy", "assumptionPolicy"];
+        "protocolVersion", "compilerManifest", "budgets", "cache",
+        "verifyPolicy", "assumptionPolicy"];
     private static readonly string[] s_responseProperties = [
-        "protocolVersion", "inputHash", "manifest", "runStatus", "failureReason", "callableResults", "claimResults", "summary", "errors"];
+        "protocolVersion", "requestHash", "inputHash", "manifest", "runStatus", "failureReason", "callableResults", "claimResults", "summary", "errors"];
 
     public static JsonSerializerOptions Options => new(s_options);
     public static WorkerVerifyRequest? DeserializeRequest(string json) {
@@ -29,6 +29,8 @@ public static class WorkerProtocolJson {
         if (request == null) throw new ArgumentNullException(nameof(request));
         return JsonSerializer.Serialize(request, s_options);
     }
+    public static string ComputeRequestHash(WorkerVerifyRequest request) =>
+        ComputeSha256(Encoding.UTF8.GetBytes(SerializeRequest(request)));
     public static string SerializeResponse(WorkerVerifyResponse response) {
         if (response == null) throw new ArgumentNullException(nameof(response));
         Canonicalize(response);
@@ -42,30 +44,37 @@ public static class WorkerProtocolJson {
         }
         validation.Check(request.ProtocolVersion == WorkerProtocolVersions.Current, "protocol.unsupported",
             $"Protocol version {WorkerProtocolVersions.Current} is required.");
-        validation.Check(!string.IsNullOrWhiteSpace(request.ProjectDirectory), "project.directory", "A project directory is required.");
-        validation.Check(!string.IsNullOrWhiteSpace(request.AssemblyName), "project.assembly_name", "An assembly name is required.");
-        ValidateStrings(request.SourceFiles, false, "project.sources", "project.source_path", validation);
-        ValidateStrings(request.ReferenceAssemblies, false, "project.references", "project.reference_path", validation);
-        ValidateStrings(request.DefineConstants, true, "project.constants", "project.constant", validation);
-        ValidateCompilation(request.Compilation, validation);
+        validation.Check(request.CompilerManifest != null && !string.IsNullOrWhiteSpace(request.CompilerManifest.Path) &&
+                IsSha256(request.CompilerManifest.Sha256),
+            "project.compiler_manifest", "A compiler manifest path and lowercase SHA-256 are required.");
         ValidateBudgets(request.Budgets, "budgets", validation);
         if (request.Cache == null)
             validation.Add("cache.null", "Cache options are required.");
         else
             validation.Check(request.Cache.MaximumBytes is > 0 and <= WorkerCacheOptions.DefaultMaximumBytes,
                 "cache.maximum_bytes", "Cache size must be between 1 byte and 512 MiB.");
-        validation.Defined(request.Features, WorkerFeatureSet.Unspecified, "policy.features", "An analysis feature set is required.");
         validation.Defined(request.VerifyPolicy, WorkerVerifyPolicy.Unspecified, "policy.verify", "A verification policy is required.");
         validation.Defined(request.AssumptionPolicy, WorkerAssumptionPolicy.Unspecified, "policy.assumption",
             "An assumption policy is required.");
         return validation.Result;
     }
-    public static WorkerProtocolValidationResult Validate(WorkerVerifyResponse? response) => ValidateResponse(response, null, null);
+    public static WorkerProtocolValidationResult Validate(WorkerVerifyResponse? response) =>
+        ValidateResponse(response, null, null, null, null);
     public static WorkerProtocolValidationResult Validate(WorkerVerifyResponse? response, string expectedInputHash,
         WorkerClaimManifest? expectedManifest = null) {
         if (!IsSha256(expectedInputHash))
             throw new ArgumentException("A lowercase SHA-256 input hash is required.", nameof(expectedInputHash));
-        return ValidateResponse(response, expectedInputHash, expectedManifest);
+        return ValidateResponse(response, expectedInputHash, expectedManifest, null, null);
+    }
+    public static WorkerProtocolValidationResult ValidateForRequest(
+        WorkerVerifyResponse? response, string expectedRequestHash,
+        string expectedInputHash, WorkerClaimManifest expectedManifest, WorkerBudgets expectedBudgets) {
+        if (!IsSha256(expectedRequestHash))
+            throw new ArgumentException("A lowercase SHA-256 request hash is required.", nameof(expectedRequestHash));
+        if (!IsSha256(expectedInputHash))
+            throw new ArgumentException("A lowercase SHA-256 input hash is required.", nameof(expectedInputHash));
+        if (expectedBudgets == null) throw new ArgumentNullException(nameof(expectedBudgets));
+        return ValidateResponse(response, expectedInputHash, expectedManifest, expectedRequestHash, expectedBudgets);
     }
     public static void Canonicalize(WorkerClaimManifest manifest) {
         if (manifest == null) throw new ArgumentNullException(nameof(manifest));
@@ -78,19 +87,24 @@ public static class WorkerProtocolJson {
             callable.SelectionReasons = [.. (callable.SelectionReasons ?? []).OrderBy(static value => value)];
             callable.ClaimIds = [.. (callable.ClaimIds ?? [])
                 .OrderBy(id => FindClaimOrdinal(manifest, id)).ThenBy(static id => id, StringComparer.Ordinal)];
+            callable.Assumptions = CanonicalizeAssumptions(callable.Assumptions);
         }
     }
     public static string ComputeManifestHash(WorkerClaimManifest manifest) {
         if (manifest == null) throw new ArgumentNullException(nameof(manifest));
-        using var sha256 = SHA256.Create();
-        var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(CreateManifestPayload(manifest)));
-        return string.Concat(bytes.Select(static value => value.ToString("x2", CultureInfo.InvariantCulture)));
+        return ComputeSha256(Encoding.UTF8.GetBytes(CreateManifestPayload(manifest)));
     }
     public static void SealManifest(WorkerClaimManifest manifest) {
         if (manifest == null) throw new ArgumentNullException(nameof(manifest));
         Canonicalize(manifest);
         manifest.Hash = ComputeManifestHash(manifest);
     }
+    public static WorkerProtocolValidationResult ValidateManifest(WorkerClaimManifest? manifest) {
+        var validation = new Validator(); ValidateManifestCore(manifest, "manifest", validation); return validation.Result;
+    }
+    public static bool ManifestsEqual(WorkerClaimManifest? left, WorkerClaimManifest? right) =>
+        left != null && right != null && left.Hash == right.Hash &&
+        CreateManifestPayload(left) == CreateManifestPayload(right);
     public static void Canonicalize(WorkerVerifyResponse response) {
         if (response == null) throw new ArgumentNullException(nameof(response));
         if (response.Manifest != null) Canonicalize(response.Manifest);
@@ -117,7 +131,9 @@ public static class WorkerProtocolJson {
             .ThenBy(static error => error?.Message, StringComparer.Ordinal)];
     }
     private static WorkerProtocolValidationResult ValidateResponse(
-        WorkerVerifyResponse? response, string? expectedInputHash, WorkerClaimManifest? expectedManifest) {
+        WorkerVerifyResponse? response, string? expectedInputHash,
+        WorkerClaimManifest? expectedManifest, string? expectedRequestHash,
+        WorkerBudgets? expectedBudgets) {
         var validation = new Validator();
         if (response == null) {
             validation.Add("response.null", "The response is required.");
@@ -125,18 +141,24 @@ public static class WorkerProtocolJson {
         }
         validation.Check(response.ProtocolVersion == WorkerProtocolVersions.Current,
             "response.protocol", "The response protocol is invalid.");
+        validation.Check(IsSha256(response.RequestHash),
+            "response.request_hash", "The response request hash is invalid.");
+        if (IsSha256(response.RequestHash) && expectedRequestHash != null)
+            validation.Check(response.RequestHash == expectedRequestHash,
+                "response.request_mismatch",
+                "The response request hash does not match the request.");
         validation.Check(IsSha256(response.InputHash), "response.input_hash", "The response input hash is invalid.");
         if (IsSha256(response.InputHash) && expectedInputHash != null)
             validation.Check(response.InputHash == expectedInputHash,
                 "response.input_mismatch", "The response input hash does not match the request.");
-        ValidateManifest(response.Manifest, "manifest", validation);
+        ValidateManifestCore(response.Manifest, "manifest", validation);
         if (expectedManifest != null) {
             var expectedValidation = new Validator();
-            ValidateManifest(expectedManifest, "expected_manifest", expectedValidation);
+            ValidateManifestCore(expectedManifest, "expected_manifest", expectedValidation);
             if (expectedValidation.Count != 0)
                 validation.Add("response.expected_manifest", "The expected manifest is invalid.");
             else if (response.Manifest != null)
-                validation.Check(CreateManifestPayload(response.Manifest) == CreateManifestPayload(expectedManifest),
+                validation.Check(ManifestsEqual(response.Manifest, expectedManifest),
                     "response.manifest_mismatch", "The response manifest does not match the current manifest.");
         }
         var protocolErrors = ValidateProtocolErrors(response.Errors, validation);
@@ -145,9 +167,12 @@ public static class WorkerProtocolJson {
         var claims = ValidateClaimResults(response.ClaimResults, response.Manifest, validation);
         ValidateUnknownCoverage(callables, claims, response.Manifest, validation);
         ValidateSummary(response.Summary, callables, claims, validation);
+        if (expectedBudgets != null) validation.Check(response.Summary?.Budgets != null &&
+                BudgetsEqual(response.Summary.Budgets, expectedBudgets), "response.budgets_mismatch",
+            "The response summary budgets do not match the request.");
         return validation.Result;
     }
-    private static void ValidateManifest(WorkerClaimManifest? manifest, string prefix, Validator validation) {
+    private static void ValidateManifestCore(WorkerClaimManifest? manifest, string prefix, Validator validation) {
         if (manifest == null) {
             validation.Add(prefix + ".null", "The claim manifest is required.");
             return;
@@ -173,6 +198,14 @@ public static class WorkerProtocolJson {
                     callable.ClaimIds.All(static id => !string.IsNullOrWhiteSpace(id)) &&
                     callable.ClaimIds.Distinct(StringComparer.Ordinal).Count() == callable.ClaimIds.Length,
                 prefix + ".callable_claim_ids", "Callable claim IDs must be nonblank and unique.");
+            ValidateAssumptions(
+                callable.Assumptions, prefix + ".callable_assumptions",
+                validation);
+            validation.Check(
+                (callable.Assumptions ?? []).All(
+                    static assumption => !assumption.Used),
+                prefix + ".callable_assumption_usage",
+                "Manifest assumptions must be declared but unused.");
         }
         foreach (var claim in claims) {
             validation.Check(callableIds.Contains(claim.CallableId), prefix + ".claim_callable",
@@ -212,6 +245,13 @@ public static class WorkerProtocolJson {
                 !Enum.IsDefined(typeof(WorkerCallableCoverageReason), value.Reason))
                 validation.Add("response.callable_reason", "Callable coverage and reason are inconsistent.");
             ValidateAssumptions(value.Assumptions, "response.callable_assumptions", validation);
+            var declared = manifest?.Callables?.FirstOrDefault(callable =>
+                callable != null && callable.CallableId == value.CallableId);
+            validation.Check(declared != null &&
+                    SameAssumptionDeclarations(
+                        value.Assumptions, declared.Assumptions),
+                "response.callable_assumption_set",
+                "Callable results must report exactly the declared assumptions.");
         }
         ValidateExactIds(valid.Select(static value => value.CallableId),
             manifest?.Callables?.Where(static value => value != null).Select(static value => value.CallableId) ?? [],
@@ -235,6 +275,14 @@ public static class WorkerProtocolJson {
                 !Enum.IsDefined(typeof(WorkerClaimReason), value.Reason))
                 validation.Add("response.claim_reason", "Claim outcome and reason are inconsistent.");
             ValidateEvidence(value, validation);
+            var claim = manifest?.Claims?.FirstOrDefault(entry =>
+                entry != null && entry.ClaimId == value.ClaimId);
+            var owner = manifest?.Callables?.FirstOrDefault(entry =>
+                entry != null && entry.CallableId == claim?.CallableId);
+            validation.Check(owner != null &&
+                    SameAssumptionDeclarations(value.Assumptions, owner.Assumptions),
+                "response.claim_assumption_set",
+                "Claim results must report exactly the owning callable's declared assumptions.");
         }
         ValidateExactIds(valid.Select(static value => value.ClaimId),
             manifest?.Claims?.Where(static value => value != null).Select(static value => value.ClaimId) ?? [],
@@ -359,29 +407,6 @@ public static class WorkerProtocolJson {
         }
         return values;
     }
-    private static void ValidateCompilation(WorkerCompilationOptions? options, Validator validation) {
-        if (options == null) {
-            validation.Add("compilation.null", "Compilation options are required.");
-            return;
-        }
-        validation.Check(IsValidText(options.TargetFramework, 256),
-            "compilation.target_framework", "A valid target framework identity is required.");
-        validation.Check(IsValidText(options.LanguageVersion, 32),
-            "compilation.language_version", "An explicit C# language version is required.");
-        validation.Defined(options.NullableContext, WorkerNullableContext.Unspecified,
-            "compilation.nullable", "An explicit nullable context is required.");
-        validation.Defined(options.Optimization, WorkerOptimizationLevel.Unspecified,
-            "compilation.optimization", "An explicit optimization level is required.");
-        validation.Check(options.CheckOverflow.HasValue,
-            "compilation.checked_overflow", "An explicit checked-overflow setting is required.");
-        validation.Check(options.AllowUnsafe.HasValue, "compilation.allow_unsafe", "An explicit unsafe-code setting is required.");
-        validation.Check(options.Deterministic.HasValue,
-            "compilation.deterministic", "An explicit deterministic-build setting is required.");
-        validation.Defined(options.OutputKind, WorkerOutputKind.Unspecified,
-            "compilation.output_kind", "An explicit output kind is required.");
-        validation.Defined(options.Platform, WorkerPlatform.Unspecified,
-            "compilation.platform", "An explicit target platform is required.");
-    }
     private static void ValidateBudgets(WorkerBudgets? budgets, string prefix, Validator validation) {
         if (budgets == null) {
             validation.Add(prefix + ".null", "Budgets are required.");
@@ -404,16 +429,15 @@ public static class WorkerProtocolJson {
         validation.Check(budgets.MethodWallTimeMilliseconds <= budgets.ProjectWallTimeMilliseconds,
             prefix + ".wall_order", "Method wall time cannot exceed project wall time.");
     }
+    private static bool BudgetsEqual(WorkerBudgets left, WorkerBudgets right) =>
+        (left.QueryRlimit, left.MethodRlimit, left.MethodWallTimeMilliseconds, left.ProjectWallTimeMilliseconds,
+            left.MaxParallelism, left.MaximumExpressionDepth, left.ProcessMemoryLimitBytes, left.MaxWorkerProcesses) ==
+        (right.QueryRlimit, right.MethodRlimit, right.MethodWallTimeMilliseconds, right.ProjectWallTimeMilliseconds,
+            right.MaxParallelism, right.MaximumExpressionDepth, right.ProcessMemoryLimitBytes, right.MaxWorkerProcesses);
     private static void ValidateLocation(WorkerSourceLocation? location, string code, Validator validation) =>
         validation.Check(location != null && !string.IsNullOrWhiteSpace(location.Path) &&
                 location.Start >= 0 && location.Length >= 0 && location.Line >= 1 && location.Column >= 1,
             code, "A complete source location is required.");
-    private static void ValidateStrings(string[]? values, bool allowEmpty, string nullCode, string valueCode, Validator validation) {
-        if (values == null || !allowEmpty && values.Length == 0)
-            validation.Add(nullCode, "A non-null value collection is required.");
-        else if (values.Any(string.IsNullOrWhiteSpace))
-            validation.Add(valueCode, "Values cannot be blank.");
-    }
     private static void ValidateUniqueIds(IEnumerable<string?> values, string code, Validator validation) {
         var array = values.ToArray();
         validation.Check(array.All(static value => !string.IsNullOrWhiteSpace(value)) &&
@@ -429,18 +453,28 @@ public static class WorkerProtocolJson {
                 values.Distinct().Count() == values.Length,
             code, "Typed selections must be nonempty and unique.");
     private static void ValidateAssumptions(WorkerAssumptionEvidence[]? values, string code, Validator validation) =>
-        validation.Check(AreCompleteAndUnique(values,
-                static value => !string.IsNullOrWhiteSpace(value.Id) &&
-                    IsDefined(value.Kind, WorkerAssumptionKind.Unspecified), static value => value.Id),
+        validation.Check(AreValidAssumptions(values),
             code, "Assumption evidence must be complete and unique.");
+    internal static bool AreValidAssumptions(WorkerAssumptionEvidence[]? values) =>
+        AreCompleteAndUnique(values, static value => !string.IsNullOrWhiteSpace(value.Id) &&
+            IsDefined(value.Kind, WorkerAssumptionKind.Unspecified), static value => value.Id);
     private static bool AreCompleteAndUnique<T>(T[]? values, Func<T, bool> complete, Func<T, string?> key) where T : class =>
         values != null && values.All(value => value != null && complete(value)) &&
         values.Select(key).Distinct(StringComparer.Ordinal).Count() == values.Length;
     private static WorkerAssumptionEvidence[] CanonicalizeAssumptions(WorkerAssumptionEvidence[]? values) =>
         [.. (values ?? []).OrderBy(static value => value?.Kind).ThenBy(static value => value?.Id, StringComparer.Ordinal)];
+    private static bool SameAssumptionDeclarations(
+        WorkerAssumptionEvidence[]? actual,
+        WorkerAssumptionEvidence[]? expected) =>
+        (actual ?? []).Where(static value => value != null)
+        .OrderBy(static value => value.Id, StringComparer.Ordinal)
+        .Select(static value => (value.Id, value.Kind))
+        .SequenceEqual((expected ?? []).Where(static value => value != null)
+            .OrderBy(static value => value.Id, StringComparer.Ordinal)
+            .Select(static value => (value.Id, value.Kind)));
     private static string CreateManifestPayload(WorkerClaimManifest manifest) {
         var builder = new StringBuilder();
-        Append(builder, "SharpProof.Worker.ManifestHash"); Append(builder, 1);
+        Append(builder, "SharpProof.Worker.ManifestHash"); Append(builder, 2);
         Append(builder, "manifest.schemaVersion"); Append(builder, manifest.SchemaVersion);
         Append(builder, "manifest.callables"); Append(builder, manifest.Callables?.Length ?? -1);
         foreach (var callable in (manifest.Callables ?? [])
@@ -456,6 +490,13 @@ public static class WorkerProtocolJson {
             Append(builder, "callable.claimIds"); Append(builder, callable?.ClaimIds?.Length ?? -1);
             foreach (var claimId in (callable?.ClaimIds ?? []).OrderBy(static value => value, StringComparer.Ordinal))
                 Append(builder, claimId);
+            Append(builder, "callable.assumptions");
+            Append(builder, callable?.Assumptions?.Length ?? -1);
+            foreach (var assumption in CanonicalizeAssumptions(
+                         callable?.Assumptions)) {
+                Append(builder, assumption.Id);
+                Append(builder, (int)assumption.Kind);
+            }
         }
         Append(builder, "manifest.claims"); Append(builder, manifest.Claims?.Length ?? -1);
         foreach (var claim in (manifest.Claims ?? [])
@@ -488,11 +529,14 @@ public static class WorkerProtocolJson {
         manifest?.Claims?.FirstOrDefault(claim => claim != null && claim.ClaimId == id)?.Ordinal ?? int.MaxValue;
     private static string FindClaimCallableId(WorkerClaimManifest? manifest, string? id) =>
         manifest?.Claims?.FirstOrDefault(claim => claim != null && claim.ClaimId == id)?.CallableId ?? string.Empty;
-    private static bool IsSha256(string? value) => value is { Length: 64 } &&
+    internal static bool IsSha256(string? value) => value is { Length: 64 } &&
         value.All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
-    private static bool IsValidText(string? value, int maximumLength) =>
-        value != null && !string.IsNullOrWhiteSpace(value) && value.Length <= maximumLength && !value.Any(char.IsControl);
-    private static bool IsDefined<T>(T value, T unspecified) where T : struct, Enum =>
+    internal static string ComputeSha256(byte[] bytes) {
+        using var hash = SHA256.Create();
+        return string.Concat(hash.ComputeHash(bytes).Select(static value =>
+            value.ToString("x2", CultureInfo.InvariantCulture)));
+    }
+    internal static bool IsDefined<T>(T value, T unspecified) where T : struct, Enum =>
         Enum.IsDefined(typeof(T), value) && !EqualityComparer<T>.Default.Equals(value, unspecified);
     private static void EnsureRootProperties(string json, IEnumerable<string> required) {
         if (json == null) throw new ArgumentNullException(nameof(json));

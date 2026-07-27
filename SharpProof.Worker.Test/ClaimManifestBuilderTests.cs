@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Attributes;
+using SharpProof.CompilerArtifact;
 using SharpProof.Contracts;
 using SharpProof.Worker.Protocol;
 
@@ -20,6 +21,31 @@ public sealed class ClaimManifestBuilderTests {
         WorkerAssumptionKind.UserAssume,
         WorkerAssumptionKind.TrustedBoundary
     ];
+
+    [Test]
+    public void CancellationStopsCompanionDiscovery() {
+        var compilation = GetCompilation((
+            "Subject.cs", "internal sealed class Subject { }"));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Action action = () => _ = new ClaimManifestBuilder(
+            compilation, WorkerFeatureSet.All, cancellation.Token);
+        Assert.That(action, Throws.InstanceOf<OperationCanceledException>());
+    }
+
+    [Test]
+    public void CancellationStopsMethodDiscovery() {
+        var compilation = GetCompilation((
+            "Subject.cs", "internal sealed class Subject { }"));
+        using var cancellation = new CancellationTokenSource();
+        var builder = new ClaimManifestBuilder(
+            compilation, WorkerFeatureSet.All, cancellation.Token);
+        cancellation.Cancel();
+
+        Action action = () => builder.Build();
+        Assert.That(action, Throws.InstanceOf<OperationCanceledException>());
+    }
 
     [Test]
     public void ClaimIdentityIgnoresTriviaNamesAndPaths() {

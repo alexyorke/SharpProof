@@ -106,11 +106,12 @@ after executable replay. Any failed check becomes `Unknown`.
 
 ## Worker verification records
 
-Protocol version 3 separates run state, callable coverage, and claim outcome.
+Protocol version 5 binds compiler-manifest evidence and separates run state,
+callable coverage, and claim outcome.
 Every enum reserves `Unspecified` as its zero value; a valid request or response
 must use a permitted nonzero value where the field is required.
 
-The request `WorkerFeatureSet` is exactly:
+The compiler artifact's `WorkerFeatureSet` is exactly:
 
 - `Unspecified` - invalid placeholder;
 - `Effects` - select effect annotations and exclude postcondition claims; the
@@ -122,9 +123,10 @@ The request `WorkerFeatureSet` is exactly:
 
 `WorkerVerifyPolicy` is `Unspecified`, `Advisory`, `WarnOnUnknown`, or
 `RequireProven`. `WorkerAssumptionPolicy` is `Unspecified`, `Allow`, `Warn`, or
-`Error`. `Unspecified` is invalid in a request. The launcher maps the other
-values to SP0047/SP0048 severity and build behavior; policy never changes a
-claim outcome or makes a failed run successful.
+`Error`. `Unspecified` is invalid for artifact feature selection and for
+required request policies. The launcher maps the other policy values to
+SP0047/SP0048 severity and build behavior; policy never changes a claim outcome
+or makes a failed run successful.
 
 `WorkerRunStatus` is exactly:
 
@@ -143,8 +145,9 @@ claim outcome or makes a failed run successful.
 | `Unspecified` | Invalid placeholder |
 | `None` | Required for a `Complete`, `TimedOut`, or `Canceled` run |
 | `InvalidRequest` | The request failed schema or value validation |
-| `InputUnavailable` | A required source/reference/input could not be read |
+| `InputUnavailable` | The required compiler-manifest artifact could not be read |
 | `CompilationFailure` | Roslyn could not construct a valid compilation |
+| `CompilerManifestMismatch` | Artifact digest/schema, compiler/reference evidence, reconstruction, or discovered claims do not exactly match |
 | `BackendUnavailable` | The configured SMT backend or native payload is unavailable |
 | `InfrastructureFailure` | A non-semantic worker component failed |
 | `MalformedResult` | A backend, cache, or assembled response failed structural validation |
@@ -217,17 +220,19 @@ effective budgets, and elapsed time.
 
 ## Protocol errors are separate
 
-Malformed requests, invalid compilation settings, missing input files,
-compilation errors, and project construction failures are serialized in the
-response `errors` array as typed string codes such as:
+Malformed requests, invalid compiler artifacts, compilation errors, and
+infrastructure failures are serialized in the response `errors` array as typed
+string codes such as:
 
 - `request.null`, `request.malformed`, and `protocol.unsupported`;
-- `project.sources`, `project.references`, and `project.invalid_input`;
-- `compilation.language_version`, `compilation.nullable`, and other explicit
-  compilation-option codes;
+- `project.compiler_manifest`;
+- `compiler_manifest.unavailable`, `compiler_manifest.invalid`,
+  `compiler_manifest.compilation`, and `compiler_manifest.mismatch`;
+- `manifest.failed`;
 - `budgets.rlimit`, `budgets.expression_depth`, and other budget codes;
 - `cache.maximum_bytes`;
-- `input.unavailable`; and
+- `input.unavailable`, `backend.unavailable`, `worker.infrastructure`,
+  `containment.unavailable`, and `worker.malformed_result`; and
 - `compiler.<diagnostic-id>`.
 
 These errors are not `WorkerClaimReason` values and are not semantic
@@ -249,5 +254,5 @@ Unknown outcomes, protocol errors, cancellation, timeout, malformed results,
 backend failures, and failed replay are never semantic cache entries. Only a
 `Complete`, exact-manifest response with complete callable coverage and claims
 that are hygienic `Proven` or replay-validated `Refuted` is cacheable. Cache
-schema version 3 stores the semantic payload; every read revalidates it against
+schema version 5 stores the semantic payload; every read revalidates it against
 the complete current manifest.

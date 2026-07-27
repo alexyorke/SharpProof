@@ -22,7 +22,8 @@
     <CompilerVisibleProperty Include="SharpProofVerifyPolicy" />
     <CompilerVisibleProperty Include="SharpProofAssumptionPolicy" />
     <CompilerVisibleProperty Include="SharpProofMode" />
-    <CompilerVisibleProperty Include="_SharpProofCompilationSealPath" />
+    <CompilerVisibleProperty Include="_SharpProofCompilerManifestPath" />
     <CompilerVisibleProperty Include="_SharpProofCompilationTargetFramework" />
+    <CompilerVisibleProperty Include="_SharpProofProjectDirectory" />
   </ItemGroup>
 </Project>

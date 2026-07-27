@@ -15,4 +15,7 @@
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.CompilerArtifact" />
+  </ItemGroup>
 </Project>

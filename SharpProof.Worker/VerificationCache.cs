@@ -29,10 +29,10 @@ internal sealed class VerificationCache(
                     !string.Equals(envelope.PayloadHash, HashText(envelope.Payload), StringComparison.Ordinal)) {
                     return null;
                 }
-                if (!CacheableWorkerResponse.TryParse(
+                cancellationToken.ThrowIfCancellationRequested(); if (!CacheableWorkerResponse.TryParse(
                         envelope.Payload, inputHash, manifest, budgets, out var response))
                     return null;
-                File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
+                cancellationToken.ThrowIfCancellationRequested(); File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
                 return response;
             }
             catch (Exception exception) when (exception is
@@ -61,16 +61,9 @@ internal sealed class VerificationCache(
                 response.Payload);
             var json = JsonSerializer.Serialize(envelope, WorkerProtocolJson.Options);
             var path = GetPath(response.InputHash);
-            var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-            try {
-                await File.WriteAllTextAsync(
-                    temporary, json, new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
-                File.Move(temporary, path, overwrite: true);
-            }
-            finally {
-                if (File.Exists(temporary)) File.Delete(temporary);
-            }
-            Evict();
+            await AtomicFile.WriteUtf8Async(path, json, cancellationToken)
+                .ConfigureAwait(false);
+            Evict(cancellationToken);
             return true;
         }
         catch (Exception exception) when (exception is
@@ -84,7 +77,8 @@ internal sealed class VerificationCache(
         }
     }
 
-    private void Evict() {
+    private void Evict(CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
         var files = new DirectoryInfo(_directory)
             .EnumerateFiles("*.json", SearchOption.TopDirectoryOnly)
             .OrderBy(static file => file.LastWriteTimeUtc)
@@ -92,7 +86,7 @@ internal sealed class VerificationCache(
             .ToArray();
         var total = files.Sum(static file => file.Length);
         foreach (var file in files) {
-            if (total <= _maximumBytes) break;
+            cancellationToken.ThrowIfCancellationRequested(); if (total <= _maximumBytes) break;
             var length = file.Length;
             try {
                 file.Delete();

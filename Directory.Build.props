@@ -17,6 +17,7 @@
       '$(MSBuildProjectName)' == 'SharpProof.Analyzer' Or
       '$(MSBuildProjectName)' == 'SharpProof.Attributes' Or
       '$(MSBuildProjectName)' == 'SharpProof.ContractForGenerator' Or
+      '$(MSBuildProjectName)' == 'SharpProof.CompilerArtifact' Or
       '$(MSBuildProjectName)' == 'SharpProof.Contracts' Or
       '$(MSBuildProjectName)' == 'SharpProof.Dataflow' Or
       '$(MSBuildProjectName)' == 'SharpProof.Effects' Or

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <LangVersion>12.0</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <IsPackable>false</IsPackable>
@@ -14,6 +14,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
+    <ProjectReference Include="..\SharpProof.CompilerArtifact\SharpProof.CompilerArtifact.csproj" />
     <ProjectReference Include="..\SharpProof.Dataflow\SharpProof.Dataflow.csproj" />
     <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
     <ProjectReference Include="..\SharpProof.Specs\SharpProof.Specs.csproj" />

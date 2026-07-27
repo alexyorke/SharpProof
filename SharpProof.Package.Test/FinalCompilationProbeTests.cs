@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
 using System.Text.Json;
@@ -95,7 +96,7 @@ public sealed class FinalCompilationProbeTests {
     }
 
     [Test]
-    public async Task PackedCollectorSealsActualGeneratorOutput() {
+    public async Task PackedCollectorAttestsAndVerifiesGeneratorOutput() {
         using var workspace = ProbeWorkspace.Create();
         var packagePath = await workspace.PackSharpProofAsync();
         workspace.WritePackedConsumer(GetPackageVersion(packagePath));
@@ -109,8 +110,8 @@ public sealed class FinalCompilationProbeTests {
         Assert.That(first.ExitCode, Is.Zero, first.Output);
         var firstOracle = await ProbeArtifact.ReadAsync(
             workspace.PackedProbeArtifactPath);
-        var firstSeal = await CompilationSeal.ReadAsync(
-            workspace.CompilationSealPath);
+        var firstManifest = await CompilerManifestArtifact.ReadAsync(
+            workspace.CompilerManifestPath);
         Assert.That(
             firstOracle.SyntaxTreePaths,
             Has.Some.EndsWith(CompilerProbeContract.GlobalUsingsHintName));
@@ -118,8 +119,8 @@ public sealed class FinalCompilationProbeTests {
             firstOracle.SyntaxTreePaths,
             Has.Some.EndsWith(CompilerProbeContract.ContractHintName));
         Assert.That(
-            firstSeal.SyntaxTreeCount,
-            Is.EqualTo(firstOracle.SyntaxTreeCount));
+            firstManifest.ClaimPaths,
+            Has.Some.EndsWith(CompilerProbeContract.ContractHintName));
         var firstGeneratedChecksum = firstOracle.GetTreeChecksum(
             CompilerProbeContract.ContractHintName);
         var firstHandwrittenChecksum =
@@ -128,8 +129,8 @@ public sealed class FinalCompilationProbeTests {
         var noOp = await workspace.RebuildAsync();
         Assert.That(noOp.ExitCode, Is.Zero, noOp.Output);
         Assert.That(
-            await File.ReadAllBytesAsync(workspace.CompilationSealPath),
-            Is.EqualTo(firstSeal.Bytes));
+            await File.ReadAllBytesAsync(workspace.CompilerManifestPath),
+            Is.EqualTo(firstManifest.Bytes));
         var noOpOracle = await ProbeArtifact.ReadAsync(
             workspace.PackedProbeArtifactPath);
         Assert.That(
@@ -142,8 +143,8 @@ public sealed class FinalCompilationProbeTests {
         Assert.That(changed.ExitCode, Is.Zero, changed.Output);
         var changedOracle = await ProbeArtifact.ReadAsync(
             workspace.PackedProbeArtifactPath);
-        var changedSeal = await CompilationSeal.ReadAsync(
-            workspace.CompilationSealPath);
+        var changedManifest = await CompilerManifestArtifact.ReadAsync(
+            workspace.CompilerManifestPath);
         using (Assert.EnterMultipleScope()) {
             Assert.That(
                 await File.ReadAllBytesAsync(workspace.SubjectPath),
@@ -156,11 +157,25 @@ public sealed class FinalCompilationProbeTests {
                     CompilerProbeContract.ContractHintName),
                 Is.Not.EqualTo(firstGeneratedChecksum));
             Assert.That(
-                changedSeal.SyntaxTreeCount,
-                Is.EqualTo(changedOracle.SyntaxTreeCount));
+                changedManifest.ClaimPaths,
+                Has.Some.EndsWith(CompilerProbeContract.ContractHintName));
             Assert.That(
-                changedSeal.CompilationSha256,
-                Is.Not.EqualTo(firstSeal.CompilationSha256));
+                changedManifest.CompilationSha256,
+                Is.Not.EqualTo(firstManifest.CompilationSha256));
+        }
+        if (OperatingSystem.IsWindows() &&
+            RuntimeInformation.ProcessArchitecture == Architecture.X64 &&
+            RuntimeInformation.OSArchitecture == Architecture.X64) {
+            var verification = await workspace.VerifyPackedArtifactAsync();
+            using (Assert.EnterMultipleScope()) {
+                Assert.That(
+                    verification.ExitCode,
+                    Is.Zero,
+                    verification.Output);
+                Assert.That(
+                    verification.Output,
+                    Does.Contain("SharpProof Proven"));
+            }
         }
     }
 
@@ -337,41 +352,44 @@ public sealed class FinalCompilationProbeTests {
         }
     }
 
-    private sealed record CompilationSeal(
+    private sealed record CompilerManifestArtifact(
         byte[] Bytes,
-        int SyntaxTreeCount,
-        string CompilationSha256) {
-        internal static async Task<CompilationSeal> ReadAsync(string path) {
+        string CompilationSha256,
+        string[] ClaimPaths) {
+        internal static async Task<CompilerManifestArtifact> ReadAsync(
+            string path) {
             Assert.That(File.Exists(path), Is.True, path);
             var bytes = await File.ReadAllBytesAsync(path);
             var text = Encoding.UTF8.GetString(bytes);
             Assert.That(text, Does.Not.Contain('\r'), path);
-            var values = text.Split(
-                '\n',
-                StringSplitOptions.RemoveEmptyEntries)
-                .ToDictionary(
-                    static row => row[
-                        ..row.IndexOf('=', StringComparison.Ordinal)],
-                    static row => row[
-                        (row.IndexOf('=', StringComparison.Ordinal) + 1)..],
-                    StringComparer.Ordinal);
+            using var document = JsonDocument.Parse(bytes);
+            var root = document.RootElement;
+            var compilationSha256 =
+                root.GetProperty("compilationSha256").GetString();
+            var claimPaths = root.GetProperty("manifest")
+                .GetProperty("claims")
+                .EnumerateArray()
+                .Select(static claim => claim.GetProperty("location")
+                    .GetProperty("path").GetString() ?? string.Empty)
+                .ToArray();
             using (Assert.EnterMultipleScope()) {
                 Assert.That(
-                    values["schema"],
-                    Is.EqualTo("SharpProof.CompilationSeal"),
+                    root.GetProperty("schema").GetString(),
+                    Is.EqualTo("SharpProof.CompilerManifest"),
                     path);
-                Assert.That(values["schemaVersion"], Is.EqualTo("1"), path);
                 Assert.That(
-                    values["compilationSha256"],
+                    root.GetProperty("schemaVersion").GetInt32(),
+                    Is.EqualTo(2),
+                    path);
+                Assert.That(
+                    compilationSha256,
                     Does.Match("^[0-9a-f]{64}$"),
                     path);
             }
-            return new CompilationSeal(
+            return new CompilerManifestArtifact(
                 bytes,
-                int.Parse(
-                    values["syntaxTreeCount"],
-                    System.Globalization.CultureInfo.InvariantCulture),
-                values["compilationSha256"]);
+                compilationSha256!,
+                claimPaths);
         }
     }
 
@@ -387,7 +405,10 @@ public sealed class FinalCompilationProbeTests {
             ArtifactDirectory = Path.Combine(root, "probe");
             PackageSource = Path.Combine(root, "packages");
             PackageCache = Path.Combine(root, "package-cache");
-            CompilationSealPath = Path.Combine(root, "seal", "compilation.seal");
+            CompilerManifestPath = Path.Combine(
+                root,
+                "manifest",
+                "compiler-manifest.json");
             PackedProbeArtifactPath = Path.Combine(
                 root,
                 "probe",
@@ -400,7 +421,7 @@ public sealed class FinalCompilationProbeTests {
         internal string ArtifactDirectory { get; }
         internal string PackageSource { get; }
         internal string PackageCache { get; }
-        internal string CompilationSealPath { get; }
+        internal string CompilerManifestPath { get; }
         internal string PackedProbeArtifactPath { get; }
         internal string SubjectPath { get; }
 
@@ -409,6 +430,9 @@ public sealed class FinalCompilationProbeTests {
                 s_workspaceParent,
                 Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
+            File.Copy(
+                Path.Combine(FindRepositoryRoot(), "global.json"),
+                Path.Combine(root, "global.json"));
             var workspace = new ProbeWorkspace(root);
             Directory.CreateDirectory(workspace.PackageSource);
             return workspace;
@@ -492,6 +516,35 @@ public sealed class FinalCompilationProbeTests {
                 "/nodeReuse:false",
                 "-p:UseSharedCompilation=false"
             ]);
+
+        internal Task<ProcessResult> VerifyPackedArtifactAsync() {
+            var runDirectory = Path.Combine(_root, "verify-run");
+            var publishDirectory = Path.Combine(_root, "published");
+            return RunDotNetAsync([
+                "msbuild",
+                ProjectPath,
+                "/t:_SharpProofVerifyCore",
+                "/nologo",
+                "/nodeReuse:false",
+                "-p:Configuration=Release",
+                "-p:SharpProofVerify=true",
+                "-p:_SharpProofCompilerManifestPath=" +
+                    CompilerManifestPath,
+                "-p:_SharpProofInvocationDirectory=" + runDirectory,
+                "-p:_SharpProofInvocationRequestFile=" +
+                    Path.Combine(runDirectory, "request.json"),
+                "-p:_SharpProofInvocationResultFile=" +
+                    Path.Combine(runDirectory, "result.json"),
+                "-p:SharpProofVerifyRequestFile=" +
+                    Path.Combine(publishDirectory, "request.json"),
+                "-p:SharpProofVerifyResultFile=" +
+                    Path.Combine(publishDirectory, "result.json"),
+                "-p:SharpProofCompilerManifestFile=" +
+                    Path.Combine(publishDirectory, "compiler-manifest.json"),
+                "-p:SharpProofVerifyCacheDirectory=" +
+                    Path.Combine(publishDirectory, "cache")
+            ]);
+        }
 
         internal Task<ProcessResult> RestoreAsync() =>
             RunDotNetAsync([
@@ -660,8 +713,9 @@ public sealed class FinalCompilationProbeTests {
                     <Nullable>enable</Nullable>
                     <SharpProofProfile>advisory</SharpProofProfile>
                     <SharpProofVerify>false</SharpProofVerify>
-                    <_SharpProofCompilationSealPath>{Escape(CompilationSealPath)}</_SharpProofCompilationSealPath>
+                    <_SharpProofCompilerManifestPath>{Escape(CompilerManifestPath)}</_SharpProofCompilerManifestPath>
                     <_SharpProofCompilationTargetFramework>$(TargetFramework)</_SharpProofCompilationTargetFramework>
+                    <_SharpProofProjectDirectory>$(MSBuildProjectDirectory)</_SharpProofProjectDirectory>
                     <{outputProperty}>{Escape(PackedProbeArtifactPath)}</{outputProperty}>
                     <{globalProperty}>$(TargetFramework)</{globalProperty}>
                     <WarningsAsErrors>AD0001;CS8032;CS8785</WarningsAsErrors>

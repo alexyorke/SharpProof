@@ -1,5 +1,9 @@
+using System.Globalization;
 using System.Text.Json;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
+using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
@@ -8,17 +12,30 @@ namespace SharpProof.Worker.Test;
 public sealed class ProtocolJsonTests {
     private const string InputHash =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    private static readonly string[] s_requestProperties = [
+        "protocolVersion", "compilerManifest", "budgets", "cache", "verifyPolicy", "assumptionPolicy"
+    ];
+    private static readonly WorkerAssumptionKind[] s_assumptionKinds = [
+        WorkerAssumptionKind.UserAssume, WorkerAssumptionKind.TrustedBoundary
+    ];
 
     [Test]
-    public void VersionThreeRequestPoliciesAreExplicitStringEnums() {
+    public void VersionFiveRequestCarriesOnlyArtifactAndRuntimeControls() {
         var request = CreateRequest();
         var json = WorkerProtocolJson.SerializeRequest(request);
         var roundTrip = WorkerProtocolJson.DeserializeRequest(json)!;
+        using var document = JsonDocument.Parse(json);
 
         using (Assert.EnterMultipleScope()) {
-            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("3"));
-            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(3));
-            Assert.That(roundTrip.Features, Is.EqualTo(WorkerFeatureSet.All));
+            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("5"));
+            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(5));
+            Assert.That(WorkerManifestVersions.Current, Is.EqualTo(2));
+            Assert.That(
+                document.RootElement.EnumerateObject()
+                    .Select(static property => property.Name),
+                Is.EqualTo(s_requestProperties));
+            Assert.That(roundTrip.CompilerManifest.Path, Is.EqualTo("compiler.manifest.json"));
+            Assert.That(roundTrip.CompilerManifest.Sha256, Is.EqualTo(InputHash));
             Assert.That(roundTrip.VerifyPolicy, Is.EqualTo(WorkerVerifyPolicy.Advisory));
             Assert.That(roundTrip.AssumptionPolicy, Is.EqualTo(WorkerAssumptionPolicy.Allow));
             Assert.That(WorkerProtocolJson.Validate(roundTrip).IsValid, Is.True);
@@ -38,13 +55,60 @@ public sealed class ProtocolJsonTests {
 
         request.VerifyPolicy = WorkerVerifyPolicy.Unspecified;
         request.AssumptionPolicy = (WorkerAssumptionPolicy)999;
-        request.Features = WorkerFeatureSet.Unspecified;
+        request.CompilerManifest.Sha256 = InputHash.ToUpperInvariant();
         Assert.That(
             WorkerProtocolJson.Validate(request).Errors
                 .Select(static error => error.Code),
             Does.Contain("policy.verify")
                 .And.Contain("policy.assumption")
-                .And.Contain("policy.features"));
+                .And.Contain("project.compiler_manifest"));
+    }
+
+    [Test]
+    public void CompilerManifestArtifactIsCanonicalAndCarriesAssumptions() {
+        var manifest = CreateManifest();
+        var compilation = CreateCompilation();
+        var artifact = CompilerManifestArtifactJson.Create(
+            compilation,
+            TestContext.CurrentContext.WorkDirectory,
+            "net9.0",
+            WorkerFeatureSet.All,
+            manifest,
+            CancellationToken.None);
+        var json = CompilerManifestArtifactJson.Serialize(artifact);
+        var roundTrip = CompilerManifestArtifactJson.Deserialize(json);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(roundTrip.SchemaVersion, Is.EqualTo(2));
+            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("5"));
+            Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(manifest.Hash));
+            Assert.That(roundTrip.Manifest.Callables[0].Assumptions, Has.Length.EqualTo(2));
+            Assert.That(
+                roundTrip.Manifest.Callables[0].Assumptions
+                    .Select(static assumption => assumption.Kind),
+                Is.EqualTo(s_assumptionKinds));
+            Assert.That(roundTrip.Compilation.SyntaxTrees, Has.Length.EqualTo(1));
+            Assert.That(roundTrip.CompilationSha256, Does.Match("^[0-9a-f]{64}$"));
+            Assert.That(CompilerManifestArtifactJson.ManifestsEqual(
+                roundTrip.Manifest, manifest), Is.True);
+        }
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(json.Replace(
+                "\"schemaVersion\":2",
+                "\"schemaVersion\":2,\"schemaVersion\":2",
+                StringComparison.Ordinal))));
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(json.Replace(
+                "\"features\":\"All\"",
+                "\"features\":1",
+                StringComparison.Ordinal))));
+
+        roundTrip.Manifest.Claims[0].Location.Column++;
+        Assert.That(CompilerManifestArtifactJson.ManifestsEqual(
+            roundTrip.Manifest, manifest), Is.False);
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(roundTrip))));
     }
 
     [Test]
@@ -96,9 +160,20 @@ public sealed class ProtocolJsonTests {
     public void StrictResponseValidationRequiresExactManifestAndResultSets() {
         var expected = CreateManifest();
         var response = CreateResponse(expected);
+        var request = CreateRequest();
+        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
         Assert.That(
             WorkerProtocolJson.Validate(response, InputHash, expected).IsValid,
             Is.True);
+        Assert.That(WorkerProtocolJson.ValidateForRequest(
+            response, response.RequestHash, InputHash, expected,
+            request.Budgets).IsValid, Is.True);
+        request.VerifyPolicy = WorkerVerifyPolicy.WarnOnUnknown;
+        Assert.That(WorkerProtocolJson.ValidateForRequest(
+                response, WorkerProtocolJson.ComputeRequestHash(request),
+                InputHash, expected, request.Budgets)
+            .Errors.Select(static error => error.Code),
+            Does.Contain("response.request_mismatch"));
 
         response.ClaimResults = [];
         Assert.That(
@@ -131,6 +206,36 @@ public sealed class ProtocolJsonTests {
                     expected)
                 .Errors.Select(static error => error.Code),
             Does.Contain("response.input_mismatch"));
+    }
+
+    [TestCase(nameof(WorkerBudgets.QueryRlimit))]
+    [TestCase(nameof(WorkerBudgets.MethodRlimit))]
+    [TestCase(nameof(WorkerBudgets.MethodWallTimeMilliseconds))]
+    [TestCase(nameof(WorkerBudgets.ProjectWallTimeMilliseconds))]
+    [TestCase(nameof(WorkerBudgets.MaxParallelism))]
+    [TestCase(nameof(WorkerBudgets.MaximumExpressionDepth))]
+    [TestCase(nameof(WorkerBudgets.ProcessMemoryLimitBytes))]
+    [TestCase(nameof(WorkerBudgets.MaxWorkerProcesses))]
+    public void RequestValidationBindsEverySummaryBudget(string propertyName) {
+        var request = CreateRequest();
+        var response = CreateResponse(CreateManifest());
+        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        var property = typeof(WorkerBudgets).GetProperty(propertyName)!;
+        var value = Convert.ToInt64(
+            property.GetValue(response.Summary.Budgets),
+            CultureInfo.InvariantCulture);
+        property.SetValue(
+            response.Summary.Budgets,
+            Convert.ChangeType(
+                value + 1, property.PropertyType,
+                CultureInfo.InvariantCulture));
+
+        Assert.That(
+            WorkerProtocolJson.ValidateForRequest(
+                    response, response.RequestHash, InputHash,
+                    response.Manifest, request.Budgets)
+                .Errors.Select(static error => error.Code),
+            Does.Contain("response.budgets_mismatch"));
     }
 
     [Test]
@@ -232,28 +337,31 @@ public sealed class ProtocolJsonTests {
     [Test]
     public void AssumptionSummaryUnionsDeclarationsAndUsageById() {
         var response = CreateResponse(CreateManifest());
-        response.CallableResults[0].Assumptions = [
-            new WorkerAssumptionEvidence {
-                Id = "assume:0",
-                Kind = WorkerAssumptionKind.UserAssume
-            }
-        ];
-        response.ClaimResults[0].Assumptions = [
-            new WorkerAssumptionEvidence {
-                Id = "assume:0",
-                Kind = WorkerAssumptionKind.UserAssume,
-                Used = true
-            }
-        ];
+        var used = response.ClaimResults[0].Assumptions.Single(
+            static assumption =>
+                assumption.Kind == WorkerAssumptionKind.UserAssume);
+        used.Used = true;
         response.Summary = CreateSummary(response);
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
 
-        response.ClaimResults[0].Assumptions[0].Kind =
-            WorkerAssumptionKind.TrustedBoundary;
+        used.Kind = WorkerAssumptionKind.TrustedBoundary;
         Assert.That(
             WorkerProtocolJson.Validate(response).Errors
                 .Select(static error => error.Code),
             Does.Contain("summary.assumption_conflict"));
+    }
+
+    [Test]
+    public void ClaimResultsRequireOwningCallableAssumptionDeclarations() {
+        var response = CreateResponse(CreateManifest());
+        response.ClaimResults[0].Assumptions =
+            [.. response.ClaimResults[0].Assumptions.Skip(1)];
+        response.Summary = CreateSummary(response);
+
+        Assert.That(
+            WorkerProtocolJson.Validate(response).Errors
+                .Select(static error => error.Code),
+            Does.Contain("response.claim_assumption_set"));
     }
 
     [Test]
@@ -310,23 +418,29 @@ public sealed class ProtocolJsonTests {
 
     private static WorkerVerifyRequest CreateRequest() =>
         new() {
-            ProjectDirectory = "C:\\project",
-            AssemblyName = "ProtocolTest",
-            SourceFiles = ["Subject.cs"],
-            ReferenceAssemblies = ["System.Runtime.dll"],
-            DefineConstants = [],
-            Compilation = new WorkerCompilationOptions {
-                TargetFramework = "net8.0",
-                LanguageVersion = "12.0",
-                NullableContext = WorkerNullableContext.Enabled,
-                Optimization = WorkerOptimizationLevel.Release,
-                CheckOverflow = false,
-                AllowUnsafe = false,
-                Deterministic = true,
-                OutputKind = WorkerOutputKind.DynamicallyLinkedLibrary,
-                Platform = WorkerPlatform.AnyCpu
+            CompilerManifest = new WorkerFileReference {
+                Path = "compiler.manifest.json",
+                Sha256 = InputHash
             }
         };
+
+    private static CSharpCompilation CreateCompilation() {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "ProtocolSubject.cs");
+        var tree = CSharpSyntaxTree.ParseText(
+            "public static class Subject { public static long Identity(long value) => value; }",
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            path);
+        return CSharpCompilation.Create(
+            "ProtocolTest",
+            [tree],
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release,
+                deterministic: true,
+                concurrentBuild: false));
+    }
 
     private static WorkerClaimManifest CreateManifest() {
         var location = new WorkerSourceLocation {
@@ -345,7 +459,17 @@ public sealed class ProtocolJsonTests {
                         WorkerSelectionReason.DiscoveredPostcondition
                     ],
                     Location = location,
-                    ClaimIds = ["claim.identity.0"]
+                    ClaimIds = ["claim.identity.0"],
+                    Assumptions = [
+                        new WorkerAssumptionEvidence {
+                            Id = "spa1:1",
+                            Kind = WorkerAssumptionKind.UserAssume
+                        },
+                        new WorkerAssumptionEvidence {
+                            Id = "spa1:2",
+                            Kind = WorkerAssumptionKind.TrustedBoundary
+                        }
+                    ]
                 }
             ],
             Claims = [
@@ -449,18 +573,32 @@ public sealed class ProtocolJsonTests {
                 static callable => new WorkerCallableResult {
                     CallableId = callable.CallableId,
                     Coverage = WorkerCallableCoverage.Complete,
-                    Reason = WorkerCallableCoverageReason.None
+                    Reason = WorkerCallableCoverageReason.None,
+                    Assumptions = CopyAssumptions(callable.Assumptions)
                 })],
             ClaimResults = [.. manifest.Claims.Select(
-                static claim => new WorkerClaimResult {
+                claim => new WorkerClaimResult {
                     ClaimId = claim.ClaimId,
                     Outcome = WorkerClaimOutcome.Proven,
-                    Reason = WorkerClaimReason.None
+                    Reason = WorkerClaimReason.None,
+                    Assumptions = CopyAssumptions(
+                        manifest.Callables.Single(callable =>
+                            callable.CallableId == claim.CallableId)
+                            .Assumptions)
                 })]
         };
         response.Summary = CreateSummary(response);
         return response;
     }
+
+    private static WorkerAssumptionEvidence[] CopyAssumptions(
+        IEnumerable<WorkerAssumptionEvidence> assumptions) =>
+        [.. assumptions.Select(static assumption =>
+            new WorkerAssumptionEvidence {
+                Id = assumption.Id,
+                Kind = assumption.Kind,
+                Used = assumption.Used
+            })];
 
     private static WorkerVerificationSummary CreateSummary(
         WorkerVerifyResponse response) {

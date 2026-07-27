@@ -356,6 +356,96 @@ public sealed class SharpProofSoundnessAnalyzerTests {
     }
 
     [Test]
+    public async Task AllowsExactWorkerVerifyAsyncCancellationBoundary() {
+        const string source =
+            """
+            using System;
+            using System.Threading;
+            using System.Threading.Tasks;
+            namespace SharpProof.Worker.Protocol {
+                sealed class WorkerVerifyRequest { }
+                sealed class WorkerVerifyResponse { }
+            }
+            namespace SharpProof.Worker {
+                using SharpProof.Worker.Protocol;
+                sealed class SharpProofWorker {
+                    internal async Task<WorkerVerifyResponse> VerifyAsync(
+                        WorkerVerifyRequest request,
+                        CancellationToken cancellationToken) {
+                        await Task.Yield();
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) {
+                            return new WorkerVerifyResponse();
+                        }
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [TestCase(
+        "WorkerLookalike",
+        "internal async Task<WorkerVerifyResponse> VerifyAsync(WorkerVerifyRequest request, CancellationToken cancellationToken)")]
+    [TestCase(
+        "SharpProofWorker",
+        "internal static async Task<WorkerVerifyResponse> VerifyAsync(WorkerVerifyRequest request, CancellationToken cancellationToken)")]
+    [TestCase(
+        "SharpProofWorker",
+        "internal async Task<WorkerVerifyResponse> Verify(WorkerVerifyRequest request, CancellationToken cancellationToken)")]
+    [TestCase(
+        "SharpProofWorker",
+        "internal async Task<WorkerVerifyResponse> VerifyAsync(object request, CancellationToken cancellationToken)")]
+    [TestCase(
+        "SharpProofWorker",
+        "internal async Task<object> VerifyAsync(WorkerVerifyRequest request, CancellationToken cancellationToken)")]
+    [TestCase(
+        "SharpProofWorker",
+        "internal async Task<WorkerVerifyResponse> VerifyAsync(WorkerVerifyRequest input, CancellationToken cancellationToken)")]
+    [TestCase(
+        "SharpProofWorker",
+        "internal async Task<WorkerVerifyResponse> VerifyAsync(WorkerVerifyRequest request, CancellationToken token)")]
+    public async Task RejectsWorkerVerifyAsyncLookalikes(
+        string typeName,
+        string methodSignature) {
+        var exactTypeDeclaration =
+            typeName == "SharpProofWorker"
+                ? ""
+                : "sealed class SharpProofWorker { }";
+        var source =
+            $$"""
+            using System;
+            using System.Threading;
+            using System.Threading.Tasks;
+            namespace SharpProof.Worker.Protocol {
+                sealed class WorkerVerifyRequest { }
+                sealed class WorkerVerifyResponse { }
+            }
+            namespace SharpProof.Worker {
+                using SharpProof.Worker.Protocol;
+                {{exactTypeDeclaration}}
+                sealed class {{typeName}} {
+                    {{methodSignature}} {
+                        await Task.Yield();
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) {
+                            return new WorkerVerifyResponse();
+                        }
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task AllowsAuditedWorkerTypedCancellationReification() {
         const string source =
             """

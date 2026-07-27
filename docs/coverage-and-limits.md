@@ -145,10 +145,11 @@ invocation; they are not BCL coverage.
 - `Unknown` covers unsupported, unresolved, approximate, method-time-limited,
   or resource-exhausted claim analysis. Unsupported unannotated analyzer
   callables are silent; unsupported selected callables produce SP0047.
-- Protocol version 3 separately records run status, callable coverage, and one
+- Protocol version 5 binds a compiler-manifest artifact and separately records
+  run status, callable coverage, and one
   outcome for each stable manifest claim ID. Exact manifest/result equality is
   mandatory.
-- The request carries `SharpProofFeatures` as `WorkerFeatureSet`.
+- The compiler artifact carries `SharpProofFeatures` as `WorkerFeatureSet`.
   `contracts` excludes effect-only annotations, `effects` excludes
   postcondition claims and contract assumptions, and `all` selects both. The
   current worker has no effect-proof claim kind, so an effect-selected callable
@@ -156,7 +157,7 @@ invocation; they are not BCL coverage.
 - Caller cancellation is run status `Canceled`, project timeout is
   `TimedOut`, and infrastructure/protocol/backend/replay failure is `Failed`.
   None is a successful claim outcome.
-- Cache schema version 3 stores only complete validated payloads. Cache reads
+- Cache schema version 5 stores only complete validated payloads. Cache reads
   are checked against the entire current manifest. Unknown, cancellation,
   timeout, malformed result, infrastructure failure, and failed replay are not
   semantic cache entries.
@@ -164,24 +165,32 @@ invocation; they are not BCL coverage.
   warning, or error SP0047 reporting. `SharpProofAssumptionPolicy` maps user or
   trusted evidence to SP0048. These policies do not make fatal runs successful.
 
-## Current compilation-integration gap
+## Remaining compilation-integration gap
 
-During Windows verification, the production analyzer now captures a
-deterministic post-generator compilation seal. It covers the final source and
-generated syntax trees, compiler and parse options, reference identities,
-aliases and image hashes, `AdditionalFiles`, effective SharpProof policies,
-Roslyn version, target framework, and assembly identity. An inability to emit
-the requested seal is fatal SP0049.
+During Windows verification, the production analyzer captures schema-2
+compiler evidence from the post-generator compilation. It contains the sealed
+selected-claim manifest, exact compiler build identities, final handwritten
+and generated tree text, a bounded compiler/parse-option set, reference
+paths/identities/aliases and image hashes, target framework, and assembly
+identity. Only readable, file-backed `PortableExecutableReference` inputs are
+admitted. Raw `AdditionalFiles`, analyzer configuration, and reporting policies
+are not included; their observable generated-compilation effects are covered.
+An inability to emit the requested artifact is fatal SP0049.
 
-The seal is parity and diagnostic evidence only. The worker still reconstructs
-a compilation from MSBuild source and reference lists and does not consume the
-seal as a closed compiler artifact. Collection requires file-backed references
-and fingerprints their current on-disk images, not an exact copy of Roslyn's
-loaded metadata, so the seal is not used for cache validity. Generated claims
-and other compiler-only state are therefore not yet closed into the worker
-manifest/IR artifact required for 1.0. Production-plan Step 4 remains
-incomplete; compilation reconstruction deletion and SARIF projection are
-still future work.
+The launcher binds the artifact path to its exact bytes with SHA-256. The
+worker reads those bytes once, requires exact Roslyn Common/C# build-identity
+equality, recreates symbols from embedded tree text and hash-verified reference
+images, and requires exact claim-manifest equality before any cache lookup or
+solver query. The compiler snapshot hash participates in cache identity.
+Generated claims and bodies are therefore visible and verifiable; drift or an
+omitted claim fails closed as `CompilerManifestMismatch`.
+
+This bridge still is not the lowered-IR artifact required for 1.0. The bounded
+option snapshot does not claim to serialize all Roslyn compilation state,
+reference bytes remain file-backed, and compiler reconstruction remains
+build-coupled. Production-plan Step 4 remains incomplete; obligation-IR
+consumption, removal of compiler reconstruction, broader compatible-Roslyn
+hosting, and SARIF projection are future work.
 
 See [Typed abstention reasons](unknown-reasons.md) for the exact enums and
 [Analysis limits](analysis-limits.md) for configured budgets.

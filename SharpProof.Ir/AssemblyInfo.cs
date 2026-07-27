@@ -3,3 +3,4 @@
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("SharpProof.Ir.Test")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("SharpProof.Smt")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("SharpProof.Worker")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("SharpProof.Worker.Launcher")]

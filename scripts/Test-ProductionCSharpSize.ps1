@@ -22,6 +22,7 @@ if ($maximumPhysicalLines -le 0 -or $maximumNonblankLines -le 0) {
 $roots = @(
     'SharpProof.Attributes/',
     'SharpProof.Analyzer/',
+    'SharpProof.CompilerArtifact/',
     'SharpProof.ContractForGenerator/',
     'SharpProof.Contracts/',
     'SharpProof.Dataflow/',

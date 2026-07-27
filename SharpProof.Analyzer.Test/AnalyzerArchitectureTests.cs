@@ -10,22 +10,26 @@ namespace SharpProof.Analyzer.Test;
 public sealed class AnalyzerArchitectureTests {
     private static readonly string[] ExpectedAnalyzerReferences = [
         "SharpProof.Attributes",
+        "SharpProof.CompilerArtifact",
         "SharpProof.Contracts",
         "SharpProof.Effects",
         "SharpProof.Frontend",
         "SharpProof.Ir",
-        "SharpProof.Specs"
+        "SharpProof.Specs",
+        "SharpProof.Worker.Protocol"
     ];
 
     private static readonly string[] ExpectedAnalyzerOutputAssemblies = [
         "SharpProof.Analyzer",
         "SharpProof.Attributes",
+        "SharpProof.CompilerArtifact",
         "SharpProof.Contracts",
         "SharpProof.Dataflow",
         "SharpProof.Effects",
         "SharpProof.Frontend",
         "SharpProof.Ir",
-        "SharpProof.Specs"
+        "SharpProof.Specs",
+        "SharpProof.Worker.Protocol"
     ];
 
     [Test]

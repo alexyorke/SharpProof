@@ -1,4 +1,4 @@
-namespace SharpProof.Worker;
+namespace SharpProof.CompilerArtifact;
 internal static class SemanticClaimIdentity {
     private const string ClaimDomain = "SharpProofClaim/v1";
     private const string AssumptionDomain = "SharpProofAssumption/v1";
@@ -17,7 +17,7 @@ internal static class SemanticClaimIdentity {
     private static string CreateEvidenceId(
         string prefix, string domain, string assemblyName, string callableId,
         string kind, string fingerprint, int duplicateRank) {
-        ArgumentOutOfRangeException.ThrowIfNegative(duplicateRank);
+        if (duplicateRank < 0) throw new ArgumentOutOfRangeException(nameof(duplicateRank));
         using var writer = new CanonicalHashWriter();
         writer.Add(domain).Add(assemblyName).Add(callableId).Add(kind)
             .Add(fingerprint).Add(duplicateRank);
@@ -26,7 +26,7 @@ internal static class SemanticClaimIdentity {
 
     internal static string CreateInvocationFingerprint(
         IInvocationOperation invocation, IMethodSymbol target, IMethodSymbol source, bool usesCompanion) {
-        ArgumentNullException.ThrowIfNull(invocation);
+        if (invocation == null) throw new ArgumentNullException(nameof(invocation));
         if (invocation.Arguments.Length != 1)
             return CreateMalformedInvocationFingerprint(invocation, target, source);
         var context = new ClaimIdentityContext(target, source, usesCompanion);
@@ -34,7 +34,7 @@ internal static class SemanticClaimIdentity {
     }
 
     internal static string CreateAttributeFingerprint(AttributeData attribute, IMethodSymbol target) {
-        ArgumentNullException.ThrowIfNull(attribute);
+        if (attribute == null) throw new ArgumentNullException(nameof(attribute));
         var context = new ClaimIdentityContext(target, target, false);
         using var writer = new CanonicalHashWriter();
         writer.Add(FingerprintDomain).Add("return-attribute");
@@ -45,8 +45,8 @@ internal static class SemanticClaimIdentity {
     }
 
     internal static string CreateTrustedFingerprint(AttributeData attribute, ISymbol scope, IMethodSymbol target) {
-        ArgumentNullException.ThrowIfNull(attribute);
-        ArgumentNullException.ThrowIfNull(scope);
+        if (attribute == null) throw new ArgumentNullException(nameof(attribute));
+        if (scope == null) throw new ArgumentNullException(nameof(scope));
         var context = new ClaimIdentityContext(target, target, false);
         using var writer = new CanonicalHashWriter();
         writer.Add(FingerprintDomain).Add("trusted-boundary");
@@ -57,10 +57,10 @@ internal static class SemanticClaimIdentity {
     }
 
     internal static string CreateCallableId(IMethodSymbol method) {
-        ArgumentNullException.ThrowIfNull(method);
+        if (method == null) throw new ArgumentNullException(nameof(method));
         method = NormalizePartial(method).OriginalDefinition;
         var documentationId = DocumentationCommentId.CreateDeclarationId(method);
-        if (!string.IsNullOrEmpty(documentationId)) return documentationId;
+        if (!string.IsNullOrEmpty(documentationId)) return documentationId!;
         using var writer = new CanonicalHashWriter();
         writer.Add("SharpProofCallable/v1");
         WriteMethod(writer, method, new ClaimIdentityContext(method, method, false));
@@ -68,9 +68,11 @@ internal static class SemanticClaimIdentity {
     }
     internal static string CreateNestedCallableId(
         string parentId, IMethodSymbol method, int siblingOrdinal) {
-        ArgumentException.ThrowIfNullOrWhiteSpace(parentId);
-        ArgumentNullException.ThrowIfNull(method);
-        ArgumentOutOfRangeException.ThrowIfNegative(siblingOrdinal);
+        if (parentId == null) throw new ArgumentNullException(nameof(parentId));
+        if (parentId.Length == 0 || parentId.All(char.IsWhiteSpace))
+            throw new ArgumentException("The value cannot be an empty string or composed entirely of whitespace.", nameof(parentId));
+        if (method == null) throw new ArgumentNullException(nameof(method));
+        if (siblingOrdinal < 0) throw new ArgumentOutOfRangeException(nameof(siblingOrdinal));
         method = NormalizePartial(method).OriginalDefinition;
         using var writer = new CanonicalHashWriter();
         writer.Add("SharpProofCallable/v1").Add(parentId).Add(siblingOrdinal);
@@ -78,9 +80,9 @@ internal static class SemanticClaimIdentity {
         return "spm1:" + writer.Finish();
     }
     internal static string CreateContainerId(ISymbol symbol) {
-        ArgumentNullException.ThrowIfNull(symbol);
+        if (symbol == null) throw new ArgumentNullException(nameof(symbol));
         var documentationId = DocumentationCommentId.CreateDeclarationId(symbol);
-        if (!string.IsNullOrEmpty(documentationId)) return documentationId;
+        if (!string.IsNullOrEmpty(documentationId)) return documentationId!;
         using var writer = new CanonicalHashWriter();
         writer.Add("SharpProofContainer/v1").Add(symbol.Kind.ToString())
             .Add(symbol.MetadataName)
@@ -280,9 +282,9 @@ internal static class SemanticClaimIdentity {
         foreach (var argument in attribute.ConstructorArguments) WriteTypedConstant(writer, argument, context);
         if (!includeNamed) return;
         writer.Add(attribute.NamedArguments.Length);
-        foreach (var (name, value) in attribute.NamedArguments.OrderBy(static item => item.Key, StringComparer.Ordinal)) {
-            writer.Add(name);
-            WriteTypedConstant(writer, value, context);
+        foreach (var item in attribute.NamedArguments.OrderBy(static item => item.Key, StringComparer.Ordinal)) {
+            writer.Add(item.Key);
+            WriteTypedConstant(writer, item.Value, context);
         }
     }
 
@@ -304,7 +306,7 @@ internal static class SemanticClaimIdentity {
         writer.Add(value.GetType().FullName ?? value.GetType().Name);
         switch (value) {
             case ITypeSymbol type: WriteType(writer, type, context); break;
-            case float number: writer.Add(BitConverter.SingleToInt32Bits(number)); break;
+            case float number: writer.Add(BitConverter.ToInt32(BitConverter.GetBytes(number), 0)); break;
             case double number: writer.Add(BitConverter.DoubleToInt64Bits(number)); break;
             case decimal number:
                 foreach (var part in decimal.GetBits(number)) writer.Add(part);
