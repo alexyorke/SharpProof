@@ -141,10 +141,16 @@ invocation; they are not BCL coverage.
   specs, verified contracts, or explicit user assumptions.
 - `Refuted` requires executable replay of the candidate model. The analyzer's
   current effect may-analysis does not produce definitive effect refutations.
-  Worker replay currently uses the lowered obligation path, not the independent
-  whole-body exact-CFG interpreter required by the 1.0 release gate. A SAT
-  result involving a spec-modeled call result is downgraded to `Unknown` with
-  `CounterexampleReplayFailed`.
+  The proof kernel first checks exact backend-model closure and re-evaluates
+  the lowered assumptions and goal. The worker then independently executes the
+  compiler-produced whole-body program along the concrete CFG path and
+  evaluates the original postcondition over the reconstructed post-state.
+  Contract-only ordinary `void` methods replay as exact zero-step programs.
+  Constructor postconditions are `UnsupportedBody` until base-constructor and
+  field-initializer semantics are lowered.
+  An executed spec-modeled call or unsupported operation fails replay to
+  `Unknown` with `CounterexampleReplayFailed`; one on an unselected path does
+  not block the refutation. Result models expose only canonical user variables.
 - `Unknown` covers unsupported, unresolved, approximate, method-time-limited,
   or resource-exhausted claim analysis. Unsupported unannotated analyzer
   callables are silent; unsupported selected callables produce SP0047.
@@ -160,7 +166,7 @@ invocation; they are not BCL coverage.
 - Caller cancellation is run status `Canceled`, project timeout is
   `TimedOut`, and infrastructure/protocol/backend/replay failure is `Failed`.
   None is a successful claim outcome.
-- Cache schema version 5 stores only complete validated payloads. Cache reads
+- Cache schema version 6 stores only complete validated payloads. Cache reads
   are checked against the entire current manifest. Unknown, cancellation,
   timeout, malformed result, infrastructure failure, and failed replay are not
   semantic cache entries.
@@ -215,10 +221,10 @@ identity rather than runtime compatibility gates. Compiler errors become
 option mismatch becomes `CompilerManifestMismatch`.
 
 Generated claims and supported bodies are therefore visible and executable
-from compiler-produced IR. The remaining integration limits are independent
-whole-body counterexample replay, SARIF projection, broader host
-qualification, and the planned package split; they are not worker-side
-compilation reconstruction work.
+from compiler-produced IR, and candidate refutations receive independent
+whole-body replay. The remaining integration limits are SARIF projection,
+broader host qualification, and the planned package split; they are not
+worker-side compilation reconstruction or counterexample-replay work.
 
 See [Typed abstention reasons](unknown-reasons.md) for the exact enums and
 [Analysis limits](analysis-limits.md) for configured budgets.

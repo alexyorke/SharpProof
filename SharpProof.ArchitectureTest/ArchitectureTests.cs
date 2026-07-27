@@ -290,9 +290,12 @@ public sealed class ArchitectureTests {
             "SharpProof.Effects/OperationEffectScanner.cs",
             "SharpProof.Frontend/RoslynOperationLowerer.cs",
             "SharpProof.Frontend/RoslynProgramLowerer.cs",
+            "SharpProof.Ir/IrInterpreter.cs",
+            "SharpProof.Ir/IrProgramInterpreter.cs",
             "SharpProof.Verify/Evidence.cs",
             "SharpProof.Verify/Outcomes.cs",
-            "SharpProof.Verify/ProofKernel.cs"
+            "SharpProof.Verify/ProofKernel.cs",
+            "SharpProof.Worker/CallableCounterexampleReplayer.cs"
         };
         Assert.That(manifest.SchemaVersion, Is.EqualTo(1));
         Assert.That(manifest.Rationale, Is.Not.Empty);
@@ -326,6 +329,90 @@ public sealed class ArchitectureTests {
                 Is.True,
                 entry.Path);
             Assert.That(File.Exists(fullPath), Is.True, entry.Path);
+        }
+    }
+
+    [Test]
+    public void TrustedComputingBaseDeclarationNamesEveryRequiredPath() {
+        var expected = new Dictionary<string, string[]>(
+            StringComparer.Ordinal) {
+            ["discovery"] = [
+                "SharpProof.Analyzer/FinalCompilationCollector.cs",
+                "SharpProof.Analyzer/CompilerArtifact/ClaimManifestBuilder.cs",
+                "SharpProof.Analyzer/CompilerArtifact/SemanticClaimIdentity.cs",
+                "SharpProof.Contracts/ContractClauseInventoryBuilder.cs"
+            ],
+            ["lowering"] = [
+                "SharpProof.Analyzer/CompilerArtifact/CompilerCallableLowerer.cs",
+                "SharpProof.Analyzer/CompilerArtifact/CompilerManifestArtifactProducer.cs",
+                "SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs",
+                "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
+                "SharpProof.Contracts/ContractBinder.cs",
+                "SharpProof.Contracts/ContractExpressionBinder.cs",
+                "SharpProof.Frontend/RoslynOperationLowerer.cs",
+                "SharpProof.Frontend/RoslynProgramLowerer.cs"
+            ],
+            ["execution"] = [
+                "SharpProof.Worker/CallableVerifier.cs",
+                "SharpProof.Worker/SpecResultDomainProjection.cs",
+                "SharpProof.Worker/SharpProofWorker.cs"
+            ],
+            ["encoding"] = ["SharpProof.Smt/IrSmtBackend.cs"],
+            ["replay"] = [
+                "SharpProof.Verify/ProofKernel.cs",
+                "SharpProof.Ir/IrInterpreter.cs",
+                "SharpProof.Ir/IrProgramInterpreter.cs",
+                "SharpProof.Worker/CallableCounterexampleReplayer.cs"
+            ],
+            ["policy"] = [
+                "SharpProof.Worker.Launcher/Program.cs",
+                "SharpProof.Worker/CallableClaimResultAssembler.cs"
+            ],
+            ["cacheValidation"] = [
+                "SharpProof.CompilerArtifact/CompilerManifestArtifact.cs",
+                "SharpProof.Worker.Protocol/ProtocolJson.cs",
+                "SharpProof.Worker.Protocol/WorkerResultAssembler.cs",
+                "SharpProof.Worker/WorkerInputSnapshot.cs",
+                "SharpProof.Worker/CacheableWorkerResponse.cs",
+                "SharpProof.Worker/VerificationCache.cs"
+            ]
+        };
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            RepositoryRoot(), "eng", "acceptance", "contract.json")));
+        var root = document.RootElement;
+        Assert.That(
+            root.GetProperty("trustedKernel")
+                .GetProperty("maximumNonblankLines")
+                .GetInt32(),
+            Is.EqualTo(275));
+        var declaration = root.GetProperty("trustedComputingBase");
+        Assert.That(
+            declaration.GetProperty("measurement").GetString(),
+            Is.Not.Empty);
+        var actual = declaration.GetProperty("components")
+            .EnumerateArray()
+            .ToDictionary(
+                static component =>
+                    component.GetProperty("name").GetString() ?? "",
+                static component => component.GetProperty("paths")
+                    .EnumerateArray()
+                    .Select(static path => path.GetString() ?? "")
+                    .ToArray(),
+                StringComparer.Ordinal);
+        Assert.That(
+            actual.Keys.OrderBy(static name => name, StringComparer.Ordinal),
+            Is.EqualTo(expected.Keys.OrderBy(
+                static name => name,
+                StringComparer.Ordinal)));
+        foreach (var component in expected) {
+            Assert.That(
+                actual[component.Key].OrderBy(
+                    static path => path,
+                    StringComparer.Ordinal),
+                Is.EqualTo(component.Value.OrderBy(
+                    static path => path,
+                    StringComparer.Ordinal)),
+                component.Key);
         }
     }
 

@@ -6,7 +6,7 @@ internal static class CallableClaimResultAssembler {
         ProofOutcome outcome, IReadOnlyList<CompilerCanonicalVariable> variables,
         IReadOnlyDictionary<ProofJustification, string> assumptionLabels,
         IReadOnlyDictionary<ProofJustification, string> userAssumptionIds,
-        bool usesSpecModeledCallResult) {
+        bool counterexampleReplayed) {
         var record = CreateBaseRecord(target, contractOrdinal);
         var usedUserAssumptions = new HashSet<string>(StringComparer.Ordinal);
         switch (outcome) {
@@ -21,7 +21,7 @@ internal static class CallableClaimResultAssembler {
                     if (userAssumptionIds.TryGetValue(justification, out var id))
                         usedUserAssumptions.Add(id);
                 break;
-            case RefutedOutcome when usesSpecModeledCallResult:
+            case RefutedOutcome when !counterexampleReplayed:
                 record.Outcome = WorkerClaimOutcome.Unknown;
                 record.Reason = WorkerClaimReason.CounterexampleReplayFailed;
                 break;
@@ -74,9 +74,9 @@ internal static class CallableClaimResultAssembler {
             static variable => variable.Variable,
             static variable => variable.ModelLabel);
         return [.. outcome.Model.Assignments
+            .Where(assignment => names.ContainsKey(assignment.Key))
             .Select(assignment => new WorkerModelValue {
-                Variable = names.TryGetValue(assignment.Key, out var name) ? name :
-                    "variable:" + assignment.Key.Value.ToString(CultureInfo.InvariantCulture),
+                Variable = names[assignment.Key],
                 Kind = assignment.Value.Kind.ToString(), Value = FormatValue(assignment.Value)
             })
             .OrderBy(static value => value.Variable, StringComparer.Ordinal)];

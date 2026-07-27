@@ -143,6 +143,47 @@ public sealed class IrKernelTests {
     }
 
     [Test]
+    public void InterpreterMemoizesSharedDagOnlyWithinOneEnvironment() {
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("value", factory.IntegerType);
+        IrTerm term = factory.Variable(variable);
+        for (var depth = 0; depth < 60; depth++)
+            term = factory.Binary(IrBinaryOperator.Add, term, term);
+        var interpreter = new IrInterpreter(factory);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+        var first = interpreter.Evaluate(
+            term,
+            new Dictionary<IrVarId, IrValue> {
+                [variable] = factory.CreateIntegerValue(1)
+            },
+            timeout.Token);
+        var second = interpreter.Evaluate(
+            term,
+            new Dictionary<IrVarId, IrValue> {
+                [variable] = factory.CreateIntegerValue(2)
+            },
+            timeout.Token);
+
+        Assert.That(first.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(first.Value!.Integer, Is.EqualTo(1L << 60));
+        Assert.That(second.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(second.Value!.Integer, Is.EqualTo(1L << 61));
+    }
+
+    [Test]
+    public void InterpreterHonorsPreCanceledEvaluation() {
+        var factory = new IrFactory();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(
+            (Action)(() => new IrInterpreter(factory).Evaluate(
+                factory.Integer(1),
+                cancellationToken: cancellation.Token)));
+    }
+
+    [Test]
     public void IdentifiersAndTermsAreScopedToTheirFactory() {
         var first = new IrFactory();
         var second = new IrFactory();

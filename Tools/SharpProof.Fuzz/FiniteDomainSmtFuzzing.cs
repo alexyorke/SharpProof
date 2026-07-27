@@ -40,7 +40,10 @@ public sealed class FiniteDomainSmtDifferentialOracle {
         bool Check(int index) {
             cancellationToken.ThrowIfCancellationRequested();
             if (index == variables.Length) {
-                var evaluated = interpreter.Evaluate(formula, environment);
+                var evaluated = interpreter.Evaluate(
+                    formula,
+                    environment,
+                    cancellationToken);
                 return evaluated.Status == IrEvaluationStatus.Value &&
                        evaluated.Value is { Kind: IrValueKind.Boolean };
             }
@@ -175,7 +178,10 @@ public sealed class FiniteDomainSmtDifferentialOracle {
         bool Search(int index) {
             cancellationToken.ThrowIfCancellationRequested();
             if (index == variables.Length) {
-                var evaluated = interpreter.Evaluate(formula, environment);
+                var evaluated = interpreter.Evaluate(
+                    formula,
+                    environment,
+                    cancellationToken);
                 return evaluated.Status == IrEvaluationStatus.Value &&
                        evaluated.Value is {
                            Kind: IrValueKind.Boolean,

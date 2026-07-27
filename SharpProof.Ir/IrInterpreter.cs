@@ -104,33 +104,41 @@ public sealed class IrInterpreter(IrFactory factory) {
 
     public IrEvaluationResult Evaluate(
         IrTerm term,
-        IReadOnlyDictionary<IrVarId, IrValue>? variables = null) {
+        IReadOnlyDictionary<IrVarId, IrValue>? variables = null,
+        CancellationToken cancellationToken = default) {
         if (term == null) throw new ArgumentNullException(nameof(term));
         _factory.EnsureTerm(term, nameof(term));
-        return EvaluateCore(term, variables ?? EmptyEnvironment);
+        return EvaluateCore(
+            term,
+            new EvaluationState(variables ?? EmptyEnvironment, cancellationToken));
     }
 
     private IrEvaluationResult EvaluateCore(
         IrTerm term,
-        IReadOnlyDictionary<IrVarId, IrValue> variables) =>
-        term switch {
+        EvaluationState state) {
+        if (state.Results.TryGetValue(term.Id, out var cached)) return cached;
+        state.CancellationToken.ThrowIfCancellationRequested();
+        var result = term switch {
             IrBooleanTerm boolean => IrEvaluationResult.FromValue(_factory.CreateBooleanValue(boolean.Value)),
             IrIntegerTerm integer => IrEvaluationResult.FromValue(_factory.CreateIntegerValue(integer.Value)),
             IrStringTerm text => IrEvaluationResult.FromValue(
                 _factory.CreateStringValue(_factory.GetString(text.Value))),
             IrNullTerm => IrEvaluationResult.FromValue(_factory.CreateNullValue(term.Type)),
-            IrVariableTerm variable => EvaluateVariable(variable, variables),
-            IrOpaqueTerm opaque => EvaluateOpaque(opaque, variables),
-            IrUnaryTerm unary => EvaluateUnary(unary, variables),
-            IrBinaryTerm binary => EvaluateBinary(binary, variables),
-            IrConditionalTerm conditional => EvaluateConditional(conditional, variables),
-            IrCastTerm cast => EvaluateCast(cast, variables),
-            IrLengthTerm length => EvaluateLength(length, variables),
-            IrSequenceAccessTerm access => EvaluateSequenceAccess(access, variables),
+            IrVariableTerm variable => EvaluateVariable(variable, state.Variables),
+            IrOpaqueTerm opaque => EvaluateOpaque(opaque, state),
+            IrUnaryTerm unary => EvaluateUnary(unary, state),
+            IrBinaryTerm binary => EvaluateBinary(binary, state),
+            IrConditionalTerm conditional => EvaluateConditional(conditional, state),
+            IrCastTerm cast => EvaluateCast(cast, state),
+            IrLengthTerm length => EvaluateLength(length, state),
+            IrSequenceAccessTerm access => EvaluateSequenceAccess(access, state),
             _ => IrEvaluationResult.FromUnsupported(
                 IrUnsupportedReason.UnsupportedOperation,
                 "Unknown IR term kind: " + term.Kind + ".")
         };
+        state.Results.Add(term.Id, result);
+        return result;
+    }
 
     private static IrEvaluationResult EvaluateVariable(
         IrVariableTerm variable,
@@ -148,15 +156,15 @@ public sealed class IrInterpreter(IrFactory factory) {
 
     private IrEvaluationResult EvaluateOpaque(
         IrOpaqueTerm opaque,
-        IReadOnlyDictionary<IrVarId, IrValue> variables) {
+        EvaluationState state) {
         IrValue? receiverValue = null;
         if (opaque.Receiver != null) {
-            var receiver = EvaluateCore(opaque.Receiver, variables);
+            var receiver = EvaluateCore(opaque.Receiver, state);
             if (receiver.Status != IrEvaluationStatus.Value) return receiver;
             receiverValue = receiver.Value;
         }
         foreach (var argument in opaque.Arguments) {
-            var argumentResult = EvaluateCore(argument, variables);
+            var argumentResult = EvaluateCore(argument, state);
             if (argumentResult.Status != IrEvaluationStatus.Value) return argumentResult;
         }
         if (receiverValue?.Kind == IrValueKind.Null)
@@ -172,8 +180,8 @@ public sealed class IrInterpreter(IrFactory factory) {
 
     private IrEvaluationResult EvaluateUnary(
         IrUnaryTerm unary,
-        IReadOnlyDictionary<IrVarId, IrValue> variables) {
-        var operand = EvaluateCore(unary.Operand, variables);
+        EvaluationState state) {
+        var operand = EvaluateCore(unary.Operand, state);
         if (operand.Status != IrEvaluationStatus.Value) return operand;
         switch (unary.Operator) {
             case IrUnaryOperator.Not:
@@ -197,8 +205,8 @@ public sealed class IrInterpreter(IrFactory factory) {
 
     private IrEvaluationResult EvaluateBinary(
         IrBinaryTerm binary,
-        IReadOnlyDictionary<IrVarId, IrValue> variables) {
-        var left = EvaluateCore(binary.Left, variables);
+        EvaluationState state) {
+        var left = EvaluateCore(binary.Left, state);
         if (left.Status != IrEvaluationStatus.Value) return left;
         if (binary.Operator == IrBinaryOperator.AndAlso) {
             if (left.Value!.Kind != IrValueKind.Boolean)
@@ -210,7 +218,7 @@ public sealed class IrInterpreter(IrFactory factory) {
                 return InvalidValue("Conditional disjunction requires boolean values.");
             if (left.Value.Boolean) return IrEvaluationResult.FromValue(_factory.CreateBooleanValue(true));
         }
-        var right = EvaluateCore(binary.Right, variables);
+        var right = EvaluateCore(binary.Right, state);
         if (right.Status != IrEvaluationStatus.Value) return right;
         return binary.Operator switch {
             IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply
@@ -321,18 +329,18 @@ public sealed class IrInterpreter(IrFactory factory) {
 
     private IrEvaluationResult EvaluateConditional(
         IrConditionalTerm conditional,
-        IReadOnlyDictionary<IrVarId, IrValue> variables) {
-        var condition = EvaluateCore(conditional.Condition, variables);
+        EvaluationState state) {
+        var condition = EvaluateCore(conditional.Condition, state);
         if (condition.Status != IrEvaluationStatus.Value) return condition;
         if (condition.Value!.Kind != IrValueKind.Boolean)
             return InvalidValue("A conditional guard requires a boolean value.");
-        return EvaluateCore(condition.Value.Boolean ? conditional.WhenTrue : conditional.WhenFalse, variables);
+        return EvaluateCore(condition.Value.Boolean ? conditional.WhenTrue : conditional.WhenFalse, state);
     }
 
     private IrEvaluationResult EvaluateCast(
         IrCastTerm cast,
-        IReadOnlyDictionary<IrVarId, IrValue> variables) {
-        var operand = EvaluateCore(cast.Operand, variables);
+        EvaluationState state) {
+        var operand = EvaluateCore(cast.Operand, state);
         if (operand.Status != IrEvaluationStatus.Value) return operand;
         if (operand.Value!.Type == cast.Type) return operand;
         var target = _factory.GetTypeInfo(cast.Type);
@@ -358,8 +366,8 @@ public sealed class IrInterpreter(IrFactory factory) {
 
     private IrEvaluationResult EvaluateLength(
         IrLengthTerm length,
-        IReadOnlyDictionary<IrVarId, IrValue> variables) {
-        var value = EvaluateCore(length.Value, variables);
+        EvaluationState state) {
+        var value = EvaluateCore(length.Value, state);
         if (value.Status != IrEvaluationStatus.Value) return value;
         if (value.Value!.Kind == IrValueKind.Null)
             return IrEvaluationResult.FromException(
@@ -376,10 +384,10 @@ public sealed class IrInterpreter(IrFactory factory) {
 
     private IrEvaluationResult EvaluateSequenceAccess(
         IrSequenceAccessTerm access,
-        IReadOnlyDictionary<IrVarId, IrValue> variables) {
-        var sequence = EvaluateCore(access.Sequence, variables);
+        EvaluationState state) {
+        var sequence = EvaluateCore(access.Sequence, state);
         if (sequence.Status != IrEvaluationStatus.Value) return sequence;
-        var index = EvaluateCore(access.Index, variables);
+        var index = EvaluateCore(access.Index, state);
         if (index.Status != IrEvaluationStatus.Value) return index;
         var invalid = ValidateSequenceAccess(sequence.Value!, index.Value!);
         return invalid ?? IrEvaluationResult.FromValue(
@@ -404,4 +412,12 @@ public sealed class IrInterpreter(IrFactory factory) {
 
     private static IrEvaluationResult InvalidValue(string detail) =>
         IrEvaluationResult.FromUnsupported(IrUnsupportedReason.InvalidVariableValue, detail);
+
+    private sealed class EvaluationState(
+        IReadOnlyDictionary<IrVarId, IrValue> variables,
+        CancellationToken cancellationToken) {
+        internal IReadOnlyDictionary<IrVarId, IrValue> Variables { get; } = variables;
+        internal CancellationToken CancellationToken { get; } = cancellationToken;
+        internal Dictionary<IrId, IrEvaluationResult> Results { get; } = [];
+    }
 }

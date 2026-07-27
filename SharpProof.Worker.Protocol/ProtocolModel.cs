@@ -5,7 +5,7 @@ public static class WorkerProtocolVersions {
     public const string Current = "5";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
-public static class WorkerCacheVersions { public const int Current = 5; }
+public static class WorkerCacheVersions { public const int Current = 6; }
 public static class WorkerManifestVersions { public const int Current = 2; }
 public static class WorkerLauncherDefaults { public const int TerminationGraceMilliseconds = 1_000; }
 public sealed class WorkerVerifyRequest {

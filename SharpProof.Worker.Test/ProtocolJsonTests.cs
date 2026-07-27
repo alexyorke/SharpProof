@@ -29,7 +29,7 @@ public sealed class ProtocolJsonTests {
 
         using (Assert.EnterMultipleScope()) {
             Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("5"));
-            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(5));
+            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(6));
             Assert.That(WorkerManifestVersions.Current, Is.EqualTo(2));
             Assert.That(
                 document.RootElement.EnumerateObject()

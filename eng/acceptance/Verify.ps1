@@ -88,6 +88,43 @@ function Invoke-SharpProofDotnet {
     }
 }
 
+function Measure-RepositoryNonblankLines {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Paths,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Scope
+    )
+
+    if ($Paths.Count -eq 0) {
+        throw "$Scope must declare at least one path."
+    }
+    $seenPaths = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    $nonblankLines = 0
+    foreach ($untypedRelativePath in $Paths) {
+        $relativePath = [string]$untypedRelativePath
+        if ([string]::IsNullOrWhiteSpace($relativePath) -or
+            -not $seenPaths.Add($relativePath)) {
+            throw "$Scope contains a blank or duplicate path: $relativePath"
+        }
+        $fullPath = [IO.Path]::GetFullPath(
+            (Join-Path $repositoryRoot $relativePath))
+        if (-not $fullPath.StartsWith(
+                $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
+                [StringComparison]::OrdinalIgnoreCase) -or
+            -not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+            throw "Invalid $Scope path: $relativePath"
+        }
+        $nonblankLines += @(
+            Get-Content -LiteralPath $fullPath |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        ).Count
+    }
+    return $nonblankLines
+}
+
 Assert-Equal $contract.schemaVersion 3 'schemaVersion'
 Assert-Equal $contract.releaseLine '0.2.0-preview' 'releaseLine'
 Assert-Equal $contract.flagship 'effects' 'flagship'
@@ -114,7 +151,7 @@ Assert-Equal $contract.worker.methodRlimit 20000000 'worker.methodRlimit'
 Assert-Equal $contract.worker.maximumMethodWallSeconds 10 'worker.maximumMethodWallSeconds'
 Assert-Equal $contract.worker.maximumProjectWallSeconds 300 'worker.maximumProjectWallSeconds'
 Assert-Equal $contract.worker.forcedTerminationMilliseconds 1000 'worker.forcedTerminationMilliseconds'
-Assert-Equal $contract.cache.schemaVersion 5 'cache.schemaVersion'
+Assert-Equal $contract.cache.schemaVersion 6 'cache.schemaVersion'
 Assert-Equal $contract.cache.maximumMiB 512 'cache.maximumMiB'
 Assert-Equal ($contract.cache.cacheableOutcomes -join ',') 'Proven,Refuted' 'cache.cacheableOutcomes'
 Assert-Equal `
@@ -157,21 +194,9 @@ try {
     if ($kernelPaths.Count -eq 0 -or $kernelMaximum -le 0) {
         throw 'The trusted-kernel LOC contract must declare paths and a positive limit.'
     }
-    $kernelNonblankLines = 0
-    foreach ($relativeKernelPath in $kernelPaths) {
-        $kernelPath = [IO.Path]::GetFullPath(
-            (Join-Path $repositoryRoot ([string]$relativeKernelPath)))
-        if (-not $kernelPath.StartsWith(
-                $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-                [StringComparison]::OrdinalIgnoreCase) -or
-            -not (Test-Path -LiteralPath $kernelPath -PathType Leaf)) {
-            throw "Invalid trusted-kernel path: $relativeKernelPath"
-        }
-        $kernelNonblankLines += @(
-            Get-Content -LiteralPath $kernelPath |
-                Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-        ).Count
-    }
+    $kernelNonblankLines = Measure-RepositoryNonblankLines `
+        -Paths $kernelPaths `
+        -Scope 'trusted-kernel'
     if ($kernelNonblankLines -gt $kernelMaximum) {
         throw "Trusted-kernel nonblank LOC $kernelNonblankLines exceeds " +
             "the contract limit $kernelMaximum."
@@ -179,6 +204,53 @@ try {
     Write-Host (
         "Trusted-kernel nonblank lines: $kernelNonblankLines " +
         "(maximum $kernelMaximum)")
+
+    $requiredTcbComponents = @(
+        'discovery',
+        'lowering',
+        'execution',
+        'encoding',
+        'replay',
+        'policy',
+        'cacheValidation'
+    )
+    $tcbComponents = @($contract.trustedComputingBase.components)
+    $actualTcbComponents = @(
+        $tcbComponents |
+            ForEach-Object { [string]$_.name } |
+            Sort-Object
+    )
+    $expectedTcbComponents = @($requiredTcbComponents | Sort-Object)
+    if (($actualTcbComponents -join ',') -ne
+        ($expectedTcbComponents -join ',')) {
+        throw "Trusted-computing-base components must be exactly: " +
+            ($requiredTcbComponents -join ', ') + "."
+    }
+    $allTcbPaths = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($component in $tcbComponents) {
+        $name = [string]$component.name
+        $paths = @($component.paths)
+        $maximum = [int]$component.maximumNonblankLines
+        if ($maximum -le 0) {
+            throw "Trusted-computing-base component '$name' must have a positive limit."
+        }
+        foreach ($path in $paths) {
+            if (-not $allTcbPaths.Add([string]$path)) {
+                throw "Trusted-computing-base path belongs to multiple components: $path"
+            }
+        }
+        $nonblankLines = Measure-RepositoryNonblankLines `
+            -Paths $paths `
+            -Scope "trusted-computing-base component '$name'"
+        if ($nonblankLines -gt $maximum) {
+            throw "Trusted-computing-base component '$name' nonblank LOC " +
+                "$nonblankLines exceeds the contract limit $maximum."
+        }
+        Write-Host (
+            "Trusted-computing-base $name nonblank lines: " +
+            "$nonblankLines (maximum $maximum)")
+    }
 
     & (Join-Path $repositoryRoot 'scripts\Test-ProductionCSharpSize.ps1')
     if ($LASTEXITCODE -ne 0) {

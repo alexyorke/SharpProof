@@ -19,7 +19,8 @@ internal sealed record WorkerPerformanceMeasurements(
 internal static class WorkerPerformanceProbe {
     private const int CooperativeProjectWallMilliseconds = 100;
     private const int CooperativeTerminationGraceMilliseconds = 10_000;
-    private const int ForcedTerminationProbeHeadroomMilliseconds = 100;
+    // Shared CI can observe exit after the kernel deadline; product grace is unchanged.
+    private const int ForcedTerminationProbeHeadroomMilliseconds = 300;
     private const int LauncherWorkloadMethods = 384;
 
     internal static async Task<WorkerPerformanceMeasurements> MeasureAsync(

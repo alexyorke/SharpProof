@@ -839,7 +839,8 @@ public sealed class FrontendDifferentialOracle {
                     generated);
                 var interpreted = new IrInterpreter(factory).Evaluate(
                     lowering.Term,
-                    environment);
+                    environment,
+                    cancellationToken);
                 var runtimeMethod = runtimeType.GetMethod(
                     MethodName(index),
                     BindingFlags.Public | BindingFlags.Static)!;
@@ -1044,7 +1045,8 @@ public sealed class FrontendDifferentialOracle {
             generated.Arguments);
         var interpreted = new IrInterpreter(factory).Evaluate(
             lowering.Term,
-            environment);
+            environment,
+            cancellationToken);
         var runtimeMethod = runtimeType.GetMethod(
             SemanticEdgeMethodName(index),
             BindingFlags.Public | BindingFlags.Static)!;

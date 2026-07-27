@@ -98,11 +98,14 @@ value accompanies backend `Unknown` and is mapped through the proof kernel.
 | `BackendUnavailable` | The configured backend or native dependency is unavailable |
 | `InfrastructureFailure` | Non-semantic worker/backend infrastructure failed |
 | `MalformedBackendResult` | Status, core, or model shape is invalid |
-| `CounterexampleReplayFailed` | A SAT model did not replay to an observed goal failure |
+| `CounterexampleReplayFailed` | A SAT model failed exact assignment-closure or lowered-term replay |
 
 Only the proof kernel constructs proof outcomes. Backend UNSAT becomes
 `Proven` only after evidence-core hygiene. Backend SAT becomes `Refuted` only
-after executable replay. Any failed check becomes `Unknown`.
+after its assignments exactly close the requested model and replay every
+lowered assumption as true and the goal as false. Any failed check becomes
+`Unknown`. The worker applies the additional independent whole-body replay
+before assembling a `Refuted` record.
 
 ## Worker verification records
 
@@ -190,7 +193,7 @@ Every manifest claim has exactly one non-`Unspecified` outcome.
 | `BackendUnavailable` | Z3/backend loading or availability failed |
 | `InfrastructureFailure` | Non-semantic worker infrastructure failed |
 | `MalformedBackendResult` | The backend result cannot pass structural/kernel validation |
-| `CounterexampleReplayFailed` | A candidate refutation could not be reproduced by the executable IR |
+| `CounterexampleReplayFailed` | A candidate refutation failed exact term replay or could not be reproduced along the compiler-produced whole-body CFG |
 
 The worker intentionally coalesces some lower-layer distinctions. For example,
 proof `UnsupportedOperation`, `ApproximationTouchedGoal`,
@@ -198,6 +201,14 @@ proof `UnsupportedOperation`, `ApproximationTouchedGoal`,
 `UnsupportedExpression`. Contract binding failures map to
 `UnsupportedContract`, `UnsupportedExpression`, or `UnsupportedCallable`
 according to their closed failure kind.
+
+Whole-body replay executes only the concrete path selected by the model.
+Executed spec calls and unsupported IR operations fail closed to
+`CounterexampleReplayFailed`; the same instructions on unselected paths do not
+block replay. Contract-only ordinary `void` methods use exact zero-step replay.
+Constructor postconditions are `UnsupportedBody` until base-constructor and
+field-initializer semantics are lowered. Successful refutations expose only
+canonical user-model variables.
 
 The callable record prevents a zero-claim selected method from disappearing.
 The sealed manifest and response must have exact callable/result and
@@ -254,5 +265,5 @@ Unknown outcomes, protocol errors, cancellation, timeout, malformed results,
 backend failures, and failed replay are never semantic cache entries. Only a
 `Complete`, exact-manifest response with complete callable coverage and claims
 that are hygienic `Proven` or replay-validated `Refuted` is cacheable. Cache
-schema version 5 stores the semantic payload; every read revalidates it against
+schema version 6 stores the semantic payload; every read revalidates it against
 the complete current manifest.

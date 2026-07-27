@@ -31,7 +31,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 5,
+    "schemaVersion": 6,
     "maximumMiB": 512,
     "cacheableOutcomes": [
       "Proven",
@@ -45,6 +45,81 @@
       "SharpProof.Verify/Outcomes.cs"
     ],
     "maximumNonblankLines": 275
+  },
+  "trustedComputingBase": {
+    "measurement": "Aggregate nonblank physical lines across the component's repository-relative paths.",
+    "components": [
+      {
+        "name": "discovery",
+        "paths": [
+          "SharpProof.Analyzer/FinalCompilationCollector.cs",
+          "SharpProof.Analyzer/CompilerArtifact/ClaimManifestBuilder.cs",
+          "SharpProof.Analyzer/CompilerArtifact/SemanticClaimIdentity.cs",
+          "SharpProof.Contracts/ContractClauseInventoryBuilder.cs"
+        ],
+        "maximumNonblankLines": 1025
+      },
+      {
+        "name": "lowering",
+        "paths": [
+          "SharpProof.Analyzer/CompilerArtifact/CompilerCallableLowerer.cs",
+          "SharpProof.Analyzer/CompilerArtifact/CompilerManifestArtifactProducer.cs",
+          "SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs",
+          "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
+          "SharpProof.Contracts/ContractBinder.cs",
+          "SharpProof.Contracts/ContractExpressionBinder.cs",
+          "SharpProof.Frontend/RoslynOperationLowerer.cs",
+          "SharpProof.Frontend/RoslynProgramLowerer.cs"
+        ],
+        "maximumNonblankLines": 2970
+      },
+      {
+        "name": "execution",
+        "paths": [
+          "SharpProof.Worker/CallableVerifier.cs",
+          "SharpProof.Worker/SpecResultDomainProjection.cs",
+          "SharpProof.Worker/SharpProofWorker.cs"
+        ],
+        "maximumNonblankLines": 930
+      },
+      {
+        "name": "encoding",
+        "paths": [
+          "SharpProof.Smt/IrSmtBackend.cs"
+        ],
+        "maximumNonblankLines": 410
+      },
+      {
+        "name": "replay",
+        "paths": [
+          "SharpProof.Verify/ProofKernel.cs",
+          "SharpProof.Ir/IrInterpreter.cs",
+          "SharpProof.Ir/IrProgramInterpreter.cs",
+          "SharpProof.Worker/CallableCounterexampleReplayer.cs"
+        ],
+        "maximumNonblankLines": 711
+      },
+      {
+        "name": "policy",
+        "paths": [
+          "SharpProof.Worker.Launcher/Program.cs",
+          "SharpProof.Worker/CallableClaimResultAssembler.cs"
+        ],
+        "maximumNonblankLines": 590
+      },
+      {
+        "name": "cacheValidation",
+        "paths": [
+          "SharpProof.CompilerArtifact/CompilerManifestArtifact.cs",
+          "SharpProof.Worker.Protocol/ProtocolJson.cs",
+          "SharpProof.Worker.Protocol/WorkerResultAssembler.cs",
+          "SharpProof.Worker/WorkerInputSnapshot.cs",
+          "SharpProof.Worker/CacheableWorkerResponse.cs",
+          "SharpProof.Worker/VerificationCache.cs"
+        ],
+        "maximumNonblankLines": 910
+      }
+    ]
   },
   "productionSize": {
     "maximumPhysicalLines": 19916,

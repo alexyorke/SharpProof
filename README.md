@@ -273,7 +273,7 @@ under every policy. The worker uses deterministic query, method, project,
 expression-depth, memory, process, and parallelism limits. Its
 content-addressed cache defaults to
 `obj/<Configuration>/<TargetFramework>/SharpProof/cache` in the MSBuild
-integration. Cache schema version 5 stores only a semantically complete
+integration. Cache schema version 6 stores only a semantically complete
 payload whose manifest hash and exact claim set validate against the current
 request and whose outcomes are all `Proven` or replay-validated `Refuted`.
 Timeout, cancellation, `Unknown`, malformed, infrastructure, and failed-replay
@@ -300,14 +300,23 @@ The worker also has narrow, spec-justified support for:
 - `string.Concat(string, string)` result non-nullness;
 - `Array.Empty<T>()` result non-nullness and zero array length.
 
-It does not treat `Enumerable.Empty<T>()` as array-backed sequence state, and a
-counterexample involving a spec-modeled call result is withheld when concrete
-replay cannot validate it.
+It does not treat `Enumerable.Empty<T>()` as array-backed sequence state.
+During counterexample replay, an executed spec-modeled call or other
+unsupported instruction cannot be independently reproduced, so the candidate
+becomes `Unknown` with `CounterexampleReplayFailed`. A call on a CFG path that
+the concrete model does not select does not block replay.
 
-Current replay evaluates the lowered obligation-path IR used to build the SMT
-query. It is not yet the independent whole-body, exact-CFG interpreter required
-by the 1.0 release gate, so the preview must not be treated as production-ready
-counterexample validation.
+For a SAT answer, the proof kernel first requires the backend assignments to
+close exactly over the requested Boolean/integer model variables, then
+re-evaluates every lowered assumption as true and the lowered goal as false.
+The worker separately seeds and executes the compiler-produced whole-body
+program along the model-selected CFG path, reconstructs the post-state, and
+requires the original `Ensures` condition to evaluate to false. Contract-only
+ordinary `void` methods use an exact zero-step replay. Constructor
+postconditions are currently `UnsupportedBody` because base construction and
+field initializers are not yet in the lowered body. Only a candidate that
+passes both layers is emitted as `Refuted`; its JSON model exposes only
+canonical user-model variables.
 
 Within a worker target, `Requires` clauses are entry assumptions; the worker
 does not prove that callers satisfy them. `Assume` clauses are explicit
@@ -406,13 +415,11 @@ Resolver-dependent `#r` or `#load`, missing-assembly resolver mode, reference
 supersession, custom assembly-identity comparers, and non-file or unreadable
 references fail artifact collection as SP0049.
 
-The compiler-to-worker reconstruction cutover is complete for this bounded
-subset, but SharpProof is not production-ready. Counterexample replay still
-uses the lowered obligation path rather than an independent interpreter over
-the exact whole-body CFG. A SAT model involving a spec-modeled call result is
-therefore downgraded to `Unknown` with `CounterexampleReplayFailed`. SARIF
-output, the three-package release split, broader host qualification, and the
-remaining release reviews are also outstanding.
+The compiler-to-worker reconstruction cutover and independent whole-body
+counterexample-replay gate are complete for this bounded subset, but SharpProof
+is not production-ready. SARIF output, the three-package release split,
+broader host qualification, and the remaining release reviews are still
+outstanding.
 
 ## Build and validate this repository
 

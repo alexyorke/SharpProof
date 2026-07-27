@@ -47,7 +47,9 @@ internal sealed class CompilerCallableLowerer {
         cancellationToken.ThrowIfCancellationRequested();
         if (target.Method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None))
             return Unsupported(out failure);
-        if (target.Method.ReturnsVoid || target.Method.MethodKind == MethodKind.Constructor) {
+        if (target.Method.MethodKind == MethodKind.Constructor)
+            return Unsupported(out failure);
+        if (target.Method.ReturnsVoid) {
             failure = ContainsOnlyContractStatements(target) ? WorkerClaimReason.None : WorkerClaimReason.UnsupportedBody;
             return failure == WorkerClaimReason.None ? CompilerPreparedBody.Trivial() : null;
         }
@@ -290,7 +292,7 @@ internal sealed class CompilerCallableLowerer {
     }
 
     private static bool TryValidateAcyclicBody(IrProgram program, IrBlockId start, CancellationToken cancellationToken) {
-        var colors = new Dictionary<IrBlockId, int>(); var reachable = 0;
+        var colors = new Dictionary<IrBlockId, int>(); var reachable = 0; var instructions = 0;
         return Visit(start);
 
         bool Visit(IrBlockId blockId) {
@@ -299,6 +301,8 @@ internal sealed class CompilerCallableLowerer {
             if (++reachable > MaximumBodyBlocks) return false;
             colors.Add(blockId, 1);
             var block = program.GetBlock(blockId);
+            if (block.Instructions.Length > CompilerPreparedBody.MaximumInstructions - instructions) return false;
+            instructions += block.Instructions.Length;
             foreach (var successor in GetSuccessors(block.Terminator)) {
                 if (colors.TryGetValue(successor, out color) && color == 1) return false;
                 if (!Visit(successor)) return false;

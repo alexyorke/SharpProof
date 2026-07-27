@@ -104,8 +104,15 @@ acyclic CFG executor; deep or otherwise unsupported postconditions abstain.
 
 Proof evidence is type-safe. Approximations cannot construct an assumption.
 `Proven` is created only by the proof kernel after unsat-core hygiene checks.
-`Refuted` is created only after the executable IR replays a SAT model and
-observes the goal fail.
+For SAT, the proof kernel first requires exact assignment closure over the
+requested Boolean/integer model variables and re-evaluates every lowered
+assumption as true and the lowered goal as false. The worker then independently
+executes the compiler-produced whole-body program along the concrete CFG path,
+reconstructs its post-state, and evaluates the original `Ensures`. `Refuted` is
+created only when both layers observe the violation. Contract-only ordinary
+`void` methods have an exact zero-step whole-body replay. Constructor
+postconditions abstain as `UnsupportedBody` until base-constructor and field-
+initializer semantics are lowered.
 
 ## Manifest, protocol, determinism, and cache
 
@@ -134,7 +141,7 @@ first, the manifest and request are atomically replaced, and the result is
 written last as the commit marker. A failed publication therefore cannot leave
 a stale successful result associated with a partly updated evidence set. The
 content-addressed cache includes semantic, protocol, tool, compilation,
-reference, option, target-framework, and spec identity. Cache schema version 5
+reference, option, target-framework, and spec identity. Cache schema version 6
 stores only the validated semantic payload. A hit is accepted only when its
 manifest hash and complete result set match the current manifest. Only
 complete callables whose claims are hygienic `Proven` or replay-validated
@@ -178,13 +185,14 @@ observable effects on the final compilation and effective SharpProof options;
 generated output is covered by its tree hashes, manifest entries, and lowered
 callables.
 
-This closes the compiler-to-worker lowered-artifact cutover for the bounded
-verifier subset. It does not close the independent replay gate.
-Counterexample replay still re-evaluates the lowered obligation path rather
-than interpreting the exact whole-body CFG independently. In particular, a SAT
-model involving a spec-modeled call result is downgraded to `Unknown` with
-`CounterexampleReplayFailed`. Deterministic JSON is emitted, but SARIF
-projection is also future work.
+This closes both the compiler-to-worker lowered-artifact cutover and the
+independent whole-body replay gate for the bounded verifier subset. Replay
+executes only the concrete CFG path selected by the model, so unsupported
+operations or spec-modeled calls on other paths do not block a refutation. If
+one is executed, replay fails closed to `Unknown` with
+`CounterexampleReplayFailed`. Result JSON includes only canonical user-model
+variables, not temporary lowered variables. Deterministic JSON is emitted, but
+SARIF projection is future work.
 
 ## Activation and release gates
 

@@ -3,8 +3,7 @@ namespace SharpProof.Verify;
 public sealed class ProofKernel(ISmtBackend backend) {
     private readonly ISmtBackend _backend = backend ?? throw new ArgumentNullException(nameof(backend));
 
-    public async Task<ProofOutcome> VerifyAsync(
-        VerificationQuery query,
+    public async Task<ProofOutcome> VerifyAsync(VerificationQuery query,
         CancellationToken cancellationToken = default) {
         if (query == null) throw new ArgumentNullException(nameof(query));
         cancellationToken.ThrowIfCancellationRequested();
@@ -13,15 +12,13 @@ public sealed class ProofKernel(ISmtBackend backend) {
         if (result == null) return Unknown(AbstentionReason.MalformedBackendResult);
         return result.Status switch {
             BackendCheckStatus.Unsatisfiable => CreateProven(query, result),
-            BackendCheckStatus.Satisfiable => ReplayCounterexample(query, result),
+            BackendCheckStatus.Satisfiable => ReplayCounterexample(query, result, cancellationToken),
             BackendCheckStatus.Unknown => Unknown(MapFailure(result.FailureReason)),
             _ => Unknown(AbstentionReason.MalformedBackendResult)
         };
     }
 
-    private static ProofOutcome CreateProven(
-        VerificationQuery query,
-        BackendCheckResult result) {
+    private static ProofOutcome CreateProven(VerificationQuery query, BackendCheckResult result) {
         if (result.Model != null ||
             result.FailureReason != BackendFailureReason.None ||
             result.UnsatCore.IsDefault)
@@ -36,36 +33,39 @@ public sealed class ProofKernel(ISmtBackend backend) {
         return new ProvenOutcome(core.ToImmutable());
     }
 
-    private static ProofOutcome ReplayCounterexample(
-        VerificationQuery query,
-        BackendCheckResult result) {
+    private static ProofOutcome ReplayCounterexample(VerificationQuery query, BackendCheckResult result, CancellationToken cancellationToken) {
         if (result.Model == null ||
             result.FailureReason != BackendFailureReason.None ||
             !result.UnsatCore.IsDefaultOrEmpty)
             return Unknown(AbstentionReason.MalformedBackendResult);
-        if (!ValidateAssignments(query.Factory, result.Model.Assignments))
+        if (!ValidateAssignments(query, result.Model.Assignments))
             return Unknown(AbstentionReason.CounterexampleReplayFailed);
         var interpreter = new IrInterpreter(query.Factory);
         foreach (var assumption in query.Assumptions) {
-            var evaluated = interpreter.Evaluate(
-                assumption.Predicate,
-                result.Model.Assignments);
+            cancellationToken.ThrowIfCancellationRequested();
+            var evaluated = interpreter.Evaluate(assumption.Predicate,
+                result.Model.Assignments, cancellationToken);
             if (!IsBoolean(evaluated, expected: true))
                 return Unknown(AbstentionReason.CounterexampleReplayFailed);
         }
-        var goal = interpreter.Evaluate(query.Goal.Predicate, result.Model.Assignments);
+        cancellationToken.ThrowIfCancellationRequested();
+        var goal = interpreter.Evaluate(query.Goal.Predicate, result.Model.Assignments, cancellationToken);
         return IsBoolean(goal, expected: false)
             ? new RefutedOutcome(new ValidatedModel(result.Model.Assignments))
             : Unknown(AbstentionReason.CounterexampleReplayFailed);
     }
 
-    private static bool ValidateAssignments(
-        IrFactory factory,
+    private static bool ValidateAssignments(VerificationQuery query,
         ImmutableDictionary<IrVarId, IrValue> assignments) {
+        if (assignments.Count != query.ModelVariables.Length ||
+            query.ModelVariables.Any(variable => !assignments.ContainsKey(variable)))
+            return false;
         foreach (var assignment in assignments) {
             if (assignment.Value == null) return false;
             try {
-                if (factory.GetVariableInfo(assignment.Key).Type != assignment.Value.Type)
+                var type = query.Factory.GetVariableInfo(assignment.Key).Type;
+                if (type != assignment.Value.Type ||
+                    type != query.Factory.BooleanType && type != query.Factory.IntegerType)
                     return false;
             }
             catch (ArgumentException) {

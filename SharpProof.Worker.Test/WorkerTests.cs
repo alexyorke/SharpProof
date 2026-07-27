@@ -1162,6 +1162,94 @@ public sealed class WorkerTests {
     }
 
     [Test]
+    public async Task WholeBodyReplayCoversTrivialStateAndAnUnreachedSpecCall() {
+        using var project = TestProject.Create(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static void Trivial() {
+                    Contract.Ensures(false);
+                }
+
+                public static int UnusedInput(int value) {
+                    Contract.Ensures(false);
+                    return 0;
+                }
+
+                public static bool Mutate(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() ==
+                        Contract.Old(value));
+                    value = !value;
+                    return value;
+                }
+
+                public static int AvoidCall(int value) {
+                    Contract.Ensures(
+                        Contract.Result<int>() > 0);
+                    if (value == 0) {
+                        return 0;
+                    }
+                    var ignored = Math.Abs(value);
+                    return 1;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(response.Errors, Is.Empty);
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(response.ClaimResults, Has.Length.EqualTo(4));
+            Assert.That(
+                response.ClaimResults.Select(static result => result.Outcome),
+                Is.All.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(
+                response.ClaimResults.Select(static result => result.Reason),
+                Is.All.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                response.ClaimResults.SelectMany(static result => result.Model)
+                    .Any(static value => value.Variable.StartsWith(
+                        "variable:", StringComparison.Ordinal)),
+                Is.False);
+        }
+    }
+
+    [Test]
+    public async Task ConstructorInitializersCannotProduceAFalseRefutation() {
+        using var project = TestProject.Create(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public sealed class Subject {
+                private readonly int value = Throw();
+
+                public Subject() {
+                    Contract.Ensures(false);
+                }
+
+                private static int Throw() =>
+                    throw new InvalidOperationException();
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        var result = response.ClaimResults.Single();
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(response.Errors, Is.Empty);
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        }
+    }
+
+    [Test]
     public async Task WorkerProductPathInstantiatesApiSpecPostconditions() {
         using var project = TestProject.Create(
             """
@@ -1800,6 +1888,35 @@ public sealed class WorkerTests {
             project.CacheDirectory,
             "*.json").Single();
         await File.WriteAllTextAsync(cacheFile, "{corrupt");
+        var second = await worker.VerifyAsync(request);
+
+        Assert.That(backend.CallCount, Is.EqualTo(2));
+        AssertSemanticallyEquivalent(first, second);
+    }
+
+    [Test]
+    public async Task PreviousReplayCacheSchemaMissesAndRecomputes() {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        var backend = new CountingBackend(
+            BackendCheckResult.Unsatisfiable([]));
+        using var worker = new SharpProofWorker(backend);
+        var first = await worker.VerifyAsync(request);
+        var cacheFile = Directory.GetFiles(
+            project.CacheDirectory,
+            "*.json").Single();
+        var current = "\"schemaVersion\":" +
+            WorkerCacheVersions.Current.ToString(
+                System.Globalization.CultureInfo.InvariantCulture);
+        var stale = "\"schemaVersion\":" +
+            (WorkerCacheVersions.Current - 1).ToString(
+                System.Globalization.CultureInfo.InvariantCulture);
+        var envelope = await File.ReadAllTextAsync(cacheFile);
+        Assert.That(envelope, Does.Contain(current));
+        await File.WriteAllTextAsync(
+            cacheFile,
+            envelope.Replace(current, stale, StringComparison.Ordinal));
+
         var second = await worker.VerifyAsync(request);
 
         Assert.That(backend.CallCount, Is.EqualTo(2));

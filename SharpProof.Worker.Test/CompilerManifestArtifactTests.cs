@@ -165,6 +165,35 @@ public sealed class CompilerManifestArtifactTests {
     }
 
     [Test]
+    public void LoweredProgramAboveTheReplayInstructionBoundFailsHydration() {
+        var artifact = CreateContractArtifact(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Identity(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    value = value;
+                    return value;
+                }
+            }
+            """);
+        var block = artifact.Callables[0].Graph!.Blocks.Single();
+        var assignment = block.Instructions.Single(static instruction =>
+            instruction.Kind == IrInstructionKind.Assign);
+        var returned = block.Instructions.Single(static instruction =>
+            instruction.Kind == IrInstructionKind.Return);
+        block.Instructions = [
+            .. Enumerable.Repeat(
+                assignment,
+                CompilerPreparedBody.MaximumInstructions),
+            returned
+        ];
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
+    }
+
+    [Test]
     public void EnsuresRowsExactlyMatchManifestClaimIdentityAndEvidence() {
         const string source =
             """

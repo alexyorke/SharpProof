@@ -32,5 +32,5 @@ package and placing the worker in `SharpProof.Verifier.Win-x64`. The worker now
 receives compiler artifact schema version 3 with portable lowered CFG/IR. It
 does not construct a Roslyn compilation, parse source, or reread reference
 files; compiler and reference identities are provenance only. The package
-split, independent whole-body counterexample replay, and SARIF projection
-remain production work.
+split and SARIF projection remain production work. Independent whole-body
+counterexample replay is implemented for the admitted program subset.
