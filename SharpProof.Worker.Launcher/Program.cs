@@ -142,7 +142,7 @@ internal static class Program {
         using var process = Process.Start(startInfo) ??
             throw new InvalidOperationException("The SharpProof worker could not be started.");
         if (!job.TryAssign(process)) {
-            Terminate(process);
+            Terminate(process, entireTree: true);
             return 125;
         }
         var hardLimit = checked(request.Budgets.ProjectWallTimeMilliseconds +
@@ -155,9 +155,9 @@ internal static class Program {
         return 124;
     }
 
-    private static void Terminate(Process process) {
+    private static void Terminate(Process process, bool entireTree = false) {
         try {
-            process.Kill(entireProcessTree: true);
+            process.Kill(entireProcessTree: entireTree);
         }
         catch (InvalidOperationException) {
         }
