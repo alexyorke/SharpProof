@@ -827,53 +827,96 @@ internal static class PerformanceGate {
 
     internal static void ValidateAdvisoryPackagePolicy(
         string repositoryRoot) {
-        var packageRoot = Path.Combine(
+        var portableRoot = Path.Combine(
             repositoryRoot,
             "SharpProof.Package",
             "buildTransitive");
-        var props = XDocument.Load(Path.Combine(
-            packageRoot,
+        var verifierRoot = Path.Combine(
+            repositoryRoot,
+            "SharpProof.Verifier.Win-x64",
+            "buildTransitive");
+        var portableProps = XDocument.Load(Path.Combine(
+            portableRoot,
             "SharpProof.props"));
-        var targets = XDocument.Load(Path.Combine(
-            packageRoot,
+        var portableTargets = XDocument.Load(Path.Combine(
+            portableRoot,
             "SharpProof.targets"));
-        ValidateAdvisoryPackagePolicy(props, targets);
+        var verifierProps = XDocument.Load(Path.Combine(
+            verifierRoot,
+            "SharpProof.Verifier.Win-x64.props"));
+        var verifierTargets = XDocument.Load(Path.Combine(
+            verifierRoot,
+            "SharpProof.Verifier.Win-x64.targets"));
+        ValidateAdvisoryPackagePolicy(
+            portableProps,
+            portableTargets,
+            verifierProps,
+            verifierTargets);
     }
 
     internal static void ValidateAdvisoryPackagePolicy(
-        XDocument props,
-        XDocument targets) {
-        var visibleProperties = props.Descendants("CompilerVisibleProperty")
+        XDocument portableProps,
+        XDocument portableTargets,
+        XDocument verifierProps,
+        XDocument verifierTargets) {
+        var visibleProperties = portableProps
+            .Descendants("CompilerVisibleProperty")
             .Select(static element => (string?)element.Attribute("Include"))
             .ToHashSet(StringComparer.Ordinal);
-        var profile = targets.Descendants("SharpProofProfile").SingleOrDefault(
-            static element =>
-                string.Equals(
-                    (string?)element.Attribute("Condition"),
-                    "'$(SharpProofProfile)' == ''",
-                    StringComparison.Ordinal));
-        var features = targets.Descendants("SharpProofFeatures").SingleOrDefault(
-            static element =>
-                string.Equals(
-                    (string?)element.Attribute("Condition"),
-                    "'$(SharpProofFeatures)' == ''",
-                    StringComparison.Ordinal));
-        var verify = targets.Descendants("SharpProofVerify").SingleOrDefault(
-            static element =>
-                string.Equals(
-                    (string?)element.Attribute("Condition"),
-                    "'$(SharpProofVerify)' == ''",
-                    StringComparison.Ordinal));
-        var analyzerGroup = targets.Descendants("ItemGroup")
+        var profile = portableTargets
+            .Descendants("SharpProofProfile")
+            .SingleOrDefault(
+                static element =>
+                    string.Equals(
+                        (string?)element.Attribute("Condition"),
+                        "'$(SharpProofProfile)' == ''",
+                        StringComparison.Ordinal));
+        var features = portableTargets
+            .Descendants("SharpProofFeatures")
+            .SingleOrDefault(
+                static element =>
+                    string.Equals(
+                        (string?)element.Attribute("Condition"),
+                        "'$(SharpProofFeatures)' == ''",
+                        StringComparison.Ordinal));
+        var verify = portableTargets
+            .Descendants("SharpProofVerify")
+            .SingleOrDefault(
+                static element =>
+                    string.Equals(
+                        (string?)element.Attribute("Condition"),
+                        "'$(SharpProofVerify)' == ''",
+                        StringComparison.Ordinal));
+        var analyzerGroup = portableTargets.Descendants("ItemGroup")
             .SingleOrDefault(static group =>
                 group.Elements("Analyzer").Any());
-        var verifierTarget = targets.Descendants("Target")
+        var verifierMarker = verifierProps
+            .Descendants("_SharpProofVerifierPackagePresent")
+            .SingleOrDefault();
+        var verifierHost = verifierProps
+            .Descendants("_SharpProofVerifierHostSupported")
+            .SingleOrDefault();
+        var verifyPolicy = verifierTargets
+            .Descendants("SharpProofVerifyPolicy")
+            .SingleOrDefault(static element =>
+                string.Equals(
+                    (string?)element.Attribute("Condition"),
+                    "'$(SharpProofVerifyPolicy)' == ''",
+                    StringComparison.Ordinal));
+        var assumptionPolicy = verifierTargets
+            .Descendants("SharpProofAssumptionPolicy")
+            .SingleOrDefault(static element =>
+                string.Equals(
+                    (string?)element.Attribute("Condition"),
+                    "'$(SharpProofAssumptionPolicy)' == ''",
+                    StringComparison.Ordinal));
+        var verifierTarget = verifierTargets.Descendants("Target")
             .SingleOrDefault(static target =>
                 string.Equals(
                     (string?)target.Attribute("Name"),
                     "SharpProofVerify",
                     StringComparison.Ordinal));
-        var verifierCore = targets.Descendants("Target")
+        var verifierCore = verifierTargets.Descendants("Target")
             .SingleOrDefault(static target =>
                 string.Equals(
                     (string?)target.Attribute("Name"),
@@ -883,32 +926,60 @@ internal static class PerformanceGate {
             (string?)analyzerGroup?.Attribute("Condition"));
         var normalizedVerifierCondition = NormalizeMsBuildCondition(
             (string?)verifierTarget?.Attribute("Condition"));
+        var normalizedHostCondition = NormalizeMsBuildCondition(
+            (string?)verifierHost?.Attribute("Condition"));
+        const string expectedHostCondition =
+            "'$(OS)'=='Windows_NT'AND" +
+            "'$(_SharpProofVerifierHostArchitecture)'=='X64'AND" +
+            "'$(_SharpProofVerifierProcessArchitecture)'=='X64'";
         const string expectedVerifierCondition =
             "'$(SharpProofVerify)'=='true'AND'$(_SharpProofProfileNormalized)'!='off'AND" +
-            "'$(OS)'=='Windows_NT'AND" +
+            "'$(_SharpProofVerifierHostSupported)'=='true'AND" +
             "'$(DesignTimeBuild)'!='true'AND'$(BuildingProject)'!='false'";
-        var unexpectedCoreDependency = targets.Descendants("Target")
+        var unexpectedCoreDependency = verifierTargets.Descendants("Target")
             .Where(target => !ReferenceEquals(target, verifierTarget))
             .Any(target => SplitTargetList(
                     (string?)target.Attribute("DependsOnTargets"))
                 .Contains(
                     "_SharpProofVerifyCore",
                     StringComparer.Ordinal));
-        var callTargetInvokesCore = targets.Descendants("CallTarget")
+        var callTargetInvokesCore = verifierTargets.Descendants("CallTarget")
             .Any(call => SplitTargetList(
                     (string?)call.Attribute("Targets"))
                 .Contains(
                     "_SharpProofVerifyCore",
                     StringComparer.Ordinal));
-        var verifierExec = targets.Descendants("Exec").ToArray();
+        var verifierExec = verifierTargets.Descendants("Exec").ToArray();
+        var portableContainsVerifierWork =
+            portableTargets.Descendants("Exec").Any() ||
+            portableTargets.Descendants("Target").Any(static target =>
+                (string?)target.Attribute("Name") is
+                    "SharpProofVerify" or "_SharpProofVerifyCore");
         if (!visibleProperties.Contains("SharpProofProfile") ||
             !visibleProperties.Contains("SharpProofFeatures") ||
             !string.Equals(profile?.Value, "advisory", StringComparison.Ordinal) ||
             !string.Equals(features?.Value, "all", StringComparison.Ordinal) ||
             !string.Equals(verify?.Value, "false", StringComparison.Ordinal) ||
+            portableContainsVerifierWork ||
             !string.Equals(
                 normalizedCondition,
                 "'$(_SharpProofProfileNormalized)'!='off'",
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                verifierMarker?.Value,
+                "true",
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                normalizedHostCondition,
+                expectedHostCondition,
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                verifyPolicy?.Value,
+                "advisory",
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                assumptionPolicy?.Value,
+                "allow",
                 StringComparison.Ordinal) ||
             !string.Equals(
                 normalizedVerifierCondition,

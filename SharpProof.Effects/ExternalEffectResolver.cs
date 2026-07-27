@@ -3,14 +3,6 @@ using System.Globalization;
 namespace SharpProof.Effects;
 
 internal sealed class ExternalEffectResolver {
-    private static readonly SharpProofEffect DefinedEffects =
-        Enum.GetValues(typeof(SharpProofEffect))
-            .Cast<SharpProofEffect>()
-            .Aggregate(SharpProofEffect.None, static (left, right) => left | right);
-    private static readonly SharpProofCapability DefinedCapabilities =
-        Enum.GetValues(typeof(SharpProofCapability))
-            .Cast<SharpProofCapability>()
-            .Aggregate(SharpProofCapability.None, static (left, right) => left | right);
     private readonly Compilation _compilation;
     private readonly INamedTypeSymbol? _effectContractAttribute;
     private readonly INamedTypeSymbol? _exceptionType;
@@ -33,11 +25,11 @@ internal sealed class ExternalEffectResolver {
         _compilation = compilation ??
             throw new ArgumentNullException(nameof(compilation));
         _effectContractAttribute = compilation.GetTypeByMetadataName(
-            "SharpProof.Attributes.EffectContractAttribute");
+            EffectContractMetadata.AttributeMetadataName);
         _exceptionType = compilation.GetTypeByMetadataName(
             FrameworkTypeMetadataNames.Exception);
         _trustedAttribute = compilation.GetTypeByMetadataName(
-            "SharpProof.Attributes.SharpProofTrustedAttribute");
+            EffectContractMetadata.TrustedAttributeMetadataName);
         _specs = apiSpecs ?? throw new ArgumentNullException(nameof(apiSpecs));
     }
 
@@ -122,33 +114,34 @@ internal sealed class ExternalEffectResolver {
         if (attribute.ConstructorArguments.Length != 1 ||
             attribute.ConstructorArguments[0].Value == null ||
             !TryConvertEffects(attribute.ConstructorArguments[0].Value!, out var effects) ||
-            (effects & ~DefinedEffects) != 0)
+            (effects & ~EffectContractMetadata.AllEffects) != 0)
             return false;
-        var capabilities = SharpProofCapability.None;
+        var capabilities = EffectContractCapabilityKind.None;
         var complete = true;
         var deterministic = true;
         ImmutableArray<TypedConstant> thrown = [];
         foreach (var argument in attribute.NamedArguments) {
             switch (argument.Key) {
-                case nameof(EffectContractAttribute.Capabilities):
+                case EffectContractMetadata.CapabilitiesPropertyName:
                     if (argument.Value.Value == null ||
                         !TryConvertCapabilities(
                             argument.Value.Value,
                             out capabilities) ||
-                        (capabilities & ~DefinedCapabilities) != 0)
+                        (capabilities &
+                         ~EffectContractMetadata.AllCapabilities) != 0)
                         return false;
                     break;
-                case nameof(EffectContractAttribute.Complete):
+                case EffectContractMetadata.CompletePropertyName:
                     if (argument.Value.Value is not bool completeValue)
                         return false;
                     complete = completeValue;
                     break;
-                case nameof(EffectContractAttribute.IsDeterministic):
+                case EffectContractMetadata.IsDeterministicPropertyName:
                     if (argument.Value.Value is not bool deterministicValue)
                         return false;
                     deterministic = deterministicValue;
                     break;
-                case nameof(EffectContractAttribute.ThrownExceptions):
+                case EffectContractMetadata.ThrownExceptionsPropertyName:
                     if (argument.Value.Kind != TypedConstantKind.Array ||
                         argument.Value.Values.IsDefault)
                         return false;
@@ -165,34 +158,36 @@ internal sealed class ExternalEffectResolver {
                 return false;
             exceptionTypes.Add(type);
         }
-        if ((effects & SharpProofEffect.Throws) != 0 && exceptionTypes.Count == 0 ||
-            (effects & SharpProofEffect.Throws) == 0 && exceptionTypes.Count != 0)
+        if ((effects & EffectContractKind.Throws) != 0 &&
+            exceptionTypes.Count == 0 ||
+            (effects & EffectContractKind.Throws) == 0 &&
+            exceptionTypes.Count != 0)
             return false;
         if ((effects &
-             (SharpProofEffect.WritesReceiverState |
-              SharpProofEffect.ReadsReceiverState)) != 0 &&
+             (EffectContractKind.WritesReceiverState |
+              EffectContractKind.ReadsReceiverState)) != 0 &&
             method.IsStatic)
             return false;
         if ((effects &
-             (SharpProofEffect.WritesArgumentState |
-              SharpProofEffect.ReadsArgumentState)) != 0 &&
+             (EffectContractKind.WritesArgumentState |
+              EffectContractKind.ReadsArgumentState)) != 0 &&
             method.Parameters.IsDefaultOrEmpty)
             return false;
 
         var reads = ContractRegions(method, effects, isWrite: false);
         var writes = ContractRegions(method, effects, isWrite: true);
-        var allocation = (effects & SharpProofEffect.Allocates) != 0
+        var allocation = (effects & EffectContractKind.Allocates) != 0
             ? EffectAllocationKind.Managed
             : EffectAllocationKind.None;
         var capabilityKinds = ConvertCapabilities(capabilities);
-        if ((effects & SharpProofEffect.Synchronizes) != 0)
+        if ((effects & EffectContractKind.Synchronizes) != 0)
             capabilityKinds |= EffectCapabilityKind.Synchronization;
-        if ((effects & SharpProofEffect.UsesNondeterminism) != 0 ||
+        if ((effects & EffectContractKind.UsesNondeterminism) != 0 ||
             !deterministic)
             capabilityKinds |= EffectCapabilityKind.Randomness;
-        if ((effects & SharpProofEffect.UsesNativeCode) != 0)
+        if ((effects & EffectContractKind.UsesNativeCode) != 0)
             capabilityKinds |= EffectCapabilityKind.NativeInterop;
-        if ((effects & SharpProofEffect.UsesReflection) != 0)
+        if ((effects & EffectContractKind.UsesReflection) != 0)
             capabilityKinds |= EffectCapabilityKind.Reflection;
         summary = new EffectSummary(
             reads, writes, allocation, new EffectCapabilitySet(capabilityKinds),
@@ -303,23 +298,23 @@ internal sealed class ExternalEffectResolver {
     }
 
     private static EffectRegionSet ContractRegions(
-        IMethodSymbol method, SharpProofEffect effects, bool isWrite) {
+        IMethodSymbol method, EffectContractKind effects, bool isWrite) {
         var result = EffectRegionSet.Empty;
         var receiverFlag = isWrite
-            ? SharpProofEffect.WritesReceiverState
-            : SharpProofEffect.ReadsReceiverState;
+            ? EffectContractKind.WritesReceiverState
+            : EffectContractKind.ReadsReceiverState;
         var argumentFlag = isWrite
-            ? SharpProofEffect.WritesArgumentState
-            : SharpProofEffect.ReadsArgumentState;
+            ? EffectContractKind.WritesArgumentState
+            : EffectContractKind.ReadsArgumentState;
         var capturedFlag = isWrite
-            ? SharpProofEffect.WritesCapturedState
-            : SharpProofEffect.ReadsCapturedState;
+            ? EffectContractKind.WritesCapturedState
+            : EffectContractKind.ReadsCapturedState;
         var staticFlag = isWrite
-            ? SharpProofEffect.WritesStaticState
-            : SharpProofEffect.ReadsStaticState;
+            ? EffectContractKind.WritesStaticState
+            : EffectContractKind.ReadsStaticState;
         var ambientFlag = isWrite
-            ? SharpProofEffect.WritesAmbientState
-            : SharpProofEffect.ReadsAmbientState;
+            ? EffectContractKind.WritesAmbientState
+            : EffectContractKind.ReadsAmbientState;
         if ((effects & receiverFlag) != 0)
             result = result.Union(EffectRegionSet.Create(EffectRegionId.Receiver));
         if ((effects & argumentFlag) != 0)
@@ -341,22 +336,24 @@ internal sealed class ExternalEffectResolver {
     }
 
     private static EffectCapabilityKind ConvertCapabilities(
-        SharpProofCapability capabilities) =>
+        EffectContractCapabilityKind capabilities) =>
         (EffectCapabilityKind)(int)capabilities;
 
     private static bool TryConvertEffects(
-        object value, out SharpProofEffect effects) {
+        object value, out EffectContractKind effects) {
         var converted = TryConvertEnumValue(value, wide: true, out var result);
-        effects = converted ? (SharpProofEffect)result : SharpProofEffect.None;
+        effects = converted
+            ? (EffectContractKind)result
+            : EffectContractKind.None;
         return converted;
     }
 
     private static bool TryConvertCapabilities(
-        object value, out SharpProofCapability capabilities) {
+        object value, out EffectContractCapabilityKind capabilities) {
         var converted = TryConvertEnumValue(value, wide: false, out var result);
         capabilities = converted
-            ? (SharpProofCapability)result
-            : SharpProofCapability.None;
+            ? (EffectContractCapabilityKind)result
+            : EffectContractCapabilityKind.None;
         return converted;
     }
 

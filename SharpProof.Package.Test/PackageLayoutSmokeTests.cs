@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Xml.Linq;
 using NUnit.Framework;
 using SharpProof.CompilerProbe.TestAsset;
 using SharpProof.Worker;
@@ -20,7 +21,6 @@ public sealed class PackageLayoutSmokeTests {
 
     private static readonly string[] ExpectedAnalyzerDependencyFileNames = [
         "Microsoft.Bcl.AsyncInterfaces.dll",
-        "SharpProof.Attributes.dll",
         "SharpProof.CompilerArtifact.dll",
         "SharpProof.Contracts.dll",
         "SharpProof.Dataflow.dll",
@@ -45,7 +45,6 @@ public sealed class PackageLayoutSmokeTests {
     private static readonly string[] ExpectedConditionalAnalyzerEntries = [
         "tools/analyzers/dotnet/cs/Microsoft.Bcl.AsyncInterfaces.dll",
         "tools/analyzers/dotnet/cs/SharpProof.Analyzer.dll",
-        "tools/analyzers/dotnet/cs/SharpProof.Attributes.dll",
         "tools/analyzers/dotnet/cs/SharpProof.CompilerArtifact.dll",
         "tools/analyzers/dotnet/cs/SharpProof.ContractForGenerator.dll",
         "tools/analyzers/dotnet/cs/SharpProof.Contracts.dll",
@@ -93,24 +92,25 @@ public sealed class PackageLayoutSmokeTests {
     private static readonly string[] ExpectedNativeZ3Entries = [
         "tools/net9/runtimes/win-x64/native/libz3.dll"
     ];
+    private static readonly string[] ExpectedDependencyAttributes = [
+        "id",
+        "version"
+    ];
 
     [Test]
-    public async Task PackedAnalyzerIsThinAndPackagedWorkerRuns() {
-        using var workspace = PackageWorkspace.Create();
-        var packagePath = await PackSharpProofAsync(workspace);
-        VerifyPackageLayout(packagePath);
+    public async Task PackageGraphAndLayoutsAreExact() {
+        var feed = await PackagedProductFeed.GetAsync();
 
-        workspace.WriteConsumer(GetPackageVersion(packagePath));
-        var restore = await RunDotNetAsync(
-            workspace.ConsumerDirectory,
-            "restore",
-            workspace.ConsumerProject,
-            "--nologo",
-            "/nodeReuse:false",
-            "--source",
-            workspace.PackageSource,
-            "--packages",
-            workspace.PackageCache);
+        VerifyPackageGraph(feed);
+        VerifyPackageLayouts(feed);
+    }
+
+    [Test]
+    public async Task PortablePackageRunsAdvisoryAndRequiresVerifier() {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteConsumer(feed.Version, PackagedProductFeed.PortablePackageId);
+        var restore = await RestoreConsumerAsync(workspace, feed);
         Assert.That(restore.ExitCode, Is.Zero, restore.Output);
 
         var disabledItems = await RunDotNetAsync(
@@ -118,7 +118,7 @@ public sealed class PackageLayoutSmokeTests {
             "msbuild",
             workspace.ConsumerProject,
             "-getItem:Analyzer",
-            "-p:SharpProofMode=OFF",
+            "-p:SharpProofProfile=off",
             "--nologo");
         Assert.That(disabledItems.ExitCode, Is.Zero, disabledItems.Output);
         Assert.That(
@@ -161,12 +161,7 @@ public sealed class PackageLayoutSmokeTests {
         Assert.That(analyzerBuild.ExitCode, Is.Zero, analyzerBuild.Output);
         Assert.That(analyzerBuild.Output, Does.Contain("SP0045"));
 
-        if (!OperatingSystem.IsWindows() ||
-            RuntimeInformation.ProcessArchitecture != Architecture.X64 ||
-            RuntimeInformation.OSArchitecture != Architecture.X64)
-            return;
-
-        var build = await RunDotNetAsync(
+        var explicitVerification = await RunDotNetAsync(
             workspace.ConsumerDirectory,
             "build",
             workspace.ConsumerProject,
@@ -177,17 +172,141 @@ public sealed class PackageLayoutSmokeTests {
             "/nodeReuse:false",
             "-p:UseSharedCompilation=false",
             "-p:SharpProofVerify=true");
-        Assert.That(build.ExitCode, Is.Zero, build.Output);
-        Assert.That(build.Output, Does.Contain("SharpProof Proven"));
-        Assert.That(File.Exists(workspace.ResultPath), Is.True);
+        Assert.That(
+            explicitVerification.ExitCode,
+            Is.Not.Zero,
+            explicitVerification.Output);
+        Assert.That(
+            explicitVerification.Output,
+            Does.Contain(
+                "requires the matching SharpProof.Verifier.Win-x64 package"));
+
+        var strict = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "build",
+            workspace.ConsumerProject,
+            "-c",
+            "Release",
+            "--no-restore",
+            "--nologo",
+            "/nodeReuse:false",
+            "-p:UseSharedCompilation=false",
+            "-p:SharpProofProfile=strict");
+        Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
+        Assert.That(
+            strict.Output,
+            Does.Contain(
+                "requires the matching SharpProof.Verifier.Win-x64 package"));
+    }
+
+    [Test]
+    public async Task VerifierPackageTransitivelySuppliesPortableProduct() {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteConsumer(
+            feed.Version,
+            PackagedProductFeed.VerifierPackageId);
+        var restore = await RestoreConsumerAsync(workspace, feed);
+        Assert.That(restore.ExitCode, Is.Zero, restore.Output);
+
+        var enabledItems = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "msbuild",
+            workspace.ConsumerProject,
+            "-getItem:Analyzer",
+            "--nologo");
+        Assert.That(enabledItems.ExitCode, Is.Zero, enabledItems.Output);
+        var packagedAnalyzerItems =
+            GetPackagedAnalyzerItems(enabledItems.Output);
+        Assert.That(
+            packagedAnalyzerItems
+                .Where(static item => item.Role == "EntryPoint")
+                .Select(static item => item.FileName),
+            Is.EquivalentTo(ExpectedAnalyzerEntryFileNames));
+        Assert.That(
+            packagedAnalyzerItems
+                .Where(static item => item.Role == "Dependency")
+                .Select(static item => item.FileName),
+            Is.EquivalentTo(ExpectedAnalyzerDependencyFileNames));
+
+        var advisory = await BuildAnalyzerConsumerAsync(workspace);
+        Assert.That(advisory.ExitCode, Is.Zero, advisory.Output);
+        Assert.That(advisory.Output, Does.Contain("SP0045"));
+
+        var verification = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "build",
+            workspace.ConsumerProject,
+            "-c",
+            "Release",
+            "--no-restore",
+            "--nologo",
+            "/nodeReuse:false",
+            "-p:UseSharedCompilation=false",
+            "-p:SharpProofVerify=true");
+        if (OperatingSystem.IsWindows() &&
+            RuntimeInformation.ProcessArchitecture == Architecture.X64 &&
+            RuntimeInformation.OSArchitecture == Architecture.X64) {
+            Assert.That(
+                verification.ExitCode,
+                Is.Zero,
+                verification.Output);
+            Assert.That(
+                verification.Output,
+                Does.Contain("SharpProof Proven"));
+            Assert.That(File.Exists(workspace.ResultPath), Is.True);
+        }
+        else {
+            Assert.That(
+                verification.ExitCode,
+                Is.Not.Zero,
+                verification.Output);
+            Assert.That(
+                verification.Output,
+                Does.Contain(
+                    "supported only on Windows x64"));
+        }
+    }
+
+    [Test]
+    public async Task VerifierPackageRejectsANonX64BuildProcess() {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteConsumer(
+            feed.Version,
+            PackagedProductFeed.VerifierPackageId);
+        var restore = await RestoreConsumerAsync(workspace, feed);
+        Assert.That(restore.ExitCode, Is.Zero, restore.Output);
+
+        var verification = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "build",
+            workspace.ConsumerProject,
+            "-c",
+            "Release",
+            "--no-restore",
+            "--nologo",
+            "/nodeReuse:false",
+            "-p:UseSharedCompilation=false",
+            "-p:SharpProofVerify=true",
+            "-p:_SharpProofVerifierProcessArchitecture=X86");
+
+        Assert.That(
+            verification.ExitCode,
+            Is.Not.Zero,
+            verification.Output);
+        Assert.That(
+            verification.Output,
+            Does.Contain("supported only on Windows x64"));
     }
 
     [Test]
     public async Task PackedAnalyzerReportsContractCorrectnessRegressions() {
+        var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
-        var packagePath = await PackSharpProofAsync(workspace);
         workspace.WriteAnalyzerConsumer(
-            GetPackageVersion(packagePath),
+            feed.Version,
+            PackagedProductFeed.PortablePackageId,
             """
             using SharpProof.Attributes;
 
@@ -202,18 +321,9 @@ public sealed class PackageLayoutSmokeTests {
                     new Positive(-1);
             }
             """,
-            "all-experimental",
+            "all",
             "SP0027");
-        var restore = await RunDotNetAsync(
-            workspace.ConsumerDirectory,
-            "restore",
-            workspace.ConsumerProject,
-            "--nologo",
-            "/nodeReuse:false",
-            "--source",
-            workspace.PackageSource,
-            "--packages",
-            workspace.PackageCache);
+        var restore = await RestoreConsumerAsync(workspace, feed);
         Assert.That(restore.ExitCode, Is.Zero, restore.Output);
 
         var validBuild = await BuildAnalyzerConsumerAsync(workspace);
@@ -272,20 +382,11 @@ public sealed class PackageLayoutSmokeTests {
 
     [Test]
     public async Task PackedConsumerProbeCapturesFinalCompilerInputs() {
+        var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
-        var packagePath = await PackSharpProofAsync(workspace);
         workspace.WriteCompilerProbeConsumer(
-            GetPackageVersion(packagePath));
-        var restore = await RunDotNetAsync(
-            workspace.ConsumerDirectory,
-            "restore",
-            workspace.ConsumerProject,
-            "--nologo",
-            "/nodeReuse:false",
-            "--source",
-            workspace.PackageSource,
-            "--packages",
-            workspace.PackageCache);
+            feed.Version);
+        var restore = await RestoreConsumerAsync(workspace, feed);
         Assert.That(restore.ExitCode, Is.Zero, restore.Output);
 
         var withoutPath =
@@ -365,28 +466,19 @@ public sealed class PackageLayoutSmokeTests {
             Is.Not.EqualTo(SnapshotChecksum(inputBytes)));
     }
 
-    private static async Task<string> PackSharpProofAsync(
-        PackageWorkspace workspace) {
-        var pack = await RunDotNetAsync(
-            FindRepositoryRoot(),
-            "pack",
-            Path.Combine(
-                FindRepositoryRoot(),
-                "SharpProof.Package",
-                "SharpProof.Package.csproj"),
-            "-c",
-            "Release",
+    private static Task<ProcessResult> RestoreConsumerAsync(
+        PackageWorkspace workspace,
+        PackagedProductFeed feed) =>
+        RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "restore",
+            workspace.ConsumerProject,
             "--nologo",
             "/nodeReuse:false",
-            "-p:UseSharedCompilation=false",
-            "-p:GeneratePackageOnBuild=false",
-            "--output",
-            workspace.PackageSource);
-        Assert.That(pack.ExitCode, Is.Zero, pack.Output);
-        return Directory
-            .EnumerateFiles(workspace.PackageSource, "SharpProof.*.nupkg")
-            .Single();
-    }
+            "--source",
+            feed.Source,
+            "--packages",
+            workspace.PackageCache);
 
     private static Task<ProcessResult> BuildAnalyzerConsumerAsync(
         PackageWorkspace workspace) =>
@@ -620,10 +712,183 @@ public sealed class PackageLayoutSmokeTests {
                 ": error " + id + ":",
                 StringComparison.Ordinal));
 
-    private static void VerifyPackageLayout(string packagePath) {
+    private static void VerifyPackageGraph(PackagedProductFeed feed) {
+        var expectedDependencies =
+            new Dictionary<string, (string Id, string Version)[]>(
+                StringComparer.Ordinal) {
+                [PackagedProductFeed.AttributesPackageId] = [],
+                [PackagedProductFeed.PortablePackageId] = [
+                    (
+                        PackagedProductFeed.AttributesPackageId,
+                        "[" + feed.Version + "]")
+                ],
+                [PackagedProductFeed.VerifierPackageId] = [
+                    (
+                        PackagedProductFeed.PortablePackageId,
+                        "[" + feed.Version + "]")
+                ]
+            };
+        foreach (var package in feed.Packages) {
+            using var archive = ZipFile.OpenRead(package.Path);
+            var nuspec = archive.Entries.Single(entry =>
+                entry.FullName.EndsWith(
+                    ".nuspec",
+                    StringComparison.OrdinalIgnoreCase));
+            using var stream = nuspec.Open();
+            var document = XDocument.Load(stream);
+            var metadata = document.Descendants().Single(element =>
+                element.Name.LocalName == "metadata");
+            Assert.That(
+                metadata.Elements().Single(element =>
+                    element.Name.LocalName == "id").Value,
+                Is.EqualTo(package.Id));
+            Assert.That(
+                metadata.Elements().Single(element =>
+                    element.Name.LocalName == "version").Value,
+                Is.EqualTo(feed.Version));
+            var dependencies = metadata.Descendants()
+                .Where(element =>
+                    element.Name.LocalName == "dependency")
+                .ToArray();
+            Assert.That(
+                dependencies.Select(static dependency => (
+                    Id: dependency.Attribute("id")?.Value,
+                    Version: dependency.Attribute("version")?.Value)),
+                Is.EqualTo(expectedDependencies[package.Id]),
+                package.Id);
+            foreach (var dependency in dependencies)
+                Assert.That(
+                    dependency.Attributes()
+                        .Select(static attribute =>
+                            attribute.Name.LocalName),
+                    Is.EquivalentTo(ExpectedDependencyAttributes),
+                    package.Id +
+                    " dependency metadata must not filter assets.");
+        }
+    }
+
+    private static void VerifyPackageLayouts(PackagedProductFeed feed) {
+        var attributes = feed.GetPackage(
+            PackagedProductFeed.AttributesPackageId);
+        AssertArchiveLayout(
+            attributes.Path,
+            [
+                "_rels/.rels",
+                "[Content_Types].xml",
+                "lib/netstandard2.0/SharpProof.Attributes.dll",
+                "LICENSE",
+                "package/services/metadata/core-properties/" +
+                    "<generated>.psmdcp",
+                "README.md",
+                "SharpProof.Attributes.nuspec"
+            ]);
+
+        var portable = feed.GetPackage(
+            PackagedProductFeed.PortablePackageId);
+        AssertArchiveLayout(
+            portable.Path,
+            [
+                "_rels/.rels",
+                "[Content_Types].xml",
+                "buildTransitive/SharpProof.props",
+                "buildTransitive/SharpProof.targets",
+                "LICENSE",
+                "package/services/metadata/core-properties/" +
+                    "<generated>.psmdcp",
+                "README.md",
+                "SharpProof.nuspec",
+                .. ExpectedConditionalAnalyzerEntries
+            ]);
+        VerifyPortableLayout(portable.Path);
+
+        var verifier = feed.GetPackage(
+            PackagedProductFeed.VerifierPackageId);
+        AssertArchiveLayout(
+            verifier.Path,
+            [
+                "_rels/.rels",
+                "[Content_Types].xml",
+                "buildTransitive/SharpProof.Verifier.Win-x64.props",
+                "buildTransitive/SharpProof.Verifier.Win-x64.targets",
+                "LICENSE",
+                "package/services/metadata/core-properties/" +
+                    "<generated>.psmdcp",
+                "README.md",
+                "SharpProof.Verifier.Win-x64.nuspec",
+                "THIRD-PARTY-NOTICES.txt",
+                .. ExpectedToolEntries
+            ]);
+        VerifyVerifierLayout(verifier.Path);
+
+        var allEntries = feed.Packages.SelectMany(package => {
+            using var archive = ZipFile.OpenRead(package.Path);
+            return archive.Entries
+                .Select(entry => (package.Id, entry.FullName))
+                .ToArray();
+        }).ToArray();
+        Assert.That(
+            allEntries.Where(static entry =>
+                entry.FullName.EndsWith(
+                    "/SharpProof.Attributes.dll",
+                    StringComparison.OrdinalIgnoreCase)),
+            Is.EqualTo([
+                (
+                    PackagedProductFeed.AttributesPackageId,
+                    "lib/netstandard2.0/SharpProof.Attributes.dll")
+            ]));
+        Assert.That(
+            allEntries.Where(static entry =>
+                IsNativeZ3(entry.FullName)),
+            Is.EqualTo([
+                (
+                    PackagedProductFeed.VerifierPackageId,
+                    ExpectedNativeZ3Entries[0])
+            ]));
+    }
+
+    private static void AssertArchiveLayout(
+        string packagePath,
+        string[] expectedEntries) {
         using var archive = ZipFile.OpenRead(packagePath);
         var entries = archive.Entries
-            .Select(entry => entry.FullName)
+            .Select(static entry =>
+                NormalizeGeneratedPackageEntry(entry.FullName))
+            .ToArray();
+        Assert.That(
+            entries,
+            Is.EquivalentTo(expectedEntries),
+            Path.GetFileName(packagePath));
+    }
+
+    private static string NormalizeGeneratedPackageEntry(string entry) {
+        const string coreProperties =
+            "package/services/metadata/core-properties/";
+        if (entry.StartsWith(coreProperties, StringComparison.Ordinal) &&
+            entry.EndsWith(".psmdcp", StringComparison.Ordinal))
+            return coreProperties + "<generated>.psmdcp";
+        return entry;
+    }
+
+    private static bool IsNativeZ3(string entry) {
+        var fileName = Path.GetFileName(entry);
+        return string.Equals(
+                fileName,
+                "libz3.dll",
+                StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(
+                fileName,
+                "libz3.so",
+                StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(
+                fileName,
+                "libz3.dylib",
+                StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void VerifyPortableLayout(string packagePath) {
+        using var archive = ZipFile.OpenRead(packagePath);
+        var entries = archive.Entries
+            .Select(static entry => entry.FullName)
             .ToArray();
         var analyzerEntries = entries
             .Where(entry => entry.StartsWith(
@@ -669,6 +934,17 @@ public sealed class PackageLayoutSmokeTests {
                     "<SharpProofAnalyzerRole>EntryPoint</SharpProofAnalyzerRole>")
                 .And.Contain(
                     "<SharpProofAnalyzerRole>Dependency</SharpProofAnalyzerRole>"));
+        Assert.That(
+            entries,
+            Has.None.StartsWith("lib/")
+                .And.None.StartsWith("tools/net9/"));
+    }
+
+    private static void VerifyVerifierLayout(string packagePath) {
+        using var archive = ZipFile.OpenRead(packagePath);
+        var entries = archive.Entries
+            .Select(static entry => entry.FullName)
+            .ToArray();
         var toolEntries = entries
             .Where(entry => entry.StartsWith(
                 "tools/net9/",
@@ -705,9 +981,7 @@ public sealed class PackageLayoutSmokeTests {
                 dependencies);
         Assert.That(
             entries.Where(static entry =>
-                entry.EndsWith(
-                    "/libz3.dll",
-                    StringComparison.OrdinalIgnoreCase)),
+                IsNativeZ3(entry)),
             Is.EquivalentTo(ExpectedNativeZ3Entries));
     }
 
@@ -719,15 +993,6 @@ public sealed class PackageLayoutSmokeTests {
                 "Package entry was not found: " + entryPath);
         using var reader = new StreamReader(entry.Open());
         return reader.ReadToEnd();
-    }
-
-    private static string GetPackageVersion(string packagePath) {
-        const string prefix = "SharpProof.";
-        const string suffix = ".nupkg";
-        var name = Path.GetFileName(packagePath);
-        return name.Substring(
-            prefix.Length,
-            name.Length - prefix.Length - suffix.Length);
     }
 
     private static async Task<ProcessResult> RunDotNetAsync(
@@ -794,7 +1059,6 @@ public sealed class PackageLayoutSmokeTests {
 
         private PackageWorkspace(string root) {
             _root = root;
-            PackageSource = Path.Combine(root, "package source");
             PackageCache = Path.Combine(root, "package cache");
             ConsumerDirectory = Path.Combine(root, "consumer project");
             ConsumerProject = Path.Combine(
@@ -817,11 +1081,9 @@ public sealed class PackageLayoutSmokeTests {
             ProbeInputPath = Path.Combine(
                 ConsumerDirectory,
                 CompilerProbeContract.AdditionalFileName);
-            Directory.CreateDirectory(PackageSource);
             Directory.CreateDirectory(ConsumerDirectory);
         }
 
-        internal string PackageSource { get; }
         internal string PackageCache { get; }
         internal string ConsumerDirectory { get; }
         internal string ConsumerProject { get; }
@@ -841,9 +1103,10 @@ public sealed class PackageLayoutSmokeTests {
             return new PackageWorkspace(root);
         }
 
-        internal void WriteConsumer(string version) =>
+        internal void WriteConsumer(string version, string packageId) =>
             WriteAnalyzerConsumer(
                 version,
+                packageId,
                 """
                 using SharpProof.Attributes;
                 public static class Subject {
@@ -856,13 +1119,14 @@ public sealed class PackageLayoutSmokeTests {
                     }
                 }
                 """,
-                "all-experimental",
+                "all",
                 "SP0045");
 
         internal void WriteAnalyzerConsumer(
             string version,
+            string packageId,
             string source,
-            string mode,
+            string features,
             params string[] enabledDiagnosticIds) {
             WriteSource(source);
             File.WriteAllText(
@@ -875,7 +1139,8 @@ public sealed class PackageLayoutSmokeTests {
                         .Prepend("is_global = true")) + "\n",
                 new System.Text.UTF8Encoding(false));
             var escapedVersion = SecurityElement.Escape(version);
-            var escapedMode = SecurityElement.Escape(mode);
+            var escapedPackageId = SecurityElement.Escape(packageId);
+            var escapedFeatures = SecurityElement.Escape(features);
             File.WriteAllText(
                 ConsumerProject,
                 $"""
@@ -883,11 +1148,12 @@ public sealed class PackageLayoutSmokeTests {
                   <PropertyGroup>
                     <TargetFramework>net8.0</TargetFramework>
                     <LangVersion>12.0</LangVersion>
-                    <SharpProofMode>{escapedMode}</SharpProofMode>
+                    <SharpProofProfile>advisory</SharpProofProfile>
+                    <SharpProofFeatures>{escapedFeatures}</SharpProofFeatures>
                     <WarningsAsErrors>AD0001;CS8032;CS8034;CS8785</WarningsAsErrors>
                   </PropertyGroup>
                   <ItemGroup>
-                    <PackageReference Include="SharpProof"
+                    <PackageReference Include="{escapedPackageId}"
                                       Version="{escapedVersion}" />
                   </ItemGroup>
                 </Project>

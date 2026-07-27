@@ -62,9 +62,10 @@ artifact without constructing a Roslyn compilation or rereading reference
 files. Compiler MVIDs and reference identities remain artifact provenance and
 cache identity rather than runtime compatibility gates.
 Exact backend-model closure and independent whole-body counterexample replay
-are implemented for the admitted subset. SARIF projection, the three-package
-split, protected publishing, and independent human release reviews remain open
-gates.
+are implemented for the admitted subset, and package validation covers the
+exact Attributes -> portable analyzer -> Windows verifier dependency chain.
+SARIF projection, release provenance, protected publishing, and independent
+human release reviews remain open gates.
 
 Changes to the trusted-kernel paths, assumption construction, complete effect
 summaries, API specifications, or proof-producing outcome construction require
@@ -84,6 +85,7 @@ architecture, semantic, corpus, fuzz, worker, package, cancellation, and
 performance gate. Off-profile performance compares real baseline and
 SharpProof-imported MSBuild rebuilds and separately checks the loaded-but-off
 analyzer retention boundary. The full acceptance job currently runs on Windows
-x64. Separate package-consumer CI exercises the analyzer on Windows x64, Linux
-x64, macOS x64, and macOS ARM64, but packaged worker execution remains Windows
-x64 only.
+x64. Separate package-consumer CI restores the exact same three-package
+artifacts and exercises the portable analyzer on Windows x64, Linux x64, macOS
+x64, and macOS ARM64. Packaged worker execution remains Windows x64 only;
+unsupported matrix hosts assert the explicit verification rejection.

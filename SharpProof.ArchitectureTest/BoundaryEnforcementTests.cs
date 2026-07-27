@@ -166,7 +166,6 @@ public sealed class BoundaryEnforcementTests {
     public void ThinAnalyzerHasOnlyCurrentFrontendDependencies() {
         var direct = ProjectReferences("SharpProof.Analyzer");
         string[] expectedDirect = [
-            "SharpProof.Attributes",
             "SharpProof.CompilerArtifact",
             "SharpProof.Contracts",
             "SharpProof.Effects",
@@ -321,6 +320,7 @@ public sealed class BoundaryEnforcementTests {
             @"SharpProof.Specs\SharpProof.Specs.csproj",
             @"SharpProof.Testing.Test\SharpProof.Testing.Test.csproj",
             @"SharpProof.Testing\SharpProof.Testing.csproj",
+            @"SharpProof.Verifier.Win-x64\SharpProof.Verifier.Win-x64.csproj",
             @"SharpProof.Fuzz.Test\SharpProof.Fuzz.Test.csproj",
             @"SharpProof.Gates.Test\SharpProof.Gates.Test.csproj",
             @"SharpProof.Gates\SharpProof.Gates.csproj",

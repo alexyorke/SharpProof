@@ -110,17 +110,27 @@ public sealed class PerformanceGateTests {
     [Test]
     public void AdvisoryPolicyRejectsAWidenedVerifierCondition() {
         var root = RepositoryLayout.FindRoot();
-        var props = XDocument.Load(Path.Combine(
+        var portableProps = XDocument.Load(Path.Combine(
             root,
             "SharpProof.Package",
             "buildTransitive",
             "SharpProof.props"));
-        var targets = XDocument.Load(Path.Combine(
+        var portableTargets = XDocument.Load(Path.Combine(
             root,
             "SharpProof.Package",
             "buildTransitive",
             "SharpProof.targets"));
-        var verifier = targets.Descendants("Target").Single(target =>
+        var verifierProps = XDocument.Load(Path.Combine(
+            root,
+            "SharpProof.Verifier.Win-x64",
+            "buildTransitive",
+            "SharpProof.Verifier.Win-x64.props"));
+        var verifierTargets = XDocument.Load(Path.Combine(
+            root,
+            "SharpProof.Verifier.Win-x64",
+            "buildTransitive",
+            "SharpProof.Verifier.Win-x64.targets"));
+        var verifier = verifierTargets.Descendants("Target").Single(target =>
             string.Equals(
                 (string?)target.Attribute("Name"),
                 "SharpProofVerify",
@@ -133,8 +143,54 @@ public sealed class PerformanceGateTests {
         Assert.Throws<InvalidDataException>(
             (Action)(() =>
                 PerformanceGate.ValidateAdvisoryPackagePolicy(
-                    props,
-                    targets)));
+                    portableProps,
+                    portableTargets,
+                    verifierProps,
+                    verifierTargets)));
+    }
+
+    [Test]
+    public void AdvisoryPolicyRejectsVerifierConditionWithoutOptIn() {
+        var root = RepositoryLayout.FindRoot();
+        var portableProps = XDocument.Load(Path.Combine(
+            root,
+            "SharpProof.Package",
+            "buildTransitive",
+            "SharpProof.props"));
+        var portableTargets = XDocument.Load(Path.Combine(
+            root,
+            "SharpProof.Package",
+            "buildTransitive",
+            "SharpProof.targets"));
+        var verifierProps = XDocument.Load(Path.Combine(
+            root,
+            "SharpProof.Verifier.Win-x64",
+            "buildTransitive",
+            "SharpProof.Verifier.Win-x64.props"));
+        var verifierTargets = XDocument.Load(Path.Combine(
+            root,
+            "SharpProof.Verifier.Win-x64",
+            "buildTransitive",
+            "SharpProof.Verifier.Win-x64.targets"));
+        var verifier = verifierTargets.Descendants("Target").Single(target =>
+            string.Equals(
+                (string?)target.Attribute("Name"),
+                "SharpProofVerify",
+                StringComparison.Ordinal));
+        verifier.SetAttributeValue(
+            "Condition",
+            ((string?)verifier.Attribute("Condition"))?.Replace(
+                "'$(SharpProofVerify)' == 'true' AND ",
+                string.Empty,
+                StringComparison.Ordinal));
+
+        Assert.Throws<InvalidDataException>(
+            (Action)(() =>
+                PerformanceGate.ValidateAdvisoryPackagePolicy(
+                    portableProps,
+                    portableTargets,
+                    verifierProps,
+                    verifierTargets)));
     }
 
     [Test]

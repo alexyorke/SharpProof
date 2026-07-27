@@ -1,21 +1,6 @@
 namespace SharpProof.Analyzer;
 
 internal static class EffectContractDiagnostics {
-    private const SharpProofCapability AllCapabilities =
-        SharpProofCapability.IO |
-        SharpProofCapability.FileRead |
-        SharpProofCapability.FileWrite |
-        SharpProofCapability.Network |
-        SharpProofCapability.Console |
-        SharpProofCapability.Process |
-        SharpProofCapability.Environment |
-        SharpProofCapability.Registry |
-        SharpProofCapability.Clock |
-        SharpProofCapability.Randomness |
-        SharpProofCapability.Reflection |
-        SharpProofCapability.Synchronization |
-        SharpProofCapability.NativeInterop;
-
     internal static void ValidateArguments(IMethodSymbol method, AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic) {
         var attributes = AnalyzerAttributeSymbols.GetCallableAttributes(method).ToImmutableArray();
@@ -112,7 +97,7 @@ internal static class EffectContractDiagnostics {
             else {
                 var actual = result.Projection.Capabilities;
                 var disallowed = actual & ~capabilities.Value;
-                if (disallowed != SharpProofCapability.None) {
+                if (disallowed != EffectContractCapabilityKind.None) {
                     hasUnknown = true;
                     reportDiagnostic(
                         Diagnostic.Create(
@@ -165,17 +150,18 @@ internal static class EffectContractDiagnostics {
             ? AnalyzerSemanticOutcome.Unknown : AnalyzerSemanticOutcome.Proven;
     }
 
-    private static (SharpProofCapability Value, bool IsValid) DecodeCapabilities(
+    private static (EffectContractCapabilityKind Value, bool IsValid) DecodeCapabilities(
         ImmutableArray<AttributeData> attributes,
         Location fallbackLocation,
         AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic) {
-        var value = SharpProofCapability.None;
+        var value = EffectContractCapabilityKind.None;
         foreach (var attribute in attributes) {
             if (attribute.ConstructorArguments.Length != 1 ||
                 !TryGetInt64(attribute.ConstructorArguments[0], out var raw) ||
                 raw < 0 ||
-                ((SharpProofCapability)raw & ~AllCapabilities) != 0) {
+                ((EffectContractCapabilityKind)raw &
+                 ~EffectContractMetadata.AllCapabilities) != 0) {
                 if (session.TryMarkAttributeValidated(attribute))
                     reportDiagnostic(
                         InvalidContractArgumentDiagnostics.Create(
@@ -183,9 +169,9 @@ internal static class EffectContractDiagnostics {
                             "<invalid>",
                             "expected a defined SharpProofCapability flags value",
                             GetLocation(attribute, fallbackLocation)));
-                return (SharpProofCapability.None, false);
+                return (EffectContractCapabilityKind.None, false);
             }
-            value |= (SharpProofCapability)raw;
+            value |= (EffectContractCapabilityKind)raw;
         }
         return (value, true);
     }

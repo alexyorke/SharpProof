@@ -3,7 +3,13 @@
     <SharpProofProductName>SharpProof</SharpProofProductName>
     <SharpProofPublisher>Alex Yorke</SharpProofPublisher>
     <SharpProofVersionPrefix>0.2.0</SharpProofVersionPrefix>
+    <SharpProofAssemblyVersion>$(SharpProofVersionPrefix).0</SharpProofAssemblyVersion>
     <SharpProofPackageVersion>$(SharpProofVersionPrefix)-preview.1</SharpProofPackageVersion>
+    <Version>$(SharpProofPackageVersion)</Version>
+    <PackageVersion>$(SharpProofPackageVersion)</PackageVersion>
+    <AssemblyVersion>$(SharpProofAssemblyVersion)</AssemblyVersion>
+    <FileVersion>$(SharpProofAssemblyVersion)</FileVersion>
+    <InformationalVersion>$(SharpProofPackageVersion)</InformationalVersion>
     <SharpProofProductDescription>SharpProof soundness-first C# effect analysis for purity, zero-allocation, capabilities, exception contracts, and compiler-bound preconditions. Unsupported code is handled conservatively and proof-producing features are opt-in.</SharpProofProductDescription>
     <SharpProofProjectUrl>https://github.com/alexyorke/SharpProof</SharpProofProjectUrl>
   </PropertyGroup>

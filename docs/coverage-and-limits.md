@@ -222,9 +222,10 @@ option mismatch becomes `CompilerManifestMismatch`.
 
 Generated claims and supported bodies are therefore visible and executable
 from compiler-produced IR, and candidate refutations receive independent
-whole-body replay. The remaining integration limits are SARIF projection,
-broader host qualification, and the planned package split; they are not
-worker-side compilation reconstruction or counterexample-replay work.
+whole-body replay. The three-package split is complete. The remaining
+integration limits are SARIF projection, release provenance, and broader host
+qualification; they are not worker-side compilation reconstruction,
+counterexample-replay, or package-separation work.
 
 See [Typed abstention reasons](unknown-reasons.md) for the exact enums and
 [Analysis limits](analysis-limits.md) for configured budgets.
