@@ -17,6 +17,7 @@ internal enum CompilerPreparedBodyKind { Trivial, Program }
 internal sealed record CompilerPreparedBody(CompilerPreparedBodyKind Kind, IrProgram? Program,
     ImmutableDictionary<IrVarId, IrVarId> ParameterBindings,
     ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> SpecCalls) {
+    internal const int MaximumInstructions = 4096;
     internal static CompilerPreparedBody Trivial() => new(CompilerPreparedBodyKind.Trivial, null,
         ImmutableDictionary<IrVarId, IrVarId>.Empty, ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty);
     internal static CompilerPreparedBody ProgramBody(IrProgram program, ImmutableDictionary<IrVarId, IrVarId> parameterBindings,

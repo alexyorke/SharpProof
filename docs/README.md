@@ -32,7 +32,7 @@ The implementation remains the authority for enumerated surfaces:
   `SharpProof.ContractForGenerator/GeneratedDiagnosticDescriptors.cs` declare
   diagnostic IDs, severities, defaults, and messages.
 - `SharpProof.Worker.Protocol/ProtocolModel.cs` declares protocol version 5,
-  manifest schema version 2, cache schema version 5, policies, run statuses,
+  manifest schema version 2, cache schema version 6, policies, run statuses,
   callable coverage, claim outcomes/reasons, and summary records.
 - `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs` declares compiler
   artifact schema version 3 and the closed compiler-evidence envelope.
@@ -70,9 +70,12 @@ before cache or backend work. Compiler and reference identities are provenance,
 not a runtime Roslyn-build gate. The compiler reconstruction portion of
 production-plan Step 4 is complete for the bounded verifier subset.
 
-Independent whole-body counterexample replay, SARIF projection, and the planned
-three-package split remain future work. Current behavior and limits are
-recorded in
+Independent whole-body counterexample replay is implemented for the admitted
+program subset. The proof kernel checks exact model closure and the lowered
+assumptions/goal before the worker independently executes the compiler-produced
+whole-body CFG. SARIF projection, the planned three-package split, broader host
+qualification, and the remaining release reviews are future work. Current
+behavior and limits are recorded in
 [Coverage and limits](coverage-and-limits.md#closed-compiler-artifact-and-remaining-limits).
 
 ## Machine-owned Markdown

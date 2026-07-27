@@ -14,21 +14,28 @@ timeouts, canonical variable names, stable formula ordering, typed models, and
 typed unsat cores. Cancellation interrupts the backend and remains
 cancellation.
 
-A SAT result becomes `Refuted` only when the extracted assignments replay
-through the executable IR and falsify the goal. An UNSAT result becomes
-`Proven` only when every core item has admissible justification. Unsupported
-encoding, resource limits, and method boundaries produce typed claim-level
-`Unknown` results. Backend unavailability, malformed backend results, replay
-failure, containment failure, and infrastructure failure make the protocol
-version 5 run `Failed` and fail the build under every policy. Project timeout
-and caller cancellation use the separate `TimedOut` and `Canceled` run
-statuses.
+A SAT result becomes `Refuted` only after two replay layers. First, the proof
+kernel requires the extracted assignments to close exactly over every
+requested Boolean/integer model variable, re-evaluates all lowered assumptions
+as true, and re-evaluates the lowered goal as false. Second, the worker seeds
+and independently executes the compiler-produced whole-body program along the
+model-selected concrete CFG path, reconstructs the post-state, and requires the
+original `Ensures` condition to evaluate to false. Contract-only ordinary
+`void` methods are exact zero-step replays. Constructor postconditions abstain
+as `UnsupportedBody` until base-constructor and field-initializer semantics are
+lowered. Only canonical user-model variables are exposed in the result;
+lowered temporaries remain internal.
 
-The current replay executes the lowered obligation path. Independent
-whole-body replay over the exact compiler CFG remains a 1.0 release gate.
-A SAT result whose model depends on a spec-modeled call result is therefore
-reported as claim `Unknown` with `CounterexampleReplayFailed`, which makes the
-run fail; it is never emitted as `Refuted`.
+An executed spec-modeled call or other unsupported IR operation cannot be
+independently replayed, so the candidate is reported as claim `Unknown` with
+`CounterexampleReplayFailed`; an operation on an unselected CFG path does not
+block replay. An UNSAT result becomes `Proven` only when every core item has
+admissible justification. Unsupported encoding, resource limits, and method
+boundaries produce typed claim-level `Unknown` results. Backend unavailability,
+malformed backend results, replay failure, containment failure, and
+infrastructure failure make the protocol version 5 run `Failed` and fail the
+build under every policy. Project timeout and caller cancellation use the
+separate `TimedOut` and `Canceled` run statuses.
 
 `SharpProofVerifyPolicy` controls whether otherwise valid incomplete selected
 analysis is informational, warning, or error SP0047 output.
@@ -39,7 +46,7 @@ run into success.
 Only exact-manifest, complete `Proven` and replay-validated `Refuted` project
 results enter the content-addressed disk cache. Cache keys include protocol,
 semantics, tool, target framework, the exact closed compiler artifact and
-lowered IR, budgets, and spec versions. Cache schema version 5 revalidates the
+lowered IR, budgets, and spec versions. Cache schema version 6 revalidates the
 stored semantic payload against the complete current manifest.
 
 See [Typed abstention reasons](unknown-reasons.md) for exact statuses and

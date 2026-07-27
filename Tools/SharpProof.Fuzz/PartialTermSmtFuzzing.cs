@@ -119,7 +119,10 @@ public sealed class PartialTermSmtDifferentialOracle {
             var scenario = generated.Scenarios[index];
             ValidateScenario(factory, variables, scenario);
             var expected = Classify(
-                interpreter.Evaluate(generated.Formula, scenario));
+                interpreter.Evaluate(
+                    generated.Formula,
+                    scenario,
+                    cancellationToken));
             if (expected == null)
                 return Result(
                     FuzzOracleStatus.Abstained,

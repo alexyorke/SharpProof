@@ -51,6 +51,102 @@ public sealed class ProofKernelTests {
     }
 
     [Test]
+    public async Task FormulaAndRequestedModelVariablesFormAnExactDeterministicSet() {
+        var factory = new IrFactory();
+        var integer = factory.CreateVariable("integer", factory.IntegerType);
+        var boolean = factory.CreateVariable("boolean", factory.BooleanType);
+        var formula = factory.CreateVariable("formula", factory.BooleanType);
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Variable(formula),
+                ProofDiagnosticKind.Postcondition,
+                new SourceLocationId(0)),
+            [boolean, integer]);
+        var model = new BackendModel([
+            KeyValuePair.Create(boolean, factory.CreateBooleanValue(true)),
+            KeyValuePair.Create(integer, factory.CreateIntegerValue(42)),
+            KeyValuePair.Create(formula, factory.CreateBooleanValue(false))
+        ]);
+
+        var outcome = await new ProofKernel(
+            new StubBackend(BackendCheckResult.Satisfiable(model)))
+            .VerifyAsync(query);
+
+        Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That(query.ModelVariables, Has.Length.EqualTo(3));
+        Assert.That(query.ModelVariables[0], Is.EqualTo(integer));
+        Assert.That(query.ModelVariables[1], Is.EqualTo(boolean));
+        Assert.That(query.ModelVariables[2], Is.EqualTo(formula));
+        Assert.That(((RefutedOutcome)outcome).Model.Assignments, Has.Count.EqualTo(3));
+
+        var invented = factory.CreateVariable("invented", factory.IntegerType);
+        var inventedOutcome = await new ProofKernel(new StubBackend(
+                BackendCheckResult.Satisfiable(new BackendModel(
+                    model.Assignments.Append(KeyValuePair.Create(
+                        invented, factory.CreateIntegerValue(7)))))))
+            .VerifyAsync(query);
+        Assert.That(inventedOutcome, Is.TypeOf<UnknownOutcome>());
+        Assert.That(
+            ((UnknownOutcome)inventedOutcome).Reason,
+            Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
+    }
+
+    [Test]
+    public async Task MissingOrMalformedRequestedModelBindingsAbstain() {
+        var factory = new IrFactory();
+        var integer = factory.CreateVariable("integer", factory.IntegerType);
+        var text = factory.CreateVariable("text", factory.StringType);
+        var goal = new Goal(
+            factory,
+            factory.Boolean(false),
+            ProofDiagnosticKind.Postcondition,
+            new SourceLocationId(0));
+        var exactQuery = new VerificationQuery(factory, [], goal, [integer]);
+        var missing = await new ProofKernel(new StubBackend(
+                BackendCheckResult.Satisfiable(new BackendModel([]))))
+            .VerifyAsync(exactQuery);
+        var wrongType = await new ProofKernel(new StubBackend(
+                BackendCheckResult.Satisfiable(new BackendModel([
+                    KeyValuePair.Create(integer, factory.CreateBooleanValue(false))
+                ]))))
+            .VerifyAsync(exactQuery);
+        var unsupported = await new ProofKernel(new StubBackend(
+                BackendCheckResult.Satisfiable(new BackendModel([
+                    KeyValuePair.Create(text, factory.CreateStringValue("value"))
+                ]))))
+            .VerifyAsync(new VerificationQuery(factory, [], goal, [text]));
+
+        ProofOutcome[] outcomes = [missing, wrongType, unsupported];
+        Assert.That(outcomes, Has.All.TypeOf<UnknownOutcome>());
+        Assert.That(
+            outcomes.Cast<UnknownOutcome>()
+                .Select(static outcome => outcome.Reason),
+            Has.All.EqualTo(AbstentionReason.CounterexampleReplayFailed));
+    }
+
+    [Test]
+    public void RequestedModelVariablesMustBeUniqueAndFactoryOwned() {
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("value", factory.IntegerType);
+        var foreignFactory = new IrFactory();
+        var foreign = foreignFactory.CreateVariable("foreign", foreignFactory.IntegerType);
+        var goal = new Goal(
+            factory,
+            factory.Boolean(false),
+            ProofDiagnosticKind.Postcondition,
+            new SourceLocationId(0));
+
+        Assert.Throws<ArgumentException>(
+            (Action)(() => _ = new VerificationQuery(
+                factory, [], goal, [variable, variable])));
+        Assert.Throws<ArgumentException>(
+            (Action)(() => _ = new VerificationQuery(factory, [], goal, [foreign])));
+    }
+
+    [Test]
     public async Task SpuriousOrIncompleteModelsAbstain() {
         var fixture = CreateFixture();
         var trueModel = new BackendModel([

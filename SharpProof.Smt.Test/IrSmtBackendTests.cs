@@ -60,6 +60,37 @@ public sealed class IrSmtBackendTests {
     }
 
     [Test]
+    public async Task FormulaAndExplicitVariablesProduceOneExactModelSet() {
+        var factory = new IrFactory();
+        var integer = factory.CreateVariable("integer", factory.IntegerType);
+        var boolean = factory.CreateVariable("boolean", factory.BooleanType);
+        var formula = factory.CreateVariable("formula", factory.BooleanType);
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Variable(formula),
+                ProofDiagnosticKind.Postcondition,
+                new SourceLocationId(0)),
+            [boolean, integer]);
+
+        using var backend = new IrSmtBackend();
+        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+
+        Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That(query.ModelVariables, Has.Length.EqualTo(3));
+        Assert.That(query.ModelVariables[0], Is.EqualTo(integer));
+        Assert.That(query.ModelVariables[1], Is.EqualTo(boolean));
+        Assert.That(query.ModelVariables[2], Is.EqualTo(formula));
+        var assignments = ((RefutedOutcome)outcome).Model.Assignments;
+        Assert.That(assignments, Has.Count.EqualTo(3));
+        Assert.That(assignments[integer].Kind, Is.EqualTo(IrValueKind.Integer));
+        Assert.That(assignments[boolean].Kind, Is.EqualTo(IrValueKind.Boolean));
+        Assert.That(assignments[formula].Boolean, Is.False);
+    }
+
+    [Test]
     public async Task NormalCompletionGuardsCheckedDivision() {
         var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);

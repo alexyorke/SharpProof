@@ -152,10 +152,10 @@ release gates, not end-user MSBuild defaults.
 | IDE edit p95 | At most 100 ms |
 | IDE edit maximum | At most 250 ms |
 
-The active contract also fixes protocol version 5, cache schema version 5,
+The active contract also fixes protocol version 5, cache schema version 6,
 claim-manifest schema version 2, and compiler artifact schema version 3, along
-with the proof-kernel-only path/LOC boundary and the reference
-surfaces `netstandard2.0`, `net8.0`, and `net472`.
+with the narrow proof-kernel and component TCB path/LOC ratchets and the
+reference surfaces `netstandard2.0`, `net8.0`, and `net472`.
 
 Unknown rate is reported by the corpus as explicit, silent, and total metrics;
 it is not a release threshold.
@@ -173,3 +173,9 @@ every policy.
 Only exact-manifest, complete hygienic `Proven` and replay-validated `Refuted`
 project responses can enter the semantic cache. See
 [Typed abstention reasons](unknown-reasons.md) for exact reason values.
+
+Replay validation has two layers: exact backend-model and lowered-term checks
+in the proof kernel, followed by independent execution of the compiler-produced
+whole-body CFG in the worker. Executed spec calls or unsupported operations
+fail closed to `CounterexampleReplayFailed`; instructions on unselected paths
+do not block a concrete replay.

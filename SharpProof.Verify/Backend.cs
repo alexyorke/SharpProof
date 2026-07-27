@@ -77,7 +77,8 @@ public sealed class VerificationQuery {
     public VerificationQuery(
         IrFactory factory,
         IEnumerable<Assumption> assumptions,
-        Goal goal) {
+        Goal goal,
+        ImmutableArray<IrVarId> modelVariables = default) {
         Factory = factory ?? throw new ArgumentNullException(nameof(factory));
         if (assumptions == null) throw new ArgumentNullException(nameof(assumptions));
         Assumptions = [.. assumptions];
@@ -87,9 +88,21 @@ public sealed class VerificationQuery {
         foreach (var assumption in Assumptions)
             FactoryGuards.RequireBooleanTerm(factory, assumption.Predicate, nameof(assumptions));
         FactoryGuards.RequireBooleanTerm(factory, goal.Predicate, nameof(goal));
+        if (modelVariables.IsDefault) modelVariables = [];
+        if (modelVariables.Distinct().Count() != modelVariables.Length)
+            throw new ArgumentException("Model variables cannot contain duplicates.", nameof(modelVariables));
+        foreach (var variable in modelVariables) factory.GetVariableInfo(variable);
+        ModelVariables = [.. IrTraversal.CollectVariables(
+                Assumptions
+                    .Select(static assumption => assumption.Predicate)
+                    .Append(goal.Predicate))
+            .Concat(modelVariables)
+            .Distinct()
+            .OrderBy(static variable => variable.Value)];
     }
 
     public IrFactory Factory { get; }
     public ImmutableArray<Assumption> Assumptions { get; }
     public Goal Goal { get; }
+    public ImmutableArray<IrVarId> ModelVariables { get; }
 }

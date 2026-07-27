@@ -337,7 +337,9 @@ internal static class RequiresCallSiteAnalyzer {
 
         var interpreter = new IrInterpreter(factory);
         foreach (var input in replayPlan.Inputs) {
-            var replayedInput = interpreter.Evaluate(input.Term);
+            var replayedInput = interpreter.Evaluate(
+                input.Term,
+                cancellationToken: cancellationToken);
             if (replayedInput.Status != IrEvaluationStatus.Value ||
                 input.IsReceiver &&
                 replayedInput.Value?.Kind == IrValueKind.Null)
@@ -360,7 +362,9 @@ internal static class RequiresCallSiteAnalyzer {
                     AnalyzerSemanticOutcome.Unknown);
                 continue;
             }
-            var replay = interpreter.Evaluate(instantiated);
+            var replay = interpreter.Evaluate(
+                instantiated,
+                cancellationToken: cancellationToken);
             if (replay.Status != IrEvaluationStatus.Value ||
                 replay.Value?.Kind != IrValueKind.Boolean) {
                 outcome = AnalyzerSemanticOutcomes.Combine(

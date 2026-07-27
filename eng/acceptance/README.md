@@ -15,11 +15,12 @@ is acceptable only when:
   and every response has exact manifest/result equality;
 - every new `Proven` outcome is backed by hygienic evidence and every
   `Refuted` outcome has a replay-validated witness;
-- proof-kernel evidence and outcome construction stays within the explicit
-  trusted-kernel file set and its nonblank LOC budget;
-- replaced frontend, dataflow, effects, and proof-kernel algorithm files stay
-  within the physical-file and Roslyn member-size ratchets declared in
-  `algorithm-size-ratchets.json`;
+- proof construction and the discovery, lowering, execution, encoding, replay,
+  policy, and cache-validation TCB components stay within their explicit path
+  sets and nonblank LOC budgets;
+- replaced frontend, dataflow, effects, proof-kernel, execution, and replay
+  algorithm files stay within the physical-file and Roslyn member-size
+  ratchets declared in `algorithm-size-ratchets.json`;
 - `Unknown`, timeout, cancellation, malformed, backend/replay, containment, and
   infrastructure results are never cached as semantic answers;
 - cache, worklist, formatting, renaming, and concurrency variants produce the
@@ -60,9 +61,10 @@ fail-closed option/provenance validation. The worker consumes that closed
 artifact without constructing a Roslyn compilation or rereading reference
 files. Compiler MVIDs and reference identities remain artifact provenance and
 cache identity rather than runtime compatibility gates.
-Independent whole-body counterexample replay, SARIF projection, the
-three-package split, protected publishing, and independent human release
-reviews remain open gates.
+Exact backend-model closure and independent whole-body counterexample replay
+are implemented for the admitted subset. SARIF projection, the three-package
+split, protected publishing, and independent human release reviews remain open
+gates.
 
 Changes to the trusted-kernel paths, assumption construction, complete effect
 summaries, API specifications, or proof-producing outcome construction require

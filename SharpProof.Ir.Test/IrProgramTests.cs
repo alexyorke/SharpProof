@@ -489,6 +489,20 @@ public sealed class IrProgramTests {
             Is.EqualTo(IrExceptionKind.IndexOutOfRange));
     }
 
+    [Test]
+    public void InterpreterObservesPreCanceledExecution() {
+        var factory = new IrFactory();
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        builder.Return(entry, factory.CreateOperation("return"));
+        var cancellationToken = new CancellationToken(canceled: true);
+
+        Assert.Throws<OperationCanceledException>(new Action(() =>
+            _ = new IrProgramInterpreter(factory).Execute(
+                builder.Build(),
+                cancellationToken: cancellationToken)));
+    }
+
     private static IrProgram CreateShape() {
         var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);

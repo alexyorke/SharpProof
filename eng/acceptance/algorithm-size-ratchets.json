@@ -17,6 +17,16 @@
       "maximumMemberLines": 95
     },
     {
+      "path": "SharpProof.Ir/IrInterpreter.cs",
+      "maximumPhysicalLines": 423,
+      "maximumMemberLines": 34
+    },
+    {
+      "path": "SharpProof.Ir/IrProgramInterpreter.cs",
+      "maximumPhysicalLines": 185,
+      "maximumMemberLines": 96
+    },
+    {
       "path": "SharpProof.Dataflow/ForwardDataflowAnalysis.cs",
       "maximumPhysicalLines": 150,
       "maximumMemberLines": 80
@@ -65,6 +75,11 @@
       "path": "SharpProof.Verify/Outcomes.cs",
       "maximumPhysicalLines": 65,
       "maximumMemberLines": 5
+    },
+    {
+      "path": "SharpProof.Worker/CallableCounterexampleReplayer.cs",
+      "maximumPhysicalLines": 61,
+      "maximumMemberLines": 57
     }
   ]
 }

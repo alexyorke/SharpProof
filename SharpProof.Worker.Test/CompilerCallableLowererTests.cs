@@ -101,7 +101,7 @@ public sealed class CompilerCallableLowererTests {
     }
 
     [Test]
-    public void ContractOnlyConstructorIsTrivialAndRefBodyIsTypedUnsupported() {
+    public void ConstructorAndRefBodyAreTypedUnsupported() {
         var constructor = Prepare(
             """
             using SharpProof.Attributes;
@@ -125,15 +125,40 @@ public sealed class CompilerCallableLowererTests {
             "Read");
 
         using (Assert.EnterMultipleScope()) {
-            Assert.That(constructor.IsSuccess, Is.True);
+            Assert.That(constructor.IsSuccess, Is.False);
             Assert.That(
-                constructor.Body!.Kind,
-                Is.EqualTo(CompilerPreparedBodyKind.Trivial));
+                constructor.FailureReason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
             Assert.That(byReference.IsSuccess, Is.False);
             Assert.That(
                 byReference.FailureReason,
                 Is.EqualTo(WorkerClaimReason.UnsupportedBody));
         }
+    }
+
+    [Test]
+    public void BodyAboveTheReplayInstructionBoundIsTypedUnsupported() {
+        var statements = string.Concat(Enumerable.Repeat(
+            "value = value;\n",
+            CompilerPreparedBody.MaximumInstructions));
+        var preparation = Prepare(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Oversized(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+            """ + statements +
+            """
+                    return value;
+                }
+            }
+            """,
+            "Oversized");
+
+        Assert.That(preparation.IsSuccess, Is.False);
+        Assert.That(
+            preparation.FailureReason,
+            Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
 
     [Test]

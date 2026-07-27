@@ -204,11 +204,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         internal QueryEncoder(Context context, VerificationQuery query) {
             _context = context;
             _factory = query.Factory;
-            Variables = [.. IrTraversal.CollectVariables(
-                    query.Assumptions
-                        .Select(static assumption => assumption.Predicate)
-                        .Append(query.Goal.Predicate))
-                .OrderBy(static variable => variable.Value)];
+            Variables = query.ModelVariables;
             IntegerVariables = [.. Variables.Where(variable =>
                 _factory.GetVariableInfo(variable).Type == _factory.IntegerType)];
             for (var index = 0; index < Variables.Length; index++) {

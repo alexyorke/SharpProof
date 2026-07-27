@@ -246,6 +246,7 @@ internal static class CompilerLoweredArtifact {
         }
         if (row.Kind != CompilerPreparedBodyKind.Program ||
             graph.Program == null || graph.Blocks.Count == 0 ||
+            graph.Program.Blocks.Sum(static block => (long)block.Instructions.Length) > CompilerPreparedBody.MaximumInstructions ||
             graph.Program.Entry.Value != 0 || graph.Program.Entry != graph.Blocks[0])
             throw new InvalidDataException("A lowered program body is invalid.");
         var canonical = new HashSet<IrVarId>(variables.Select(static item => item.Variable));

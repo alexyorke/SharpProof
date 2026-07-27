@@ -67,6 +67,10 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             return CallableClaimResultAssembler.Unknowns(target, WorkerClaimReason.UnsupportedExpression);
         var assumptionsUseSupportedDomain = assumptions.All(assumption =>
             IsSupportedProofDomain(factory, assumption.Predicate));
+        ImmutableArray<IrVarId> replayVariables = [.. target.Variables.Where(variable =>
+            variable.Role is CompilerVariableRole.Receiver or CompilerVariableRole.Parameter &&
+            factory.GetTypeInfo(factory.GetVariableInfo(variable.Variable).Type).Kind is
+                IrTypeKind.Boolean or IrTypeKind.Integer).Select(static variable => variable.Variable)];
 
         var records = ImmutableArray.CreateBuilder<WorkerClaimResult>(ensures.Length);
         for (var index = 0; index < ensures.Length; index++) {
@@ -99,14 +103,19 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 break;
             }
             var query = new VerificationQuery(factory, assumptions,
-                new Goal(factory, condition, ProofDiagnosticKind.Postcondition, new SourceLocationId(index)));
+                new Goal(factory, condition, ProofDiagnosticKind.Postcondition, new SourceLocationId(index)),
+                replayVariables);
             var outcome = await _kernel.VerifyAsync(query, cancellationToken).ConfigureAwait(false);
             if (resourceBudget.IsExceeded) {
                 CallableClaimResultAssembler.AppendResourceLimit(records, target, index, ensures.Length);
                 break;
             }
+            var replayed = outcome is not RefutedOutcome refuted ||
+                CallableCounterexampleReplayer.TryReplay(
+                    target, index, refuted.Model.Assignments, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             records.Add(CallableClaimResultAssembler.FromOutcome(target, index, outcome, target.Variables,
-                assumptionLabels, userAssumptionIds, body.UsesSpecModeledCallResult));
+                assumptionLabels, userAssumptionIds, replayed));
         }
         return records.ToImmutable();
     }
@@ -494,8 +503,6 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
 
     private readonly record struct BodyLoweringResult(
         ImmutableArray<BodyPath> Paths, WorkerClaimReason Reason) {
-        internal bool UsesSpecModeledCallResult =>
-            Paths.Any(path => !path.SpecAssumptions.IsDefaultOrEmpty);
         internal bool IsSuccess => Reason == WorkerClaimReason.None;
         internal static BodyLoweringResult Trivial(IrFactory factory) => Success([new BodyPath(
             factory.Boolean(true), null, ImmutableDictionary<IrVarId, IrTerm>.Empty,
