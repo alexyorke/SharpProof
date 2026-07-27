@@ -7,7 +7,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />
+    <PackageReference Include="System.Collections.Immutable" Version="10.0.10" />
     <Reference Include="Microsoft.CodeAnalysis"
                HintPath="$(RoslynTargetsPath)\bincore\Microsoft.CodeAnalysis.dll"
                Private="true" />
