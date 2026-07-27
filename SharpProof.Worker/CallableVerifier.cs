@@ -24,13 +24,15 @@ internal sealed class CallableVerifier(
         var factory = _factory;
         var binding = ContractBinder.Bind(target.Method);
         if (!binding.IsSuccess)
-            return CreateUnknowns(target, MapBindingFailure(binding.Failure));
+            return CallableClaimResultAssembler.Unknowns(
+                target,
+                MapBindingFailure(binding.Failure));
         var contracts = binding.Contracts!;
         var ensures = contracts.Clauses
             .Where(static clause => clause.Kind == BoundContractKind.Ensures)
             .ToImmutableArray();
         if (ensures.Length != target.Claims.Length)
-            return CreateUnknowns(
+            return CallableClaimResultAssembler.Unknowns(
                 target,
                 WorkerClaimReason.UnsupportedContract);
         if (ensures.IsDefaultOrEmpty) return [];
@@ -39,11 +41,12 @@ internal sealed class CallableVerifier(
         if (contracts.Clauses.Count(static clause =>
                 clause.Kind == BoundContractKind.Assume) !=
             userAssumptionEvidence.Length)
-            return CreateUnknowns(target, WorkerClaimReason.UnsupportedContract);
+            return CallableClaimResultAssembler.Unknowns(
+                target,
+                WorkerClaimReason.UnsupportedContract);
         var body = LowerBody(target, contracts, factory);
         if (!body.IsSuccess)
-            return [.. ensures.Select((_, index) =>
-                CreateUnknown(target, index, body.Reason))];
+            return CallableClaimResultAssembler.Unknowns(target, body.Reason);
 
         var assumptions = ImmutableArray.CreateBuilder<Assumption>();
         var assumptionLabels = new Dictionary<ProofJustification, string>(
@@ -60,11 +63,9 @@ internal sealed class CallableVerifier(
                 contracts);
             if (predicate == null ||
                 GetDepth(predicate) > _maximumExpressionDepth)
-                return [.. ensures.Select((_, index) =>
-                    CreateUnknown(
-                        target,
-                        index,
-                        WorkerClaimReason.UnsupportedExpression))];
+                return CallableClaimResultAssembler.Unknowns(
+                    target,
+                    WorkerClaimReason.UnsupportedExpression);
             ProofJustification justification = clause.Kind ==
                 BoundContractKind.Assume
                 ? new UserAssumedJustification(
@@ -92,11 +93,9 @@ internal sealed class CallableVerifier(
                     factory, specAssumption.Predicate, path.SpecResultProjections);
                 var predicate = Guard(factory, pathCondition, specPredicate);
                 if (GetDepth(predicate) > _maximumExpressionDepth)
-                    return [.. ensures.Select((_, index) =>
-                        CreateUnknown(
-                            target,
-                            index,
-                            WorkerClaimReason.UnsupportedExpression))];
+                    return CallableClaimResultAssembler.Unknowns(
+                        target,
+                        WorkerClaimReason.UnsupportedExpression);
                 ProofJustification justification =
                     new SpecJustification(specAssumption.Spec);
                 assumptions.Add(new Assumption(
@@ -114,11 +113,9 @@ internal sealed class CallableVerifier(
                 body.Paths,
                 assumptions,
                 assumptionLabels))
-            return [.. ensures.Select((_, index) =>
-                CreateUnknown(
-                    target,
-                    index,
-                    WorkerClaimReason.UnsupportedExpression))];
+            return CallableClaimResultAssembler.Unknowns(
+                target,
+                WorkerClaimReason.UnsupportedExpression);
         AddNormalCompletionAssumption(
             factory,
             body.Paths,
@@ -126,11 +123,9 @@ internal sealed class CallableVerifier(
             assumptionLabels);
         if (assumptions.Any(assumption =>
                 GetDepth(assumption.Predicate) > _maximumExpressionDepth))
-            return [.. ensures.Select((_, index) =>
-                CreateUnknown(
-                    target,
-                    index,
-                    WorkerClaimReason.UnsupportedExpression))];
+            return CallableClaimResultAssembler.Unknowns(
+                target,
+                WorkerClaimReason.UnsupportedExpression);
         var assumptionsUseSupportedDomain = assumptions.All(assumption =>
             IsSupportedProofDomain(factory, assumption.Predicate));
 
@@ -159,7 +154,7 @@ internal sealed class CallableVerifier(
                 pathObligations.Add(Guard(factory, executionCondition, pathCondition));
             }
             if (missingReturnValue) {
-                records.Add(CreateUnknown(
+                records.Add(CallableClaimResultAssembler.Unknown(
                     target,
                     index,
                     WorkerClaimReason.MissingReturnValue));
@@ -167,7 +162,7 @@ internal sealed class CallableVerifier(
             }
             var condition = Conjoin(factory, pathObligations);
             if (GetDepth(condition) > _maximumExpressionDepth) {
-                records.Add(CreateUnknown(
+                records.Add(CallableClaimResultAssembler.Unknown(
                     target,
                     index,
                     WorkerClaimReason.DeepPostcondition));
@@ -175,14 +170,14 @@ internal sealed class CallableVerifier(
             }
             if (!assumptionsUseSupportedDomain ||
                 !IsSupportedProofDomain(factory, condition)) {
-                records.Add(CreateUnknown(
+                records.Add(CallableClaimResultAssembler.Unknown(
                     target,
                     index,
                     WorkerClaimReason.UnsupportedExpression));
                 continue;
             }
             if (!resourceBudget.TryStartQuery()) {
-                AddResourceLimitRecords(
+                CallableClaimResultAssembler.AppendResourceLimit(
                     records,
                     target,
                     index,
@@ -201,14 +196,14 @@ internal sealed class CallableVerifier(
                 query,
                 cancellationToken).ConfigureAwait(false);
             if (resourceBudget.IsExceeded) {
-                AddResourceLimitRecords(
+                CallableClaimResultAssembler.AppendResourceLimit(
                     records,
                     target,
                     index,
                     ensures.Length);
                 break;
             }
-            records.Add(CreateRecord(
+            records.Add(CallableClaimResultAssembler.FromOutcome(
                 target,
                 index,
                 outcome,
@@ -393,18 +388,6 @@ internal sealed class CallableVerifier(
             foreach (var child in IrTraversal.GetChildren(term)) pending.Push(child);
         }
         return true;
-    }
-
-    private static void AddResourceLimitRecords(
-        ImmutableArray<WorkerClaimResult>.Builder records,
-        ManifestCallableTarget target,
-        int start,
-        int count) {
-        for (var index = start; index < count; index++)
-            records.Add(CreateUnknown(
-                target,
-                index,
-                WorkerClaimReason.ResourceLimit));
     }
 
     private BodyLoweringResult LowerBody(
@@ -1267,124 +1250,6 @@ internal sealed class CallableVerifier(
         }
     }
 
-    private static WorkerClaimResult CreateRecord(
-        ManifestCallableTarget target,
-        int contractOrdinal,
-        ProofOutcome outcome,
-        BoundMethodContracts contracts,
-        Dictionary<ProofJustification, string> assumptionLabels,
-        Dictionary<ProofJustification, string> userAssumptionIds,
-        bool usesSpecModeledCallResult) {
-        var record = CreateBaseRecord(target, contractOrdinal);
-        var usedUserAssumptions = new HashSet<string>(StringComparer.Ordinal);
-        switch (outcome) {
-            case ProvenOutcome proven:
-                record.Outcome = WorkerClaimOutcome.Proven;
-                record.Reason = WorkerClaimReason.None;
-                record.ProofCore = [.. proven.Core
-                    .Select(justification =>
-                        assumptionLabels.TryGetValue(justification, out var label)
-                            ? label
-                            : "hygienic")
-                    .Distinct(StringComparer.Ordinal)
-                    .OrderBy(static label => label, StringComparer.Ordinal)];
-                foreach (var justification in proven.Core)
-                    if (userAssumptionIds.TryGetValue(justification, out var id))
-                        usedUserAssumptions.Add(id);
-                break;
-            case RefutedOutcome when usesSpecModeledCallResult:
-                record.Outcome = WorkerClaimOutcome.Unknown;
-                record.Reason =
-                    WorkerClaimReason.CounterexampleReplayFailed;
-                break;
-            case RefutedOutcome refuted:
-                record.Outcome = WorkerClaimOutcome.Refuted;
-                record.Reason = WorkerClaimReason.None;
-                record.Model = CreateModel(refuted, contracts);
-                break;
-            case UnknownOutcome unknown:
-                record.Outcome = WorkerClaimOutcome.Unknown;
-                record.Reason = MapAbstention(unknown.Reason);
-                break;
-            default:
-                record.Outcome = WorkerClaimOutcome.Unknown;
-                record.Reason =
-                    WorkerClaimReason.MalformedBackendResult;
-                break;
-        }
-        record.Assumptions = [.. target.Assumptions.Select(evidence =>
-            new WorkerAssumptionEvidence {
-                Id = evidence.Id,
-                Kind = evidence.Kind,
-                Used = evidence.Kind == WorkerAssumptionKind.UserAssume &&
-                       usedUserAssumptions.Contains(evidence.Id)
-            })];
-        return record;
-    }
-
-    private static WorkerModelValue[] CreateModel(
-        RefutedOutcome outcome,
-        BoundMethodContracts contracts) {
-        var names = contracts.Variables.ToDictionary(
-            static variable => variable.Variable,
-            static variable => variable.Role switch {
-                BoundContractVariableRole.Parameter =>
-                    "parameter:" + variable.Ordinal.ToString(
-                        CultureInfo.InvariantCulture),
-                BoundContractVariableRole.Receiver => "receiver",
-                BoundContractVariableRole.Result => "result",
-                BoundContractVariableRole.PreState =>
-                    "pre:" + (variable.CurrentStateVariable?.Value ?? -1)
-                        .ToString(CultureInfo.InvariantCulture),
-                _ => "variable:" + variable.Variable.Value.ToString(
-                    CultureInfo.InvariantCulture)
-            });
-        return [.. outcome.Model.Assignments
-            .Select(assignment => new WorkerModelValue {
-                Variable = names.TryGetValue(assignment.Key, out var name)
-                    ? name
-                    : "variable:" + assignment.Key.Value.ToString(
-                        CultureInfo.InvariantCulture),
-                Kind = assignment.Value.Kind.ToString(),
-                Value = FormatValue(assignment.Value)
-            })
-            .OrderBy(static value => value.Variable, StringComparer.Ordinal)];
-    }
-
-    private static string FormatValue(IrValue value) => value.Kind switch {
-        IrValueKind.Boolean => value.Boolean ? "true" : "false",
-        IrValueKind.Integer => value.Integer.ToString(CultureInfo.InvariantCulture),
-        IrValueKind.String => value.String,
-        IrValueKind.Null => "null",
-        _ => "<opaque>"
-    };
-
-    private static WorkerClaimResult CreateUnknown(
-        ManifestCallableTarget target,
-        int contractOrdinal,
-        WorkerClaimReason reason) {
-        var record = CreateBaseRecord(target, contractOrdinal);
-        record.Outcome = WorkerClaimOutcome.Unknown;
-        record.Reason = reason;
-        return record;
-    }
-
-    private static ImmutableArray<WorkerClaimResult> CreateUnknowns(
-        ManifestCallableTarget target,
-        WorkerClaimReason reason) =>
-        [.. target.Claims.Select((_, index) =>
-            CreateUnknown(target, index, reason))];
-
-    private static WorkerClaimResult CreateBaseRecord(
-        ManifestCallableTarget target,
-        int contractOrdinal) =>
-        new() {
-            ClaimId = target.Claims[contractOrdinal].Entry.ClaimId,
-            Outcome = WorkerClaimOutcome.Unknown,
-            Reason = WorkerClaimReason.InfrastructureFailure,
-            Assumptions = [.. target.Assumptions]
-        };
-
     private static WorkerClaimReason MapBindingFailure(
         ContractBindingFailure failure) => failure switch {
             ContractBindingFailure.UnsupportedExpression =>
@@ -1404,27 +1269,6 @@ internal sealed class CallableVerifier(
         LazyInitializer.EnsureInitialized(
             ref _contractBinder,
             () => new ContractBinder(_compilation, _factory));
-
-    private static WorkerClaimReason MapAbstention(
-        AbstentionReason reason) => reason switch {
-            AbstentionReason.UnsupportedOperation =>
-                WorkerClaimReason.UnsupportedExpression,
-            AbstentionReason.UnsupportedEncoding =>
-                WorkerClaimReason.UnsupportedExpression,
-            AbstentionReason.ResourceLimit =>
-                WorkerClaimReason.ResourceLimit,
-            AbstentionReason.Timeout =>
-                WorkerClaimReason.MethodTimeout,
-            AbstentionReason.BackendUnavailable =>
-                WorkerClaimReason.BackendUnavailable,
-            AbstentionReason.InfrastructureFailure =>
-                WorkerClaimReason.InfrastructureFailure,
-            AbstentionReason.MalformedBackendResult =>
-                WorkerClaimReason.MalformedBackendResult,
-            AbstentionReason.CounterexampleReplayFailed =>
-                WorkerClaimReason.CounterexampleReplayFailed,
-            _ => WorkerClaimReason.UnsupportedExpression
-        };
 
     private bool IsKnownPure(IMethodSymbol method) =>
         _apiSpecs.IsSideEffectFree(method);
