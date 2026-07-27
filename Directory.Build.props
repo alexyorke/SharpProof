@@ -39,7 +39,7 @@
 
   <ItemGroup Condition="'$(SharpProofProductionProject)' == 'true'">
     <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers"
-                      Version="3.3.4"
+                      Version="5.6.0"
                       PrivateAssets="all" />
     <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt"
                      Link="BannedSymbols.txt" />
