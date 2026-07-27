@@ -35,7 +35,7 @@ internal static class WorkerPerformanceProbe {
                 contract.Samples,
                 cancellationToken)
             .ConfigureAwait(false);
-        var forcedTermination = await MeasureForcedTerminationAsync(
+        var forcedTermination = await MeasureForcedTerminationCoreAsync(
                 repositoryRoot,
                 workspace,
                 contract,
@@ -44,6 +44,19 @@ internal static class WorkerPerformanceProbe {
         return new WorkerPerformanceMeasurements(
             cancellationLatencies,
             forcedTermination);
+    }
+
+    internal static async Task<double> MeasureForcedTerminationAsync(
+        string repositoryRoot,
+        AcceptancePerformanceContract contract,
+        CancellationToken cancellationToken = default) {
+        using var workspace = WorkerProbeWorkspace.Create();
+        return await MeasureForcedTerminationCoreAsync(
+                repositoryRoot,
+                workspace,
+                contract,
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private static async Task<double[]> MeasureWorkerCancellationAsync(
@@ -140,7 +153,7 @@ internal static class WorkerPerformanceProbe {
                 "The real worker did not report a cooperative project timeout.");
     }
 
-    private static async Task<double> MeasureForcedTerminationAsync(
+    private static async Task<double> MeasureForcedTerminationCoreAsync(
         string repositoryRoot,
         WorkerProbeWorkspace workspace,
         AcceptancePerformanceContract contract,
@@ -179,12 +192,16 @@ internal static class WorkerPerformanceProbe {
                     boundary.Token)
                 .ConfigureAwait(false);
             var stopwatch = Stopwatch.StartNew();
-            await process.WaitForExitAsync(boundary.Token)
-                .ConfigureAwait(false);
-            await WaitForProcessExitAsync(
-                    workerProcessId,
-                    boundary.Token)
-                .ConfigureAwait(false);
+            var waitLimit = checked(
+                (int)contract.ForcedTerminationMilliseconds + 10_000);
+#pragma warning disable CA1849 // The deadline probe intentionally uses kernel waits.
+            if (!process.WaitForExit(waitLimit))
+                throw new TimeoutException(
+                    "The launcher did not reach its hard deadline.");
+            WaitForProcessExit(
+                workerProcessId,
+                Math.Max(0, waitLimit - (int)stopwatch.ElapsedMilliseconds));
+#pragma warning restore CA1849
             stopwatch.Stop();
             var output = await standardOutput.ConfigureAwait(false);
             var error = await standardError.ConfigureAwait(false);
@@ -344,15 +361,18 @@ internal static class WorkerPerformanceProbe {
         }
     }
 
-    private static async Task WaitForProcessExitAsync(
+    private static void WaitForProcessExit(
         int processId,
-        CancellationToken cancellationToken) {
+        int timeoutMilliseconds) {
         Process? worker = null;
         try {
             worker = Process.GetProcessById(processId);
-            if (!worker.HasExited)
-                await worker.WaitForExitAsync(cancellationToken)
-                    .ConfigureAwait(false);
+#pragma warning disable CA1849 // The deadline probe intentionally uses kernel waits.
+            if (!worker.HasExited &&
+                !worker.WaitForExit(timeoutMilliseconds))
+                throw new TimeoutException(
+                    "The worker process tree did not terminate.");
+#pragma warning restore CA1849
         }
         catch (ArgumentException) {
         }
@@ -582,8 +602,17 @@ internal static class WorkerPerformanceProbe {
                 internal static class Program {
                     private static int Main(string[] args) {
                         var requestIndex = Array.IndexOf(args, "--request");
-                        if (requestIndex < 0 || requestIndex + 1 >= args.Length)
+                        var startEventIndex = Array.IndexOf(
+                            args,
+                            "--start-event");
+                        if (requestIndex < 0 ||
+                            requestIndex + 1 >= args.Length ||
+                            startEventIndex < 0 ||
+                            startEventIndex + 1 >= args.Length)
                             return 2;
+                        using var startEvent = EventWaitHandle.OpenExisting(
+                            args[startEventIndex + 1]);
+                        startEvent.WaitOne();
                         File.WriteAllText(
                             args[requestIndex + 1] + ".ready",
                             Environment.ProcessId.ToString(

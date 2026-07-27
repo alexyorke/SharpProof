@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Win32.SafeHandles;
 using SharpProof.Worker.Protocol;
 
 [assembly: DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
@@ -43,7 +44,7 @@ internal static class Program {
 
         int exitCode;
         try {
-            exitCode = await RunWorkerAsync(arguments, request).ConfigureAwait(false);
+            exitCode = RunWorker(arguments, request);
         }
         catch (PlatformNotSupportedException exception) {
             Console.Error.WriteLine(exception.Message);
@@ -114,7 +115,7 @@ internal static class Program {
         return exitCode;
     }
 
-    private static async Task<int> RunWorkerAsync(
+    private static int RunWorker(
         LauncherArguments arguments,
         WorkerVerifyRequest request) {
         var startInfo = new ProcessStartInfo {
@@ -141,29 +142,31 @@ internal static class Program {
         using var process = Process.Start(startInfo) ??
             throw new InvalidOperationException("The SharpProof worker could not be started.");
         if (!job.TryAssign(process)) {
-            Terminate(process);
+            Terminate(process, entireTree: true);
             return 125;
         }
-        startEvent.Set();
         var hardLimit = checked(request.Budgets.ProjectWallTimeMilliseconds +
             arguments.TerminationGraceMilliseconds);
-        using var hardBoundary = new CancellationTokenSource(hardLimit);
-        try {
-            await process.WaitForExitAsync(hardBoundary.Token).ConfigureAwait(false);
+        using var processExit = new ProcessWaitHandle(process);
+        if (WaitHandle.SignalAndWait(
+                startEvent, processExit, hardLimit, exitContext: false))
             return process.ExitCode;
-        }
-        catch (OperationCanceledException) {
-            Terminate(process);
-            return 124;
-        }
+        Terminate(process);
+        return 124;
     }
 
-    private static void Terminate(Process process) {
+    private static void Terminate(Process process, bool entireTree = false) {
         try {
-            process.Kill(entireProcessTree: true);
+            process.Kill(entireProcessTree: entireTree);
         }
         catch (InvalidOperationException) {
         }
+    }
+
+    private sealed class ProcessWaitHandle : WaitHandle {
+        internal ProcessWaitHandle(Process process) =>
+            SafeWaitHandle = new SafeWaitHandle(
+                process.Handle, ownsHandle: false);
     }
 
     internal static int ValidateAndReport(
