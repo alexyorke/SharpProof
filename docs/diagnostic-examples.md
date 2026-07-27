@@ -32,7 +32,8 @@ dotnet_diagnostic.SP0027.severity = warning
 
 `SP0024` is an error and `SP0025` is a warning. The `SPCF` rules are errors once
 the generator is loaded. Unsupported unannotated methods are quiet; an
-unsupported explicitly selected method produces SP0047.
+unsupported explicitly selected method produces SP0047. SP0049 is a fatal
+compiler-collection infrastructure error during Windows verification.
 
 ## Main analyzer summary
 
@@ -49,6 +50,7 @@ unsupported explicitly selected method produces SP0047.
 | `SP0045` | `effects` | Info, on | Yes |
 | `SP0046` | `effects` | Info, on | Yes |
 | `SP0047` | Explicitly selected unsupported method | Info, on | Yes |
+| `SP0049` | Windows verification compilation seal | Error, on | On seal failure |
 
 `SharpProofFeatures=all` enables both feature pipelines. `SharpProofMode` and
 `all-experimental` are deprecated preview compatibility inputs.
@@ -199,6 +201,18 @@ by the manifest. `SharpProofAssumptionPolicy=allow` reports information,
 `warn` reports a warning, and `error` fails the build. Advisory defaults to
 `allow`; strict defaults to `error`.
 
+<a id="sp0049"></a>
+## SP0049 - final compilation seal emission failed
+
+The production analyzer emits SP0049 when Windows verification requested a
+post-generator compilation seal but the analyzer could not write it. The
+diagnostic is an error because the expected compiler-compilation evidence is
+missing. It is an infrastructure failure, never a contract or proof outcome.
+
+The seal is currently deterministic parity and diagnostic evidence only. The
+worker still reconstructs its compilation from MSBuild inputs and does not
+consume the seal as a closed compiler artifact.
+
 <a id="contractfor-generator-diagnostics"></a>
 ## ContractFor generator diagnostics
 
@@ -295,7 +309,8 @@ describe the target member.
   replayed violating execution.
 - SP0027 is stronger: it is emitted only after concrete predicate replay
   evaluates to false.
-- SP0047 is explicit incomplete analysis, and SP0048 is explicit
-  user/trusted evidence; neither is a proof outcome.
+- SP0047 is explicit incomplete analysis, SP0048 is explicit user/trusted
+  evidence, and SP0049 is a compilation-collection infrastructure failure;
+  none is a proof outcome.
 - Worker `Unknown` reasons are protocol records, not Roslyn diagnostics. See
   [Typed abstention reasons](unknown-reasons.md).

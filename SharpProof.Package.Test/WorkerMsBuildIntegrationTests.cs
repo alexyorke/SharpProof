@@ -21,6 +21,10 @@ public sealed class WorkerMsBuildIntegrationTests {
         "SharpProofAssumptionPolicy",
         "SharpProofMode"
     ];
+    private static readonly string[] s_compilationSealProperties = [
+        "_SharpProofCompilationSealPath",
+        "_SharpProofCompilationTargetFramework"
+    ];
 
     [Test]
     public void WorkerContainmentIsMandatoryOnTheSupportedHost() {
@@ -161,6 +165,50 @@ public sealed class WorkerMsBuildIntegrationTests {
         Assert.That(
             response.ClaimResults.Single().Outcome,
             Is.EqualTo(WorkerClaimOutcome.Proven));
+    }
+
+    [Test]
+    public async Task VerificationPublishesFinalCompilationSealPerTargetFramework() {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+
+        var build = await project.BuildAsync(verify: true);
+
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        Assert.That(File.Exists(project.CompilationSealPath), Is.True);
+        var seal = await File.ReadAllTextAsync(project.CompilationSealPath);
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                project.CompilationSealPath,
+                Does.Contain(
+                    Path.Combine("Release", "net8.0", "SharpProof")));
+            Assert.That(
+                seal,
+                Does.Contain("schema=SharpProof.CompilationSeal\n"));
+            Assert.That(seal, Does.Contain("targetFramework=net8.0\n"));
+            Assert.That(seal, Does.Not.Contain('\r'));
+        }
+    }
+
+    [Test]
+    public async Task MissingFinalCompilationSealFailsBeforeWorkerLaunch() {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: false);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var build = await project.RunVerificationTargetAsync();
+
+        Assert.That(build.ExitCode, Is.Not.Zero);
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(build.Output, Does.Contain("SP0049"));
+            Assert.That(
+                build.Output,
+                Does.Contain(
+                    "required final compilation seal"));
+            Assert.That(File.Exists(project.RequestPath), Is.False);
+            Assert.That(File.Exists(project.ResultPath), Is.False);
+        }
     }
 
     [Test]
@@ -320,13 +368,19 @@ public sealed class WorkerMsBuildIntegrationTests {
                 }
             }
             """);
-        var baseline = await project.BuildAsync(verify: false);
+        var baseline = await project.BuildAsync(verify: true);
         Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
 
         var contractsTask = project.RunVerificationTargetAsync(
+            ("_SharpProofCompilationSealPath", project.CompilationSealPath),
+            ("SharpProofCompilationSealFile",
+                project.CompilationSealPath + ".contracts"),
             ("SharpProofFeatures", "contracts"),
             ("SharpProofVerifyPolicy", "require-proven"));
         var effectsTask = project.RunVerificationTargetAsync(
+            ("_SharpProofCompilationSealPath", project.CompilationSealPath),
+            ("SharpProofCompilationSealFile",
+                project.CompilationSealPath + ".effects"),
             ("SharpProofFeatures", "effects"),
             ("SharpProofVerifyPolicy", "require-proven"));
         var results = await Task.WhenAll(contractsTask, effectsTask);
@@ -361,6 +415,9 @@ public sealed class WorkerMsBuildIntegrationTests {
         var malformedWorker = await project.CreateMalformedWorkerAsync();
 
         var malformed = await project.RunVerificationTargetAsync(
+            ("_SharpProofCompilationSealPath", project.CompilationSealPath),
+            ("SharpProofCompilationSealFile",
+                project.CompilationSealPath + ".malformed"),
             ("SharpProofWorkerPath", malformedWorker),
             ("SharpProofFeatures", "effects"));
 
@@ -390,6 +447,9 @@ public sealed class WorkerMsBuildIntegrationTests {
                    FileAccess.Read,
                    FileShare.Read))
             failed = await project.RunVerificationTargetAsync(
+                ("_SharpProofCompilationSealPath", project.CompilationSealPath),
+                ("SharpProofCompilationSealFile",
+                    project.CompilationSealPath + ".failed"),
                 ("SharpProofFeatures", "effects"));
 
         Assert.That(failed.ExitCode, Is.Not.Zero);
@@ -680,6 +740,59 @@ public sealed class WorkerMsBuildIntegrationTests {
     }
 
     [Test]
+    public void CompilationSealPropertiesAreCompilerVisibleBeforeEditorConfigGeneration() {
+        var repository = ConsumerProject.FindRepositoryRoot();
+        var packageProps = XDocument.Load(Path.Combine(
+            repository,
+            "SharpProof.Package",
+            "buildTransitive",
+            "SharpProof.props"));
+        var analyzerConsumerProps = XDocument.Load(Path.Combine(
+            repository,
+            "SharpProof.AnalyzerConsumer.props"));
+        var targets = XDocument.Load(Path.Combine(
+            repository,
+            "SharpProof.Package",
+            "buildTransitive",
+            "SharpProof.targets"));
+        var initialize = targets
+            .Descendants("Target")
+            .Single(static target =>
+                target.Attribute("Name")?.Value ==
+                "_SharpProofInitializeVerify");
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                CompilerVisibleProperties(packageProps),
+                Is.SupersetOf(s_compilationSealProperties));
+            Assert.That(
+                CompilerVisibleProperties(analyzerConsumerProps),
+                Is.SupersetOf(s_compilationSealProperties));
+            Assert.That(
+                initialize.Attribute("BeforeTargets")?.Value
+                    .Split(';', StringSplitOptions.RemoveEmptyEntries),
+                Does.Contain("GenerateMSBuildEditorConfigFile"));
+            Assert.That(
+                initialize.Attribute("BeforeTargets")?.Value
+                    .Split(';', StringSplitOptions.RemoveEmptyEntries),
+                Does.Contain(
+                    "GenerateMSBuildEditorConfigFileShouldRun"));
+            Assert.That(
+                initialize.Descendants(
+                    "_SharpProofCompilationSealPath"),
+                Is.Not.Empty);
+            Assert.That(
+                initialize.Descendants(
+                    "_SharpProofCompilationTargetFramework"),
+                Is.Not.Empty);
+            Assert.That(
+                initialize.Descendants(
+                    "SharpProofCompilationSealFile"),
+                Is.Not.Empty);
+        }
+    }
+
+    [Test]
     public void LauncherDistinguishesValidFailedAndMalformedResponses() {
         var manifest = new WorkerClaimManifest();
         WorkerProtocolJson.SealManifest(manifest);
@@ -868,6 +981,12 @@ public sealed class WorkerMsBuildIntegrationTests {
                 "The packaged worker is supported only on Windows x64.");
     }
 
+    private static IEnumerable<string?> CompilerVisibleProperties(
+        XDocument document) =>
+        document.Descendants("CompilerVisibleProperty")
+            .Select(static property =>
+                property.Attribute("Include")?.Value);
+
     private sealed class ConsumerProject : IDisposable {
         private readonly string _root;
 
@@ -888,11 +1007,19 @@ public sealed class WorkerMsBuildIntegrationTests {
                 "net8.0",
                 "SharpProof",
                 "result.json");
+            CompilationSealPath = Path.Combine(
+                root,
+                "obj",
+                "Release",
+                "net8.0",
+                "SharpProof",
+                "compilation.seal");
         }
 
         internal string ProjectPath { get; }
         internal string RequestPath { get; }
         internal string ResultPath { get; }
+        internal string CompilationSealPath { get; }
 
         internal string CreateInvalidWorker() {
             var path = Path.Combine(_root, "invalid-worker.dll");
@@ -1063,6 +1190,18 @@ public sealed class WorkerMsBuildIntegrationTests {
                     "SharpProof.Package",
                     "buildTransitive",
                     "SharpProof.props"));
+            var testConfiguration = new DirectoryInfo(
+                Path.GetDirectoryName(
+                    typeof(WorkerMsBuildIntegrationTests).Assembly.Location)!)
+                .Parent?.Name ??
+                throw new InvalidOperationException(
+                    "The test build configuration was not found.");
+            var analyzerDirectory = SecurityElement.Escape(Path.Combine(
+                repository,
+                "SharpProof.Analyzer",
+                "bin",
+                testConfiguration,
+                "netstandard2.0"));
             var targets = SecurityElement.Escape(
                 Path.Combine(
                     repository,
@@ -1082,6 +1221,9 @@ public sealed class WorkerMsBuildIntegrationTests {
             return
                 $"""
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <SharpProofAnalyzerDirectory>{analyzerDirectory}</SharpProofAnalyzerDirectory>
+                  </PropertyGroup>
                   <Import Project="{props}" />
                   <PropertyGroup>
                     <TargetFramework>net8.0</TargetFramework>
@@ -1098,8 +1240,7 @@ public sealed class WorkerMsBuildIntegrationTests {
                   <Target Name="_RemoveSharpProofAnalyzersForWorkerTargetTest"
                           BeforeTargets="CoreCompile">
                     <ItemGroup>
-                      <Analyzer Remove="@(Analyzer)"
-                                Condition="'%(Analyzer.SharpProofAnalyzerRole)' != ''" />
+                      <Analyzer Remove="$(SharpProofContractForGeneratorPath)" />
                     </ItemGroup>
                   </Target>
                 </Project>

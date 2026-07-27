@@ -1,5 +1,4 @@
 namespace SharpProof.Ir;
-
 internal static class IrTraversal {
     internal static ImmutableArray<IrTerm> GetChildren(IrTerm term) =>
         term switch {
@@ -16,10 +15,8 @@ internal static class IrTraversal {
             IrSequenceAccessTerm access => [access.Sequence, access.Index],
             _ => []
         };
-
     internal static ImmutableHashSet<IrVarId> CollectVariables(IrTerm root) =>
         CollectVariables([root]);
-
     internal static ImmutableHashSet<IrVarId> CollectVariables(
         IEnumerable<IrTerm> roots) {
         var result = ImmutableHashSet.CreateBuilder<IrVarId>();

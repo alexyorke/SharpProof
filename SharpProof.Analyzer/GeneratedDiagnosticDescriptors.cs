@@ -87,6 +87,14 @@ internal static class GeneratedDiagnosticDescriptors {
         "Verification",
         "Reports selected methods outside the supported analyzer subset.");
 
+    internal static readonly DiagnosticDescriptor CompilationSealFailureRule = Create(
+        "SP0049",
+        "Final Compilation Seal Emission Failed",
+        "SharpProof could not emit the final compilation seal: {0}",
+        "Infrastructure",
+        "Reports a fatal failure to seal the compiler's final compilation.",
+        severity: DiagnosticSeverity.Error);
+
     internal static readonly ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics = [
         PurityNotVerifiedRule,
         AllocationInZeroAllocationMethodRule,
@@ -98,7 +106,8 @@ internal static class GeneratedDiagnosticDescriptors {
         ExceptionContractViolationRule,
         ZeroAllocationsNotVerifiedRule,
         ExceptionContractNotVerifiedRule,
-        SelectedAnalysisIncompleteRule
+        SelectedAnalysisIncompleteRule,
+        CompilationSealFailureRule
     ];
 
     private static DiagnosticDescriptor Create(

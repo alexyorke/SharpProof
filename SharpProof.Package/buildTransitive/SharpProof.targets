@@ -84,7 +84,8 @@
              Text="SharpProofMode='$(_SharpProofLegacyModeValue)' is deprecated during preview. Use SharpProofProfile and SharpProofFeatures; all-experimental maps to SharpProofFeatures=all." />
   </Target>
 
-  <Target Name="_SharpProofInitializeVerify">
+  <Target Name="_SharpProofInitializeVerify"
+          BeforeTargets="GenerateMSBuildEditorConfigFileShouldRun;GenerateMSBuildEditorConfigFile">
     <PropertyGroup>
       <_SharpProofVerifyDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(IntermediateOutputPath)SharpProof'))</_SharpProofVerifyDirectory>
       <SharpProofVerifyRequestFile Condition="'$(SharpProofVerifyRequestFile)' == ''">$(_SharpProofVerifyDirectory)\request.json</SharpProofVerifyRequestFile>
@@ -98,6 +99,13 @@
       <_SharpProofReferenceList>$(_SharpProofInvocationDirectory)\references.list</_SharpProofReferenceList>
       <_SharpProofConstantList>$(_SharpProofInvocationDirectory)\constants.list</_SharpProofConstantList>
       <_SharpProofOptionsInput>$(_SharpProofInvocationDirectory)\options.input</_SharpProofOptionsInput>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(OS)' == 'Windows_NT' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+      <_SharpProofCompilationTargetFramework>$(TargetFramework)</_SharpProofCompilationTargetFramework>
+      <_SharpProofCompilationSealPath>$(_SharpProofInvocationDirectory)\compilation.seal</_SharpProofCompilationSealPath>
+      <SharpProofCompilationSealFile Condition="'$(SharpProofCompilationSealFile)' == ''">$(_SharpProofVerifyDirectory)\compilation.seal</SharpProofCompilationSealFile>
+    </PropertyGroup>
+    <PropertyGroup>
       <_SharpProofNullable>$(Nullable)</_SharpProofNullable>
       <_SharpProofNullable Condition="'$(_SharpProofNullable)' == ''">disable</_SharpProofNullable>
       <_SharpProofCheckedOverflow>$(CheckForOverflowUnderflow)</_SharpProofCheckedOverflow>
@@ -136,6 +144,9 @@
            Text="SharpProofVerifyPolicy must be advisory, warn-on-unknown, or require-proven." />
     <Error Condition="'$(_SharpProofAssumptionPolicyNormalized)' != 'allow' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'warn' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'error'"
            Text="SharpProofAssumptionPolicy must be allow, warn, or error." />
+    <Error Code="SP0049"
+           Condition="!Exists('$(_SharpProofCompilationSealPath)')"
+           Text="SharpProof did not receive the required final compilation seal." />
     <Error Condition="!Exists('$(_SharpProofLauncherPath)')"
            Text="SharpProof verifier launcher was not found at '$(_SharpProofLauncherPath)'." />
     <Error Condition="!Exists('$(_SharpProofWorkerPath)')"
@@ -169,6 +180,8 @@
       <Output TaskParameter="ExitCode"
               PropertyName="_SharpProofVerifierExitCode" />
     </Exec>
+    <Copy SourceFiles="$(_SharpProofCompilationSealPath)"
+          DestinationFiles="$(SharpProofCompilationSealFile)" />
     <RemoveDir Directories="$(_SharpProofInvocationDirectory)" />
     <Error Condition="'$(_SharpProofVerifierExitCode)' != '0'"
            Text="SharpProof verifier failed with exit code $(_SharpProofVerifierExitCode)." />

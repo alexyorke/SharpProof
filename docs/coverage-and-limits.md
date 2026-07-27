@@ -166,12 +166,22 @@ invocation; they are not BCL coverage.
 
 ## Current compilation-integration gap
 
-The worker currently reconstructs a compilation from MSBuild source and
-reference lists. It does not consume the final compiler `Compilation` after
-generators. Generated trees, `AdditionalFiles`, aliases, and other compiler-only
-state are therefore not yet closed into the manifest artifact required for
-1.0. The planned compiler collector/artifact and SARIF projection are not
-implemented.
+During Windows verification, the production analyzer now captures a
+deterministic post-generator compilation seal. It covers the final source and
+generated syntax trees, compiler and parse options, reference identities,
+aliases and image hashes, `AdditionalFiles`, effective SharpProof policies,
+Roslyn version, target framework, and assembly identity. An inability to emit
+the requested seal is fatal SP0049.
+
+The seal is parity and diagnostic evidence only. The worker still reconstructs
+a compilation from MSBuild source and reference lists and does not consume the
+seal as a closed compiler artifact. Collection requires file-backed references
+and fingerprints their current on-disk images, not an exact copy of Roslyn's
+loaded metadata, so the seal is not used for cache validity. Generated claims
+and other compiler-only state are therefore not yet closed into the worker
+manifest/IR artifact required for 1.0. Production-plan Step 4 remains
+incomplete; compilation reconstruction deletion and SARIF projection are
+still future work.
 
 See [Typed abstention reasons](unknown-reasons.md) for the exact enums and
 [Analysis limits](analysis-limits.md) for configured budgets.

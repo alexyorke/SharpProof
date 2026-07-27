@@ -1,3 +1,4 @@
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("SharpProof.Analyzer")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("SharpProof.Contracts")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("SharpProof.Ir.Test")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("SharpProof.Smt")]

@@ -2,7 +2,11 @@
   <ItemGroup>
     <CompilerVisibleProperty Include="SharpProofProfile" />
     <CompilerVisibleProperty Include="SharpProofFeatures" />
+    <CompilerVisibleProperty Include="SharpProofVerifyPolicy" />
+    <CompilerVisibleProperty Include="SharpProofAssumptionPolicy" />
     <CompilerVisibleProperty Include="SharpProofMode" />
+    <CompilerVisibleProperty Include="_SharpProofCompilationSealPath" />
+    <CompilerVisibleProperty Include="_SharpProofCompilationTargetFramework" />
   </ItemGroup>
 
   <ItemGroup>

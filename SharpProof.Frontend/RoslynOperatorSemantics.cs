@@ -1,5 +1,4 @@
 namespace SharpProof.Frontend;
-
 internal static class RoslynOperatorSemantics {
     internal static IrBinaryOperator? MapBinary(
         BinaryOperatorKind kind,
@@ -25,19 +24,16 @@ internal static class RoslynOperatorSemantics {
                 IrBinaryOperator.GreaterThanOrEqual,
             _ => null
         };
-
     internal static bool IsIntegerArithmetic(BinaryOperatorKind kind) =>
         kind is BinaryOperatorKind.Add or
             BinaryOperatorKind.Subtract or
             BinaryOperatorKind.Multiply or
             BinaryOperatorKind.Divide or
             BinaryOperatorKind.Remainder;
-
     internal static bool RequiresCheckedArithmetic(BinaryOperatorKind kind) =>
         kind is BinaryOperatorKind.Add or
             BinaryOperatorKind.Subtract or
             BinaryOperatorKind.Multiply;
-
     internal static bool IsValuePreservingIntegerConversion(
         SpecialType source,
         SpecialType target) {
@@ -48,7 +44,6 @@ internal static class RoslynOperatorSemantics {
                sourceRange.Value.Minimum >= targetRange.Value.Minimum &&
                sourceRange.Value.Maximum <= targetRange.Value.Maximum;
     }
-
     private static IntegerRange? GetIntegerRange(SpecialType type) =>
         type switch {
             SpecialType.System_SByte => new(sbyte.MinValue, sbyte.MaxValue),
@@ -61,7 +56,6 @@ internal static class RoslynOperatorSemantics {
             SpecialType.System_Int64 => new(long.MinValue, long.MaxValue),
             _ => null
         };
-
     private readonly struct IntegerRange(long minimum, long maximum) {
         internal long Minimum { get; } = minimum;
         internal long Maximum { get; } = maximum;

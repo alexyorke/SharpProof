@@ -128,15 +128,23 @@ manifest hash and complete result set match the current manifest. Only
 complete callables whose claims are hygienic `Proven` or replay-validated
 `Refuted` are cacheable.
 
-One important production boundary is not complete: MSBuild still sends
-source/reference lists and the worker reconstructs a compilation. It does not
-yet observe the final post-generator Roslyn `Compilation`, generated-tree
-checksums, `AdditionalFiles`, or a closed compiler artifact. That collector and
-artifact are future work; documentation does not treat generated claims as
-accounted for today. Deterministic JSON is emitted, but SARIF projection is
-also future work. Counterexample replay currently re-evaluates the lowered
-obligation-path IR; an independent whole-body interpreter over the exact CFG is
-also still required before 1.0.
+One important production boundary is not complete. During Windows verification,
+the production analyzer now observes the final post-generator Roslyn
+`Compilation` and atomically emits a deterministic seal over compiler options,
+source and generated trees, references, `AdditionalFiles`, SharpProof policies,
+and target-framework identity. Seal emission failure is fatal SP0049.
+
+That seal is parity and diagnostic evidence only. MSBuild still sends
+source/reference lists to the worker, which reconstructs a separate
+compilation; the seal is not the closed manifest/IR artifact consumed by the
+worker. Seal collection currently requires file-backed references and hashes
+their on-disk images; it is not an exact snapshot of Roslyn's loaded metadata
+and is never a cache authority. Generated claims are therefore not yet
+accounted for, compilation reconstruction has not been deleted, and
+production-plan Step 4 is not complete. Deterministic JSON is emitted, but
+SARIF projection is also future work. Counterexample replay currently
+re-evaluates the lowered obligation-path IR; an independent whole-body
+interpreter over the exact CFG is also still required before 1.0.
 
 ## Activation and release gates
 
