@@ -13,6 +13,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Launcher;
 
 internal static class Program {
+    private const int TerminationCleanupReserveMilliseconds = 100;
     internal static async Task<int> Main(string[] args) {
         if (!LauncherArguments.TryParse(args, out var arguments)) {
             Console.Error.WriteLine(
@@ -146,7 +147,8 @@ internal static class Program {
             return 125;
         }
         var hardLimit = checked(request.Budgets.ProjectWallTimeMilliseconds +
-            arguments.TerminationGraceMilliseconds);
+            Math.Max(1, arguments.TerminationGraceMilliseconds -
+                TerminationCleanupReserveMilliseconds));
         using var processExit = new ProcessWaitHandle(process);
         if (WaitHandle.SignalAndWait(
                 startEvent, processExit, hardLimit, exitContext: false))
