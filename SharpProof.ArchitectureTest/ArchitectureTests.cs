@@ -21,6 +21,7 @@ public sealed class ArchitectureTests {
 
     private static readonly string[] ProductionProjects = [
         "SharpProof.Ir",
+        "SharpProof.CompilerArtifact",
         "SharpProof.ContractForGenerator",
         "SharpProof.Specs",
         "SharpProof.Dataflow",
@@ -38,6 +39,12 @@ public sealed class ArchitectureTests {
     public void NewLayerProjectReferencesFollowTheDependencyDag() {
         var allowed = new Dictionary<string, string[]>(StringComparer.Ordinal) {
             ["SharpProof.Ir"] = [],
+            ["SharpProof.CompilerArtifact"] = [
+                "SharpProof.Contracts",
+                "SharpProof.Frontend",
+                "SharpProof.Ir",
+                "SharpProof.Worker.Protocol"
+            ],
             ["SharpProof.ContractForGenerator"] = ["SharpProof.Contracts"],
             ["SharpProof.Specs"] = ["SharpProof.Ir"],
             ["SharpProof.Dataflow"] = [],
@@ -59,6 +66,7 @@ public sealed class ArchitectureTests {
             ["SharpProof.Worker.Protocol"] = [],
             ["SharpProof.Worker"] = [
                 "SharpProof.Attributes",
+                "SharpProof.CompilerArtifact",
                 "SharpProof.Contracts",
                 "SharpProof.Dataflow",
                 "SharpProof.Frontend",
@@ -69,6 +77,7 @@ public sealed class ArchitectureTests {
                 "SharpProof.Worker.Protocol"
             ],
             ["SharpProof.Worker.Launcher"] = [
+                "SharpProof.Ir",
                 "SharpProof.Worker.Protocol"
             ]
         };
@@ -138,6 +147,7 @@ public sealed class ArchitectureTests {
     public void SemanticConsumersDoNotEncodeFrameworkIdentitiesAsStringLiterals() {
         var semanticConsumers = new[] {
             "SharpProof.Analyzer",
+            "SharpProof.CompilerArtifact",
             "SharpProof.Contracts",
             "SharpProof.Dataflow",
             "SharpProof.Effects",

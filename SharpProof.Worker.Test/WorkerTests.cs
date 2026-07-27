@@ -1,6 +1,7 @@
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.Attributes;
+using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;

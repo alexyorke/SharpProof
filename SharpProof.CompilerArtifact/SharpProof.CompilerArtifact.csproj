@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>12.0</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="4.14.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+    <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\SharpProof.Specs\Polyfills\IsExternalInit.cs"
+             Link="Polyfills\IsExternalInit.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SharpProof.Contracts\SharpProof.Contracts.csproj" />
+    <ProjectReference Include="..\SharpProof.Frontend\SharpProof.Frontend.csproj" />
+    <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
+    <ProjectReference Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\SharpProof.Worker.Protocol\SharpProof.Worker.Protocol.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="System.Collections.Immutable" />
+    <Using Include="System.Globalization" />
+    <Using Include="Microsoft.CodeAnalysis" />
+    <Using Include="Microsoft.CodeAnalysis.CSharp" />
+    <Using Include="Microsoft.CodeAnalysis.CSharp.Syntax" />
+    <Using Include="Microsoft.CodeAnalysis.Operations" />
+    <Using Include="SharpProof.Contracts" />
+    <Using Include="SharpProof.Ir" />
+    <Using Include="SharpProof.Worker.Protocol" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Analyzer" />
+    <InternalsVisibleTo Include="SharpProof.Worker" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+  </ItemGroup>
+</Project>

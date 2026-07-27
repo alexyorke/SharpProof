@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text;
 #pragma warning disable RS1035 // This build-only analyzer emits the selected seal.
 namespace SharpProof.Analyzer;
 internal static class FinalCompilationCollector {
@@ -7,14 +6,13 @@ internal static class FinalCompilationCollector {
         "build_property._SharpProofCompilationSealPath";
     private const string TargetFrameworkOption =
         "build_property._SharpProofCompilationTargetFramework";
-    private static readonly UTF8Encoding Utf8 = new(false);
     internal static void Collect(CompilationAnalysisContext context, AnalyzerConfiguration configuration) {
         var options = context.Options.AnalyzerConfigOptionsProvider.GlobalOptions;
         if (!options.TryGetValue(OutputOption, out var path) ||
             string.IsNullOrWhiteSpace(path))
             return;
         try {
-            Write(path, Create(context, options, configuration));
+            AtomicFile.WriteUtf8(path, Create(context, options, configuration));
         }
 #pragma warning disable CA1031
         catch (Exception exception)
@@ -116,24 +114,6 @@ internal static class FinalCompilationCollector {
             var count = stream.Read(buffer, 0, buffer.Length);
             if (count == 0) return Convert.ToBase64String(hash.GetHashAndReset());
             hash.AppendData(buffer, 0, count);
-        }
-    }
-    private static void Write(string path, string content) {
-        var destination = Path.GetFullPath(path);
-        var directory = Path.GetDirectoryName(destination) ??
-            throw new InvalidOperationException(
-                "The compilation seal path has no parent directory.");
-        Directory.CreateDirectory(directory);
-        var temporary = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try {
-            File.WriteAllText(temporary, content, Utf8);
-            if (File.Exists(destination))
-                File.Replace(temporary, destination, null);
-            else
-                File.Move(temporary, destination);
-        }
-        finally {
-            if (File.Exists(temporary)) File.Delete(temporary);
         }
     }
 }

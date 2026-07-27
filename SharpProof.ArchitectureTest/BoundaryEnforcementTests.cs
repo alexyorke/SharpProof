@@ -9,6 +9,7 @@ public sealed class BoundaryEnforcementTests {
     private static readonly string[] BannedApiProjects = [
         "SharpProof.Analyzer",
         "SharpProof.Attributes",
+        "SharpProof.CompilerArtifact",
         "SharpProof.ContractForGenerator",
         "SharpProof.Contracts",
         "SharpProof.Dataflow",
@@ -26,6 +27,7 @@ public sealed class BoundaryEnforcementTests {
 
     private static readonly string[] SoundnessCriticalProjects = [
         "SharpProof.Analyzer",
+        "SharpProof.CompilerArtifact",
         "SharpProof.ContractForGenerator",
         "SharpProof.Contracts",
         "SharpProof.Dataflow",
@@ -165,6 +167,7 @@ public sealed class BoundaryEnforcementTests {
         var direct = ProjectReferences("SharpProof.Analyzer");
         string[] expectedDirect = [
             "SharpProof.Attributes",
+            "SharpProof.CompilerArtifact",
             "SharpProof.Contracts",
             "SharpProof.Effects",
             "SharpProof.Frontend",
@@ -294,6 +297,7 @@ public sealed class BoundaryEnforcementTests {
             @"SharpProof.Attributes.Test\SharpProof.Attributes.Test.csproj",
             @"SharpProof.Attributes\SharpProof.Attributes.csproj",
             @"SharpProof.CompilerProbe.TestAsset\SharpProof.CompilerProbe.TestAsset.csproj",
+            @"SharpProof.CompilerArtifact\SharpProof.CompilerArtifact.csproj",
             @"SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj",
             @"SharpProof.ContractForGenerator\SharpProof.ContractForGenerator.csproj",
             @"SharpProof.Contracts.Test\SharpProof.Contracts.Test.csproj",

@@ -1,4 +1,4 @@
-namespace SharpProof.Worker;
+namespace SharpProof.CompilerArtifact;
 internal sealed class ClaimManifestBuilder(
     CSharpCompilation compilation,
     WorkerFeatureSet enabledFeatures = WorkerFeatureSet.All) {
@@ -36,7 +36,7 @@ internal sealed class ClaimManifestBuilder(
         var usesCompanion = false;
         if (inventory.Clauses.IsDefaultOrEmpty &&
             TryResolveCompanion(target, out var companion)) {
-            source = companion;
+            source = companion!;
             inventory = _clauses.Create(source);
             usesCompanion = true;
         }
@@ -65,7 +65,7 @@ internal sealed class ClaimManifestBuilder(
         if (candidates.Count == 0 && selected.IsDefaultOrEmpty && assumptions.IsDefaultOrEmpty)
             return null;
         var claims = CreateClaims(candidates.ToImmutable(), callableId, _compilation.Assembly.Identity.Name);
-        var features = selected.ToHashSet();
+        var features = new HashSet<WorkerSelectedFeature>(selected);
         if (claims.Length != 0 ||
             assumptions.Any(static evidence => evidence.Kind == WorkerAssumptionKind.UserAssume))
             features.Add(WorkerSelectedFeature.Contracts);
@@ -78,7 +78,7 @@ internal sealed class ClaimManifestBuilder(
         var callableLocation = GetCallableLocation(target, declaration);
         var entry = new WorkerCallableManifestEntry {
             CallableId = callableId,
-            SelectedFeatures = [.. features.Order()],
+            SelectedFeatures = [.. features.OrderBy(static value => value)],
             SelectionReasons = reasons.ToArray(),
             Location = callableLocation.IsInSource ? ToSourceLocation(callableLocation) :
                 claims.FirstOrDefault()?.Entry.Location ?? new WorkerSourceLocation(),
@@ -209,7 +209,8 @@ internal sealed class ClaimManifestBuilder(
     private ImmutableDictionary<IMethodSymbol, string> CreateCallableIds(
         ImmutableArray<CallableSeed> callables) {
         var trees = _compilation.SyntaxTrees.Select(
-            static (tree, ordinal) => (tree, ordinal)).ToDictionary();
+            static (tree, ordinal) => (tree, ordinal)).ToDictionary(
+            static value => value.tree, static value => value.ordinal);
         var ordinals = new Dictionary<IMethodSymbol, int>(SymbolEqualityComparer.Default);
         foreach (var group in callables
                      .Where(static seed => seed.Method.MethodKind is
@@ -244,7 +245,7 @@ internal sealed class ClaimManifestBuilder(
             return id;
         }
     }
-    private bool TryResolveCompanion(IMethodSymbol target, [NotNullWhen(true)] out IMethodSymbol? source) {
+    private bool TryResolveCompanion(IMethodSymbol target, out IMethodSymbol? source) {
         source = null;
         if (target.MethodKind != MethodKind.Ordinary) return false;
         var companions = _companions

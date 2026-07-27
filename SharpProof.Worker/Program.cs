@@ -174,25 +174,9 @@ internal static class Program {
         return false;
     }
 
-    private static async Task WriteResponseAtomicAsync(
+    private static Task WriteResponseAtomicAsync(
         string path,
-        WorkerVerifyResponse response) {
-        var fullPath = Path.GetFullPath(path);
-        Directory.CreateDirectory(
-            Path.GetDirectoryName(fullPath) ??
-            throw new InvalidOperationException(
-                "The result path has no directory."));
-        var temporary = fullPath + "." +
-                        Guid.NewGuid().ToString("N") + ".tmp";
-        try {
-            await File.WriteAllTextAsync(
-                temporary,
-                WorkerProtocolJson.SerializeResponse(response),
-                new UTF8Encoding(false)).ConfigureAwait(false);
-            File.Move(temporary, fullPath, overwrite: true);
-        }
-        finally {
-            if (File.Exists(temporary)) File.Delete(temporary);
-        }
-    }
+        WorkerVerifyResponse response) =>
+        AtomicFile.WriteUtf8Async(
+            path, WorkerProtocolJson.SerializeResponse(response));
 }

@@ -19,4 +19,7 @@
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\SharpProof.Specs\SharpProof.Specs.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.CompilerArtifact" />
+  </ItemGroup>
 </Project>

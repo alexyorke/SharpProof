@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Win32.SafeHandles;
+using SharpProof.Ir;
 using SharpProof.Worker.Protocol;
 
 [assembly: DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
@@ -273,21 +274,8 @@ internal static class Program {
             new { response.RunStatus, response.FailureReason, response.Summary },
             WorkerProtocolJson.Options));
 
-    private static async Task WriteAtomicAsync(string path, string content) {
-        var fullPath = Path.GetFullPath(path);
-        Directory.CreateDirectory(
-            Path.GetDirectoryName(fullPath) ??
-            throw new InvalidOperationException("The output path has no directory."));
-        var temporary = fullPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try {
-            await File.WriteAllTextAsync(temporary, content, new UTF8Encoding(false))
-                .ConfigureAwait(false);
-            File.Move(temporary, fullPath, overwrite: true);
-        }
-        finally {
-            if (File.Exists(temporary)) File.Delete(temporary);
-        }
-    }
+    private static Task WriteAtomicAsync(string path, string content) =>
+        AtomicFile.WriteUtf8Async(path, content);
 
     private static async Task PublishAsync(
         string sourcePath, string? destinationPath) {

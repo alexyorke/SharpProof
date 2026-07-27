@@ -61,15 +61,8 @@ internal sealed class VerificationCache(
                 response.Payload);
             var json = JsonSerializer.Serialize(envelope, WorkerProtocolJson.Options);
             var path = GetPath(response.InputHash);
-            var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-            try {
-                await File.WriteAllTextAsync(
-                    temporary, json, new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
-                File.Move(temporary, path, overwrite: true);
-            }
-            finally {
-                if (File.Exists(temporary)) File.Delete(temporary);
-            }
+            await AtomicFile.WriteUtf8Async(path, json, cancellationToken)
+                .ConfigureAwait(false);
             Evict();
             return true;
         }

@@ -12,6 +12,7 @@ global using Microsoft.CodeAnalysis.CSharp.Syntax;
 global using Microsoft.CodeAnalysis.Operations;
 global using Microsoft.CodeAnalysis.Text;
 global using SharpProof.Contracts;
+global using SharpProof.CompilerArtifact;
 global using SharpProof.Dataflow;
 global using SharpProof.Frontend;
 global using SharpProof.Ir;
