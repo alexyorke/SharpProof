@@ -467,13 +467,13 @@ public sealed class ClaimManifestBuilderTests {
         var second = Build(("Second.cs", source)).Targets.Values.Single();
 
         Assert.That(
-            first.Assumptions.Select(static value => value.Kind),
+            first.Entry.Assumptions.Select(static value => value.Kind),
             Is.EqualTo(UserAndTrusted));
         Assert.That(
-            first.Assumptions.Select(static value => value.Id),
-            Is.EqualTo(second.Assumptions.Select(static value => value.Id)));
+            first.Entry.Assumptions.Select(static value => value.Id),
+            Is.EqualTo(second.Entry.Assumptions.Select(static value => value.Id)));
         Assert.That(
-            first.Assumptions.All(static value => !value.Used),
+            first.Entry.Assumptions.All(static value => !value.Used),
             Is.True);
     }
 
@@ -589,7 +589,7 @@ public sealed class ClaimManifestBuilderTests {
             WorkerFeatureSet.Effects).Build().Targets.Values.Single();
 
         Assert.That(
-            target.Assumptions.Select(static evidence => evidence.Kind),
+            target.Entry.Assumptions.Select(static evidence => evidence.Kind),
             Is.EqualTo([WorkerAssumptionKind.TrustedBoundary]));
     }
 

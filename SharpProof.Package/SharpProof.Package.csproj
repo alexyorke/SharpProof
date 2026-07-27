@@ -46,7 +46,6 @@
     <AttributesPayloadPath>..\SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.dll</AttributesPayloadPath>
     <WorkerPayloadDirectory>..\SharpProof.Worker\bin\$(Configuration)\net9.0</WorkerPayloadDirectory>
     <LauncherPayloadDirectory>..\SharpProof.Worker.Launcher\bin\$(Configuration)\net9.0</LauncherPayloadDirectory>
-    <RoslynCompilerPayloadDirectory>$(RoslynTargetsPath)\bincore</RoslynCompilerPayloadDirectory>
   </PropertyGroup>
   <Target Name="_AddAnalyzersToOutput">
     <ItemGroup>
@@ -63,7 +62,6 @@
           $(AnalyzerPayloadDirectory)\SharpProof.Ir.dll;
           $(AnalyzerPayloadDirectory)\SharpProof.Specs.dll;
           $(AnalyzerPayloadDirectory)\SharpProof.Worker.Protocol.dll;
-          $(AnalyzerPayloadDirectory)\Microsoft.CodeAnalysis.AnalyzerUtilities.dll;
           $(AnalyzerPayloadDirectory)\System.Buffers.dll;
           $(AnalyzerPayloadDirectory)\System.Collections.Immutable.dll;
           $(AnalyzerPayloadDirectory)\System.IO.Pipelines.dll;
@@ -78,15 +76,9 @@
                                  PackagePath="tools/analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="$(AttributesPayloadPath)" PackagePath="lib/netstandard2.0" />
       <TfmSpecificPackageFile Include="
-          $(WorkerPayloadDirectory)\Microsoft.CodeAnalysis.AnalyzerUtilities.dll;
-          $(RoslynCompilerPayloadDirectory)\Microsoft.CodeAnalysis.CSharp.dll;
-          $(RoslynCompilerPayloadDirectory)\Microsoft.CodeAnalysis.dll;
           $(WorkerPayloadDirectory)\Microsoft.Z3.dll;
-          $(WorkerPayloadDirectory)\SharpProof.Attributes.dll;
           $(WorkerPayloadDirectory)\SharpProof.CompilerArtifact.dll;
-          $(WorkerPayloadDirectory)\SharpProof.Contracts.dll;
           $(WorkerPayloadDirectory)\SharpProof.Dataflow.dll;
-          $(WorkerPayloadDirectory)\SharpProof.Frontend.dll;
           $(WorkerPayloadDirectory)\SharpProof.Ir.dll;
           $(WorkerPayloadDirectory)\SharpProof.Smt.dll;
           $(WorkerPayloadDirectory)\SharpProof.Specs.dll;

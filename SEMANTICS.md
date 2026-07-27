@@ -196,10 +196,38 @@ and primary constructors. A closed constructed generic API call is accepted only
 when a specification resolves for that exact call. Every Roslyn `OperationKind`
 is classified by a checked-in decision table; an unknown future kind is rejected.
 
-The packaged verifier consumes schema-2 compiler evidence containing the final
-handwritten and generated tree text, a bounded captured parse/compilation-option set,
-reference identities and image hashes, and the sealed selected-claim manifest.
-It does not reread project source or MSBuild input lists. It currently recreates
-Roslyn symbols from that evidence under an exact compiler-version gate; the
-final lowered-IR artifact that removes compiler reconstruction is still a 1.0
-gate. SARIF projection is likewise not implemented.
+The packaged verifier consumes compiler artifact schema version 3 produced
+from the final post-generator compilation. The artifact contains the sealed
+feature-selected manifest and, for every selected callable, either a typed
+lowering failure or portable whole-body CFG/IR with bound clauses, canonical
+variables, body-entry state, parameter mappings, and bound API-spec witness
+metadata. It also carries compiler error diagnostics and mapped locations,
+handwritten and generated tree hashes and parse evidence, a bounded
+proof-relevant compilation-option set, assembly and target identity, and
+compiler/reference provenance. It contains no source text.
+
+Before cache lookup or backend creation, the worker validates the artifact
+digest and canonical shape, requires the compiler-visible maximum expression
+depth to equal the request budget, and requires exact manifest/lowered-callable
+equality, including claim ownership and declared assumptions. It hydrates
+portable IR without constructing a Roslyn compilation, reparsing source, or
+rereading reference files. Compiler versions and MVIDs and reference
+paths/hashes/identities/aliases are provenance, not a runtime compatibility
+gate.
+
+Artifact collection rejects resolver-dependent `#r`/`#load`, missing-assembly
+resolver mode, reference supersession, custom assembly-identity comparers, and
+non-file or unreadable references. `AdditionalFiles` are represented by
+canonical paths and content hashes without embedding their raw contents.
+Analyzer configuration is represented by its observable effects on the final
+compilation and effective SharpProof options. Compiler error diagnostics fail
+verification as `CompilationFailure`; malformed lowered evidence or an
+expression-depth mismatch fails as `CompilerManifestMismatch`.
+
+This closed artifact removes worker-side compiler reconstruction, but it does
+not by itself establish independent counterexample replay. Current replay
+still evaluates the lowered obligation path rather than an independent
+interpreter over the exact whole-body CFG. A SAT result that depends on a
+spec-modeled call result becomes `Unknown` with
+`CounterexampleReplayFailed`, never `Refuted`. SARIF projection is likewise not
+implemented.

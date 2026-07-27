@@ -1,11 +1,9 @@
 namespace SharpProof.Worker;
+#pragma warning disable IDE0055 // Compact result assembly preserves the fixed production-size ceiling.
 
 internal static class CallableClaimResultAssembler {
-    internal static WorkerClaimResult FromOutcome(
-        ManifestCallableTarget target,
-        int contractOrdinal,
-        ProofOutcome outcome,
-        BoundMethodContracts contracts,
+    internal static WorkerClaimResult FromOutcome(CompilerCallablePreparation target, int contractOrdinal,
+        ProofOutcome outcome, IReadOnlyList<CompilerCanonicalVariable> variables,
         IReadOnlyDictionary<ProofJustification, string> assumptionLabels,
         IReadOnlyDictionary<ProofJustification, string> userAssumptionIds,
         bool usesSpecModeledCallResult) {
@@ -13,13 +11,10 @@ internal static class CallableClaimResultAssembler {
         var usedUserAssumptions = new HashSet<string>(StringComparer.Ordinal);
         switch (outcome) {
             case ProvenOutcome proven:
-                record.Outcome = WorkerClaimOutcome.Proven;
-                record.Reason = WorkerClaimReason.None;
+                record.Outcome = WorkerClaimOutcome.Proven; record.Reason = WorkerClaimReason.None;
                 record.ProofCore = [.. proven.Core
                     .Select(justification =>
-                        assumptionLabels.TryGetValue(justification, out var label)
-                            ? label
-                            : "hygienic")
+                        assumptionLabels.TryGetValue(justification, out var label) ? label : "hygienic")
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(static label => label, StringComparer.Ordinal)];
                 foreach (var justification in proven.Core)
@@ -28,28 +23,22 @@ internal static class CallableClaimResultAssembler {
                 break;
             case RefutedOutcome when usesSpecModeledCallResult:
                 record.Outcome = WorkerClaimOutcome.Unknown;
-                record.Reason =
-                    WorkerClaimReason.CounterexampleReplayFailed;
+                record.Reason = WorkerClaimReason.CounterexampleReplayFailed;
                 break;
             case RefutedOutcome refuted:
-                record.Outcome = WorkerClaimOutcome.Refuted;
-                record.Reason = WorkerClaimReason.None;
-                record.Model = CreateModel(refuted, contracts);
+                record.Outcome = WorkerClaimOutcome.Refuted; record.Reason = WorkerClaimReason.None;
+                record.Model = CreateModel(refuted, variables);
                 break;
             case UnknownOutcome unknown:
-                record.Outcome = WorkerClaimOutcome.Unknown;
-                record.Reason = MapAbstention(unknown.Reason);
+                record.Outcome = WorkerClaimOutcome.Unknown; record.Reason = MapAbstention(unknown.Reason);
                 break;
             default:
-                record.Outcome = WorkerClaimOutcome.Unknown;
-                record.Reason =
-                    WorkerClaimReason.MalformedBackendResult;
+                record.Outcome = WorkerClaimOutcome.Unknown; record.Reason = WorkerClaimReason.MalformedBackendResult;
                 break;
         }
-        record.Assumptions = [.. target.Assumptions.Select(evidence =>
+        record.Assumptions = [.. target.Entry.Assumptions.Select(evidence =>
             new WorkerAssumptionEvidence {
-                Id = evidence.Id,
-                Kind = evidence.Kind,
+                Id = evidence.Id, Kind = evidence.Kind,
                 Used = evidence.Kind == WorkerAssumptionKind.UserAssume &&
                        usedUserAssumptions.Contains(evidence.Id)
             })];
@@ -57,68 +46,38 @@ internal static class CallableClaimResultAssembler {
     }
 
     internal static WorkerClaimResult Unknown(
-        ManifestCallableTarget target,
-        int contractOrdinal,
-        WorkerClaimReason reason) {
+        CompilerCallablePreparation target, int contractOrdinal, WorkerClaimReason reason) {
         var record = CreateBaseRecord(target, contractOrdinal);
-        record.Outcome = WorkerClaimOutcome.Unknown;
-        record.Reason = reason;
+        record.Outcome = WorkerClaimOutcome.Unknown; record.Reason = reason;
         return record;
     }
 
     internal static ImmutableArray<WorkerClaimResult> Unknowns(
-        ManifestCallableTarget target,
-        WorkerClaimReason reason) =>
-        [.. target.Claims.Select((_, index) =>
-            Unknown(target, index, reason))];
+        CompilerCallablePreparation target, WorkerClaimReason reason) =>
+        [.. target.Entry.ClaimIds.Select((_, index) => Unknown(target, index, reason))];
 
-    internal static void AppendResourceLimit(
-        ImmutableArray<WorkerClaimResult>.Builder records,
-        ManifestCallableTarget target,
-        int start,
-        int count) {
+    internal static void AppendResourceLimit(ImmutableArray<WorkerClaimResult>.Builder records,
+        CompilerCallablePreparation target, int start, int count) {
         for (var index = start; index < count; index++)
-            records.Add(Unknown(
-                target,
-                index,
-                WorkerClaimReason.ResourceLimit));
+            records.Add(Unknown(target, index, WorkerClaimReason.ResourceLimit));
     }
 
-    private static WorkerClaimResult CreateBaseRecord(
-        ManifestCallableTarget target,
-        int contractOrdinal) =>
+    private static WorkerClaimResult CreateBaseRecord(CompilerCallablePreparation target, int contractOrdinal) =>
         new() {
-            ClaimId = target.Claims[contractOrdinal].Entry.ClaimId,
-            Outcome = WorkerClaimOutcome.Unknown,
-            Reason = WorkerClaimReason.InfrastructureFailure,
-            Assumptions = [.. target.Assumptions]
+            ClaimId = target.Entry.ClaimIds[contractOrdinal], Outcome = WorkerClaimOutcome.Unknown,
+            Reason = WorkerClaimReason.InfrastructureFailure, Assumptions = [.. target.Entry.Assumptions]
         };
 
     private static WorkerModelValue[] CreateModel(
-        RefutedOutcome outcome,
-        BoundMethodContracts contracts) {
-        var names = contracts.Variables.ToDictionary(
+        RefutedOutcome outcome, IReadOnlyList<CompilerCanonicalVariable> variables) {
+        var names = variables.ToDictionary(
             static variable => variable.Variable,
-            static variable => variable.Role switch {
-                BoundContractVariableRole.Parameter =>
-                    "parameter:" + variable.Ordinal.ToString(
-                        CultureInfo.InvariantCulture),
-                BoundContractVariableRole.Receiver => "receiver",
-                BoundContractVariableRole.Result => "result",
-                BoundContractVariableRole.PreState =>
-                    "pre:" + (variable.CurrentStateVariable?.Value ?? -1)
-                        .ToString(CultureInfo.InvariantCulture),
-                _ => "variable:" + variable.Variable.Value.ToString(
-                    CultureInfo.InvariantCulture)
-            });
+            static variable => variable.ModelLabel);
         return [.. outcome.Model.Assignments
             .Select(assignment => new WorkerModelValue {
-                Variable = names.TryGetValue(assignment.Key, out var name)
-                    ? name
-                    : "variable:" + assignment.Key.Value.ToString(
-                        CultureInfo.InvariantCulture),
-                Kind = assignment.Value.Kind.ToString(),
-                Value = FormatValue(assignment.Value)
+                Variable = names.TryGetValue(assignment.Key, out var name) ? name :
+                    "variable:" + assignment.Key.Value.ToString(CultureInfo.InvariantCulture),
+                Kind = assignment.Value.Kind.ToString(), Value = FormatValue(assignment.Value)
             })
             .OrderBy(static value => value.Variable, StringComparer.Ordinal)];
     }
@@ -131,24 +90,15 @@ internal static class CallableClaimResultAssembler {
         _ => "<opaque>"
     };
 
-    private static WorkerClaimReason MapAbstention(
-        AbstentionReason reason) => reason switch {
-            AbstentionReason.UnsupportedOperation =>
-                WorkerClaimReason.UnsupportedExpression,
-            AbstentionReason.UnsupportedEncoding =>
-                WorkerClaimReason.UnsupportedExpression,
-            AbstentionReason.ResourceLimit =>
-                WorkerClaimReason.ResourceLimit,
-            AbstentionReason.Timeout =>
-                WorkerClaimReason.MethodTimeout,
-            AbstentionReason.BackendUnavailable =>
-                WorkerClaimReason.BackendUnavailable,
-            AbstentionReason.InfrastructureFailure =>
-                WorkerClaimReason.InfrastructureFailure,
-            AbstentionReason.MalformedBackendResult =>
-                WorkerClaimReason.MalformedBackendResult,
-            AbstentionReason.CounterexampleReplayFailed =>
-                WorkerClaimReason.CounterexampleReplayFailed,
+    private static WorkerClaimReason MapAbstention(AbstentionReason reason) => reason switch {
+            AbstentionReason.UnsupportedOperation => WorkerClaimReason.UnsupportedExpression,
+            AbstentionReason.UnsupportedEncoding => WorkerClaimReason.UnsupportedExpression,
+            AbstentionReason.ResourceLimit => WorkerClaimReason.ResourceLimit,
+            AbstentionReason.Timeout => WorkerClaimReason.MethodTimeout,
+            AbstentionReason.BackendUnavailable => WorkerClaimReason.BackendUnavailable,
+            AbstentionReason.InfrastructureFailure => WorkerClaimReason.InfrastructureFailure,
+            AbstentionReason.MalformedBackendResult => WorkerClaimReason.MalformedBackendResult,
+            AbstentionReason.CounterexampleReplayFailed => WorkerClaimReason.CounterexampleReplayFailed,
             _ => WorkerClaimReason.UnsupportedExpression
         };
 }

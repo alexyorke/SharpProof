@@ -20,7 +20,7 @@
   "worker": {
     "protocolVersion": 5,
     "manifestSchemaVersion": 2,
-    "compilerArtifactSchemaVersion": 2,
+    "compilerArtifactSchemaVersion": 3,
     "maximumParallelism": 4,
     "maximumMemoryMiB": 2048,
     "queryRlimit": 3000000,

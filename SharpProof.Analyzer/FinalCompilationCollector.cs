@@ -3,7 +3,9 @@ namespace SharpProof.Analyzer;
 internal static class FinalCompilationCollector {
     private const string OutputOption = "build_property._SharpProofCompilerManifestPath",
         TargetFrameworkOption = "build_property._SharpProofCompilationTargetFramework",
-        ProjectDirectoryOption = "build_property._SharpProofProjectDirectory";
+        ProjectDirectoryOption = "build_property._SharpProofProjectDirectory",
+        MaximumExpressionDepthOption =
+            "build_property.SharpProofVerifyMaximumExpressionDepth";
     internal static void Collect(CompilationAnalysisContext context, AnalyzerConfiguration configuration) {
         var options = context.Options.AnalyzerConfigOptionsProvider.GlobalOptions;
         if (!options.TryGetValue(OutputOption, out var path) ||
@@ -32,10 +34,18 @@ internal static class FinalCompilationCollector {
             configuration.Features == SharpProofFeatures.Contracts ? WorkerFeatureSet.Contracts : WorkerFeatureSet.All;
         var discovery = new ClaimManifestBuilder(
             compilation, features, context.CancellationToken).Build();
-        var artifact = CompilerManifestArtifactJson.Create(
+        if (!int.TryParse(
+                Get(options, MaximumExpressionDepthOption),
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var maximumExpressionDepth) ||
+            maximumExpressionDepth is < 1 or > 256)
+            throw new InvalidOperationException(
+                "SharpProofVerifyMaximumExpressionDepth must be between 1 and 256.");
+        var artifact = CompilerManifestArtifactProducer.Create(
             compilation, Get(options, ProjectDirectoryOption),
-            targetFramework, features, discovery.Manifest,
-            context.CancellationToken);
+            targetFramework, features, discovery, maximumExpressionDepth,
+            context.CancellationToken, context.Options.AdditionalFiles);
         return CompilerManifestArtifactJson.Serialize(artifact);
     }
     private static string Get(AnalyzerConfigOptions options, string key) => options.TryGetValue(key, out var value) ? value : string.Empty;

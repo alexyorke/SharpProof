@@ -403,24 +403,39 @@ foreach ($propertyName in $workerPropertyNames) {
 }
 
 $callableVerifier = Get-RequiredText 'SharpProof.Worker\CallableVerifier.cs'
-$fixedBodyBounds = [ordered]@{
-    maximumBodyBlocks = 'Reachable CFG blocks'
-    maximumBodyPaths = 'Normal-return paths'
-    maximumExecutionStates = 'Symbolic execution states'
+$compilerCallableLowerer = Get-RequiredText (
+    'SharpProof.Analyzer\CompilerArtifact\CompilerCallableLowerer.cs')
+$blockBound = [regex]::Match(
+    $compilerCallableLowerer,
+    'const\s+int\s+MaximumBodyBlocks\s*=\s*(?<value>\d+)\s*;')
+$executorBounds = [regex]::Match(
+    $callableVerifier,
+    'prepared\.ParameterBindings,\s*(?<paths>\d+),\s*(?<states>\d+)\s*\)',
+    [System.Text.RegularExpressions.RegexOptions]::Singleline)
+if (-not $blockBound.Success -or -not $executorBounds.Success) {
+    throw 'Could not derive compiler/worker body execution bounds.'
 }
-foreach ($entry in $fixedBodyBounds.GetEnumerator()) {
-    $boundMatch = [regex]::Match(
-        $callableVerifier,
-        'const\s+int\s+' + $entry.Key + '\s*=\s*(?<value>\d+)\s*;')
-    if (-not $boundMatch.Success) {
-        throw "Could not derive worker body bound '$($entry.Key)'."
+$fixedBodyBounds = @(
+    [pscustomobject]@{
+        Label = 'Reachable CFG blocks'
+        Value = $blockBound.Groups['value'].Value
+    },
+    [pscustomobject]@{
+        Label = 'Normal-return paths'
+        Value = $executorBounds.Groups['paths'].Value
+    },
+    [pscustomobject]@{
+        Label = 'Symbolic execution states'
+        Value = $executorBounds.Groups['states'].Value
     }
+)
+foreach ($entry in $fixedBodyBounds) {
     $displayValue = [int]::Parse(
-        $boundMatch.Groups['value'].Value,
+        $entry.Value,
         [Globalization.CultureInfo]::InvariantCulture).ToString(
             'N0',
             [Globalization.CultureInfo]::InvariantCulture)
-    $expectedRow = '| ' + $entry.Value + ' | ' + $displayValue + ' |'
+    $expectedRow = '| ' + $entry.Label + ' | ' + $displayValue + ' |'
     if (-not $limitReference.Contains(
         $expectedRow,
         [StringComparison]::Ordinal)) {

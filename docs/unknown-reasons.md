@@ -146,8 +146,8 @@ or makes a failed run successful.
 | `None` | Required for a `Complete`, `TimedOut`, or `Canceled` run |
 | `InvalidRequest` | The request failed schema or value validation |
 | `InputUnavailable` | The required compiler-manifest artifact could not be read |
-| `CompilationFailure` | Roslyn could not construct a valid compilation |
-| `CompilerManifestMismatch` | Artifact digest/schema, compiler/reference evidence, reconstruction, or discovered claims do not exactly match |
+| `CompilationFailure` | The compiler-produced artifact contains one or more error diagnostics |
+| `CompilerManifestMismatch` | Artifact digest/schema, expression-depth binding, lowered graph, callable/claim ownership, or assumption declarations are invalid or inconsistent |
 | `BackendUnavailable` | The configured SMT backend or native payload is unavailable |
 | `InfrastructureFailure` | A non-semantic worker component failed |
 | `MalformedResult` | A backend, cache, or assembled response failed structural validation |
@@ -215,8 +215,9 @@ mis-owned claims make the response malformed rather than successful.
 - `Unavailable`
 
 The response summary includes counts for every claim outcome and reason,
-user/trusted evidence, cache state, protocol/manifest/cache/tool/spec versions,
-effective budgets, and elapsed time.
+assumptions (including used, user, and trusted counts), cache state,
+protocol/manifest/cache/tool/spec versions, effective budgets, and elapsed
+time.
 
 ## Protocol errors are separate
 
@@ -226,9 +227,8 @@ string codes such as:
 
 - `request.null`, `request.malformed`, and `protocol.unsupported`;
 - `project.compiler_manifest`;
-- `compiler_manifest.unavailable`, `compiler_manifest.invalid`,
-  `compiler_manifest.compilation`, and `compiler_manifest.mismatch`;
-- `manifest.failed`;
+- `compiler_manifest.unavailable` and `compiler_manifest.invalid`;
+- `compiler_manifest.options` and `compiler_manifest.lowered_ir`;
 - `budgets.rlimit`, `budgets.expression_depth`, and other budget codes;
 - `cache.maximum_bytes`;
 - `input.unavailable`, `backend.unavailable`, `worker.infrastructure`,

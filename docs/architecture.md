@@ -18,13 +18,13 @@ Contracts             -> Attributes, Frontend, Ir, Specs
 Effects               -> Attributes, Dataflow, Frontend, Specs
 Verify                -> Ir, Specs
 Smt                   -> Ir, Verify
-CompilerArtifact      -> Contracts, Frontend, Ir, Worker.Protocol
+CompilerArtifact      -> Contracts, Frontend, Ir, Specs, Worker.Protocol
 ContractForGenerator  -> Contracts
 Analyzer              -> Attributes, CompilerArtifact, Contracts, Effects,
                          Frontend, Ir, Specs
 Worker.Protocol
-Worker                -> Attributes, CompilerArtifact, Contracts, Dataflow,
-                         Frontend, Ir, Smt, Specs, Verify, Worker.Protocol
+Worker                -> CompilerArtifact, Contracts, Dataflow, Ir, Smt,
+                         Specs, Verify, Worker.Protocol
 Worker.Launcher       -> CompilerArtifact, Ir, Specs, Worker.Protocol
 ```
 
@@ -45,6 +45,15 @@ boundaries into build errors. Architecture and package tests complement those
 rules with exact project-reference and payload checks. These checks define
 mechanical enforcement boundaries; they do not expand the admitted language or
 turn an unsupported result into proof.
+
+The `trustedKernel` path/LOC ratchet in `eng/acceptance/contract.json` covers
+only proof-outcome construction. It is not the complete trusted computing base.
+End-to-end verification also trusts compiler-side selection, contract/spec
+binding, lowering and artifact encoding; worker-side artifact decoding,
+obligation construction, SMT encoding and replay; protocol/policy/cache
+validation; and launcher containment/publication. Those boundaries require
+direct tests and review even though they are not all in the proof-kernel LOC
+ratchet.
 
 ## Semantic core
 
@@ -72,9 +81,10 @@ bounded call-result integration; it does not use roslyn-analyzers entities,
 points-to state, or general CFG transfer.
 
 External effect analysis uses a symbol-resolved `ApiSpecTable` or an explicitly
-trusted, complete effect contract. The worker consumes only eligible resolved
-`ApiSpec` rows. Unmodeled or untrusted metadata is unknown; there is no IL
-interpreter.
+trusted, complete effect contract. Compiler-side callable lowering binds only
+eligible resolved `ApiSpec` rows into exact witness metadata; the worker
+revalidates those witnesses against its matching table. Unmodeled or untrusted
+metadata is unknown; there is no IL interpreter.
 
 ## Contracts and modular verification
 
@@ -84,13 +94,13 @@ validated by an incremental, no-source generator using exact symbol identity,
 including generics, constraints, ref/scoped kinds, nullability, defaults, and
 return shape.
 
-At inlining depth zero, the current worker consumes only facts from resolved
-`ApiSpec` rows within its admitted call boundary. This is not general
-source-callee modular assume/guarantee verification. The analyzer performs
-cheap effect projections and reports a compiler-bound `Requires` violation
-only when concrete replay evaluates the precondition to false. The worker
-checks only the bounded `Ensures` subset supported by its admitted acyclic CFG
-executor; deep or otherwise unsupported postconditions abstain.
+At inlining depth zero, the current verifier consumes only facts from
+compiler-bound `ApiSpec` rows within its admitted call boundary. This is not
+general source-callee modular assume/guarantee verification. The analyzer
+performs cheap effect projections and reports a compiler-bound `Requires`
+violation only when concrete replay evaluates the precondition to false. The
+worker checks only the bounded `Ensures` subset supported by its admitted
+acyclic CFG executor; deep or otherwise unsupported postconditions abstain.
 
 Proof evidence is type-safe. Approximations cannot construct an assumption.
 `Proven` is created only by the proof kernel after unsat-core hygiene checks.
@@ -104,14 +114,12 @@ indices. Formula construction, worklists, specs, proof cores, diagnostics, and
 serialized responses are stably ordered. Z3 uses resource limits; wall time is
 an outer process kill boundary.
 
-Protocol version 5 binds each request to a compiler-produced manifest artifact
-and then builds an independent manifest from compiler symbols recreated from
-that artifact. Stable semantic IDs identify selected callables, postcondition
-claims, and user/trusted evidence independently of formatting. The protocol
-separates run status, callable coverage, and per-claim outcome. Central
-validation requires the response to match the sealed manifest exactly,
-including dense ordinals, claim ownership, summary counts, assumption
-summaries, and allowed payloads.
+Protocol version 5 binds each request to a compiler-produced closed artifact.
+Stable semantic IDs identify selected callables, postcondition claims, and
+user/trusted evidence independently of formatting. The protocol separates run
+status, callable coverage, and per-claim outcome. Central validation requires
+the response to match the sealed manifest exactly, including dense ordinals,
+claim ownership, summary counts, assumption summaries, and allowed payloads.
 
 The request carries only the compiler-artifact path/digest, policies, budgets,
 and cache controls. The artifact carries `WorkerFeatureSet` and applies the same
@@ -134,35 +142,49 @@ complete callables whose claims are hygienic `Proven` or replay-validated
 
 During Windows verification, the production analyzer observes the final
 post-generator Roslyn `Compilation` and atomically emits compiler artifact
-schema version 2 evidence. It contains the sealed selected-claim manifest,
-exact compiler build identities, a bounded parse/compilation-option set, final
-handwritten and generated tree text, reference
-paths/aliases/identities/image hashes, assembly identity, and target framework.
-Only readable, file-backed `PortableExecutableReference` inputs are admitted;
-artifact collection failure is fatal SP0049.
+schema version 3. The compiler owns selection, contract/spec binding, and body
+lowering. Every selected callable has either a typed failure record or a
+portable graph containing its bound clauses, canonical variables, whole-body
+CFG/IR, body start, initial environment, parameter mappings, and exact
+API-spec witness metadata. Callable IDs, claim ownership, and user-assumption
+IDs remain tied to the sealed manifest.
+
+The artifact also contains compiler error diagnostics with mapped locations,
+handwritten and generated tree hashes and parse settings, the bounded
+proof-relevant compilation-option set, assembly and target identity, and
+compiler/reference provenance. It intentionally contains no source text.
+Readable file-backed references are required while the compiler records their
+path, image hash, identity, kind, embed flag, and aliases. Resolver-dependent
+`#r`/`#load`, missing-assembly resolver mode, reference supersession, and custom
+assembly-identity comparers fail artifact collection as SP0049.
 
 The launcher binds the artifact bytes and request identity into the response
-and publishes the request, response, and manifest under one lock with the result
-written last. The compiler artifact is the worker's sole compilation input. The
-worker requires exact compiler-build equality, recreates symbols from embedded
-tree text and hash-verified reference images, and requires its discovered
-manifest to match compiler evidence before cache lookup or a solver query.
-Body/reference drift, missing generated claims, or incompatible compiler inputs
-fail closed as `CompilerManifestMismatch`.
+and publishes the request, response, and manifest under one lock with the
+result written last. The artifact is the worker's sole compilation input. The
+worker validates its digest and canonical shape, requires the embedded maximum
+expression depth to equal the request budget, and decodes the portable graph.
+Exact manifest/lowered-callable equality, claim lists, assumption declarations,
+and graph indices are checked before cache lookup or backend creation.
+Compiler diagnostics fail as `CompilationFailure`; malformed lowered evidence
+or option mismatch fails as `CompilerManifestMismatch`.
 
-The artifact is not yet closed lowered IR. Raw `AdditionalFiles` and analyzer
-configuration are not retained; their generated output is covered only when it
-changes final compiler state. Reference images remain file-backed, though their
-bytes are verified before use, and exact Roslyn Common/C# build-identity
-equality is temporarily required. The bounded option snapshot does not claim
-to serialize all Roslyn compilation state. Generated bodies are now
-verifiable. Source-list reconstruction has
-been deleted, but compiler reconstruction remains until obligation IR replaces
-the embedded-tree bridge, so production-plan Step 4 is not complete.
-Deterministic JSON is emitted, but SARIF projection is also future work.
-Counterexample replay currently re-evaluates the lowered obligation-path IR; an
-independent whole-body interpreter over the exact CFG is also still required
-before 1.0.
+The worker project contains no direct Roslyn dependency and performs no
+compiler reconstruction or source parsing. It does not reread reference files.
+Compiler versions and MVIDs and reference paths/hashes/identities/aliases are
+provenance and cache-key evidence, not a runtime compatibility gate.
+`AdditionalFiles` are sealed by canonical path and content hash without
+embedding their raw contents. Analyzer configuration is represented by its
+observable effects on the final compilation and effective SharpProof options;
+generated output is covered by its tree hashes, manifest entries, and lowered
+callables.
+
+This closes the compiler-to-worker lowered-artifact cutover for the bounded
+verifier subset. It does not close the independent replay gate.
+Counterexample replay still re-evaluates the lowered obligation path rather
+than interpreting the exact whole-body CFG independently. In particular, a SAT
+model involving a spec-modeled call result is downgraded to `Unknown` with
+`CounterexampleReplayFailed`. Deterministic JSON is emitted, but SARIF
+projection is also future work.
 
 ## Activation and release gates
 

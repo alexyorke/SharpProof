@@ -25,5 +25,6 @@
     <CompilerVisibleProperty Include="_SharpProofCompilerManifestPath" />
     <CompilerVisibleProperty Include="_SharpProofCompilationTargetFramework" />
     <CompilerVisibleProperty Include="_SharpProofProjectDirectory" />
+    <CompilerVisibleProperty Include="SharpProofVerifyMaximumExpressionDepth" />
   </ItemGroup>
 </Project>

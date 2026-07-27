@@ -8,6 +8,7 @@
     <CompilerVisibleProperty Include="_SharpProofCompilerManifestPath" />
     <CompilerVisibleProperty Include="_SharpProofCompilationTargetFramework" />
     <CompilerVisibleProperty Include="_SharpProofProjectDirectory" />
+    <CompilerVisibleProperty Include="SharpProofVerifyMaximumExpressionDepth" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,7 +28,6 @@
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Ir\bin\$(Configuration)\netstandard2.0\SharpProof.Ir.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Specs\bin\$(Configuration)\netstandard2.0\SharpProof.Specs.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Worker.Protocol\bin\$(Configuration)\netstandard2.0\SharpProof.Worker.Protocol.dll" />
-    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\Microsoft.CodeAnalysis.AnalyzerUtilities.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\Microsoft.Bcl.AsyncInterfaces.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\System.Buffers.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\System.Collections.Immutable.dll" />

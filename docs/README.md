@@ -35,7 +35,7 @@ The implementation remains the authority for enumerated surfaces:
   manifest schema version 2, cache schema version 5, policies, run statuses,
   callable coverage, claim outcomes/reasons, and summary records.
 - `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs` declares compiler
-  artifact schema version 2 and the compiler-evidence envelope.
+  artifact schema version 3 and the closed compiler-evidence envelope.
 - `eng/acceptance/contract.json` declares release-gate budgets. Package
   defaults that are not release-gate fields live in
   `SharpProof.Package/buildTransitive/SharpProof.props` and
@@ -57,19 +57,23 @@ the current coverage inventory or normative semantics.
 ## Known production gaps
 
 During Windows verification, the production analyzer emits a deterministic
-compiler-manifest attestation from the final post-generator Roslyn
-`Compilation`. The worker recreates compiler symbols from embedded final tree
-text and hash-verified reference images, and must match the compiler-produced
-selected-claim manifest before cache lookup or a solver query. Generated
-contracts are visible and verifiable through this bridge.
+schema-3 artifact from the final post-generator Roslyn `Compilation`. It
+contains the selected-claim manifest and portable lowered whole-body CFG/IR for
+supported selected callables, plus bound contract/spec metadata, compiler
+diagnostics, generated-tree hashes, bounded options, mapped locations, and
+identity/provenance evidence. It contains no source text.
 
-This remains an exact-build-coupled compiler bridge rather than the lowered-IR
-artifact required for 1.0. Reference images are file-backed and compiler
-reconstruction remains until the worker consumes compiler-produced obligation
-IR. Production-plan Step 4 is therefore incomplete. SARIF projection and the
-planned three-package split are also future work. Current behavior and limits
-are recorded in
-[Coverage and limits](coverage-and-limits.md#remaining-compilation-integration-gap).
+The worker validates and hydrates that closed artifact without constructing a
+Roslyn compilation or rereading reference files. Exact manifest/lowered
+callable equality and the compiler-visible expression-depth match are required
+before cache or backend work. Compiler and reference identities are provenance,
+not a runtime Roslyn-build gate. The compiler reconstruction portion of
+production-plan Step 4 is complete for the bounded verifier subset.
+
+Independent whole-body counterexample replay, SARIF projection, and the planned
+three-package split remain future work. Current behavior and limits are
+recorded in
+[Coverage and limits](coverage-and-limits.md#closed-compiler-artifact-and-remaining-limits).
 
 ## Machine-owned Markdown
 

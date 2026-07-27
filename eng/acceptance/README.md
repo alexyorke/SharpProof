@@ -11,7 +11,8 @@ is acceptable only when:
   SP0047;
 - protocol version 5 binds compiler-manifest evidence and manifests every
   selected callable and postcondition with a
-  stable semantic ID, and every response has exact manifest/result equality;
+  stable semantic ID, every lowered callable exactly matches that manifest,
+  and every response has exact manifest/result equality;
 - every new `Proven` outcome is backed by hygienic evidence and every
   `Refuted` outcome has a replay-validated witness;
 - proof-kernel evidence and outcome construction stays within the explicit
@@ -52,12 +53,16 @@ effect-only artifacts exclude postcondition claims.
 under every policy. `SharpProofMode` is a deprecated preview compatibility
 alias.
 
-This acceptance contract covers the schema-2 post-generator compiler snapshot,
-generated-tree accountability, exact manifest/result equality, and fail-closed
-compiler-version/reference validation. The worker still recreates Roslyn
-symbols from embedded tree text and file-backed, hash-verified reference
-images; lowered obligation IR, SARIF projection, the three-package split,
-protected publishing, and independent human release reviews remain open gates.
+This acceptance contract covers compiler artifact schema version 3,
+generated-tree accountability, portable whole-body lowered CFG/IR, exact
+manifest/lowered-callable/result equality, compiler-diagnostic propagation, and
+fail-closed option/provenance validation. The worker consumes that closed
+artifact without constructing a Roslyn compilation or rereading reference
+files. Compiler MVIDs and reference identities remain artifact provenance and
+cache identity rather than runtime compatibility gates.
+Independent whole-body counterexample replay, SARIF projection, the
+three-package split, protected publishing, and independent human release
+reviews remain open gates.
 
 Changes to the trusted-kernel paths, assumption construction, complete effect
 summaries, API specifications, or proof-producing outcome construction require

@@ -20,7 +20,6 @@ public sealed class PackageLayoutSmokeTests {
 
     private static readonly string[] ExpectedAnalyzerDependencyFileNames = [
         "Microsoft.Bcl.AsyncInterfaces.dll",
-        "Microsoft.CodeAnalysis.AnalyzerUtilities.dll",
         "SharpProof.Attributes.dll",
         "SharpProof.CompilerArtifact.dll",
         "SharpProof.Contracts.dll",
@@ -44,7 +43,6 @@ public sealed class PackageLayoutSmokeTests {
     ];
 
     private static readonly string[] ExpectedConditionalAnalyzerEntries = [
-        "tools/analyzers/dotnet/cs/Microsoft.CodeAnalysis.AnalyzerUtilities.dll",
         "tools/analyzers/dotnet/cs/Microsoft.Bcl.AsyncInterfaces.dll",
         "tools/analyzers/dotnet/cs/SharpProof.Analyzer.dll",
         "tools/analyzers/dotnet/cs/SharpProof.Attributes.dll",
@@ -71,15 +69,9 @@ public sealed class PackageLayoutSmokeTests {
     ];
 
     private static readonly string[] ExpectedToolEntries = [
-        "tools/net9/Microsoft.CodeAnalysis.AnalyzerUtilities.dll",
-        "tools/net9/Microsoft.CodeAnalysis.CSharp.dll",
-        "tools/net9/Microsoft.CodeAnalysis.dll",
         "tools/net9/Microsoft.Z3.dll",
-        "tools/net9/SharpProof.Attributes.dll",
         "tools/net9/SharpProof.CompilerArtifact.dll",
-        "tools/net9/SharpProof.Contracts.dll",
         "tools/net9/SharpProof.Dataflow.dll",
-        "tools/net9/SharpProof.Frontend.dll",
         "tools/net9/SharpProof.Ir.dll",
         "tools/net9/SharpProof.Smt.dll",
         "tools/net9/SharpProof.Specs.dll",
@@ -685,6 +677,32 @@ public sealed class PackageLayoutSmokeTests {
         Assert.That(
             toolEntries,
             Is.EquivalentTo(ExpectedToolEntries));
+        Assert.That(
+            toolEntries,
+            Does.Not.Contain(
+                "tools/net9/Microsoft.CodeAnalysis.AnalyzerUtilities.dll"));
+        Assert.That(
+            toolEntries.Where(static entry =>
+                entry.StartsWith(
+                    "tools/net9/Microsoft.CodeAnalysis",
+                    StringComparison.Ordinal) ||
+                entry is
+                    "tools/net9/SharpProof.Attributes.dll" or
+                    "tools/net9/SharpProof.Contracts.dll" or
+                    "tools/net9/SharpProof.Frontend.dll"),
+            Is.Empty);
+        foreach (var dependencies in new[] {
+                     "tools/net9/SharpProof.Worker.deps.json",
+                     "tools/net9/SharpProof.Worker.Launcher.deps.json"
+                 })
+            Assert.That(
+                ReadArchiveText(archive, dependencies),
+                Does.Not.Contain("\"Microsoft.CodeAnalysis/\"")
+                    .And.Not.Contain("\"Microsoft.CodeAnalysis.CSharp/\"")
+                    .And.Not.Contain("SharpProof.Attributes")
+                    .And.Not.Contain("SharpProof.Contracts")
+                    .And.Not.Contain("SharpProof.Frontend"),
+                dependencies);
         Assert.That(
             entries.Where(static entry =>
                 entry.EndsWith(
