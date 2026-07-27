@@ -2,11 +2,12 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Win32.SafeHandles;
+using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
+using SharpProof.Specs;
 using SharpProof.Worker.Protocol;
 
 [assembly: DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
@@ -14,47 +15,61 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Launcher;
 
 internal static class Program {
+    private const int TerminationCleanupReserveMilliseconds = 100;
+
     internal static async Task<int> Main(string[] args) {
         if (!LauncherArguments.TryParse(args, out var arguments)) {
             Console.Error.WriteLine(
-                "Usage: SharpProof.Worker.Launcher verify --worker <path> --request <path> --result <path> --project-directory <path> --assembly-name <name> --sources <path-list> --references <path-list> --constants <path-list> --target-framework <tfm> --language-version <version> --nullable <mode> --checked-overflow <bool> --optimize <bool> --allow-unsafe <bool> --deterministic <bool> --output-type <kind> --platform-target <platform> --prefer-32-bit <bool> --features <features> --verify-policy <policy> --assumption-policy <policy> [--publish-request <path> --publish-result <path>] [budget options]");
+                "Usage: SharpProof.Worker.Launcher verify --worker <path> --request <path> --result <path> " +
+                "--compiler-manifest <path> --verify-policy <policy> --assumption-policy <policy> " +
+                "[--publish-request <path> --publish-result <path> --publish-compiler-manifest <path>] [budget options]");
             return 2;
         }
 
         WorkerVerifyRequest request;
+        CompilerManifestArtifact artifact;
+        byte[] artifactBytes;
+        string expectedInputHash;
         try {
-            request = arguments.CreateRequest();
+            request = arguments.CreateRequest(out artifact, out artifactBytes);
+            expectedInputHash = ComputeExpectedInputHash(arguments.WorkerPath, request, artifactBytes);
             var validation = WorkerProtocolJson.Validate(request);
             if (!validation.IsValid) {
                 WriteErrors(validation.Errors, string.Empty);
                 return 2;
             }
-            await WriteAtomicAsync(
-                arguments.RequestPath,
+            await AtomicFile.WriteUtf8Async(arguments.RequestPath,
                 WorkerProtocolJson.SerializeRequest(request)).ConfigureAwait(false);
             DeleteIfExists(arguments.ResultPath);
         }
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or
-                ArgumentException or FormatException or OverflowException) {
+                ArgumentException or FormatException or OverflowException or
+                JsonException) {
             Console.Error.WriteLine(
                 "SharpProof launcher input is invalid: " +
-                exception.GetType().Name);
+                exception.GetType().Name + ": " + exception.Message);
             return 2;
         }
 
         int exitCode;
         try {
-            exitCode = RunWorker(arguments, request);
+            exitCode = RunWorker(arguments, request, artifact.Compilation.ProjectDirectory);
+        }
+        catch (OverflowException) {
+            const string message =
+                "The combined project timeout and termination grace exceed the supported range.";
+            Console.Error.WriteLine("SharpProof launcher timeout is invalid.");
+            exitCode = 3;
+            await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
+                WorkerRunStatus.Failed, WorkerRunFailureReason.InvalidRequest,
+                "launcher.timeout_overflow", message).ConfigureAwait(false);
         }
         catch (PlatformNotSupportedException exception) {
             Console.Error.WriteLine(exception.Message);
             exitCode = 125;
-            await WriteLauncherFailureAsync(
-                arguments.ResultPath,
-                request,
-                WorkerRunStatus.Failed,
-                WorkerRunFailureReason.ContainmentFailure,
+            await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
+                WorkerRunStatus.Failed, WorkerRunFailureReason.ContainmentFailure,
                 "containment.unsupported",
                 exception.Message).ConfigureAwait(false);
         }
@@ -64,43 +79,39 @@ internal static class Program {
             Console.Error.WriteLine(
                 "SharpProof worker containment could not be established.");
             exitCode = 125;
-            await WriteLauncherFailureAsync(
-                arguments.ResultPath,
-                request,
-                WorkerRunStatus.Failed,
-                WorkerRunFailureReason.ContainmentFailure,
+            await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
+                WorkerRunStatus.Failed, WorkerRunFailureReason.ContainmentFailure,
                 "containment.unavailable",
                 "Required worker containment could not be established.")
                 .ConfigureAwait(false);
         }
         if (!File.Exists(arguments.ResultPath)) {
-            var containmentFailure = exitCode == 125;
-            await WriteLauncherFailureAsync(
-                arguments.ResultPath,
-                request,
-                exitCode == 124
-                    ? WorkerRunStatus.TimedOut
-                    : WorkerRunStatus.Failed,
-                exitCode == 124
-                    ? WorkerRunFailureReason.None
-                    : containmentFailure
-                        ? WorkerRunFailureReason.ContainmentFailure
-                        : WorkerRunFailureReason.MalformedResult,
-                containmentFailure
-                    ? "containment.unavailable"
-                    : "worker.no_result",
-                containmentFailure
-                    ? "Required worker containment could not be established."
-                    : "The worker exited without a result.").ConfigureAwait(false);
+            var failure = exitCode switch {
+                124 => (WorkerRunStatus.TimedOut, WorkerRunFailureReason.None,
+                    "worker.timeout", "The worker exceeded its project time budget."),
+                125 => (WorkerRunStatus.Failed, WorkerRunFailureReason.ContainmentFailure,
+                    "containment.unavailable", "Required worker containment could not be established."),
+                _ => (WorkerRunStatus.Failed, WorkerRunFailureReason.MalformedResult,
+                    "worker.no_result", "The worker exited without a result.")
+            };
+            await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
+                failure.Item1, failure.Item2, failure.Item3, failure.Item4).ConfigureAwait(false);
         }
-        var resultExitCode = ValidateAndReport(
-            arguments.ResultPath,
-            request,
-            out var validResponse);
+        var resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
+            artifact.Manifest, out var validResponse);
+        if (!validResponse) {
+            await WriteLauncherFailureAsync(
+                arguments.ResultPath, request, artifact, expectedInputHash,
+                WorkerRunStatus.Failed, WorkerRunFailureReason.MalformedResult,
+                "worker.malformed_result",
+                "The worker result was unavailable or malformed.")
+                .ConfigureAwait(false);
+            resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
+                artifact.Manifest, out validResponse);
+        }
         if (validResponse) {
             try {
-                await PublishPairAsync(arguments)
-                    .ConfigureAwait(false);
+                PublishOutputs(arguments, request, artifact, artifactBytes, expectedInputHash);
             }
             catch (Exception exception) when (
                 exception is IOException or UnauthorizedAccessException or ArgumentException) {
@@ -117,14 +128,16 @@ internal static class Program {
     }
 
     private static int RunWorker(
-        LauncherArguments arguments,
-        WorkerVerifyRequest request) {
+        LauncherArguments arguments, WorkerVerifyRequest request,
+        string projectDirectory) {
+        var hardLimit = ComputeHardLimit(
+            request.Budgets.ProjectWallTimeMilliseconds, arguments.TerminationGraceMilliseconds);
         var startInfo = new ProcessStartInfo {
             FileName = Environment.ProcessPath ??
                 throw new InvalidOperationException("The dotnet host path is unavailable."),
             UseShellExecute = false,
             CreateNoWindow = true,
-            WorkingDirectory = request.ProjectDirectory
+            WorkingDirectory = projectDirectory
         };
         startInfo.ArgumentList.Add(arguments.WorkerPath);
         startInfo.ArgumentList.Add("verify");
@@ -133,8 +146,8 @@ internal static class Program {
         startInfo.ArgumentList.Add("--result");
         startInfo.ArgumentList.Add(arguments.ResultPath);
 
-        using var job = WindowsJob.CreateRequired(request.Budgets.ProcessMemoryLimitBytes,
-            request.Budgets.MaxWorkerProcesses);
+        using var job = WindowsJob.CreateRequired(
+            request.Budgets.ProcessMemoryLimitBytes, request.Budgets.MaxWorkerProcesses);
         var startEventName = "Local\\SharpProof.Worker." + Guid.NewGuid().ToString("N");
         using var startEvent = new EventWaitHandle(false, EventResetMode.ManualReset,
             startEventName);
@@ -146,8 +159,6 @@ internal static class Program {
             Terminate(process, entireTree: true);
             return 125;
         }
-        var hardLimit = checked(request.Budgets.ProjectWallTimeMilliseconds +
-            arguments.TerminationGraceMilliseconds);
         using var processExit = new ProcessWaitHandle(process);
         if (WaitHandle.SignalAndWait(
                 startEvent, processExit, hardLimit, exitContext: false))
@@ -156,24 +167,41 @@ internal static class Program {
         return 124;
     }
 
+    internal static int ComputeHardLimit(
+        int projectMilliseconds, int terminationGraceMilliseconds) =>
+        checked(projectMilliseconds + Math.Max(
+            1, terminationGraceMilliseconds -
+            TerminationCleanupReserveMilliseconds));
+
+    internal static string ComputeExpectedInputHash(
+        string workerPath, WorkerVerifyRequest request, byte[] artifactBytes) {
+        var version = FileVersionInfo.GetVersionInfo(Path.GetFullPath(workerPath));
+        return CompilerArtifactInputHash.Compute(
+            request, artifactBytes, RequiredVersion(version.ProductName, "product name"),
+            RequiredVersion(version.ProductVersion, "product version"),
+            ApiSpecTable.DefaultTableIdentity, ApiSpecTable.DefaultTableVersion);
+    }
+
+    private static string RequiredVersion(string? value, string name) =>
+        !string.IsNullOrWhiteSpace(value) ? value : throw new InvalidDataException("The worker " + name + " is unavailable.");
+
     private static void Terminate(Process process, bool entireTree = false) {
-        try {
-            process.Kill(entireProcessTree: entireTree);
-        }
-        catch (InvalidOperationException) {
-        }
+        try { process.Kill(entireProcessTree: entireTree); }
+        catch (InvalidOperationException) { }
     }
 
     private sealed class ProcessWaitHandle : WaitHandle {
-        internal ProcessWaitHandle(Process process) =>
-            SafeWaitHandle = new SafeWaitHandle(
-                process.Handle, ownsHandle: false);
+        internal ProcessWaitHandle(Process process) => SafeWaitHandle =
+            new SafeWaitHandle(process.Handle, ownsHandle: false);
     }
 
     internal static int ValidateAndReport(
-        string resultPath,
-        WorkerVerifyRequest request,
-        out bool validResponse) {
+        string resultPath, WorkerVerifyRequest request, out bool validResponse) =>
+        ValidateAndReport(resultPath, request, null, null, out validResponse);
+
+    internal static int ValidateAndReport(
+        string resultPath, WorkerVerifyRequest request,
+        string? expectedInputHash, WorkerClaimManifest? expectedManifest, out bool validResponse) {
         validResponse = false;
         WorkerVerifyResponse? response;
         try {
@@ -186,9 +214,14 @@ internal static class Program {
                 "SharpProof worker result is unavailable or malformed.");
             return 3;
         }
-        var validation = WorkerProtocolJson.Validate(response);
+        var validation = expectedManifest == null || expectedInputHash == null
+            ? WorkerProtocolJson.Validate(response)
+            : WorkerProtocolJson.ValidateForRequest(
+                response, WorkerProtocolJson.ComputeRequestHash(request),
+                expectedInputHash, expectedManifest, request.Budgets);
         if (!validation.IsValid) {
             WriteErrors(validation.Errors, "SharpProof ");
+            WriteErrors(response?.Errors ?? [], "SharpProof worker ");
             return 3;
         }
         validResponse = true;
@@ -196,10 +229,8 @@ internal static class Program {
         WorkerProtocolJson.Canonicalize(response);
         WriteErrors(response.Errors, "SharpProof ");
 
-        var manifestClaims = response.Manifest.Claims.ToDictionary(
-            static claim => claim.ClaimId, StringComparer.Ordinal);
-        var refuted = response.ClaimResults.Any(static result =>
-            result.Outcome == WorkerClaimOutcome.Refuted);
+        var manifestClaims = response.Manifest.Claims.ToDictionary(static claim => claim.ClaimId, StringComparer.Ordinal);
+        var refuted = response.ClaimResults.Any(static result => result.Outcome == WorkerClaimOutcome.Refuted);
         foreach (var result in response.ClaimResults) {
             var claim = manifestClaims[result.ClaimId];
             Console.WriteLine(
@@ -209,16 +240,15 @@ internal static class Program {
                     ? string.Empty
                     : " (" + result.Reason + ")"));
         }
-        var incomplete = response.CallableResults.Where(static result =>
-            result.Coverage == WorkerCallableCoverage.Incomplete).ToArray();
+        var incomplete = response.CallableResults
+            .Where(static result => result.Coverage == WorkerCallableCoverage.Incomplete).ToArray();
+        var unknownClaims = response.ClaimResults.Count(static result => result.Outcome == WorkerClaimOutcome.Unknown);
         if (incomplete.Length != 0)
             ReportDiagnostic(
-                response.Manifest.Callables.First(callable => callable.CallableId ==
-                    incomplete[0].CallableId).Location,
-                Severity(request.VerifyPolicy),
-                "SP0047",
+                response.Manifest.Callables.First(callable => callable.CallableId == incomplete[0].CallableId).Location,
+                Severity(request.VerifyPolicy), "SP0047",
                 FormattableString.Invariant(
-                    $"Selected analysis is incomplete: callables={incomplete.Length}, unknown-claims={response.ClaimResults.Count(static result => result.Outcome == WorkerClaimOutcome.Unknown)}."));
+                    $"Selected analysis is incomplete: callables={incomplete.Length}, unknown-claims={unknownClaims}."));
         var incompleteError = incomplete.Length != 0 &&
             request.VerifyPolicy == WorkerVerifyPolicy.RequireProven;
         var assumptionError = ReportAssumptions(request.AssumptionPolicy, response);
@@ -237,8 +267,7 @@ internal static class Program {
     }
 
     private static bool ReportAssumptions(
-        WorkerAssumptionPolicy policy,
-        WorkerVerifyResponse response) {
+        WorkerAssumptionPolicy policy, WorkerVerifyResponse response) {
         var assumptions = response.Summary.Assumptions;
         var declared = assumptions.User + assumptions.Trusted;
         if (declared == 0) return false;
@@ -257,10 +286,7 @@ internal static class Program {
         };
 
     private static void ReportDiagnostic(
-        WorkerSourceLocation location,
-        string severity,
-        string id,
-        string message) {
+        WorkerSourceLocation location, string severity, string id, string message) {
         var prefix = string.IsNullOrWhiteSpace(location.Path)
             ? "SharpProof"
             : location.Path + FormattableString.Invariant(
@@ -274,38 +300,14 @@ internal static class Program {
             new { response.RunStatus, response.FailureReason, response.Summary },
             WorkerProtocolJson.Options));
 
-    private static Task WriteAtomicAsync(string path, string content) =>
-        AtomicFile.WriteUtf8Async(path, content);
-
-    private static async Task PublishAsync(
-        string sourcePath, string? destinationPath) {
-        if (destinationPath == null ||
-            string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(destinationPath),
-                StringComparison.OrdinalIgnoreCase) ||
-            !File.Exists(sourcePath))
-            return;
-        var content = await File.ReadAllTextAsync(sourcePath).ConfigureAwait(false);
-        await WriteAtomicAsync(destinationPath, content)
-            .ConfigureAwait(false);
-    }
-
-    private static Task PublishPairAsync(LauncherArguments arguments) {
-        if (arguments.PublishRequestPath == null ||
-            arguments.PublishResultPath == null) {
-            PublishAsync(
-                arguments.RequestPath,
-                arguments.PublishRequestPath).GetAwaiter().GetResult();
-            PublishAsync(
-                arguments.ResultPath,
-                arguments.PublishResultPath).GetAwaiter().GetResult();
-            return Task.CompletedTask;
-        }
-        var identity = Path.GetFullPath(arguments.PublishRequestPath)
-            .ToUpperInvariant() + "\0" +
-            Path.GetFullPath(arguments.PublishResultPath).ToUpperInvariant();
-        var name = "Local\\SharpProof.Publish." +
-            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
-        using var publication = new Mutex(false, name);
+    private static void PublishOutputs(
+        LauncherArguments arguments, WorkerVerifyRequest request,
+        CompilerManifestArtifact artifact, byte[] artifactBytes, string expectedInputHash) {
+        if (arguments.PublishRequestPath == null) return;
+        var requestPath = arguments.PublishRequestPath;
+        var resultPath = arguments.PublishResultPath!;
+        var manifestPath = arguments.PublishCompilerManifestPath!;
+        using var publication = new Mutex(false, "Local\\SharpProof.Publish");
         var ownsPublication = false;
         try {
             try {
@@ -317,62 +319,46 @@ internal static class Program {
             if (!ownsPublication)
                 throw new IOException(
                     "Timed out waiting to publish SharpProof results.");
-            var previousRequest = File.Exists(arguments.PublishRequestPath)
-                ? File.ReadAllText(arguments.PublishRequestPath)
-                : null;
-            try {
-                PublishAsync(
-                    arguments.RequestPath,
-                    arguments.PublishRequestPath).GetAwaiter().GetResult();
-                PublishAsync(
-                    arguments.ResultPath,
-                    arguments.PublishResultPath).GetAwaiter().GetResult();
-            }
-            catch {
-                if (previousRequest == null)
-                    DeleteIfExists(arguments.PublishRequestPath);
-                else
-                    WriteAtomicAsync(arguments.PublishRequestPath, previousRequest)
-                        .GetAwaiter().GetResult();
-                throw;
-            }
+            DeleteIfExists(resultPath);
+            AtomicFile.WriteBytesAsync(manifestPath, artifactBytes)
+                .GetAwaiter().GetResult();
+            request.CompilerManifest.Path = Path.GetFullPath(manifestPath);
+            AtomicFile.WriteUtf8Async(
+                requestPath, WorkerProtocolJson.SerializeRequest(request))
+                .GetAwaiter().GetResult();
+            var response = WorkerProtocolJson.DeserializeResponse(
+                File.ReadAllText(arguments.ResultPath)) ??
+                throw new IOException("The worker response is missing.");
+            response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+            if (!WorkerProtocolJson.ValidateForRequest(
+                    response, response.RequestHash, expectedInputHash,
+                    artifact.Manifest, request.Budgets).IsValid)
+                throw new IOException("The worker response binding is invalid.");
+            AtomicFile.WriteUtf8Async(
+                resultPath, WorkerProtocolJson.SerializeResponse(response))
+                .GetAwaiter().GetResult();
         }
         finally {
             if (ownsPublication) publication.ReleaseMutex();
         }
-        return Task.CompletedTask;
     }
 
     private static Task WriteLauncherFailureAsync(
-        string path,
-        WorkerVerifyRequest request,
-        WorkerRunStatus status,
-        WorkerRunFailureReason reason,
-        string code,
-        string message) {
-        var manifest = new WorkerClaimManifest();
-        WorkerProtocolJson.SealManifest(manifest);
-        var response = new WorkerVerifyResponse {
-            InputHash =
-                "e3b0c44298fc1c149afbf4c8996fb924" +
-                "27ae41e4649b934ca495991b7852b855",
-            Manifest = manifest,
-            RunStatus = status,
-            FailureReason = reason,
-            Summary = new WorkerVerificationSummary {
-                CacheStatus = WorkerCacheStatus.Disabled,
-                Versions = new WorkerVersionSummary {
-                    WorkerVersion = "launcher",
-                    ApiSpecVersion = "unavailable"
-                },
-                Budgets = request.Budgets
-            },
-            Errors = status == WorkerRunStatus.Failed
+        string path, WorkerVerifyRequest request, CompilerManifestArtifact artifact,
+        string expectedInputHash, WorkerRunStatus status,
+        WorkerRunFailureReason reason, string code, string message) {
+        var timeout = status == WorkerRunStatus.TimedOut;
+        var response = WorkerResultAssembler.CreateIncomplete(
+            expectedInputHash,
+            WorkerProtocolJson.ComputeRequestHash(request),
+            artifact.Manifest, request.Budgets, status, reason,
+            timeout ? WorkerCallableCoverageReason.ProjectTimeout : WorkerCallableCoverageReason.InfrastructureFailure,
+            timeout ? WorkerClaimReason.ProjectTimeout : WorkerClaimReason.InfrastructureFailure,
+            status == WorkerRunStatus.Failed
                 ? [new WorkerProtocolError { Code = code, Message = message }]
-                : []
-        };
-        WorkerProtocolJson.Canonicalize(response);
-        return WriteAtomicAsync(path, WorkerProtocolJson.SerializeResponse(response));
+                : [],
+            new WorkerVersionSummary { WorkerVersion = "launcher", ApiSpecVersion = "unavailable" });
+        return AtomicFile.WriteUtf8Async(path, WorkerProtocolJson.SerializeResponse(response));
     }
 
     private static void DeleteIfExists(string? path) {
@@ -388,183 +374,106 @@ internal static class Program {
 
 internal sealed class LauncherArguments {
     private static readonly string[] s_required = [
-        "worker", "request", "result", "project-directory", "assembly-name",
-        "sources", "references", "constants", "target-framework", "language-version",
-        "nullable", "checked-overflow", "optimize", "allow-unsafe", "deterministic",
-        "output-type", "platform-target", "prefer-32-bit", "features",
-        "verify-policy", "assumption-policy"
+        "worker", "request", "result", "compiler-manifest", "verify-policy", "assumption-policy"
+    ];
+    private static readonly string[] s_publication = ["publish-request", "publish-result", "publish-compiler-manifest"];
+    private static readonly HashSet<string> s_allowed = [
+        .. s_required, .. s_publication, "termination-grace-ms",
+        "query-rlimit", "method-rlimit", "method-wall-ms", "project-wall-ms",
+        "max-parallelism", "max-expression-depth", "process-memory-bytes", "max-worker-processes",
+        "cache-enabled", "cache-directory", "cache-maximum-bytes"
     ];
     private readonly IReadOnlyDictionary<string, string> _values;
 
-    private LauncherArguments(IReadOnlyDictionary<string, string> values) =>
-        _values = values;
+    private LauncherArguments(IReadOnlyDictionary<string, string> values) => _values = values;
 
-    internal string WorkerPath => FullPath("worker");
-    internal string RequestPath => FullPath("request");
-    internal string ResultPath => FullPath("result");
-    internal string? PublishRequestPath => OptionalFullPath("publish-request");
-    internal string? PublishResultPath => OptionalFullPath("publish-result");
-    internal int TerminationGraceMilliseconds =>
-        Number("termination-grace-ms",
-            WorkerLauncherDefaults.TerminationGraceMilliseconds);
+    internal string WorkerPath => FullPath("worker"); internal string RequestPath => FullPath("request");
+    internal string ResultPath => FullPath("result"); internal string CompilerManifestPath => FullPath("compiler-manifest");
+    internal string? PublishRequestPath => OptionalFullPath("publish-request"); internal string? PublishResultPath => OptionalFullPath("publish-result");
+    internal string? PublishCompilerManifestPath => OptionalFullPath("publish-compiler-manifest");
+    internal int TerminationGraceMilliseconds => Number("termination-grace-ms", WorkerLauncherDefaults.TerminationGraceMilliseconds);
 
     internal static bool TryParse(string[] args, out LauncherArguments arguments) {
         arguments = null!;
-        if (args.Length < 3 ||
-            !string.Equals(args[0], "verify", StringComparison.Ordinal) ||
-            args.Length % 2 == 0)
+        if (args.Length < 3 || !string.Equals(args[0], "verify", StringComparison.Ordinal) || args.Length % 2 == 0)
             return false;
-        var values = new Dictionary<string, string>(
-            StringComparer.Ordinal);
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var index = 1; index < args.Length; index += 2) {
             var key = args[index];
-            if (!key.StartsWith("--", StringComparison.Ordinal) ||
-                !values.TryAdd(key.Substring(2), args[index + 1]))
+            if (!key.StartsWith("--", StringComparison.Ordinal)) return false;
+            key = key.Substring(2);
+            if (!s_allowed.Contains(key) || !values.TryAdd(key, args[index + 1]))
                 return false;
         }
-        if (s_required.Any(key =>
-                !values.TryGetValue(key, out var value) ||
-                string.IsNullOrWhiteSpace(value)))
+        if (s_required.Any(key => !values.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value)))
             return false;
+        var publicationCount = s_publication.Count(key => values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value));
+        if (publicationCount is not (0 or 3)) return false;
         arguments = new LauncherArguments(values);
         return true;
     }
 
-    internal WorkerVerifyRequest CreateRequest() =>
-        new() {
-            ProjectDirectory = FullPath("project-directory"),
-            AssemblyName = Required("assembly-name"),
-            SourceFiles = ReadPathList("sources"),
-            ReferenceAssemblies = ReadPathList("references"),
-            DefineConstants = ReadList("constants"),
-            Features = Policy<WorkerFeatureSet>("features"),
-            VerifyPolicy = Policy<WorkerVerifyPolicy>("verify-policy"),
-            AssumptionPolicy = Policy<WorkerAssumptionPolicy>("assumption-policy"),
-            Compilation = CreateCompilation(),
-            Budgets = CreateBudgets(),
-            Cache = CreateCache()
-        };
+    internal WorkerVerifyRequest CreateRequest(
+        out CompilerManifestArtifact artifact, out byte[] artifactBytes) {
+        ValidateDistinctPaths();
+        var manifest = CreateCompilerManifestReference(out artifact, out artifactBytes);
+        var request = new WorkerVerifyRequest { CompilerManifest = manifest };
+        request.VerifyPolicy = Policy<WorkerVerifyPolicy>("verify-policy"); request.AssumptionPolicy = Policy<WorkerAssumptionPolicy>("assumption-policy");
+        request.Budgets = CreateBudgets(); request.Cache = CreateCache();
+        return request;
+    }
 
-    private WorkerCompilationOptions CreateCompilation() => new() {
-        TargetFramework = Required("target-framework"),
-        LanguageVersion = Required("language-version"),
-        NullableContext = NullableContext("nullable"),
-        CheckOverflow = Boolean("checked-overflow"),
-        Optimization = Boolean("optimize")
-            ? WorkerOptimizationLevel.Release
-            : WorkerOptimizationLevel.Debug,
-        AllowUnsafe = Boolean("allow-unsafe"),
-        Deterministic = Boolean("deterministic"),
-        OutputKind = OutputKind("output-type"),
-        Platform = Platform("platform-target", Boolean("prefer-32-bit"))
-    };
+    private void ValidateDistinctPaths() {
+        string?[] candidates = [RequestPath, ResultPath, CompilerManifestPath,
+            PublishRequestPath, PublishResultPath, PublishCompilerManifestPath];
+        var paths = candidates.OfType<string>().ToArray();
+        if (paths.Distinct(StringComparer.OrdinalIgnoreCase).Count() != paths.Length)
+            throw new ArgumentException("SharpProof I/O paths must be distinct.");
+    }
 
-    private WorkerBudgets CreateBudgets() => new() {
-        QueryRlimit = Number("query-rlimit", WorkerBudgets.DefaultQueryRlimit),
-        MethodRlimit = Number("method-rlimit", WorkerBudgets.DefaultMethodRlimit),
-        MethodWallTimeMilliseconds = Number(
-            "method-wall-ms", WorkerBudgets.DefaultMethodWallTimeMilliseconds),
-        ProjectWallTimeMilliseconds = Number(
-            "project-wall-ms", WorkerBudgets.DefaultProjectWallTimeMilliseconds),
-        MaxParallelism = Number("max-parallelism", WorkerBudgets.MaximumParallelism),
-        MaximumExpressionDepth = Number(
-            "max-expression-depth", WorkerBudgets.DefaultMaximumExpressionDepth),
-        ProcessMemoryLimitBytes = Number(
-            "process-memory-bytes", WorkerBudgets.DefaultProcessMemoryLimitBytes),
-        MaxWorkerProcesses = Number(
-            "max-worker-processes", WorkerBudgets.MaximumParallelism)
-    };
+    private WorkerFileReference CreateCompilerManifestReference(
+        out CompilerManifestArtifact artifact, out byte[] bytes) {
+        var path = FullPath("compiler-manifest");
+        bytes = File.ReadAllBytes(path);
+        artifact = CompilerManifestArtifactJson.Deserialize(new UTF8Encoding(false, true).GetString(bytes));
+        return new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) };
+    }
 
-    private WorkerCacheOptions CreateCache() => new() {
-        Enabled = Boolean("cache-enabled", true),
-        Directory = Optional("cache-directory"),
-        MaximumBytes = Number(
-            "cache-maximum-bytes", WorkerCacheOptions.DefaultMaximumBytes)
-    };
+    private WorkerBudgets CreateBudgets() {
+        var value = new WorkerBudgets();
+        value.QueryRlimit = Number("query-rlimit", WorkerBudgets.DefaultQueryRlimit); value.MethodRlimit = Number("method-rlimit", WorkerBudgets.DefaultMethodRlimit);
+        value.MethodWallTimeMilliseconds = Number("method-wall-ms", WorkerBudgets.DefaultMethodWallTimeMilliseconds); value.ProjectWallTimeMilliseconds = Number("project-wall-ms", WorkerBudgets.DefaultProjectWallTimeMilliseconds);
+        value.MaxParallelism = Number("max-parallelism", WorkerBudgets.MaximumParallelism); value.MaximumExpressionDepth = Number("max-expression-depth", WorkerBudgets.DefaultMaximumExpressionDepth);
+        value.ProcessMemoryLimitBytes = Number("process-memory-bytes", WorkerBudgets.DefaultProcessMemoryLimitBytes); value.MaxWorkerProcesses = Number("max-worker-processes", WorkerBudgets.MaximumParallelism);
+        return value;
+    }
+
+    private WorkerCacheOptions CreateCache() {
+        var value = new WorkerCacheOptions { Enabled = Boolean("cache-enabled", true) };
+        value.Directory = Optional("cache-directory"); value.MaximumBytes = Number("cache-maximum-bytes", WorkerCacheOptions.DefaultMaximumBytes);
+        return value;
+    }
 
     private T Policy<T>(string key) where T : struct, Enum =>
         Enum.Parse<T>(Required(key).Replace("-", string.Empty, StringComparison.Ordinal),
             ignoreCase: true);
 
-    private string[] ReadPathList(string key) =>
-        [.. ReadList(key).Select(Path.GetFullPath)];
-
-    private string[] ReadList(string key) =>
-        [.. File.ReadAllLines(FullPath(key))
-            .Where(static line => !string.IsNullOrWhiteSpace(line))];
-
     private string FullPath(string key) => Path.GetFullPath(Required(key));
 
-    private string? OptionalFullPath(string key) {
-        var value = Optional(key);
-        return value == null ? null : Path.GetFullPath(value);
-    }
+    private string? OptionalFullPath(string key) => Optional(key) is { } value ? Path.GetFullPath(value) : null;
 
-    private string Required(string key) =>
-        _values.TryGetValue(key, out var value)
-            ? value
-            : throw new ArgumentException(
-                "A required launcher argument is missing.",
-                key);
+    private string Required(string key) => _values.TryGetValue(key, out var value) ? value :
+        throw new ArgumentException("A required launcher argument is missing.", key);
 
-    private string? Optional(string key) =>
-        _values.TryGetValue(key, out var value) &&
-        !string.IsNullOrWhiteSpace(value)
-            ? value
-            : null;
+    private string? Optional(string key) => _values.TryGetValue(key, out var value) &&
+        !string.IsNullOrWhiteSpace(value) ? value : null;
 
     private T Number<T>(string key, T fallback) where T : struct, INumberBase<T> =>
-        _values.TryGetValue(key, out var value)
-            ? T.Parse(value, NumberStyles.None, CultureInfo.InvariantCulture)
-            : fallback;
+        _values.TryGetValue(key, out var value) ? T.Parse(value, NumberStyles.None, CultureInfo.InvariantCulture) : fallback;
 
-    private bool Boolean(string key, bool? fallback = null) =>
-        _values.TryGetValue(key, out var value)
-            ? bool.Parse(value)
-            : fallback ?? bool.Parse(Required(key));
+    private bool Boolean(string key, bool? fallback = null) => _values.TryGetValue(key, out var value)
+        ? bool.Parse(value) : fallback ?? bool.Parse(Required(key));
 
-    private WorkerNullableContext NullableContext(string key) =>
-        Required(key).ToUpperInvariant() switch {
-            "DISABLE" => WorkerNullableContext.Disabled,
-            "WARNINGS" => WorkerNullableContext.Warnings,
-            "ANNOTATIONS" => WorkerNullableContext.Annotations,
-            "ENABLE" => WorkerNullableContext.Enabled,
-            _ => Invalid<WorkerNullableContext>(
-                "The nullable context is invalid.", key)
-        };
-
-    private WorkerOutputKind OutputKind(string key) =>
-        Required(key).ToUpperInvariant() switch {
-            "EXE" => WorkerOutputKind.ConsoleApplication,
-            "WINEXE" => WorkerOutputKind.WindowsApplication,
-            "LIBRARY" => WorkerOutputKind.DynamicallyLinkedLibrary,
-            "MODULE" => WorkerOutputKind.NetModule,
-            "WINMDOBJ" => WorkerOutputKind.WindowsRuntimeMetadata,
-            "APPCONTAINEREXE" =>
-                WorkerOutputKind.WindowsRuntimeApplication,
-            _ => Invalid<WorkerOutputKind>("The output type is invalid.", key)
-        };
-
-    private WorkerPlatform Platform(string key, bool prefer32Bit) {
-        var value = Required(key);
-        if (value.Equals("AnyCPU", StringComparison.OrdinalIgnoreCase))
-            return prefer32Bit
-                ? WorkerPlatform.AnyCpu32BitPreferred
-                : WorkerPlatform.AnyCpu;
-        if (prefer32Bit)
-            throw new ArgumentException("Prefer32Bit is valid only for AnyCPU.", key);
-        return value.ToUpperInvariant() switch {
-            "X86" => WorkerPlatform.X86,
-            "X64" => WorkerPlatform.X64,
-            "ARM" => WorkerPlatform.Arm,
-            "ARM64" => WorkerPlatform.Arm64,
-            "ITANIUM" => WorkerPlatform.Itanium,
-            _ => Invalid<WorkerPlatform>("The platform target is invalid.", key)
-        };
-    }
-
-    private static T Invalid<T>(string message, string key) =>
-        throw new ArgumentException(message, key);
 }
 
 internal sealed partial class WindowsJob : IDisposable {
@@ -574,40 +483,28 @@ internal sealed partial class WindowsJob : IDisposable {
 
     internal static WindowsJob CreateRequired(
         long memoryLimitBytes, int activeProcessLimit) {
-        if (!OperatingSystem.IsWindows() ||
-            RuntimeInformation.ProcessArchitecture != Architecture.X64 ||
+        if (!OperatingSystem.IsWindows() || RuntimeInformation.ProcessArchitecture != Architecture.X64 ||
             RuntimeInformation.OSArchitecture != Architecture.X64)
-            throw new PlatformNotSupportedException(
-                "The SharpProof verifier requires Windows x64.");
+            throw new PlatformNotSupportedException("The SharpProof verifier requires Windows x64.");
         var handle = NativeMethods.CreateJobObject(IntPtr.Zero, null);
-        if (handle == IntPtr.Zero)
-            throw new InvalidOperationException(
-                "A SharpProof worker Job Object could not be created.");
+        if (handle == IntPtr.Zero) throw new InvalidOperationException("A SharpProof worker Job Object could not be created.");
         var job = new WindowsJob(handle);
-        var information = new NativeMethods.JobObjectExtendedLimitInformation {
-            LimitFlags = NativeMethods.JobObjectLimitFlags.KillOnJobClose |
-                NativeMethods.JobObjectLimitFlags.JobMemory |
-                NativeMethods.JobObjectLimitFlags.ActiveProcess,
-            ActiveProcessLimit = checked((uint)activeProcessLimit),
-            JobMemoryLimit = checked((nuint)memoryLimitBytes)
-        };
-        var size = checked((uint)
-            Marshal.SizeOf<NativeMethods.JobObjectExtendedLimitInformation>());
-        if (NativeMethods.SetInformationJobObject(handle, 9, ref information, size))
-            return job;
+        var information = new NativeMethods.JobObjectExtendedLimitInformation();
+        information.LimitFlags = NativeMethods.JobObjectLimitFlags.KillOnJobClose |
+            NativeMethods.JobObjectLimitFlags.JobMemory | NativeMethods.JobObjectLimitFlags.ActiveProcess;
+        information.ActiveProcessLimit = checked((uint)activeProcessLimit); information.JobMemoryLimit = checked((nuint)memoryLimitBytes);
+        var size = checked((uint)Marshal.SizeOf<NativeMethods.JobObjectExtendedLimitInformation>());
+        if (NativeMethods.SetInformationJobObject(handle, 9, ref information, size)) return job;
         job.Dispose();
-        throw new InvalidOperationException(
-            "The SharpProof worker Job Object could not be configured.");
+        throw new InvalidOperationException("The SharpProof worker Job Object could not be configured.");
     }
 
-    internal bool TryAssign(Process process) =>
-        _handle != IntPtr.Zero &&
+    internal bool TryAssign(Process process) => _handle != IntPtr.Zero &&
         NativeMethods.AssignProcessToJobObject(_handle, process.Handle);
 
     public void Dispose() {
         var handle = Interlocked.Exchange(ref _handle, IntPtr.Zero);
-        if (handle != IntPtr.Zero)
-            NativeMethods.CloseHandle(handle);
+        if (handle != IntPtr.Zero) NativeMethods.CloseHandle(handle);
     }
 
     private static partial class NativeMethods {
@@ -621,12 +518,9 @@ internal sealed partial class WindowsJob : IDisposable {
         // host. Only the three fields configured by the launcher need names.
         [StructLayout(LayoutKind.Explicit, Size = 144)]
         internal struct JobObjectExtendedLimitInformation {
-            [FieldOffset(16)]
-            internal JobObjectLimitFlags LimitFlags;
-            [FieldOffset(40)]
-            internal uint ActiveProcessLimit;
-            [FieldOffset(120)]
-            internal nuint JobMemoryLimit;
+            [FieldOffset(16)] internal JobObjectLimitFlags LimitFlags;
+            [FieldOffset(40)] internal uint ActiveProcessLimit;
+            [FieldOffset(120)] internal nuint JobMemoryLimit;
         }
 
         [LibraryImport("kernel32.dll", EntryPoint = "CreateJobObjectW",

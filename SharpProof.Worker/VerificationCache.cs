@@ -29,10 +29,10 @@ internal sealed class VerificationCache(
                     !string.Equals(envelope.PayloadHash, HashText(envelope.Payload), StringComparison.Ordinal)) {
                     return null;
                 }
-                if (!CacheableWorkerResponse.TryParse(
+                cancellationToken.ThrowIfCancellationRequested(); if (!CacheableWorkerResponse.TryParse(
                         envelope.Payload, inputHash, manifest, budgets, out var response))
                     return null;
-                File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
+                cancellationToken.ThrowIfCancellationRequested(); File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
                 return response;
             }
             catch (Exception exception) when (exception is
@@ -63,7 +63,7 @@ internal sealed class VerificationCache(
             var path = GetPath(response.InputHash);
             await AtomicFile.WriteUtf8Async(path, json, cancellationToken)
                 .ConfigureAwait(false);
-            Evict();
+            Evict(cancellationToken);
             return true;
         }
         catch (Exception exception) when (exception is
@@ -77,7 +77,8 @@ internal sealed class VerificationCache(
         }
     }
 
-    private void Evict() {
+    private void Evict(CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
         var files = new DirectoryInfo(_directory)
             .EnumerateFiles("*.json", SearchOption.TopDirectoryOnly)
             .OrderBy(static file => file.LastWriteTimeUtc)
@@ -85,7 +86,7 @@ internal sealed class VerificationCache(
             .ToArray();
         var total = files.Sum(static file => file.Length);
         foreach (var file in files) {
-            if (total <= _maximumBytes) break;
+            cancellationToken.ThrowIfCancellationRequested(); if (total <= _maximumBytes) break;
             var length = file.Length;
             try {
                 file.Delete();

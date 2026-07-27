@@ -97,9 +97,10 @@ internal static class Program {
                         Code = backendUnavailable
                             ? "backend.unavailable"
                             : "worker.infrastructure",
-                        Message = backendUnavailable
+                        Message = (backendUnavailable
                             ? "The native SMT backend is unavailable."
-                            : "The worker failed before producing a semantic result."
+                            : "The worker failed before producing a semantic result.") +
+                            " " + exception.GetBaseException().Message
                     }],
                     request?.Budgets ?? new WorkerBudgets()))
                 .ConfigureAwait(false);

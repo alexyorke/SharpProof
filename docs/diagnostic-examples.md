@@ -50,7 +50,7 @@ compiler-collection infrastructure error during Windows verification.
 | `SP0045` | `effects` | Info, on | Yes |
 | `SP0046` | `effects` | Info, on | Yes |
 | `SP0047` | Explicitly selected unsupported method | Info, on | Yes |
-| `SP0049` | Windows verification compilation seal | Error, on | On seal failure |
+| `SP0049` | Windows verification compiler manifest | Error, on | On artifact failure |
 
 `SharpProofFeatures=all` enables both feature pipelines. `SharpProofMode` and
 `all-experimental` are deprecated preview compatibility inputs.
@@ -202,16 +202,21 @@ by the manifest. `SharpProofAssumptionPolicy=allow` reports information,
 `allow`; strict defaults to `error`.
 
 <a id="sp0049"></a>
-## SP0049 - final compilation seal emission failed
+## SP0049 - final compiler manifest emission failed
 
 The production analyzer emits SP0049 when Windows verification requested a
-post-generator compilation seal but the analyzer could not write it. The
-diagnostic is an error because the expected compiler-compilation evidence is
-missing. It is an infrastructure failure, never a contract or proof outcome.
+post-generator compiler-manifest artifact but could not collect or write it.
+This includes a final metadata reference that is not a readable, file-backed
+`PortableExecutableReference`. The diagnostic is an error because the expected
+compiler-compilation evidence is missing. It is an infrastructure failure,
+never a contract or proof outcome.
 
-The seal is currently deterministic parity and diagnostic evidence only. The
-worker still reconstructs its compilation from MSBuild inputs and does not
-consume the seal as a closed compiler artifact.
+The artifact includes final handwritten and generated tree text plus a sealed
+selected-claim manifest. The worker recreates compiler symbols from that
+evidence and hash-verified reference images, and exact manifest equality is
+required before cache lookup or a solver query. Generated contracts are
+verifiable; the artifact does not yet carry the lowered obligation IR needed
+to remove compiler reconstruction.
 
 <a id="contractfor-generator-diagnostics"></a>
 ## ContractFor generator diagnostics

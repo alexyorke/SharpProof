@@ -1,9 +1,11 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using SharpProof.Attributes;
+using SharpProof.CompilerArtifact;
 using SharpProof.Verify;
 using SharpProof.Worker;
 using SharpProof.Worker.Protocol;
@@ -189,6 +191,7 @@ internal static class WorkerPerformanceProbe {
             var workerProcessId = await WaitForWorkerReadyAsync(
                     readyPath,
                     process,
+                    standardError,
                     boundary.Token)
                 .ConfigureAwait(false);
             var stopwatch = Stopwatch.StartNew();
@@ -246,25 +249,7 @@ internal static class WorkerPerformanceProbe {
         AddOption(startInfo, "worker", workerPath);
         AddOption(startInfo, "request", workspace.RequestPath(runName));
         AddOption(startInfo, "result", workspace.ResultPath(runName));
-        AddOption(
-            startInfo,
-            "project-directory",
-            workspace.DirectoryPath);
-        AddOption(startInfo, "assembly-name", "SharpProofPerformanceProbe");
-        AddOption(startInfo, "sources", workspace.SourceListPath);
-        AddOption(startInfo, "references", workspace.ReferenceListPath);
-        AddOption(startInfo, "constants", workspace.ConstantListPath);
-        AddOption(startInfo, "target-framework", "net8.0");
-        AddOption(startInfo, "language-version", "12.0");
-        AddOption(startInfo, "nullable", "enable");
-        AddOption(startInfo, "checked-overflow", false);
-        AddOption(startInfo, "optimize", true);
-        AddOption(startInfo, "allow-unsafe", false);
-        AddOption(startInfo, "deterministic", true);
-        AddOption(startInfo, "output-type", "Library");
-        AddOption(startInfo, "platform-target", "AnyCPU");
-        AddOption(startInfo, "prefer-32-bit", false);
-        AddOption(startInfo, "features", "all");
+        AddOption(startInfo, "compiler-manifest", workspace.LauncherManifestPath);
         AddOption(startInfo, "verify-policy", "advisory");
         AddOption(startInfo, "assumption-policy", "allow");
         AddOption(
@@ -335,12 +320,14 @@ internal static class WorkerPerformanceProbe {
     private static async Task<int> WaitForWorkerReadyAsync(
         string readyPath,
         Process launcher,
+        Task<string> standardError,
         CancellationToken cancellationToken) {
         while (true) {
             cancellationToken.ThrowIfCancellationRequested();
             if (launcher.HasExited)
                 throw new InvalidOperationException(
-                    "The launcher exited before the worker probe became ready.");
+                    "The launcher exited before the worker probe became ready." +
+                    Environment.NewLine + await standardError.ConfigureAwait(false));
             try {
                 if (File.Exists(readyPath)) {
                     var text = await File.ReadAllTextAsync(
@@ -401,7 +388,7 @@ internal static class WorkerPerformanceProbe {
                 projectName,
                 "bin",
                 candidate!,
-                "net8.0",
+                "net9.0",
                 projectName + ".dll");
             if (File.Exists(path))
                 return path;
@@ -470,27 +457,12 @@ internal static class WorkerPerformanceProbe {
         private static readonly UTF8Encoding Utf8WithoutBom =
             new(encoderShouldEmitUTF8Identifier: false);
 
-        private WorkerProbeWorkspace(
-            string directoryPath,
-            string cancellationSourcePath,
-            string sourceListPath,
-            string referenceListPath,
-            string constantListPath,
-            string[] references) {
+        private WorkerProbeWorkspace(string directoryPath) =>
             DirectoryPath = directoryPath;
-            CancellationSourcePath = cancellationSourcePath;
-            SourceListPath = sourceListPath;
-            ReferenceListPath = referenceListPath;
-            ConstantListPath = constantListPath;
-            References = references;
-        }
 
         internal string DirectoryPath { get; }
-        internal string CancellationSourcePath { get; }
-        internal string SourceListPath { get; }
-        internal string ReferenceListPath { get; }
-        internal string ConstantListPath { get; }
-        internal string[] References { get; }
+        internal string LauncherManifestPath =>
+            Path.Combine(DirectoryPath, "launcher.compiler-manifest.json");
 
         internal static WorkerProbeWorkspace Create() {
             var directory = Path.Combine(
@@ -523,38 +495,25 @@ internal static class WorkerPerformanceProbe {
                 Utf8WithoutBom);
 
             var references = GetReferences();
-            var sourceList = Path.Combine(directory, "sources.rsp");
-            var referenceList = Path.Combine(directory, "references.rsp");
-            var constantList = Path.Combine(directory, "constants.rsp");
-            File.WriteAllLines(
-                sourceList,
-                [launcherSource],
-                Utf8WithoutBom);
-            File.WriteAllLines(
-                referenceList,
-                references,
-                Utf8WithoutBom);
-            File.WriteAllLines(
-                constantList,
-                [Contract.ConditionalSymbol],
-                Utf8WithoutBom);
-            return new WorkerProbeWorkspace(
-                directory,
-                cancellationSource,
-                sourceList,
-                referenceList,
-                constantList,
+            var workspace = new WorkerProbeWorkspace(directory);
+            WriteCompilerManifest(
+                workspace.LauncherManifestPath,
+                "SharpProofPerformanceProbe",
+                launcherSource,
+                File.ReadAllText(launcherSource),
                 references);
+            WriteCompilerManifest(
+                workspace.CancellationManifestPath,
+                "SharpProofCancellationPerformanceProbe",
+                cancellationSource,
+                File.ReadAllText(cancellationSource),
+                references);
+            return workspace;
         }
 
         internal WorkerVerifyRequest CreateCancellationRequest() =>
             new() {
-                ProjectDirectory = DirectoryPath,
-                AssemblyName = "SharpProofCancellationPerformanceProbe",
-                SourceFiles = [CancellationSourcePath],
-                ReferenceAssemblies = References,
-                DefineConstants = [Contract.ConditionalSymbol],
-                Compilation = CreateCompilationOptions(),
+                CompilerManifest = Reference(CancellationManifestPath),
                 Budgets = new WorkerBudgets {
                     MethodWallTimeMilliseconds = 30_000,
                     ProjectWallTimeMilliseconds = 30_000,
@@ -567,20 +526,51 @@ internal static class WorkerPerformanceProbe {
                 }
             };
 
-        private static WorkerCompilationOptions
-            CreateCompilationOptions() =>
+        private string CancellationManifestPath =>
+            Path.Combine(DirectoryPath, "cancellation.compiler-manifest.json");
+
+        private static WorkerFileReference Reference(string path) =>
             new() {
-                TargetFramework = "net8.0",
-                LanguageVersion = "12.0",
-                NullableContext = WorkerNullableContext.Enabled,
-                Optimization = WorkerOptimizationLevel.Release,
-                CheckOverflow = false,
-                AllowUnsafe = false,
-                Deterministic = true,
-                OutputKind =
-                    WorkerOutputKind.DynamicallyLinkedLibrary,
-                Platform = WorkerPlatform.AnyCpu
+                Path = path,
+                Sha256 = LowerSha(File.ReadAllBytes(path))
             };
+
+        private static void WriteCompilerManifest(
+            string artifactPath, string assemblyName, string sourcePath,
+            string source, IEnumerable<string> referencePaths) {
+            var tree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.CSharp12,
+                    preprocessorSymbols: [Contract.ConditionalSymbol]),
+                sourcePath);
+            var compilation = CSharpCompilation.Create(
+                assemblyName,
+                [tree],
+                referencePaths.Select(static path =>
+                    MetadataReference.CreateFromFile(path)),
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary,
+                    optimizationLevel: OptimizationLevel.Release,
+                    nullableContextOptions: NullableContextOptions.Enable,
+                    deterministic: true,
+                    concurrentBuild: false));
+            var discovery = new ClaimManifestBuilder(compilation).Build();
+            var artifact = CompilerManifestArtifactJson.Create(
+                compilation,
+                Path.GetDirectoryName(sourcePath)!,
+                "net9.0",
+                WorkerFeatureSet.All,
+                discovery.Manifest,
+                CancellationToken.None);
+            File.WriteAllText(
+                artifactPath,
+                CompilerManifestArtifactJson.Serialize(artifact),
+                Utf8WithoutBom);
+        }
+
+        private static string LowerSha(byte[] bytes) =>
+            string.Concat(SHA256.HashData(bytes).Select(static value =>
+                value.ToString("x2", CultureInfo.InvariantCulture)));
 
         internal string RequestPath(string runName) =>
             Path.Combine(DirectoryPath, runName + ".request.json");
@@ -598,6 +588,9 @@ internal static class WorkerPerformanceProbe {
                 using System.Globalization;
                 using System.IO;
                 using System.Threading;
+
+                [assembly: System.Reflection.AssemblyProduct("SharpProof.Worker")]
+                [assembly: System.Reflection.AssemblyInformationalVersion("performance-probe")]
 
                 internal static class Program {
                     private static int Main(string[] args) {
@@ -639,7 +632,11 @@ internal static class WorkerPerformanceProbe {
                 new CSharpCompilationOptions(
                     OutputKind.ConsoleApplication,
                     optimizationLevel: OptimizationLevel.Release));
-            var emit = compilation.Emit(path);
+            using var resources = compilation.CreateDefaultWin32Resources(
+                versionResource: true, noManifest: true,
+                manifestContents: null, iconInIcoFormat: null);
+            using var output = File.Create(path);
+            var emit = compilation.Emit(output, win32Resources: resources);
             if (!emit.Success)
                 throw new InvalidOperationException(
                     "The uncooperative worker probe could not be compiled: " +

@@ -36,7 +36,10 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Analyzer" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
+    <InternalsVisibleTo Include="SharpProof.Gates" />
     <InternalsVisibleTo Include="SharpProof.Worker" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Launcher" />
     <InternalsVisibleTo Include="SharpProof.Worker.Test" />
   </ItemGroup>
 </Project>

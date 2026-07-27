@@ -77,7 +77,9 @@ public sealed class ArchitectureTests {
                 "SharpProof.Worker.Protocol"
             ],
             ["SharpProof.Worker.Launcher"] = [
+                "SharpProof.CompilerArtifact",
                 "SharpProof.Ir",
+                "SharpProof.Specs",
                 "SharpProof.Worker.Protocol"
             ]
         };

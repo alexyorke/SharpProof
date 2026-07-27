@@ -1,7 +1,7 @@
 name: Cross-platform package consumers
 on:
   push:
-    branches: ["**"]
+    branches: [master]
   pull_request:
     branches: ["**"]
   workflow_dispatch:
@@ -17,8 +17,10 @@ jobs:
             os: windows-latest
           - name: Linux packaged analyzer
             os: ubuntu-latest
-          - name: macOS packaged analyzer
+          - name: macOS x64 packaged analyzer
             os: macos-15-intel
+          - name: macOS ARM64 packaged analyzer
+            os: macos-15
     steps:
       - uses: actions/checkout@v4
       - name: Setup required .NET SDKs

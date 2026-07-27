@@ -11,14 +11,16 @@ internal static class AtomicFile {
             if (File.Exists(temporary)) File.Delete(temporary);
         }
     }
-    internal static async Task WriteUtf8Async(
-        string path, string content, CancellationToken cancellationToken = default) {
+    internal static Task WriteUtf8Async(
+        string path, string content, CancellationToken cancellationToken = default) =>
+        WriteBytesAsync(path, Utf8.GetBytes(content), cancellationToken);
+    internal static async Task WriteBytesAsync(
+        string path, byte[] content, CancellationToken cancellationToken = default) {
         var (destination, temporary) = Prepare(path);
         try {
-            var bytes = Utf8.GetBytes(content);
             using (var stream = new FileStream(temporary, FileMode.CreateNew,
                        FileAccess.Write, FileShare.None, 4096, useAsync: true))
-                await stream.WriteAsync(bytes, 0, bytes.Length, cancellationToken)
+                await stream.WriteAsync(content, 0, content.Length, cancellationToken)
                     .ConfigureAwait(false);
             Publish(temporary, destination);
         }

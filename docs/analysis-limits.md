@@ -42,10 +42,20 @@ the project's intermediate output, normally
 `obj/<Configuration>/<TargetFramework>/SharpProof/cache`.
 `SharpProofVerifyRequestFile` and `SharpProofVerifyResultFile` are initialized
 beside it. Concurrent builds use isolated invocation paths beneath
-`SharpProof/runs`. Validated writers are serialized by a cross-process mutex;
-each stable file is atomically replaced, with rollback if the second replacement
-fails. This preserves the completed pair but is not an instantaneous two-file
-transaction.
+`SharpProof/runs`. Validated writers are serialized by a cross-process mutex.
+The stable result is removed first, the compiler manifest and request are
+atomically replaced, and the validated result is written last as the commit
+marker. Interrupted publication therefore leaves no successful result for a
+partly updated evidence set.
+
+Windows verification also initializes an internal, compiler-visible
+`_SharpProofCompilerManifestPath` beneath the isolated invocation directory.
+The final analyzer compilation atomically writes the manifest there. The
+launcher snapshots that file by absolute path and SHA-256 before starting the
+worker, and a successful invocation publishes the same artifact to
+`SharpProofCompilerManifestFile`, normally
+`obj/<Configuration>/<TargetFramework>/SharpProof/compiler-manifest.json`.
+Missing compiler evidence fails the build as SP0049 before worker launch.
 
 `SharpProofMode` values `off`, `effects`, `contracts`, and `all-experimental`
 remain deprecated compatibility inputs during preview. Do not combine the
@@ -74,13 +84,18 @@ not proof facts. Z3 queries use deterministic resource limits. The launcher
 uses the project wall limit plus the termination grace to enforce a final
 process boundary.
 
-Every effective compilation option and budget participates in worker input and
-cache identity. Changing a limit cannot reuse an answer produced under a
-different limit. Verification and assumption policy are reporting/build
-policies, not semantic proof inputs, so they do not alter the semantic cache
-payload.
+Every budget and every option field in the bounded compiler-artifact snapshot
+participates in worker input and cache identity. That snapshot captures the
+reconstruction fields admitted by schema 2; it does not claim to serialize
+every Roslyn compilation option. The compiler-manifest compilation hash also
+covers final post-generator syntax trees and reference evidence. Raw analyzer
+inputs are not retained, but any generated-tree change alters the identity.
+Changing a limit or captured compiler input cannot reuse an answer produced
+under a different identity. Verification and assumption policy are
+reporting/build policies, not semantic proof inputs, so they do not alter the
+semantic cache payload.
 
-`SharpProofFeatures` is a semantic request input. `contracts` excludes
+`SharpProofFeatures` is a semantic compiler-artifact input. `contracts` excludes
 effect-only annotations from the manifest; `effects` excludes postcondition
 claims and contract assumptions; `all` includes both.
 
@@ -129,9 +144,10 @@ release gates, not end-user MSBuild defaults.
 | IDE edit p95 | At most 100 ms |
 | IDE edit maximum | At most 250 ms |
 
-The active contract also fixes protocol version 3, cache schema version 3, and
-manifest schema version 1, along with the trusted-kernel path/LOC boundary and
-the reference surfaces `netstandard2.0`, `net8.0`, and `net472`.
+The active contract also fixes protocol version 5, cache schema version 5,
+claim-manifest schema version 2, and compiler-manifest attestation schema
+version 2, along with the proof-kernel-only path/LOC boundary and the reference
+surfaces `netstandard2.0`, `net8.0`, and `net472`.
 
 Unknown rate is reported by the corpus as explicit, silent, and total metrics;
 it is not a release threshold.

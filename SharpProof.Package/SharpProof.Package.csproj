@@ -44,38 +44,46 @@
     <AnalyzerPayloadDirectory>..\SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0</AnalyzerPayloadDirectory>
     <ContractForGeneratorPayloadPath>..\SharpProof.ContractForGenerator\bin\$(Configuration)\netstandard2.0\SharpProof.ContractForGenerator.dll</ContractForGeneratorPayloadPath>
     <AttributesPayloadPath>..\SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.dll</AttributesPayloadPath>
-    <WorkerPayloadDirectory>..\SharpProof.Worker\bin\$(Configuration)\net8.0</WorkerPayloadDirectory>
-    <LauncherPayloadDirectory>..\SharpProof.Worker.Launcher\bin\$(Configuration)\net8.0</LauncherPayloadDirectory>
+    <WorkerPayloadDirectory>..\SharpProof.Worker\bin\$(Configuration)\net9.0</WorkerPayloadDirectory>
+    <LauncherPayloadDirectory>..\SharpProof.Worker.Launcher\bin\$(Configuration)\net9.0</LauncherPayloadDirectory>
+    <RoslynCompilerPayloadDirectory>$(RoslynTargetsPath)\bincore</RoslynCompilerPayloadDirectory>
   </PropertyGroup>
   <Target Name="_AddAnalyzersToOutput">
     <ItemGroup>
       <TfmSpecificPackageFile Include="
           $(AnalyzerPayloadDirectory)\SharpProof.Analyzer.dll;
           $(ContractForGeneratorPayloadPath);
+          $(AnalyzerPayloadDirectory)\Microsoft.Bcl.AsyncInterfaces.dll;
           $(AnalyzerPayloadDirectory)\SharpProof.Attributes.dll;
+          $(AnalyzerPayloadDirectory)\SharpProof.CompilerArtifact.dll;
           $(AnalyzerPayloadDirectory)\SharpProof.Contracts.dll;
           $(AnalyzerPayloadDirectory)\SharpProof.Dataflow.dll;
           $(AnalyzerPayloadDirectory)\SharpProof.Effects.dll;
           $(AnalyzerPayloadDirectory)\SharpProof.Frontend.dll;
           $(AnalyzerPayloadDirectory)\SharpProof.Ir.dll;
           $(AnalyzerPayloadDirectory)\SharpProof.Specs.dll;
+          $(AnalyzerPayloadDirectory)\SharpProof.Worker.Protocol.dll;
           $(AnalyzerPayloadDirectory)\Microsoft.CodeAnalysis.AnalyzerUtilities.dll;
           $(AnalyzerPayloadDirectory)\System.Buffers.dll;
           $(AnalyzerPayloadDirectory)\System.Collections.Immutable.dll;
+          $(AnalyzerPayloadDirectory)\System.IO.Pipelines.dll;
           $(AnalyzerPayloadDirectory)\System.Memory.dll;
           $(AnalyzerPayloadDirectory)\System.Numerics.Vectors.dll;
           $(AnalyzerPayloadDirectory)\System.Reflection.Metadata.dll;
           $(AnalyzerPayloadDirectory)\System.Runtime.CompilerServices.Unsafe.dll;
           $(AnalyzerPayloadDirectory)\System.Text.Encoding.CodePages.dll;
+          $(AnalyzerPayloadDirectory)\System.Text.Encodings.Web.dll;
+          $(AnalyzerPayloadDirectory)\System.Text.Json.dll;
           $(AnalyzerPayloadDirectory)\System.Threading.Tasks.Extensions.dll"
                                  PackagePath="tools/analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="$(AttributesPayloadPath)" PackagePath="lib/netstandard2.0" />
       <TfmSpecificPackageFile Include="
           $(WorkerPayloadDirectory)\Microsoft.CodeAnalysis.AnalyzerUtilities.dll;
-          $(WorkerPayloadDirectory)\Microsoft.CodeAnalysis.CSharp.dll;
-          $(WorkerPayloadDirectory)\Microsoft.CodeAnalysis.dll;
+          $(RoslynCompilerPayloadDirectory)\Microsoft.CodeAnalysis.CSharp.dll;
+          $(RoslynCompilerPayloadDirectory)\Microsoft.CodeAnalysis.dll;
           $(WorkerPayloadDirectory)\Microsoft.Z3.dll;
           $(WorkerPayloadDirectory)\SharpProof.Attributes.dll;
+          $(WorkerPayloadDirectory)\SharpProof.CompilerArtifact.dll;
           $(WorkerPayloadDirectory)\SharpProof.Contracts.dll;
           $(WorkerPayloadDirectory)\SharpProof.Dataflow.dll;
           $(WorkerPayloadDirectory)\SharpProof.Frontend.dll;
@@ -87,16 +95,16 @@
           $(WorkerPayloadDirectory)\SharpProof.Worker.dll;
           $(WorkerPayloadDirectory)\SharpProof.Worker.deps.json;
           $(WorkerPayloadDirectory)\SharpProof.Worker.runtimeconfig.json;
-          $(WorkerPayloadDirectory)\System.Collections.Immutable.dll;
           $(WorkerPayloadDirectory)\System.IO.Pipelines.dll;
-          $(WorkerPayloadDirectory)\System.Reflection.Metadata.dll;
           $(WorkerPayloadDirectory)\System.Text.Encodings.Web.dll;
           $(WorkerPayloadDirectory)\System.Text.Json.dll"
-                              PackagePath="tools/net8" />
+                              PackagePath="tools/net9" />
       <TfmSpecificPackageFile Include="$(WorkerPayloadDirectory)\runtimes\win-x64\native\libz3.dll"
-                              PackagePath="tools/net8/runtimes/win-x64/native" />
+                              PackagePath="tools/net9/runtimes/win-x64/native" />
+      <TfmSpecificPackageFile Include="$(WorkerPayloadDirectory)\runtimes\win\lib\net9.0\System.Text.Encodings.Web.dll"
+                              PackagePath="tools/net9/runtimes/win/lib/net9.0" />
       <TfmSpecificPackageFile Include="$(LauncherPayloadDirectory)\SharpProof.Worker.Launcher.dll;$(LauncherPayloadDirectory)\SharpProof.Worker.Launcher.deps.json;$(LauncherPayloadDirectory)\SharpProof.Worker.Launcher.runtimeconfig.json"
-                              PackagePath="tools/net8" />
+                              PackagePath="tools/net9" />
     </ItemGroup>
   </Target>
 </Project>

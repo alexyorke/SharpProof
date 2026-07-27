@@ -374,7 +374,10 @@ public sealed class BoundaryEnforcementTests {
             "libz3",
             "SharpProof.Smt",
             "SharpProof.Verify",
-            "SharpProof.Worker"
+            "SharpProof.Worker.dll",
+            "SharpProof.Worker.deps.json",
+            "SharpProof.Worker.runtimeconfig.json",
+            "SharpProof.Worker.Launcher"
         ];
         foreach (var forbidden in forbiddenAssets)
             Assert.That(

@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $repositoryDefaultBranch = 'master'
-$maintainedDocuments = @(
+$currentMaintainedDocuments = @(
     'README.md',
     'SEMANTICS.md',
     'docs\README.md',
@@ -19,11 +19,16 @@ $maintainedDocuments = @(
     'docs\unknown-reasons.md',
     'docs\native-smt-packaging.md',
     'docs\smt-lifecycle.md',
-    'docs\soundness-notes\2026-07-25-api-spec-result-domains.md',
-    'docs\soundness-notes\2026-07-25-hardening.md',
     'eng\acceptance\README.md',
     'SharpProof.Gates\README.md',
     'SharpProof.Gates\Corpus\README.md'
+)
+$datedEvidenceDocuments = @(
+    'docs\soundness-notes\2026-07-25-api-spec-result-domains.md',
+    'docs\soundness-notes\2026-07-25-hardening.md'
+)
+$maintainedDocuments = @(
+    $currentMaintainedDocuments + $datedEvidenceDocuments
 )
 
 function Get-RepositoryPath {
@@ -276,7 +281,6 @@ $requiredReadmeText = @(
     'Unknown',
     'SHARPPROOF_CONTRACTS',
     'Windows x64',
-    'protocol version 3',
     'compiler artifact',
     'SARIF',
     'docs/README.md'
@@ -285,9 +289,7 @@ $forbiddenReadmeText = @(
     'Deep Ensures',
     'DeepEnsures',
     'WorkerVerificationStatus',
-    'WorkerVerificationReason',
-    'protocol version 2',
-    'cache schema version 2'
+    'WorkerVerificationReason'
 )
 foreach ($required in $requiredReadmeText) {
     if (-not $readme.Contains($required, [StringComparison]::Ordinal)) {
@@ -462,25 +464,104 @@ $cacheVersion = [regex]::Match(
 $manifestVersion = [regex]::Match(
     $protocolSource,
     'WorkerManifestVersions\s*\{\s*public const int Current = (?<value>\d+)')
+$compilerArtifactSource = Get-RequiredText (
+    'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs')
+$compilerArtifactVersion = [regex]::Match(
+    $compilerArtifactSource,
+    'CompilerManifestArtifactVersions\s*\{[\s\S]*?\bCurrent\s*=\s*(?<value>\d+)\s*;')
 if (-not $protocolVersion.Success -or
     -not $cacheVersion.Success -or
-    -not $manifestVersion.Success) {
-    throw 'Could not derive worker protocol, cache, and manifest versions.'
+    -not $manifestVersion.Success -or
+    -not $compilerArtifactVersion.Success) {
+    throw (
+        'Could not derive worker protocol, cache, manifest, and compiler-' +
+        'artifact versions.')
 }
+
+$derivedVersions = [ordered]@{
+    Protocol = $protocolVersion.Groups['value'].Value
+    Cache = $cacheVersion.Groups['value'].Value
+    Manifest = $manifestVersion.Groups['value'].Value
+    CompilerArtifact = $compilerArtifactVersion.Groups['value'].Value
+}
+$acceptanceContract = Get-RequiredText 'eng\acceptance\contract.json' |
+    ConvertFrom-Json
+$contractVersions = [ordered]@{
+    Protocol = $acceptanceContract.worker.protocolVersion
+    Cache = $acceptanceContract.cache.schemaVersion
+    Manifest = $acceptanceContract.worker.manifestSchemaVersion
+    CompilerArtifact = $acceptanceContract.worker.compilerArtifactSchemaVersion
+}
+foreach ($name in $derivedVersions.Keys) {
+    $expected = $derivedVersions[$name]
+    $actual = [string]$contractVersions[$name]
+    if ($actual -ne $expected) {
+        throw (
+            "Acceptance contract $name version '$actual' does not match " +
+            "the code-derived version '$expected'.")
+    }
+}
+
 foreach ($expected in @(
-        "protocol version $($protocolVersion.Groups['value'].Value)",
-        "cache schema version $($cacheVersion.Groups['value'].Value)",
-        "manifest schema version $($manifestVersion.Groups['value'].Value)")) {
+        "protocol version $($derivedVersions.Protocol)",
+        "cache schema version $($derivedVersions.Cache)",
+        "manifest schema version $($derivedVersions.Manifest)",
+        "compiler artifact schema version $($derivedVersions.CompilerArtifact)")) {
     if (-not $readme.Contains($expected, [StringComparison]::OrdinalIgnoreCase)) {
         throw "README.md is missing code-derived worker text: $expected"
     }
 }
 
+$versionMentionRules = @(
+    [pscustomobject]@{
+        Name = 'protocol'
+        Pattern = '\b(?:protocol\s+version\s+|protocol-v)(?<value>\d+)\b'
+        Expected = $derivedVersions.Protocol
+    },
+    [pscustomobject]@{
+        Name = 'cache schema'
+        Pattern = '\bcache\s+schema\s+version\s+(?<value>\d+)\b'
+        Expected = $derivedVersions.Cache
+    },
+    [pscustomobject]@{
+        Name = 'claim-manifest schema'
+        Pattern = '(?<!compiler )(?<!compiler-)\b(?:claim-)?manifest\s+schema\s+version\s+(?<value>\d+)\b'
+        Expected = $derivedVersions.Manifest
+    },
+    [pscustomobject]@{
+        Name = 'compiler-artifact schema'
+        Pattern = '\bcompiler(?:\s+artifact|-manifest(?:\s+attestation)?)\s+schema\s+version\s+(?<value>\d+)\b'
+        Expected = $derivedVersions.CompilerArtifact
+    },
+    [pscustomobject]@{
+        Name = 'compiler-artifact schema'
+        Pattern = '\bschema-(?<value>\d+)\s+compiler(?:\s+artifact|\s+evidence|\s+snapshot|-manifest)\b'
+        Expected = $derivedVersions.CompilerArtifact
+    }
+)
+foreach ($relativePath in $currentMaintainedDocuments) {
+    $content = Get-RequiredText $relativePath
+    foreach ($rule in $versionMentionRules) {
+        foreach ($match in [regex]::Matches(
+                $content,
+                $rule.Pattern,
+                [Text.RegularExpressions.RegexOptions]::IgnoreCase)) {
+            if ($match.Groups['value'].Value -ne $rule.Expected) {
+                throw (
+                    "Current documentation has stale $($rule.Name) version " +
+                    "'$($match.Groups['value'].Value)' in $relativePath; " +
+                    "code declares '$($rule.Expected)'.")
+            }
+        }
+    }
+}
+
 if ($Verify) {
     Write-Host (
-        "SharpProof documentation matches code-derived version, configuration, " +
-        'diagnostics, API specs, worker options, protocol enums, versions, ' +
-        'links, and anchors.')
+        "SharpProof documentation matches code-derived package, protocol, " +
+        'cache, manifest, and compiler-artifact versions, acceptance-contract ' +
+        'versions, configuration, diagnostics, API specs, worker options, ' +
+        'protocol enums, links, and anchors.')
 }
 else {
     Write-Host 'SharpProof documentation validation passed.'

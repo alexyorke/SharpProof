@@ -31,9 +31,11 @@ The implementation remains the authority for enumerated surfaces:
 - `SharpProof.Analyzer/GeneratedDiagnosticDescriptors.cs` and
   `SharpProof.ContractForGenerator/GeneratedDiagnosticDescriptors.cs` declare
   diagnostic IDs, severities, defaults, and messages.
-- `SharpProof.Worker.Protocol/ProtocolModel.cs` declares protocol version 3,
-  manifest schema version 1, cache schema version 3, policies, run statuses,
+- `SharpProof.Worker.Protocol/ProtocolModel.cs` declares protocol version 5,
+  manifest schema version 2, cache schema version 5, policies, run statuses,
   callable coverage, claim outcomes/reasons, and summary records.
+- `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs` declares compiler
+  artifact schema version 2 and the compiler-evidence envelope.
 - `eng/acceptance/contract.json` declares release-gate budgets. Package
   defaults that are not release-gate fields live in
   `SharpProof.Package/buildTransitive/SharpProof.props` and
@@ -55,14 +57,19 @@ the current coverage inventory or normative semantics.
 ## Known production gaps
 
 During Windows verification, the production analyzer emits a deterministic
-seal of the final post-generator Roslyn `Compilation`. The seal is parity and
-diagnostic evidence only: the accountable manifest is still built from a
-worker-reconstructed compilation, not from a closed compiler artifact.
-Generated claims and other compiler-only inputs are not claimed as
-1.0-complete, so production-plan Step 4 remains incomplete. SARIF projection
-and the planned three-package split are also future work. Current behavior and
-limits are recorded in
-[Coverage and limits](coverage-and-limits.md#current-compilation-integration-gap).
+compiler-manifest attestation from the final post-generator Roslyn
+`Compilation`. The worker recreates compiler symbols from embedded final tree
+text and hash-verified reference images, and must match the compiler-produced
+selected-claim manifest before cache lookup or a solver query. Generated
+contracts are visible and verifiable through this bridge.
+
+This remains an exact-build-coupled compiler bridge rather than the lowered-IR
+artifact required for 1.0. Reference images are file-backed and compiler
+reconstruction remains until the worker consumes compiler-produced obligation
+IR. Production-plan Step 4 is therefore incomplete. SARIF projection and the
+planned three-package split are also future work. Current behavior and limits
+are recorded in
+[Coverage and limits](coverage-and-limits.md#remaining-compilation-integration-gap).
 
 ## Machine-owned Markdown
 
@@ -74,9 +81,10 @@ limits are recorded in
 ## Maintenance
 
 Markdown is hand-maintained. `scripts/Generate-Readme.ps1 -Verify` validates
-code-derived versions, configuration values, diagnostics, API-spec IDs, worker
-properties, protocol enums/versions, local links, anchors, line endings, and
-BOM policy; it does not
+code-derived versions, acceptance-contract versions, configuration values,
+diagnostics, API-spec IDs, worker properties, protocol enums, local links,
+anchors, line endings, and BOM policy; it does not
 generate these files. When behavior changes, update the relevant source-owned
 table first, then update the coverage, diagnostic, limit, or reason reference
-that mirrors it.
+that mirrors it. Dated soundness notes remain subject to link and file-format
+checks but are excluded from current-version drift checks.

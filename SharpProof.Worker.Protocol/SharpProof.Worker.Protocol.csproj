@@ -9,4 +9,11 @@
     <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />
     <PackageReference Include="System.Text.Json" Version="10.0.10" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.CompilerArtifact" />
+    <InternalsVisibleTo Include="SharpProof.Gates" />
+    <InternalsVisibleTo Include="SharpProof.Worker" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Launcher" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+  </ItemGroup>
 </Project>

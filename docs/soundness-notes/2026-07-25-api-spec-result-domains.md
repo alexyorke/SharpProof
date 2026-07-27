@@ -1,8 +1,8 @@
 # ApiSpec result-domain projection - 2026-07-25
 
 > Dated evidence: this note records the bounded result-domain tranche as
-> reviewed on 2026-07-25. The current worker wraps these proofs in protocol
-> version 3 manifests and exact claim accounting; see
+> reviewed on 2026-07-25. At that reviewed checkpoint, the worker wrapped these
+> proofs in protocol version 3 manifests with exact claim accounting; see
 > [Coverage and limits](../coverage-and-limits.md).
 
 ## Scope

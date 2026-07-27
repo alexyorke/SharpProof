@@ -23,6 +23,31 @@ public sealed class ClaimManifestBuilderTests {
     ];
 
     [Test]
+    public void CancellationStopsCompanionDiscovery() {
+        var compilation = GetCompilation((
+            "Subject.cs", "internal sealed class Subject { }"));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Action action = () => _ = new ClaimManifestBuilder(
+            compilation, WorkerFeatureSet.All, cancellation.Token);
+        Assert.That(action, Throws.InstanceOf<OperationCanceledException>());
+    }
+
+    [Test]
+    public void CancellationStopsMethodDiscovery() {
+        var compilation = GetCompilation((
+            "Subject.cs", "internal sealed class Subject { }"));
+        using var cancellation = new CancellationTokenSource();
+        var builder = new ClaimManifestBuilder(
+            compilation, WorkerFeatureSet.All, cancellation.Token);
+        cancellation.Cancel();
+
+        Action action = () => builder.Build();
+        Assert.That(action, Throws.InstanceOf<OperationCanceledException>());
+    }
+
+    [Test]
     public void ClaimIdentityIgnoresTriviaNamesAndPaths() {
         var first = Build((
             "First.cs",

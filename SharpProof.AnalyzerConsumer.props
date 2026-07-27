@@ -5,8 +5,9 @@
     <CompilerVisibleProperty Include="SharpProofVerifyPolicy" />
     <CompilerVisibleProperty Include="SharpProofAssumptionPolicy" />
     <CompilerVisibleProperty Include="SharpProofMode" />
-    <CompilerVisibleProperty Include="_SharpProofCompilationSealPath" />
+    <CompilerVisibleProperty Include="_SharpProofCompilerManifestPath" />
     <CompilerVisibleProperty Include="_SharpProofCompilationTargetFramework" />
+    <CompilerVisibleProperty Include="_SharpProofProjectDirectory" />
   </ItemGroup>
 
   <ItemGroup>
@@ -18,12 +19,26 @@
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerArtifact\bin\$(Configuration)\netstandard2.0\SharpProof.CompilerArtifact.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Contracts\bin\$(Configuration)\netstandard2.0\SharpProof.Contracts.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Dataflow\bin\$(Configuration)\netstandard2.0\SharpProof.Dataflow.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Effects\bin\$(Configuration)\netstandard2.0\SharpProof.Effects.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Frontend\bin\$(Configuration)\netstandard2.0\SharpProof.Frontend.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Ir\bin\$(Configuration)\netstandard2.0\SharpProof.Ir.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Specs\bin\$(Configuration)\netstandard2.0\SharpProof.Specs.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Worker.Protocol\bin\$(Configuration)\netstandard2.0\SharpProof.Worker.Protocol.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\Microsoft.CodeAnalysis.AnalyzerUtilities.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\Microsoft.Bcl.AsyncInterfaces.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\System.Buffers.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\System.Collections.Immutable.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\System.IO.Pipelines.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\System.Memory.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\System.Numerics.Vectors.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\System.Reflection.Metadata.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\System.Runtime.CompilerServices.Unsafe.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\System.Text.Encoding.CodePages.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\System.Text.Encodings.Web.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\System.Text.Json.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\System.Threading.Tasks.Extensions.dll" />
   </ItemGroup>
 </Project>

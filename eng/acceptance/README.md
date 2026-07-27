@@ -9,7 +9,8 @@ is acceptable only when:
 - the supported-language gate is exhaustive, unsupported unannotated analyzer
   methods remain quiet, and unsupported explicitly selected methods report
   SP0047;
-- protocol version 3 manifests every selected callable and postcondition with a
+- protocol version 5 binds compiler-manifest evidence and manifests every
+  selected callable and postcondition with a
   stable semantic ID, and every response has exact manifest/result equality;
 - every new `Proven` outcome is backed by hygienic evidence and every
   `Refuted` outcome has a replay-validated witness;
@@ -42,20 +43,21 @@ otherwise unsupported postconditions abstain.
 
 The package defaults to `SharpProofProfile=advisory` and
 `SharpProofFeatures=all`; unannotated code remains quiet.
-The same feature selection enters the worker request and filters manifest
-discovery, so contract-only requests exclude effect annotations and effect-only
-requests exclude postcondition claims.
+The same feature selection enters the compiler artifact and filters manifest
+discovery, so contract-only artifacts exclude effect annotations and
+effect-only artifacts exclude postcondition claims.
 `SharpProofProfile=strict` enables verification, defaults
 `SharpProofVerifyPolicy` to `require-proven`, and defaults
 `SharpProofAssumptionPolicy` to `error`. Fatal run states and refutations fail
 under every policy. `SharpProofMode` is a deprecated preview compatibility
 alias.
 
-This acceptance contract does not yet claim the final generated compiler
-compilation: the worker still reconstructs from source/reference lists. The
-planned compiler artifact, generated-tree accountability, SARIF projection,
-three-package split, protected publishing, and independent human release
-reviews remain open production gates.
+This acceptance contract covers the schema-2 post-generator compiler snapshot,
+generated-tree accountability, exact manifest/result equality, and fail-closed
+compiler-version/reference validation. The worker still recreates Roslyn
+symbols from embedded tree text and file-backed, hash-verified reference
+images; lowered obligation IR, SARIF projection, the three-package split,
+protected publishing, and independent human release reviews remain open gates.
 
 Changes to the trusted-kernel paths, assumption construction, complete effect
 summaries, API specifications, or proof-producing outcome construction require
@@ -76,4 +78,5 @@ performance gate. Off-profile performance compares real baseline and
 SharpProof-imported MSBuild rebuilds and separately checks the loaded-but-off
 analyzer retention boundary. The full acceptance job currently runs on Windows
 x64. Separate package-consumer CI exercises the analyzer on Windows x64, Linux
-x64, and macOS Intel, but packaged worker execution remains Windows x64 only.
+x64, macOS x64, and macOS ARM64, but packaged worker execution remains Windows
+x64 only.

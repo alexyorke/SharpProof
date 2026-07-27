@@ -13,17 +13,19 @@ Attributes
 Ir
 Dataflow
 Specs                 -> Ir
-Frontend              -> Ir, Roslyn
+Frontend              -> Ir
 Contracts             -> Attributes, Frontend, Ir, Specs
 Effects               -> Attributes, Dataflow, Frontend, Specs
-Verify                -> Ir, Specs, ISmtBackend
-Smt                   -> Ir, Verify, Z3
-ContractForGenerator  -> Frontend
-Analyzer              -> Attributes, Contracts, Effects, Frontend, Ir, Specs
+Verify                -> Ir, Specs
+Smt                   -> Ir, Verify
+CompilerArtifact      -> Contracts, Frontend, Ir, Worker.Protocol
+ContractForGenerator  -> Contracts
+Analyzer              -> Attributes, CompilerArtifact, Contracts, Effects,
+                         Frontend, Ir, Specs
 Worker.Protocol
-Worker                -> Attributes, Contracts, Dataflow, Frontend, Ir, Smt,
-                         Specs, Verify, Worker.Protocol
-Worker.Launcher       -> Worker.Protocol
+Worker                -> Attributes, CompilerArtifact, Contracts, Dataflow,
+                         Frontend, Ir, Smt, Specs, Verify, Worker.Protocol
+Worker.Launcher       -> CompilerArtifact, Ir, Specs, Worker.Protocol
 ```
 
 Build-only references to `SharpProof.Meta.Analyzers` are omitted. The
@@ -31,7 +33,7 @@ architecture suite compares every direct project reference against this graph.
 
 The Roslyn analyzer has no verifier, SMT, Z3, or native dependency. Z3 is
 allowed only in `SharpProof.Smt`, which is packaged below
-`tools/net8` for the worker. `Ir`, `Dataflow`, and `Specs` contain no C# syntax
+`tools/net9` for the worker. `Ir`, `Dataflow`, and `Specs` contain no C# syntax
 types. Production semantic-model acquisition passes through the single audited
 `SharpProof.Frontend.Host.CompilationModelProvider`.
 
@@ -102,49 +104,65 @@ indices. Formula construction, worklists, specs, proof cores, diagnostics, and
 serialized responses are stably ordered. Z3 uses resource limits; wall time is
 an outer process kill boundary.
 
-Protocol version 3 first builds a manifest from compiler symbols. Stable
-semantic IDs identify selected callables, postcondition claims, and
-user/trusted evidence independently of formatting. The protocol separates run
-status, callable coverage, and per-claim outcome. Central validation requires
-the response to match the sealed manifest exactly, including dense ordinals,
-claim ownership, summary counts, evidence summaries, and allowed payloads.
+Protocol version 5 binds each request to a compiler-produced manifest artifact
+and then builds an independent manifest from compiler symbols recreated from
+that artifact. Stable semantic IDs identify selected callables, postcondition
+claims, and user/trusted evidence independently of formatting. The protocol
+separates run status, callable coverage, and per-claim outcome. Central
+validation requires the response to match the sealed manifest exactly,
+including dense ordinals, claim ownership, summary counts, assumption
+summaries, and allowed payloads.
 
-The request carries real source and reference paths plus explicit compilation
-options, feature selection, policies, and budgets. `WorkerFeatureSet` applies
-the same `effects`/`contracts`/`all` selection before manifest discovery:
-contract-only requests exclude effect annotations and effect-only requests
-exclude postcondition claims. On the supported Windows x64 worker host, the
+The request carries only the compiler-artifact path/digest, policies, budgets,
+and cache controls. The artifact carries `WorkerFeatureSet` and applies the same
+`effects`/`contracts`/`all` selection before manifest discovery: contract-only
+artifacts exclude effect annotations and effect-only artifacts exclude
+postcondition claims. On the supported Windows x64 worker host, the
 launcher creates a startup barrier, assigns the worker to a Job Object with
 process and memory limits, and only then releases verification work. Concurrent
-builds use isolated request/result paths. After validating a response, a
-cross-process mutex serializes publication; each stable file is atomically
-replaced, and the request replacement is rolled back if result publication
-fails. Completed writers leave a consistent pair, though readers can observe
-the narrow interval between the two replacements. The
+builds use isolated artifact/request/result paths. After validating a response,
+a cross-process mutex serializes publication. The stable result is deleted
+first, the manifest and request are atomically replaced, and the result is
+written last as the commit marker. A failed publication therefore cannot leave
+a stale successful result associated with a partly updated evidence set. The
 content-addressed cache includes semantic, protocol, tool, compilation,
-reference, option, target-framework, and spec identity. Cache schema version 3
+reference, option, target-framework, and spec identity. Cache schema version 5
 stores only the validated semantic payload. A hit is accepted only when its
 manifest hash and complete result set match the current manifest. Only
 complete callables whose claims are hygienic `Proven` or replay-validated
 `Refuted` are cacheable.
 
-One important production boundary is not complete. During Windows verification,
-the production analyzer now observes the final post-generator Roslyn
-`Compilation` and atomically emits a deterministic seal over compiler options,
-source and generated trees, references, `AdditionalFiles`, SharpProof policies,
-and target-framework identity. Seal emission failure is fatal SP0049.
+During Windows verification, the production analyzer observes the final
+post-generator Roslyn `Compilation` and atomically emits compiler artifact
+schema version 2 evidence. It contains the sealed selected-claim manifest,
+exact compiler build identities, a bounded parse/compilation-option set, final
+handwritten and generated tree text, reference
+paths/aliases/identities/image hashes, assembly identity, and target framework.
+Only readable, file-backed `PortableExecutableReference` inputs are admitted;
+artifact collection failure is fatal SP0049.
 
-That seal is parity and diagnostic evidence only. MSBuild still sends
-source/reference lists to the worker, which reconstructs a separate
-compilation; the seal is not the closed manifest/IR artifact consumed by the
-worker. Seal collection currently requires file-backed references and hashes
-their on-disk images; it is not an exact snapshot of Roslyn's loaded metadata
-and is never a cache authority. Generated claims are therefore not yet
-accounted for, compilation reconstruction has not been deleted, and
-production-plan Step 4 is not complete. Deterministic JSON is emitted, but
-SARIF projection is also future work. Counterexample replay currently
-re-evaluates the lowered obligation-path IR; an independent whole-body
-interpreter over the exact CFG is also still required before 1.0.
+The launcher binds the artifact bytes and request identity into the response
+and publishes the request, response, and manifest under one lock with the result
+written last. The compiler artifact is the worker's sole compilation input. The
+worker requires exact compiler-build equality, recreates symbols from embedded
+tree text and hash-verified reference images, and requires its discovered
+manifest to match compiler evidence before cache lookup or a solver query.
+Body/reference drift, missing generated claims, or incompatible compiler inputs
+fail closed as `CompilerManifestMismatch`.
+
+The artifact is not yet closed lowered IR. Raw `AdditionalFiles` and analyzer
+configuration are not retained; their generated output is covered only when it
+changes final compiler state. Reference images remain file-backed, though their
+bytes are verified before use, and exact Roslyn Common/C# build-identity
+equality is temporarily required. The bounded option snapshot does not claim
+to serialize all Roslyn compilation state. Generated bodies are now
+verifiable. Source-list reconstruction has
+been deleted, but compiler reconstruction remains until obligation IR replaces
+the embedded-tree bridge, so production-plan Step 4 is not complete.
+Deterministic JSON is emitted, but SARIF projection is also future work.
+Counterexample replay currently re-evaluates the lowered obligation-path IR; an
+independent whole-body interpreter over the exact CFG is also still required
+before 1.0.
 
 ## Activation and release gates
 

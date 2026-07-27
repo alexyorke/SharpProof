@@ -4,7 +4,7 @@ SMT verification is out of process. The IDE analyzer never creates a Z3
 context.
 
 The packaged worker lifecycle is currently supported and exercised only on
-Windows x64. Linux x64 and macOS Intel CI exercise analyzer-only package
+Windows x64. Linux x64, macOS x64, and macOS ARM64 CI exercise analyzer-only package
 consumption; Windows arm64 and non-Windows packaged worker lifecycles are not
 validated.
 
@@ -20,7 +20,7 @@ through the executable IR and falsify the goal. An UNSAT result becomes
 encoding, resource limits, and method boundaries produce typed claim-level
 `Unknown` results. Backend unavailability, malformed backend results, replay
 failure, containment failure, and infrastructure failure make the protocol
-version 3 run `Failed` and fail the build under every policy. Project timeout
+version 5 run `Failed` and fail the build under every policy. Project timeout
 and caller cancellation use the separate `TimedOut` and `Canceled` run
 statuses.
 
@@ -36,7 +36,7 @@ run into success.
 Only exact-manifest, complete `Proven` and replay-validated `Refuted` project
 results enter the content-addressed disk cache. Cache keys include protocol,
 semantics, tool, target framework, compilation inputs, references, options, and
-spec versions. Cache schema version 3 revalidates the stored semantic payload
+spec versions. Cache schema version 5 revalidates the stored semantic payload
 against the complete current manifest.
 
 See [Typed abstention reasons](unknown-reasons.md) for exact statuses and

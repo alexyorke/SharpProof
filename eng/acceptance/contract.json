@@ -18,7 +18,9 @@
     "unsupportedSelectedCallableDiagnostic": "SP0047"
   },
   "worker": {
-    "protocolVersion": 3,
+    "protocolVersion": 5,
+    "manifestSchemaVersion": 2,
+    "compilerArtifactSchemaVersion": 2,
     "maximumParallelism": 4,
     "maximumMemoryMiB": 2048,
     "queryRlimit": 3000000,
@@ -29,7 +31,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 3,
+    "schemaVersion": 5,
     "maximumMiB": 512,
     "cacheableOutcomes": [
       "Proven",
