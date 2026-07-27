@@ -55,7 +55,7 @@ The package defaults to advisory analysis of both implemented feature groups:
   verification.
 
 `SharpProofFeatures` values are `effects`, `contracts`, and `all` (the
-default). The effective selection is sealed into the schema-2 compiler
+default). The effective selection is sealed into the schema-3 compiler
 artifact and filters its manifest: `contracts` excludes effect-only
 annotations, `effects` excludes postcondition claims and contract assumptions,
 and `all` selects both surfaces. The current worker has no effect-proof claims,
@@ -377,29 +377,42 @@ x64, Linux x64, macOS x64, and macOS ARM64; only Windows x64 enables packaged
 worker verification. Real Visual Studio, Rider, and Windows ARM64 validation
 remain outstanding release gates.
 
-## Remaining compiler integration gap
+## Closed compiler artifact and remaining release gaps
 
-The build-only collector now embeds the final handwritten and generated syntax
-tree text, the schema's bounded parse/compilation-option set, assembly and
-target identities, exact compiler build identities, reference
-paths/aliases/identities/image hashes, feature selection, and the sealed claim
-manifest in compiler artifact schema version 2. Only readable, file-backed
-`PortableExecutableReference` inputs can enter this bridge; inability to
-capture one is fatal SP0049. The compiler artifact is the worker's sole
-compilation input. The worker verifies its digest, requires exact compiler-build
-equality, rebuilds from the embedded trees and hash-verified reference images,
-and requires independent manifest equality before cache lookup or a solver
-query. Generated contracts are therefore visible and verifiable through this
-bridge.
+The build-only collector now emits compiler artifact schema version 3 from the
+final post-generator Roslyn `Compilation`. It seals the feature-selected claim
+manifest and, for each selected callable, either a typed lowering failure or
+portable whole-body CFG/IR with bound contract clauses, canonical variables,
+body-entry state, parameter mappings, and exact API-spec witness metadata. The
+artifact also records compiler error diagnostics with mapped locations,
+handwritten and generated tree hashes and parse settings, a bounded
+proof-relevant compilation-option set, assembly/target identity, and
+compiler/reference provenance. It contains no source text.
 
-This is not yet the final lowered-IR artifact required for 1.0. Raw
-`AdditionalFiles` and analyzer configuration are represented only by their
-observable final-compilation effects, the snapshot does not claim to serialize
-every Roslyn option, and reference image bytes remain file-backed. The package
-is built on Roslyn 4.14, but matching an assembly version number alone is not
-enough: the exact Roslyn Common and C# compiler build identities must match or
-verification fails closed. Lowered obligation IR, SARIF output, and the
-three-package release split remain production work.
+The artifact is the worker's sole compilation input. The worker verifies its
+digest and canonical shape, requires its compiler-visible maximum expression
+depth to equal the request budget, and validates exact manifest/callable/claim,
+assumption, and portable-graph relationships before cache lookup or backend
+creation. It hydrates the lowered IR without constructing a Roslyn compilation,
+reparsing source, or rereading reference files. Compiler versions and MVIDs,
+and reference paths, hashes, identities, kinds, and aliases, are provenance and
+cache identity rather than a runtime compiler-compatibility gate.
+
+Generated contracts and bodies are therefore closed into the same artifact.
+`AdditionalFiles` are sealed as canonical paths and content hashes; their raw
+contents are not embedded. Analyzer configuration is represented through its
+observable effect on the final compilation and effective SharpProof options.
+Resolver-dependent `#r` or `#load`, missing-assembly resolver mode, reference
+supersession, custom assembly-identity comparers, and non-file or unreadable
+references fail artifact collection as SP0049.
+
+The compiler-to-worker reconstruction cutover is complete for this bounded
+subset, but SharpProof is not production-ready. Counterexample replay still
+uses the lowered obligation path rather than an independent interpreter over
+the exact whole-body CFG. A SAT model involving a spec-modeled call result is
+therefore downgraded to `Unknown` with `CounterexampleReplayFailed`. SARIF
+output, the three-package release split, broader host qualification, and the
+remaining release reviews are also outstanding.
 
 ## Build and validate this repository
 

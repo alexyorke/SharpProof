@@ -16,9 +16,9 @@ unsupported expressions, approximate facts, and exhausted budgets remain
 | Effect contracts | Analyzer with `SharpProofFeatures=effects` or `all` | Computes path-insensitive may summaries for reads, writes, allocation, capabilities, exceptions, termination, and completeness; checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, and `[AllowedExceptions]` | A possible or unresolved violation produces a not-proven diagnostic, not a definitive effect witness |
 | Call-site preconditions | Analyzer with `SharpProofFeatures=contracts` or `all` | Binds source `Contract.Requires` clauses and closed parameter attributes with compiler symbols for ordinary calls and object creation; reports only when receiver, arguments, and required prefix evaluation are exact and non-throwing and the instantiated predicate concretely evaluates to false | Unknown values and possible throws remain silent at unannotated sites; unsupported explicitly selected methods report SP0047 |
 | Postconditions | Optional Windows x64 worker with `SharpProofFeatures=contracts` or `all`; strict enables the worker by default | Manifests `Contract.Ensures` and return attributes, including directly owned local-function, lambda, anonymous-method, and top-level claims, then proves admitted bounded obligations over normal-return paths with Boolean/integer SMT and replay-gated counterexamples | The additional callable forms are currently visible as `UnsupportedCallable`; `effects` excludes postcondition claims; this is bounded `Ensures` verification, not arbitrary deep, recursive, looping, heap, or sequence verification |
-| Worker body execution | Opt-in Windows x64 worker | Executes a bounded acyclic CFG model with locals, reassignment, branches, multiple returns, entry-state `Old`, supported expressions, and eligible resolved API specs | Loops, stateful instructions outside the narrow admitted model, unresolved calls, unsupported mutation, and exceeded bounds abstain |
+| Worker body execution | Compiler collector plus opt-in Windows x64 worker | The compiler emits portable whole-body CFG/IR; the worker executes its bounded acyclic subset with locals, reassignment, branches, multiple returns, entry-state `Old`, supported expressions, and eligible resolved API specs | Loops, stateful instructions outside the narrow admitted model, unresolved calls, unsupported mutation, and exceeded bounds abstain |
 | `ContractFor` validation | Incremental generator loaded with any non-`off` profile | Validates companion type and member identity, including receiver, overload, generic constraints, ref/scoped kinds, nullability, defaults, and return shape | It validates and binds existing source; it emits no generated source and does not make an unsupported contract provable |
-| External calls | Analyzer and worker | Both resolve exact original symbols against `ApiSpecTable`; effect analysis can additionally consume an explicitly trusted complete effect contract | The worker does not turn arbitrary trusted metadata contracts into proof facts; missing, ambiguous, untrusted, incomplete, or target-framework-inapplicable models fail closed |
+| External calls | Analyzer, compiler collector, and worker | Analyzer/compiler stages resolve exact original symbols against `ApiSpecTable`; the artifact binds an admitted lowered call to its exact witness identifier, which the worker revalidates against the matching spec table | The worker does not turn arbitrary trusted metadata contracts into proof facts; missing, ambiguous, untrusted, incomplete, or target-framework-inapplicable models fail closed |
 | SMT | Worker only | Encodes supported Boolean and signed-integer obligations; creates `Proven` only after unsat-core hygiene and `Refuted` only after executable replay | No Z3 or verifier payload is loaded into the IDE analyzer |
 
 Not active as 0.2 product features:
@@ -52,9 +52,10 @@ conversion, unsupported member access, or unsupported invocation form still
 causes frontend abstention. The effect scanner can likewise return an
 incomplete summary for admitted syntax.
 
-The worker body subset is narrower than the analyzer gate: its executor is
-acyclic and bounded and accepts only instructions it can substitute and model
-exactly. Analyzer admission must not be read as worker support.
+The verifier body subset is narrower than the analyzer gate: compiler artifact
+lowering and the worker executor accept only acyclic, bounded instructions they
+can substitute and model exactly. Analyzer admission must not be read as worker
+support.
 
 ## Contract surface
 
@@ -141,7 +142,9 @@ invocation; they are not BCL coverage.
 - `Refuted` requires executable replay of the candidate model. The analyzer's
   current effect may-analysis does not produce definitive effect refutations.
   Worker replay currently uses the lowered obligation path, not the independent
-  whole-body exact-CFG interpreter required by the 1.0 release gate.
+  whole-body exact-CFG interpreter required by the 1.0 release gate. A SAT
+  result involving a spec-modeled call result is downgraded to `Unknown` with
+  `CounterexampleReplayFailed`.
 - `Unknown` covers unsupported, unresolved, approximate, method-time-limited,
   or resource-exhausted claim analysis. Unsupported unannotated analyzer
   callables are silent; unsupported selected callables produce SP0047.
@@ -165,32 +168,57 @@ invocation; they are not BCL coverage.
   warning, or error SP0047 reporting. `SharpProofAssumptionPolicy` maps user or
   trusted evidence to SP0048. These policies do not make fatal runs successful.
 
-## Remaining compilation-integration gap
+## Closed compiler artifact and remaining limits
 
-During Windows verification, the production analyzer captures schema-2
-compiler evidence from the post-generator compilation. It contains the sealed
-selected-claim manifest, exact compiler build identities, final handwritten
-and generated tree text, a bounded compiler/parse-option set, reference
-paths/identities/aliases and image hashes, target framework, and assembly
-identity. Only readable, file-backed `PortableExecutableReference` inputs are
-admitted. Raw `AdditionalFiles`, analyzer configuration, and reporting policies
-are not included; their observable generated-compilation effects are covered.
-An inability to emit the requested artifact is fatal SP0049.
+During Windows verification, the production analyzer captures compiler
+artifact schema version 3 from the post-generator compilation. The artifact
+contains:
+
+- the feature-selected, sealed claim manifest;
+- one record per selected callable, containing either a typed lowering failure
+  or portable whole-body CFG/IR with bound contract clauses, canonical
+  variables, body-entry state, parameter mappings, and exact API-spec witness
+  metadata;
+- compiler error diagnostics with mapped locations;
+- handwritten and generated tree hashes with language version, documentation
+  mode, source kind, preprocessor symbols, and parse features;
+- a bounded proof-relevant compilation-option set, assembly and target
+  identity, and compiler identity/MVID provenance; and
+- reference provenance: path, image hash, symbol identity, image kind,
+  embed-interop flag, and aliases.
+
+The bounded compilation-option record covers output kind, optimization,
+platform, nullable context, metadata import, checked overflow, unsafe mode,
+determinism, global usings, reference-supersession state, the supported
+Default/Desktop assembly-identity comparer profile, and the fixed
+evidence-only resolver policy. General and warning diagnostic options are
+not serialized directly; their observable compiler error diagnostics are.
+
+Source text and reference image bytes are not embedded. The compiler must be
+able to read each file-backed `PortableExecutableReference` to record its
+provenance, but the worker never rereads it. Resolver-dependent `#r`/`#load`,
+missing-assembly resolver mode, reference supersession, custom
+assembly-identity comparers, and non-file or unreadable references fail
+artifact collection as SP0049. `AdditionalFiles` are sealed by canonical path
+and content hash without embedding their raw contents. Analyzer configuration
+and reporting policies are represented by their observable effects on the
+final compilation and effective SharpProof options.
 
 The launcher binds the artifact path to its exact bytes with SHA-256. The
-worker reads those bytes once, requires exact Roslyn Common/C# build-identity
-equality, recreates symbols from embedded tree text and hash-verified reference
-images, and requires exact claim-manifest equality before any cache lookup or
-solver query. The compiler snapshot hash participates in cache identity.
-Generated claims and bodies are therefore visible and verifiable; drift or an
-omitted claim fails closed as `CompilerManifestMismatch`.
+worker reads those bytes once, validates the closed portable graph, requires
+the embedded maximum expression depth to match the request, and requires exact
+manifest/lowered-callable equality before any cache lookup or backend creation.
+It does not construct a Roslyn compilation, parse source, or read references.
+Compiler build identities and reference metadata are provenance and cache
+identity rather than runtime compatibility gates. Compiler errors become
+`CompilationFailure`; malformed lowered evidence, claim/assumption drift, or an
+option mismatch becomes `CompilerManifestMismatch`.
 
-This bridge still is not the lowered-IR artifact required for 1.0. The bounded
-option snapshot does not claim to serialize all Roslyn compilation state,
-reference bytes remain file-backed, and compiler reconstruction remains
-build-coupled. Production-plan Step 4 remains incomplete; obligation-IR
-consumption, removal of compiler reconstruction, broader compatible-Roslyn
-hosting, and SARIF projection are future work.
+Generated claims and supported bodies are therefore visible and executable
+from compiler-produced IR. The remaining integration limits are independent
+whole-body counterexample replay, SARIF projection, broader host
+qualification, and the planned package split; they are not worker-side
+compilation reconstruction work.
 
 See [Typed abstention reasons](unknown-reasons.md) for the exact enums and
 [Analysis limits](analysis-limits.md) for configured budgets.

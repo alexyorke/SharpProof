@@ -1,19 +1,14 @@
 namespace SharpProof.Worker;
-internal sealed class VerificationCache(
-    string directory,
-    long maximumBytes) : IDisposable {
+#pragma warning disable IDE0055 // Compact cache storage preserves the fixed production-size ceiling.
+internal sealed class VerificationCache(string directory, long maximumBytes) : IDisposable {
     private readonly string _directory = Path.GetFullPath(
         directory ?? throw new ArgumentNullException(nameof(directory)));
-    private readonly long _maximumBytes = maximumBytes > 0
-        ? maximumBytes
-        : throw new ArgumentOutOfRangeException(nameof(maximumBytes));
+    private readonly long _maximumBytes = maximumBytes > 0 ? maximumBytes :
+        throw new ArgumentOutOfRangeException(nameof(maximumBytes));
     private readonly SemaphoreSlim _gate = new(1, 1);
 
-    internal async Task<CacheableWorkerResponse?> TryReadAsync(
-        string inputHash,
-        WorkerClaimManifest manifest,
-        WorkerBudgets budgets,
-        CancellationToken cancellationToken) {
+    internal async Task<CacheableWorkerResponse?> TryReadAsync(string inputHash,
+        WorkerClaimManifest manifest, WorkerBudgets budgets, CancellationToken cancellationToken) {
         var path = GetPath(inputHash);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
@@ -21,60 +16,45 @@ internal sealed class VerificationCache(
             try {
                 var json = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
                 var envelope = JsonSerializer.Deserialize<CacheEnvelope>(json, WorkerProtocolJson.Options);
-                if (envelope == null ||
-                    envelope.SchemaVersion !=
-                    WorkerCacheVersions.Current ||
+                if (envelope == null || envelope.SchemaVersion != WorkerCacheVersions.Current ||
                     !string.Equals(envelope.InputHash, inputHash, StringComparison.Ordinal) ||
                     string.IsNullOrEmpty(envelope.Payload) ||
                     !string.Equals(envelope.PayloadHash, HashText(envelope.Payload), StringComparison.Ordinal)) {
                     return null;
                 }
-                cancellationToken.ThrowIfCancellationRequested(); if (!CacheableWorkerResponse.TryParse(
-                        envelope.Payload, inputHash, manifest, budgets, out var response))
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!CacheableWorkerResponse.TryParse(envelope.Payload, inputHash, manifest, budgets, out var response))
                     return null;
                 cancellationToken.ThrowIfCancellationRequested(); File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
                 return response;
             }
             catch (Exception exception) when (exception is
-                JsonException or
-                IOException or
-                UnauthorizedAccessException) {
+                JsonException or IOException or UnauthorizedAccessException) {
                 return null;
             }
         }
-        finally {
-            _gate.Release();
-        }
+        finally { _gate.Release(); }
     }
 
     internal async Task<bool> TryWriteAsync(
-        CacheableWorkerResponse response,
-        CancellationToken cancellationToken) {
+        CacheableWorkerResponse response, CancellationToken cancellationToken) {
         ArgumentNullException.ThrowIfNull(response);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             Directory.CreateDirectory(_directory);
-            var envelope = new CacheEnvelope(
-                WorkerCacheVersions.Current,
-                response.InputHash,
-                HashText(response.Payload),
-                response.Payload);
+            var envelope = new CacheEnvelope(WorkerCacheVersions.Current,
+                response.InputHash, HashText(response.Payload), response.Payload);
             var json = JsonSerializer.Serialize(envelope, WorkerProtocolJson.Options);
             var path = GetPath(response.InputHash);
-            await AtomicFile.WriteUtf8Async(path, json, cancellationToken)
-                .ConfigureAwait(false);
+            await AtomicFile.WriteUtf8Async(path, json, cancellationToken).ConfigureAwait(false);
             Evict(cancellationToken);
             return true;
         }
-        catch (Exception exception) when (exception is
-            IOException or
-            UnauthorizedAccessException) {
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) {
             // Cache failures never change semantic verifier outcomes.
             return false;
         }
-        finally {
-            _gate.Release();
-        }
+        finally { _gate.Release(); }
     }
 
     private void Evict(CancellationToken cancellationToken) {
@@ -88,10 +68,7 @@ internal sealed class VerificationCache(
         foreach (var file in files) {
             cancellationToken.ThrowIfCancellationRequested(); if (total <= _maximumBytes) break;
             var length = file.Length;
-            try {
-                file.Delete();
-                total -= length;
-            }
+            try { file.Delete(); total -= length; }
             catch (Exception exception) when (exception is
                 IOException or UnauthorizedAccessException) {
             }
@@ -99,9 +76,7 @@ internal sealed class VerificationCache(
     }
 
     private string GetPath(string inputHash) {
-        if (inputHash.Length != 64 ||
-            inputHash.Any(static character =>
-                !Uri.IsHexDigit(character)))
+        if (inputHash.Length != 64 || inputHash.Any(static character => !Uri.IsHexDigit(character)))
             throw new ArgumentException("A SHA-256 input hash is required.", nameof(inputHash));
         return Path.Combine(_directory, inputHash.ToLowerInvariant() + ".json");
     }
@@ -112,8 +87,5 @@ internal sealed class VerificationCache(
     public void Dispose() => _gate.Dispose();
 
     private sealed record CacheEnvelope(
-        int SchemaVersion,
-        string InputHash,
-        string PayloadHash,
-        string Payload);
+        int SchemaVersion, string InputHash, string PayloadHash, string Payload);
 }

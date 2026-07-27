@@ -33,12 +33,14 @@ internal static class SemanticClaimIdentity {
         return CreateOperationFingerprint(invocation.Arguments[0].Value, context);
     }
 
-    internal static string CreateAttributeFingerprint(AttributeData attribute, IMethodSymbol target) {
+    internal static string CreateAttributeFingerprint(
+        AttributeData attribute, IMethodSymbol target, IParameterSymbol? parameter = null) {
         if (attribute == null) throw new ArgumentNullException(nameof(attribute));
         var context = new ClaimIdentityContext(target, target, false);
         using var writer = new CanonicalHashWriter();
-        writer.Add(FingerprintDomain).Add("return-attribute");
-        WriteType(writer, target.ReturnType, context);
+        writer.Add(FingerprintDomain).Add(parameter == null ? "return-attribute" : "parameter-attribute");
+        if (parameter != null) writer.Add(parameter.Ordinal);
+        WriteType(writer, parameter?.Type ?? target.ReturnType, context);
         WriteType(writer, attribute.AttributeClass, context);
         WriteAttributeArguments(writer, attribute, context, includeNamed: true);
         return writer.Finish();

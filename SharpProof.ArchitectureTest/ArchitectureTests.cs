@@ -40,8 +40,6 @@ public sealed class ArchitectureTests {
         var allowed = new Dictionary<string, string[]>(StringComparer.Ordinal) {
             ["SharpProof.Ir"] = [],
             ["SharpProof.CompilerArtifact"] = [
-                "SharpProof.Contracts",
-                "SharpProof.Frontend",
                 "SharpProof.Ir",
                 "SharpProof.Worker.Protocol"
             ],
@@ -65,11 +63,8 @@ public sealed class ArchitectureTests {
             ["SharpProof.Smt"] = ["SharpProof.Ir", "SharpProof.Verify"],
             ["SharpProof.Worker.Protocol"] = [],
             ["SharpProof.Worker"] = [
-                "SharpProof.Attributes",
                 "SharpProof.CompilerArtifact",
-                "SharpProof.Contracts",
                 "SharpProof.Dataflow",
-                "SharpProof.Frontend",
                 "SharpProof.Ir",
                 "SharpProof.Smt",
                 "SharpProof.Specs",
@@ -98,9 +93,55 @@ public sealed class ArchitectureTests {
     }
 
     [Test]
+    public void WorkerAndLauncherRuntimeClosuresAreCompilerNeutral() {
+        var forbiddenProjects = new[] {
+            "SharpProof.Analyzer", "SharpProof.Attributes", "SharpProof.Contracts",
+            "SharpProof.Effects", "SharpProof.Frontend"
+        };
+        foreach (var root in new[] {
+                     "SharpProof.Worker", "SharpProof.Worker.Launcher"
+                 }) {
+            var closure = TransitiveProjectClosure(root).ToArray();
+            Assert.That(
+                closure.Intersect(forbiddenProjects, StringComparer.Ordinal),
+                Is.Empty,
+                root);
+            foreach (var project in closure) {
+                Assert.That(
+                    ProjectPackages(project),
+                    Has.None.StartsWith("Microsoft.CodeAnalysis"),
+                    project);
+                Assert.That(
+                    ReadProductionSources(project),
+                    Does.Not.Contain("Microsoft.CodeAnalysis"),
+                    project);
+                Assert.That(
+                    File.ReadAllText(ProjectFile(project)),
+                    Does.Not.Contain("RoslynTargetsPath"),
+                    project);
+            }
+        }
+    }
+
+    [Test]
+    public void AnalyzerUtilitiesHasNoStaleBuildOrTestResidue() {
+        foreach (var path in new[] {
+                     "Directory.Build.targets",
+                     "SharpProof.AnalyzerConsumer.props",
+                     "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj"
+                 })
+            Assert.That(
+                File.ReadAllText(Path.Combine(
+                    RepositoryRoot(), path.Replace('/', Path.DirectorySeparatorChar))),
+                Does.Not.Contain("Microsoft.CodeAnalysis.AnalyzerUtilities"),
+                path);
+    }
+
+    [Test]
     public void LanguageNeutralLayersHaveNoCSharpSyntaxDependency() {
         foreach (var project in new[] {
                      "SharpProof.Ir",
+                     "SharpProof.CompilerArtifact",
                      "SharpProof.Specs",
                      "SharpProof.Dataflow"
                  }) {
@@ -409,6 +450,25 @@ public sealed class ArchitectureTests {
             .Select(static value =>
                 Path.GetFileNameWithoutExtension(value!.Replace('\\', '/')));
     }
+
+    private static IEnumerable<string> TransitiveProjectClosure(string root) {
+        var pending = new Stack<string>(); var visited = new HashSet<string>(StringComparer.Ordinal);
+        pending.Push(root);
+        while (pending.Count != 0) {
+            var project = pending.Pop();
+            if (!visited.Add(project)) continue;
+            yield return project;
+            foreach (var dependency in GetProjectReferences(project))
+                pending.Push(dependency);
+        }
+    }
+
+    private static string[] ProjectPackages(string project) => [..
+        XDocument.Load(ProjectFile(project))
+            .Descendants("PackageReference")
+            .Select(static element => (string?)element.Attribute("Include"))
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value!)];
 
     private static string ProjectFile(string project) =>
         Path.Combine(RepositoryRoot(), project, project + ".csproj");

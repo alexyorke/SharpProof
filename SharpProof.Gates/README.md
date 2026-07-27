@@ -86,6 +86,8 @@ analyzer performance paths reference neither SMT nor Z3.
 
 Worker/package tests also exercise protocol version 5 manifest equality,
 stable claim IDs, policy-controlled SP0047/SP0048 output, cache validation
-against the current manifest, fatal run handling, and schema-2 final compiler
-artifacts including generated contracts. Lowered obligation IR and SARIF
-projection are not implemented release gates yet.
+against the current manifest, fatal run handling, and compiler artifact schema
+version 3, including generated contracts, portable whole-body CFG/IR,
+compiler diagnostics, and exact lowered-callable hydration. Independent
+whole-body counterexample replay and SARIF projection are not implemented
+release gates yet.

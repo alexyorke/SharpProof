@@ -1,16 +1,10 @@
 namespace SharpProof.Worker;
-internal sealed record CacheableWorkerResponse(
-    string InputHash,
-    string Payload,
-    WorkerCallableResult[] CallableResults,
-    WorkerClaimResult[] ClaimResults) {
+#pragma warning disable IDE0055 // Compact cache validation preserves the fixed production-size ceiling.
+internal sealed record CacheableWorkerResponse(string InputHash, string Payload,
+    WorkerCallableResult[] CallableResults, WorkerClaimResult[] ClaimResults) {
 
-    internal static bool TryCreate(
-        WorkerVerifyResponse? response,
-        string expectedInputHash,
-        WorkerClaimManifest expectedManifest,
-        [NotNullWhen(true)]
-        out CacheableWorkerResponse? cacheable) {
+    internal static bool TryCreate(WorkerVerifyResponse? response, string expectedInputHash,
+        WorkerClaimManifest expectedManifest, [NotNullWhen(true)] out CacheableWorkerResponse? cacheable) {
         cacheable = null;
         if (response == null ||
             response.RunStatus != WorkerRunStatus.Complete ||
@@ -21,27 +15,21 @@ internal sealed record CacheableWorkerResponse(
                 (WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted)) ||
             !WorkerProtocolJson.Validate(response, expectedInputHash, expectedManifest).IsValid)
             return false;
-        var payload = JsonSerializer.Serialize(new CachePayload(
-            expectedManifest.Hash, response.CallableResults, response.ClaimResults), WorkerProtocolJson.Options);
-        cacheable = new CacheableWorkerResponse(
-            expectedInputHash,
-            payload,
-            response.CallableResults,
-            response.ClaimResults);
+        var payload = JsonSerializer.Serialize(new CachePayload(expectedManifest.Hash,
+            response.CallableResults, response.ClaimResults), WorkerProtocolJson.Options);
+        cacheable = new CacheableWorkerResponse(expectedInputHash, payload,
+            response.CallableResults, response.ClaimResults);
         return true;
     }
 
-    internal static bool TryParse(
-        string? payload,
-        string expectedInputHash,
-        WorkerClaimManifest expectedManifest,
-        WorkerBudgets budgets,
-        [NotNullWhen(true)]
-        out CacheableWorkerResponse? cacheable) {
+    internal static bool TryParse(string? payload, string expectedInputHash,
+        WorkerClaimManifest expectedManifest, WorkerBudgets budgets,
+        [NotNullWhen(true)] out CacheableWorkerResponse? cacheable) {
         cacheable = null;
         CachePayload? decoded;
         try {
-            decoded = JsonSerializer.Deserialize<CachePayload>(payload ?? string.Empty, WorkerProtocolJson.Options);
+            decoded = JsonSerializer.Deserialize<CachePayload>(
+                payload ?? string.Empty, WorkerProtocolJson.Options);
         }
         catch (JsonException) {
             return false;
@@ -51,25 +39,12 @@ internal sealed record CacheableWorkerResponse(
             decoded.CallableResults == null ||
             decoded.ClaimResults == null)
             return false;
-        var response = WorkerResultAssembler.Create(
-            expectedInputHash,
-            expectedManifest,
-            WorkerRunStatus.Complete,
-            WorkerRunFailureReason.None,
-            decoded.CallableResults,
-            decoded.ClaimResults,
-            budgets,
-            WorkerCacheStatus.Hit,
-            0);
-        return TryCreate(
-            response,
-            expectedInputHash,
-            expectedManifest,
-            out cacheable);
+        var response = WorkerResultAssembler.Create(expectedInputHash, expectedManifest,
+            WorkerRunStatus.Complete, WorkerRunFailureReason.None, decoded.CallableResults,
+            decoded.ClaimResults, budgets, WorkerCacheStatus.Hit, 0);
+        return TryCreate(response, expectedInputHash, expectedManifest, out cacheable);
     }
 
-    private sealed record CachePayload(
-        string ManifestHash,
-        WorkerCallableResult[] CallableResults,
-        WorkerClaimResult[] ClaimResults);
+    private sealed record CachePayload(string ManifestHash,
+        WorkerCallableResult[] CallableResults, WorkerClaimResult[] ClaimResults);
 }

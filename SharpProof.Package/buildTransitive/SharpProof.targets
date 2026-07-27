@@ -104,7 +104,6 @@
       backslash wildcard was not portable to non-Windows hosts.
     -->
     <Analyzer Include="
-        $(_SharpProofAnalyzerDirectory)/Microsoft.CodeAnalysis.AnalyzerUtilities.dll;
         $(_SharpProofAnalyzerDirectory)/Microsoft.Bcl.AsyncInterfaces.dll;
         $(_SharpProofAnalyzerDirectory)/SharpProof.Attributes.dll;
         $(_SharpProofAnalyzerDirectory)/SharpProof.CompilerArtifact.dll;

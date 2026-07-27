@@ -62,7 +62,7 @@ internal sealed class ClaimManifestBuilder(
             candidates.Add(new ClaimCandidate(
                 SemanticClaimIdentity.CreateAttributeFingerprint(attribute, target),
                 GetAttributeLocation(attribute, target), WorkerClaimEvidence.ReturnAttribute,
-                 null, attribute, null));
+                null, attribute, null));
         var selected = _attributes.GetSelectedFeatures(target).Where(IsFeatureEnabled).ToImmutableArray();
         var assumptions = CreateAssumptions(
             target, source, inventory, usesCompanion, callableId);
@@ -92,7 +92,7 @@ internal sealed class ClaimManifestBuilder(
         var supported = declaration is MethodDeclarationSyntax or ConstructorDeclarationSyntax
             && target.MethodKind is MethodKind.Ordinary or MethodKind.Constructor;
         return new ManifestCallableTarget(
-            target, declaration, seed.Model, entry, claims, assumptions, supported);
+            target, declaration, seed.Model, entry, claims, supported);
     }
     private bool ContractsEnabled =>
         enabledFeatures is WorkerFeatureSet.Contracts or WorkerFeatureSet.All;
@@ -107,13 +107,20 @@ internal sealed class ClaimManifestBuilder(
         if (ContractsEnabled)
             foreach (var occurrence in inventory.Clauses) {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (occurrence.Kind != BoundContractKind.Assume ||
+                if (occurrence.Kind is not (BoundContractKind.Requires or BoundContractKind.Assume) ||
                     occurrence.Placement == ContractClausePlacement.NestedCallable)
                     continue;
                 candidates.Add(new AssumptionCandidate(
-                    WorkerAssumptionKind.UserAssume,
+                    occurrence.Kind == BoundContractKind.Requires
+                        ? WorkerAssumptionKind.Precondition
+                        : WorkerAssumptionKind.UserAssume,
                     SemanticClaimIdentity.CreateInvocationFingerprint(occurrence.Invocation, target, source, usesCompanion)));
             }
+        if (ContractsEnabled)
+            foreach (var parameter in target.Parameters)
+                foreach (var attribute in parameter.GetAttributes().Where(_attributes.IsClosedReturnAttribute))
+                    candidates.Add(new AssumptionCandidate(WorkerAssumptionKind.Precondition,
+                        SemanticClaimIdentity.CreateAttributeFingerprint(attribute, target, parameter)));
         foreach (var (scope, attribute) in _attributes.GetTrustedAttributes(target))
             candidates.Add(new AssumptionCandidate(
                 WorkerAssumptionKind.TrustedBoundary,
@@ -436,7 +443,6 @@ internal sealed record ClaimManifestBuildResult(
 internal sealed record ManifestCallableTarget(
     IMethodSymbol Method, SyntaxNode? Declaration, SemanticModel? SemanticModel,
     WorkerCallableManifestEntry Entry, ImmutableArray<ManifestClaim> Claims,
-    ImmutableArray<WorkerAssumptionEvidence> Assumptions,
     bool IsVerifierSupported) {
     internal BaseMethodDeclarationSyntax VerifierDeclaration =>
         (BaseMethodDeclarationSyntax)Declaration!;

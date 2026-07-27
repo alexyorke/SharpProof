@@ -29,7 +29,7 @@ they agree.
 | `SharpProofVerifyMethodWallTimeMilliseconds` | `10000` | Outer method wall boundary | `SharpProof.props` and `WorkerBudgets`; mirrored as 10 seconds by `contract.json` |
 | `SharpProofVerifyProjectWallTimeMilliseconds` | `300000` | Outer project wall boundary | `SharpProof.props` and `WorkerBudgets`; mirrored as 300 seconds by `contract.json` |
 | `SharpProofVerifyMaxParallelism` | `4` | Maximum concurrent worker method verification | `SharpProof.props` and `WorkerBudgets`; mirrored by `contract.json` |
-| `SharpProofVerifyMaximumExpressionDepth` | `64` | Maximum proof-obligation term depth | `SharpProof.props` and `WorkerBudgets`; not present in `contract.json` |
+| `SharpProofVerifyMaximumExpressionDepth` | `64` | Compiler-visible proof-obligation term depth sealed into the artifact; worker request must match | `SharpProof.props`, `FinalCompilationCollector`, and `WorkerBudgets`; not present in `contract.json` |
 | `SharpProofVerifyProcessMemoryLimitBytes` | `2147483648` | Windows Job Object memory limit | `SharpProof.props` and `WorkerBudgets`; mirrored as 2048 MiB by `contract.json` |
 | `SharpProofVerifyMaxWorkerProcesses` | `4` | Windows Job Object active-process limit | `SharpProof.props` and `WorkerBudgets`; not present in `contract.json` |
 | `SharpProofVerifyTerminationGraceMilliseconds` | `1000` | Grace added to the project boundary before forced termination | `SharpProof.props` and `WorkerLauncherDefaults`; mirrored by `contract.json` |
@@ -84,16 +84,24 @@ not proof facts. Z3 queries use deterministic resource limits. The launcher
 uses the project wall limit plus the termination grace to enforce a final
 process boundary.
 
-Every budget and every option field in the bounded compiler-artifact snapshot
-participates in worker input and cache identity. That snapshot captures the
-reconstruction fields admitted by schema 2; it does not claim to serialize
-every Roslyn compilation option. The compiler-manifest compilation hash also
-covers final post-generator syntax trees and reference evidence. Raw analyzer
-inputs are not retained, but any generated-tree change alters the identity.
-Changing a limit or captured compiler input cannot reuse an answer produced
-under a different identity. Verification and assumption policy are
-reporting/build policies, not semantic proof inputs, so they do not alter the
-semantic cache payload.
+`SharpProofVerifyMaximumExpressionDepth` is also a compiler-visible property.
+The collector parses it, enforces the 1-through-256 range, and seals it into the
+schema-3 artifact. The launcher supplies the same property as the worker request
+budget. A mismatch is `CompilerManifestMismatch` and stops before cache lookup
+or backend creation; neither side may silently use a different depth.
+
+Every budget and every artifact byte participates in worker input and cache
+identity. The artifact contains portable lowered callables plus a bounded
+proof-relevant compiler snapshot; it does not claim to serialize every Roslyn
+diagnostic or host option. The compilation hash covers handwritten and
+generated tree hashes and parse settings, bounded compilation options,
+assembly/target identity, compiler provenance, and reference provenance. The
+worker does not read the trees or references again. Raw analyzer inputs are not
+retained, but a change that affects final generated trees, selected claims, or
+lowered IR changes the artifact identity. Changing a limit or captured compiler
+input cannot reuse an answer produced under a different identity.
+Verification and assumption policy are reporting/build policies, not semantic
+proof inputs, so they do not alter the semantic cache payload.
 
 `SharpProofFeatures` is a semantic compiler-artifact input. `contracts` excludes
 effect-only annotations from the manifest; `effects` excludes postcondition
@@ -145,8 +153,8 @@ release gates, not end-user MSBuild defaults.
 | IDE edit maximum | At most 250 ms |
 
 The active contract also fixes protocol version 5, cache schema version 5,
-claim-manifest schema version 2, and compiler-manifest attestation schema
-version 2, along with the proof-kernel-only path/LOC boundary and the reference
+claim-manifest schema version 2, and compiler artifact schema version 3, along
+with the proof-kernel-only path/LOC boundary and the reference
 surfaces `netstandard2.0`, `net8.0`, and `net472`.
 
 Unknown rate is reported by the corpus as explicit, silent, and total metrics;

@@ -19,7 +19,6 @@
     <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Frontend.dll" />
     <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Ir.dll" />
     <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Specs.dll" />
-    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\Microsoft.CodeAnalysis.AnalyzerUtilities.dll" />
   </ItemGroup>
 
   <Target Name="_ValidateSharpProofDogfoodAnalyzer"

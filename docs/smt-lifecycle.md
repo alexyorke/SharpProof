@@ -26,6 +26,9 @@ statuses.
 
 The current replay executes the lowered obligation path. Independent
 whole-body replay over the exact compiler CFG remains a 1.0 release gate.
+A SAT result whose model depends on a spec-modeled call result is therefore
+reported as claim `Unknown` with `CounterexampleReplayFailed`, which makes the
+run fail; it is never emitted as `Refuted`.
 
 `SharpProofVerifyPolicy` controls whether otherwise valid incomplete selected
 analysis is informational, warning, or error SP0047 output.
@@ -35,9 +38,9 @@ run into success.
 
 Only exact-manifest, complete `Proven` and replay-validated `Refuted` project
 results enter the content-addressed disk cache. Cache keys include protocol,
-semantics, tool, target framework, compilation inputs, references, options, and
-spec versions. Cache schema version 5 revalidates the stored semantic payload
-against the complete current manifest.
+semantics, tool, target framework, the exact closed compiler artifact and
+lowered IR, budgets, and spec versions. Cache schema version 5 revalidates the
+stored semantic payload against the complete current manifest.
 
 See [Typed abstention reasons](unknown-reasons.md) for exact statuses and
 reasons, and [Analysis limits](analysis-limits.md) for configured and fixed

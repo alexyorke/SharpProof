@@ -555,12 +555,13 @@ internal static class WorkerPerformanceProbe {
                     deterministic: true,
                     concurrentBuild: false));
             var discovery = new ClaimManifestBuilder(compilation).Build();
-            var artifact = CompilerManifestArtifactJson.Create(
+            var artifact = CompilerManifestArtifactProducer.Create(
                 compilation,
                 Path.GetDirectoryName(sourcePath)!,
                 "net9.0",
                 WorkerFeatureSet.All,
-                discovery.Manifest,
+                discovery,
+                WorkerBudgets.DefaultMaximumExpressionDepth,
                 CancellationToken.None);
             File.WriteAllText(
                 artifactPath,

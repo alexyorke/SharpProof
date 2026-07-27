@@ -1,19 +1,18 @@
 namespace SharpProof.Worker;
+#pragma warning disable IDE0055 // Compact input transport preserves the fixed production-size ceiling.
 internal sealed record WorkerInputSnapshot(
     CompilerManifestArtifact CompilerManifest, string InputHash) {
     internal const string ManifestUnavailable = "The compiler manifest is unavailable.";
     internal const string ManifestInvalid = "The compiler manifest is invalid.";
-    internal static async Task<WorkerInputSnapshot> LoadAsync(WorkerVerifyRequest request, CancellationToken cancellationToken) =>
-        await LoadAsync(request, WorkerCacheIdentity.Current, cancellationToken).ConfigureAwait(false);
     internal static async Task<WorkerInputSnapshot> LoadAsync(
-        WorkerVerifyRequest request, WorkerCacheIdentity cacheIdentity,
-        CancellationToken cancellationToken) {
+        WorkerVerifyRequest request, CancellationToken cancellationToken) =>
+        await LoadAsync(request, WorkerCacheIdentity.Current, cancellationToken).ConfigureAwait(false);
+    internal static async Task<WorkerInputSnapshot> LoadAsync(WorkerVerifyRequest request,
+        WorkerCacheIdentity cacheIdentity, CancellationToken cancellationToken) {
         ArgumentNullException.ThrowIfNull(cacheIdentity);
         var manifestPath = Path.GetFullPath(request.CompilerManifest.Path);
         byte[] manifestBytes;
-        try {
-            manifestBytes = await File.ReadAllBytesAsync(manifestPath, cancellationToken).ConfigureAwait(false);
-        }
+        try { manifestBytes = await File.ReadAllBytesAsync(manifestPath, cancellationToken).ConfigureAwait(false); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) {
             throw new IOException(ManifestUnavailable, exception);
         }
@@ -28,8 +27,7 @@ internal sealed record WorkerInputSnapshot(
             throw new IOException(ManifestInvalid, exception);
         }
         var inputHash = CompilerArtifactInputHash.Compute(request, manifestBytes, cacheIdentity.ToolIdentity,
-            cacheIdentity.ToolVersion, cacheIdentity.ApiSpecIdentity,
-            cacheIdentity.ApiSpecVersion);
+            cacheIdentity.ToolVersion, cacheIdentity.ApiSpecIdentity, cacheIdentity.ApiSpecVersion);
         return new WorkerInputSnapshot(manifest, inputHash);
     }
     private static string DecodeUtf8(byte[] bytes) {

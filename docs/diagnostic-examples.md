@@ -18,9 +18,9 @@ The main package defaults to advisory analysis with both feature groups:
 diagnostics are enabled `Info` diagnostics by default, except SP0027 is a
 Warning. Configure their effective severities with normal Roslyn settings:
 
-The selected feature value also enters the verifier request and filters its
-manifest. Contract-only requests ignore effect-only annotations; effect-only
-requests do not create postcondition claims.
+The selected feature value is compiler-visible, enters the closed verifier
+artifact, and filters its manifest. Contract-only artifacts ignore effect-only
+annotations; effect-only artifacts do not create postcondition claims.
 
 ```ini
 dotnet_diagnostic.SP0002.severity = suggestion
@@ -206,17 +206,20 @@ by the manifest. `SharpProofAssumptionPolicy=allow` reports information,
 
 The production analyzer emits SP0049 when Windows verification requested a
 post-generator compiler-manifest artifact but could not collect or write it.
-This includes a final metadata reference that is not a readable, file-backed
-`PortableExecutableReference`. The diagnostic is an error because the expected
-compiler-compilation evidence is missing. It is an infrastructure failure,
-never a contract or proof outcome.
+This includes invalid compiler-visible expression depth; resolver-dependent
+`#r`/`#load` or missing-assembly resolution; reference supersession; a custom
+assembly-identity comparer; a non-file or unreadable metadata reference; and
+artifact lowering, serialization, or write failure. The diagnostic is an error
+because the required closed compiler evidence is missing. It is an
+infrastructure failure, never a contract or proof outcome.
 
-The artifact includes final handwritten and generated tree text plus a sealed
-selected-claim manifest. The worker recreates compiler symbols from that
-evidence and hash-verified reference images, and exact manifest equality is
-required before cache lookup or a solver query. Generated contracts are
-verifiable; the artifact does not yet carry the lowered obligation IR needed
-to remove compiler reconstruction.
+Compiler artifact schema version 3 includes the sealed selected-claim manifest,
+compiler diagnostics, source/generated-tree hashes and parse evidence, and,
+for each supported selected callable, bound contract/spec metadata plus
+portable whole-body lowered CFG/IR. It contains no source text. The worker
+hydrates this artifact without constructing a Roslyn compilation or rereading
+references. Exact manifest/lowered-callable equality and the expression-depth
+match are required before cache lookup or backend creation.
 
 <a id="contractfor-generator-diagnostics"></a>
 ## ContractFor generator diagnostics

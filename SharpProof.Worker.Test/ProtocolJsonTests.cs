@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
+using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
 
@@ -66,20 +67,22 @@ public sealed class ProtocolJsonTests {
 
     [Test]
     public void CompilerManifestArtifactIsCanonicalAndCarriesAssumptions() {
-        var manifest = CreateManifest();
         var compilation = CreateCompilation();
-        var artifact = CompilerManifestArtifactJson.Create(
+        var discovery = new ClaimManifestBuilder(compilation).Build();
+        var manifest = discovery.Manifest;
+        var artifact = CompilerManifestArtifactProducer.Create(
             compilation,
             TestContext.CurrentContext.WorkDirectory,
             "net9.0",
             WorkerFeatureSet.All,
-            manifest,
+            discovery,
+            WorkerBudgets.DefaultMaximumExpressionDepth,
             CancellationToken.None);
         var json = CompilerManifestArtifactJson.Serialize(artifact);
         var roundTrip = CompilerManifestArtifactJson.Deserialize(json);
 
         using (Assert.EnterMultipleScope()) {
-            Assert.That(roundTrip.SchemaVersion, Is.EqualTo(2));
+            Assert.That(roundTrip.SchemaVersion, Is.EqualTo(3));
             Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("5"));
             Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(manifest.Hash));
             Assert.That(roundTrip.Manifest.Callables[0].Assumptions, Has.Length.EqualTo(2));
@@ -88,14 +91,17 @@ public sealed class ProtocolJsonTests {
                     .Select(static assumption => assumption.Kind),
                 Is.EqualTo(s_assumptionKinds));
             Assert.That(roundTrip.Compilation.SyntaxTrees, Has.Length.EqualTo(1));
+            Assert.That(
+                roundTrip.Compilation.SyntaxTrees[0].Sha256,
+                Does.Match("^[0-9a-f]{64}$"));
             Assert.That(roundTrip.CompilationSha256, Does.Match("^[0-9a-f]{64}$"));
-            Assert.That(CompilerManifestArtifactJson.ManifestsEqual(
+            Assert.That(WorkerProtocolJson.ManifestsEqual(
                 roundTrip.Manifest, manifest), Is.True);
         }
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(json.Replace(
-                "\"schemaVersion\":2",
-                "\"schemaVersion\":2,\"schemaVersion\":2",
+                "\"schemaVersion\":3",
+                "\"schemaVersion\":3,\"schemaVersion\":3",
                 StringComparison.Ordinal))));
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(json.Replace(
@@ -104,7 +110,7 @@ public sealed class ProtocolJsonTests {
                 StringComparison.Ordinal))));
 
         roundTrip.Manifest.Claims[0].Location.Column++;
-        Assert.That(CompilerManifestArtifactJson.ManifestsEqual(
+        Assert.That(WorkerProtocolJson.ManifestsEqual(
             roundTrip.Manifest, manifest), Is.False);
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(
@@ -429,12 +435,41 @@ public sealed class ProtocolJsonTests {
             TestContext.CurrentContext.WorkDirectory,
             "ProtocolSubject.cs");
         var tree = CSharpSyntaxTree.ParseText(
-            "public static class Subject { public static long Identity(long value) => value; }",
-            new CSharpParseOptions(LanguageVersion.CSharp12),
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [SharpProofTrusted("reviewed boundary")]
+                public static long Identity(long value) {
+                    Contract.Assume(value >= 0);
+                    Contract.Ensures(Contract.Result<long>() >= 0);
+                    return value;
+                }
+            }
+            """,
+            new CSharpParseOptions(
+                LanguageVersion.CSharp12,
+                preprocessorSymbols: [Contract.ConditionalSymbol]),
             path);
+        var trusted = ((string)AppContext.GetData(
+                "TRUSTED_PLATFORM_ASSEMBLIES")!)
+            .Split(Path.PathSeparator);
+        var required = new HashSet<string>(
+            [
+                "System.Private.CoreLib.dll",
+                "System.Linq.dll",
+                "System.Runtime.dll",
+                "netstandard.dll"
+            ],
+            StringComparer.OrdinalIgnoreCase);
+        var references = trusted
+            .Where(item => required.Contains(Path.GetFileName(item)))
+            .Append(typeof(Contract).Assembly.Location)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(static item => MetadataReference.CreateFromFile(item));
         return CSharpCompilation.Create(
             "ProtocolTest",
             [tree],
+            references,
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release,

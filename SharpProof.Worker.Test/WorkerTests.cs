@@ -129,7 +129,7 @@ public sealed class WorkerTests {
                 Is.EqualTo(WorkerRunFailureReason.None));
             Assert.That(response.Errors, Is.Empty);
             Assert.That(
-                CompilerManifestArtifactJson.ManifestsEqual(
+                WorkerProtocolJson.ManifestsEqual(
                     response.Manifest, authoritative.Manifest),
                 Is.True);
             Assert.That(
@@ -170,7 +170,7 @@ public sealed class WorkerTests {
             Assert.That(
                 response.FailureReason,
                 Is.EqualTo(WorkerRunFailureReason.CompilationFailure));
-            Assert.That(CompilerManifestArtifactJson.ManifestsEqual(
+            Assert.That(WorkerProtocolJson.ManifestsEqual(
                 response.Manifest, authoritative.Manifest), Is.True);
             Assert.That(response.CallableResults, Has.Length.EqualTo(1));
             Assert.That(response.ClaimResults.Single().Outcome,
@@ -210,7 +210,7 @@ public sealed class WorkerTests {
     }
 
     [Test]
-    public async Task IncompatibleCompilerVersionPreservesManifestAndStopsBeforeWork() {
+    public async Task CompilerVersionIsProvenanceRatherThanARuntimeGate() {
         using var project = TestProject.Create(TautologySource);
         var request = project.CreateRequest(cacheEnabled: true);
         var artifact = CompilerManifestArtifactJson.Deserialize(
@@ -232,19 +232,17 @@ public sealed class WorkerTests {
         var response = await worker.VerifyAsync(request);
 
         using (Assert.EnterMultipleScope()) {
-            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(
                 response.FailureReason,
-                Is.EqualTo(WorkerRunFailureReason.CompilerManifestMismatch));
-            Assert.That(
-                response.Errors.Single().Code,
-                Is.EqualTo("compiler_manifest.compilation"));
+                Is.EqualTo(WorkerRunFailureReason.None));
+            Assert.That(response.Errors, Is.Empty);
             Assert.That(response.Manifest.Claims, Has.Length.EqualTo(1));
             Assert.That(
                 response.ClaimResults.Single().Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(factoryCalls, Is.Zero);
-            Assert.That(CacheFiles(project), Is.Empty);
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(factoryCalls, Is.EqualTo(1));
+            Assert.That(CacheFiles(project), Has.Length.EqualTo(1));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
@@ -328,7 +326,7 @@ public sealed class WorkerTests {
     }
 
     [Test]
-    public async Task ClosedArtifactReconstructsCompilerSemanticOptions() {
+    public async Task ClosedArtifactRecordsCompilerSemanticOptions() {
         using var project = TestProject.Create(TautologySource);
         var request = project.CreateRequest(
             cacheEnabled: false,
@@ -345,31 +343,28 @@ public sealed class WorkerTests {
             request,
             CancellationToken.None);
 
-        var compilation = CompilerManifestArtifactJson.CreateCompilation(
-            snapshot.CompilerManifest, CancellationToken.None);
-        var parse = (CSharpParseOptions)
-            compilation.SyntaxTrees.Single().Options;
-        var options = compilation.Options;
+        var parse = snapshot.CompilerManifest.Compilation.SyntaxTrees.Single();
+        var options = snapshot.CompilerManifest.Compilation.Options;
 
         using (Assert.EnterMultipleScope()) {
             Assert.That(
                 parse.LanguageVersion,
-                Is.EqualTo(LanguageVersion.CSharp13));
+                Is.EqualTo(LanguageVersion.CSharp13.ToString()));
             Assert.That(
-                options.NullableContextOptions,
-                Is.EqualTo(NullableContextOptions.Warnings));
+                options.NullableContext,
+                Is.EqualTo(NullableContextOptions.Warnings.ToString()));
             Assert.That(
                 options.OptimizationLevel,
-                Is.EqualTo(OptimizationLevel.Debug));
+                Is.EqualTo(OptimizationLevel.Debug.ToString()));
             Assert.That(options.CheckOverflow, Is.True);
             Assert.That(options.AllowUnsafe, Is.True);
             Assert.That(options.Deterministic, Is.False);
             Assert.That(
                 options.OutputKind,
-                Is.EqualTo(OutputKind.ConsoleApplication));
+                Is.EqualTo(OutputKind.ConsoleApplication.ToString()));
             Assert.That(
                 options.Platform,
-                Is.EqualTo(Platform.X64));
+                Is.EqualTo(Platform.X64.ToString()));
         }
     }
 
@@ -533,11 +528,7 @@ public sealed class WorkerTests {
                 }
                 """));
         var request = project.CreateRequest(cacheEnabled: false);
-        var snapshot = await WorkerInputSnapshot.LoadAsync(
-            request,
-            CancellationToken.None);
-        var compilation = CompilerManifestArtifactJson.CreateCompilation(
-            snapshot.CompilerManifest, CancellationToken.None);
+        var compilation = project.CreateCompilation();
         var backend = new CountingBackend(
             BackendCheckResult.Unsatisfiable([]));
         var target = new ClaimManifestBuilder(compilation)
@@ -579,11 +570,8 @@ public sealed class WorkerTests {
         var runtimeRequest = project.CreateRequest(
             cacheEnabled: false,
             parseOptions: CreateParseOptions(preprocessorSymbols: []));
-        var snapshot = await WorkerInputSnapshot.LoadAsync(
-            runtimeRequest,
-            CancellationToken.None);
-        var runtimeCompilation = CompilerManifestArtifactJson.CreateCompilation(
-            snapshot.CompilerManifest, CancellationToken.None);
+        var runtimeCompilation = project.CreateCompilation(
+            CreateParseOptions(preprocessorSymbols: []));
         using var image = new MemoryStream();
         var emit = runtimeCompilation.Emit(image);
         Assert.That(
@@ -779,18 +767,25 @@ public sealed class WorkerTests {
         var snapshot = await WorkerInputSnapshot.LoadAsync(
             request,
             CancellationToken.None);
-        var expectedUsedId = new ClaimManifestBuilder(
-                CompilerManifestArtifactJson.CreateCompilation(
-                    snapshot.CompilerManifest, CancellationToken.None))
-            .Build().Targets.Values.Single().Assumptions
-            .First(static evidence =>
-                evidence.Kind == WorkerAssumptionKind.UserAssume).Id;
-        using var worker = new SharpProofWorker(new CountingBackend(
-            BackendCheckResult.Unsatisfiable([0])));
+        var expectedUsedId = snapshot.CompilerManifest.Callables.Single()
+            .Clauses.First(static clause =>
+                clause.Kind == CompilerContractKind.Assume)
+            .AssumptionId;
+        var backend = new CapturingBackend(
+            BackendCheckResult.Unsatisfiable([0]));
+        using var worker = new SharpProofWorker(backend);
 
         var response = await worker.VerifyAsync(request);
 
-        var userAssumptions = response.ClaimResults.Single().Assumptions
+        var record = response.ClaimResults.Single();
+        Assert.That(
+            record.Outcome,
+            Is.EqualTo(WorkerClaimOutcome.Proven),
+            record.Reason.ToString());
+        Assert.That(
+            backend.Query.Assumptions[0].Justification,
+            Is.TypeOf<UserAssumedJustification>());
+        var userAssumptions = record.Assumptions
             .Where(static evidence =>
                 evidence.Kind == WorkerAssumptionKind.UserAssume).ToArray();
         using (Assert.EnterMultipleScope()) {
@@ -1458,8 +1453,9 @@ public sealed class WorkerTests {
                 }
             }
             """);
-        var request = project.CreateRequest(cacheEnabled: false);
-        request.Budgets.MaximumExpressionDepth = 3;
+        var request = project.CreateRequest(
+            cacheEnabled: false,
+            maximumExpressionDepth: 3);
         using var worker = new SharpProofWorker(new CountingBackend(
             BackendCheckResult.Unsatisfiable([])));
         var response = await worker.VerifyAsync(request);
@@ -2013,7 +2009,7 @@ public sealed class WorkerTests {
     }
 
     [Test]
-    public async Task ProjectBoundaryCoversCompilationReconstructionAndDiscovery() {
+    public async Task ProjectBoundaryCoversArtifactLoadingAndDecoding() {
         var sources = Enumerable.Range(0, 512)
             .Select(index => ($"Padding{index}.cs", $"internal sealed class Padding{index} {{ }}"))
             .Prepend(("Subject.cs", TautologySource))
@@ -2492,17 +2488,20 @@ public sealed class WorkerTests {
             CSharpParseOptions? parseOptions = null,
             CSharpCompilationOptions? compilationOptions = null,
             string targetFramework = "net8.0",
-            WorkerFeatureSet features = WorkerFeatureSet.All) {
+            WorkerFeatureSet features = WorkerFeatureSet.All,
+            int maximumExpressionDepth =
+                WorkerBudgets.DefaultMaximumExpressionDepth) {
             var compilation = CreateCompilation(
                 parseOptions, compilationOptions);
             var discovery = new ClaimManifestBuilder(
                 compilation, features).Build();
-            var artifact = CompilerManifestArtifactJson.Create(
+            var artifact = CompilerManifestArtifactProducer.Create(
                 compilation,
                 DirectoryPath,
                 targetFramework,
                 features,
-                discovery.Manifest,
+                discovery,
+                maximumExpressionDepth,
                 CancellationToken.None);
             var bytes = System.Text.Encoding.UTF8.GetBytes(
                 CompilerManifestArtifactJson.Serialize(artifact));
@@ -2524,6 +2523,9 @@ public sealed class WorkerTests {
                 Cache = new WorkerCacheOptions {
                     Enabled = cacheEnabled,
                     Directory = CacheDirectory
+                },
+                Budgets = new WorkerBudgets {
+                    MaximumExpressionDepth = maximumExpressionDepth
                 }
             };
         }
@@ -2557,9 +2559,9 @@ public sealed class WorkerTests {
                 .OrderBy(static path => path, StringComparer.Ordinal)];
         }
 
-        private CSharpCompilation CreateCompilation(
-            CSharpParseOptions? parseOptions,
-            CSharpCompilationOptions? compilationOptions) {
+        internal CSharpCompilation CreateCompilation(
+            CSharpParseOptions? parseOptions = null,
+            CSharpCompilationOptions? compilationOptions = null) {
             var effectiveParseOptions =
                 parseOptions ?? CreateParseOptions();
             var syntaxTrees = SourcePaths.Select(path =>

@@ -1,5 +1,4 @@
 using System.Globalization;
-using Microsoft.CodeAnalysis.FlowAnalysis.DataFlow;
 
 namespace SharpProof.Dataflow.Test;
 
@@ -115,12 +114,12 @@ public sealed class IntervalDomainTests {
         DomainLawAssertions.AssertConservativeHavoc(_domain, Samples);
 
     [Test]
-    public void RoslynDomainFacadeUsesSharpProofJoinAndOrder() {
-        AbstractDomain<IntervalValue> roslynDomain = _domain;
-
+    public void ClosedDomainFacadeUsesSharpProofJoinAndOrder() {
         Assert.That(
-            roslynDomain.Merge(_domain.Constant(2), _domain.Constant(6)),
+            _domain.Merge(_domain.Constant(2), _domain.Constant(6)),
             Is.EqualTo(_domain.Join(_domain.Constant(2), _domain.Constant(6))));
-        Assert.That(roslynDomain.Compare(_domain.Bottom, _domain.Top), Is.LessThan(0));
+        Assert.That(
+            _domain.Compare(_domain.Bottom, _domain.Top),
+            Is.LessThan(0));
     }
 }

@@ -16,6 +16,8 @@ public sealed class FinalCompilationCollectorTests {
     private const string TargetFrameworkKey =
         "build_property._SharpProofCompilationTargetFramework",
         ProjectDirectoryKey = "build_property._SharpProofProjectDirectory";
+    private const string MaximumExpressionDepthKey =
+        "build_property.SharpProofVerifyMaximumExpressionDepth";
 
     [Test]
     public async Task CollectorIsInactiveWithoutAPathAndForTheOffProfile() {
@@ -81,10 +83,15 @@ public sealed class FinalCompilationCollectorTests {
             Assert.That(first.Take(3), Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
             Assert.That(first, Does.Not.Contain((byte)'\r'));
             Assert.That(artifact.Schema, Is.EqualTo("SharpProof.CompilerManifest"));
-            Assert.That(artifact.SchemaVersion, Is.EqualTo(2));
+            Assert.That(artifact.SchemaVersion, Is.EqualTo(3));
             Assert.That(artifact.ProtocolVersion, Is.EqualTo("5"));
             Assert.That(artifact.Compilation.TargetFramework, Is.EqualTo("net9.0"));
             Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.All));
+            Assert.That(
+                artifact.MaximumExpressionDepth,
+                Is.EqualTo(64));
+            Assert.That(artifact.CompilerDiagnostics, Is.Empty);
+            Assert.That(artifact.Callables, Has.Length.EqualTo(1));
             Assert.That(artifact.CompilationSha256, Has.Length.EqualTo(64));
             Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
             Assert.That(
@@ -144,12 +151,15 @@ public sealed class FinalCompilationCollectorTests {
 
         using (Assert.EnterMultipleScope()) {
             Assert.That(
-                new[] { baselineHash, sourceHash, parseHash, aliasHash }
+                new[] {
+                    baselineHash, sourceHash, parseHash, aliasHash,
+                    additionalHash
+                }
                     .Distinct(StringComparer.Ordinal).Count(),
-                Is.EqualTo(4));
+                Is.EqualTo(5));
             Assert.That(
                 new[] {
-                    additionalHash, policyHash, assumptionHash, featuresHash
+                    policyHash, assumptionHash, featuresHash
                 },
                 Is.All.EqualTo(baselineHash));
         }
@@ -169,6 +179,23 @@ public sealed class FinalCompilationCollectorTests {
         Assert.That(
             diagnostics[0].DefaultSeverity,
             Is.EqualTo(DiagnosticSeverity.Error));
+    }
+
+    [TestCase("0")]
+    [TestCase("257")]
+    [TestCase("not-a-number")]
+    public async Task InvalidExpressionDepthFailsArtifactEmission(string value) {
+        using var workspace = new CollectorWorkspace();
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            CreateCompilation(),
+            Options(
+                workspace.SealPath("invalid-depth"),
+                maximumExpressionDepth: value));
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0049"]));
     }
 
     [Test]
@@ -206,8 +233,18 @@ public sealed class FinalCompilationCollectorTests {
                 assumptionPolicy: assumptionPolicy),
             [new MemoryAdditionalText("proof.inputs", additional)]);
         Assert.That(diagnostics, Is.Empty);
-        return CompilerManifestArtifactJson.Deserialize(
-            await File.ReadAllTextAsync(path)).CompilationSha256;
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            await File.ReadAllTextAsync(path));
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(artifact.Compilation.AdditionalFiles, Has.Length.EqualTo(1));
+            Assert.That(
+                artifact.Compilation.AdditionalFiles[0].Path,
+                Does.EndWith("/proof.inputs"));
+            Assert.That(
+                artifact.Compilation.AdditionalFiles[0].Sha256,
+                Has.Length.EqualTo(64));
+        }
+        return artifact.CompilationSha256;
     }
 
     private static CSharpCompilation CreateCompilation(
@@ -219,11 +256,13 @@ public sealed class FinalCompilationCollectorTests {
         string profile = "advisory",
         string features = "all",
         string verifyPolicy = "advisory",
-        string assumptionPolicy = "allow") {
+        string assumptionPolicy = "allow",
+        string maximumExpressionDepth = "64") {
         var values = new Dictionary<string, string>(
             StringComparer.OrdinalIgnoreCase) {
             [TargetFrameworkKey] = "net9.0",
             [ProjectDirectoryKey] = Environment.CurrentDirectory,
+            [MaximumExpressionDepthKey] = maximumExpressionDepth,
             ["build_property.SharpProofProfile"] = profile,
             ["build_property.SharpProofFeatures"] = features,
             ["build_property.SharpProofVerifyPolicy"] = verifyPolicy,

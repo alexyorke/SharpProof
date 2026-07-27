@@ -379,7 +379,7 @@ public sealed class FinalCompilationProbeTests {
                     path);
                 Assert.That(
                     root.GetProperty("schemaVersion").GetInt32(),
-                    Is.EqualTo(2),
+                    Is.EqualTo(3),
                     path);
                 Assert.That(
                     compilationSha256,
