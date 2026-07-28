@@ -49,6 +49,7 @@ The implementation remains the authority for enumerated surfaces:
 | [Acceptance contract](../eng/acceptance/README.md) | Active | Defines the release checks for the 0.2 preview. |
 | [Release gates](../SharpProof.Gates/README.md) | Active | Documents the corpus, metamorphic, performance, and cancellation runners. |
 | [Open-source corpus](../SharpProof.Gates/Corpus/README.md) | Active | Records corpus provenance, licensing, instrumentation, and update procedure. |
+| [2026-07-27 product bug sweep](soundness-notes/2026-07-27-product-sweep.md) | Dated evidence | Records analyzer, contract, effect, and worker adversarial fixes plus exact validation evidence. |
 | [2026-07-25 hardening audit](soundness-notes/2026-07-25-hardening.md) | Dated evidence | Records one completed hardening tranche and its remaining checkpoints. |
 | [2026-07-25 API-spec result domains](soundness-notes/2026-07-25-api-spec-result-domains.md) | Dated evidence | Records the bounded worker result-projection tranche. |
 

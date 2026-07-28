@@ -47,6 +47,35 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
+    public void DirectClauseSourceAlsoWinsForRequiresOnlyBinding() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static long Read(long value) {
+                    Contract.Ensures(
+                        Contract.Result<long>() == value);
+                    return value;
+                }
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static long Read(long value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.BindRequires("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.UsesCompanion, Is.False);
+        Assert.That(result.Contracts.Clauses, Is.Empty);
+    }
+
+    [Test]
     public void ResultAndOldBindToTypedResultAndPreStateVariables() {
         const string source =
             """

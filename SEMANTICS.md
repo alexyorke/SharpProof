@@ -224,10 +224,12 @@ compilation and effective SharpProof options. Compiler error diagnostics fail
 verification as `CompilationFailure`; malformed lowered evidence or an
 expression-depth mismatch fails as `CompilerManifestMismatch`.
 
-This closed artifact removes worker-side compiler reconstruction, but it does
-not by itself establish independent counterexample replay. Current replay
-still evaluates the lowered obligation path rather than an independent
-interpreter over the exact whole-body CFG. A SAT result that depends on a
-spec-modeled call result becomes `Unknown` with
-`CounterexampleReplayFailed`, never `Refuted`. SARIF projection is likewise not
-implemented.
+This closed artifact removes worker-side compiler reconstruction. For the
+admitted program subset, counterexample replay is independent of symbolic
+execution: the worker executes the compiler-produced whole-body IR with a
+separate interpreter and evaluates the original postcondition over the
+reconstructed state. Differential compiled-C# execution remains a test
+facility and is not run during user builds. A SAT result that depends on a
+spec-modeled call result which the replay interpreter cannot execute becomes
+`Unknown` with `CounterexampleReplayFailed`, never `Refuted`. SARIF projection
+is likewise not implemented.

@@ -73,10 +73,7 @@ public sealed class ContractBinder(
             return ContractBindingResult.Fail(
                 ContractBindingFailure.InvalidClausePlacement);
 
-        if (!inventory.Clauses.Any(clause =>
-                clause.IsValid &&
-                (!requiresOnly ||
-                 clause.Kind == BoundContractKind.Requires))) {
+        if (!inventory.Clauses.Any(static clause => clause.IsValid)) {
             var companion = ResolveCompanion(target);
             if (companion.Failure != ContractBindingFailure.None)
                 return ContractBindingResult.Fail(companion.Failure);
