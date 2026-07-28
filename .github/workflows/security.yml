@@ -12,6 +12,7 @@ on:
 permissions:
   contents: read
 
+# CodeQL default setup is repository-managed for Actions and C#.
 jobs:
   dependency-review:
     if: github.event_name == 'pull_request'
@@ -48,40 +49,3 @@ jobs:
           list SharpProof.sln package
           --vulnerable
           --include-transitive
-
-  codeql:
-    runs-on: windows-latest
-    permissions:
-      contents: read
-      security-events: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4
-        with:
-          languages: csharp
-          build-mode: manual
-
-      - name: Setup required .NET SDKs
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          dotnet-version: "8.0.x"
-          global-json-file: global.json
-
-      - name: Build for CodeQL
-        shell: pwsh
-        run: |
-          .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          .\scripts\Invoke-SharpProofDotnet.ps1 `
-            -MemoryLimitMb 8192 `
-            -TimeoutSeconds 600 `
-            build SharpProof.sln -c Release --no-restore
-
-      - name: Analyze
-        uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4
-        with:
-          category: /language:csharp
