@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="ContractFor/ContractFor.csproj" />
+  <Project Path="Diagnostics/Diagnostics.csproj" />
+  <Project Path="Effects/Effects.csproj" />
+  <Project Path="Library/Library.csproj" />
+  <Project Path="MalformedContract/MalformedContract.csproj" />
+  <Project Path="Outcomes/Outcomes.csproj" />
+  <Project Path="Preconditions/Preconditions.csproj" />
+  <Project Path="TrustedBoundary/TrustedBoundary.csproj" />
+</Solution>

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <SharpProofFeatures>contracts</SharpProofFeatures>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SharpProof.Verifier.Win-x64"
+                      Version="$(SharpProofSamplePackageVersion)"
+                      PrivateAssets="all" />
+  </ItemGroup>
+</Project>

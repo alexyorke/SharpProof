@@ -18,6 +18,10 @@ contain documented breaking changes.
 - Portable-PDB symbol packages with SourceLink bound to the packaged commit.
 - Deterministic SHA-256 release manifests, SPDX SBOM generation, and GitHub
   build-provenance and SBOM attestations.
+- Package-backed passing, diagnostic, mixed-outcome, strict-library, and
+  host-policy samples with an isolated local-feed assertion runner.
+- Exact IntelliSense XML documentation for every supported
+  `SharpProof.Attributes` public API member.
 
 ### Changed
 

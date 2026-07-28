@@ -907,6 +907,7 @@ public sealed class PackageLayoutSmokeTests {
                 "_rels/.rels",
                 "[Content_Types].xml",
                 "lib/netstandard2.0/SharpProof.Attributes.dll",
+                "lib/netstandard2.0/SharpProof.Attributes.xml",
                 "LICENSE",
                 "package/services/metadata/core-properties/" +
                     "<generated>.psmdcp",

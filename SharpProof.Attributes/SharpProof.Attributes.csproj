@@ -20,5 +20,9 @@
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
+    <None Include="SharpProof.Attributes.xml">
+      <Pack>True</Pack>
+      <PackagePath>lib\netstandard2.0\</PackagePath>
+    </None>
   </ItemGroup>
 </Project> 

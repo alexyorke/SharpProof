@@ -15,10 +15,12 @@ $currentMaintainedDocuments = @(
     'docs\architecture.md',
     'docs\coverage-and-limits.md',
     'docs\analysis-limits.md',
+    'docs\public-api.md',
     'docs\diagnostic-examples.md',
     'docs\unknown-reasons.md',
     'docs\native-smt-packaging.md',
     'docs\smt-lifecycle.md',
+    'samples\README.md',
     'eng\acceptance\README.md',
     'SharpProof.Gates\README.md',
     'SharpProof.Gates\Corpus\README.md'
@@ -203,6 +205,54 @@ function Assert-RepositoryLinksInSource {
     }
 }
 
+function Assert-ParseableMarkdownFences {
+    param(
+        [Parameter(Mandatory)][string]$RelativePath,
+        [Parameter(Mandatory)][string]$Content
+    )
+
+    $pattern =
+        '^```(?<language>xml|powershell|pwsh)[ \t]*\n' +
+        '(?<body>.*?)^```[ \t]*$'
+    $ordinal = 0
+    foreach ($match in [regex]::Matches(
+            $Content,
+            $pattern,
+            [Text.RegularExpressions.RegexOptions]::Multiline -bor
+                [Text.RegularExpressions.RegexOptions]::Singleline -bor
+                [Text.RegularExpressions.RegexOptions]::IgnoreCase)) {
+        $ordinal++
+        $language = $match.Groups['language'].Value.ToLowerInvariant()
+        $body = $match.Groups['body'].Value
+        if ($language -eq 'xml') {
+            try {
+                [void][xml](
+                    "<SharpProofSnippetRoot>`n" +
+                    $body +
+                    "`n</SharpProofSnippetRoot>")
+            }
+            catch {
+                throw (
+                    "$RelativePath XML fence $ordinal is not parseable: " +
+                    $_.Exception.Message)
+            }
+            continue
+        }
+
+        $tokens = $null
+        $errors = $null
+        [void][Management.Automation.Language.Parser]::ParseInput(
+            $body,
+            [ref]$tokens,
+            [ref]$errors)
+        if ($errors.Count -ne 0) {
+            throw (
+                "$RelativePath PowerShell fence $ordinal is not parseable: " +
+                ($errors -join '; '))
+        }
+    }
+}
+
 function Get-EnumMembers {
     param(
         [Parameter(Mandatory)][string]$Content,
@@ -237,6 +287,7 @@ foreach ($relativePath in $maintainedDocuments) {
     Assert-LfUtf8Document $relativePath
     Assert-MarkdownLinks $relativePath
     $maintainedText = Get-RequiredText $relativePath
+    Assert-ParseableMarkdownFences $relativePath $maintainedText
     foreach ($obsoleteWorkerTerm in @(
             'WorkerVerificationStatus',
             'WorkerVerificationReason',
@@ -584,7 +635,7 @@ if ($Verify) {
         "SharpProof documentation matches code-derived package, protocol, " +
         'cache, manifest, and compiler-artifact versions, acceptance-contract ' +
         'versions, configuration, diagnostics, API specs, worker options, ' +
-        'protocol enums, links, and anchors.')
+        'protocol enums, links, anchors, and parseable XML/PowerShell fences.')
 }
 else {
     Write-Host 'SharpProof documentation validation passed.'
