@@ -222,10 +222,17 @@ option mismatch becomes `CompilerManifestMismatch`.
 
 Generated claims and supported bodies are therefore visible and executable
 from compiler-produced IR, and candidate refutations receive independent
-whole-body replay. The three-package split is complete. The remaining
-integration limits are SARIF projection, release provenance, and broader host
-qualification; they are not worker-side compilation reconstruction,
-counterexample-replay, or package-separation work.
+whole-body replay. The three-package split is complete. Each package has a
+matching portable-PDB `.snupkg` with SourceLink bound to the package repository
+commit, and package builds run SDK package validation. The package workflow
+publishes the six NuGet artifacts with a deterministic SHA-256 manifest, an
+SPDX JSON SBOM, and SLSA build-provenance and SBOM attestations for canonical
+`master` builds.
+
+The remaining integration limits are SARIF projection, protected-tag
+promotion and trusted NuGet publishing, and broader host qualification; they
+are not worker-side compilation reconstruction, counterexample replay,
+package separation, or release-artifact provenance work.
 
 See [Typed abstention reasons](unknown-reasons.md) for the exact enums and
 [Analysis limits](analysis-limits.md) for configured budgets.

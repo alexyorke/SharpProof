@@ -7,17 +7,25 @@ on:
     branches: ["**"]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   package:
     name: Pack exact release artifacts
     runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Setup required .NET SDKs
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: "8.0.x"
           global-json-file: global.json
@@ -61,16 +69,52 @@ jobs:
           .\scripts\Test-SharpProofPackageConsumers.ps1 `
             -PackageSource nupkgs `
             -ValidatePackageSourceOnly
-          Get-ChildItem nupkgs -File -Filter '*.nupkg' |
-            Get-FileHash -Algorithm SHA256 |
-            Sort-Object Path |
-            Format-Table -AutoSize
+
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          path: ./nupkgs
+          format: spdx-json
+          output-file: nupkgs/SharpProof.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Generate deterministic release evidence
+        shell: pwsh
+        run: >-
+          .\scripts\New-SharpProofReleaseEvidence.ps1
+          -PackageSource nupkgs
+          -SbomPath nupkgs/SharpProof.spdx.json
+
+      - name: Attest build provenance
+        if: >-
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/master' &&
+          github.repository == 'alexyorke/SharpProof'
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-path: |
+            nupkgs/*.nupkg
+            nupkgs/*.snupkg
+            nupkgs/SharpProof.spdx.json
+            nupkgs/SharpProof.release.json
+            nupkgs/SHA256SUMS
+
+      - name: Attest the package SBOM
+        if: >-
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/master' &&
+          github.repository == 'alexyorke/SharpProof'
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-path: nupkgs/*.*nupkg
+          sbom-path: nupkgs/SharpProof.spdx.json
 
       - name: Upload exact NuGet artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nuget-packages
-          path: nupkgs/*.nupkg
+          path: nupkgs/*
           if-no-files-found: error
 
   package-consumer:
@@ -94,16 +138,16 @@ jobs:
             os: macos-15
             expected_smt: Graceful
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup required .NET SDKs
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: "8.0.x"
           global-json-file: global.json
 
       - name: Download exact NuGet artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: nuget-packages
           path: nupkgs

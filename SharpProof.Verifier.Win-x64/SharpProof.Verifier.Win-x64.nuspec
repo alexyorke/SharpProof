@@ -27,13 +27,21 @@
     <file src="THIRD-PARTY-NOTICES.txt" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\Microsoft.Z3.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.CompilerArtifact.dll" target="tools\net9" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.CompilerArtifact.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Dataflow.dll" target="tools\net9" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Dataflow.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Ir.dll" target="tools\net9" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Ir.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Smt.dll" target="tools\net9" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Smt.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Specs.dll" target="tools\net9" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Specs.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Verify.dll" target="tools\net9" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Verify.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.Protocol.dll" target="tools\net9" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.Protocol.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.dll" target="tools\net9" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.deps.json" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.runtimeconfig.json" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.IO.Pipelines.dll" target="tools\net9" />
@@ -42,6 +50,7 @@
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\runtimes\win-x64\native\libz3.dll" target="tools\net9\runtimes\win-x64\native" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\runtimes\win\lib\net9.0\System.Text.Encodings.Web.dll" target="tools\net9\runtimes\win\lib\net9.0" />
     <file src="..\SharpProof.Worker.Launcher\bin\$configuration$\net9.0\SharpProof.Worker.Launcher.dll" target="tools\net9" />
+    <file src="..\SharpProof.Worker.Launcher\bin\$configuration$\net9.0\SharpProof.Worker.Launcher.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker.Launcher\bin\$configuration$\net9.0\SharpProof.Worker.Launcher.deps.json" target="tools\net9" />
     <file src="..\SharpProof.Worker.Launcher\bin\$configuration$\net9.0\SharpProof.Worker.Launcher.runtimeconfig.json" target="tools\net9" />
   </files>

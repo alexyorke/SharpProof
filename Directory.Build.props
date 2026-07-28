@@ -2,6 +2,11 @@
   <Import Project="$(MSBuildThisFileDirectory)SharpProof.Release.props" />
   <PropertyGroup>
     <MicrosoftZ3PackageVersion>4.12.2</MicrosoftZ3PackageVersion>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    <Deterministic>true</Deterministic>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>portable</DebugType>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
     <ImplicitUsings Condition="'$(ImplicitUsings)' == ''">enable</ImplicitUsings>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>

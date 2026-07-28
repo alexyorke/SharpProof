@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Xml.Linq;
 using NUnit.Framework;
@@ -14,6 +16,9 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 [NonParallelizable]
 public sealed class PackageLayoutSmokeTests {
+    private static readonly Guid SourceLinkKind = new(
+        "CC110556-A091-4D38-9FEC-25AB9A351A6A");
+
     private static readonly string[] ExpectedAnalyzerEntryFileNames = [
         "SharpProof.Analyzer.dll",
         "SharpProof.ContractForGenerator.dll"
@@ -103,6 +108,132 @@ public sealed class PackageLayoutSmokeTests {
 
         VerifyPackageGraph(feed);
         VerifyPackageLayouts(feed);
+    }
+
+    [Test]
+    public async Task SymbolPackagesAreExactPortableAndSourceLinked() {
+        var feed = await PackagedProductFeed.GetAsync();
+        var repositoryRoot = FindRepositoryRoot();
+        var revision = await RunProcessAsync(
+            repositoryRoot,
+            "git",
+            "rev-parse",
+            "HEAD");
+        Assert.That(revision.ExitCode, Is.Zero, revision.Output);
+        var commit = revision.Output.Trim();
+        Assert.That(
+            commit,
+            Does.Match("^[0-9a-f]{40}$"));
+
+        foreach (var package in feed.Packages) {
+            var symbolPackagePath =
+                feed.GetSymbolPackagePath(package.Id);
+            VerifyRepositoryMetadata(package.Path, commit);
+            VerifyRepositoryMetadata(symbolPackagePath, commit);
+            VerifySymbolPackagePair(
+                package.Path,
+                symbolPackagePath,
+                package.Id + ".nuspec",
+                commit);
+        }
+    }
+
+    [Test]
+    public async Task ReleaseEvidenceIsDeterministicAndComplete() {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = ReleaseEvidenceWorkspace.Create();
+        var script = Path.Combine(
+            FindRepositoryRoot(),
+            "scripts",
+            "New-SharpProofReleaseEvidence.ps1");
+        var arguments = new[] {
+            "-NoLogo",
+            "-NoProfile",
+            "-File",
+            script,
+            "-PackageSource",
+            feed.Source,
+            "-SbomPath",
+            workspace.SbomPath,
+            "-OutputDirectory",
+            workspace.OutputDirectory
+        };
+        var firstRun = await RunProcessAsync(
+            FindRepositoryRoot(),
+            "pwsh",
+            arguments);
+        Assert.That(firstRun.ExitCode, Is.Zero, firstRun.Output);
+        var firstManifest = await File.ReadAllBytesAsync(
+            workspace.ManifestPath);
+        var firstSums = await File.ReadAllBytesAsync(
+            workspace.SumsPath);
+        var secondRun = await RunProcessAsync(
+            FindRepositoryRoot(),
+            "pwsh",
+            arguments);
+        Assert.That(secondRun.ExitCode, Is.Zero, secondRun.Output);
+        Assert.That(
+            await File.ReadAllBytesAsync(workspace.ManifestPath),
+            Is.EqualTo(firstManifest));
+        Assert.That(
+            await File.ReadAllBytesAsync(workspace.SumsPath),
+            Is.EqualTo(firstSums));
+        Assert.That(
+            firstManifest.Take(3),
+            Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
+        Assert.That(Encoding.UTF8.GetString(firstManifest), Does.Not.Contain('\r'));
+        Assert.That(Encoding.UTF8.GetString(firstSums), Does.Not.Contain('\r'));
+
+        using var document = JsonDocument.Parse(firstManifest);
+        var root = document.RootElement;
+        Assert.That(
+            root.GetProperty("schemaVersion").GetInt32(),
+            Is.EqualTo(1));
+        Assert.That(
+            root.GetProperty("packageVersion").GetString(),
+            Is.EqualTo(feed.Version));
+        var artifacts = root.GetProperty("artifacts")
+            .EnumerateArray()
+            .ToArray();
+        Assert.That(artifacts, Has.Length.EqualTo(7));
+        Assert.That(
+            artifacts.Select(static artifact =>
+                artifact.GetProperty("kind").GetString()),
+            Is.EquivalentTo([
+                "package",
+                "package",
+                "package",
+                "symbols",
+                "symbols",
+                "symbols",
+                "sbom"
+            ]));
+        foreach (var artifact in artifacts) {
+            var fileName = artifact.GetProperty("fileName").GetString() ??
+                throw new InvalidDataException(
+                    "Release artifact fileName is null.");
+            var kind = artifact.GetProperty("kind").GetString();
+            var path = kind == "sbom"
+                ? workspace.SbomPath
+                : Path.Combine(feed.Source, fileName);
+            var hash = Convert.ToHexString(
+                SHA256.HashData(
+                    await File.ReadAllBytesAsync(path)));
+            Assert.That(
+                artifact.GetProperty("sha256").GetString(),
+                Is.EqualTo(hash).IgnoreCase,
+                fileName);
+            Assert.That(
+                artifact.GetProperty("bytes").GetInt64(),
+                Is.EqualTo(new FileInfo(path).Length),
+                fileName);
+        }
+        Assert.That(
+            await File.ReadAllLinesAsync(workspace.SumsPath),
+            Is.EqualTo(artifacts.Select(static artifact =>
+                artifact.GetProperty("sha256").GetString() +
+                "  " +
+                artifact.GetProperty("fileName").GetString())));
     }
 
     [Test]
@@ -860,6 +991,132 @@ public sealed class PackageLayoutSmokeTests {
             Path.GetFileName(packagePath));
     }
 
+    private static void VerifySymbolPackagePair(
+        string packagePath,
+        string symbolPackagePath,
+        string nuspecName,
+        string commit) {
+        using var package = ZipFile.OpenRead(packagePath);
+        var packageEntries = package.Entries
+            .Select(static entry => entry.FullName)
+            .ToArray();
+        Assert.That(
+            packageEntries,
+            Has.None.EndsWith(".pdb"),
+            Path.GetFileName(packagePath));
+        var expectedPdbEntries = packageEntries
+            .Where(static entry =>
+                entry.EndsWith(".dll", StringComparison.Ordinal) &&
+                Path.GetFileName(entry).StartsWith(
+                    "SharpProof.",
+                    StringComparison.Ordinal))
+            .Select(static entry => entry[..^".dll".Length] + ".pdb")
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        Assert.That(
+            expectedPdbEntries,
+            Is.Not.Empty,
+            Path.GetFileName(packagePath));
+        AssertArchiveLayout(
+            symbolPackagePath,
+            [
+                "_rels/.rels",
+                "[Content_Types].xml",
+                "package/services/metadata/core-properties/" +
+                    "<generated>.psmdcp",
+                nuspecName,
+                .. expectedPdbEntries
+            ]);
+
+        using var symbols = ZipFile.OpenRead(symbolPackagePath);
+        foreach (var pdbEntry in expectedPdbEntries) {
+            var entry = symbols.GetEntry(pdbEntry) ??
+                throw new InvalidDataException(
+                    "Symbol package entry was not found: " + pdbEntry);
+            VerifyPortablePdbSourceLink(entry, commit);
+        }
+    }
+
+    private static void VerifyPortablePdbSourceLink(
+        ZipArchiveEntry entry,
+        string commit) {
+        using var image = new MemoryStream();
+        using (var stream = entry.Open())
+            stream.CopyTo(image);
+        image.Position = 0;
+        using var provider =
+            MetadataReaderProvider.FromPortablePdbStream(
+                image,
+                MetadataStreamOptions.LeaveOpen);
+        var reader = provider.GetMetadataReader();
+        var sourceLinks = reader.CustomDebugInformation
+            .Select(reader.GetCustomDebugInformation)
+            .Where(information =>
+                reader.GetGuid(information.Kind) == SourceLinkKind)
+            .ToArray();
+        Assert.That(
+            sourceLinks,
+            Has.Length.EqualTo(1),
+            entry.FullName);
+        var json = Encoding.UTF8.GetString(
+            reader.GetBlobBytes(sourceLinks[0].Value));
+        using var document = JsonDocument.Parse(json);
+        Assert.That(
+            document.RootElement.ValueKind,
+            Is.EqualTo(JsonValueKind.Object),
+            entry.FullName);
+        var documents = document.RootElement
+            .GetProperty("documents");
+        Assert.That(
+            documents.ValueKind,
+            Is.EqualTo(JsonValueKind.Object),
+            entry.FullName);
+        var mappings = documents
+            .EnumerateObject()
+            .ToArray();
+        Assert.That(mappings, Is.Not.Empty, entry.FullName);
+        var expectedUrl =
+            "https://raw.githubusercontent.com/alexyorke/" +
+            "SharpProof/" + commit + "/*";
+        Assert.That(
+            mappings.Select(static mapping =>
+                mapping.Name.Replace('\\', '/')),
+            Has.All.EndsWith("/*"),
+            entry.FullName);
+        Assert.That(
+            mappings.Select(static mapping =>
+                mapping.Value.GetString()),
+            Is.All.EqualTo(expectedUrl),
+            entry.FullName);
+    }
+
+    private static void VerifyRepositoryMetadata(
+        string packagePath,
+        string commit) {
+        using var archive = ZipFile.OpenRead(packagePath);
+        var nuspec = archive.Entries.Single(entry =>
+            entry.FullName.EndsWith(
+                ".nuspec",
+                StringComparison.OrdinalIgnoreCase));
+        using var stream = nuspec.Open();
+        var document = XDocument.Load(stream);
+        var repository = document.Descendants().Single(element =>
+            element.Name.LocalName == "repository");
+        Assert.That(
+            repository.Attribute("type")?.Value,
+            Is.EqualTo("git"),
+            Path.GetFileName(packagePath));
+        Assert.That(
+            repository.Attribute("url")?.Value,
+            Is.EqualTo(
+                "https://github.com/alexyorke/SharpProof"),
+            Path.GetFileName(packagePath));
+        Assert.That(
+            repository.Attribute("commit")?.Value,
+            Is.EqualTo(commit),
+            Path.GetFileName(packagePath));
+    }
+
     private static string NormalizeGeneratedPackageEntry(string entry) {
         const string coreProperties =
             "package/services/metadata/core-properties/";
@@ -997,9 +1254,18 @@ public sealed class PackageLayoutSmokeTests {
 
     private static async Task<ProcessResult> RunDotNetAsync(
         string workingDirectory,
+        params string[] arguments) =>
+        await RunProcessAsync(
+            workingDirectory,
+            "dotnet",
+            arguments);
+
+    private static async Task<ProcessResult> RunProcessAsync(
+        string workingDirectory,
+        string fileName,
         params string[] arguments) {
         var startInfo = new ProcessStartInfo {
-            FileName = "dotnet",
+            FileName = fileName,
             WorkingDirectory = workingDirectory,
             UseShellExecute = false,
             RedirectStandardOutput = true,
@@ -1246,6 +1512,62 @@ public sealed class PackageLayoutSmokeTests {
                     StringComparison.Ordinal))
                 throw new InvalidOperationException(
                     "Refusing to remove an unexpected test directory.");
+            if (Directory.Exists(resolved))
+                Directory.Delete(resolved, recursive: true);
+        }
+    }
+
+    private sealed class ReleaseEvidenceWorkspace : IDisposable {
+        private readonly string _root;
+
+        private ReleaseEvidenceWorkspace(string root) {
+            _root = root;
+            OutputDirectory = Path.Combine(root, "output");
+            SbomPath = Path.Combine(root, "SharpProof.spdx.json");
+            ManifestPath = Path.Combine(
+                OutputDirectory,
+                "SharpProof.release.json");
+            SumsPath = Path.Combine(OutputDirectory, "SHA256SUMS");
+            File.WriteAllText(
+                SbomPath,
+                """
+                {
+                  "spdxVersion": "SPDX-2.3",
+                  "dataLicense": "CC0-1.0",
+                  "SPDXID": "SPDXRef-DOCUMENT",
+                  "name": "SharpProof package test",
+                  "documentNamespace": "https://github.com/alexyorke/SharpProof/test"
+                }
+                """,
+                new UTF8Encoding(false));
+        }
+
+        internal string OutputDirectory { get; }
+        internal string SbomPath { get; }
+        internal string ManifestPath { get; }
+        internal string SumsPath { get; }
+
+        internal static ReleaseEvidenceWorkspace Create() {
+            var root = Path.Combine(
+                Path.GetTempPath(),
+                "SharpProof.ReleaseEvidence.Test",
+                Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            return new ReleaseEvidenceWorkspace(root);
+        }
+
+        public void Dispose() {
+            var resolved = Path.GetFullPath(_root);
+            var expectedRoot = Path.GetFullPath(
+                Path.Combine(
+                    Path.GetTempPath(),
+                    "SharpProof.ReleaseEvidence.Test"));
+            if (!resolved.StartsWith(
+                    expectedRoot + Path.DirectorySeparatorChar,
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "Refusing to remove an unexpected release-evidence " +
+                    "test directory.");
             if (Directory.Exists(resolved))
                 Directory.Delete(resolved, recursive: true);
         }

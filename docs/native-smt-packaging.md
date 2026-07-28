@@ -31,8 +31,16 @@ worker.
 
 Package validation obtains one isolated three-package feed, either by packing
 the graph once locally or by consuming the exact CI artifacts. It inspects
-package layouts and dependency ranges, then restores consumers only from that
-feed. Package-consumer CI promotes those same bytes to Windows x64
+package layouts, portable SourceLink PDBs, repository commits, and dependency
+ranges, then restores consumers only from that feed. SDK package validation is
+enabled for all three package projects. Each `.nupkg` is PDB-free and has a
+matching `.snupkg`; together the release set is exactly three packages and
+three symbol packages at one version.
+
+Package-consumer CI creates an SPDX JSON SBOM plus deterministic
+`SHA256SUMS` and `SharpProof.release.json` evidence. Canonical `master` builds
+receive separate SLSA provenance and SBOM attestations. CI then promotes those
+same package bytes to Windows x64
 (`windows-latest`), Linux x64 (`ubuntu-latest`), macOS x64
 (`macos-15-intel`), and macOS ARM64 (`macos-15`). Every host runs the portable
 consumer checks. Only Windows x64 additionally enables verification, launches
@@ -43,5 +51,5 @@ The worker receives compiler artifact schema version 3 with portable lowered
 CFG/IR. It does not construct a Roslyn compilation, parse source, or reread
 reference files; compiler and reference identities are provenance only.
 Independent whole-body counterexample replay is implemented for the admitted
-program subset. SARIF projection and release provenance remain production
-work.
+program subset. SARIF projection, protected-tag promotion, and trusted NuGet
+publishing remain production work.

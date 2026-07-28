@@ -72,9 +72,11 @@ production-plan Step 4 is complete for the bounded verifier subset.
 Independent whole-body counterexample replay is implemented for the admitted
 program subset. The proof kernel checks exact model closure and the lowered
 assumptions/goal before the worker independently executes the compiler-produced
-whole-body CFG. The three-package split is implemented. SARIF projection,
-release provenance, broader host qualification, and the remaining release
-reviews are future work. Current behavior and limits are recorded in
+whole-body CFG. The three-package split, portable SourceLink symbols, package
+validation, deterministic hashes, SPDX SBOM generation, and GitHub build/SBOM
+attestations are implemented. SARIF projection, protected-tag promotion,
+trusted NuGet publishing, broader host qualification, and the remaining
+release reviews are future work. Current behavior and limits are recorded in
 [Coverage and limits](coverage-and-limits.md#closed-compiler-artifact-and-remaining-limits).
 
 ## Machine-owned Markdown

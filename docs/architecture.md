@@ -233,7 +233,9 @@ creation and retained state, while the package policy proves that
 `SharpProofProfile=off` omits analyzer items and verifier invocation. The
 worker is isolated in `SharpProof.Verifier.Win-x64`; the portable `SharpProof`
 package contains only analyzer/generator assets and depends exactly on
-`SharpProof.Attributes`. The corpus reports explicit, silent, and total
-semantic Unknown rates as metrics; none is a release gate.
+`SharpProof.Attributes`. Each package has a portable-PDB symbol package with
+SourceLink, and the package workflow records exact SHA-256 hashes, an SPDX
+SBOM, and GitHub provenance/SBOM attestations. The corpus reports explicit,
+silent, and total semantic Unknown rates as metrics; none is a release gate.
 
 The active contract is `eng/acceptance`.
