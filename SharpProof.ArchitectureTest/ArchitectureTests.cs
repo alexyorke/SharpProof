@@ -48,13 +48,11 @@ public sealed class ArchitectureTests {
             ["SharpProof.Dataflow"] = [],
             ["SharpProof.Frontend"] = ["SharpProof.Ir"],
             ["SharpProof.Contracts"] = [
-                "SharpProof.Attributes",
                 "SharpProof.Frontend",
                 "SharpProof.Ir",
                 "SharpProof.Specs"
             ],
             ["SharpProof.Effects"] = [
-                "SharpProof.Attributes",
                 "SharpProof.Dataflow",
                 "SharpProof.Frontend",
                 "SharpProof.Specs"

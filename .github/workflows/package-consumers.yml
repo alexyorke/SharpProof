@@ -1,35 +1,118 @@
 name: Cross-platform package consumers
+
 on:
   push:
     branches: [master]
   pull_request:
     branches: ["**"]
   workflow_dispatch:
+
 jobs:
-  package-consumer:
-    name: ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Windows packaged analyzer and worker
-            os: windows-latest
-          - name: Linux packaged analyzer
-            os: ubuntu-latest
-          - name: macOS x64 packaged analyzer
-            os: macos-15-intel
-          - name: macOS ARM64 packaged analyzer
-            os: macos-15
+  package:
+    name: Pack exact release artifacts
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Setup required .NET SDKs
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
           global-json-file: global.json
-      - name: Build packages and run consumers
+
+      - name: Restore dependencies
+        shell: pwsh
+        run: .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
+
+      - name: Build package payloads
         shell: pwsh
         run: >-
-          ./scripts/Test-SharpProofPackageConsumers.ps1
-          -Configuration Release
+          .\scripts\Invoke-SharpProofDotnet.ps1
+          build SharpProof.sln
+          --configuration Release
+          --no-restore
+
+      - name: Pack and validate the three-package graph
+        shell: pwsh
+        run: |
+          $expectedProjects = @(
+            'SharpProof.Attributes/SharpProof.Attributes.csproj',
+            'SharpProof.Package/SharpProof.Package.csproj',
+            'SharpProof.Verifier.Win-x64/SharpProof.Verifier.Win-x64.csproj'
+          )
+          $manifest = Get-Content scripts/package-projects.json -Raw |
+            ConvertFrom-Json
+          if ($manifest.schemaVersion -ne 1 -or
+              (@($manifest.projects) -join '|') -ne
+              ($expectedProjects -join '|')) {
+            throw 'Package manifest must contain the exact dependency-ordered three-package graph.'
+          }
+
+          foreach ($project in $manifest.projects) {
+            .\scripts\Invoke-SharpProofDotnet.ps1 pack $project `
+              --configuration Release `
+              --no-build `
+              --output nupkgs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+          .\scripts\Test-SharpProofPackageConsumers.ps1 `
+            -PackageSource nupkgs `
+            -ValidatePackageSourceOnly
+          Get-ChildItem nupkgs -File -Filter '*.nupkg' |
+            Get-FileHash -Algorithm SHA256 |
+            Sort-Object Path |
+            Format-Table -AutoSize
+
+      - name: Upload exact NuGet artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: nupkgs/*.nupkg
+          if-no-files-found: error
+
+  package-consumer:
+    name: ${{ matrix.name }}
+    needs: package
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows package graph, analyzer, and worker
+            os: windows-latest
+            expected_smt: Required
+          - name: Linux package graph and analyzer
+            os: ubuntu-latest
+            expected_smt: Graceful
+          - name: macOS x64 package graph and analyzer
+            os: macos-15-intel
+            expected_smt: Graceful
+          - name: macOS ARM64 package graph and analyzer
+            os: macos-15
+            expected_smt: Graceful
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup required .NET SDKs
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+          global-json-file: global.json
+
+      - name: Download exact NuGet artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: nupkgs
+
+      - name: Run consumers against the downloaded local feed
+        shell: pwsh
+        run: |
+          $packageSource = (Resolve-Path ./nupkgs).Path
+          ./scripts/Test-SharpProofPackageConsumers.ps1 `
+            -Configuration Release `
+            -ExpectedSmt '${{ matrix.expected_smt }}' `
+            -PackageSource $packageSource

@@ -9,7 +9,6 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class AnalyzerArchitectureTests {
     private static readonly string[] ExpectedAnalyzerReferences = [
-        "SharpProof.Attributes",
         "SharpProof.CompilerArtifact",
         "SharpProof.Contracts",
         "SharpProof.Effects",
@@ -77,6 +76,21 @@ public sealed class AnalyzerArchitectureTests {
         Assert.That(
             references,
             Is.SubsetOf(ExpectedAnalyzerReferences));
+    }
+
+    [Test]
+    public void PortableAnalysisAssembliesDoNotReferenceRuntimeAttributes() {
+        var assemblies = new[] {
+            typeof(SharpProofAnalyzer).Assembly,
+            typeof(SharpProof.Effects.EffectSummaryProjector).Assembly
+        };
+
+        foreach (var assembly in assemblies)
+            Assert.That(
+                assembly.GetReferencedAssemblies()
+                    .Select(static reference => reference.Name),
+                Does.Not.Contain("SharpProof.Attributes"),
+                assembly.GetName().Name);
     }
 
     [Test]

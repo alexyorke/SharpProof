@@ -380,18 +380,26 @@ foreach ($apiSpecId in $apiSpecIds) {
 }
 
 $limitReference = Get-RequiredText 'docs\analysis-limits.md'
-$packageProps = [xml](Get-RequiredText (
+$portablePackageProps = [xml](Get-RequiredText (
     'SharpProof.Package\buildTransitive\SharpProof.props'))
+$verifierPackageProps = [xml](Get-RequiredText (
+    'SharpProof.Verifier.Win-x64\buildTransitive\SharpProof.Verifier.Win-x64.props'))
+$packagePropsDocuments = @(
+    $portablePackageProps,
+    $verifierPackageProps
+)
 $workerPropertyNames = @(
-    'SharpProofProfile',
-    'SharpProofFeatures',
-    'SharpProofVerifyPolicy',
-    'SharpProofAssumptionPolicy',
-    'SharpProofMode',
-    'SharpProofVerify'
-    $packageProps.SelectNodes(
-        '//PropertyGroup/*[starts-with(local-name(), "SharpProofVerify")]') |
-        ForEach-Object { $_.Name } |
+    @(
+        'SharpProofVerify'
+        foreach ($packagePropsDocument in $packagePropsDocuments) {
+            $packagePropsDocument.SelectNodes(
+                '//CompilerVisibleProperty[starts-with(@Include, "SharpProof")]') |
+                ForEach-Object { $_.GetAttribute('Include') }
+            $packagePropsDocument.SelectNodes(
+                '//PropertyGroup/*[starts-with(local-name(), "SharpProofVerify") or local-name() = "SharpProofDotNetHost"]') |
+                ForEach-Object { $_.Name }
+        }
+    ) |
         Sort-Object -Unique
 )
 foreach ($propertyName in $workerPropertyNames) {

@@ -97,13 +97,13 @@ public sealed class FinalCompilationProbeTests {
 
     [Test]
     public async Task PackedCollectorAttestsAndVerifiesGeneratorOutput() {
+        var feed = await PackagedProductFeed.GetAsync();
         using var workspace = ProbeWorkspace.Create();
-        var packagePath = await workspace.PackSharpProofAsync();
-        workspace.WritePackedConsumer(GetPackageVersion(packagePath));
+        workspace.WritePackedConsumer(feed.Version);
         var handwrittenSource =
             await File.ReadAllBytesAsync(workspace.SubjectPath);
 
-        var restore = await workspace.RestoreAsync();
+        var restore = await workspace.RestoreAsync(feed.Source);
         Assert.That(restore.ExitCode, Is.Zero, restore.Output);
 
         var first = await workspace.RebuildAsync();
@@ -403,7 +403,6 @@ public sealed class FinalCompilationProbeTests {
             _root = root;
             ProjectPath = Path.Combine(root, "Consumer.csproj");
             ArtifactDirectory = Path.Combine(root, "probe");
-            PackageSource = Path.Combine(root, "packages");
             PackageCache = Path.Combine(root, "package-cache");
             CompilerManifestPath = Path.Combine(
                 root,
@@ -419,7 +418,6 @@ public sealed class FinalCompilationProbeTests {
 
         internal string ProjectPath { get; }
         internal string ArtifactDirectory { get; }
-        internal string PackageSource { get; }
         internal string PackageCache { get; }
         internal string CompilerManifestPath { get; }
         internal string PackedProbeArtifactPath { get; }
@@ -433,9 +431,7 @@ public sealed class FinalCompilationProbeTests {
             File.Copy(
                 Path.Combine(FindRepositoryRoot(), "global.json"),
                 Path.Combine(root, "global.json"));
-            var workspace = new ProbeWorkspace(root);
-            Directory.CreateDirectory(workspace.PackageSource);
-            return workspace;
+            return new ProbeWorkspace(root);
         }
 
         internal void WriteConsumer(
@@ -546,48 +542,17 @@ public sealed class FinalCompilationProbeTests {
             ]);
         }
 
-        internal Task<ProcessResult> RestoreAsync() =>
+        internal Task<ProcessResult> RestoreAsync(string packageSource) =>
             RunDotNetAsync([
                 "restore",
                 ProjectPath,
                 "--nologo",
                 "/nodeReuse:false",
                 "--source",
-                PackageSource,
+                packageSource,
                 "--packages",
                 PackageCache
             ]);
-
-        internal async Task<string> PackSharpProofAsync() {
-            var repositoryRoot = FindRepositoryRoot();
-            var packageProject = Path.Combine(
-                repositoryRoot,
-                "SharpProof.Package",
-                "SharpProof.Package.csproj");
-            var pack = await RunDotNetAsync(
-                [
-                    "pack",
-                    packageProject,
-                    "-c",
-                    "Release",
-                    "--nologo",
-                    "/nodeReuse:false",
-                    "-p:UseSharedCompilation=false",
-                    "-p:GeneratePackageOnBuild=false",
-                    "--output",
-                    PackageSource
-                ],
-                repositoryRoot);
-            Assert.That(pack.ExitCode, Is.Zero, pack.Output);
-            return Directory.EnumerateFiles(
-                    PackageSource,
-                    "SharpProof.*.nupkg")
-                .Single(path => {
-                    var name = Path.GetFileName(path);
-                    return name.Length > "SharpProof.".Length &&
-                        char.IsDigit(name["SharpProof.".Length]);
-                });
-        }
 
         private async Task<ProcessResult> RunDotNetAsync(
             string[] arguments,
@@ -721,7 +686,7 @@ public sealed class FinalCompilationProbeTests {
                     <WarningsAsErrors>AD0001;CS8032;CS8785</WarningsAsErrors>
                   </PropertyGroup>
                   <ItemGroup>
-                    <PackageReference Include="SharpProof"
+                    <PackageReference Include="SharpProof.Verifier.Win-x64"
                                       Version="{Escape(packageVersion)}" />
                     <Analyzer Include="{analyzerPath}" />
                     <AdditionalFiles Include="{additionalFile}">
@@ -755,15 +720,6 @@ public sealed class FinalCompilationProbeTests {
             SecurityElement.Escape(value) ??
             throw new InvalidOperationException(
                 "Failed to escape an MSBuild value.");
-    }
-
-    private static string GetPackageVersion(string packagePath) {
-        const string prefix = "SharpProof.";
-        const string suffix = ".nupkg";
-        var name = Path.GetFileName(packagePath);
-        return name.Substring(
-            prefix.Length,
-            name.Length - prefix.Length - suffix.Length);
     }
 
     private sealed record ProcessResult(int ExitCode, string Output);

@@ -11,3 +11,5 @@ global using Microsoft.CodeAnalysis.CSharp.Syntax;
 global using NUnit.Framework;
 global using SharpProof.Attributes;
 global using SharpProof.Effects;
+global using SharpProofCapability = SharpProof.Effects.EffectContractCapabilityKind;
+global using SharpProofEffect = SharpProof.Effects.EffectContractKind;

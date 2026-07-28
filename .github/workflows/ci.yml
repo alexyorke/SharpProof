@@ -36,14 +36,33 @@ jobs:
       - name: Package NuGet packages
         shell: pwsh
         run: |
+          $expectedProjects = @(
+            'SharpProof.Attributes/SharpProof.Attributes.csproj',
+            'SharpProof.Package/SharpProof.Package.csproj',
+            'SharpProof.Verifier.Win-x64/SharpProof.Verifier.Win-x64.csproj'
+          )
           $manifest = Get-Content scripts/package-projects.json -Raw | ConvertFrom-Json
+          if ($manifest.schemaVersion -ne 1 -or
+              (@($manifest.projects) -join '|') -ne
+              ($expectedProjects -join '|')) {
+            throw 'Package manifest must contain the exact dependency-ordered three-package graph.'
+          }
           foreach ($project in $manifest.projects) {
             .\scripts\Invoke-SharpProofDotnet.ps1 pack $project --configuration Release --no-build --output nupkgs
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+
+          .\scripts\Test-SharpProofPackageConsumers.ps1 `
+            -PackageSource nupkgs `
+            -ValidatePackageSourceOnly
+          Get-ChildItem nupkgs -File -Filter '*.nupkg' |
+            Get-FileHash -Algorithm SHA256 |
+            Sort-Object Path |
+            Format-Table -AutoSize
 
       - name: Upload NuGet artifact
         uses: actions/upload-artifact@v4
         with:
           name: nuget-packages
           path: nupkgs/*.nupkg
+          if-no-files-found: error

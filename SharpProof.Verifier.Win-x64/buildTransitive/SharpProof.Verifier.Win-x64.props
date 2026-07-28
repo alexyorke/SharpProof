@@ -1,0 +1,34 @@
+<Project>
+  <PropertyGroup>
+    <_SharpProofVerifierPackagePresent>true</_SharpProofVerifierPackagePresent>
+    <_SharpProofVerifierHostArchitecture>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</_SharpProofVerifierHostArchitecture>
+    <_SharpProofVerifierProcessArchitecture>$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)</_SharpProofVerifierProcessArchitecture>
+    <_SharpProofVerifierHostSupported Condition="'$(OS)' == 'Windows_NT' AND '$(_SharpProofVerifierHostArchitecture)' == 'X64' AND '$(_SharpProofVerifierProcessArchitecture)' == 'X64'">true</_SharpProofVerifierHostSupported>
+    <SharpProofToolsDirectory Condition="'$(SharpProofToolsDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/net9'))</SharpProofToolsDirectory>
+    <_SharpProofToolsDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofToolsDirectory)'))</_SharpProofToolsDirectory>
+    <SharpProofWorkerPath Condition="'$(SharpProofWorkerPath)' == ''">$(_SharpProofToolsDirectory)/SharpProof.Worker.dll</SharpProofWorkerPath>
+    <SharpProofLauncherPath Condition="'$(SharpProofLauncherPath)' == ''">$(_SharpProofToolsDirectory)/SharpProof.Worker.Launcher.dll</SharpProofLauncherPath>
+    <_SharpProofWorkerPath>$([System.IO.Path]::GetFullPath('$(SharpProofWorkerPath)'))</_SharpProofWorkerPath>
+    <_SharpProofLauncherPath>$([System.IO.Path]::GetFullPath('$(SharpProofLauncherPath)'))</_SharpProofLauncherPath>
+    <SharpProofVerifyQueryRlimit Condition="'$(SharpProofVerifyQueryRlimit)' == ''">3000000</SharpProofVerifyQueryRlimit>
+    <SharpProofVerifyMethodRlimit Condition="'$(SharpProofVerifyMethodRlimit)' == ''">20000000</SharpProofVerifyMethodRlimit>
+    <SharpProofVerifyMethodWallTimeMilliseconds Condition="'$(SharpProofVerifyMethodWallTimeMilliseconds)' == ''">10000</SharpProofVerifyMethodWallTimeMilliseconds>
+    <SharpProofVerifyProjectWallTimeMilliseconds Condition="'$(SharpProofVerifyProjectWallTimeMilliseconds)' == ''">300000</SharpProofVerifyProjectWallTimeMilliseconds>
+    <SharpProofVerifyMaxParallelism Condition="'$(SharpProofVerifyMaxParallelism)' == ''">4</SharpProofVerifyMaxParallelism>
+    <SharpProofVerifyMaximumExpressionDepth Condition="'$(SharpProofVerifyMaximumExpressionDepth)' == ''">64</SharpProofVerifyMaximumExpressionDepth>
+    <SharpProofVerifyProcessMemoryLimitBytes Condition="'$(SharpProofVerifyProcessMemoryLimitBytes)' == ''">2147483648</SharpProofVerifyProcessMemoryLimitBytes>
+    <SharpProofVerifyMaxWorkerProcesses Condition="'$(SharpProofVerifyMaxWorkerProcesses)' == ''">4</SharpProofVerifyMaxWorkerProcesses>
+    <SharpProofVerifyTerminationGraceMilliseconds Condition="'$(SharpProofVerifyTerminationGraceMilliseconds)' == ''">1000</SharpProofVerifyTerminationGraceMilliseconds>
+    <SharpProofVerifyCacheEnabled Condition="'$(SharpProofVerifyCacheEnabled)' == ''">true</SharpProofVerifyCacheEnabled>
+    <SharpProofVerifyCacheMaximumBytes Condition="'$(SharpProofVerifyCacheMaximumBytes)' == ''">536870912</SharpProofVerifyCacheMaximumBytes>
+    <SharpProofDotNetHost Condition="'$(SharpProofDotNetHost)' == ''">dotnet</SharpProofDotNetHost>
+  </PropertyGroup>
+  <ItemGroup>
+    <CompilerVisibleProperty Include="SharpProofVerifyPolicy" />
+    <CompilerVisibleProperty Include="SharpProofAssumptionPolicy" />
+    <CompilerVisibleProperty Include="_SharpProofCompilerManifestPath" />
+    <CompilerVisibleProperty Include="_SharpProofCompilationTargetFramework" />
+    <CompilerVisibleProperty Include="_SharpProofProjectDirectory" />
+    <CompilerVisibleProperty Include="SharpProofVerifyMaximumExpressionDepth" />
+  </ItemGroup>
+</Project>

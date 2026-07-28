@@ -19,7 +19,6 @@
     <ProjectReference Include="$(MSBuildThisFileDirectory)SharpProof.ContractForGenerator\SharpProof.ContractForGenerator.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
-    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerArtifact\bin\$(Configuration)\netstandard2.0\SharpProof.CompilerArtifact.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Contracts\bin\$(Configuration)\netstandard2.0\SharpProof.Contracts.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Dataflow\bin\$(Configuration)\netstandard2.0\SharpProof.Dataflow.dll" />

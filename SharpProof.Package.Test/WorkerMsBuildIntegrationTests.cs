@@ -40,6 +40,21 @@ public sealed class WorkerMsBuildIntegrationTests {
         "WriteLinesToFile", "sources.list", "references.list",
         "constants.list", "options.input"
     ];
+    private static readonly string[] s_manualConsumerElementOrder = [
+        "Import",
+        "Import",
+        "PropertyGroup",
+        "ItemGroup",
+        "Import",
+        "Import",
+        "Target"
+    ];
+    private static readonly string[] s_manualConsumerImportOrder = [
+        "SharpProof.props",
+        "SharpProof.Verifier.Win-x64.props",
+        "SharpProof.targets",
+        "SharpProof.Verifier.Win-x64.targets"
+    ];
 
     [Test]
     public void WorkerContainmentIsMandatoryOnTheSupportedHost() {
@@ -58,6 +73,25 @@ public sealed class WorkerMsBuildIntegrationTests {
             WorkerBudgets.DefaultProcessMemoryLimitBytes,
             WorkerBudgets.MaximumParallelism);
         Assert.That(boundary, Is.Not.Null);
+    }
+
+    [Test]
+    public void ManualConsumerImportsFollowSplitPackageOrder() {
+        using var project = ConsumerProject.Create(IdentitySource);
+        var document = XDocument.Load(project.ProjectPath);
+        var elements = document.Root?.Elements().ToArray() ??
+            throw new InvalidDataException(
+                "The generated consumer project has no root.");
+
+        Assert.That(
+            elements.Select(static element => element.Name.LocalName),
+            Is.EqualTo(s_manualConsumerElementOrder));
+        Assert.That(
+            elements.Where(static element =>
+                    element.Name.LocalName == "Import")
+                .Select(static import => Path.GetFileName(
+                    import.Attribute("Project")?.Value)),
+            Is.EqualTo(s_manualConsumerImportOrder));
     }
 
     [Test]
@@ -312,6 +346,10 @@ public sealed class WorkerMsBuildIntegrationTests {
             ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
             ("SharpProofWorkerPath",
                 project.CompilerManifestPath + ".missing-worker.dll"));
+        await AssertInvalidatedAsync(
+            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+            ("SharpProofNativeZ3Path",
+                project.CompilerManifestPath + ".missing-z3.dll"));
         await AssertInvalidatedAsync(
             ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
             ("SharpProofVerifyPolicy", "invalid"));
@@ -808,12 +846,17 @@ public sealed class WorkerMsBuildIntegrationTests {
     [Test]
     public void PackagePropertiesMatchProtocolDefaults() {
         var repository = ConsumerProject.FindRepositoryRoot();
-        var document = XDocument.Load(Path.Combine(
+        var portableProps = XDocument.Load(Path.Combine(
             repository,
             "SharpProof.Package",
             "buildTransitive",
             "SharpProof.props"));
-        var properties = document
+        var verifierProps = XDocument.Load(Path.Combine(
+            repository,
+            "SharpProof.Verifier.Win-x64",
+            "buildTransitive",
+            "SharpProof.Verifier.Win-x64.props"));
+        var properties = verifierProps
             .Descendants()
             .Where(static element =>
                 element.Parent?.Name.LocalName == "PropertyGroup")
@@ -824,8 +867,9 @@ public sealed class WorkerMsBuildIntegrationTests {
                 static group => group.Key,
                 static group => group.Last().Value,
                 StringComparer.Ordinal);
-        var compilerVisible = document
+        var compilerVisible = portableProps
             .Descendants("CompilerVisibleProperty")
+            .Concat(verifierProps.Descendants("CompilerVisibleProperty"))
             .Select(static element =>
                 element.Attribute("Include")?.Value)
             .Where(static value => value != null);
@@ -900,17 +944,22 @@ public sealed class WorkerMsBuildIntegrationTests {
         var repository = ConsumerProject.FindRepositoryRoot();
         var packageProps = XDocument.Load(Path.Combine(
             repository,
+            "SharpProof.Verifier.Win-x64",
+            "buildTransitive",
+            "SharpProof.Verifier.Win-x64.props"));
+        var portableTargets = XDocument.Load(Path.Combine(
+            repository,
             "SharpProof.Package",
             "buildTransitive",
-            "SharpProof.props"));
+            "SharpProof.targets"));
         var analyzerConsumerProps = XDocument.Load(Path.Combine(
             repository,
             "SharpProof.AnalyzerConsumer.props"));
         var targets = XDocument.Load(Path.Combine(
             repository,
-            "SharpProof.Package",
+            "SharpProof.Verifier.Win-x64",
             "buildTransitive",
-            "SharpProof.targets"));
+            "SharpProof.Verifier.Win-x64.targets"));
         var initialize = targets
             .Descendants("Target")
             .Single(static target =>
@@ -933,6 +982,11 @@ public sealed class WorkerMsBuildIntegrationTests {
             Assert.That(
                 CompilerVisibleProperties(analyzerConsumerProps),
                 Is.SupersetOf(s_compilerManifestProperties));
+            Assert.That(
+                portableTargets.Descendants("Target")
+                    .Select(static target =>
+                        target.Attribute("Name")?.Value),
+                Has.None.EqualTo("_SharpProofVerifyCore"));
             Assert.That(
                 initialize.Attribute("BeforeTargets")?.Value
                     .Split(';', StringSplitOptions.RemoveEmptyEntries),
@@ -1559,6 +1613,12 @@ public sealed class WorkerMsBuildIntegrationTests {
                     "SharpProof.Package",
                     "buildTransitive",
                     "SharpProof.props"));
+            var verifierProps = SecurityElement.Escape(
+                Path.Combine(
+                    repository,
+                    "SharpProof.Verifier.Win-x64",
+                    "buildTransitive",
+                    "SharpProof.Verifier.Win-x64.props"));
             var testConfiguration = new DirectoryInfo(
                 Path.GetDirectoryName(
                     typeof(WorkerMsBuildIntegrationTests).Assembly.Location)!)
@@ -1577,9 +1637,19 @@ public sealed class WorkerMsBuildIntegrationTests {
                     "SharpProof.Package",
                     "buildTransitive",
                     "SharpProof.targets"));
+            var verifierTargets = SecurityElement.Escape(
+                Path.Combine(
+                    repository,
+                    "SharpProof.Verifier.Win-x64",
+                    "buildTransitive",
+                    "SharpProof.Verifier.Win-x64.targets"));
             var worker = SecurityElement.Escape(
                 Path.Combine(repository, "SharpProof.Worker", "bin",
                     testConfiguration, "net9.0", "SharpProof.Worker.dll"));
+            var nativeZ3 = SecurityElement.Escape(
+                Path.Combine(repository, "SharpProof.Worker", "bin",
+                    testConfiguration, "net9.0", "runtimes", "win-x64",
+                    "native", "libz3.dll"));
             var launcher = SecurityElement.Escape(
                 Path.Combine(repository, "SharpProof.Worker.Launcher", "bin",
                     testConfiguration, "net9.0",
@@ -1593,17 +1663,21 @@ public sealed class WorkerMsBuildIntegrationTests {
             return
                 $"""
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <Import Project="{props}" />
+                  <Import Project="{verifierProps}" />
                   <PropertyGroup>
                     <SharpProofAnalyzerDirectory>{analyzerDirectory}</SharpProofAnalyzerDirectory>
-                  </PropertyGroup>
-                  <Import Project="{props}" />
-                  <PropertyGroup>
+                    <_SharpProofAnalyzerDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>
+                    <SharpProofContractForGeneratorPath>{analyzerDirectory}/SharpProof.ContractForGenerator.dll</SharpProofContractForGeneratorPath>
                 {configuredProperties}
                     <TargetFramework Condition="'$(TargetFrameworks)' == ''">net8.0</TargetFramework>
                     <LangVersion>12.0</LangVersion>
                     <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
                     <SharpProofWorkerPath>{worker}</SharpProofWorkerPath>
+                    <_SharpProofWorkerPath>$([System.IO.Path]::GetFullPath('$(SharpProofWorkerPath)'))</_SharpProofWorkerPath>
+                    <SharpProofNativeZ3Path>{nativeZ3}</SharpProofNativeZ3Path>
                     <SharpProofLauncherPath>{launcher}</SharpProofLauncherPath>
+                    <_SharpProofLauncherPath>$([System.IO.Path]::GetFullPath('$(SharpProofLauncherPath)'))</_SharpProofLauncherPath>
                   </PropertyGroup>
                   <ItemGroup>
                     <Reference Include="SharpProof.Attributes">
@@ -1612,6 +1686,7 @@ public sealed class WorkerMsBuildIntegrationTests {
                     </Reference>
                   </ItemGroup>
                   <Import Project="{targets}" />
+                  <Import Project="{verifierTargets}" />
                   <Target Name="_RemoveSharpProofAnalyzersForWorkerTargetTest"
                           BeforeTargets="CoreCompile">
                     <ItemGroup>

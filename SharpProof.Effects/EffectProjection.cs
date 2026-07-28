@@ -1,12 +1,12 @@
 namespace SharpProof.Effects;
 
 public readonly struct EffectProjection(
-    SharpProofEffect effects,
-    SharpProofCapability capabilities,
+    EffectContractKind effects,
+    EffectContractCapabilityKind capabilities,
     bool isComplete)
     : IEquatable<EffectProjection> {
-    public SharpProofEffect Effects { get; } = effects;
-    public SharpProofCapability Capabilities { get; } = capabilities;
+    public EffectContractKind Effects { get; } = effects;
+    public EffectContractCapabilityKind Capabilities { get; } = capabilities;
     public bool IsComplete { get; } = isComplete;
 
     public bool Equals(EffectProjection other) =>
@@ -30,26 +30,26 @@ public static class EffectSummaryProjector {
         if (summary == null) throw new ArgumentNullException(nameof(summary));
         if (summary.IsBottom)
             return new EffectProjection(
-                SharpProofEffect.None, SharpProofCapability.None, isComplete: true);
+                EffectContractKind.None, EffectContractCapabilityKind.None, isComplete: true);
 
         var effects = ProjectRegions(summary.Reads, isWrite: false) |
                       ProjectRegions(summary.Writes, isWrite: true);
         var allocationUnknown =
             (summary.Allocation & (EffectAllocationKind)(1 << 2)) != 0;
         if (summary.Allocation != EffectAllocationKind.None && !allocationUnknown)
-            effects |= SharpProofEffect.Allocates;
+            effects |= EffectContractKind.Allocates;
         if (!summary.Throws.Types.IsDefaultOrEmpty)
-            effects |= SharpProofEffect.Throws;
+            effects |= EffectContractKind.Throws;
         if (!summary.Capabilities.IsUnknown) {
             if (summary.Capabilities.Contains(EffectCapabilityKind.Synchronization))
-                effects |= SharpProofEffect.Synchronizes;
+                effects |= EffectContractKind.Synchronizes;
             if (summary.Capabilities.Contains(EffectCapabilityKind.Randomness) ||
                 summary.Capabilities.Contains(EffectCapabilityKind.Clock))
-                effects |= SharpProofEffect.UsesNondeterminism;
+                effects |= EffectContractKind.UsesNondeterminism;
             if (summary.Capabilities.Contains(EffectCapabilityKind.Reflection))
-                effects |= SharpProofEffect.UsesReflection;
+                effects |= EffectContractKind.UsesReflection;
             if (summary.Capabilities.Contains(EffectCapabilityKind.NativeInterop))
-                effects |= SharpProofEffect.UsesNativeCode;
+                effects |= EffectContractKind.UsesNativeCode;
         }
         var isComplete =
             summary.Completeness == EffectCompleteness.Complete &&
@@ -61,37 +61,37 @@ public static class EffectSummaryProjector {
             summary.Uncertainty is EffectUncertainty.None or EffectUncertainty.DirectCall;
 
         var capabilities = summary.Capabilities.IsUnknown
-            ? SharpProofCapability.None
-            : (SharpProofCapability)(
+            ? EffectContractCapabilityKind.None
+            : (EffectContractCapabilityKind)(
                 summary.Capabilities.Kinds & EffectCapabilityKind.AllKnown);
         return new EffectProjection(effects, capabilities, isComplete);
     }
 
-    private static SharpProofEffect ProjectRegions(
+    private static EffectContractKind ProjectRegions(
         EffectRegionSet regions, bool isWrite) {
         if (regions.IsUnknown)
-            return SharpProofEffect.None;
-        var result = SharpProofEffect.None;
+            return EffectContractKind.None;
+        var result = EffectContractKind.None;
         foreach (var region in regions.Regions)
             result |= ProjectRegion(region.Kind, isWrite);
         return result;
     }
 
-    private static SharpProofEffect ProjectRegion(
+    private static EffectContractKind ProjectRegion(
         EffectRegionKind kind, bool isWrite) =>
         (kind, isWrite) switch {
-            (EffectRegionKind.Receiver, false) => SharpProofEffect.ReadsReceiverState,
-            (EffectRegionKind.Parameter, false) => SharpProofEffect.ReadsArgumentState,
-            (EffectRegionKind.Captured, false) => SharpProofEffect.ReadsCapturedState,
-            (EffectRegionKind.Static, false) => SharpProofEffect.ReadsStaticState,
-            (EffectRegionKind.Ambient, false) => SharpProofEffect.ReadsAmbientState,
-            (EffectRegionKind.Receiver, true) => SharpProofEffect.WritesReceiverState,
-            (EffectRegionKind.Parameter, true) => SharpProofEffect.WritesArgumentState,
-            (EffectRegionKind.Captured, true) => SharpProofEffect.WritesCapturedState,
-            (EffectRegionKind.Static, true) => SharpProofEffect.WritesStaticState,
-            (EffectRegionKind.Fresh, true) => SharpProofEffect.None,
-            (EffectRegionKind.Ambient, true) => SharpProofEffect.WritesAmbientState,
-            (EffectRegionKind.Unknown, _) => SharpProofEffect.None,
-            _ => SharpProofEffect.None
+            (EffectRegionKind.Receiver, false) => EffectContractKind.ReadsReceiverState,
+            (EffectRegionKind.Parameter, false) => EffectContractKind.ReadsArgumentState,
+            (EffectRegionKind.Captured, false) => EffectContractKind.ReadsCapturedState,
+            (EffectRegionKind.Static, false) => EffectContractKind.ReadsStaticState,
+            (EffectRegionKind.Ambient, false) => EffectContractKind.ReadsAmbientState,
+            (EffectRegionKind.Receiver, true) => EffectContractKind.WritesReceiverState,
+            (EffectRegionKind.Parameter, true) => EffectContractKind.WritesArgumentState,
+            (EffectRegionKind.Captured, true) => EffectContractKind.WritesCapturedState,
+            (EffectRegionKind.Static, true) => EffectContractKind.WritesStaticState,
+            (EffectRegionKind.Fresh, true) => EffectContractKind.None,
+            (EffectRegionKind.Ambient, true) => EffectContractKind.WritesAmbientState,
+            (EffectRegionKind.Unknown, _) => EffectContractKind.None,
+            _ => EffectContractKind.None
         };
 }

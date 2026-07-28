@@ -1,0 +1,147 @@
+<Project>
+  <UsingTask TaskName="_SharpProofInvalidatePublishedResult"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <ResultPath ParameterType="System.String"
+                  Required="true" />
+      <ProjectDirectory ParameterType="System.String"
+                        Required="true" />
+      <RequestPath ParameterType="System.String" />
+      <ManifestPath ParameterType="System.String" />
+      <InvocationRequestPath ParameterType="System.String" />
+      <InvocationResultPath ParameterType="System.String" />
+      <InvocationManifestPath ParameterType="System.String" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.Linq" />
+      <Code Type="Fragment"
+            Language="cs"><![CDATA[
+        var projectDirectory = System.IO.Path.GetFullPath(ProjectDirectory);
+        System.Func<string, string> resolvePath = path =>
+            System.IO.Path.GetFullPath(System.IO.Path.IsPathRooted(path)
+                ? path
+                : System.IO.Path.Combine(projectDirectory, path));
+        var resultPath = resolvePath(ResultPath);
+        var protectedPaths = new[] {
+            RequestPath, ManifestPath, InvocationRequestPath,
+            InvocationResultPath, InvocationManifestPath
+        };
+        var aliasesInput = protectedPaths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(resolvePath)
+            .Any(path => string.Equals(
+                resultPath, path, System.StringComparison.OrdinalIgnoreCase));
+        if (!aliasesInput) {
+            using (var publication =
+                new System.Threading.Mutex(false, @"Local\SharpProof.Publish")) {
+                var ownsPublication = false;
+                try {
+                    try {
+                        ownsPublication = publication.WaitOne(
+                            System.TimeSpan.FromSeconds(30));
+                    }
+                    catch (System.Threading.AbandonedMutexException) {
+                        ownsPublication = true;
+                    }
+                    if (!ownsPublication)
+                        Log.LogError(
+                            "Timed out waiting to invalidate the prior SharpProof result.");
+                    else if (System.IO.File.Exists(resultPath))
+                        System.IO.File.Delete(resultPath);
+                }
+                finally {
+                    if (ownsPublication) publication.ReleaseMutex();
+                }
+            }
+        }
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <PropertyGroup>
+    <SharpProofVerifyPolicy Condition="'$(SharpProofVerifyPolicy)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">require-proven</SharpProofVerifyPolicy>
+    <SharpProofVerifyPolicy Condition="'$(SharpProofVerifyPolicy)' == ''">advisory</SharpProofVerifyPolicy>
+    <SharpProofAssumptionPolicy Condition="'$(SharpProofAssumptionPolicy)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">error</SharpProofAssumptionPolicy>
+    <SharpProofAssumptionPolicy Condition="'$(SharpProofAssumptionPolicy)' == ''">allow</SharpProofAssumptionPolicy>
+    <_SharpProofVerifyPolicyNormalized>$([System.String]::Copy('$(SharpProofVerifyPolicy)').ToLowerInvariant())</_SharpProofVerifyPolicyNormalized>
+    <_SharpProofAssumptionPolicyNormalized>$([System.String]::Copy('$(SharpProofAssumptionPolicy)').ToLowerInvariant())</_SharpProofAssumptionPolicyNormalized>
+  </PropertyGroup>
+
+  <Target Name="_SharpProofInitializeVerify"
+          BeforeTargets="GenerateMSBuildEditorConfigFileShouldRun;GenerateMSBuildEditorConfigFile">
+    <PropertyGroup>
+      <_SharpProofVerifyDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)SharpProof'))))</_SharpProofVerifyDirectory>
+      <SharpProofVerifyRequestFile Condition="'$(SharpProofVerifyRequestFile)' == ''">$(_SharpProofVerifyDirectory)\request.json</SharpProofVerifyRequestFile>
+      <SharpProofVerifyResultFile Condition="'$(SharpProofVerifyResultFile)' == ''">$(_SharpProofVerifyDirectory)\result.json</SharpProofVerifyResultFile>
+      <SharpProofCompilerManifestFile Condition="'$(SharpProofCompilerManifestFile)' == ''">$(_SharpProofVerifyDirectory)\compiler-manifest.json</SharpProofCompilerManifestFile>
+      <SharpProofVerifyCacheDirectory Condition="'$(SharpProofVerifyCacheDirectory)' == ''">$(_SharpProofVerifyDirectory)\cache</SharpProofVerifyCacheDirectory>
+      <_SharpProofInvocationId Condition="'$(_SharpProofInvocationId)' == ''">$([System.Guid]::NewGuid().ToString('N'))</_SharpProofInvocationId>
+      <_SharpProofInvocationDirectory>$(_SharpProofVerifyDirectory)\runs\$(_SharpProofInvocationId)</_SharpProofInvocationDirectory>
+      <_SharpProofInvocationRequestFile>$(_SharpProofInvocationDirectory)\request.json</_SharpProofInvocationRequestFile>
+      <_SharpProofInvocationResultFile>$(_SharpProofInvocationDirectory)\result.json</_SharpProofInvocationResultFile>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+      <_SharpProofCompilationTargetFramework>$(TargetFramework)</_SharpProofCompilationTargetFramework>
+      <_SharpProofCompilerManifestPath>$(_SharpProofInvocationDirectory)\compiler-manifest.json</_SharpProofCompilerManifestPath>
+      <_SharpProofProjectDirectory>$(MSBuildProjectDirectory)</_SharpProofProjectDirectory>
+    </PropertyGroup>
+    <_SharpProofInvalidatePublishedResult
+        Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true'"
+        ResultPath="$(SharpProofVerifyResultFile)"
+        ProjectDirectory="$(MSBuildProjectDirectory)"
+        RequestPath="$(SharpProofVerifyRequestFile)"
+        ManifestPath="$(SharpProofCompilerManifestFile)"
+        InvocationRequestPath="$(_SharpProofInvocationRequestFile)"
+        InvocationResultPath="$(_SharpProofInvocationResultFile)"
+        InvocationManifestPath="$(_SharpProofCompilerManifestPath)" />
+  </Target>
+
+  <Target Name="_SharpProofVerifyCore"
+          DependsOnTargets="_SharpProofInitializeVerify;ResolveReferences">
+    <PropertyGroup>
+      <SharpProofNativeZ3Path Condition="'$(SharpProofNativeZ3Path)' == ''">$([System.IO.Path]::GetDirectoryName('$(_SharpProofWorkerPath)'))/runtimes/win-x64/native/libz3.dll</SharpProofNativeZ3Path>
+      <_SharpProofNativeZ3Path>$([System.IO.Path]::GetFullPath('$(SharpProofNativeZ3Path)'))</_SharpProofNativeZ3Path>
+    </PropertyGroup>
+    <Error Condition="'$(_SharpProofVerifierHostSupported)' != 'true'"
+           Text="SharpProof out-of-process verification is supported only on Windows x64. Portable analyzer profiles remain available on this host." />
+    <Error Condition="'$(_SharpProofVerifyPolicyNormalized)' != 'advisory' AND '$(_SharpProofVerifyPolicyNormalized)' != 'warn-on-unknown' AND '$(_SharpProofVerifyPolicyNormalized)' != 'require-proven'"
+           Text="SharpProofVerifyPolicy must be advisory, warn-on-unknown, or require-proven." />
+    <Error Condition="'$(_SharpProofAssumptionPolicyNormalized)' != 'allow' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'warn' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'error'"
+           Text="SharpProofAssumptionPolicy must be allow, warn, or error." />
+    <Error Code="SP0049"
+           Condition="!Exists('$(_SharpProofCompilerManifestPath)')"
+           Text="SharpProof did not receive the required final compiler manifest." />
+    <Error Condition="!Exists('$(_SharpProofLauncherPath)')"
+           Text="SharpProof verifier launcher was not found at '$(_SharpProofLauncherPath)'." />
+    <Error Condition="!Exists('$(_SharpProofWorkerPath)')"
+           Text="SharpProof verifier worker was not found at '$(_SharpProofWorkerPath)'." />
+    <Error Condition="!Exists('$(_SharpProofNativeZ3Path)')"
+           Text="SharpProof verifier native Z3 payload was not found at '$(_SharpProofNativeZ3Path)'." />
+    <MakeDir Directories="$(_SharpProofInvocationDirectory)" />
+    <Exec Command="&quot;$(SharpProofDotNetHost)&quot; &quot;$(_SharpProofLauncherPath)&quot; verify --worker &quot;$(_SharpProofWorkerPath)&quot; --request &quot;$(_SharpProofInvocationRequestFile)&quot; --result &quot;$(_SharpProofInvocationResultFile)&quot; --publish-request &quot;$(SharpProofVerifyRequestFile)&quot; --publish-result &quot;$(SharpProofVerifyResultFile)&quot; --compiler-manifest &quot;$(_SharpProofCompilerManifestPath)&quot; --publish-compiler-manifest &quot;$(SharpProofCompilerManifestFile)&quot; --verify-policy &quot;$(_SharpProofVerifyPolicyNormalized)&quot; --assumption-policy &quot;$(_SharpProofAssumptionPolicyNormalized)&quot; --query-rlimit &quot;$(SharpProofVerifyQueryRlimit)&quot; --method-rlimit &quot;$(SharpProofVerifyMethodRlimit)&quot; --method-wall-ms &quot;$(SharpProofVerifyMethodWallTimeMilliseconds)&quot; --project-wall-ms &quot;$(SharpProofVerifyProjectWallTimeMilliseconds)&quot; --max-parallelism &quot;$(SharpProofVerifyMaxParallelism)&quot; --max-expression-depth &quot;$(SharpProofVerifyMaximumExpressionDepth)&quot; --process-memory-bytes &quot;$(SharpProofVerifyProcessMemoryLimitBytes)&quot; --max-worker-processes &quot;$(SharpProofVerifyMaxWorkerProcesses)&quot; --termination-grace-ms &quot;$(SharpProofVerifyTerminationGraceMilliseconds)&quot; --cache-enabled &quot;$(SharpProofVerifyCacheEnabled)&quot; --cache-directory &quot;$(SharpProofVerifyCacheDirectory)&quot; --cache-maximum-bytes &quot;$(SharpProofVerifyCacheMaximumBytes)&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          StandardOutputImportance="High"
+          StandardErrorImportance="High"
+          IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode"
+              PropertyName="_SharpProofVerifierExitCode" />
+    </Exec>
+    <RemoveDir Directories="$(_SharpProofInvocationDirectory)" />
+    <Error Condition="'$(_SharpProofVerifierExitCode)' != '0'"
+           Text="SharpProof verifier failed with exit code $(_SharpProofVerifierExitCode)." />
+    <Message Importance="High"
+             Text="SharpProof verifier result: $(SharpProofVerifyResultFile)" />
+  </Target>
+
+  <Target Name="SharpProofVerify"
+          AfterTargets="CoreCompile"
+          DependsOnTargets="_SharpProofInitializeVerify;_SharpProofVerifyCore"
+          Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'" />
+
+  <Target Name="SharpProofRejectUnsupportedWorkerHost"
+          AfterTargets="CoreCompile"
+          Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' != 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+    <Error Text="SharpProof out-of-process verification is supported only on Windows x64. Portable analyzer profiles remain available on this host." />
+  </Target>
+</Project>

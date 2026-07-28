@@ -14,14 +14,25 @@ $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
-$packagePropsPath = Join-Path `
+$portablePropsPath = Join-Path `
     $repositoryRoot `
     'SharpProof.Package\buildTransitive\SharpProof.props'
-[xml]$packageProps = Get-Content -LiteralPath $packagePropsPath -Raw
-$packageTargetsPath = Join-Path `
+[xml]$portableProps = Get-Content -LiteralPath $portablePropsPath -Raw
+$portableTargetsPath = Join-Path `
     $repositoryRoot `
     'SharpProof.Package\buildTransitive\SharpProof.targets'
-[xml]$packageTargets = Get-Content -LiteralPath $packageTargetsPath -Raw
+[xml]$portableTargets = Get-Content -LiteralPath $portableTargetsPath -Raw
+$verifierPropsPath = Join-Path `
+    $repositoryRoot `
+    'SharpProof.Verifier.Win-x64\buildTransitive\SharpProof.Verifier.Win-x64.props'
+[xml]$verifierProps = Get-Content -LiteralPath $verifierPropsPath -Raw
+$verifierTargetsPath = Join-Path `
+    $repositoryRoot `
+    'SharpProof.Verifier.Win-x64\buildTransitive\SharpProof.Verifier.Win-x64.targets'
+[xml]$verifierTargets = Get-Content -LiteralPath $verifierTargetsPath -Raw
+$packageManifestPath = Join-Path $repositoryRoot 'scripts\package-projects.json'
+$packageManifest = Get-Content -LiteralPath $packageManifestPath -Raw |
+    ConvertFrom-Json
 
 function Assert-Equal {
     param(
@@ -43,30 +54,45 @@ function Assert-Equal {
 function Get-MsBuildProperty {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$Name
+        [xml]$Document,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Owner
     )
 
-    $node = $packageProps.SelectSingleNode(
+    $node = $Document.SelectSingleNode(
         "/Project/PropertyGroup/$Name")
     if ($null -eq $node) {
-        throw "Required package property '$Name' is missing."
+        throw "Required $Owner property '$Name' is missing."
     }
     return $node.InnerText
 }
 
 function Get-MsBuildDefault {
-    param([Parameter(Mandatory = $true)][string]$Name)
+    param(
+        [Parameter(Mandatory = $true)]
+        [xml]$Document,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Owner
+    )
 
     $apostrophe = [char]39
     $condition = $apostrophe + '$(' + $Name + ')' + $apostrophe +
         ' == ' + $apostrophe + $apostrophe
     $nodes = @(
-        @($packageTargets.SelectNodes(
+        @($Document.SelectNodes(
             "/Project/PropertyGroup/$Name")) |
             Where-Object { $_.GetAttribute('Condition') -eq $condition }
     )
     if ($nodes.Count -ne 1) {
-        throw "Required package default '$Name' is missing."
+        throw "Required $Owner default '$Name' is missing."
     }
     return $nodes[0].InnerText
 }
@@ -136,10 +162,22 @@ Assert-Equal $contract.analyzer.defaultDiagnosticSeverity 'Info' 'analyzer.defau
 Assert-Equal $contract.analyzer.diagnosticsEnabledByDefault $true 'analyzer.diagnosticsEnabledByDefault'
 Assert-Equal $contract.analyzer.unsupportedUnannotatedCallableBehavior 'silent' 'analyzer.unsupportedUnannotatedCallableBehavior'
 Assert-Equal $contract.analyzer.unsupportedSelectedCallableDiagnostic 'SP0047' 'analyzer.unsupportedSelectedCallableDiagnostic'
-Assert-Equal (Get-MsBuildDefault 'SharpProofProfile') $contract.analyzer.defaultProfile 'SharpProofProfile'
-Assert-Equal (Get-MsBuildDefault 'SharpProofFeatures') $contract.analyzer.defaultFeatures 'SharpProofFeatures'
-Assert-Equal (Get-MsBuildDefault 'SharpProofVerifyPolicy') $contract.analyzer.defaultVerifyPolicy 'SharpProofVerifyPolicy'
-Assert-Equal (Get-MsBuildDefault 'SharpProofAssumptionPolicy') $contract.analyzer.defaultAssumptionPolicy 'SharpProofAssumptionPolicy'
+Assert-Equal `
+    (Get-MsBuildDefault $portableTargets 'SharpProofProfile' 'portable package') `
+    $contract.analyzer.defaultProfile `
+    'SharpProofProfile'
+Assert-Equal `
+    (Get-MsBuildDefault $portableTargets 'SharpProofFeatures' 'portable package') `
+    $contract.analyzer.defaultFeatures `
+    'SharpProofFeatures'
+Assert-Equal `
+    (Get-MsBuildDefault $verifierTargets 'SharpProofVerifyPolicy' 'verifier package') `
+    $contract.analyzer.defaultVerifyPolicy `
+    'SharpProofVerifyPolicy'
+Assert-Equal `
+    (Get-MsBuildDefault $verifierTargets 'SharpProofAssumptionPolicy' 'verifier package') `
+    $contract.analyzer.defaultAssumptionPolicy `
+    'SharpProofAssumptionPolicy'
 Assert-Equal ($contract.supportedTargetFrameworks -join ',') 'netstandard2.0,net8.0,net472' 'supportedTargetFrameworks'
 Assert-Equal $contract.worker.protocolVersion 5 'worker.protocolVersion'
 Assert-Equal $contract.worker.manifestSchemaVersion 2 'worker.manifestSchemaVersion'
@@ -155,35 +193,59 @@ Assert-Equal $contract.cache.schemaVersion 6 'cache.schemaVersion'
 Assert-Equal $contract.cache.maximumMiB 512 'cache.maximumMiB'
 Assert-Equal ($contract.cache.cacheableOutcomes -join ',') 'Proven,Refuted' 'cache.cacheableOutcomes'
 Assert-Equal `
-    (Get-MsBuildProperty 'SharpProofVerifyQueryRlimit') `
+    (Get-MsBuildProperty $portableProps '_SharpProofPortablePackagePresent' 'portable package') `
+    'true' `
+    '_SharpProofPortablePackagePresent'
+Assert-Equal `
+    (Get-MsBuildProperty $verifierProps '_SharpProofVerifierPackagePresent' 'verifier package') `
+    'true' `
+    '_SharpProofVerifierPackagePresent'
+Assert-Equal $packageManifest.schemaVersion 1 'package manifest schemaVersion'
+$expectedPackageProjects = @(
+    'SharpProof.Attributes/SharpProof.Attributes.csproj',
+    'SharpProof.Package/SharpProof.Package.csproj',
+    'SharpProof.Verifier.Win-x64/SharpProof.Verifier.Win-x64.csproj'
+)
+Assert-Equal `
+    (@($packageManifest.projects) -join '|') `
+    ($expectedPackageProjects -join '|') `
+    'package manifest projects'
+foreach ($packageProject in $expectedPackageProjects) {
+    $packageProjectPath = Join-Path $repositoryRoot $packageProject
+    if (-not (Test-Path -LiteralPath $packageProjectPath -PathType Leaf)) {
+        throw "Required package project is missing: $packageProject"
+    }
+}
+Assert-Equal `
+    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyQueryRlimit' 'verifier package') `
     ([string]$contract.worker.queryRlimit) `
     'SharpProofVerifyQueryRlimit'
 Assert-Equal `
-    (Get-MsBuildProperty 'SharpProofVerifyMethodRlimit') `
+    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyMethodRlimit' 'verifier package') `
     ([string]$contract.worker.methodRlimit) `
     'SharpProofVerifyMethodRlimit'
 Assert-Equal `
-    (Get-MsBuildProperty 'SharpProofVerifyMethodWallTimeMilliseconds') `
+    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyMethodWallTimeMilliseconds' 'verifier package') `
     ([string]([int]$contract.worker.maximumMethodWallSeconds * 1000)) `
     'SharpProofVerifyMethodWallTimeMilliseconds'
 Assert-Equal `
-    (Get-MsBuildProperty 'SharpProofVerifyProjectWallTimeMilliseconds') `
+    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyProjectWallTimeMilliseconds' 'verifier package') `
     ([string]([int]$contract.worker.maximumProjectWallSeconds * 1000)) `
     'SharpProofVerifyProjectWallTimeMilliseconds'
 Assert-Equal `
-    (Get-MsBuildProperty 'SharpProofVerifyMaxParallelism') `
+    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyMaxParallelism' 'verifier package') `
     ([string]$contract.worker.maximumParallelism) `
     'SharpProofVerifyMaxParallelism'
 Assert-Equal `
-    (Get-MsBuildProperty 'SharpProofVerifyProcessMemoryLimitBytes') `
+    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyProcessMemoryLimitBytes' 'verifier package') `
     ([string]([int64]$contract.worker.maximumMemoryMiB * 1024 * 1024)) `
     'SharpProofVerifyProcessMemoryLimitBytes'
 Assert-Equal `
-    (Get-MsBuildProperty 'SharpProofVerifyTerminationGraceMilliseconds') `
+    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyTerminationGraceMilliseconds' 'verifier package') `
     ([string]$contract.worker.forcedTerminationMilliseconds) `
     'SharpProofVerifyTerminationGraceMilliseconds'
 Assert-Equal `
-    (Get-MsBuildProperty 'SharpProofVerifyCacheMaximumBytes') `
+    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyCacheMaximumBytes' 'verifier package') `
     ([string]([int64]$contract.cache.maximumMiB * 1024 * 1024)) `
     'SharpProofVerifyCacheMaximumBytes'
 

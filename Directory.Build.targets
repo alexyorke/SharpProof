@@ -12,7 +12,6 @@
   <ItemGroup Condition="'$(SharpProofDogfood)' == 'true'">
     <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Analyzer.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.ContractForGenerator\bin\$(Configuration)\netstandard2.0\SharpProof.ContractForGenerator.dll" />
-    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Attributes.dll" />
     <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Contracts.dll" />
     <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Dataflow.dll" />
     <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Effects.dll" />

@@ -4,9 +4,11 @@ SMT verification is out of process. The IDE analyzer never creates a Z3
 context.
 
 The packaged worker lifecycle is currently supported and exercised only on
-Windows x64. Linux x64, macOS x64, and macOS ARM64 CI exercise analyzer-only package
-consumption; Windows arm64 and non-Windows packaged worker lifecycles are not
-validated.
+Windows x64. Package-consumer CI restores the exact same three-package
+artifacts and exercises portable analyzer consumption on Windows x64, Linux
+x64, macOS x64, and macOS ARM64. Every unsupported matrix host also asserts
+that requested verification is rejected explicitly. Windows ARM64 and
+non-Windows worker execution remain unsupported and are not exercised.
 
 Each `SharpProof.Worker` process owns one Z3 context and serves a bounded
 project request. Queries use Z3 resource limits rather than wall-clock solver

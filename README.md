@@ -29,14 +29,24 @@ are not implemented.
 
 ## Install and enable
 
-Reference the preview package:
+Library projects that publish SharpProof annotations should reference the
+contract API normally:
+
+```xml
+<PackageReference Include="SharpProof.Attributes"
+                  Version="0.2.0-preview.1" />
+```
+
+Add the portable analyzer and generator as a development-only dependency:
 
 ```xml
 <PackageReference Include="SharpProof" Version="0.2.0-preview.1"
                   PrivateAssets="all" />
 ```
 
-The package defaults to advisory analysis of both implemented feature groups:
+`SharpProof` depends on the exact matching Attributes version. It contains no
+worker, launcher, Z3, or native payload. It defaults to advisory analysis of
+both implemented feature groups:
 
 ```xml
 <PropertyGroup>
@@ -90,10 +100,21 @@ settings, and are planned for removal before RC.
 For strict CI:
 
 ```xml
+<ItemGroup>
+  <PackageReference Include="SharpProof.Verifier.Win-x64"
+                    Version="0.2.0-preview.1"
+                    PrivateAssets="all" />
+</ItemGroup>
 <PropertyGroup>
   <SharpProofProfile>strict</SharpProofProfile>
 </PropertyGroup>
 ```
+
+The verifier package depends on the exact matching `SharpProof` package, so a
+CI-only verifier reference also supplies the analyzer and contract API.
+`strict` or explicit `SharpProofVerify=true` without the verifier package fails
+with an installation error. Installing the verifier while verification remains
+disabled is harmless on unsupported hosts.
 
 This implies `SharpProofVerify=true`,
 `SharpProofVerifyPolicy=require-proven`, and
@@ -373,18 +394,20 @@ The checked-in acceptance contract declares these consumer target frameworks:
 - `net8.0`
 - `net472`
 
-The analyzer and attributes are `netstandard2.0` and contain no verifier, Z3,
-or native solver payload. The current preview package carries
-`SharpProof.Worker` as a `net9.0` tool with a Windows x64 native Z3 payload and
-mandatory Windows Job Object containment.
-`SharpProofVerify=true` on a non-Windows host fails with an explicit
+The Attributes and portable SharpProof packages target `netstandard2.0` and
+contain no verifier, Z3, or native solver payload.
+`SharpProof.Verifier.Win-x64` carries `SharpProof.Worker` as a `net9.0` tool,
+the launcher, and one Windows x64 native Z3 payload with mandatory Windows Job
+Object containment.
+`SharpProofVerify=true` on an unsupported host fails with an explicit
 unsupported-host build error; portable analyzer features remain available.
 
 The full acceptance workflow runs on `windows-latest`. A separate
-package-consumer workflow restores and exercises analyzer consumers on Windows
-x64, Linux x64, macOS x64, and macOS ARM64; only Windows x64 enables packaged
-worker verification. Real Visual Studio, Rider, and Windows ARM64 validation
-remain outstanding release gates.
+package-consumer workflow restores the exact same three-package artifact graph
+and exercises portable analyzer consumers on Windows x64, Linux x64, macOS x64,
+and macOS ARM64. Only Windows x64 executes the packaged worker; every other
+matrix host asserts the explicit unsupported-host rejection. Real Visual
+Studio, Rider, and Windows ARM64 validation remain outstanding release gates.
 
 ## Closed compiler artifact and remaining release gaps
 
@@ -415,11 +438,11 @@ Resolver-dependent `#r` or `#load`, missing-assembly resolver mode, reference
 supersession, custom assembly-identity comparers, and non-file or unreadable
 references fail artifact collection as SP0049.
 
-The compiler-to-worker reconstruction cutover and independent whole-body
-counterexample-replay gate are complete for this bounded subset, but SharpProof
-is not production-ready. SARIF output, the three-package release split,
-broader host qualification, and the remaining release reviews are still
-outstanding.
+The compiler-to-worker reconstruction cutover, independent whole-body
+counterexample-replay gate, and three-package split are complete for this
+bounded subset, but SharpProof is not production-ready. SARIF output, release
+artifact provenance, broader host qualification, pilot-library evidence, and
+the remaining independent release reviews are still outstanding.
 
 ## Build and validate this repository
 
@@ -465,3 +488,10 @@ cache/concurrency/cancellation tests, the pinned corpus, a fixed-seed
   records validation evidence and outstanding checkpoints.
 - [Acceptance contract](https://github.com/alexyorke/SharpProof/blob/master/eng/acceptance/README.md)
   describes the active release gate.
+
+## Project policies
+
+- [MIT License](https://github.com/alexyorke/SharpProof/blob/master/LICENSE)
+- [Security policy](https://github.com/alexyorke/SharpProof/blob/master/SECURITY.md)
+- [Contributing guide](https://github.com/alexyorke/SharpProof/blob/master/CONTRIBUTING.md)
+- [Changelog](https://github.com/alexyorke/SharpProof/blob/master/CHANGELOG.md)

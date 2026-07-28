@@ -6,27 +6,29 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <NuspecFile>SharpProof.nuspec</NuspecFile>
+    <NuspecFile>SharpProof.Verifier.Win-x64.nuspec</NuspecFile>
     <NuspecBasePath>$(MSBuildProjectDirectory)</NuspecBasePath>
     <NoWarn>$(NoWarn);NU5128</NoWarn>
   </PropertyGroup>
   <PropertyGroup>
-    <PackageId>SharpProof</PackageId>
-    <Title>$(SharpProofProductName)</Title>
-    <Description>$(SharpProofProductDescription)</Description>
-    <PackageReleaseNotes>Breaking 0.2 preview with opt-in effect analysis, compiler-bound preconditions, fail-closed language gating, and conservative external boundaries.</PackageReleaseNotes>
+    <PackageId>SharpProof.Verifier.Win-x64</PackageId>
+    <Title>SharpProof Verifier for Windows x64</Title>
+    <Description>Windows x64 postcondition verifier for SharpProof, including the worker, launcher, MSBuild integration, and one native Z3 payload.</Description>
+    <PackageReleaseNotes>Initial split Windows x64 verifier package for the soundness-first SharpProof preview.</PackageReleaseNotes>
     <Copyright>Copyright (c) Alex Yorke</Copyright>
-    <PackageTags>SharpProof;Roslyn;Analyzer;Purity;StaticAnalysis;MethodEffects;Capabilities;ZeroAllocations;ExceptionContracts;Preconditions;Contracts</PackageTags>
+    <PackageTags>SharpProof;Verifier;Contracts;SMT;Z3;Windows;x64</PackageTags>
     <NoPackageAnalysis>true</NoPackageAnalysis>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj"
+    <ProjectReference Include="..\SharpProof.Package\SharpProof.Package.csproj"
                       PrivateAssets="all"
                       TreatAsPackageReference="false" />
-    <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj"
+    <ProjectReference Include="..\SharpProof.Worker\SharpProof.Worker.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
                       PrivateAssets="all"
                       TreatAsPackageReference="false" />
-    <ProjectReference Include="..\SharpProof.ContractForGenerator\SharpProof.ContractForGenerator.csproj"
+    <ProjectReference Include="..\SharpProof.Worker.Launcher\SharpProof.Worker.Launcher.csproj"
                       ReferenceOutputAssembly="false"
                       SkipGetTargetFrameworkProperties="true"
                       PrivateAssets="all"

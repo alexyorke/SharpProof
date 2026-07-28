@@ -37,9 +37,8 @@ The implementation remains the authority for enumerated surfaces:
 - `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs` declares compiler
   artifact schema version 3 and the closed compiler-evidence envelope.
 - `eng/acceptance/contract.json` declares release-gate budgets. Package
-  defaults that are not release-gate fields live in
-  `SharpProof.Package/buildTransitive/SharpProof.props` and
-  `SharpProof.targets`.
+  defaults that are not release-gate fields live in the portable and verifier
+  build-transitive props and targets.
 
 ## Acceptance and evidence
 
@@ -73,9 +72,9 @@ production-plan Step 4 is complete for the bounded verifier subset.
 Independent whole-body counterexample replay is implemented for the admitted
 program subset. The proof kernel checks exact model closure and the lowered
 assumptions/goal before the worker independently executes the compiler-produced
-whole-body CFG. SARIF projection, the planned three-package split, broader host
-qualification, and the remaining release reviews are future work. Current
-behavior and limits are recorded in
+whole-body CFG. The three-package split is implemented. SARIF projection,
+release provenance, broader host qualification, and the remaining release
+reviews are future work. Current behavior and limits are recorded in
 [Coverage and limits](coverage-and-limits.md#closed-compiler-artifact-and-remaining-limits).
 
 ## Machine-owned Markdown

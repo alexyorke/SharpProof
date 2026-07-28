@@ -7,12 +7,14 @@ SharpProof has two kinds of limits:
   releasable.
 
 They have different sources.
-`SharpProof.Package/buildTransitive/SharpProof.props` defines fixed worker
-defaults and compiler-visible properties; `SharpProof.targets` resolves profile,
-feature, and policy defaults. `SharpProof.Worker.Protocol/ProtocolModel.cs`
-defines matching protocol defaults and validation bounds. The release gate
-mirrors selected values in `eng/acceptance/contract.json` and verifies that
-they agree.
+The portable `SharpProof.props` and `SharpProof.targets` define analyzer paths,
+profile/feature defaults, and verifier-package requirements.
+`SharpProof.Verifier.Win-x64.props` and
+`SharpProof.Verifier.Win-x64.targets` define worker budgets, policy defaults,
+compiler-manifest properties, paths, invocation, and host enforcement.
+`SharpProof.Worker.Protocol/ProtocolModel.cs` defines matching protocol defaults
+and validation bounds. The release gate mirrors selected values in
+`eng/acceptance/contract.json` and verifies that they agree.
 
 ## Package and worker defaults
 
@@ -20,24 +22,24 @@ they agree.
 |---|---:|---|---|
 | `SharpProofProfile` | `advisory` | Analyzer/build posture: `advisory`, `strict`, or `off` | `SharpProof.targets`; mirrored by `contract.json` |
 | `SharpProofFeatures` | `all` | Analyzer and worker-manifest features: `effects`, `contracts`, or `all` | `SharpProof.targets`; mirrored by `contract.json` |
-| `SharpProofVerifyPolicy` | `advisory`; strict defaults to `require-proven` | Incomplete selected-analysis policy: `advisory`, `warn-on-unknown`, or `require-proven` | `SharpProof.targets`; mirrored by `contract.json` |
-| `SharpProofAssumptionPolicy` | `allow`; strict defaults to `error` | User/trusted evidence policy: `allow`, `warn`, or `error` | `SharpProof.targets`; mirrored by `contract.json` |
+| `SharpProofVerifyPolicy` | `advisory`; strict defaults to `require-proven` | Incomplete selected-analysis policy: `advisory`, `warn-on-unknown`, or `require-proven` | verifier targets; mirrored by `contract.json` |
+| `SharpProofAssumptionPolicy` | `allow`; strict defaults to `error` | User/trusted evidence policy: `allow`, `warn`, or `error` | verifier targets; mirrored by `contract.json` |
 | `SharpProofMode` | unset | Deprecated preview alias for profile/features | `SharpProof.targets` |
 | `SharpProofVerify` | `false`; strict requires `true` | Optional advisory worker execution; mandatory in strict | `SharpProof.targets` |
-| `SharpProofVerifyQueryRlimit` | `3000000` | Z3 resource limit for one query | `SharpProof.props` and `WorkerBudgets`; mirrored by `contract.json` |
-| `SharpProofVerifyMethodRlimit` | `20000000` | Aggregate resource allowance for one method | `SharpProof.props` and `WorkerBudgets`; mirrored by `contract.json` |
-| `SharpProofVerifyMethodWallTimeMilliseconds` | `10000` | Outer method wall boundary | `SharpProof.props` and `WorkerBudgets`; mirrored as 10 seconds by `contract.json` |
-| `SharpProofVerifyProjectWallTimeMilliseconds` | `300000` | Outer project wall boundary | `SharpProof.props` and `WorkerBudgets`; mirrored as 300 seconds by `contract.json` |
-| `SharpProofVerifyMaxParallelism` | `4` | Maximum concurrent worker method verification | `SharpProof.props` and `WorkerBudgets`; mirrored by `contract.json` |
-| `SharpProofVerifyMaximumExpressionDepth` | `64` | Compiler-visible proof-obligation term depth sealed into the artifact; worker request must match | `SharpProof.props`, `FinalCompilationCollector`, and `WorkerBudgets`; not present in `contract.json` |
-| `SharpProofVerifyProcessMemoryLimitBytes` | `2147483648` | Windows Job Object memory limit | `SharpProof.props` and `WorkerBudgets`; mirrored as 2048 MiB by `contract.json` |
-| `SharpProofVerifyMaxWorkerProcesses` | `4` | Windows Job Object active-process limit | `SharpProof.props` and `WorkerBudgets`; not present in `contract.json` |
-| `SharpProofVerifyTerminationGraceMilliseconds` | `1000` | Grace added to the project boundary before forced termination | `SharpProof.props` and `WorkerLauncherDefaults`; mirrored by `contract.json` |
-| `SharpProofVerifyCacheEnabled` | `true` | Enables the content-addressed disk cache | `SharpProof.props` and `WorkerCacheOptions`; not present in `contract.json` |
-| `SharpProofVerifyCacheMaximumBytes` | `536870912` | Maximum cache size, 512 MiB | `SharpProof.props` and `WorkerCacheOptions`; mirrored by `contract.json` |
-| `SharpProofDotNetHost` | `dotnet` | Host used to start the launcher | `SharpProof.props` |
+| `SharpProofVerifyQueryRlimit` | `3000000` | Z3 resource limit for one query | verifier props and `WorkerBudgets`; mirrored by `contract.json` |
+| `SharpProofVerifyMethodRlimit` | `20000000` | Aggregate resource allowance for one method | verifier props and `WorkerBudgets`; mirrored by `contract.json` |
+| `SharpProofVerifyMethodWallTimeMilliseconds` | `10000` | Outer method wall boundary | verifier props and `WorkerBudgets`; mirrored as 10 seconds by `contract.json` |
+| `SharpProofVerifyProjectWallTimeMilliseconds` | `300000` | Outer project wall boundary | verifier props and `WorkerBudgets`; mirrored as 300 seconds by `contract.json` |
+| `SharpProofVerifyMaxParallelism` | `4` | Maximum concurrent worker method verification | verifier props and `WorkerBudgets`; mirrored by `contract.json` |
+| `SharpProofVerifyMaximumExpressionDepth` | `64` | Compiler-visible proof-obligation term depth sealed into the artifact; worker request must match | verifier props, `FinalCompilationCollector`, and `WorkerBudgets`; not present in `contract.json` |
+| `SharpProofVerifyProcessMemoryLimitBytes` | `2147483648` | Windows Job Object memory limit | verifier props and `WorkerBudgets`; mirrored as 2048 MiB by `contract.json` |
+| `SharpProofVerifyMaxWorkerProcesses` | `4` | Windows Job Object active-process limit | verifier props and `WorkerBudgets`; not present in `contract.json` |
+| `SharpProofVerifyTerminationGraceMilliseconds` | `1000` | Grace added to the project boundary before forced termination | verifier props and `WorkerLauncherDefaults`; mirrored by `contract.json` |
+| `SharpProofVerifyCacheEnabled` | `true` | Enables the content-addressed disk cache | verifier props and `WorkerCacheOptions`; not present in `contract.json` |
+| `SharpProofVerifyCacheMaximumBytes` | `536870912` | Maximum cache size, 512 MiB | verifier props and `WorkerCacheOptions`; mirrored by `contract.json` |
+| `SharpProofDotNetHost` | `dotnet` | Host used to start the launcher | verifier props |
 
-`SharpProofVerifyCacheDirectory` is initialized by `SharpProof.targets` beneath
+`SharpProofVerifyCacheDirectory` is initialized by the verifier targets beneath
 the project's intermediate output, normally
 `obj/<Configuration>/<TargetFramework>/SharpProof/cache`.
 `SharpProofVerifyRequestFile` and `SharpProofVerifyResultFile` are initialized
@@ -61,10 +63,9 @@ Missing compiler evidence fails the build as SP0049 before worker launch.
 remain deprecated compatibility inputs during preview. Do not combine the
 alias with `SharpProofProfile` or `SharpProofFeatures`.
 `SharpProofVerify=true` invokes the packaged worker target only for
-non-design-time Windows builds; the shipped native payload is supported on
-Windows x64. Non-Windows hosts receive an explicit unsupported-host build
-error; portable analyzer features remain available. Strict rejects
-`SharpProofVerify=false`.
+non-design-time builds on the supported Windows x64 host. Every unsupported
+host receives an explicit build error; portable analyzer features remain
+available. Strict rejects `SharpProofVerify=false`.
 
 ## Protocol validation bounds
 

@@ -4,7 +4,8 @@ The authoritative descriptors are static fields in
 `SharpProof.Analyzer/GeneratedDiagnosticDescriptors.cs` and
 `SharpProof.ContractForGenerator/GeneratedDiagnosticDescriptors.cs`.
 
-The main package defaults to advisory analysis with both feature groups:
+The portable `SharpProof` package defaults to advisory analysis with both
+feature groups:
 
 ```xml
 <PropertyGroup>

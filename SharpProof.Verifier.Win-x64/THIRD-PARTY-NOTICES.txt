@@ -1,4 +1,4 @@
-SharpProof analyzer package third-party notices
+SharpProof verifier package third-party notices
 
 Microsoft Z3 4.12.2
 Source: https://github.com/Z3Prover/z3/tree/z3-4.12.2

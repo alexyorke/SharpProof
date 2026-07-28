@@ -14,17 +14,17 @@ Ir
 Dataflow
 Specs                 -> Ir
 Frontend              -> Ir
-Contracts             -> Attributes, Frontend, Ir, Specs
-Effects               -> Attributes, Dataflow, Frontend, Specs
+Contracts             -> Frontend, Ir, Specs
+Effects               -> Dataflow, Frontend, Specs
 Verify                -> Ir, Specs
 Smt                   -> Ir, Verify
 CompilerArtifact      -> Contracts, Frontend, Ir, Specs, Worker.Protocol
 ContractForGenerator  -> Contracts
-Analyzer              -> Attributes, CompilerArtifact, Contracts, Effects,
-                         Frontend, Ir, Specs
+Analyzer              -> CompilerArtifact, Contracts, Effects, Frontend, Ir,
+                         Specs
 Worker.Protocol
-Worker                -> CompilerArtifact, Contracts, Dataflow, Ir, Smt,
-                         Specs, Verify, Worker.Protocol
+Worker                -> CompilerArtifact, Dataflow, Ir, Smt, Specs, Verify,
+                         Worker.Protocol
 Worker.Launcher       -> CompilerArtifact, Ir, Specs, Worker.Protocol
 ```
 
@@ -230,9 +230,10 @@ The current gate includes:
 Off-profile latency samples alternate real baseline and SharpProof-imported
 MSBuild rebuilds. A separate loaded-but-off analyzer canary covers session
 creation and retained state, while the package policy proves that
-`SharpProofProfile=off` omits analyzer items and verifier invocation. The worker
-remains in the current preview package's opt-in tools payload. The corpus
-reports explicit, silent, and total semantic Unknown rates as metrics; none is
-a release gate.
+`SharpProofProfile=off` omits analyzer items and verifier invocation. The
+worker is isolated in `SharpProof.Verifier.Win-x64`; the portable `SharpProof`
+package contains only analyzer/generator assets and depends exactly on
+`SharpProof.Attributes`. The corpus reports explicit, silent, and total
+semantic Unknown rates as metrics; none is a release gate.
 
 The active contract is `eng/acceptance`.

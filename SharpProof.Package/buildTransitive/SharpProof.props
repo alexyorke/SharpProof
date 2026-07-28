@@ -1,30 +1,13 @@
 <Project>
   <PropertyGroup>
+    <_SharpProofPortablePackagePresent>true</_SharpProofPortablePackagePresent>
     <SharpProofAnalyzerDirectory Condition="'$(SharpProofAnalyzerDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/analyzers/dotnet/cs'))</SharpProofAnalyzerDirectory>
     <_SharpProofAnalyzerDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>
     <SharpProofContractForGeneratorPath Condition="'$(SharpProofContractForGeneratorPath)' == ''">$(_SharpProofAnalyzerDirectory)/SharpProof.ContractForGenerator.dll</SharpProofContractForGeneratorPath>
-    <SharpProofVerifyQueryRlimit Condition="'$(SharpProofVerifyQueryRlimit)' == ''">3000000</SharpProofVerifyQueryRlimit>
-    <SharpProofVerifyMethodRlimit Condition="'$(SharpProofVerifyMethodRlimit)' == ''">20000000</SharpProofVerifyMethodRlimit>
-    <SharpProofVerifyMethodWallTimeMilliseconds Condition="'$(SharpProofVerifyMethodWallTimeMilliseconds)' == ''">10000</SharpProofVerifyMethodWallTimeMilliseconds>
-    <SharpProofVerifyProjectWallTimeMilliseconds Condition="'$(SharpProofVerifyProjectWallTimeMilliseconds)' == ''">300000</SharpProofVerifyProjectWallTimeMilliseconds>
-    <SharpProofVerifyMaxParallelism Condition="'$(SharpProofVerifyMaxParallelism)' == ''">4</SharpProofVerifyMaxParallelism>
-    <SharpProofVerifyMaximumExpressionDepth Condition="'$(SharpProofVerifyMaximumExpressionDepth)' == ''">64</SharpProofVerifyMaximumExpressionDepth>
-    <SharpProofVerifyProcessMemoryLimitBytes Condition="'$(SharpProofVerifyProcessMemoryLimitBytes)' == ''">2147483648</SharpProofVerifyProcessMemoryLimitBytes>
-    <SharpProofVerifyMaxWorkerProcesses Condition="'$(SharpProofVerifyMaxWorkerProcesses)' == ''">4</SharpProofVerifyMaxWorkerProcesses>
-    <SharpProofVerifyTerminationGraceMilliseconds Condition="'$(SharpProofVerifyTerminationGraceMilliseconds)' == ''">1000</SharpProofVerifyTerminationGraceMilliseconds>
-    <SharpProofVerifyCacheEnabled Condition="'$(SharpProofVerifyCacheEnabled)' == ''">true</SharpProofVerifyCacheEnabled>
-    <SharpProofVerifyCacheMaximumBytes Condition="'$(SharpProofVerifyCacheMaximumBytes)' == ''">536870912</SharpProofVerifyCacheMaximumBytes>
-    <SharpProofDotNetHost Condition="'$(SharpProofDotNetHost)' == ''">dotnet</SharpProofDotNetHost>
   </PropertyGroup>
   <ItemGroup>
     <CompilerVisibleProperty Include="SharpProofProfile" />
     <CompilerVisibleProperty Include="SharpProofFeatures" />
-    <CompilerVisibleProperty Include="SharpProofVerifyPolicy" />
-    <CompilerVisibleProperty Include="SharpProofAssumptionPolicy" />
     <CompilerVisibleProperty Include="SharpProofMode" />
-    <CompilerVisibleProperty Include="_SharpProofCompilerManifestPath" />
-    <CompilerVisibleProperty Include="_SharpProofCompilationTargetFramework" />
-    <CompilerVisibleProperty Include="_SharpProofProjectDirectory" />
-    <CompilerVisibleProperty Include="SharpProofVerifyMaximumExpressionDepth" />
   </ItemGroup>
 </Project>
