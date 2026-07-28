@@ -153,6 +153,95 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
+    public void VolatileFieldAccessRequiresSynchronizationCapability() {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class Sample {
+                private volatile int _volatileValue;
+                private int _ordinaryValue;
+
+                public int ReadVolatile() => _volatileValue;
+                public int ReadOrdinary() => _ordinaryValue;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var volatileRead = session.Analyze(Method(compilation, "ReadVolatile"));
+        var ordinaryRead = session.Analyze(Method(compilation, "ReadOrdinary"));
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                volatileRead.Summary.Capabilities.Contains(
+                    EffectCapabilityKind.Synchronization),
+                Is.True);
+            Assert.That(
+                volatileRead.Projection.Capabilities,
+                Is.EqualTo(SharpProofCapability.Synchronization));
+            Assert.That(
+                ordinaryRead.Summary.Capabilities.IsEmpty,
+                Is.True);
+            Assert.That(
+                ordinaryRead.Projection.Capabilities,
+                Is.EqualTo(SharpProofCapability.None));
+        }
+    }
+
+    [Test]
+    public void CompileTimeConstantsDoNotReadStaticState() {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                private const int Answer = 42;
+
+                public static int ReadConstant() => Answer;
+                public static System.DayOfWeek ReadEnum() =>
+                    System.DayOfWeek.Monday;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                session.Analyze(Method(compilation, "ReadConstant"))
+                    .Summary.Reads.IsEmpty,
+                Is.True);
+            Assert.That(
+                session.Analyze(Method(compilation, "ReadEnum"))
+                    .Summary.Reads.IsEmpty,
+                Is.True);
+        }
+    }
+
+    [Test]
+    public void PropertyIncrementUsesBothAccessorsWithoutBecomingIncomplete() {
+        var result = Analyze(
+            """
+            public sealed class Sample {
+                private int _value;
+
+                private int Value {
+                    get => _value;
+                    set => _value = value;
+                }
+
+                public void Increment() => Value++;
+            }
+            """,
+            "Sample",
+            "Increment");
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(result.Summary.Reads.Regions, Does.Contain(
+                EffectRegionId.Receiver));
+            Assert.That(result.Summary.Writes.Regions, Does.Contain(
+                EffectRegionId.Receiver));
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(result.Projection.IsComplete, Is.True);
+        }
+    }
+
+    [Test]
     public void ValueTypeConstructionDoesNotReportManagedAllocation() {
         var result = Analyze(
             """

@@ -192,6 +192,45 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
+    public async Task DirectLocalInitializersAndAssignmentsReplayPreconditions() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static void LocalInitializer() {
+                    var first = Positive(-1);
+                }
+
+                public static void LocalAssignment() {
+                    var first = 0;
+                    first = Positive(-2);
+                }
+
+                public static void DiscardAssignment() {
+                    _ = Positive(-3);
+                }
+
+                public static void PotentiallyThrowingTarget(int[]? values) {
+                    values[0] = Positive(-4);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027", "SP0027", "SP0027"]));
+    }
+
+    [Test]
     public async Task ExpressionBodiedPropertiesReplayConcretePreconditions() {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """

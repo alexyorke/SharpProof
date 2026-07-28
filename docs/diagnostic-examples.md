@@ -131,6 +131,10 @@ and concrete IR replay.
 Unknown arguments, unsupported expressions, possible receiver/argument/prefix
 throws, and non-definitely-executed calls remain silent.
 
+Direct top-level expression statements, returns, throws, single local
+initializers, simple assignments with definitely non-throwing targets,
+expression-bodied members, and constructor initializers are replayable shapes.
+
 Example:
 
 ```csharp

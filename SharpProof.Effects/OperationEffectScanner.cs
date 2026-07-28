@@ -80,7 +80,7 @@ internal sealed class OperationEffectScanner {
             ICompoundAssignmentOperation assignment => ScanCompoundAssignment(assignment),
             IIncrementOrDecrementOperation increment => EffectSummaryOperations.Join(
                 Scan(increment.Target, EffectAccess.Read),
-                Scan(increment.Target, EffectAccess.Write),
+                ScanWriteTarget(increment.Target, increment.Target),
                 CheckedOverflow(increment.IsChecked),
                 ScanOperatorCall(
                     increment.OperatorMethod,
@@ -126,9 +126,9 @@ internal sealed class OperationEffectScanner {
 
     private EffectSummary ScanField(
         IFieldReferenceOperation field, EffectAccess access) {
-        var region = field.Field.IsStatic
-            ? EffectRegionSet.Create(EffectRegionId.Static())
-            : ClassifyRegion(field.Instance);
+        if (field.Field.IsConst) return EffectSummary.Empty;
+        var region = field.Field.IsStatic ? EffectRegionSet.Create(
+            EffectRegionId.Static()) : ClassifyRegion(field.Instance);
         var accessSummary = access == EffectAccess.Write
             ? EffectSummaryOperations.Write(region)
             : EffectSummaryOperations.Read(region);
@@ -136,6 +136,8 @@ internal sealed class OperationEffectScanner {
             field.Instance == null ? EffectSummary.Empty : Scan(field.Instance),
             PotentialNullReceiver(field.Instance),
             accessSummary,
+            field.Field.IsVolatile ? EffectSummaryOperations.Capability(
+                EffectCapabilityKind.Synchronization) : EffectSummary.Empty,
             field.Field.IsStatic && !field.Field.IsConst
                 ? _session.ResolveStaticFieldTypeInitialization(
                     _method,
