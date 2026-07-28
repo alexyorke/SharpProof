@@ -153,6 +153,39 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
+    public void VolatileFieldAccessRequiresSynchronizationCapability() {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class Sample {
+                private volatile int _volatileValue;
+                private int _ordinaryValue;
+
+                public int ReadVolatile() => _volatileValue;
+                public int ReadOrdinary() => _ordinaryValue;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var volatileRead = session.Analyze(Method(compilation, "ReadVolatile"));
+        var ordinaryRead = session.Analyze(Method(compilation, "ReadOrdinary"));
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                volatileRead.Summary.Capabilities.Contains(
+                    EffectCapabilityKind.Synchronization),
+                Is.True);
+            Assert.That(
+                volatileRead.Projection.Capabilities,
+                Is.EqualTo(SharpProofCapability.Synchronization));
+            Assert.That(
+                ordinaryRead.Summary.Capabilities.IsEmpty,
+                Is.True);
+            Assert.That(
+                ordinaryRead.Projection.Capabilities,
+                Is.EqualTo(SharpProofCapability.None));
+        }
+    }
+
+    [Test]
     public void ValueTypeConstructionDoesNotReportManagedAllocation() {
         var result = Analyze(
             """

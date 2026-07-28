@@ -169,31 +169,29 @@ internal static class RequiresCallSiteAnalyzer {
             _ => null
         };
         if (body == null) return false;
-        var statement = callSite.Syntax.AncestorsAndSelf()
-            .OfType<StatementSyntax>()
-            .FirstOrDefault(candidate =>
-                ReferenceEquals(candidate.Parent, body));
-        if (statement == null ||
-            statement switch {
-                ExpressionStatementSyntax expression =>
-                    expression.Expression.Span != callSite.Syntax.Span,
-                ReturnStatementSyntax { Expression: { } returned } =>
-                    returned.Span != callSite.Syntax.Span,
-                _ => true
-            })
-            return false;
-        foreach (var prior in body.Statements.TakeWhile(
-                     candidate => !ReferenceEquals(candidate, statement)))
-            if (prior is not (
-                    EmptyStatementSyntax or
-                    LocalFunctionStatementSyntax) &&
-                !new NonThrowingAnalysis(
-                        semanticModel.Compilation,
-                        cancellationToken)
-                    .IsDefinitelyNonThrowing(
-                        semanticModel.GetOperation(prior, cancellationToken)))
-                return false;
-        return true;
+        var statement = callSite.Syntax.AncestorsAndSelf().OfType<StatementSyntax>()
+            .FirstOrDefault(candidate => ReferenceEquals(candidate.Parent, body));
+        if (statement == null) return false;
+        var nonThrowing = new NonThrowingAnalysis(semanticModel.Compilation, cancellationToken);
+        return IsDirectReplayableStatement(statement, callSite, semanticModel, nonThrowing, cancellationToken) &&
+            body.Statements.TakeWhile(candidate => !ReferenceEquals(candidate, statement)).All(prior =>
+                prior is EmptyStatementSyntax or LocalFunctionStatementSyntax ||
+                nonThrowing.IsDefinitelyNonThrowing(semanticModel.GetOperation(prior, cancellationToken)));
+    }
+    private static bool IsDirectReplayableStatement(StatementSyntax statement, IOperation callSite,
+        SemanticModel semanticModel, NonThrowingAnalysis nonThrowing, CancellationToken cancellationToken) {
+        var span = callSite.Syntax.Span; return statement switch {
+            ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax assignment }
+                when assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) =>
+                assignment.Right.Span == span && nonThrowing.IsDefinitelyNonThrowing(
+                    semanticModel.GetOperation(assignment.Left, cancellationToken)),
+            ExpressionStatementSyntax expression => expression.Expression.Span == span,
+            LocalDeclarationStatementSyntax local => local.Declaration.Variables.Count == 1 &&
+                local.Declaration.Variables[0].Initializer?.Value.Span == span,
+            ReturnStatementSyntax returned => returned.Expression?.Span == span,
+            ThrowStatementSyntax thrown => thrown.Expression?.Span == span,
+            _ => false
+        };
     }
 
     private static ExpressionSyntax? GetPropertyExpression(SyntaxNode declaration) => declaration switch {

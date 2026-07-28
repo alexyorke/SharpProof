@@ -136,6 +136,8 @@ internal sealed class OperationEffectScanner {
             field.Instance == null ? EffectSummary.Empty : Scan(field.Instance),
             PotentialNullReceiver(field.Instance),
             accessSummary,
+            field.Field.IsVolatile ? EffectSummaryOperations.Capability(
+                EffectCapabilityKind.Synchronization) : EffectSummary.Empty,
             field.Field.IsStatic && !field.Field.IsConst
                 ? _session.ResolveStaticFieldTypeInitialization(
                     _method,

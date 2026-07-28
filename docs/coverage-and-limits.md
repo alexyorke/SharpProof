@@ -21,6 +21,12 @@ unsupported expressions, approximate facts, and exhausted budgets remain
 | External calls | Analyzer, compiler collector, and worker | Analyzer/compiler stages resolve exact original symbols against `ApiSpecTable`; the artifact binds an admitted lowered call to its exact witness identifier, which the worker revalidates against the matching spec table | The worker does not turn arbitrary trusted metadata contracts into proof facts; missing, ambiguous, untrusted, incomplete, or target-framework-inapplicable models fail closed |
 | SMT | Worker only | Encodes supported Boolean and signed-integer obligations; creates `Proven` only after unsat-core hygiene and `Refuted` only after executable replay | No Z3 or verifier payload is loaded into the IDE analyzer |
 
+Effect exception contracts cover modeled synchronous managed exception flows.
+Ambient catastrophic runtime failures such as memory or stack exhaustion are
+outside that universe unless source or an exact boundary explicitly throws or
+declares them. An unmodeled ordinary synchronous exception remains incomplete;
+it is not silently excluded.
+
 Not active as 0.2 product features:
 
 - complexity classification or complexity diagnostics;

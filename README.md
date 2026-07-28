@@ -149,6 +149,11 @@ state; `[ZeroAllocations]` does not. Implicit exceptions from dereferences,
 indexing, division, casts, checked arithmetic, and similar operations count
 toward exception contracts.
 
+Exception contracts cover modeled synchronous managed exceptions. Ambient
+catastrophic runtime failures, such as memory or stack exhaustion, are outside
+the exception universe unless source or an exact boundary explicitly
+throws or declares them.
+
 An external metadata call is modeled only when an exact built-in `ApiSpec`
 resolves, or when the boundary has both:
 
@@ -208,6 +213,10 @@ expressions lower exactly, the prefix is known not to throw, and the
 instantiated precondition replays to `false`. Unknown arguments, conditional
 execution, unsupported expressions, and potentially throwing prefixes are
 silent.
+
+Replayable top-level forms include a direct expression statement, return or
+throw expression, single local initializer, simple assignment whose target is
+definitely non-throwing, expression-bodied member, and constructor initializer.
 
 `Contract.Requires`, `Contract.Ensures`, and `Contract.Assume` carry
 `[Conditional("SHARPPROOF_CONTRACTS")]`. Normal builds therefore erase the

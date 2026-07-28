@@ -137,6 +137,16 @@ An operation that may throw and is not discharged by the analysis makes
 array and index access, division, casts, checked arithmetic, and similar runtime
 operations. An unmodeled external call has unknown effects.
 
+Exception contracts quantify over synchronous managed exception flows represented
+by the admitted C# operation model or an exact API/boundary specification. They
+exclude ambient catastrophic runtime-failure channels that have no modeled
+exception edge, such as memory exhaustion during allocation, stack exhaustion,
+runtime corruption, or process termination. An exception explicitly thrown by
+source or declared by an exact or trusted boundary remains in scope even when it
+has the same runtime type. Any other ordinary synchronous exception whose
+semantics is unavailable makes the summary incomplete; the catastrophic-failure
+exclusion is not permission to omit it.
+
 Object, collection, and array initializers are part of the creating expression.
 Instance field, property, and event initializers are part of each explicit
 instance-constructor summary. Static member initializers are part of an explicit

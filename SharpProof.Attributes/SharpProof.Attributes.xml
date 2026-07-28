@@ -67,10 +67,10 @@
       <value>The target type.</value>
     </member>
     <member name="T:SharpProof.Attributes.DoesNotThrowAttribute">
-      <summary>Requires a member to prove that no exception can escape.</summary>
+      <summary>Requires a member to prove that no modeled synchronous exception can escape.</summary>
     </member>
     <member name="M:SharpProof.Attributes.DoesNotThrowAttribute.#ctor">
-      <summary>Creates a no-escaping-exceptions contract.</summary>
+      <summary>Creates a no-escaping-modeled-exceptions contract.</summary>
     </member>
     <member name="T:SharpProof.Attributes.EffectContractAttribute">
       <summary>Declares a complete or partial effect summary for a member boundary.</summary>

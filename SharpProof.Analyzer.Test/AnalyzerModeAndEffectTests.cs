@@ -190,6 +190,28 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
+    public async Task VolatileFieldReadCannotProvePurityOrNoSynchronization() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Fixture {
+                private volatile int _value;
+
+                [EnforcePure]
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public int Read() => _value;
+            }
+            """,
+            "effects",
+            ["SP0002", "SP0016"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EquivalentTo(["SP0002", "SP0016"]));
+    }
+
+    [Test]
     public async Task SemanticOutcomeDoesNotTreatSilentCallSiteAsProven() {
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
