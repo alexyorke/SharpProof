@@ -16,7 +16,7 @@ public enum ProofDiagnosticKind {
     InternalConsistency
 }
 
-public readonly struct SourceLocationId : IEquatable<SourceLocationId> {
+public readonly record struct SourceLocationId {
     public SourceLocationId(int value) {
         if (value < 0) throw new ArgumentOutOfRangeException(nameof(value));
         Value = value;
@@ -24,12 +24,7 @@ public readonly struct SourceLocationId : IEquatable<SourceLocationId> {
 
     public int Value { get; }
 
-    public bool Equals(SourceLocationId other) => Value == other.Value;
-    public override bool Equals(object? obj) => obj is SourceLocationId other && Equals(other);
-    public override int GetHashCode() => Value;
     public override string ToString() => "location" + Value;
-    public static bool operator ==(SourceLocationId left, SourceLocationId right) => left.Equals(right);
-    public static bool operator !=(SourceLocationId left, SourceLocationId right) => !left.Equals(right);
 }
 
 public abstract class Justification {
@@ -40,23 +35,16 @@ public abstract class ProofJustification : Justification {
     private protected ProofJustification() { }
 }
 
-public sealed class SpecJustification : ProofJustification {
-    public SpecJustification(SpecId spec) {
-        if (spec.IsDefault) throw new ArgumentException("A non-default spec identifier is required.", nameof(spec));
-        Spec = spec;
-    }
-
-    public SpecId Spec { get; }
+public sealed class SpecJustification(SpecId spec) : ProofJustification {
+    public SpecId Spec { get; } = !spec.IsDefault
+        ? spec
+        : throw new ArgumentException("A non-default spec identifier is required.", nameof(spec));
 }
 
-public sealed class LoweredJustification : ProofJustification {
-    public LoweredJustification(OperationId operation) {
-        if (operation.IsDefault)
-            throw new ArgumentException("A non-default operation identifier is required.", nameof(operation));
-        Operation = operation;
-    }
-
-    public OperationId Operation { get; }
+public sealed class LoweredJustification(OperationId operation) : ProofJustification {
+    public OperationId Operation { get; } = !operation.IsDefault
+        ? operation
+        : throw new ArgumentException("A non-default operation identifier is required.", nameof(operation));
 }
 
 public sealed class UserAssumedJustification(SourceLocationId location) : ProofJustification {
@@ -81,43 +69,23 @@ public sealed class Assumption {
     public ProofJustification Justification { get; }
 }
 
-public sealed class Goal {
-    public Goal(
-        IrFactory factory,
-        IrTerm predicate,
-        ProofDiagnosticKind diagnostic,
-        SourceLocationId location) {
-        FactoryGuards.RequireBooleanTerm(factory, predicate, nameof(predicate));
-        Predicate = predicate;
-        Diagnostic = diagnostic;
-        Location = location;
-    }
-
-    public IrTerm Predicate { get; }
-    public ProofDiagnosticKind Diagnostic { get; }
-    public SourceLocationId Location { get; }
+public sealed class Goal(IrFactory factory, IrTerm predicate,
+    ProofDiagnosticKind diagnostic, SourceLocationId location) {
+    public IrTerm Predicate { get; } = FactoryGuards.RequireBooleanTerm(factory, predicate, nameof(predicate));
+    public ProofDiagnosticKind Diagnostic { get; } = diagnostic;
+    public SourceLocationId Location { get; } = location;
 }
 
 internal static class FactoryGuards {
-    internal static void RequireBooleanTerm(
+    internal static IrTerm RequireBooleanTerm(
         IrFactory factory,
         IrTerm term,
         string parameterName) {
         if (factory == null) throw new ArgumentNullException(nameof(factory));
         if (term == null) throw new ArgumentNullException(parameterName);
-        IrTerm interned;
-        try {
-            interned = factory.GetTerm(term.Id);
-        }
-        catch (ArgumentException exception) {
-            throw new ArgumentException(
-                "The term belongs to a different IR factory.",
-                parameterName,
-                exception);
-        }
-        if (!ReferenceEquals(interned, term))
-            throw new ArgumentException("The term is not interned by the supplied factory.", parameterName);
+        factory.EnsureTerm(term, parameterName);
         if (term.Type != factory.BooleanType)
             throw new ArgumentException("A Boolean IR term is required.", parameterName);
+        return term;
     }
 }

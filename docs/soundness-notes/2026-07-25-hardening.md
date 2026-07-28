@@ -25,9 +25,10 @@ been completed.
   rebuilds. A separate loaded-but-off analyzer canary asserts that no analysis
   session or diagnostics are created. Retained-memory checks exercise the same
   loaded-but-off boundary.
-- Cache writes require a `CacheableWorkerResponse` containing only validated,
-  canonical terminal outcomes. Cache reads revalidate that wrapper; `Unknown`,
-  malformed, mismatched, and infrastructure outcomes are recomputed.
+- Cache writes require a response accepted by
+  `VerificationCache.IsCacheable`, containing only validated canonical
+  terminal outcomes. Cache reads revalidate that payload; `Unknown`, malformed,
+  mismatched, and infrastructure outcomes are recomputed.
 - Construction of proof outcomes and validated models is mechanically confined
   to the proof kernel. Cancellation exceptions may cross only audited entry
   boundaries, including an exact caller-token guard in the worker.

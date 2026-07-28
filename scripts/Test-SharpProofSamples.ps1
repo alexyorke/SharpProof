@@ -358,7 +358,7 @@ try {
         $strictResult = Read-WorkerResult $strictResultPath
         if ([string]$strictResult.runStatus -ne 'Complete' -or
             [string]$strictResult.failureReason -ne 'None' -or
-            @($strictResult.claimResults).Count -ne 1 -or
+            @($strictResult.claimResults).Count -ne 5 -or
             @($strictResult.claimResults |
                 Where-Object { [string]$_.outcome -ne 'Proven' }).Count -ne 0) {
             throw 'The strict library sample did not prove every selected claim.'

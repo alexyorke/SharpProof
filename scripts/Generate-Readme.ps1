@@ -314,6 +314,31 @@ $versionExpression = $releaseXml.SelectSingleNode(
 $packageVersion = $versionExpression.Replace(
     '$(SharpProofVersionPrefix)',
     $versionPrefix)
+if ($versionPrefix -notmatch '^(?<major>\d+)\.(?<minor>\d+)\.') {
+    throw "Could not derive the product series from '$versionPrefix'."
+}
+$productSeries = $Matches['major'] + '.' + $Matches['minor']
+foreach ($productDocument in @(
+        'README.md',
+        'docs\README.md',
+        'docs\architecture.md',
+        'docs\coverage-and-limits.md')) {
+    $productText = Get-RequiredText $productDocument
+    $productMentions = [regex]::Matches(
+        $productText,
+        '\bSharpProof\s+(?<series>\d+\.\d+)(?:\.\d+)?')
+    if ($productMentions.Count -eq 0) {
+        throw "$productDocument is missing the SharpProof product series."
+    }
+    foreach ($mention in $productMentions) {
+        if ($mention.Groups['series'].Value -ne $productSeries) {
+            throw (
+                "$productDocument has stale SharpProof product series " +
+                "'$($mention.Groups['series'].Value)'; expected " +
+                "'$productSeries'.")
+        }
+    }
+}
 
 $readme = Get-RequiredText 'README.md'
 $requiredReadmeText = @(
@@ -400,6 +425,49 @@ foreach ($descriptorSource in $descriptorSources) {
         }
     }
 }
+$analyzerDescriptorSource = Get-RequiredText (
+    'SharpProof.Analyzer\GeneratedDiagnosticDescriptors.cs')
+$analyzerDescriptors = [regex]::Matches(
+    $analyzerDescriptorSource,
+    'internal static readonly DiagnosticDescriptor\s+\w+\s*=\s*Create\(\s*"(?<id>SP\d{4})"(?<arguments>[\s\S]*?)\);')
+if ($analyzerDescriptors.Count -eq 0) {
+    throw 'Could not derive analyzer diagnostic defaults.'
+}
+foreach ($descriptor in $analyzerDescriptors) {
+    $id = $descriptor.Groups['id'].Value
+    $arguments = $descriptor.Groups['arguments'].Value
+    $severityMatch = [regex]::Match(
+        $arguments,
+        'severity:\s*DiagnosticSeverity\.(?<value>\w+)')
+    $severity = if ($severityMatch.Success) {
+        $severityMatch.Groups['value'].Value
+    }
+    else {
+        'Info'
+    }
+    $enabledMatch = [regex]::Match(
+        $arguments,
+        'isEnabledByDefault:\s*(?<value>true|false)',
+        [Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    $enabled = if ($enabledMatch.Success) {
+        [bool]::Parse($enabledMatch.Groups['value'].Value)
+    }
+    else {
+        $true
+    }
+    $row = [regex]::Match(
+        $diagnosticCatalog,
+        '(?m)^\|\s*`' + [regex]::Escape($id) +
+        '`\s*\|[^|]*\|\s*(?<severity>Info|Warning|Error),\s*' +
+        '(?<state>on|off)\s*\|')
+    if (-not $row.Success -or
+        $row.Groups['severity'].Value -ne $severity -or
+        ($row.Groups['state'].Value -eq 'on') -ne $enabled) {
+        throw (
+            "Diagnostic catalog default for '$id' does not match " +
+            "$severity, " + $(if ($enabled) { 'on' } else { 'off' }) + '.')
+    }
+}
 foreach ($launcherDiagnostic in @('SP0047', 'SP0048')) {
     $anchor = '<a id="' + $launcherDiagnostic.ToLowerInvariant() + '"></a>'
     if (-not $diagnosticCatalog.Contains(
@@ -467,11 +535,14 @@ $compilerCallableLowerer = Get-RequiredText (
 $blockBound = [regex]::Match(
     $compilerCallableLowerer,
     'const\s+int\s+MaximumBodyBlocks\s*=\s*(?<value>\d+)\s*;')
-$executorBounds = [regex]::Match(
+$pathBound = [regex]::Match(
     $callableVerifier,
-    'prepared\.ParameterBindings,\s*(?<paths>\d+),\s*(?<states>\d+)\s*\)',
-    [System.Text.RegularExpressions.RegexOptions]::Singleline)
-if (-not $blockBound.Success -or -not $executorBounds.Success) {
+    'const\s+int\s+MaximumBodyPaths\s*=\s*(?<value>\d+)\s*;')
+$stateBound = [regex]::Match(
+    $callableVerifier,
+    'const\s+int\s+MaximumExecutionStates\s*=\s*(?<value>\d+)\s*;')
+if (-not $blockBound.Success -or -not $pathBound.Success -or
+    -not $stateBound.Success) {
     throw 'Could not derive compiler/worker body execution bounds.'
 }
 $fixedBodyBounds = @(
@@ -481,11 +552,11 @@ $fixedBodyBounds = @(
     },
     [pscustomobject]@{
         Label = 'Normal-return paths'
-        Value = $executorBounds.Groups['paths'].Value
+        Value = $pathBound.Groups['value'].Value
     },
     [pscustomobject]@{
         Label = 'Symbolic execution states'
-        Value = $executorBounds.Groups['states'].Value
+        Value = $stateBound.Groups['value'].Value
     }
 )
 foreach ($entry in $fixedBodyBounds) {

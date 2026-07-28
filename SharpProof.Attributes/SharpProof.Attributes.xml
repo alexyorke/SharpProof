@@ -73,7 +73,7 @@
       <summary>Creates a no-escaping-modeled-exceptions contract.</summary>
     </member>
     <member name="T:SharpProof.Attributes.EffectContractAttribute">
-      <summary>Declares a complete or partial effect summary for a member boundary.</summary>
+      <summary>Declares an effect summary for a member boundary; summaries are partial and nondeterministic by default.</summary>
     </member>
     <member name="M:SharpProof.Attributes.EffectContractAttribute.#ctor(SharpProof.Attributes.SharpProofEffect)">
       <summary>Creates an effect summary.</summary>
@@ -85,19 +85,19 @@
     </member>
     <member name="P:SharpProof.Attributes.EffectContractAttribute.Capabilities">
       <summary>Gets or sets the ambient capabilities used by the member.</summary>
-      <value>The used capabilities.</value>
+      <value>The used capabilities; the default is <c>None</c>.</value>
     </member>
     <member name="P:SharpProof.Attributes.EffectContractAttribute.ThrownExceptions">
       <summary>Gets or sets the exception types that may escape.</summary>
-      <value>The escaping exception types.</value>
+      <value>The escaping exception types; the default is an empty array.</value>
     </member>
     <member name="P:SharpProof.Attributes.EffectContractAttribute.IsDeterministic">
       <summary>Gets or sets whether the member is deterministic under its declared inputs and ambient reads.</summary>
-      <value>True when the summary declares deterministic behavior.</value>
+      <value>True when the summary declares deterministic behavior; the default is false.</value>
     </member>
     <member name="P:SharpProof.Attributes.EffectContractAttribute.Complete">
       <summary>Gets or sets whether the declaration is a complete effect summary.</summary>
-      <value>True when omitted effects are asserted absent.</value>
+      <value>True when omitted effects are asserted absent; the default is false.</value>
     </member>
     <member name="T:SharpProof.Attributes.EnforcePureAttribute">
       <summary>Requires a member to prove observable purity.</summary>

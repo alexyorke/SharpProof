@@ -31,7 +31,7 @@ public enum EffectCapabilityKind {
     Unknown = AllKnown | 1 << 13
 }
 
-public readonly struct EffectCapabilitySet : IEquatable<EffectCapabilitySet> {
+public readonly record struct EffectCapabilitySet {
     public EffectCapabilitySet(EffectCapabilityKind kinds) {
         if ((kinds & ~EffectCapabilityKind.Unknown) != 0)
             throw new ArgumentOutOfRangeException(nameof(kinds));
@@ -56,14 +56,6 @@ public readonly struct EffectCapabilitySet : IEquatable<EffectCapabilitySet> {
     public EffectCapabilitySet Union(EffectCapabilitySet other) =>
         new(Kinds | other.Kinds);
 
-    public bool Equals(EffectCapabilitySet other) => Kinds == other.Kinds;
-    public override bool Equals(object? obj) =>
-        obj is EffectCapabilitySet other && Equals(other);
-    public override int GetHashCode() => (int)Kinds;
-    public static bool operator ==(EffectCapabilitySet left, EffectCapabilitySet right) =>
-        left.Equals(right);
-    public static bool operator !=(EffectCapabilitySet left, EffectCapabilitySet right) =>
-        !left.Equals(right);
 }
 
 public enum EffectTermination {
@@ -121,7 +113,7 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet> {
             : new EffectThrowSet(
                 [.. distinct.OrderBy(
                     static type => type,
-                    EffectNamedTypeComparer.Instance)],
+                    EffectSymbolComparer<INamedTypeSymbol>.Instance)],
                 includesUnknown);
     }
 
@@ -172,13 +164,14 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet> {
         !left.Equals(right);
 }
 
-internal sealed class EffectNamedTypeComparer : IComparer<INamedTypeSymbol> {
-    internal static EffectNamedTypeComparer Instance { get; } = new();
+internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
+    where TSymbol : class, ISymbol {
+    internal static EffectSymbolComparer<TSymbol> Instance { get; } = new();
 
-    private EffectNamedTypeComparer() {
+    private EffectSymbolComparer() {
     }
 
-    public int Compare(INamedTypeSymbol? left, INamedTypeSymbol? right) {
+    public int Compare(TSymbol? left, TSymbol? right) {
         if (ReferenceEquals(left, right)) return 0;
         if (left == null) return -1;
         if (right == null) return 1;
@@ -187,32 +180,35 @@ internal sealed class EffectNamedTypeComparer : IComparer<INamedTypeSymbol> {
             right.ContainingAssembly?.Identity.Name,
             StringComparison.Ordinal);
         if (result != 0) return result;
-        result = CompareNamespace(left.ContainingNamespace, right.ContainingNamespace);
+        result = string.Compare(
+            DocumentationCommentId.CreateDeclarationId(left) ??
+            left.Kind + ":" + left.MetadataName,
+            DocumentationCommentId.CreateDeclarationId(right) ??
+            right.Kind + ":" + right.MetadataName,
+            StringComparison.Ordinal);
         if (result != 0) return result;
-        result = CompareContainingType(left.ContainingType, right.ContainingType);
-        if (result != 0) return result;
-        result = string.Compare(left.MetadataName, right.MetadataName, StringComparison.Ordinal);
-        if (result != 0) return result;
-        return left.Arity.CompareTo(right.Arity);
-    }
-
-    private static int CompareNamespace(INamespaceSymbol? left, INamespaceSymbol? right) {
-        if (ReferenceEquals(left, right)) return 0;
-        if (left == null) return -1;
-        if (right == null) return 1;
-        var result = CompareNamespace(left.ContainingNamespace, right.ContainingNamespace);
+        var leftLocation = left.Locations.FirstOrDefault(static location => location.IsInSource);
+        var rightLocation = right.Locations.FirstOrDefault(static location => location.IsInSource);
+        result = string.Compare(
+            leftLocation?.SourceTree?.FilePath,
+            rightLocation?.SourceTree?.FilePath,
+            StringComparison.Ordinal);
         return result != 0
             ? result
-            : string.Compare(left.MetadataName, right.MetadataName, StringComparison.Ordinal);
+            : (leftLocation?.SourceSpan.Start ?? -1)
+                .CompareTo(rightLocation?.SourceSpan.Start ?? -1);
     }
+}
 
-    private static int CompareContainingType(INamedTypeSymbol? left, INamedTypeSymbol? right) {
-        if (ReferenceEquals(left, right)) return 0;
-        if (left == null) return -1;
-        if (right == null) return 1;
-        var result = CompareContainingType(left.ContainingType, right.ContainingType);
-        if (result != 0) return result;
-        result = string.Compare(left.MetadataName, right.MetadataName, StringComparison.Ordinal);
-        return result != 0 ? result : left.Arity.CompareTo(right.Arity);
+internal static class EffectTypeFacts {
+    internal static bool IsDerivedFrom(
+        INamedTypeSymbol type,
+        INamedTypeSymbol expectedBase) {
+        for (var current = type; current != null; current = current.BaseType)
+            if (SymbolEqualityComparer.Default.Equals(
+                    current.OriginalDefinition,
+                    expectedBase.OriginalDefinition))
+                return true;
+        return false;
     }
 }

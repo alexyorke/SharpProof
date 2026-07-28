@@ -642,72 +642,50 @@ public sealed class IrFactory {
         return term;
     }
 
-    private static T GetAt<T>(IReadOnlyList<T> items, int index, string parameterName) {
-        if (index < 0 || index >= items.Count)
-            throw new ArgumentOutOfRangeException(parameterName);
-        return items[index];
-    }
-
     private T GetScoped<T>(
         long scope, int value, IReadOnlyList<T> items, string parameterName) {
         EnsureScope(scope, parameterName);
-        return GetAt(items, value, parameterName);
+        if (value < 0 || value >= items.Count)
+            throw new ArgumentOutOfRangeException(parameterName);
+        return items[value];
     }
 
-    private readonly record struct TypeKey {
-        internal TypeKey(IrTypeKind kind, int identity, int elementType) =>
-            (Kind, Identity, ElementType) = (kind, identity, elementType);
+    private readonly struct TypeKey(
+        IrTypeKind kind,
+        int identity,
+        int elementType) : IEquatable<TypeKey> {
+        private readonly (IrTypeKind Kind, int Identity, int ElementType) _value =
+            (kind, identity, elementType);
 
-        private IrTypeKind Kind { get; }
-        private int Identity { get; }
-        private int ElementType { get; }
-
-        public bool Equals(TypeKey other) =>
-            Kind == other.Kind &&
-            Identity == other.Identity &&
-            ElementType == other.ElementType;
-
-        public override int GetHashCode() =>
-            unchecked((((int)Kind * 397) ^ Identity) * 397 ^ ElementType);
+        public bool Equals(TypeKey other) => _value.Equals(other._value);
+        public override bool Equals(object? obj) =>
+            obj is TypeKey other && Equals(other);
+        public override int GetHashCode() => _value.GetHashCode();
     }
 
-    private readonly record struct MemberKey {
-        internal MemberKey(
-            int identity,
-            int declaringType,
-            int returnType,
-            bool isStatic,
-            ImmutableArray<int> parameterTypes) =>
-            (Identity, DeclaringType, ReturnType, IsStatic, ParameterTypes) =
-            (identity, declaringType, returnType, isStatic, parameterTypes);
-
-        private int Identity { get; }
-        private int DeclaringType { get; }
-        private int ReturnType { get; }
-        private bool IsStatic { get; }
-        private ImmutableArray<int> ParameterTypes { get; }
-
+    private readonly struct MemberKey(
+        int identity,
+        int declaringType,
+        int returnType,
+        bool isStatic,
+        ImmutableArray<int> parameterTypes) : IEquatable<MemberKey> {
+        private readonly (
+            int Identity,
+            int DeclaringType,
+            int ReturnType,
+            bool IsStatic) _signature =
+            (identity, declaringType, returnType, isStatic);
+        private readonly IntSequenceKey _parameters = new(parameterTypes);
         public bool Equals(MemberKey other) =>
-            Identity == other.Identity &&
-            DeclaringType == other.DeclaringType &&
-            ReturnType == other.ReturnType &&
-            IsStatic == other.IsStatic &&
-            SequenceEqual(ParameterTypes, other.ParameterTypes);
-
-        public override int GetHashCode() {
-            unchecked {
-                var hash = Identity;
-                hash = hash * 397 ^ DeclaringType;
-                hash = hash * 397 ^ ReturnType;
-                hash = hash * 397 ^ (IsStatic ? 1 : 0);
-                foreach (var parameterType in ParameterTypes) hash = hash * 397 ^ parameterType;
-                return hash;
-            }
-        }
+            _signature.Equals(other._signature) &&
+            _parameters.Equals(other._parameters);
+        public override bool Equals(object? obj) =>
+            obj is MemberKey other && Equals(other);
+        public override int GetHashCode() =>
+            unchecked(_signature.GetHashCode() * 397 ^ _parameters.GetHashCode());
     }
 
-    private abstract class ExternalIdentityKey {
-    }
+    private abstract class ExternalIdentityKey;
 
     private sealed class ExternalIdentityKey<T>(
         T value,
@@ -726,68 +704,61 @@ public sealed class IrFactory {
         public override bool Equals(object? obj) =>
             Equals(obj as ExternalIdentityKey<T>);
 
-        public override int GetHashCode() {
-            unchecked {
-                return (System.Runtime.CompilerServices.RuntimeHelpers
-                            .GetHashCode(_comparer) * 397) ^
-                       _comparer.GetHashCode(_value);
-            }
-        }
+        public override int GetHashCode() =>
+            unchecked(
+                System.Runtime.CompilerServices.RuntimeHelpers
+                    .GetHashCode(_comparer) * 397 ^
+                _comparer.GetHashCode(_value));
     }
 
-    private readonly record struct TermKey {
-        internal TermKey(
-            IrTermKind kind,
-            int type,
-            int first = 0,
-            int second = 0,
-            int third = 0,
-            long number = 0,
-            ImmutableArray<int> children = default) {
-            (Kind, Type, First, Second, Third, Number) =
-                (kind, type, first, second, third, number);
-            Children = children.IsDefault ? [] : children;
+    private readonly struct TermKey(
+        IrTermKind kind,
+        int type,
+        int first = 0,
+        int second = 0,
+        int third = 0,
+        long number = 0,
+        ImmutableArray<int> children = default) : IEquatable<TermKey> {
+        private readonly (
+            IrTermKind Kind,
+            int Type,
+            int First,
+            int Second,
+            int Third,
+            long Number) _signature =
+            (kind, type, first, second, third, number);
+        private readonly IntSequenceKey _children = new(children);
+        public bool Equals(TermKey other) =>
+            _signature.Equals(other._signature) &&
+            _children.Equals(other._children);
+        public override bool Equals(object? obj) =>
+            obj is TermKey other && Equals(other);
+        public override int GetHashCode() =>
+            unchecked(_signature.GetHashCode() * 397 ^ _children.GetHashCode());
+    }
+
+    private readonly struct IntSequenceKey(
+        ImmutableArray<int> values) : IEquatable<IntSequenceKey> {
+        private readonly ImmutableArray<int> _values =
+            values.IsDefault ? [] : values;
+
+        public bool Equals(IntSequenceKey other) {
+            if (_values.Length != other._values.Length) return false;
+            for (var index = 0; index < _values.Length; index++)
+                if (_values[index] != other._values[index])
+                    return false;
+            return true;
         }
 
-        private IrTermKind Kind { get; }
-        private int Type { get; }
-        private int First { get; }
-        private int Second { get; }
-        private int Third { get; }
-        private long Number { get; }
-        private ImmutableArray<int> Children { get; }
-
-        public bool Equals(TermKey other) =>
-            Kind == other.Kind &&
-            Type == other.Type &&
-            First == other.First &&
-            Second == other.Second &&
-            Third == other.Third &&
-            Number == other.Number &&
-            SequenceEqual(Children, other.Children);
+        public override bool Equals(object? obj) =>
+            obj is IntSequenceKey other && Equals(other);
 
         public override int GetHashCode() {
             unchecked {
-                var hash = (int)Kind;
-                hash = hash * 397 ^ Type;
-                hash = hash * 397 ^ First;
-                hash = hash * 397 ^ Second;
-                hash = hash * 397 ^ Third;
-                hash = hash * 397 ^ (int)Number;
-                hash = hash * 397 ^ (int)(Number >> 32);
-                if (!Children.IsDefaultOrEmpty)
-                    foreach (var child in Children) hash = hash * 397 ^ child;
+                var hash = 0;
+                foreach (var value in _values) hash = hash * 397 ^ value;
                 return hash;
             }
         }
-    }
-
-    private static bool SequenceEqual(ImmutableArray<int> left, ImmutableArray<int> right) {
-        if (left.IsDefaultOrEmpty && right.IsDefaultOrEmpty) return true;
-        if (left.Length != right.Length) return false;
-        for (var index = 0; index < left.Length; index++)
-            if (left[index] != right[index])
-                return false;
-        return true;
     }
 }

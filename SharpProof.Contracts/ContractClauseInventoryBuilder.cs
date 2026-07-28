@@ -17,6 +17,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation) {
         IOperation? implementationBody = null) {
         if (callable == null)
             throw new ArgumentNullException(nameof(callable));
+        callable = NormalizeCallable(callable);
         return implementationBody == null
             ? _cache.GetOrAdd(callable, CreateUncached)
             : CreateCore(callable, implementationBody);
@@ -30,7 +31,6 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation) {
         IOperation? implementationBody) {
         var bodies = GetBodies(callable, implementationBody);
         IOperation? resolvedBody = implementationBody;
-        var seen = new HashSet<(SyntaxTree Tree, int Start, int Length)>();
         var found = new List<(
             BoundContractKind Kind,
             ContractClausePlacement Placement,
@@ -45,8 +45,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation) {
             foreach (var invocation in root.DescendantsAndSelf()
                          .OfType<IInvocationOperation>()) {
                 var kind = _api?.GetClauseKind(invocation.TargetMethod);
-                if (!kind.HasValue ||
-                    !seen.Add(Site(invocation.Syntax))) continue;
+                if (!kind.HasValue) continue;
                 var syntax = invocation.Syntax;
                 found.Add((
                     kind.Value,
@@ -88,16 +87,13 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation) {
         SemanticModel model,
         StatementSyntax statement,
         out IInvocationOperation invocation) {
-        var candidate = statement is ExpressionStatementSyntax expression
-            ? model.GetOperation(expression.Expression) as IInvocationOperation
-            : null;
-        if (candidate == null ||
-            !_api!.GetClauseKind(candidate.TargetMethod).HasValue) {
-            invocation = null!;
-            return false;
-        }
-        invocation = candidate;
-        return true;
+        invocation = statement is ExpressionStatementSyntax expression &&
+                     model.GetOperation(expression.Expression) is
+                         IInvocationOperation candidate &&
+                     _api!.GetClauseKind(candidate.TargetMethod).HasValue
+            ? candidate
+            : null!;
+        return invocation != null;
     }
 
     private ContractClausePlacement Classify(
@@ -158,8 +154,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation) {
         }
         foreach (var prior in statements) {
             if (HasSameSite(prior, statement)) break;
-            if (prior is not EmptyStatementSyntax &&
-                !TryGetDirectClause(model, prior, out _)) {
+            if (!TryGetDirectClause(model, prior, out _)) {
                 placement = ContractClausePlacement.Late;
                 return true;
             }
@@ -224,10 +219,9 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation) {
         _ => null
     };
 
-    private static (SyntaxTree Tree, int Start, int Length) Site(
-        SyntaxNode syntax) =>
-        (syntax.SyntaxTree, syntax.SpanStart, syntax.Span.Length);
-
     private static bool HasSameSite(SyntaxNode left, SyntaxNode right) =>
         left.SyntaxTree == right.SyntaxTree && left.Span == right.Span;
+
+    internal static IMethodSymbol NormalizeCallable(IMethodSymbol method) =>
+        method.PartialImplementationPart ?? method;
 }

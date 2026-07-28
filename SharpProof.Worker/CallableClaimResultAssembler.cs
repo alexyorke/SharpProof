@@ -1,13 +1,12 @@
 namespace SharpProof.Worker;
-#pragma warning disable IDE0055 // Compact result assembly preserves the fixed production-size ceiling.
 
 internal static class CallableClaimResultAssembler {
     internal static WorkerClaimResult FromOutcome(CompilerCallablePreparation target, int contractOrdinal,
         ProofOutcome outcome, IReadOnlyList<CompilerCanonicalVariable> variables,
         IReadOnlyDictionary<ProofJustification, string> assumptionLabels,
         IReadOnlyDictionary<ProofJustification, string> userAssumptionIds,
-        bool counterexampleReplayed) {
-        var record = CreateBaseRecord(target, contractOrdinal);
+        WorkerClaimReason replayFailure) {
+        var record = Unknown(target, contractOrdinal, WorkerClaimReason.InfrastructureFailure);
         var usedUserAssumptions = new HashSet<string>(StringComparer.Ordinal);
         switch (outcome) {
             case ProvenOutcome proven:
@@ -21,9 +20,8 @@ internal static class CallableClaimResultAssembler {
                     if (userAssumptionIds.TryGetValue(justification, out var id))
                         usedUserAssumptions.Add(id);
                 break;
-            case RefutedOutcome when !counterexampleReplayed:
-                record.Outcome = WorkerClaimOutcome.Unknown;
-                record.Reason = WorkerClaimReason.CounterexampleReplayFailed;
+            case RefutedOutcome when replayFailure != WorkerClaimReason.None:
+                record.Reason = replayFailure;
                 break;
             case RefutedOutcome refuted:
                 record.Outcome = WorkerClaimOutcome.Refuted; record.Reason = WorkerClaimReason.None;
@@ -46,27 +44,17 @@ internal static class CallableClaimResultAssembler {
     }
 
     internal static WorkerClaimResult Unknown(
-        CompilerCallablePreparation target, int contractOrdinal, WorkerClaimReason reason) {
-        var record = CreateBaseRecord(target, contractOrdinal);
-        record.Outcome = WorkerClaimOutcome.Unknown; record.Reason = reason;
-        return record;
-    }
+        CompilerCallablePreparation target, int contractOrdinal, WorkerClaimReason reason) =>
+        new() {
+            ClaimId = target.Entry.ClaimIds[contractOrdinal],
+            Outcome = WorkerClaimOutcome.Unknown,
+            Reason = reason,
+            Assumptions = [.. target.Entry.Assumptions]
+        };
 
     internal static ImmutableArray<WorkerClaimResult> Unknowns(
         CompilerCallablePreparation target, WorkerClaimReason reason) =>
         [.. target.Entry.ClaimIds.Select((_, index) => Unknown(target, index, reason))];
-
-    internal static void AppendResourceLimit(ImmutableArray<WorkerClaimResult>.Builder records,
-        CompilerCallablePreparation target, int start, int count) {
-        for (var index = start; index < count; index++)
-            records.Add(Unknown(target, index, WorkerClaimReason.ResourceLimit));
-    }
-
-    private static WorkerClaimResult CreateBaseRecord(CompilerCallablePreparation target, int contractOrdinal) =>
-        new() {
-            ClaimId = target.Entry.ClaimIds[contractOrdinal], Outcome = WorkerClaimOutcome.Unknown,
-            Reason = WorkerClaimReason.InfrastructureFailure, Assumptions = [.. target.Entry.Assumptions]
-        };
 
     private static WorkerModelValue[] CreateModel(
         RefutedOutcome outcome, IReadOnlyList<CompilerCanonicalVariable> variables) {
@@ -91,14 +79,13 @@ internal static class CallableClaimResultAssembler {
     };
 
     private static WorkerClaimReason MapAbstention(AbstentionReason reason) => reason switch {
-            AbstentionReason.UnsupportedOperation => WorkerClaimReason.UnsupportedExpression,
-            AbstentionReason.UnsupportedEncoding => WorkerClaimReason.UnsupportedExpression,
-            AbstentionReason.ResourceLimit => WorkerClaimReason.ResourceLimit,
-            AbstentionReason.Timeout => WorkerClaimReason.MethodTimeout,
-            AbstentionReason.BackendUnavailable => WorkerClaimReason.BackendUnavailable,
-            AbstentionReason.InfrastructureFailure => WorkerClaimReason.InfrastructureFailure,
-            AbstentionReason.MalformedBackendResult => WorkerClaimReason.MalformedBackendResult,
-            AbstentionReason.CounterexampleReplayFailed => WorkerClaimReason.CounterexampleReplayFailed,
-            _ => WorkerClaimReason.UnsupportedExpression
-        };
+        AbstentionReason.ResourceLimit => WorkerClaimReason.ResourceLimit,
+        AbstentionReason.Timeout => WorkerClaimReason.MethodTimeout,
+        AbstentionReason.BackendUnavailable => WorkerClaimReason.BackendUnavailable,
+        AbstentionReason.InfrastructureFailure => WorkerClaimReason.InfrastructureFailure,
+        AbstentionReason.MalformedBackendResult => WorkerClaimReason.MalformedBackendResult,
+        AbstentionReason.CounterexampleReplayFailed => WorkerClaimReason.CounterexampleReplayFailed,
+        AbstentionReason.PostconditionMayBeUndefined => WorkerClaimReason.PostconditionMayBeUndefined,
+        _ => WorkerClaimReason.UnsupportedExpression
+    };
 }

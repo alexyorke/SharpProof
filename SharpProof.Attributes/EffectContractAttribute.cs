@@ -7,6 +7,6 @@ public sealed class EffectContractAttribute(SharpProofEffect effects) : Attribut
     public SharpProofEffect Effects { get; } = effects;
     public SharpProofCapability Capabilities { get; set; }
     public Type[] ThrownExceptions { get; set; } = [];
-    public bool IsDeterministic { get; set; } = true;
-    public bool Complete { get; set; } = true;
+    public bool IsDeterministic { get; set; }
+    public bool Complete { get; set; }
 }

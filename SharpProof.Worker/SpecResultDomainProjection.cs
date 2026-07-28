@@ -1,8 +1,6 @@
 namespace SharpProof.Worker;
-#pragma warning disable IDE0055 // Compact spec projection preserves the fixed production-size ceiling.
-internal readonly record struct SpecResultProjection(IrVarId? NonNullVariable, IrVarId? LengthVariable) {
-    internal bool HasFacts => NonNullVariable.HasValue || LengthVariable.HasValue;
-}
+
+internal readonly record struct SpecResultProjection(IrVarId? NonNullVariable, IrVarId? LengthVariable);
 internal static class SpecResultDomainProjection {
     internal static bool TryCreate(IrFactory factory, ApiSpecTemplate template, IrVarId resultVariable,
         out SpecResultProjection projection, out ImmutableArray<IrTerm> evidencePredicates) {
@@ -80,7 +78,8 @@ internal static class SpecResultDomainProjection {
             return result;
         }
         IrTerm VisitBinary(IrBinaryTerm binary) =>
-            IsEquality(binary.Operator) && RewriteEquality(binary) is { } equality ? equality :
+            binary.Operator is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual &&
+            RewriteEquality(binary) is { } equality ? equality :
                 factory.Binary(binary.Operator, Visit(binary.Left), Visit(binary.Right));
         IrTerm? RewriteEquality(IrBinaryTerm binary) {
             if (binary.Left is IrVariableTerm left && binary.Right is IrVariableTerm right &&
@@ -101,19 +100,17 @@ internal static class SpecResultDomainProjection {
             projection.LengthVariable is { } proxy
                 ? factory.Variable(proxy) : factory.Length(Visit(length.Value));
     }
-    private static bool IsEquality(IrBinaryOperator operation) =>
-        operation is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual;
     private static NullnessValue Project(SpecNullness value) => value switch {
-        SpecNullness.NonNull => NullnessDomain.Instance.AssumeNonNull(NullnessDomain.Instance.Top),
-        SpecNullness.Null => NullnessDomain.Instance.AssumeNull(NullnessDomain.Instance.Top),
+        SpecNullness.NonNull => NullnessValue.NonNull,
+        SpecNullness.Null => NullnessValue.Null,
         SpecNullness.MaybeNull or SpecNullness.Unknown or SpecNullness.NotApplicable =>
-            NullnessDomain.Instance.Top,
-        _ => NullnessDomain.Instance.Bottom
+            NullnessValue.MaybeNull,
+        _ => NullnessValue.Bottom
     };
     private static SequenceCardinalityValue Project(SpecCardinality value, long? count) =>
         value switch {
-            SpecCardinality.Empty => SequenceCardinalityDomain.Instance.AssumeEmpty(SequenceCardinalityDomain.Instance.Top),
-            SpecCardinality.NonEmpty => SequenceCardinalityDomain.Instance.AssumeNonEmpty(SequenceCardinalityDomain.Instance.Top),
+            SpecCardinality.Empty => SequenceCardinalityDomain.Instance.Empty,
+            SpecCardinality.NonEmpty => SequenceCardinalityDomain.Instance.NonEmpty,
             SpecCardinality.Exact when count.HasValue => SequenceCardinalityDomain.Instance.KnownLength(count.Value),
             SpecCardinality.Unknown or SpecCardinality.NotApplicable => SequenceCardinalityDomain.Instance.Top,
             _ => SequenceCardinalityDomain.Instance.Bottom

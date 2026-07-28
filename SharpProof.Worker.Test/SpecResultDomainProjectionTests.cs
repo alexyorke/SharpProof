@@ -44,7 +44,7 @@ public sealed class SpecResultDomainProjectionTests {
 
         using (Assert.EnterMultipleScope()) {
             Assert.That(succeeded, Is.True);
-            Assert.That(projection.HasFacts, Is.True);
+            Assert.That(projection, Is.Not.EqualTo(default(SpecResultProjection)));
             Assert.That(projection.NonNullVariable, Is.Not.Null);
             Assert.That(projection.LengthVariable, Is.Not.Null);
             Assert.That(evidence, Has.Length.EqualTo(2));
@@ -81,7 +81,7 @@ public sealed class SpecResultDomainProjectionTests {
 
         using (Assert.EnterMultipleScope()) {
             Assert.That(succeeded, Is.True);
-            Assert.That(projection.HasFacts, Is.False);
+            Assert.That(projection, Is.EqualTo(default(SpecResultProjection)));
             Assert.That(evidence, Is.Empty);
         }
     }

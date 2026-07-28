@@ -1,11 +1,5 @@
 namespace SharpProof.Verify;
 
-public enum ProofOutcomeKind {
-    Proven,
-    Refuted,
-    Unknown
-}
-
 public enum AbstentionReason {
     UnsupportedOperation,
     ApproximationTouchedGoal,
@@ -16,18 +10,16 @@ public enum AbstentionReason {
     BackendUnavailable,
     InfrastructureFailure,
     MalformedBackendResult,
-    CounterexampleReplayFailed
+    CounterexampleReplayFailed,
+    PostconditionMayBeUndefined
 }
 
 public abstract class ProofOutcome {
-    private protected ProofOutcome(ProofOutcomeKind kind) => Kind = kind;
-
-    public ProofOutcomeKind Kind { get; }
+    private protected ProofOutcome() { }
 }
 
 public sealed class ProvenOutcome : ProofOutcome {
-    internal ProvenOutcome(ImmutableArray<ProofJustification> core)
-        : base(ProofOutcomeKind.Proven) => Core = core;
+    internal ProvenOutcome(ImmutableArray<ProofJustification> core) => Core = core;
 
     public ImmutableArray<ProofJustification> Core { get; }
 }
@@ -40,22 +32,19 @@ public sealed class ValidatedModel {
 }
 
 public sealed class RefutedOutcome : ProofOutcome {
-    internal RefutedOutcome(ValidatedModel model)
-        : base(ProofOutcomeKind.Refuted) => Model = model;
+    internal RefutedOutcome(ValidatedModel model) => Model = model;
 
     public ValidatedModel Model { get; }
 }
 
 public sealed class UnknownOutcome : ProofOutcome {
-    internal UnknownOutcome(AbstentionReason reason)
-        : base(ProofOutcomeKind.Unknown) => Reason = reason;
+    internal UnknownOutcome(AbstentionReason reason) => Reason = reason;
 
     public AbstentionReason Reason { get; }
 }
 
 public static class OutcomeCachePolicy {
-    public static bool IsCacheable(ProofOutcome outcome) {
-        if (outcome == null) throw new ArgumentNullException(nameof(outcome));
-        return outcome.Kind is ProofOutcomeKind.Proven or ProofOutcomeKind.Refuted;
-    }
+    public static bool IsCacheable(ProofOutcome outcome) =>
+        outcome == null ? throw new ArgumentNullException(nameof(outcome)) :
+        outcome is ProvenOutcome or RefutedOutcome;
 }

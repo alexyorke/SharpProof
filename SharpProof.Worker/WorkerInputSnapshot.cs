@@ -1,12 +1,9 @@
 namespace SharpProof.Worker;
-#pragma warning disable IDE0055 // Compact input transport preserves the fixed production-size ceiling.
+
 internal sealed record WorkerInputSnapshot(
     CompilerManifestArtifact CompilerManifest, string InputHash) {
     internal const string ManifestUnavailable = "The compiler manifest is unavailable.";
     internal const string ManifestInvalid = "The compiler manifest is invalid.";
-    internal static async Task<WorkerInputSnapshot> LoadAsync(
-        WorkerVerifyRequest request, CancellationToken cancellationToken) =>
-        await LoadAsync(request, WorkerCacheIdentity.Current, cancellationToken).ConfigureAwait(false);
     internal static async Task<WorkerInputSnapshot> LoadAsync(WorkerVerifyRequest request,
         WorkerCacheIdentity cacheIdentity, CancellationToken cancellationToken) {
         ArgumentNullException.ThrowIfNull(cacheIdentity);
@@ -49,6 +46,6 @@ internal sealed class WorkerCacheIdentity(
         typeof(SharpProofWorker).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ??
             throw new InvalidOperationException("The worker tool version is unavailable.");
     private static string Required(string value, string parameterName) =>
-        !string.IsNullOrWhiteSpace(value) ? value
-            : throw new ArgumentException("Cache identity values cannot be blank.", parameterName);
+        !string.IsNullOrWhiteSpace(value) ? value :
+        throw new ArgumentException("Cache identity values cannot be blank.", parameterName);
 }

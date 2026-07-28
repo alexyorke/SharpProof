@@ -44,6 +44,37 @@ public sealed class PartialMethodContractTests {
     }
 
     [Test]
+    public void ClauseInventoryNormalizesDefinitionToImplementation() {
+        var compilation = CreateCompilation(
+            (
+                "Definition.cs",
+                """
+                public static partial class Subject {
+                    public static partial long Identity(long value);
+                }
+                """),
+            (
+                "Implementation.cs",
+                """
+                using SharpProof.Attributes;
+                public static partial class Subject {
+                    public static partial long Identity(long value) {
+                        Contract.Requires(value >= 0);
+                        return value;
+                    }
+                }
+                """));
+        var definition = GetMethod(compilation, "Subject", "Identity");
+
+        var inventory = new ContractClauseInventoryBuilder(compilation)
+            .Create(definition);
+
+        Assert.That(inventory.ImplementationBody, Is.Not.Null);
+        Assert.That(inventory.Clauses, Has.Length.EqualTo(1));
+        Assert.That(inventory.Clauses[0].IsValid, Is.True);
+    }
+
+    [Test]
     public void CompanionContractsBindFromTheImplementationAcrossSyntaxTrees() {
         var compilation = CreateCompilation(
             (

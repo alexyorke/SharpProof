@@ -1,4 +1,5 @@
 namespace SharpProof.Worker.Protocol;
+
 internal static class WorkerResultAssembler {
     internal const string EmptyInputHash = WorkerProtocolVersions.EmptySha256;
     internal static WorkerVerifyResponse Create(
@@ -70,5 +71,41 @@ internal static class WorkerResultAssembler {
 
     internal static WorkerClaimManifest EmptyManifest() {
         var manifest = new WorkerClaimManifest(); WorkerProtocolJson.SealManifest(manifest); return manifest;
+    }
+
+    internal static (WorkerRunStatus Status, WorkerRunFailureReason Failure,
+        bool FatalCallable, bool FatalClaim, bool TimedOut, bool Canceled) Classify(
+        IEnumerable<WorkerCallableResult>? callables, IEnumerable<WorkerClaimResult>? claims) {
+        var callableReasons = callables?.Where(static result => result != null)
+            .Select(static result => result.Reason).ToArray() ?? [];
+        var claimReasons = claims?.Where(static result => result != null)
+            .Select(static result => result.Reason).ToArray() ?? [];
+        var callableFailure = callableReasons.Contains(WorkerCallableCoverageReason.InfrastructureFailure)
+            ? WorkerRunFailureReason.InfrastructureFailure
+            : callableReasons.Contains(WorkerCallableCoverageReason.MissingClaimResult)
+                ? WorkerRunFailureReason.MalformedResult
+                : WorkerRunFailureReason.None;
+        var claimFailure = claimReasons.Contains(WorkerClaimReason.BackendUnavailable)
+            ? WorkerRunFailureReason.BackendUnavailable
+            : claimReasons.Contains(WorkerClaimReason.InfrastructureFailure)
+                ? WorkerRunFailureReason.InfrastructureFailure
+                : claimReasons.Contains(WorkerClaimReason.MalformedBackendResult)
+                    ? WorkerRunFailureReason.MalformedResult
+                    : claimReasons.Contains(WorkerClaimReason.CounterexampleReplayFailed)
+                        ? WorkerRunFailureReason.CounterexampleReplayFailed
+                        : WorkerRunFailureReason.None;
+        var failure = callableFailure != WorkerRunFailureReason.None ? callableFailure : claimFailure;
+        var canceled = callableReasons.Contains(WorkerCallableCoverageReason.Canceled) ||
+            claimReasons.Contains(WorkerClaimReason.Canceled);
+        var timedOut = callableReasons.Any(static reason => reason is
+                WorkerCallableCoverageReason.MethodTimeout or WorkerCallableCoverageReason.ProjectTimeout) ||
+            claimReasons.Any(static reason => reason is WorkerClaimReason.MethodTimeout or WorkerClaimReason.ProjectTimeout);
+        var status = failure != WorkerRunFailureReason.None ? WorkerRunStatus.Failed
+            : canceled ? WorkerRunStatus.Canceled
+            : timedOut ? WorkerRunStatus.TimedOut
+            : WorkerRunStatus.Complete;
+        return (status, failure,
+            callableFailure != WorkerRunFailureReason.None, claimFailure != WorkerRunFailureReason.None,
+            timedOut, canceled);
     }
 }

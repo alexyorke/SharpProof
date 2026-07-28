@@ -11,6 +11,22 @@ internal static class EffectContractDiagnostics {
         _ = DecodeAllowedExceptions(
             SelectAttributes(attributes, session.Attributes.AllowedExceptions),
             session.Compilation, location, session, reportDiagnostic);
+        if (!attributes.Any(attribute =>
+                AnalyzerAttributeSymbols.Is(
+                    attribute,
+                    session.Attributes.EffectContract)))
+            return;
+        var contract = session.ResolveEffectContract(method);
+        if (contract.Kind != EffectContractResolutionKind.Invalid ||
+            contract.InvalidAttribute == null ||
+            !session.TryMarkAttributeValidated(contract.InvalidAttribute))
+            return;
+        ReportInvalid(
+            contract.InvalidAttribute,
+            "[EffectContract]",
+            contract.InvalidReason,
+            location,
+            reportDiagnostic);
     }
 
     internal static AnalyzerSemanticOutcome Analyze(
@@ -30,11 +46,18 @@ internal static class EffectContractDiagnostics {
             SelectAttributes(attributes, session.Attributes.AllowedCapabilities);
         var exceptionAttributes =
             SelectAttributes(attributes, session.Attributes.AllowedExceptions);
+        var hasEffectContract = attributes.Any(attribute =>
+            AnalyzerAttributeSymbols.Is(
+                attribute,
+                session.Attributes.EffectContract));
+        var checksSourceEffectContract =
+            hasEffectContract && !method.IsAbstract && !method.IsExtern;
         if (!enforcePure &&
             !zeroAllocations &&
             !doesNotThrow &&
             capabilityAttributes.IsDefaultOrEmpty &&
-            exceptionAttributes.IsDefaultOrEmpty)
+            exceptionAttributes.IsDefaultOrEmpty &&
+            !checksSourceEffectContract)
             return AnalyzerSemanticOutcome.NotApplicable;
 
         var location = AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(declaration);
@@ -52,61 +75,75 @@ internal static class EffectContractDiagnostics {
         cancellationToken.ThrowIfCancellationRequested();
         var result = session.AnalyzeEffects(method, cancellationToken);
         var summary = result.Summary;
-        var isUnknown = IsUnknown(summary);
-        var unknownReason = FormatUnknown(summary);
         var hasUnknown =
             !capabilityAttributes.IsDefaultOrEmpty && !capabilities.IsValid ||
             !exceptionAttributes.IsDefaultOrEmpty && !exceptions.IsValid;
-
-        if (enforcePure && (isUnknown || !IsObservablePure(summary))) {
+        void Report(DiagnosticDescriptor rule, params object[] arguments) {
             hasUnknown = true;
-            reportDiagnostic(
-                Diagnostic.Create(
-                    GeneratedDiagnosticDescriptors.PurityNotVerifiedRule,
-                    location,
-                    method.Name));
+            reportDiagnostic(Diagnostic.Create(rule, location, arguments));
+        }
+
+        if (checksSourceEffectContract) {
+            var contract = session.ResolveEffectContract(method);
+            if (contract.Kind == EffectContractResolutionKind.Invalid)
+                hasUnknown = true;
+            else if (contract.Kind == EffectContractResolutionKind.Incomplete ||
+                     contract.Kind == EffectContractResolutionKind.Missing ||
+                     !Covers(summary, contract.Summary))
+                Report(
+                    GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+                    method.Name,
+                    contract.Kind == EffectContractResolutionKind.Incomplete
+                        ? "IncompleteEffectContract"
+                        : "EffectContractDoesNotCoverBodySummary");
+        }
+
+        if (enforcePure &&
+            (IsUnknown(summary, UnknownFacet.PurityUnknown) ||
+             !IsObservablePure(summary))) {
+            Report(
+                GeneratedDiagnosticDescriptors.PurityNotVerifiedRule,
+                method.Name);
         }
 
         if (zeroAllocations) {
-            if (isUnknown ||
+            var allocationUnknown = IsUnknown(
+                summary,
+                UnknownFacet.AllocationUnknown);
+            if (allocationUnknown ||
                 summary.Allocation != EffectAllocationKind.None) {
-                hasUnknown = true;
-                reportDiagnostic(
-                    Diagnostic.Create(
-                        GeneratedDiagnosticDescriptors.ZeroAllocationsNotVerifiedRule,
-                        location,
-                        method.Name,
-                        isUnknown
-                            ? unknownReason
-                            : "may-effect summary includes allocation: " +
-                              summary.Allocation));
+                Report(
+                    GeneratedDiagnosticDescriptors.ZeroAllocationsNotVerifiedRule,
+                    method.Name,
+                    allocationUnknown
+                        ? FormatUnknown(
+                            summary,
+                            UnknownFacet.AllocationUnknown)
+                        : "may-effect summary includes allocation: " +
+                          summary.Allocation);
             }
         }
 
         if (!capabilityAttributes.IsDefaultOrEmpty && capabilities.IsValid) {
-            if (isUnknown || summary.Capabilities.IsUnknown) {
-                hasUnknown = true;
-                reportDiagnostic(
-                    Diagnostic.Create(
-                        GeneratedDiagnosticDescriptors.CapabilityUnknownRule,
-                        location,
-                        "method summary",
-                        method.Name,
-                        unknownReason));
+            if (IsUnknown(summary, UnknownFacet.CapabilitySetUnknown)) {
+                Report(
+                    GeneratedDiagnosticDescriptors.CapabilityUnknownRule,
+                    "method summary",
+                    method.Name,
+                    FormatUnknown(
+                        summary,
+                        UnknownFacet.CapabilitySetUnknown));
             }
             else {
                 var actual = result.Projection.Capabilities;
                 var disallowed = actual & ~capabilities.Value;
                 if (disallowed != EffectContractCapabilityKind.None) {
-                    hasUnknown = true;
-                    reportDiagnostic(
-                        Diagnostic.Create(
-                            GeneratedDiagnosticDescriptors.CapabilityUnknownRule,
-                            location,
-                            "method summary",
-                            method.Name,
-                            "may-effect summary includes disallowed " +
-                            "capabilities: " + disallowed));
+                    Report(
+                        GeneratedDiagnosticDescriptors.CapabilityUnknownRule,
+                        "method summary",
+                        method.Name,
+                        "may-effect summary includes disallowed " +
+                        "capabilities: " + disallowed);
                 }
             }
         }
@@ -116,15 +153,14 @@ internal static class EffectContractDiagnostics {
             var contractName = doesNotThrow
                 ? "[DoesNotThrow]"
                 : "[AllowedExceptions]";
-            if (isUnknown || summary.Throws.IncludesUnknown) {
-                hasUnknown = true;
-                reportDiagnostic(
-                    Diagnostic.Create(
-                        GeneratedDiagnosticDescriptors.ExceptionContractNotVerifiedRule,
-                        location,
-                        method.Name,
-                        contractName,
-                        unknownReason));
+            if (IsUnknown(summary, UnknownFacet.ExceptionSetUnknown)) {
+                Report(
+                    GeneratedDiagnosticDescriptors.ExceptionContractNotVerifiedRule,
+                    method.Name,
+                    contractName,
+                    FormatUnknown(
+                        summary,
+                        UnknownFacet.ExceptionSetUnknown));
             }
             else {
                 var disallowed = doesNotThrow
@@ -132,17 +168,14 @@ internal static class EffectContractDiagnostics {
                     : [.. summary.Throws.Types
                         .Where(type => !IsAllowed(type, exceptions.Types))];
                 if (!disallowed.IsDefaultOrEmpty) {
-                    hasUnknown = true;
-                    reportDiagnostic(
-                        Diagnostic.Create(
-                            GeneratedDiagnosticDescriptors.ExceptionContractNotVerifiedRule,
-                            location,
-                            method.Name,
-                            contractName,
-                            "may-effect summary includes disallowed " +
-                            "exceptions: " + string.Join(
-                                ", ",
-                                disallowed.Select(static type => type.MetadataName))));
+                    Report(
+                        GeneratedDiagnosticDescriptors.ExceptionContractNotVerifiedRule,
+                        method.Name,
+                        contractName,
+                        "may-effect summary includes disallowed " +
+                        "exceptions: " + string.Join(
+                            ", ",
+                            disallowed.Select(static type => type.MetadataName)));
                 }
             }
         }
@@ -158,17 +191,19 @@ internal static class EffectContractDiagnostics {
         var value = EffectContractCapabilityKind.None;
         foreach (var attribute in attributes) {
             if (attribute.ConstructorArguments.Length != 1 ||
-                !TryGetInt64(attribute.ConstructorArguments[0], out var raw) ||
+                !EffectContractMetadata.TryConvertInt64(
+                    attribute.ConstructorArguments[0].Value,
+                    out var raw) ||
                 raw < 0 ||
                 ((EffectContractCapabilityKind)raw &
                  ~EffectContractMetadata.AllCapabilities) != 0) {
                 if (session.TryMarkAttributeValidated(attribute))
-                    reportDiagnostic(
-                        InvalidContractArgumentDiagnostics.Create(
-                            "[AllowedCapabilities]",
-                            "<invalid>",
-                            "expected a defined SharpProofCapability flags value",
-                            GetLocation(attribute, fallbackLocation)));
+                    ReportInvalid(
+                        attribute,
+                        "[AllowedCapabilities]",
+                        "expected a defined SharpProofCapability flags value",
+                        fallbackLocation,
+                        reportDiagnostic);
                 return (EffectContractCapabilityKind.None, false);
             }
             value |= (EffectContractCapabilityKind)raw;
@@ -195,37 +230,38 @@ internal static class EffectContractDiagnostics {
                 !values.IsDefault &&
                 values.All(argument =>
                     argument.Value is INamedTypeSymbol type &&
-                    IsDerivedFrom(type, exceptionType))) {
+                    EffectTypeFacts.IsDerivedFrom(type, exceptionType))) {
                 types.AddRange(values.Select(static argument =>
                     (INamedTypeSymbol)argument.Value!));
                 continue;
             }
-            ReportInvalidExceptions(
+            if (session.TryMarkAttributeValidated(attribute))
+                ReportInvalid(
                 attribute,
+                "[AllowedExceptions]",
+                "expected only System.Exception-derived types",
                 fallbackLocation,
-                session,
                 reportDiagnostic);
             isValid = false;
         }
         return isValid ? (types.ToImmutable(), true) : ([], false);
     }
 
-    private static void ReportInvalidExceptions(
+    private static void ReportInvalid(
         AttributeData attribute,
+        string contract,
+        string reason,
         Location fallbackLocation,
-        AnalyzerSession session,
-        Action<Diagnostic> reportDiagnostic) {
-        if (session.TryMarkAttributeValidated(attribute))
-            reportDiagnostic(
-                InvalidContractArgumentDiagnostics.Create(
-                    "[AllowedExceptions]",
-                    "<invalid>",
-                    "expected only System.Exception-derived types",
-                    GetLocation(attribute, fallbackLocation)));
-    }
+        Action<Diagnostic> reportDiagnostic) =>
+        reportDiagnostic(
+            InvalidContractArgumentDiagnostics.Create(
+                contract,
+                "<invalid>",
+                reason,
+                GetLocation(attribute, fallbackLocation)));
 
     private static bool IsObservablePure(EffectSummary summary) {
-        if (IsUnknown(summary) || !summary.Capabilities.IsEmpty)
+        if (!summary.Capabilities.IsEmpty)
             return false;
         if (summary.Reads.Regions.Any(static region =>
                 region.Kind is
@@ -237,58 +273,51 @@ internal static class EffectContractDiagnostics {
             region.Kind == EffectRegionKind.Fresh);
     }
 
-    private static bool IsUnknown(EffectSummary summary) {
-        const EffectUncertainty semanticUncertainty =
-            EffectUncertainty.Dispatch |
-            EffectUncertainty.UnsupportedOperation |
-            EffectUncertainty.UnmodeledCall |
-            EffectUncertainty.Recursion |
-            EffectUncertainty.InvalidContract;
-        return summary.IsBottom ||
-               summary.Completeness != EffectCompleteness.Complete ||
-               summary.Reads.IsUnknown ||
-               summary.Writes.IsUnknown ||
-               summary.Allocation == EffectAllocationKind.Unknown ||
-               summary.Capabilities.IsUnknown ||
-               summary.Throws.IncludesUnknown ||
-               (summary.Uncertainty & semanticUncertainty) != 0;
+    private static bool Covers(
+        EffectSummary actual,
+        EffectSummary declared) {
+        var actualProjection = EffectSummaryProjector.Project(actual);
+        var declaredProjection = EffectSummaryProjector.Project(declared);
+        return actualProjection.IsComplete &&
+               (actualProjection.Effects & ~declaredProjection.Effects) == 0 &&
+               (actualProjection.Capabilities &
+                ~declaredProjection.Capabilities) == 0 &&
+               actual.Throws.IsSubsetOf(declared.Throws);
     }
 
-    private static string FormatUnknown(EffectSummary summary) {
-        if (summary.Uncertainty != EffectUncertainty.None)
-            return summary.Uncertainty.ToString();
-        if (summary.Completeness != EffectCompleteness.Complete)
-            return "incomplete summary";
-        return "unknown effect facet";
-    }
+    private static bool IsUnknown(
+        EffectSummary summary,
+        UnknownFacet facet) =>
+        summary.IsBottom ||
+        facet switch {
+            UnknownFacet.PurityUnknown =>
+                summary.Reads.IsUnknown ||
+                summary.Writes.IsUnknown ||
+                summary.Capabilities.IsUnknown,
+            UnknownFacet.AllocationUnknown =>
+                summary.Allocation == EffectAllocationKind.Unknown,
+            UnknownFacet.CapabilitySetUnknown =>
+                summary.Capabilities.IsUnknown,
+            UnknownFacet.ExceptionSetUnknown =>
+                summary.Throws.IncludesUnknown,
+            _ => throw new ArgumentOutOfRangeException(nameof(facet))
+        };
+
+    private static string FormatUnknown(
+        EffectSummary summary,
+        UnknownFacet facet) =>
+        facet + ": " +
+        (summary.Uncertainty != EffectUncertainty.None
+            ? summary.Uncertainty.ToString()
+            : summary.Completeness != EffectCompleteness.Complete
+                ? "IncompleteSummary"
+                : "UnknownFacet");
 
     private static bool IsAllowed(
         INamedTypeSymbol thrown,
         ImmutableArray<INamedTypeSymbol> allowed) =>
-        allowed.Any(candidate => IsDerivedFrom(thrown, candidate));
-
-    private static bool IsDerivedFrom(
-        INamedTypeSymbol type,
-        INamedTypeSymbol expectedBase) {
-        for (var current = type; current != null; current = current.BaseType)
-            if (SymbolEqualityComparer.Default.Equals(
-                    current.OriginalDefinition,
-                    expectedBase.OriginalDefinition))
-                return true;
-        return false;
-    }
-
-    private static bool TryGetInt64(TypedConstant argument, out long value) {
-        if (argument.Value is
-            sbyte or byte or short or ushort or int or uint or long) {
-            value = Convert.ToInt64(
-                argument.Value,
-                CultureInfo.InvariantCulture);
-            return true;
-        }
-        value = 0;
-        return false;
-    }
+        allowed.Any(candidate =>
+            EffectTypeFacts.IsDerivedFrom(thrown, candidate));
 
     private static Location GetLocation(
         AttributeData attribute,
@@ -301,4 +330,11 @@ internal static class EffectContractDiagnostics {
         INamedTypeSymbol? expected) =>
         [.. attributes.Where(attribute =>
             AnalyzerAttributeSymbols.Is(attribute, expected))];
+
+    private enum UnknownFacet {
+        PurityUnknown,
+        AllocationUnknown,
+        CapabilitySetUnknown,
+        ExceptionSetUnknown
+    }
 }

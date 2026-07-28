@@ -123,7 +123,113 @@ public sealed class IrSmtBackendTests {
     }
 
     [Test]
-    public async Task UndefinedGoalStateCannotProduceAProof() {
+    public async Task SignedRemainderOverflowProducesTypedUnknown() {
+        var factory = new IrFactory();
+        var dividend = factory.CreateVariable("dividend", factory.IntegerType);
+        var divisor = factory.CreateVariable("divisor", factory.IntegerType);
+        var dividendIsMinimum = factory.Binary(
+            IrBinaryOperator.Equal,
+            factory.Variable(dividend),
+            factory.Integer(long.MinValue));
+        var divisorIsNegativeOne = factory.Binary(
+            IrBinaryOperator.Equal,
+            factory.Variable(divisor),
+            factory.Integer(-1));
+        var remainder = factory.Binary(
+            IrBinaryOperator.Remainder,
+            factory.Variable(dividend),
+            factory.Variable(divisor));
+        var query = new VerificationQuery(
+            factory,
+            [
+                new Assumption(
+                    factory,
+                    dividendIsMinimum,
+                    new LoweredJustification(factory.CreateOperation("minimum"))),
+                new Assumption(
+                    factory,
+                    divisorIsNegativeOne,
+                    new LoweredJustification(factory.CreateOperation("negative-one")))
+            ],
+            new Goal(
+                factory,
+                factory.Binary(
+                    IrBinaryOperator.Equal,
+                    remainder,
+                    factory.Integer(0)),
+                ProofDiagnosticKind.Postcondition,
+                new SourceLocationId(0)));
+
+        using var backend = new IrSmtBackend();
+        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+
+        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+        Assert.That(
+            ((UnknownOutcome)outcome).Reason,
+            Is.EqualTo(AbstentionReason.PostconditionMayBeUndefined));
+    }
+
+    [TestCase(-7L, 3L, -2L, -1L)]
+    [TestCase(7L, -3L, -2L, 1L)]
+    [TestCase(-7L, -3L, 2L, -1L)]
+    public async Task SignedDivisionAndRemainderRoundTowardZero(
+        long dividendValue,
+        long divisorValue,
+        long expectedQuotient,
+        long expectedRemainder) {
+        var factory = new IrFactory();
+        var dividend = factory.CreateVariable("dividend", factory.IntegerType);
+        var divisor = factory.CreateVariable("divisor", factory.IntegerType);
+        var quotient = factory.Binary(
+            IrBinaryOperator.Divide,
+            factory.Variable(dividend),
+            factory.Variable(divisor));
+        var remainder = factory.Binary(
+            IrBinaryOperator.Remainder,
+            factory.Variable(dividend),
+            factory.Variable(divisor));
+        var goal = factory.Binary(
+            IrBinaryOperator.AndAlso,
+            factory.Binary(
+                IrBinaryOperator.Equal,
+                quotient,
+                factory.Integer(expectedQuotient)),
+            factory.Binary(
+                IrBinaryOperator.Equal,
+                remainder,
+                factory.Integer(expectedRemainder)));
+        var query = new VerificationQuery(
+            factory,
+            [
+                new Assumption(
+                    factory,
+                    factory.Binary(
+                        IrBinaryOperator.Equal,
+                        factory.Variable(dividend),
+                        factory.Integer(dividendValue)),
+                    new LoweredJustification(factory.CreateOperation("dividend"))),
+                new Assumption(
+                    factory,
+                    factory.Binary(
+                        IrBinaryOperator.Equal,
+                        factory.Variable(divisor),
+                        factory.Integer(divisorValue)),
+                    new LoweredJustification(factory.CreateOperation("divisor")))
+            ],
+            new Goal(
+                factory,
+                goal,
+                ProofDiagnosticKind.Postcondition,
+                new SourceLocationId(0)));
+
+        using var backend = new IrSmtBackend();
+        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+
+        Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
+    }
+
+    [Test]
+    public async Task UndefinedGoalStateProducesTypedUnknown() {
         var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var quotient = factory.Binary(
@@ -149,7 +255,7 @@ public sealed class IrSmtBackendTests {
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(
             ((UnknownOutcome)outcome).Reason,
-            Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
+            Is.EqualTo(AbstentionReason.PostconditionMayBeUndefined));
     }
 
     [Test]
@@ -249,5 +355,67 @@ public sealed class IrSmtBackendTests {
         Func<Task> action = () => backend.CheckAsync(query, cancellation.Token);
 
         Assert.ThrowsAsync<OperationCanceledException>(action);
+    }
+
+    [Test]
+    public void NativeUnknownReasonsAreClassifiedPrecisely() {
+        var classify = typeof(IrSmtBackend).GetMethod(
+            "ClassifyUnknown",
+            System.Reflection.BindingFlags.Static |
+            System.Reflection.BindingFlags.NonPublic);
+        Assert.That(classify, Is.Not.Null);
+
+        Assert.That(
+            classify!.Invoke(null, ["timeout"]),
+            Is.EqualTo(BackendFailureReason.Timeout));
+        Assert.That(
+            classify.Invoke(null, ["resource limit"]),
+            Is.EqualTo(BackendFailureReason.ResourceLimit));
+        Assert.That(
+            classify.Invoke(null, ["opaque backend failure"]),
+            Is.EqualTo(BackendFailureReason.InfrastructureFailure));
+    }
+
+    [Test]
+    public void ActiveCancellationInterruptsTheNativeContext() {
+        var factory = new IrFactory();
+        var operation = factory.CreateOperation("repeated");
+        var assumption = new Assumption(
+            factory,
+            factory.Boolean(true),
+            new LoweredJustification(operation));
+        var query = new VerificationQuery(
+            factory,
+            Enumerable.Repeat(assumption, 20_000),
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        using var backend = new IrSmtBackend();
+        using var cancellation = new CancellationTokenSource();
+        var gate = typeof(IrSmtBackend).GetField(
+                "_gate",
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic)?
+            .GetValue(backend);
+        Assert.That(gate, Is.Not.Null);
+
+        var check = backend.CheckAsync(query, cancellation.Token);
+        var entered = SpinWait.SpinUntil(
+            () => IsMonitorHeld(gate!),
+            TimeSpan.FromSeconds(5));
+        Assert.That(entered, Is.True);
+        Thread.Sleep(10);
+        cancellation.Cancel();
+
+        Func<Task> action = async () => await check;
+        Assert.ThrowsAsync<OperationCanceledException>(action);
+    }
+
+    private static bool IsMonitorHeld(object gate) {
+        if (!Monitor.TryEnter(gate)) return true;
+        Monitor.Exit(gate);
+        return false;
     }
 }

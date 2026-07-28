@@ -35,4 +35,20 @@ internal static class EffectContractMetadata {
         (EffectContractKind)((1L << 16) - 1);
     internal const EffectContractCapabilityKind AllCapabilities =
         (EffectContractCapabilityKind)((1 << 13) - 1);
+
+    internal static bool TryConvertInt64(object? value, out long result) {
+        try {
+            result = Convert.ToInt64(
+                value,
+                System.Globalization.CultureInfo.InvariantCulture);
+            return value != null;
+        }
+        catch (Exception exception) when (
+            exception is InvalidCastException or
+            FormatException or
+            OverflowException) {
+            result = 0;
+            return false;
+        }
+    }
 }

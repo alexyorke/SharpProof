@@ -125,6 +125,20 @@ internal sealed class ContractApiTests {
                 AttributeTargets.Property));
     }
 
+    [Test]
+    public void EffectContractsDefaultToPartialConservativeEvidence() {
+        var contract = new EffectContractAttribute(SharpProofEffect.None);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                contract.Capabilities,
+                Is.EqualTo(SharpProofCapability.None));
+            Assert.That(contract.ThrownExceptions, Is.Empty);
+            Assert.That(contract.IsDeterministic, Is.False);
+            Assert.That(contract.Complete, Is.False);
+        }
+    }
+
     private static TException Capture<TException>(Action action)
         where TException : Exception {
         try {

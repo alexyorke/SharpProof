@@ -1,0 +1,789 @@
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$PackageSource,
+
+    [Parameter()]
+    [string]$Source,
+
+    [Parameter()]
+    [string]$ApiKey,
+
+    [Parameter()]
+    [string]$ReadApiKey,
+
+    [Parameter()]
+    [string]$SymbolSource,
+
+    [Parameter()]
+    [string]$SymbolApiKey,
+
+    [Parameter()]
+    [ValidateRange(1, 3600)]
+    [int]$TimeoutSeconds = 300,
+
+    [Parameter()]
+    [string]$DotNetPath = 'dotnet',
+
+    [Parameter()]
+    [switch]$PlanOnly,
+
+    [Parameter()]
+    [string]$RemotePackageDirectory,
+
+    [Parameter()]
+    [string]$PlanOutputPath
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$packageOrder = @(
+    'SharpProof.Attributes',
+    'SharpProof',
+    'SharpProof.Verifier.Win-x64'
+)
+
+function Get-RequiredProperty {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Value,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Owner
+    )
+
+    $property = $Value.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        throw "$Owner is missing required property '$Name'."
+    }
+    return $property.Value
+}
+
+function Get-PackageIdentity {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $archive = [IO.Compression.ZipFile]::OpenRead($Path)
+    try {
+        $nuspecEntries = @(
+            $archive.Entries |
+                Where-Object {
+                    $_.FullName.EndsWith(
+                        '.nuspec',
+                        [StringComparison]::OrdinalIgnoreCase)
+                }
+        )
+        if ($nuspecEntries.Count -ne 1) {
+            throw "Package '$Path' must contain exactly one nuspec."
+        }
+        $reader = [IO.StreamReader]::new($nuspecEntries[0].Open())
+        try {
+            [xml]$nuspec = $reader.ReadToEnd()
+        }
+        finally {
+            $reader.Dispose()
+        }
+        $namespaces = [Xml.XmlNamespaceManager]::new($nuspec.NameTable)
+        $namespaces.AddNamespace(
+            'n',
+            $nuspec.DocumentElement.NamespaceURI)
+        $metadata = $nuspec.SelectSingleNode(
+            '/n:package/n:metadata',
+            $namespaces)
+        if ($null -eq $metadata) {
+            throw "Package '$Path' has no nuspec metadata."
+        }
+        $id = $metadata.SelectSingleNode('n:id', $namespaces)
+        $version = $metadata.SelectSingleNode('n:version', $namespaces)
+        if ($null -eq $id -or $null -eq $version) {
+            throw "Package '$Path' has incomplete identity metadata."
+        }
+        return [pscustomobject][ordered]@{
+            id = $id.InnerText
+            version = $version.InnerText
+        }
+    }
+    finally {
+        $archive.Dispose()
+    }
+}
+
+function Get-ArtifactPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Directory,
+
+        [Parameter(Mandatory = $true)]
+        [string]$FileName
+    )
+
+    if ([string]::IsNullOrWhiteSpace($FileName) -or
+        $FileName -eq '.' -or
+        $FileName -eq '..' -or
+        $FileName -match '[\r\n]' -or
+        $FileName.Contains('/', [StringComparison]::Ordinal) -or
+        $FileName.Contains('\', [StringComparison]::Ordinal) -or
+        [IO.Path]::GetFileName($FileName) -ne $FileName) {
+        throw "Release artifact has an unsafe file name: '$FileName'."
+    }
+    $path = [IO.Path]::GetFullPath((Join-Path $Directory $FileName))
+    $parent = [IO.Path]::GetDirectoryName($path)
+    if (-not [string]::Equals(
+            $parent,
+            $Directory,
+            [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Release artifact escapes PackageSource: '$FileName'."
+    }
+    return $path
+}
+
+function Get-ValidatedRelease {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Directory
+    )
+
+    $manifestPath = Join-Path $Directory 'SharpProof.release.json'
+    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+        throw "Release manifest is missing: $manifestPath"
+    }
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw |
+        ConvertFrom-Json
+    if ((Get-RequiredProperty $manifest 'schemaVersion' 'Release manifest') -ne
+            2 -or
+        [string](Get-RequiredProperty `
+            $manifest `
+            'hashAlgorithm' `
+            'Release manifest') -ne 'SHA256') {
+        throw 'Release manifest must use schema 2 and SHA256.'
+    }
+    $version = [string](Get-RequiredProperty `
+        $manifest `
+        'packageVersion' `
+        'Release manifest')
+    if ($version -notmatch
+        '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$') {
+        throw "Release manifest package version is invalid: '$version'."
+    }
+
+    $repository = Get-RequiredProperty `
+        $manifest `
+        'repository' `
+        'Release manifest'
+    if ([string](Get-RequiredProperty `
+            $repository `
+            'type' `
+            'Release repository') -ne 'git' -or
+        [string](Get-RequiredProperty `
+            $repository `
+            'url' `
+            'Release repository') -ne
+                'https://github.com/alexyorke/SharpProof' -or
+        [string](Get-RequiredProperty `
+            $repository `
+            'commit' `
+            'Release repository') -notmatch '^[0-9a-f]{40}$') {
+        throw 'Release manifest repository identity is invalid.'
+    }
+
+    $artifacts = @(
+        Get-RequiredProperty $manifest 'artifacts' 'Release manifest'
+    )
+    if ($artifacts.Count -ne 7) {
+        throw 'Release manifest must contain exactly seven artifacts.'
+    }
+    $seenFileNames = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::OrdinalIgnoreCase)
+    foreach ($artifact in $artifacts) {
+        $fileName = [string](Get-RequiredProperty `
+            $artifact `
+            'fileName' `
+            'Release artifact')
+        $kind = [string](Get-RequiredProperty `
+            $artifact `
+            'kind' `
+            "Release artifact '$fileName'")
+        $bytes = [int64](Get-RequiredProperty `
+            $artifact `
+            'bytes' `
+            "Release artifact '$fileName'")
+        $sha256 = [string](Get-RequiredProperty `
+            $artifact `
+            'sha256' `
+            "Release artifact '$fileName'")
+        if (-not $seenFileNames.Add($fileName) -or
+            $kind -notin @('package', 'symbols', 'sbom') -or
+            $bytes -lt 0 -or
+            $sha256 -notmatch '^[0-9a-f]{64}$') {
+            throw "Release artifact metadata is invalid: '$fileName'."
+        }
+        $path = Get-ArtifactPath `
+            -Directory $Directory `
+            -FileName $fileName
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "Release artifact is missing: $path"
+        }
+        $file = Get-Item -LiteralPath $path
+        $actualHash = (Get-FileHash `
+            -LiteralPath $path `
+            -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ([int64]$file.Length -ne $bytes -or
+            $actualHash -ne $sha256) {
+            throw "Release artifact does not match its manifest: '$fileName'."
+        }
+    }
+
+    $packageArtifacts = @(
+        $artifacts |
+            Where-Object {
+                [string]$_.kind -in @('package', 'symbols')
+            }
+    )
+    $sbomArtifacts = @(
+        $artifacts |
+            Where-Object { [string]$_.kind -eq 'sbom' }
+    )
+    if ($packageArtifacts.Count -ne 6 -or
+        $sbomArtifacts.Count -ne 1 -or
+        [string]$sbomArtifacts[0].fileName -ne 'SharpProof.spdx.json') {
+        throw 'Release manifest has an invalid package, symbol, or SBOM graph.'
+    }
+
+    $packages = [Collections.Generic.List[object]]::new()
+    foreach ($packageId in $packageOrder) {
+        $main = @(
+            $packageArtifacts |
+                Where-Object {
+                    [string]$_.kind -eq 'package' -and
+                    [string]$_.packageId -eq $packageId
+                }
+        )
+        $symbols = @(
+            $packageArtifacts |
+                Where-Object {
+                    [string]$_.kind -eq 'symbols' -and
+                    [string]$_.packageId -eq $packageId
+                }
+        )
+        if ($main.Count -ne 1 -or $symbols.Count -ne 1) {
+            throw (
+                "Release manifest must contain one package and symbol " +
+                "artifact for '$packageId'.")
+        }
+        if (-not ([string]$main[0].fileName).EndsWith(
+                '.nupkg',
+                [StringComparison]::OrdinalIgnoreCase) -or
+            ([string]$main[0].fileName).EndsWith(
+                '.snupkg',
+                [StringComparison]::OrdinalIgnoreCase) -or
+            -not ([string]$symbols[0].fileName).EndsWith(
+                '.snupkg',
+                [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Release package extensions are invalid for '$packageId'."
+        }
+        $mainPath = Get-ArtifactPath `
+            -Directory $Directory `
+            -FileName ([string]$main[0].fileName)
+        $symbolsPath = Get-ArtifactPath `
+            -Directory $Directory `
+            -FileName ([string]$symbols[0].fileName)
+        $mainIdentity = Get-PackageIdentity -Path $mainPath
+        $symbolsIdentity = Get-PackageIdentity -Path $symbolsPath
+        if ($mainIdentity.id -ne $packageId -or
+            $symbolsIdentity.id -ne $packageId -or
+            $mainIdentity.version -ne $version -or
+            $symbolsIdentity.version -ne $version) {
+            throw "Release package identity is invalid for '$packageId'."
+        }
+        $packages.Add([pscustomobject][ordered]@{
+            packageId = $packageId
+            version = $version
+            mainFileName = [string]$main[0].fileName
+            mainPath = $mainPath
+            symbolsFileName = [string]$symbols[0].fileName
+            symbolsPath = $symbolsPath
+        })
+    }
+    $actualPackageIds = @(
+        $packageArtifacts |
+            ForEach-Object { [string]$_.packageId } |
+            Sort-Object -Unique
+    )
+    if (($actualPackageIds -join '|') -ne
+        (@($packageOrder | Sort-Object) -join '|')) {
+        throw 'Release manifest contains an unexpected package ID.'
+    }
+
+    return [pscustomobject][ordered]@{
+        version = $version
+        packages = @($packages)
+    }
+}
+
+function Get-ZipPayloadInventory {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $archive = [IO.Compression.ZipFile]::OpenRead($Path)
+    try {
+        $allNames = [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::OrdinalIgnoreCase)
+        $inventory = [Collections.Generic.Dictionary[string, object]]::new(
+            [StringComparer]::Ordinal)
+        foreach ($entry in $archive.Entries) {
+            if (-not $allNames.Add($entry.FullName)) {
+                throw "Package '$Path' has duplicate ZIP entry names."
+            }
+            if ([string]::Equals(
+                    $entry.FullName,
+                    '.signature.p7s',
+                    [StringComparison]::OrdinalIgnoreCase)) {
+                continue
+            }
+            $stream = $entry.Open()
+            $algorithm = [Security.Cryptography.SHA256]::Create()
+            try {
+                $hash = [Convert]::ToHexString(
+                    $algorithm.ComputeHash($stream)).ToLowerInvariant()
+            }
+            finally {
+                $algorithm.Dispose()
+                $stream.Dispose()
+            }
+            $inventory.Add(
+                $entry.FullName,
+                [pscustomobject][ordered]@{
+                    length = [int64]$entry.Length
+                    sha256 = $hash
+                })
+        }
+        return $inventory
+    }
+    finally {
+        $archive.Dispose()
+    }
+}
+
+function Test-ZipPayloadEquality {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$LocalPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$RemotePath
+    )
+
+    $local = Get-ZipPayloadInventory -Path $LocalPath
+    $remote = Get-ZipPayloadInventory -Path $RemotePath
+    if ($local.Count -ne $remote.Count) {
+        return $false
+    }
+    foreach ($name in $local.Keys) {
+        if (-not $remote.ContainsKey($name) -or
+            $local[$name].length -ne $remote[$name].length -or
+            $local[$name].sha256 -ne $remote[$name].sha256) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Invoke-V3Get {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Uri,
+
+        [Parameter()]
+        [string]$OutputPath
+    )
+
+    $parameters = @{
+        Uri = $Uri
+        Method = 'Get'
+        SkipHttpErrorCheck = $true
+        TimeoutSec = $TimeoutSeconds
+        ErrorAction = 'Stop'
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ReadApiKey)) {
+        $parameters.Headers = @{
+            'X-NuGet-ApiKey' = $ReadApiKey
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
+        $parameters.OutFile = $OutputPath
+        $parameters.PassThru = $true
+    }
+    return Invoke-WebRequest @parameters
+}
+
+function Get-V3PackageBaseAddress {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ServiceIndex
+    )
+
+    $serviceUri = $null
+    if (-not [Uri]::TryCreate(
+            $ServiceIndex,
+            [UriKind]::Absolute,
+            [ref]$serviceUri) -or
+        $serviceUri.Scheme -ne 'https') {
+        throw "NuGet source must be an HTTPS V3 service index: '$ServiceIndex'."
+    }
+    $response = Invoke-V3Get -Uri $serviceUri.AbsoluteUri
+    if ([int]$response.StatusCode -ne 200) {
+        throw (
+            "NuGet V3 service index returned HTTP " +
+            "$([int]$response.StatusCode): $ServiceIndex")
+    }
+    try {
+        $index = $response.Content | ConvertFrom-Json
+    }
+    catch {
+        throw "NuGet source is not a valid V3 service index: '$ServiceIndex'."
+    }
+    $resources = @(
+        Get-RequiredProperty $index 'resources' 'NuGet V3 service index'
+    )
+    $baseAddresses = @(
+        $resources |
+            Where-Object {
+                @($_.'@type') |
+                    Where-Object {
+                        [string]$_ -match '^PackageBaseAddress/'
+                    }
+            } |
+            ForEach-Object { [string]$_.'@id' } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Sort-Object -Unique
+    )
+    if ($baseAddresses.Count -ne 1) {
+        throw (
+            "NuGet V3 service index must expose exactly one " +
+            'PackageBaseAddress resource.')
+    }
+    $baseUri = $null
+    if (-not [Uri]::TryCreate(
+            $serviceUri,
+            $baseAddresses[0],
+            [ref]$baseUri) -or
+        $baseUri.Scheme -ne 'https') {
+        throw 'NuGet PackageBaseAddress must resolve to HTTPS.'
+    }
+    return $baseUri.AbsoluteUri.TrimEnd('/')
+}
+
+function Get-RemotePackageUrl {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$BaseAddress,
+
+        [Parameter(Mandatory = $true)]
+        [string]$PackageId,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Version
+    )
+
+    $normalizedId = $PackageId.ToLowerInvariant()
+    $normalizedVersion = $Version.ToLowerInvariant()
+    return (
+        $BaseAddress + '/' +
+        [Uri]::EscapeDataString($normalizedId) + '/' +
+        [Uri]::EscapeDataString($normalizedVersion) + '/' +
+        [Uri]::EscapeDataString(
+            "$normalizedId.$normalizedVersion.nupkg"))
+}
+
+function Get-RemotePackageState {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Package,
+
+        [Parameter()]
+        [string]$BaseAddress,
+
+        [Parameter()]
+        [string]$FixtureDirectory
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($FixtureDirectory)) {
+        $remotePath = Join-Path $FixtureDirectory $Package.mainFileName
+        if (-not (Test-Path -LiteralPath $remotePath -PathType Leaf)) {
+            return [pscustomobject][ordered]@{
+                state = 'Absent'
+                remoteUrl = $null
+            }
+        }
+        if (-not (Test-ZipPayloadEquality `
+                -LocalPath $Package.mainPath `
+                -RemotePath $remotePath)) {
+            throw (
+                "Remote package payload does not match the tested local " +
+                "package: $($Package.packageId) $($Package.version).")
+        }
+        return [pscustomobject][ordered]@{
+            state = 'Matching'
+            remoteUrl = $remotePath
+        }
+    }
+
+    $remoteUrl = Get-RemotePackageUrl `
+        -BaseAddress $BaseAddress `
+        -PackageId $Package.packageId `
+        -Version $Package.version
+    $temporaryPath = [IO.Path]::GetTempFileName()
+    try {
+        [IO.File]::Delete($temporaryPath)
+        $response = Invoke-V3Get `
+            -Uri $remoteUrl `
+            -OutputPath $temporaryPath
+        $status = [int]$response.StatusCode
+        if ($status -eq 404) {
+            return [pscustomobject][ordered]@{
+                state = 'Absent'
+                remoteUrl = $remoteUrl
+            }
+        }
+        if ($status -ne 200) {
+            throw (
+                "NuGet PackageBaseAddress returned HTTP $status for " +
+                "$($Package.packageId) $($Package.version).")
+        }
+        if (-not (Test-ZipPayloadEquality `
+                -LocalPath $Package.mainPath `
+                -RemotePath $temporaryPath)) {
+            throw (
+                "Remote package payload does not match the tested local " +
+                "package: $($Package.packageId) $($Package.version).")
+        }
+        return [pscustomobject][ordered]@{
+            state = 'Matching'
+            remoteUrl = $remoteUrl
+        }
+    }
+    finally {
+        if ([IO.File]::Exists($temporaryPath)) {
+            [IO.File]::Delete($temporaryPath)
+        }
+    }
+}
+
+function Invoke-NuGetPush {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Destination,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Key,
+
+        [Parameter(Mandatory = $true)]
+        [bool]$NoSymbols,
+
+        [Parameter(Mandatory = $true)]
+        [bool]$SkipDuplicate
+    )
+
+    $arguments = [Collections.Generic.List[string]]::new()
+    foreach ($argument in @(
+            'nuget',
+            'push',
+            $Path,
+            '--api-key',
+            $Key,
+            '--source',
+            $Destination,
+            '--timeout',
+            [string]$TimeoutSeconds)) {
+        $arguments.Add($argument)
+    }
+    if ($NoSymbols) {
+        $arguments.Add('--no-symbols')
+    }
+    if ($SkipDuplicate) {
+        $arguments.Add('--skip-duplicate')
+    }
+    & $DotNetPath @arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw (
+            "NuGet push failed with exit code $LASTEXITCODE for " +
+            "'$([IO.Path]::GetFileName($Path))'.")
+    }
+}
+
+function Write-PublicationPlan {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Plan
+    )
+
+    $json = ($Plan | ConvertTo-Json -Depth 6) -replace "`r`n", "`n"
+    $json += "`n"
+    if ([string]::IsNullOrWhiteSpace($PlanOutputPath)) {
+        Write-Output $json.TrimEnd()
+        return
+    }
+    $fullPath = [IO.Path]::GetFullPath($PlanOutputPath)
+    $directory = [IO.Path]::GetDirectoryName($fullPath)
+    if ([string]::IsNullOrWhiteSpace($directory)) {
+        throw "PlanOutputPath has no parent directory: '$PlanOutputPath'."
+    }
+    if (-not (Test-Path -LiteralPath $directory -PathType Container)) {
+        [IO.Directory]::CreateDirectory($directory) |
+            Out-Null
+    }
+    [IO.File]::WriteAllText(
+        $fullPath,
+        $json,
+        [Text.UTF8Encoding]::new($false))
+}
+
+$resolvedPackageSource = (Resolve-Path `
+    -LiteralPath $PackageSource `
+    -ErrorAction Stop).Path
+if (-not (Test-Path `
+        -LiteralPath $resolvedPackageSource `
+        -PathType Container)) {
+    throw "PackageSource is not a directory: $resolvedPackageSource"
+}
+if (-not $PlanOnly -and
+    -not [string]::IsNullOrWhiteSpace($RemotePackageDirectory)) {
+    throw 'RemotePackageDirectory is available only with PlanOnly.'
+}
+$resolvedRemoteDirectory = $null
+if (-not [string]::IsNullOrWhiteSpace($RemotePackageDirectory)) {
+    $resolvedRemoteDirectory = (Resolve-Path `
+        -LiteralPath $RemotePackageDirectory `
+        -ErrorAction Stop).Path
+    if (-not (Test-Path `
+            -LiteralPath $resolvedRemoteDirectory `
+            -PathType Container)) {
+        throw (
+            "RemotePackageDirectory is not a directory: " +
+            $resolvedRemoteDirectory)
+    }
+}
+if (-not $PlanOnly -and
+    ([string]::IsNullOrWhiteSpace($Source) -or
+     [string]::IsNullOrWhiteSpace($ApiKey))) {
+    throw 'Source and ApiKey are required for publication.'
+}
+if (-not $PlanOnly -and
+    $null -eq (Get-Command $DotNetPath -ErrorAction SilentlyContinue)) {
+    throw "DotNetPath is not executable: '$DotNetPath'."
+}
+
+$release = Get-ValidatedRelease -Directory $resolvedPackageSource
+$baseAddress = $null
+if (-not $PlanOnly) {
+    $baseAddress = Get-V3PackageBaseAddress -ServiceIndex $Source
+}
+$entries = [Collections.Generic.List[object]]::new()
+foreach ($package in $release.packages) {
+    $remote = if ($PlanOnly -and
+        [string]::IsNullOrWhiteSpace($resolvedRemoteDirectory)) {
+        [pscustomobject][ordered]@{
+            state = 'Unchecked'
+            remoteUrl = $null
+        }
+    }
+    else {
+        Get-RemotePackageState `
+            -Package $package `
+            -BaseAddress $baseAddress `
+            -FixtureDirectory $resolvedRemoteDirectory
+    }
+    $verifiedDuplicate = $remote.state -eq 'Matching'
+    $entries.Add([pscustomobject][ordered]@{
+        packageId = $package.packageId
+        version = $package.version
+        mainFileName = $package.mainFileName
+        symbolsFileName = $package.symbolsFileName
+        remoteState = $remote.state
+        remoteUrl = $remote.remoteUrl
+        mainAction = if ($verifiedDuplicate) {
+            'PushWithVerifiedSkipDuplicate'
+        }
+        elseif ($remote.state -eq 'Absent') {
+            'Push'
+        }
+        else {
+            'PreflightThenPush'
+        }
+        symbolsAction = if ($verifiedDuplicate) {
+            'PushWithVerifiedSkipDuplicate'
+        }
+        elseif ($remote.state -eq 'Absent') {
+            'Push'
+        }
+        else {
+            'PreflightThenPush'
+        }
+    })
+}
+
+$plan = [pscustomobject][ordered]@{
+    schemaVersion = 1
+    planOnly = [bool]$PlanOnly
+    packageVersion = $release.version
+    source = if ([string]::IsNullOrWhiteSpace($Source)) {
+        $null
+    }
+    else {
+        $Source
+    }
+    packages = @($entries)
+}
+if ($PlanOnly) {
+    Write-PublicationPlan -Plan $plan
+    return
+}
+
+$effectiveSymbolSource = if ([string]::IsNullOrWhiteSpace($SymbolSource)) {
+    $Source
+}
+else {
+    $SymbolSource
+}
+$effectiveSymbolApiKey = if (
+    [string]::IsNullOrWhiteSpace($SymbolApiKey)) {
+    $ApiKey
+}
+else {
+    $SymbolApiKey
+}
+for ($index = 0; $index -lt $release.packages.Count; $index++) {
+    $package = $release.packages[$index]
+    $entry = $entries[$index]
+    $verifiedDuplicate = $entry.remoteState -eq 'Matching'
+    Write-Host (
+        "Publishing $($package.packageId) $($package.version) " +
+        "main package.")
+    Invoke-NuGetPush `
+        -Path $package.mainPath `
+        -Destination $Source `
+        -Key $ApiKey `
+        -NoSymbols $true `
+        -SkipDuplicate $verifiedDuplicate
+    Write-Host (
+        "Publishing $($package.packageId) $($package.version) " +
+        "symbol package.")
+    Invoke-NuGetPush `
+        -Path $package.symbolsPath `
+        -Destination $effectiveSymbolSource `
+        -Key $effectiveSymbolApiKey `
+        -NoSymbols $false `
+        -SkipDuplicate $verifiedDuplicate
+}
+Write-PublicationPlan -Plan $plan

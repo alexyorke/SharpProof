@@ -17,22 +17,19 @@ internal static class RoslynOperatorSemantics {
             BinaryOperatorKind.Equals => IrBinaryOperator.Equal,
             BinaryOperatorKind.NotEquals => IrBinaryOperator.NotEqual,
             BinaryOperatorKind.LessThan => IrBinaryOperator.LessThan,
-            BinaryOperatorKind.LessThanOrEqual =>
-                IrBinaryOperator.LessThanOrEqual,
+            BinaryOperatorKind.LessThanOrEqual => IrBinaryOperator.LessThanOrEqual,
             BinaryOperatorKind.GreaterThan => IrBinaryOperator.GreaterThan,
-            BinaryOperatorKind.GreaterThanOrEqual =>
-                IrBinaryOperator.GreaterThanOrEqual,
+            BinaryOperatorKind.GreaterThanOrEqual => IrBinaryOperator.GreaterThanOrEqual,
             _ => null
         };
     internal static bool IsIntegerArithmetic(BinaryOperatorKind kind) =>
-        kind is BinaryOperatorKind.Add or
-            BinaryOperatorKind.Subtract or
-            BinaryOperatorKind.Multiply or
-            BinaryOperatorKind.Divide or
+        kind is
+            BinaryOperatorKind.Add or BinaryOperatorKind.Subtract or
+            BinaryOperatorKind.Multiply or BinaryOperatorKind.Divide or
             BinaryOperatorKind.Remainder;
     internal static bool RequiresCheckedArithmetic(BinaryOperatorKind kind) =>
-        kind is BinaryOperatorKind.Add or
-            BinaryOperatorKind.Subtract or
+        kind is
+            BinaryOperatorKind.Add or BinaryOperatorKind.Subtract or
             BinaryOperatorKind.Multiply;
     internal static bool IsValuePreservingIntegerConversion(
         SpecialType source,
@@ -44,20 +41,27 @@ internal static class RoslynOperatorSemantics {
                sourceRange.Value.Minimum >= targetRange.Value.Minimum &&
                sourceRange.Value.Maximum <= targetRange.Value.Maximum;
     }
-    private static IntegerRange? GetIntegerRange(SpecialType type) =>
+    internal static bool SupportsBuiltInOperands(
+        BinaryOperatorKind kind,
+        ITypeSymbol? left,
+        ITypeSymbol? right) =>
+        kind is not (BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals) ||
+        SupportsBuiltInEquality(left) && SupportsBuiltInEquality(right);
+    private static bool SupportsBuiltInEquality(ITypeSymbol? type) =>
+        type == null ||
+        type.IsReferenceType ||
+        type.SpecialType == SpecialType.System_Boolean ||
+        GetIntegerRange(type.SpecialType).HasValue;
+    private static (long Minimum, long Maximum)? GetIntegerRange(SpecialType type) =>
         type switch {
-            SpecialType.System_SByte => new(sbyte.MinValue, sbyte.MaxValue),
-            SpecialType.System_Byte => new(byte.MinValue, byte.MaxValue),
-            SpecialType.System_Int16 => new(short.MinValue, short.MaxValue),
-            SpecialType.System_UInt16 => new(ushort.MinValue, ushort.MaxValue),
-            SpecialType.System_Char => new(char.MinValue, char.MaxValue),
-            SpecialType.System_Int32 => new(int.MinValue, int.MaxValue),
-            SpecialType.System_UInt32 => new(uint.MinValue, uint.MaxValue),
-            SpecialType.System_Int64 => new(long.MinValue, long.MaxValue),
+            SpecialType.System_SByte => (sbyte.MinValue, sbyte.MaxValue),
+            SpecialType.System_Byte => (byte.MinValue, byte.MaxValue),
+            SpecialType.System_Int16 => (short.MinValue, short.MaxValue),
+            SpecialType.System_UInt16 => (ushort.MinValue, ushort.MaxValue),
+            SpecialType.System_Char => (char.MinValue, char.MaxValue),
+            SpecialType.System_Int32 => (int.MinValue, int.MaxValue),
+            SpecialType.System_UInt32 => (uint.MinValue, uint.MaxValue),
+            SpecialType.System_Int64 => (long.MinValue, long.MaxValue),
             _ => null
         };
-    private readonly struct IntegerRange(long minimum, long maximum) {
-        internal long Minimum { get; } = minimum;
-        internal long Maximum { get; } = maximum;
-    }
 }

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "minimumAggregateLinePercent": 86,
+  "minimumChangedTcbLinePercent": 90,
+  "projects": {
+    "SharpProof.Analyzer": 91.71,
+    "SharpProof.Attributes": 55.88,
+    "SharpProof.CompilerArtifact": 95.46,
+    "SharpProof.ContractForGenerator": 93.92,
+    "SharpProof.Contracts": 88.96,
+    "SharpProof.Dataflow": 93.24,
+    "SharpProof.Effects": 90.54,
+    "SharpProof.Frontend": 78.27,
+    "SharpProof.Gates": 78.57,
+    "SharpProof.Ir": 90.26,
+    "SharpProof.Meta.Analyzers": 98.01,
+    "SharpProof.Smt": 92.08,
+    "SharpProof.Specs": 72.33,
+    "SharpProof.Verify": 89.96,
+    "SharpProof.Worker": 85.21,
+    "SharpProof.Worker.Launcher": 26.05,
+    "SharpProof.Worker.Protocol": 96.57
+  }
+}

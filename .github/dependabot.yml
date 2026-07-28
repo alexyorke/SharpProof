@@ -8,3 +8,17 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "daily"
+    groups:
+      roslyn:
+        patterns:
+          - "Microsoft.CodeAnalysis.*"
+      test-platform:
+        patterns:
+          - "Microsoft.NET.Test.Sdk"
+          - "NUnit"
+          - "NUnit3TestAdapter"
+          - "coverlet.collector"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

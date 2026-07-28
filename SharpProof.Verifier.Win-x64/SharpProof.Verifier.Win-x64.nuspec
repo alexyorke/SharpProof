@@ -24,7 +24,7 @@
     <file src="buildTransitive\SharpProof.Verifier.Win-x64.targets" target="buildTransitive" />
     <file src="..\README.md" />
     <file src="..\LICENSE" />
-    <file src="THIRD-PARTY-NOTICES.txt" />
+    <file src="..\THIRD-PARTY-NOTICES.txt" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\Microsoft.Z3.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.CompilerArtifact.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.CompilerArtifact.pdb" target="tools\net9" />

@@ -248,9 +248,13 @@ public sealed class PartialTermSmtDifferentialOracle {
         };
 
     private static string Describe(ProofOutcome outcome) =>
-        outcome is UnknownOutcome unknown
-            ? "Unknown(" + unknown.Reason + ")"
-            : outcome.Kind.ToString();
+        outcome switch {
+            ProvenOutcome => "Proven",
+            RefutedOutcome => "Refuted",
+            UnknownOutcome unknown =>
+                "Unknown(" + unknown.Reason + ")",
+            _ => outcome.GetType().Name
+        };
 
     private static void Count(
         PartialTermSemanticOutcome outcome,

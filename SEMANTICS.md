@@ -17,13 +17,15 @@ SharpProof has three semantic outcomes:
   supported language, models, or resource limits.
 
 Unsupported syntax, missing or ambiguous specifications, approximate facts,
-budget exhaustion, solver timeout, and unsupported encoding produce
-claim-level `Unknown`. They never produce `Proven` or `Refuted`. Backend
-unavailability, infrastructure failure, malformed backend output, containment
-failure, and failed counterexample replay also prevent a semantic result, but
-protocol version 5 marks the whole run `Failed`; these conditions are fatal
-under every build policy. Unsupported unannotated analyzer callables remain
-silent. Explicitly selected unsupported callables produce SP0047.
+budget exhaustion, solver timeout, undefined postcondition evaluation, and
+unsupported encoding produce claim-level `Unknown`. A candidate model that
+depends on a modeled call which the independent interpreter cannot execute is
+also `Unknown`; it is never reported as a refutation. Backend unavailability,
+infrastructure failure, malformed backend output, containment failure, and a
+failed replay of an otherwise replayable counterexample make protocol version
+6 mark the whole run `Failed`; these conditions are fatal under every build
+policy. Unsupported unannotated analyzer callables remain silent. Explicitly
+selected unsupported callables produce SP0047.
 
 Approximate facts cannot be promoted to assumptions. A proof is valid only when
 its evidence core contains lowerings, resolved specifications, verified
@@ -38,7 +40,7 @@ exhaustion, and all `Unknown` outcomes are not reusable proof-cache entries.
 
 ## Accountable selection and worker runs
 
-Worker protocol version 5 separates `WorkerRunStatus` from
+Worker protocol version 6 separates `WorkerRunStatus` from
 `WorkerClaimOutcome`. The compiler-symbol-based manifest is sealed before
 verification. It contains every selected callable and every discovered
 postcondition with a stable semantic claim ID, evidence kind, dense ordinal,
@@ -183,9 +185,10 @@ Analyzer behavior is selected through the compilation-global
   call-site contract analysis, and `all` (the default) enables both. The
   package carries the same selection into the compiler artifact and its manifest.
 
-Feature and proof diagnostics are enabled informational diagnostics by default.
-Configuration and contract-usage errors remain enabled at their declared
-warning/error severity. `SharpProofMode`/`sharpproof_mode` and
+Effect and incomplete-proof diagnostics are enabled informational diagnostics
+by default. A concretely replayed false precondition is SP0027 at Warning.
+Configuration, contract-usage, and compiler-artifact errors remain enabled at
+their declared warning/error severity. `SharpProofMode`/`sharpproof_mode` and
 `all-experimental` are deprecated preview compatibility aliases and do not
 define the release interface.
 
@@ -245,5 +248,8 @@ separate interpreter and evaluates the original postcondition over the
 reconstructed state. Differential compiled-C# execution remains a test
 facility and is not run during user builds. A SAT result that depends on a
 spec-modeled call result which the replay interpreter cannot execute becomes
-`Unknown` with `CounterexampleReplayFailed`, never `Refuted`. SARIF projection
-is likewise not implemented.
+`Unknown` with `CounterexampleNotReplayable`, never `Refuted`. A replay
+discrepancy for an otherwise executable counterexample remains the fatal
+`CounterexampleReplayFailed` run failure. Optional SARIF 2.1.0 is a
+deterministic projection of the validated protocol response; it does not
+participate in proof construction or change build success.

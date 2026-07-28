@@ -60,6 +60,8 @@
   <Target Name="_SharpProofValidateConfiguration"
           BeforeTargets="CoreCompile"
           Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(NETCoreSdkVersion)' != '' AND $([MSBuild]::VersionLessThan('$(NETCoreSdkVersion)', '9.0.300'))"
+           Text="SharpProof analysis requires .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). Set SharpProofProfile=off to omit the analyzer on an older compiler host." />
     <Error Condition="'$(_SharpProofLegacyModeProvided)' == 'true' AND '$(_SharpProofLegacyModeNormalized)' != 'off' AND '$(_SharpProofLegacyModeNormalized)' != 'effects' AND '$(_SharpProofLegacyModeNormalized)' != 'contracts' AND '$(_SharpProofLegacyModeNormalized)' != 'all-experimental'"
            Text="SharpProofMode must be off, effects, contracts, or all-experimental while the preview compatibility alias remains available." />
     <Error Condition="'$(_SharpProofLegacyModeProvided)' == 'true' AND ('$(_SharpProofProfileProvided)' == 'true' OR '$(_SharpProofFeaturesProvided)' == 'true')"

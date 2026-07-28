@@ -38,6 +38,14 @@ internal static class ContractForSymbolMatcher {
               TypeParameterListsMatch(contractTarget.Target.TypeParameters, companion.TypeParameters)
             : companion.Arity == 0);
 
+    internal static ImmutableArray<IMethodSymbol> GetOrdinaryMethods(
+        INamedTypeSymbol type) =>
+        [.. type.GetMembers()
+            .OfType<IMethodSymbol>()
+            .Where(static method =>
+                method.MethodKind == MethodKind.Ordinary &&
+                !method.IsImplicitlyDeclared)];
+
     internal static bool MemberSignaturesMatch(
         IMethodSymbol target,
         IMethodSymbol companion) {

@@ -1,19 +1,14 @@
 namespace SharpProof.Worker;
-#pragma warning disable IDE0055 // Compact budget accounting preserves the fixed production-size ceiling.
-internal sealed class MethodResourceBudget {
-    private readonly Func<long>? _readConsumedResourceCount; private readonly long _queryRlimit;
-    private readonly long _methodRlimit; private readonly long _startingResourceCount; private long _reservedResourceCount;
 
-    internal MethodResourceBudget(Func<long>? readConsumedResourceCount, uint queryRlimit, uint methodRlimit) {
-        _readConsumedResourceCount = readConsumedResourceCount;
-        ArgumentOutOfRangeException.ThrowIfZero(queryRlimit);
-        ArgumentOutOfRangeException.ThrowIfLessThan(methodRlimit, queryRlimit);
-        _queryRlimit = queryRlimit; _methodRlimit = methodRlimit;
-        _startingResourceCount = _readConsumedResourceCount?.Invoke() ?? 0;
-        if (_startingResourceCount < 0)
-            throw new InvalidOperationException(
-                "The backend resource counter cannot be negative.");
-    }
+internal sealed class MethodResourceBudget(
+    Func<long>? readConsumedResourceCount, uint queryRlimit, uint methodRlimit) {
+    private readonly Func<long>? _readConsumedResourceCount = readConsumedResourceCount;
+    private readonly long _queryRlimit = queryRlimit > 0 ? queryRlimit :
+        throw new ArgumentOutOfRangeException(nameof(queryRlimit));
+    private readonly long _methodRlimit = methodRlimit >= queryRlimit ? methodRlimit :
+        throw new ArgumentOutOfRangeException(nameof(methodRlimit));
+    private readonly long _startingResourceCount = RequireNonnegative(readConsumedResourceCount?.Invoke() ?? 0);
+    private long _reservedResourceCount;
 
     internal bool TryStartQuery() {
         var consumed = GetConsumedResourceCount();
@@ -30,8 +25,10 @@ internal sealed class MethodResourceBudget {
             return _reservedResourceCount;
         var current = _readConsumedResourceCount();
         if (current < _startingResourceCount)
-            throw new InvalidOperationException(
-                "The backend resource counter must be monotonic.");
+            throw new InvalidOperationException("The backend resource counter must be monotonic.");
         return current - _startingResourceCount;
     }
+
+    private static long RequireNonnegative(long count) => count >= 0 ? count :
+        throw new InvalidOperationException("The backend resource counter cannot be negative.");
 }

@@ -17,8 +17,8 @@ public sealed class CallableCounterexampleReplayerTests {
                 factory.Binary(IrBinaryOperator.Equal,
                     factory.Variable(old), factory.Variable(current))));
 
-        Assert.That(CallableCounterexampleReplayer.TryReplay(
-            fixture.Target, 0, fixture.Model), Is.True);
+        Assert.That(CallableCounterexampleReplayer.Replay(
+            fixture.Target, 0, fixture.Model), Is.EqualTo(WorkerClaimReason.None));
     }
 
     [Test]
@@ -32,8 +32,8 @@ public sealed class CallableCounterexampleReplayerTests {
                     factory.Binary(IrBinaryOperator.Add,
                         factory.Variable(old), factory.Integer(1)))));
 
-        Assert.That(CallableCounterexampleReplayer.TryReplay(
-            fixture.Target, 0, fixture.Model), Is.False);
+        Assert.That(CallableCounterexampleReplayer.Replay(
+            fixture.Target, 0, fixture.Model), Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
     }
 
     [Test]
@@ -41,19 +41,19 @@ public sealed class CallableCounterexampleReplayerTests {
         var fixture = CreateIncrementingBranch(static (factory, _, _, _) =>
             factory.Boolean(false));
 
-        Assert.That(CallableCounterexampleReplayer.TryReplay(
+        Assert.That(CallableCounterexampleReplayer.Replay(
             fixture.Target, 0,
-            ImmutableDictionary<IrVarId, IrValue>.Empty), Is.False);
+            ImmutableDictionary<IrVarId, IrValue>.Empty), Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
     }
 
     [Test]
     public void TrivialNormalCompletionRequiresItsPostconditionToBeFalse() {
-        Assert.That(CallableCounterexampleReplayer.TryReplay(
+        Assert.That(CallableCounterexampleReplayer.Replay(
             CreateTrivial(postcondition: false), 0,
-            ImmutableDictionary<IrVarId, IrValue>.Empty), Is.True);
-        Assert.That(CallableCounterexampleReplayer.TryReplay(
+            ImmutableDictionary<IrVarId, IrValue>.Empty), Is.EqualTo(WorkerClaimReason.None));
+        Assert.That(CallableCounterexampleReplayer.Replay(
             CreateTrivial(postcondition: true), 0,
-            ImmutableDictionary<IrVarId, IrValue>.Empty), Is.False);
+            ImmutableDictionary<IrVarId, IrValue>.Empty), Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
     }
 
     [Test]
@@ -80,8 +80,8 @@ public sealed class CallableCounterexampleReplayerTests {
                 return builder.Build();
             });
 
-        Assert.That(CallableCounterexampleReplayer.TryReplay(
-            fixture.Target, 0, fixture.Model), Is.True);
+        Assert.That(CallableCounterexampleReplayer.Replay(
+            fixture.Target, 0, fixture.Model), Is.EqualTo(WorkerClaimReason.None));
     }
 
     [Test]
@@ -98,8 +98,8 @@ public sealed class CallableCounterexampleReplayerTests {
                 return builder.Build();
             });
 
-        Assert.That(CallableCounterexampleReplayer.TryReplay(
-            fixture.Target, 0, fixture.Model), Is.False);
+        Assert.That(CallableCounterexampleReplayer.Replay(
+            fixture.Target, 0, fixture.Model), Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
     }
 
     [TestCase(ReplayObstacle.Call)]
@@ -109,8 +109,8 @@ public sealed class CallableCounterexampleReplayerTests {
     public void ReplayFailsClosedAtNonConcreteExecution(ReplayObstacle obstacle) {
         var fixture = CreateObstacle(obstacle);
 
-        Assert.That(CallableCounterexampleReplayer.TryReplay(
-            fixture.Target, 0, fixture.Model), Is.False);
+        Assert.That(CallableCounterexampleReplayer.Replay(
+            fixture.Target, 0, fixture.Model), Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
     }
 
     [Test]
@@ -119,11 +119,55 @@ public sealed class CallableCounterexampleReplayerTests {
         var cancellationToken = new CancellationToken(canceled: true);
 
         Assert.Throws<OperationCanceledException>(new Action(() =>
-            _ = CallableCounterexampleReplayer.TryReplay(
+            _ = CallableCounterexampleReplayer.Replay(
                 target,
                 0,
                 ImmutableDictionary<IrVarId, IrValue>.Empty,
                 cancellationToken)));
+    }
+
+    [Test]
+    public void ReplayFailsClosedForMalformedCanonicalResultIdentity() {
+        var factory = new IrFactory();
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        builder.Return(
+            entry,
+            factory.CreateOperation(),
+            factory.Integer(0));
+        var target = new CompilerCallablePreparation(
+            factory,
+            new WorkerCallableManifestEntry {
+                CallableId = "malformed-result",
+                ClaimIds = ["claim"]
+            },
+            [new CompilerPreparedClause(
+                CompilerContractKind.Ensures,
+                factory.Boolean(false),
+                CompilerContractEvidence.CompilerBoundInvocation,
+                "claim",
+                null)],
+            [new CompilerCanonicalVariable(
+                CompilerVariableRole.Result,
+                -1,
+                default,
+                null,
+                null,
+                "result")],
+            WorkerClaimReason.None,
+            CompilerPreparedBody.ProgramBody(
+                builder.Build(),
+                ImmutableDictionary<IrVarId, IrVarId>.Empty,
+                ImmutableDictionary<
+                    IrInstructionId,
+                    CompilerPreparedSpecCall>.Empty));
+
+        Assert.That(
+            CallableCounterexampleReplayer.Replay(
+                target,
+                0,
+                ImmutableDictionary<IrVarId, IrValue>.Empty),
+            Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
     }
 
     private static ReplayFixture CreateIncrementingBranch(

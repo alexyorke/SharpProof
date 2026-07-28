@@ -189,7 +189,9 @@ until it has concrete effect-trace replay.
 
 The analyzer emits SP0047 when a contract or SharpProof annotation explicitly
 selects a method but the method is outside the supported analyzer subset.
-Unannotated unsupported methods remain silent.
+This includes selected abstract, interface, and `extern` declarations that have
+no operation body. Unannotated or explicitly suppressed unsupported methods
+remain silent.
 
 The verifier launcher also emits SP0047 when one or more selected callables
 have incomplete coverage or an `Unknown` claim. Its severity comes from

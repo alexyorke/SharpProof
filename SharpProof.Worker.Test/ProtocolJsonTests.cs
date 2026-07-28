@@ -21,15 +21,15 @@ public sealed class ProtocolJsonTests {
     ];
 
     [Test]
-    public void VersionFiveRequestCarriesOnlyArtifactAndRuntimeControls() {
+    public void VersionSixRequestCarriesOnlyArtifactAndRuntimeControls() {
         var request = CreateRequest();
         var json = WorkerProtocolJson.SerializeRequest(request);
         var roundTrip = WorkerProtocolJson.DeserializeRequest(json)!;
         using var document = JsonDocument.Parse(json);
 
         using (Assert.EnterMultipleScope()) {
-            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("5"));
-            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(6));
+            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("6"));
+            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(7));
             Assert.That(WorkerManifestVersions.Current, Is.EqualTo(2));
             Assert.That(
                 document.RootElement.EnumerateObject()
@@ -83,7 +83,7 @@ public sealed class ProtocolJsonTests {
 
         using (Assert.EnterMultipleScope()) {
             Assert.That(roundTrip.SchemaVersion, Is.EqualTo(3));
-            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("5"));
+            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("6"));
             Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(manifest.Hash));
             Assert.That(roundTrip.Manifest.Callables[0].Assumptions, Has.Length.EqualTo(2));
             Assert.That(

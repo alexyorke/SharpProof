@@ -49,5 +49,7 @@ public sealed class ContractClauseInventory {
     public IOperation? ImplementationBody { get; }
     public ImmutableArray<ContractClauseOccurrence> Clauses { get; }
     public bool HasPlacementErrors =>
-        Clauses.Any(static clause => !clause.IsValid);
+        Clauses.Any(static clause =>
+            !clause.IsValid &&
+            clause.Placement != ContractClausePlacement.NestedCallable);
 }

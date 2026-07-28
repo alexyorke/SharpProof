@@ -20,8 +20,11 @@ public sealed class EffectAnalysisSession {
         _definedPreprocessorSymbols = [];
     private readonly ExternalEffectResolver _external;
     private readonly object _gate = new();
-    private volatile ImmutableDictionary<IMethodSymbol, EffectSummary>? _summaries;
-    private ImmutableArray<IMethodSymbol> _orderedMethods;
+    private readonly Dictionary<IMethodSymbol, EffectMethodNode> _nodes =
+        new(SymbolEqualityComparer.Default);
+    private volatile ImmutableDictionary<IMethodSymbol, EffectSummary> _summaries =
+        ImmutableDictionary.Create<IMethodSymbol, EffectSummary>(
+            SymbolEqualityComparer.Default);
 
     public EffectAnalysisSession(
         Compilation compilation, ApiSpecTable? apiSpecs = null)
@@ -47,6 +50,10 @@ public sealed class EffectAnalysisSession {
     public Compilation Compilation => _compilation;
     internal ResolvedApiSpecTable ApiSpecs => _external.ApiSpecs;
 
+    internal EffectContractResolution ResolveExternalContract(
+        IMethodSymbol method) =>
+        _external.ResolveContract(method);
+
     public EffectMethodResult Analyze(
         IMethodSymbol method, CancellationToken cancellationToken = default) {
         if (method == null) throw new ArgumentNullException(nameof(method));
@@ -56,10 +63,10 @@ public sealed class EffectAnalysisSession {
             return new EffectMethodResult(
                 normalized,
                 _external.Resolve(normalized));
-        EnsureAnalyzed(cancellationToken);
+        EnsureAnalyzed([normalized], cancellationToken);
         return new EffectMethodResult(
             normalized,
-            _summaries!.TryGetValue(normalized, out var summary)
+            _summaries.TryGetValue(normalized, out var summary)
                 ? summary
                 : EffectSummaryOperations.UnknownBoundary(
                     EffectUncertainty.UnsupportedOperation));
@@ -67,10 +74,13 @@ public sealed class EffectAnalysisSession {
 
     public ImmutableArray<EffectMethodResult> AnalyzeAll(
         CancellationToken cancellationToken = default) {
-        EnsureAnalyzed(cancellationToken);
-        return [.. _orderedMethods.Select(method =>
-            new EffectMethodResult(method, _summaries![method]))];
+        var methods = CollectSourceMethods(cancellationToken);
+        EnsureAnalyzed(methods, cancellationToken);
+        return [.. methods.Select(method =>
+            new EffectMethodResult(method, _summaries[method]))];
     }
+
+    internal int AnalyzedSourceMethodCount => _summaries.Count;
 
     internal EffectSummary ResolveCall(
         IMethodSymbol target, EffectRegionSet receiver,
@@ -182,74 +192,98 @@ public sealed class EffectAnalysisSession {
             : EffectSummary.Empty;
     }
 
-    private void EnsureAnalyzed(CancellationToken cancellationToken) {
-        if (_summaries != null) return;
+    private void EnsureAnalyzed(
+        IEnumerable<IMethodSymbol> roots,
+        CancellationToken cancellationToken) {
+        var orderedRoots = roots
+            .Select(NormalizeMethod)
+            .Where(IsSourceMethod)
+            .Distinct<IMethodSymbol>(SymbolEqualityComparer.Default)
+            .OrderBy(static method => method, EffectSymbolComparer<IMethodSymbol>.Instance)
+            .ToImmutableArray();
+        var snapshot = _summaries;
+        if (orderedRoots.All(snapshot.ContainsKey)) return;
         lock (_gate) {
-            if (_summaries != null) return;
-            var nodes = BuildNodes(cancellationToken);
-            var recursive = FindRecursiveMethods(nodes, cancellationToken);
-            var summaries = new Dictionary<IMethodSymbol, EffectSummary>(
-                SymbolEqualityComparer.Default);
-            foreach (var method in recursive) {
-                var node = nodes[method];
-                summaries.Add(
-                    method,
-                    EffectSummaryDomain.Instance.Join(
-                        node.LocalSummary,
-                        EffectSummaryOperations.UnknownBoundary(
-                            EffectUncertainty.DirectCall |
-                            EffectUncertainty.Recursion)));
-            }
-
-            EffectSummary Compute(IMethodSymbol method) {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (summaries.TryGetValue(method, out var cached))
-                    return cached;
-                if (!nodes.TryGetValue(method, out var node))
-                    return EffectSummaryOperations.UnknownBoundary(
-                        EffectUncertainty.UnmodeledCall);
-                var summary = node.LocalSummary;
-                foreach (var call in node.Calls
-                             .OrderBy(static call => call.Target, EffectMethodComparer.Instance)
-                             .ThenBy(static call => call.Receiver.GetHashCode())) {
-                    var callee = Compute(call.Target);
-                    summary = EffectSummaryDomain.Instance.Join(
-                        summary,
-                        EffectSummaryOperations.Remap(
-                            callee,
-                            call.Receiver,
-                            call.Arguments));
-                }
-                summaries.Add(method, summary);
-                return summary;
-            }
-
-            foreach (var method in nodes.Keys.OrderBy(
-                         static method => method,
-                         EffectMethodComparer.Instance))
-                Compute(method);
-            _orderedMethods = [.. nodes.Keys.OrderBy(
-                static method => method,
-                EffectMethodComparer.Instance)];
-            _summaries = summaries.ToImmutableDictionary(
-                SymbolEqualityComparer.Default);
+            snapshot = _summaries;
+            var pendingRoots = orderedRoots
+                .Where(method => !snapshot.ContainsKey(method))
+                .ToImmutableArray();
+            if (pendingRoots.IsDefaultOrEmpty) return;
+            var nodes = BuildNodes(
+                pendingRoots,
+                snapshot,
+                cancellationToken);
+            _summaries = ComputeSummaries(
+                nodes,
+                snapshot,
+                cancellationToken);
         }
     }
 
-    private Dictionary<IMethodSymbol, EffectMethodNode> BuildNodes(
+    private static ImmutableDictionary<IMethodSymbol, EffectSummary>
+        ComputeSummaries(
+        IReadOnlyDictionary<IMethodSymbol, EffectMethodNode> nodes,
+        ImmutableDictionary<IMethodSymbol, EffectSummary> existing,
         CancellationToken cancellationToken) {
-        var methods = CollectSourceMethods(cancellationToken);
+        var summaries = existing.ToBuilder();
+        foreach (var method in FindRecursiveMethods(nodes, cancellationToken))
+            summaries[method] = EffectSummaryDomain.Instance.Join(
+                nodes[method].LocalSummary,
+                EffectSummaryOperations.UnknownBoundary(
+                    EffectUncertainty.DirectCall |
+                    EffectUncertainty.Recursion));
+
+        EffectSummary Compute(IMethodSymbol method) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (summaries.TryGetValue(method, out var cached))
+                return cached;
+            if (!nodes.TryGetValue(method, out var node))
+                return EffectSummaryOperations.UnknownBoundary(
+                    EffectUncertainty.UnmodeledCall);
+            var summary = node.LocalSummary;
+            foreach (var call in node.Calls
+                         .OrderBy(
+                             static call => call.Target,
+                             EffectSymbolComparer<IMethodSymbol>.Instance)
+                         .ThenBy(static call => call.Receiver.GetHashCode()))
+                summary = EffectSummaryDomain.Instance.Join(
+                    summary,
+                    EffectSummaryOperations.Remap(
+                        Compute(call.Target),
+                        call.Receiver,
+                        call.Arguments));
+            summaries[method] = summary;
+            return summary;
+        }
+
+        foreach (var method in nodes.Keys.OrderBy(
+                     static method => method,
+                     EffectSymbolComparer<IMethodSymbol>.Instance))
+            Compute(method);
+        return summaries.ToImmutable();
+    }
+
+    private Dictionary<IMethodSymbol, EffectMethodNode> BuildNodes(
+        ImmutableArray<IMethodSymbol> roots,
+        ImmutableDictionary<IMethodSymbol, EffectSummary> knownSummaries,
+        CancellationToken cancellationToken) {
         var nodes = new Dictionary<IMethodSymbol, EffectMethodNode>(
             SymbolEqualityComparer.Default);
-        var pending = new Queue<IMethodSymbol>(methods);
+        var pending = new Queue<IMethodSymbol>(roots);
         while (pending.Count != 0) {
             cancellationToken.ThrowIfCancellationRequested();
             var method = pending.Dequeue();
-            if (nodes.ContainsKey(method)) continue;
-            var node = BuildNode(method, cancellationToken);
+            if (knownSummaries.ContainsKey(method) ||
+                nodes.ContainsKey(method))
+                continue;
+            if (!_nodes.TryGetValue(method, out var node)) {
+                node = BuildNode(method, cancellationToken);
+                _nodes.Add(method, node);
+            }
             nodes.Add(method, node);
             foreach (var call in node.Calls)
-                if (!nodes.ContainsKey(call.Target))
+                if (!knownSummaries.ContainsKey(call.Target) &&
+                    !nodes.ContainsKey(call.Target))
                     pending.Enqueue(call.Target);
         }
         return nodes;
@@ -280,7 +314,7 @@ public sealed class EffectAnalysisSession {
         }
         return [.. methods.OrderBy(
             static method => method,
-            EffectMethodComparer.Instance)];
+            EffectSymbolComparer<IMethodSymbol>.Instance)];
     }
 
     private EffectMethodNode BuildNode(
@@ -289,7 +323,6 @@ public sealed class EffectAnalysisSession {
         var root = GetOperationRoot(method, cancellationToken);
         if (root == null)
             return new EffectMethodNode(
-                method,
                 EffectSummaryOperations.UnknownBoundary(
                     EffectUncertainty.UnsupportedOperation),
                 []);
@@ -312,7 +345,7 @@ public sealed class EffectAnalysisSession {
                 ? EffectSummaryOperations.UnknownBoundary(
                     EffectUncertainty.UnmodeledCall)
                 : EffectSummary.Empty);
-        return new EffectMethodNode(method, localSummary, [.. calls]);
+        return new EffectMethodNode(localSummary, [.. calls]);
     }
 
     private EffectSummary ScanConstructorMemberInitializers(
@@ -500,57 +533,49 @@ public sealed class EffectAnalysisSession {
     private static HashSet<IMethodSymbol> FindRecursiveMethods(
         IReadOnlyDictionary<IMethodSymbol, EffectMethodNode> nodes,
         CancellationToken cancellationToken) {
-        var index = 0;
-        var indices = new Dictionary<IMethodSymbol, int>(SymbolEqualityComparer.Default);
-        var lowLinks = new Dictionary<IMethodSymbol, int>(SymbolEqualityComparer.Default);
-        var stack = new Stack<IMethodSymbol>();
-        var onStack = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var states = new Dictionary<IMethodSymbol, byte>(
+            SymbolEqualityComparer.Default);
+        var stack = new List<IMethodSymbol>();
         var recursive = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
 
         void Visit(IMethodSymbol method) {
             cancellationToken.ThrowIfCancellationRequested();
-            indices.Add(method, index);
-            lowLinks.Add(method, index);
-            index++;
-            stack.Push(method);
-            onStack.Add(method);
+            states.Add(method, 1);
+            stack.Add(method);
             foreach (var target in nodes[method].Calls
                          .Select(static call => call.Target)
                          .Where(nodes.ContainsKey)
                          .Distinct<IMethodSymbol>(SymbolEqualityComparer.Default)
-                         .OrderBy(static target => target, EffectMethodComparer.Instance)) {
-                if (!indices.TryGetValue(target, out var targetIndex)) {
+                         .OrderBy(
+                             static target => target,
+                             EffectSymbolComparer<IMethodSymbol>.Instance)) {
+                if (!states.TryGetValue(target, out var state))
                     Visit(target);
-                    lowLinks[method] = Math.Min(lowLinks[method], lowLinks[target]);
-                }
-                else if (onStack.Contains(target)) {
-                    lowLinks[method] = Math.Min(lowLinks[method], targetIndex);
+                else if (state == 1) {
+                    for (var index = stack.Count - 1; index >= 0; index--) {
+                        recursive.Add(stack[index]);
+                        if (SymbolEqualityComparer.Default.Equals(
+                                stack[index],
+                                target))
+                            break;
+                    }
                 }
             }
-            if (lowLinks[method] != indices[method]) return;
-            var component = new List<IMethodSymbol>();
-            IMethodSymbol current;
-            do {
-                current = stack.Pop();
-                onStack.Remove(current);
-                component.Add(current);
-            } while (!SymbolEqualityComparer.Default.Equals(current, method));
-            if (component.Count > 1 ||
-                nodes[method].Calls.Any(call =>
-                    SymbolEqualityComparer.Default.Equals(call.Target, method)))
-                foreach (var member in component)
-                    recursive.Add(member);
+            stack.RemoveAt(stack.Count - 1);
+            states[method] = 2;
         }
 
         foreach (var method in nodes.Keys.OrderBy(
                      static method => method,
-                     EffectMethodComparer.Instance))
-            if (!indices.ContainsKey(method))
+                     EffectSymbolComparer<IMethodSymbol>.Instance))
+            if (!states.ContainsKey(method))
                 Visit(method);
         return recursive;
     }
 
     private bool IsSourceMethod(IMethodSymbol method) =>
+        !method.IsAbstract &&
+        !method.IsExtern &&
         method.DeclaringSyntaxReferences.Length != 0 &&
         SymbolEqualityComparer.Default.Equals(
             method.ContainingAssembly,
@@ -563,75 +588,6 @@ public sealed class EffectAnalysisSession {
     }
 }
 
-internal sealed class EffectMethodNode(
-    IMethodSymbol method,
-    EffectSummary localSummary,
-    ImmutableArray<EffectCallSite> calls) {
-    internal IMethodSymbol Method { get; } = method;
-    internal EffectSummary LocalSummary { get; } = localSummary;
-    internal ImmutableArray<EffectCallSite> Calls { get; } = calls;
-}
-
-internal sealed class EffectMethodComparer : IComparer<IMethodSymbol> {
-    internal static EffectMethodComparer Instance { get; } = new();
-
-    private EffectMethodComparer() {
-    }
-
-    public int Compare(IMethodSymbol? left, IMethodSymbol? right) {
-        if (ReferenceEquals(left, right)) return 0;
-        if (left == null) return -1;
-        if (right == null) return 1;
-        var result = EffectNamedTypeComparer.Instance.Compare(
-            left.ContainingType,
-            right.ContainingType);
-        if (result != 0) return result;
-        result = string.Compare(left.MetadataName, right.MetadataName, StringComparison.Ordinal);
-        if (result != 0) return result;
-        result = left.Arity.CompareTo(right.Arity);
-        if (result != 0) return result;
-        result = left.Parameters.Length.CompareTo(right.Parameters.Length);
-        if (result != 0) return result;
-        for (var index = 0; index < left.Parameters.Length; index++) {
-            result = left.Parameters[index].RefKind.CompareTo(right.Parameters[index].RefKind);
-            if (result != 0) return result;
-            result = CompareType(left.Parameters[index].Type, right.Parameters[index].Type);
-            if (result != 0) return result;
-        }
-        var leftLocation = left.Locations.FirstOrDefault(static location => location.IsInSource);
-        var rightLocation = right.Locations.FirstOrDefault(static location => location.IsInSource);
-        result = string.Compare(
-            leftLocation?.SourceTree?.FilePath,
-            rightLocation?.SourceTree?.FilePath,
-            StringComparison.Ordinal);
-        return result != 0
-            ? result
-            : (leftLocation?.SourceSpan.Start ?? -1)
-                .CompareTo(rightLocation?.SourceSpan.Start ?? -1);
-    }
-
-    private static int CompareType(ITypeSymbol left, ITypeSymbol right) {
-        if (left is INamedTypeSymbol leftNamed &&
-            right is INamedTypeSymbol rightNamed)
-            return EffectNamedTypeComparer.Instance.Compare(leftNamed, rightNamed);
-        if (left is IArrayTypeSymbol leftArray &&
-            right is IArrayTypeSymbol rightArray) {
-            var rank = leftArray.Rank.CompareTo(rightArray.Rank);
-            return rank != 0
-                ? rank
-                : CompareType(leftArray.ElementType, rightArray.ElementType);
-        }
-        if (left is ITypeParameterSymbol leftParameter &&
-            right is ITypeParameterSymbol rightParameter) {
-            var kind = leftParameter.TypeParameterKind.CompareTo(
-                rightParameter.TypeParameterKind);
-            return kind != 0
-                ? kind
-                : leftParameter.Ordinal.CompareTo(rightParameter.Ordinal);
-        }
-        var result = left.TypeKind.CompareTo(right.TypeKind);
-        return result != 0
-            ? result
-            : string.Compare(left.MetadataName, right.MetadataName, StringComparison.Ordinal);
-    }
-}
+internal readonly record struct EffectMethodNode(
+    EffectSummary LocalSummary,
+    ImmutableArray<EffectCallSite> Calls);

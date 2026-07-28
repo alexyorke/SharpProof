@@ -122,11 +122,35 @@ public sealed class WorkerMsBuildIntegrationTests {
     public async Task OptInBuildUsesFinalCompilerArtifact() {
         RequireWindowsWorker();
         using var project = ConsumerProject.Create(IdentitySource);
-        var build = await project.BuildAsync(verify: true);
+        var sarifPath = project.VerifyOutputPath("net8.0", "result.sarif");
+        var build = await project.BuildAsync(
+            verify: true,
+            ("SharpProofVerifySarifFile", sarifPath));
         Assert.That(build.ExitCode, Is.Zero, build.Output);
         Assert.That(build.Output, Does.Contain("SharpProof Proven"));
         Assert.That(File.Exists(project.RequestPath), Is.True);
         Assert.That(File.Exists(project.ResultPath), Is.True);
+        Assert.That(File.Exists(sarifPath), Is.True);
+        using (var sarif = JsonDocument.Parse(
+                   await File.ReadAllTextAsync(sarifPath))) {
+            var run = sarif.RootElement.GetProperty("runs")[0];
+            var result = run.GetProperty("results")[0];
+            using (Assert.EnterMultipleScope()) {
+                Assert.That(
+                    sarif.RootElement.GetProperty("version").GetString(),
+                    Is.EqualTo("2.1.0"));
+                Assert.That(
+                    run.GetProperty("invocations")[0]
+                        .GetProperty("executionSuccessful").GetBoolean(),
+                    Is.True);
+                Assert.That(
+                    result.GetProperty("ruleId").GetString(),
+                    Is.EqualTo("SharpProof.Proven"));
+                Assert.That(
+                    result.GetProperty("kind").GetString(),
+                    Is.EqualTo("pass"));
+            }
+        }
 
         var request = WorkerProtocolJson.DeserializeRequest(
             await File.ReadAllTextAsync(project.RequestPath))!;
@@ -334,6 +358,8 @@ public sealed class WorkerMsBuildIntegrationTests {
         var baseline = await project.BuildAsync(verify: true);
         Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
         var stableResult = await File.ReadAllBytesAsync(project.ResultPath);
+        var sarifPath = project.VerifyOutputPath(
+            "net8.0", "stale-result.sarif");
 
         await AssertInvalidatedAsync(
             ("_SharpProofCompilerManifestPath",
@@ -360,14 +386,19 @@ public sealed class WorkerMsBuildIntegrationTests {
         async Task AssertInvalidatedAsync(
             params (string Name, string Value)[] properties) {
             await File.WriteAllBytesAsync(project.ResultPath, stableResult);
+            await File.WriteAllTextAsync(sarifPath, "stale");
 
-            var failure = await project.RunVerificationTargetAsync(properties);
+            var failure = await project.RunVerificationTargetAsync([
+                .. properties,
+                ("SharpProofVerifySarifFile", sarifPath)
+            ]);
 
             Assert.That(failure.ExitCode, Is.Not.Zero, failure.Output);
             Assert.That(
                 File.Exists(project.ResultPath),
                 Is.False,
                 failure.Output);
+            Assert.That(File.Exists(sarifPath), Is.False, failure.Output);
         }
     }
 
@@ -566,12 +597,15 @@ public sealed class WorkerMsBuildIntegrationTests {
         var result = await File.ReadAllTextAsync(project.ResultPath);
         var malformedWorker = await project.CreateMalformedWorkerAsync();
         var malformedManifest = project.CompilerManifestPath + ".malformed";
+        var sarifPath = project.VerifyOutputPath(
+            "net8.0", "malformed-result.sarif");
 
         var malformed = await project.RunVerificationTargetAsync(
             ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
             ("SharpProofCompilerManifestFile",
                 malformedManifest),
-            ("SharpProofWorkerPath", malformedWorker));
+            ("SharpProofWorkerPath", malformedWorker),
+            ("SharpProofVerifySarifFile", sarifPath));
 
         Assert.That(malformed.ExitCode, Is.Not.Zero);
         Assert.That(malformed.Output, Does.Contain("unavailable or malformed"));
@@ -581,6 +615,10 @@ public sealed class WorkerMsBuildIntegrationTests {
             await File.ReadAllTextAsync(project.ResultPath))!;
         await AssertPublicationBindingAsync(
             failedRequest, failedResponse, malformedWorker);
+        using var sarif = JsonDocument.Parse(
+            await File.ReadAllTextAsync(sarifPath));
+        var invocation = sarif.RootElement.GetProperty("runs")[0]
+            .GetProperty("invocations")[0];
         using (Assert.EnterMultipleScope()) {
             Assert.That(
                 failedResponse.FailureReason,
@@ -591,6 +629,13 @@ public sealed class WorkerMsBuildIntegrationTests {
                 Is.Not.EqualTo(request));
             Assert.That(await File.ReadAllTextAsync(project.ResultPath),
                 Is.Not.EqualTo(result));
+            Assert.That(
+                invocation.GetProperty("executionSuccessful").GetBoolean(),
+                Is.False);
+            Assert.That(
+                invocation.GetProperty("toolExecutionNotifications")[0]
+                    .GetProperty("descriptor").GetProperty("id").GetString(),
+                Is.EqualTo("worker.malformed_result"));
         }
     }
 
@@ -601,6 +646,8 @@ public sealed class WorkerMsBuildIntegrationTests {
         var baseline = await project.BuildAsync(verify: true);
         Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
         var request = await File.ReadAllTextAsync(project.RequestPath);
+        var sarifPath = project.VerifyOutputPath(
+            "net8.0", "publication-failure.sarif");
 
         BuildResult failed;
         using (File.Open(
@@ -612,7 +659,8 @@ public sealed class WorkerMsBuildIntegrationTests {
                 ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
                 ("SharpProofCompilerManifestFile",
                     project.CompilerManifestPath + ".failed"),
-                ("SharpProofVerifyPolicy", "advisory"));
+                ("SharpProofVerifyPolicy", "advisory"),
+                ("SharpProofVerifySarifFile", sarifPath));
 
         Assert.That(failed.ExitCode, Is.Not.Zero);
         Assert.That(failed.Output, Does.Contain("could not be published"));
@@ -620,6 +668,7 @@ public sealed class WorkerMsBuildIntegrationTests {
             await File.ReadAllTextAsync(project.RequestPath),
             Is.EqualTo(request));
         Assert.That(File.Exists(project.ResultPath), Is.False);
+        Assert.That(File.Exists(sarifPath), Is.False);
         Assert.That(File.Exists(project.CompilerManifestPath + ".failed"),
             Is.True);
     }
@@ -636,6 +685,40 @@ public sealed class WorkerMsBuildIntegrationTests {
         var failed = await project.RunVerificationTargetAsync(
             ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
             ("SharpProofVerifyResultFile", project.RequestPath));
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(failed.ExitCode, Is.Not.Zero);
+            Assert.That(
+                failed.Output,
+                Does.Contain("SharpProof launcher input is invalid: ArgumentException"));
+            Assert.That(
+                await File.ReadAllTextAsync(project.RequestPath),
+                Is.EqualTo(request));
+            Assert.That(
+                await File.ReadAllTextAsync(project.ResultPath),
+                Is.EqualTo(result));
+        }
+
+        failed = await project.RunVerificationTargetAsync(
+            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+            ("SharpProofVerifySarifFile", project.RequestPath));
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(failed.ExitCode, Is.Not.Zero);
+            Assert.That(
+                failed.Output,
+                Does.Contain("SharpProof launcher input is invalid: ArgumentException"));
+            Assert.That(
+                await File.ReadAllTextAsync(project.RequestPath),
+                Is.EqualTo(request));
+            Assert.That(
+                await File.ReadAllTextAsync(project.ResultPath),
+                Is.EqualTo(result));
+        }
+
+        failed = await project.RunVerificationTargetAsync(
+            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+            ("SharpProofVerifySarifFile", project.ResultPath));
 
         using (Assert.EnterMultipleScope()) {
             Assert.That(failed.ExitCode, Is.Not.Zero);
@@ -936,6 +1019,10 @@ public sealed class WorkerMsBuildIntegrationTests {
                         "SharpProofVerifyCacheMaximumBytes"],
                     CultureInfo.InvariantCulture),
                 Is.EqualTo(WorkerCacheOptions.DefaultMaximumBytes));
+            Assert.That(
+                properties.ContainsKey("SharpProofVerifySarifFile"),
+                Is.False,
+                "SARIF projection must remain opt-in.");
         }
     }
 

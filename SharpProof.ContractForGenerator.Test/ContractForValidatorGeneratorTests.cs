@@ -234,6 +234,46 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
+    public void RepeatedContractForAttributesOnOneCompanionFailClosed() {
+        var compilation =
+            GeneratorTestHost.CreateCompilationWithoutAttributes(
+                ("Subject.cs",
+                """
+                using System;
+                using SharpProof.Attributes;
+
+                namespace SharpProof.Attributes {
+                    [AttributeUsage(
+                        AttributeTargets.Class,
+                        AllowMultiple = true)]
+                    public sealed class ContractForAttribute(Type target)
+                        : Attribute {
+                    }
+                }
+
+                public interface ITarget {
+                    void Invoke();
+                }
+
+                [ContractFor(typeof(ITarget))]
+                [ContractFor(typeof(ITarget))]
+                public static class TargetContracts {
+                    public static void Invoke(ITarget receiver) {
+                    }
+                }
+                """));
+
+        var diagnostic = AssertSingle(
+            GeneratorTestHost.Run(compilation),
+            "SPCF0001");
+
+        Assert.That(
+            diagnostic.GetMessage(
+                System.Globalization.CultureInfo.InvariantCulture),
+            Does.Contain("TargetContracts"));
+    }
+
+    [Test]
     public void NullContractForTargetFailsClosed() {
         var run = Run(
             """
@@ -570,10 +610,9 @@ public sealed class ContractForValidatorGeneratorTests {
 
         Assert.That(
             run.Diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SPCF0008", 4)));
+            Is.EqualTo(Enumerable.Repeat("SPCF0008", 3)));
         string[] expectedMessages = [
             "Contract.Ensures in companion method 'Invoke' has invalid placement: Conditional",
-            "Contract.Assume in companion method 'Invoke' has invalid placement: NestedCallable",
             "Contract.Ensures in companion method 'Invoke' has invalid placement: Late",
             "Contract.Requires in companion method 'Invoke' has invalid placement: Unreachable"
         ];
@@ -582,6 +621,30 @@ public sealed class ContractForValidatorGeneratorTests {
                 diagnostic.GetMessage(
                     System.Globalization.CultureInfo.InvariantCulture)),
             Is.EquivalentTo(expectedMessages));
+    }
+
+    [Test]
+    public void NestedCallableContractBelongsToTheNestedCallable() {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                void Invoke();
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Invoke(ITarget receiver) {
+                    void Local(bool condition) {
+                        Contract.Requires(condition);
+                    }
+                    Local(true);
+                }
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
     }
 
     [Test]

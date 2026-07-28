@@ -325,28 +325,14 @@ public static class WorkerProtocolJson {
                 response.FailureReason != WorkerRunFailureReason.None ||
             protocolErrors.Length != 0 && response.RunStatus != WorkerRunStatus.Failed)
             validation.Add("response.run_failure", "Run status, failure reason, and errors are inconsistent.");
-        var fatalClaim = response.ClaimResults?.Where(static result => result != null).Any(static result => result.Reason is
-                WorkerClaimReason.BackendUnavailable or WorkerClaimReason.InfrastructureFailure or
-                WorkerClaimReason.MalformedBackendResult or WorkerClaimReason.CounterexampleReplayFailed) == true;
-        validation.Check(!fatalClaim || response.RunStatus == WorkerRunStatus.Failed,
+        var evidence = WorkerResultAssembler.Classify(response.CallableResults, response.ClaimResults);
+        validation.Check(!evidence.FatalClaim || response.RunStatus == WorkerRunStatus.Failed,
             "response.fatal_claim", "Fatal claim failures require a Failed run.");
-        var callableReasons = response.CallableResults?.Where(static result => result != null)
-            .Select(static result => result.Reason).ToArray() ?? [];
-        var claimReasons = response.ClaimResults?.Where(static result => result != null)
-            .Select(static result => result.Reason).ToArray() ?? [];
-        var fatalCallable = callableReasons.Any(static reason => reason is
-            WorkerCallableCoverageReason.InfrastructureFailure or WorkerCallableCoverageReason.MissingClaimResult);
-        validation.Check(!fatalCallable || response.RunStatus == WorkerRunStatus.Failed,
+        validation.Check(!evidence.FatalCallable || response.RunStatus == WorkerRunStatus.Failed,
             "response.fatal_callable", "Fatal callable failures require a Failed run.");
-        var timedOut = callableReasons.Any(static reason => reason is
-                WorkerCallableCoverageReason.MethodTimeout or WorkerCallableCoverageReason.ProjectTimeout) ||
-            claimReasons.Any(static reason => reason is WorkerClaimReason.MethodTimeout or WorkerClaimReason.ProjectTimeout);
-        validation.Check(
-            !timedOut || response.RunStatus is WorkerRunStatus.TimedOut or WorkerRunStatus.Failed,
+        validation.Check(!evidence.TimedOut || response.RunStatus is WorkerRunStatus.TimedOut or WorkerRunStatus.Failed,
             "response.timeout_status", "Timeout evidence requires a TimedOut or Failed run.");
-        var canceled = callableReasons.Contains(WorkerCallableCoverageReason.Canceled) || claimReasons.Contains(WorkerClaimReason.Canceled);
-        validation.Check(
-            !canceled || response.RunStatus is WorkerRunStatus.Canceled or WorkerRunStatus.Failed,
+        validation.Check(!evidence.Canceled || response.RunStatus is WorkerRunStatus.Canceled or WorkerRunStatus.Failed,
             "response.canceled_status", "Cancellation evidence requires a Canceled or Failed run.");
     }
     private static void ValidateSummary(WorkerVerificationSummary? summary, WorkerCallableResult[] callables,

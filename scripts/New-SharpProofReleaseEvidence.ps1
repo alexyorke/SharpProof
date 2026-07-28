@@ -7,7 +7,10 @@ param(
     [string]$SbomPath,
 
     [Parameter()]
-    [string]$OutputDirectory
+    [string]$OutputDirectory,
+
+    [Parameter()]
+    [string]$ThirdPartyManifestPath
 )
 
 Set-StrictMode -Version Latest
@@ -108,12 +111,354 @@ function Write-AtomicText {
     }
 }
 
+function Get-SpdxPackageId {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter()]
+        [string]$Version
+    )
+
+    $suffix = if ([string]::IsNullOrWhiteSpace($Version)) {
+        $Name
+    }
+    else {
+        "$Name-$Version"
+    }
+    return 'SPDXRef-Package-' + (
+        $suffix -replace '[^A-Za-z0-9.-]', '-')
+}
+
+function New-DeterministicPackageSbom {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [object[]]$PackageItems,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Version,
+
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryCommit,
+
+        [Parameter(Mandatory = $true)]
+        [object[]]$ThirdPartyComponents,
+
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot
+    )
+
+    $commitTimestamp = (
+        & git -C $RepositoryRoot show `
+            -s `
+            --format=%cI `
+            $RepositoryCommit
+    ).Trim()
+    if ($LASTEXITCODE -ne 0 -or
+        [string]::IsNullOrWhiteSpace($commitTimestamp)) {
+        throw "Could not resolve timestamp for commit $RepositoryCommit."
+    }
+    $created = [DateTimeOffset]::Parse(
+        $commitTimestamp,
+        [Globalization.CultureInfo]::InvariantCulture).UtcDateTime.ToString(
+            'yyyy-MM-ddTHH:mm:ssZ',
+            [Globalization.CultureInfo]::InvariantCulture)
+
+    $packages = [Collections.Generic.List[object]]::new()
+    $relationships = [Collections.Generic.List[object]]::new()
+    $described = [Collections.Generic.List[string]]::new()
+    foreach ($item in $PackageItems |
+            Sort-Object { $_.Identity.Id }) {
+        $id = [string]$item.Identity.Id
+        $spdxId = Get-SpdxPackageId -Name $id
+        $described.Add($spdxId)
+        $hash = (Get-FileHash `
+            -LiteralPath $item.File.FullName `
+            -Algorithm SHA256).Hash.ToLowerInvariant()
+        $packages.Add([pscustomobject][ordered]@{
+            name = $id
+            SPDXID = $spdxId
+            versionInfo = $Version
+            downloadLocation = 'NOASSERTION'
+            filesAnalyzed = $false
+            checksums = @(
+                [pscustomobject][ordered]@{
+                    algorithm = 'SHA256'
+                    checksumValue = $hash
+                }
+            )
+            licenseConcluded = 'MIT'
+            licenseDeclared = 'MIT'
+            copyrightText = 'NOASSERTION'
+            externalRefs = @(
+                [pscustomobject][ordered]@{
+                    referenceCategory = 'PACKAGE-MANAGER'
+                    referenceType = 'purl'
+                    referenceLocator = (
+                        'pkg:nuget/' +
+                        [Uri]::EscapeDataString($id) +
+                        '@' +
+                        [Uri]::EscapeDataString($Version))
+                }
+            )
+        })
+        $relationships.Add([pscustomobject][ordered]@{
+            spdxElementId = 'SPDXRef-DOCUMENT'
+            relationshipType = 'DESCRIBES'
+            relatedSpdxElement = $spdxId
+        })
+    }
+
+    $componentIds = @{}
+    foreach ($component in $ThirdPartyComponents |
+            Sort-Object id, version) {
+        $componentName = [string]$component.id
+        $componentVersion = [string]$component.version
+        $key = "$componentName`0$componentVersion"
+        if (-not $componentIds.ContainsKey($key)) {
+            $componentSpdxId = Get-SpdxPackageId `
+                -Name $componentName `
+                -Version $componentVersion
+            $componentIds[$key] = $componentSpdxId
+            $packages.Add([pscustomobject][ordered]@{
+                name = $componentName
+                SPDXID = $componentSpdxId
+                versionInfo = $componentVersion
+                downloadLocation = 'NOASSERTION'
+                filesAnalyzed = $false
+                licenseConcluded = [string]$component.license
+                licenseDeclared = [string]$component.license
+                copyrightText = 'NOASSERTION'
+                externalRefs = @(
+                    [pscustomobject][ordered]@{
+                        referenceCategory = 'PACKAGE-MANAGER'
+                        referenceType = 'purl'
+                        referenceLocator = (
+                            'pkg:nuget/' +
+                            [Uri]::EscapeDataString($componentName) +
+                            '@' +
+                            [Uri]::EscapeDataString($componentVersion))
+                    }
+                )
+            })
+        }
+        $relationships.Add([pscustomobject][ordered]@{
+            spdxElementId = Get-SpdxPackageId `
+                -Name ([string]$component.packageId)
+            relationshipType = 'CONTAINS'
+            relatedSpdxElement = [string]$componentIds[$key]
+        })
+    }
+    $relationships.Add([pscustomobject][ordered]@{
+        spdxElementId = Get-SpdxPackageId -Name 'SharpProof'
+        relationshipType = 'DEPENDS_ON'
+        relatedSpdxElement = Get-SpdxPackageId `
+            -Name 'SharpProof.Attributes'
+    })
+    $relationships.Add([pscustomobject][ordered]@{
+        spdxElementId = Get-SpdxPackageId `
+            -Name 'SharpProof.Verifier.Win-x64'
+        relationshipType = 'DEPENDS_ON'
+        relatedSpdxElement = Get-SpdxPackageId -Name 'SharpProof'
+    })
+
+    $document = [pscustomobject][ordered]@{
+        spdxVersion = 'SPDX-2.3'
+        dataLicense = 'CC0-1.0'
+        SPDXID = 'SPDXRef-DOCUMENT'
+        name = "SharpProof-$Version"
+        documentNamespace = (
+            'https://github.com/alexyorke/SharpProof/sbom/' +
+            "$Version/$RepositoryCommit")
+        creationInfo = [pscustomobject][ordered]@{
+            created = $created
+            creators = @('Tool: SharpProof release evidence')
+            comment = 'Timestamp is derived from the source commit for reproducibility.'
+        }
+        documentDescribes = @($described)
+        packages = @($packages |
+            Sort-Object name, versionInfo)
+        relationships = @($relationships |
+            Sort-Object spdxElementId, relationshipType, relatedSpdxElement)
+    }
+    $json = ($document | ConvertTo-Json -Depth 10) -replace "`r`n", "`n"
+    Write-AtomicText -Path $Path -Value ($json + "`n")
+}
+
+function Get-ArchiveText {
+    param(
+        [Parameter(Mandatory = $true)]
+        [IO.Compression.ZipArchive]$Archive,
+
+        [Parameter(Mandatory = $true)]
+        [string]$EntryName
+    )
+
+    $entry = $Archive.GetEntry($EntryName)
+    if ($null -eq $entry) {
+        throw "Package archive entry is missing: $EntryName"
+    }
+    $reader = [IO.StreamReader]::new(
+        $entry.Open(),
+        [Text.UTF8Encoding]::new($false, $true))
+    try {
+        return $reader.ReadToEnd()
+    }
+    finally {
+        $reader.Dispose()
+    }
+}
+
+function Test-ThirdPartyComponentVersions {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot,
+
+        [Parameter(Mandatory = $true)]
+        [object]$Manifest
+    )
+
+    $assetPaths = @{
+        'SharpProof' = 'SharpProof.Package\obj\project.assets.json'
+        'SharpProof.Verifier.Win-x64' =
+            'SharpProof.Worker\obj\project.assets.json'
+    }
+    foreach ($packageId in $assetPaths.Keys) {
+        $assetsPath = Join-Path $RepositoryRoot $assetPaths[$packageId]
+        if (-not (Test-Path -LiteralPath $assetsPath -PathType Leaf)) {
+            throw "Restored assets are missing for '$packageId': $assetsPath"
+        }
+        $assets = Get-Content -LiteralPath $assetsPath -Raw |
+            ConvertFrom-Json -AsHashtable
+        $libraryKeys = @($assets.libraries.Keys)
+        foreach ($component in @(
+                $Manifest.packages.PSObject.Properties[$packageId].Value)) {
+            $id = [string]$component.id
+            $version = [string]$component.version
+            $matchingVersions = @(
+                $libraryKeys |
+                    Where-Object {
+                        $_.StartsWith(
+                            "$id/",
+                            [StringComparison]::OrdinalIgnoreCase)
+                    }
+            )
+            if ($matchingVersions.Count -ne 1 -or
+                -not [string]::Equals(
+                    $matchingVersions[0],
+                    "$id/$version",
+                    [StringComparison]::OrdinalIgnoreCase)) {
+                throw (
+                    "Third-party component '$id $version' for '$packageId' " +
+                    "does not match restored assets: " +
+                    ($matchingVersions -join ', '))
+            }
+        }
+    }
+}
+
+function Test-PackageThirdPartyInventory {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PackagePath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$PackageId,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [object[]]$Components
+    )
+
+    $archive = [IO.Compression.ZipFile]::OpenRead($PackagePath)
+    try {
+        $actualThirdPartyEntries = @(
+            $archive.Entries |
+                Where-Object {
+                    $_.FullName.EndsWith(
+                        '.dll',
+                        [StringComparison]::OrdinalIgnoreCase) -and
+                    -not [IO.Path]::GetFileName($_.FullName).StartsWith(
+                        'SharpProof.',
+                        [StringComparison]::Ordinal)
+                } |
+                ForEach-Object { $_.FullName } |
+                Sort-Object -Unique
+        )
+        $declaredEntries = @(
+            $Components |
+                ForEach-Object { @($_.entries) } |
+                ForEach-Object { [string]$_ } |
+                Sort-Object -Unique
+        )
+        if (($actualThirdPartyEntries -join '|') -ne
+            ($declaredEntries -join '|')) {
+            throw "Third-party inventory for '$PackageId' does not match " +
+                "the package payload. Actual: " +
+                ($actualThirdPartyEntries -join ', ') +
+                ". Declared: " + ($declaredEntries -join ', ') + "."
+        }
+        if ($Components.Count -eq 0) {
+            return
+        }
+        $notice = Get-ArchiveText `
+            -Archive $archive `
+            -EntryName 'THIRD-PARTY-NOTICES.txt'
+        foreach ($component in $Components) {
+            $id = [string]$component.id
+            $version = [string]$component.version
+            $license = [string]$component.license
+            if ([string]::IsNullOrWhiteSpace($id) -or
+                [string]::IsNullOrWhiteSpace($version) -or
+                $license -ne 'MIT' -or
+                @($component.entries).Count -eq 0) {
+                throw "Third-party component metadata for '$PackageId' is invalid."
+            }
+            $needle = "Package: $id $version"
+            if (-not $notice.Contains(
+                    $needle,
+                    [StringComparison]::Ordinal)) {
+                throw "Third-party notice for '$PackageId' is missing '$needle'."
+            }
+        }
+    }
+    finally {
+        $archive.Dispose()
+    }
+}
+
 $resolvedSource = (Resolve-Path `
     -LiteralPath $PackageSource `
     -ErrorAction Stop).Path
 if (-not (Test-Path -LiteralPath $resolvedSource -PathType Container)) {
     throw "PackageSource is not a directory: $resolvedSource"
 }
+$repositoryRoot = (Resolve-Path `
+    -LiteralPath (Join-Path $PSScriptRoot '..') `
+    -ErrorAction Stop).Path
+if ([string]::IsNullOrWhiteSpace($ThirdPartyManifestPath)) {
+    $resolvedThirdPartyManifest = Join-Path `
+        $repositoryRoot `
+        'eng\release\third-party-components.json'
+}
+else {
+    $resolvedThirdPartyManifest = (Resolve-Path `
+        -LiteralPath $ThirdPartyManifestPath `
+        -ErrorAction Stop).Path
+}
+$thirdPartyManifest = Get-Content `
+    -LiteralPath $resolvedThirdPartyManifest `
+    -Raw |
+    ConvertFrom-Json
+if ($thirdPartyManifest.schemaVersion -ne 1) {
+    throw 'Unsupported third-party component manifest schema.'
+}
+Test-ThirdPartyComponentVersions `
+    -RepositoryRoot $repositoryRoot `
+    -Manifest $thirdPartyManifest
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $resolvedOutput = $resolvedSource
 }
@@ -187,6 +532,40 @@ if ($commits.Count -ne 1) {
     throw "NuGet artifact repository commits must match; found '$($commits -join ', ')'."
 }
 
+$thirdPartyPackages = @(
+    $thirdPartyManifest.packages.PSObject.Properties |
+        ForEach-Object { $_.Name } |
+        Sort-Object
+)
+if (($thirdPartyPackages -join '|') -ne ($expectedIds -join '|')) {
+    throw 'Third-party component manifest must cover the exact package graph.'
+}
+$thirdPartyComponents = [Collections.Generic.List[object]]::new()
+foreach ($item in $identities |
+        Where-Object { $_.File.Extension -eq '.nupkg' }) {
+    $packageId = $item.Identity.Id
+    $components = @(
+        $thirdPartyManifest.packages.PSObject.Properties[$packageId].Value
+    )
+    Test-PackageThirdPartyInventory `
+        -PackagePath $item.File.FullName `
+        -PackageId $packageId `
+        -Components $components
+    foreach ($component in $components) {
+        $thirdPartyComponents.Add([pscustomobject][ordered]@{
+            packageId = $packageId
+            id = [string]$component.id
+            version = [string]$component.version
+            license = [string]$component.license
+            entries = @(
+                @($component.entries) |
+                    ForEach-Object { [string]$_ } |
+                    Sort-Object
+            )
+        })
+    }
+}
+
 $artifacts = [Collections.Generic.List[object]]::new()
 foreach ($item in $identities) {
     $hash = Get-FileHash `
@@ -206,40 +585,171 @@ foreach ($item in $identities) {
     })
 }
 
-if (-not [string]::IsNullOrWhiteSpace($SbomPath)) {
+if ([string]::IsNullOrWhiteSpace($SbomPath)) {
+    $resolvedSbom = Join-Path $resolvedOutput 'SharpProof.spdx.json'
+    New-DeterministicPackageSbom `
+        -Path $resolvedSbom `
+        -PackageItems @($identities |
+            Where-Object { $_.File.Extension -eq '.nupkg' }) `
+        -Version $versions[0] `
+        -RepositoryCommit $commits[0] `
+        -ThirdPartyComponents @($thirdPartyComponents) `
+        -RepositoryRoot $repositoryRoot
+}
+else {
     $resolvedSbom = (Resolve-Path `
         -LiteralPath $SbomPath `
         -ErrorAction Stop).Path
-    if (-not (Test-Path -LiteralPath $resolvedSbom -PathType Leaf)) {
-        throw "SbomPath is not a file: $resolvedSbom"
-    }
-    $sbom = Get-Content -LiteralPath $resolvedSbom -Raw |
-        ConvertFrom-Json
-    if ([string]::IsNullOrWhiteSpace([string]$sbom.spdxVersion) -or
-        -not ([string]$sbom.spdxVersion).StartsWith(
-            'SPDX-',
-            [StringComparison]::Ordinal)) {
-        throw "SbomPath is not an SPDX JSON document: $resolvedSbom"
-    }
-    $sbomFile = Get-Item -LiteralPath $resolvedSbom
-    $sbomHash = Get-FileHash `
-        -LiteralPath $resolvedSbom `
-        -Algorithm SHA256
-    $artifacts.Add([pscustomobject][ordered]@{
-        fileName = $sbomFile.Name
-        kind = 'sbom'
-        packageId = $null
-        bytes = [int64]$sbomFile.Length
-        sha256 = $sbomHash.Hash.ToLowerInvariant()
-    })
 }
+if (-not (Test-Path -LiteralPath $resolvedSbom -PathType Leaf)) {
+    throw "SbomPath is not a file: $resolvedSbom"
+}
+$sbom = Get-Content -LiteralPath $resolvedSbom -Raw |
+    ConvertFrom-Json
+if ($null -eq $sbom.PSObject.Properties['spdxVersion'] -or
+    [string]$sbom.spdxVersion -ne 'SPDX-2.3' -or
+    $null -eq $sbom.PSObject.Properties['dataLicense'] -or
+    [string]$sbom.dataLicense -ne 'CC0-1.0') {
+    throw "SbomPath is not a supported SPDX JSON document: $resolvedSbom"
+}
+if ($null -eq $sbom.PSObject.Properties['packages'] -or
+    $null -eq $sbom.PSObject.Properties['documentDescribes'] -or
+    $null -eq $sbom.PSObject.Properties['relationships']) {
+    throw "SPDX SBOM is missing its package graph: $resolvedSbom"
+}
+$sbomPackages = @($sbom.packages)
+$documentDescribes = @($sbom.documentDescribes)
+$relationships = @($sbom.relationships)
+$expectedComponentKeys = @(
+    $thirdPartyComponents |
+        ForEach-Object {
+            [string]$_.id + "`0" + [string]$_.version
+        } |
+        Sort-Object -Unique
+)
+if ($sbomPackages.Count -ne
+    ($expectedIds.Count + $expectedComponentKeys.Count) -or
+    $documentDescribes.Count -ne $expectedIds.Count) {
+    throw "SPDX SBOM does not contain the exact package graph: $resolvedSbom"
+}
+foreach ($expectedId in $expectedIds) {
+    $matchingPackages = @(
+        $sbomPackages |
+            Where-Object {
+                [string]$_.name -eq $expectedId -and
+                [string]$_.versionInfo -eq $versions[0]
+            }
+    )
+    if ($matchingPackages.Count -ne 1) {
+        throw "SPDX SBOM must describe exactly one $expectedId " +
+            "$($versions[0]) package."
+    }
+    $spdxId = [string]$matchingPackages[0].SPDXID
+    if (@($documentDescribes |
+            Where-Object { [string]$_ -eq $spdxId }).Count -ne 1) {
+        throw "SPDX SBOM does not describe package '$expectedId'."
+    }
+    $packageItem = @(
+        $identities |
+            Where-Object {
+                $_.File.Extension -eq '.nupkg' -and
+                $_.Identity.Id -eq $expectedId
+            }
+    )
+    $expectedHash = (Get-FileHash `
+        -LiteralPath $packageItem[0].File.FullName `
+        -Algorithm SHA256).Hash.ToLowerInvariant()
+    $checksums = @($matchingPackages[0].checksums |
+        Where-Object {
+            [string]$_.algorithm -eq 'SHA256' -and
+            [string]$_.checksumValue -eq $expectedHash
+        })
+    if ($checksums.Count -ne 1) {
+        throw "SPDX SBOM checksum for '$expectedId' is missing or stale."
+    }
+}
+foreach ($key in $expectedComponentKeys) {
+    $parts = $key.Split("`0")
+    $matchingComponents = @(
+        $sbomPackages |
+            Where-Object {
+                [string]$_.name -eq $parts[0] -and
+                [string]$_.versionInfo -eq $parts[1]
+            }
+    )
+    if ($matchingComponents.Count -ne 1) {
+        throw (
+            "SPDX SBOM must contain exactly one component " +
+            "'$($parts[0]) $($parts[1])'.")
+    }
+}
+foreach ($component in $thirdPartyComponents) {
+    $containerId = Get-SpdxPackageId -Name ([string]$component.packageId)
+    $componentId = Get-SpdxPackageId `
+        -Name ([string]$component.id) `
+        -Version ([string]$component.version)
+    $matchingRelationships = @(
+        $relationships |
+            Where-Object {
+                [string]$_.spdxElementId -eq $containerId -and
+                [string]$_.relationshipType -eq 'CONTAINS' -and
+                [string]$_.relatedSpdxElement -eq $componentId
+            }
+    )
+    if ($matchingRelationships.Count -ne 1) {
+        throw (
+            "SPDX SBOM containment is missing for " +
+            "'$($component.packageId)' and '$($component.id)'.")
+    }
+}
+$expectedDependencies = @(
+    [pscustomobject]@{
+        from = Get-SpdxPackageId -Name 'SharpProof'
+        to = Get-SpdxPackageId -Name 'SharpProof.Attributes'
+    },
+    [pscustomobject]@{
+        from = Get-SpdxPackageId -Name 'SharpProof.Verifier.Win-x64'
+        to = Get-SpdxPackageId -Name 'SharpProof'
+    }
+)
+$dependencyRelationships = @(
+    $relationships |
+        Where-Object {
+            [string]$_.relationshipType -eq 'DEPENDS_ON'
+        }
+)
+if ($dependencyRelationships.Count -ne $expectedDependencies.Count) {
+    throw 'SPDX SBOM does not contain the exact package dependency graph.'
+}
+foreach ($dependency in $expectedDependencies) {
+    if (@($dependencyRelationships |
+            Where-Object {
+                [string]$_.spdxElementId -eq $dependency.from -and
+                [string]$_.relatedSpdxElement -eq $dependency.to
+            }).Count -ne 1) {
+        throw (
+            "SPDX SBOM dependency is missing: " +
+            "$($dependency.from) -> $($dependency.to)")
+    }
+}
+$sbomFile = Get-Item -LiteralPath $resolvedSbom
+$sbomHash = Get-FileHash `
+    -LiteralPath $resolvedSbom `
+    -Algorithm SHA256
+$artifacts.Add([pscustomobject][ordered]@{
+    fileName = $sbomFile.Name
+    kind = 'sbom'
+    packageId = $null
+    bytes = [int64]$sbomFile.Length
+    sha256 = $sbomHash.Hash.ToLowerInvariant()
+})
 
 $orderedArtifacts = @(
     $artifacts |
         Sort-Object fileName
 )
 $manifest = [pscustomobject][ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     packageVersion = $versions[0]
     repository = [pscustomobject][ordered]@{
         type = 'git'
@@ -248,6 +758,10 @@ $manifest = [pscustomobject][ordered]@{
     }
     hashAlgorithm = 'SHA256'
     artifacts = $orderedArtifacts
+    thirdPartyComponents = @(
+        $thirdPartyComponents |
+            Sort-Object packageId, id, version
+    )
 }
 $json = ($manifest | ConvertTo-Json -Depth 8) -replace "`r`n", "`n"
 $json += "`n"

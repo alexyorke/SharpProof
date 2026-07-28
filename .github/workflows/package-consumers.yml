@@ -3,6 +3,8 @@ name: Cross-platform package consumers
 on:
   push:
     branches: [master]
+    tags:
+      - "v*"
   pull_request:
     branches: ["**"]
   workflow_dispatch:
@@ -16,9 +18,6 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: read
-      id-token: write
-      attestations: write
-      artifact-metadata: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -30,9 +29,62 @@ jobs:
           dotnet-version: "8.0.x"
           global-json-file: global.json
 
+      - name: Select the artifact version
+        shell: pwsh
+        run: |
+          [xml]$release = Get-Content SharpProof.Release.props -Raw
+          $prefix = [string]$release.Project.PropertyGroup.SharpProofVersionPrefix
+          $version =
+            ([string]$release.Project.PropertyGroup.SharpProofPackageVersion).
+              Replace('$(SharpProofVersionPrefix)', $prefix)
+          if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$') {
+            throw "Invalid SharpProof artifact version '$version'."
+          }
+          if ($env:GITHUB_REF.StartsWith('refs/tags/v')) {
+            $tagVersion = $env:GITHUB_REF_NAME.Substring(1)
+            if ($tagVersion -ne $version) {
+              throw (
+                "Release tag '$($env:GITHUB_REF_NAME)' does not match the " +
+                "checked-in package version '$version'.")
+            }
+            $tagCommit = (& git rev-parse "$($env:GITHUB_REF_NAME)^{commit}").Trim()
+            if ($LASTEXITCODE -ne 0 -or $tagCommit -ne $env:GITHUB_SHA) {
+              throw 'The release tag does not identify the checked-out commit.'
+            }
+            & git merge-base --is-ancestor $env:GITHUB_SHA origin/master
+            if ($LASTEXITCODE -ne 0) {
+              throw 'Release tags must identify a commit contained in origin/master.'
+            }
+            $previousTag = switch ($env:GITHUB_REF_NAME) {
+              'v1.0.0-preview.1' { $null }
+              'v1.0.0-preview.2' { 'v1.0.0-preview.1' }
+              'v1.0.0-rc.1' { 'v1.0.0-preview.2' }
+              'v1.0.0' { 'v1.0.0-rc.1' }
+              default {
+                throw "Release tag '$($env:GITHUB_REF_NAME)' is not allowlisted."
+              }
+            }
+            if ($null -ne $previousTag) {
+              & git rev-parse --verify "$previousTag^{commit}"
+              if ($LASTEXITCODE -ne 0) {
+                throw "Required predecessor tag '$previousTag' does not exist."
+              }
+              & git merge-base --is-ancestor $previousTag $env:GITHUB_SHA
+              if ($LASTEXITCODE -ne 0) {
+                throw (
+                  "Required predecessor tag '$previousTag' is not an " +
+                  'ancestor of this release.')
+              }
+            }
+          }
+          "SHARPPROOF_RELEASE_VERSION=$version" >> $env:GITHUB_ENV
+
       - name: Restore dependencies
         shell: pwsh
-        run: .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
+        run: >-
+          .\scripts\Invoke-SharpProofDotnet.ps1
+          restore SharpProof.sln
+          /p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION
 
       - name: Build package payloads
         shell: pwsh
@@ -41,6 +93,7 @@ jobs:
           build SharpProof.sln
           --configuration Release
           --no-restore
+          /p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION
 
       - name: Pack and validate the three-package graph
         shell: pwsh
@@ -62,7 +115,8 @@ jobs:
             .\scripts\Invoke-SharpProofDotnet.ps1 pack $project `
               --configuration Release `
               --no-build `
-              --output nupkgs
+              --output nupkgs `
+              /p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
@@ -70,27 +124,48 @@ jobs:
             -PackageSource nupkgs `
             -ValidatePackageSourceOnly
 
-      - name: Generate SPDX SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
-        with:
-          path: ./nupkgs
-          format: spdx-json
-          output-file: nupkgs/SharpProof.spdx.json
-          upload-artifact: false
-          upload-release-assets: false
-
-      - name: Generate deterministic release evidence
+      - name: Generate deterministic SPDX SBOM and release evidence
         shell: pwsh
         run: >-
           .\scripts\New-SharpProofReleaseEvidence.ps1
           -PackageSource nupkgs
-          -SbomPath nupkgs/SharpProof.spdx.json
+
+      - name: Validate publication-time artifact evidence
+        shell: pwsh
+        run: >-
+          .\scripts\Test-SharpProofReleaseArtifacts.ps1
+          -PackageSource nupkgs
+          -ExpectedTag "v$env:SHARPPROOF_RELEASE_VERSION"
+
+      - name: Upload exact NuGet artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nuget-packages
+          path: nupkgs/*
+          if-no-files-found: error
+
+  attest:
+    name: Attest canonical package provenance
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/master' ||
+       startsWith(github.ref, 'refs/tags/v')) &&
+      github.repository == 'alexyorke/SharpProof'
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Download exact NuGet artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nuget-packages
+          path: nupkgs
 
       - name: Attest build provenance
-        if: >-
-          github.event_name == 'push' &&
-          github.ref == 'refs/heads/master' &&
-          github.repository == 'alexyorke/SharpProof'
         uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
         with:
           subject-path: |
@@ -101,21 +176,10 @@ jobs:
             nupkgs/SHA256SUMS
 
       - name: Attest the package SBOM
-        if: >-
-          github.event_name == 'push' &&
-          github.ref == 'refs/heads/master' &&
-          github.repository == 'alexyorke/SharpProof'
         uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
         with:
           subject-path: nupkgs/*.*nupkg
           sbom-path: nupkgs/SharpProof.spdx.json
-
-      - name: Upload exact NuGet artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: nuget-packages
-          path: nupkgs/*
-          if-no-files-found: error
 
   package-consumer:
     name: ${{ matrix.name }}
@@ -169,3 +233,115 @@ jobs:
             -Configuration Release `
             -ExpectedSmt '${{ matrix.expected_smt }}' `
             -PackageSource $packageSource
+
+  publish-private-preview:
+    name: Promote preview.1 to the private feed
+    if: >-
+      github.event_name == 'push' &&
+      github.ref_name == 'v1.0.0-preview.1' &&
+      github.repository == 'alexyorke/SharpProof'
+    needs:
+      - package
+      - package-consumer
+      - attest
+    runs-on: ubuntu-latest
+    environment: nuget.private-preview
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup required .NET SDKs
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "8.0.x"
+          global-json-file: global.json
+
+      - name: Download the tested private-preview bytes
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nuget-packages
+          path: nupkgs
+
+      - name: Validate immutable tag, hashes, SBOM, and provenance identity
+        shell: pwsh
+        run: >-
+          ./scripts/Test-SharpProofReleaseArtifacts.ps1
+          -PackageSource nupkgs
+          -ExpectedTag '${{ github.ref_name }}'
+
+      - name: Publish the already-tested private-preview bytes
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_PRIVATE_API_KEY }}
+          NUGET_SOURCE: ${{ vars.NUGET_PRIVATE_SOURCE }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:NUGET_SOURCE) -or
+              [string]::IsNullOrWhiteSpace($env:NUGET_API_KEY)) {
+            throw 'The private-preview NuGet source and API key are required.'
+          }
+          ./scripts/Publish-SharpProofRelease.ps1 `
+            -PackageSource nupkgs `
+            -Source $env:NUGET_SOURCE `
+            -ApiKey $env:NUGET_API_KEY `
+            -ReadApiKey $env:NUGET_API_KEY
+
+  publish:
+    name: Promote tested packages to public NuGet
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref_name == 'v1.0.0-preview.2' ||
+       github.ref_name == 'v1.0.0-rc.1' ||
+       github.ref_name == 'v1.0.0') &&
+      github.repository == 'alexyorke/SharpProof'
+    needs:
+      - package
+      - package-consumer
+      - attest
+    runs-on: ubuntu-latest
+    environment: nuget.org
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup required .NET SDKs
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "8.0.x"
+          global-json-file: global.json
+
+      - name: Download the tested release bytes
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nuget-packages
+          path: nupkgs
+
+      - name: Validate immutable tag, hashes, SBOM, and provenance identity
+        shell: pwsh
+        run: >-
+          ./scripts/Test-SharpProofReleaseArtifacts.ps1
+          -PackageSource nupkgs
+          -ExpectedTag '${{ github.ref_name }}'
+
+      - name: Exchange GitHub OIDC token for a temporary NuGet key
+        id: nuget-login
+        uses: NuGet/login@ebc737b6fc418a6ca0073cf116ec8dc156d8b81e # v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Publish the already-tested package and symbol bytes
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: |
+          $source = 'https://api.nuget.org/v3/index.json'
+          ./scripts/Publish-SharpProofRelease.ps1 `
+            -PackageSource nupkgs `
+            -Source $source `
+            -ApiKey $env:NUGET_API_KEY

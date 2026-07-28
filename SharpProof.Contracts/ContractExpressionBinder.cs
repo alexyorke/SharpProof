@@ -33,63 +33,35 @@ internal sealed class ContractExpressionBinder {
     internal ImmutableArray<IrVarId> ReceiverVariables =>
         [.. _receiverVariables];
 
-    internal IReadOnlyDictionary<IrVarId, IrVarId> PreStateVariables =>
-        _preState;
+    internal IReadOnlyDictionary<IrVarId, IrVarId> PreStateVariables => _preState;
 
     internal IrVarId? ResultVariable => _result;
 
-    internal ExpressionBindingResult Bind(
-        IOperation operation,
-        BoundContractKind clauseKind) =>
-        BindCore(operation, clauseKind, insideOld: false);
+    internal ExpressionBindingResult Bind(IOperation operation) => BindCore(operation);
 
-    private ExpressionBindingResult BindCore(
-        IOperation operation,
-        BoundContractKind clauseKind,
-        bool insideOld) {
+    private ExpressionBindingResult BindCore(IOperation operation) {
         if (operation is IBinaryOperation nullComparison &&
             nullComparison.OperatorMethod == null &&
             !nullComparison.IsLifted &&
             nullComparison.OperatorKind is (
                 BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals) &&
             TryGetNullComparisonValue(nullComparison, out var comparedValue)) {
-            var value = BindCore(comparedValue, clauseKind, insideOld);
+            var value = BindCore(comparedValue);
             if (!value.IsSuccess) return value;
-            try {
-                var operationKind = nullComparison.OperatorKind ==
-                    BinaryOperatorKind.Equals
-                    ? IrBinaryOperator.Equal
-                    : IrBinaryOperator.NotEqual;
-                return ExpressionBindingResult.Success(
-                    _factory.Binary(
-                        operationKind, value.Term!,
-                        _factory.Null(value.Term!.Type)));
-            }
-            catch (ArgumentException) {
-                return ExpressionBindingResult.Fail(
-                    ContractBindingFailure.UnsupportedExpression);
-            }
+            var operationKind = nullComparison.OperatorKind ==
+                BinaryOperatorKind.Equals
+                ? IrBinaryOperator.Equal
+                : IrBinaryOperator.NotEqual;
+            return TryCreate(() => _factory.Binary(
+                operationKind,
+                value.Term!,
+                _factory.Null(value.Term!.Type)));
         }
         if (!ContainsIntrinsic(operation))
             return BindWithFrontend(operation);
 
         if (operation is IInvocationOperation invocation) {
             if (_api.IsResult(invocation.TargetMethod)) {
-                if (clauseKind != BoundContractKind.Ensures)
-                    return ExpressionBindingResult.Fail(
-                        ContractBindingFailure.ResultOutsideEnsures);
-                if (insideOld)
-                    return ExpressionBindingResult.Fail(
-                        ContractBindingFailure.UnsupportedExpression);
-                if (invocation.Arguments.Length != 0 ||
-                    _source.ReturnsVoid ||
-                    _source.MethodKind == MethodKind.Constructor ||
-                    invocation.Type == null ||
-                    !SymbolEqualityComparer.IncludeNullability.Equals(
-                        _specializeType(invocation.Type),
-                        _source.ReturnType))
-                    return ExpressionBindingResult.Fail(
-                        ContractBindingFailure.InvalidIntrinsicSignature);
                 _result ??= _factory.CreateVariable(
                     "source-result",
                     _lowerer.GetTypeId(_source.ReturnType));
@@ -97,19 +69,7 @@ internal sealed class ContractExpressionBinder {
                     _factory.Variable(_result.Value));
             }
             if (_api.IsOld(invocation.TargetMethod)) {
-                if (clauseKind != BoundContractKind.Ensures)
-                    return ExpressionBindingResult.Fail(
-                        ContractBindingFailure.OldOutsideEnsures);
-                if (insideOld)
-                    return ExpressionBindingResult.Fail(
-                        ContractBindingFailure.NestedOld);
-                if (invocation.Arguments.Length != 1)
-                    return ExpressionBindingResult.Fail(
-                        ContractBindingFailure.InvalidIntrinsicSignature);
-                var value = BindCore(
-                    invocation.Arguments[0].Value,
-                    clauseKind,
-                    insideOld: true);
+                var value = BindCore(invocation.Arguments[0].Value);
                 if (!value.IsSuccess) return value;
                 var substitutions = new Dictionary<IrVarId, IrTerm>();
                 foreach (var variable in IrTraversal.CollectVariables(value.Term!)) {
@@ -136,20 +96,13 @@ internal sealed class ContractExpressionBinder {
             property.Instance is { Type: IArrayTypeSymbol { Rank: 1 } } instance &&
             property.Property.Name == nameof(Array.Length) &&
             property.Type?.SpecialType == SpecialType.System_Int32) {
-            var value = BindCore(instance, clauseKind, insideOld);
+            var value = BindCore(instance);
             if (!value.IsSuccess) return value;
-            try {
-                return ExpressionBindingResult.Success(
-                    _factory.Length(value.Term!));
-            }
-            catch (ArgumentException) {
-                return ExpressionBindingResult.Fail(
-                    ContractBindingFailure.UnsupportedExpression);
-            }
+            return TryCreate(() => _factory.Length(value.Term!));
         }
 
         if (operation is IConversionOperation conversion) {
-            var operand = BindCore(conversion.Operand, clauseKind, insideOld);
+            var operand = BindCore(conversion.Operand);
             if (!operand.IsSuccess) return operand;
             var targetType = _lowerer.GetTypeId(conversion.Type);
             if (SymbolEqualityComparer.Default.Equals(
@@ -161,45 +114,40 @@ internal sealed class ContractExpressionBinder {
                     conversion.Operand.Type?.SpecialType ?? SpecialType.None,
                     conversion.Type?.SpecialType ?? SpecialType.None))
                 return operand;
-            return ExpressionBindingResult.Fail(
-                ContractBindingFailure.UnsupportedExpression);
+            return ExpressionBindingResult.Unsupported;
         }
         if (operation is IUnaryOperation unary && unary.OperatorMethod == null) {
-            var operand = BindCore(unary.Operand, clauseKind, insideOld);
+            var operand = BindCore(unary.Operand);
             if (!operand.IsSuccess) return operand;
             var mapped = unary.OperatorKind switch {
                 UnaryOperatorKind.Not => IrUnaryOperator.Not,
                 UnaryOperatorKind.Minus => IrUnaryOperator.Negate,
                 _ => (IrUnaryOperator?)null
             };
-            if (!mapped.HasValue) return ExpressionBindingResult.Fail(
-                ContractBindingFailure.UnsupportedExpression);
+            if (!mapped.HasValue) return ExpressionBindingResult.Unsupported;
             if (mapped == IrUnaryOperator.Negate &&
                 (unary.Type?.SpecialType != SpecialType.System_Int64 ||
                  !unary.IsChecked))
-                return ExpressionBindingResult.Fail(
-                    ContractBindingFailure.UnsupportedExpression);
-            try {
-                return ExpressionBindingResult.Success(
-                    _factory.Unary(mapped.Value, operand.Term!));
-            }
-            catch (ArgumentException) {
-                return ExpressionBindingResult.Fail(
-                    ContractBindingFailure.UnsupportedExpression);
-            }
+                return ExpressionBindingResult.Unsupported;
+            return TryCreate(() =>
+                _factory.Unary(mapped.Value, operand.Term!));
         }
         if (operation is IBinaryOperation binary &&
             binary.OperatorMethod == null &&
             !binary.IsLifted) {
-            var left = BindCore(binary.LeftOperand, clauseKind, insideOld);
+            if (!RoslynOperatorSemantics.SupportsBuiltInOperands(
+                    binary.OperatorKind,
+                    binary.LeftOperand.Type,
+                    binary.RightOperand.Type))
+                return ExpressionBindingResult.Unsupported;
+            var left = BindCore(binary.LeftOperand);
             if (!left.IsSuccess) return left;
-            var right = BindCore(binary.RightOperand, clauseKind, insideOld);
+            var right = BindCore(binary.RightOperand);
             if (!right.IsSuccess) return right;
             var mapped = RoslynOperatorSemantics.MapBinary(
                 binary.OperatorKind,
                 binary.Type?.SpecialType ?? SpecialType.None);
-            if (!mapped.HasValue) return ExpressionBindingResult.Fail(
-                ContractBindingFailure.UnsupportedExpression);
+            if (!mapped.HasValue) return ExpressionBindingResult.Unsupported;
             if (mapped == IrBinaryOperator.StringConcat ||
                 RoslynOperatorSemantics.IsIntegerArithmetic(
                     binary.OperatorKind) &&
@@ -207,48 +155,24 @@ internal sealed class ContractExpressionBinder {
                  RoslynOperatorSemantics.RequiresCheckedArithmetic(
                      binary.OperatorKind) &&
                  !binary.IsChecked))
-                return ExpressionBindingResult.Fail(
-                    ContractBindingFailure.UnsupportedExpression);
-            try {
-                return ExpressionBindingResult.Success(
-                    _factory.Binary(mapped.Value, left.Term!, right.Term!));
-            }
-            catch (ArgumentException) {
-                return ExpressionBindingResult.Fail(
-                    ContractBindingFailure.UnsupportedExpression);
-            }
+                return ExpressionBindingResult.Unsupported;
+            return TryCreate(() =>
+                _factory.Binary(mapped.Value, left.Term!, right.Term!));
         }
         if (operation is IConditionalOperation conditional &&
             conditional.WhenFalse != null) {
-            var condition = BindCore(
-                conditional.Condition,
-                clauseKind,
-                insideOld);
+            var condition = BindCore(conditional.Condition);
             if (!condition.IsSuccess) return condition;
-            var whenTrue = BindCore(
-                conditional.WhenTrue,
-                clauseKind,
-                insideOld);
+            var whenTrue = BindCore(conditional.WhenTrue);
             if (!whenTrue.IsSuccess) return whenTrue;
-            var whenFalse = BindCore(
-                conditional.WhenFalse,
-                clauseKind,
-                insideOld);
+            var whenFalse = BindCore(conditional.WhenFalse);
             if (!whenFalse.IsSuccess) return whenFalse;
-            try {
-                return ExpressionBindingResult.Success(
-                    _factory.Conditional(
-                        condition.Term!,
-                        whenTrue.Term!,
-                        whenFalse.Term!));
-            }
-            catch (ArgumentException) {
-                return ExpressionBindingResult.Fail(
-                    ContractBindingFailure.UnsupportedExpression);
-            }
+            return TryCreate(() => _factory.Conditional(
+                condition.Term!,
+                whenTrue.Term!,
+                whenFalse.Term!));
         }
-        return ExpressionBindingResult.Fail(
-            ContractBindingFailure.UnsupportedExpression);
+        return ExpressionBindingResult.Unsupported;
     }
 
     private static bool TryGetNullComparisonValue(
@@ -279,8 +203,7 @@ internal sealed class ContractExpressionBinder {
     private ExpressionBindingResult BindWithFrontend(IOperation operation) {
         var result = _lowerer.Lower(operation);
         if (!result.IsExact)
-            return ExpressionBindingResult.Fail(
-                ContractBindingFailure.UnsupportedExpression);
+            return ExpressionBindingResult.Unsupported;
         foreach (var binding in result.Variables)
             _variables[binding.Symbol] = binding.Variable;
 
@@ -289,11 +212,19 @@ internal sealed class ContractExpressionBinder {
         foreach (var variable in IrTraversal.CollectVariables(result.Term)) {
             if (boundVariables.Contains(variable)) continue;
             if (_source.IsStatic)
-                return ExpressionBindingResult.Fail(
-                    ContractBindingFailure.UnsupportedExpression);
+                return ExpressionBindingResult.Unsupported;
             _receiverVariables.Add(variable);
         }
         return ExpressionBindingResult.Success(result.Term);
+    }
+
+    private static ExpressionBindingResult TryCreate(Func<IrTerm> create) {
+        try {
+            return ExpressionBindingResult.Success(create());
+        }
+        catch (ArgumentException) {
+            return ExpressionBindingResult.Unsupported;
+        }
     }
 
     private bool ContainsIntrinsic(IOperation root) =>
@@ -305,16 +236,11 @@ internal sealed class ContractExpressionBinder {
 
 }
 
-internal readonly struct ExpressionBindingResult {
-    private ExpressionBindingResult(
-        IrTerm? term,
-        ContractBindingFailure failure) {
-        Term = term;
-        Failure = failure;
-    }
-
-    internal IrTerm? Term { get; }
-    internal ContractBindingFailure Failure { get; }
+internal readonly struct ExpressionBindingResult(
+    IrTerm? term,
+    ContractBindingFailure failure) {
+    internal IrTerm? Term { get; } = term;
+    internal ContractBindingFailure Failure { get; } = failure;
     internal bool IsSuccess => Failure == ContractBindingFailure.None;
 
     internal static ExpressionBindingResult Success(IrTerm term) =>
@@ -323,4 +249,7 @@ internal readonly struct ExpressionBindingResult {
     internal static ExpressionBindingResult Fail(
         ContractBindingFailure failure) =>
         new(null, failure);
+
+    internal static ExpressionBindingResult Unsupported { get; } =
+        Fail(ContractBindingFailure.UnsupportedExpression);
 }

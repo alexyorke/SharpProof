@@ -134,6 +134,7 @@ public sealed class RuntimeEffectOracleTests {
                 [EffectContract(
                     SharpProofEffect.WritesAmbientState,
                     Capabilities = SharpProofCapability.Console,
+                    IsDeterministic = true,
                     Complete = true)]
                 public static void Touch() => Console.Write("effect-oracle");
             }
@@ -227,6 +228,20 @@ public sealed class RuntimeEffectOracleTests {
             public static class RuntimeFixture {
                 public static int Divide(int left, int right) => left / right;
                 public static int Remainder(int left, int right) => left % right;
+                public static int? NullableDivide(int? left, int? right) =>
+                    left / right;
+                public static int? NullableRemainder(int? left, int? right) =>
+                    left % right;
+                public static nint NativeDivide(nint left, nint right) =>
+                    left / right;
+                public static nint NativeRemainder(nint left, nint right) =>
+                    left % right;
+                public static nuint NativeUnsignedDivide(
+                    nuint left,
+                    nuint right) => left / right;
+                public static nuint NativeUnsignedRemainder(
+                    nuint left,
+                    nuint right) => left % right;
                 public static int CompoundDivide(int left, int right) {
                     left /= right;
                     return left;
@@ -259,6 +274,30 @@ public sealed class RuntimeEffectOracleTests {
                 "Remainder",
                 [int.MinValue, -1],
                 "System.OverflowException"),
+            new RuntimeExceptionCase(
+                "NullableDivide",
+                [1, 0],
+                "System.DivideByZeroException"),
+            new RuntimeExceptionCase(
+                "NullableRemainder",
+                [int.MinValue, -1],
+                "System.OverflowException"),
+            new RuntimeExceptionCase(
+                "NativeDivide",
+                [nint.MinValue, (nint)(-1)],
+                "System.OverflowException"),
+            new RuntimeExceptionCase(
+                "NativeRemainder",
+                [nint.MinValue, (nint)(-1)],
+                "System.OverflowException"),
+            new RuntimeExceptionCase(
+                "NativeUnsignedDivide",
+                [(nuint)1, (nuint)0],
+                "System.DivideByZeroException"),
+            new RuntimeExceptionCase(
+                "NativeUnsignedRemainder",
+                [(nuint)1, (nuint)0],
+                "System.DivideByZeroException"),
             new RuntimeExceptionCase(
                 "CompoundDivide",
                 [1, 0],

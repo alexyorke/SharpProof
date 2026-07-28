@@ -36,6 +36,33 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
+    public async Task UnsupportedEffectsSyntaxDoesNotHideConcretePreconditionViolation() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void Positive(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Call() {
+                    Positive(-1);
+                    foreach (var value in new[] { 1 }) {
+                        _ = value;
+                    }
+                }
+            }
+            """,
+            mode: null,
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
     public async Task UnknownInvocationArgumentAndEnsuresAbstainSilently() {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
@@ -369,6 +396,7 @@ public sealed class RequiresAndControlTests {
                 [AllowedCapabilities((SharpProofCapability)(1 << 30))]
                 [AllowedExceptions(typeof(string))]
                 [AllowedExceptions(typeof(int))]
+                [EffectContract((SharpProofEffect)(1L << 40))]
                 public static async Task Unsupported() {
                     await Task.Yield();
                 }
@@ -379,7 +407,7 @@ public sealed class RequiresAndControlTests {
 
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0024", "SP0024", "SP0024"]));
+            Is.EqualTo(["SP0024", "SP0024", "SP0024", "SP0024"]));
     }
 
     [Test]
@@ -445,6 +473,51 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
+    public async Task IntrinsicMisuseIsDiagnosedWhenContractsAreNotSelected() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static long StandaloneResult(long value) {
+                    _ = Contract.Result<long>();
+                    return value;
+                }
+
+                public static long StandaloneOld(long value) {
+                    _ = Contract.Old(value);
+                    return value;
+                }
+
+                public static long NestedOld(long value) {
+                    Contract.Ensures(
+                        Contract.Old(Contract.Old(value)) == value);
+                    return value;
+                }
+
+                public static int MismatchedResult(int value) {
+                    Contract.Ensures(
+                        Contract.Result<long>() == value);
+                    return value;
+                }
+            }
+            """,
+            mode: null,
+            ["SP0024"],
+            features: "effects");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0024", 4)));
+        var messages = diagnostics.Select(diagnostic =>
+            diagnostic.GetMessage(CultureInfo.InvariantCulture)).ToArray();
+        Assert.That(messages[0], Does.Contain("Contract.Result").And.Contain("<placement>"));
+        Assert.That(messages[1], Does.Contain("Contract.Old").And.Contain("<placement>"));
+        Assert.That(messages[2], Does.Contain("Contract.Old").And.Contain("<nesting>"));
+        Assert.That(messages[3], Does.Contain("Contract.Result").And.Contain("<signature>"));
+    }
+
+    [Test]
     public async Task EveryMisplacedContractClauseIsDiagnosed() {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
@@ -493,11 +566,53 @@ public sealed class RequiresAndControlTests {
 
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0024", 5)));
+            Is.EqualTo(Enumerable.Repeat("SP0024", 4)));
         Assert.That(
             diagnostics.Select(diagnostic =>
                 diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Has.All.Contain("<placement>"));
+    }
+
+    [Test]
+    public async Task NestedCallableClausesAreValidatedOnlyByTheirOwner() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static void Outer(bool condition) {
+                    void Valid() {
+                        Contract.Requires(condition);
+                    }
+                    void Invalid() {
+                        _ = condition;
+                        Contract.Ensures(condition);
+                    }
+                    Action lambda = () => {
+                        _ = condition;
+                        Contract.Assume(condition);
+                    };
+                    Valid();
+                    Invalid();
+                    lambda();
+                }
+            }
+            """,
+            "contracts",
+            ["SP0024"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0024", "SP0024"]));
+        Assert.That(
+            diagnostics.Select(diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Has.Some.Contain("Contract.Ensures"));
+        Assert.That(
+            diagnostics.Select(diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Has.Some.Contain("Contract.Assume"));
     }
 
     [Test]

@@ -1,4 +1,4 @@
-name: CI/CD
+name: Fast PR gates
 
 on:
   push:
@@ -29,38 +29,20 @@ jobs:
         shell: pwsh
         run: .\scripts\Generate-Readme.ps1 -Verify
 
-      - name: Run the acceptance contract
+      - name: Validate architecture, metadata, and size contract
         shell: pwsh
-        run: .\eng\acceptance\Verify.ps1 -Configuration Release
+        run: >-
+          .\eng\acceptance\Verify.ps1
+          -Configuration Release
+          -SkipTests
 
-      - name: Package NuGet packages
+      - name: Run unit, architecture, protocol, and package-layout tests
         shell: pwsh
-        run: |
-          $expectedProjects = @(
-            'SharpProof.Attributes/SharpProof.Attributes.csproj',
-            'SharpProof.Package/SharpProof.Package.csproj',
-            'SharpProof.Verifier.Win-x64/SharpProof.Verifier.Win-x64.csproj'
-          )
-          $manifest = Get-Content scripts/package-projects.json -Raw | ConvertFrom-Json
-          if ($manifest.schemaVersion -ne 1 -or
-              (@($manifest.projects) -join '|') -ne
-              ($expectedProjects -join '|')) {
-            throw 'Package manifest must contain the exact dependency-ordered three-package graph.'
-          }
-          foreach ($project in $manifest.projects) {
-            .\scripts\Invoke-SharpProofDotnet.ps1 pack $project --configuration Release --no-build --output nupkgs
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
-
-          .\scripts\Test-SharpProofPackageConsumers.ps1 `
-            -PackageSource nupkgs `
-            -ValidatePackageSourceOnly
-          .\scripts\New-SharpProofReleaseEvidence.ps1 `
-            -PackageSource nupkgs
-
-      - name: Upload NuGet artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: nuget-packages
-          path: nupkgs/*
-          if-no-files-found: error
+        run: >-
+          .\scripts\Invoke-SharpProofDotnet.ps1
+          -MemoryLimitMb 12288
+          -TimeoutSeconds 900
+          test SharpProof.Dev.Tests.slnf
+          -c Release
+          --no-build
+          --logger 'console;verbosity=minimal'

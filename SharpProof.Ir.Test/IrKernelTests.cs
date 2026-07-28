@@ -541,6 +541,15 @@ public sealed class IrKernelTests {
                 [dividend] = factory.CreateIntegerValue(long.MinValue),
                 [divisor] = factory.CreateIntegerValue(-1)
             });
+        var remainder = interpreter.Evaluate(
+            factory.Binary(
+                IrBinaryOperator.Remainder,
+                factory.Variable(dividend),
+                factory.Variable(divisor)),
+            new Dictionary<IrVarId, IrValue> {
+                [dividend] = factory.CreateIntegerValue(long.MinValue),
+                [divisor] = factory.CreateIntegerValue(-1)
+            });
         var missing = interpreter.Evaluate(
             division,
             new Dictionary<IrVarId, IrValue> {
@@ -557,6 +566,9 @@ public sealed class IrKernelTests {
             Is.EqualTo(IrExceptionKind.DivideByZero));
         Assert.That(
             overflow.Exception!.Kind,
+            Is.EqualTo(IrExceptionKind.Overflow));
+        Assert.That(
+            remainder.Exception!.Kind,
             Is.EqualTo(IrExceptionKind.Overflow));
         Assert.That(
             missing.Unsupported!.Reason,

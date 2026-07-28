@@ -37,6 +37,7 @@ and validation bounds. The release gate mirrors selected values in
 | `SharpProofVerifyTerminationGraceMilliseconds` | `1000` | Grace added to the project boundary before forced termination | verifier props and `WorkerLauncherDefaults`; mirrored by `contract.json` |
 | `SharpProofVerifyCacheEnabled` | `true` | Enables the content-addressed disk cache | verifier props and `WorkerCacheOptions`; not present in `contract.json` |
 | `SharpProofVerifyCacheMaximumBytes` | `536870912` | Maximum cache size, 512 MiB | verifier props and `WorkerCacheOptions`; mirrored by `contract.json` |
+| `SharpProofVerifySarifFile` | unset | Opt-in deterministic SARIF 2.1.0 output path | verifier targets |
 | `SharpProofDotNetHost` | `dotnet` | Host used to start the launcher | verifier props |
 
 `SharpProofVerifyCacheDirectory` is initialized by the verifier targets beneath
@@ -49,6 +50,12 @@ The stable result is removed first, the compiler manifest and request are
 atomically replaced, and the validated result is written last as the commit
 marker. Interrupted publication therefore leaves no successful result for a
 partly updated evidence set.
+
+When `SharpProofVerifySarifFile` is nonblank, the launcher projects only the
+validated response and atomically writes SARIF under the same publication
+mutex before committing the JSON result. Claim outcomes, SP0047 incomplete
+coverage, SP0048 assumption evidence, and run failures retain policy-matched
+levels; SARIF generation cannot change verifier exit behavior.
 
 Windows verification also initializes an internal, compiler-visible
 `_SharpProofCompilerManifestPath` beneath the isolated invocation directory.
@@ -149,11 +156,16 @@ release gates, not end-user MSBuild defaults.
 | Retained-memory absolute increase | At most 32 MiB |
 | Enabled analyzer retained compilations | 0 |
 | Enabled analyzer retained-memory increase | At most 32 MiB |
+
+Nightly campaign evidence parses every runner JSON result and requires the
+exact schema, seed, configured parallelism, passing coverage, empty failure
+set, and full `agreements + abstentions` case accounting. Its published total
+is the observed runner total rather than the requested budget.
 | Simulated IDE edits | 200 |
 | IDE edit p95 | At most 100 ms |
 | IDE edit maximum | At most 250 ms |
 
-The active contract also fixes protocol version 5, cache schema version 6,
+The active contract also fixes protocol version 6, cache schema version 7,
 claim-manifest schema version 2, and compiler artifact schema version 3, along
 with the narrow proof-kernel and component TCB path/LOC ratchets and the
 reference surfaces `netstandard2.0`, `net8.0`, and `net472`.
@@ -177,6 +189,7 @@ project responses can enter the semantic cache. See
 
 Replay validation has two layers: exact backend-model and lowered-term checks
 in the proof kernel, followed by independent execution of the compiler-produced
-whole-body CFG in the worker. Executed spec calls or unsupported operations
-fail closed to `CounterexampleReplayFailed`; instructions on unselected paths
-do not block a concrete replay.
+whole-body CFG in the worker. Executed spec calls become typed
+`CounterexampleNotReplayable`; other unsupported or inconsistent replay state
+fails the run as `CounterexampleReplayFailed`. Instructions on unselected
+paths do not block a concrete replay.

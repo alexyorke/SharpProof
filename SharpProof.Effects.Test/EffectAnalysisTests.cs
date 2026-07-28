@@ -616,6 +616,7 @@ public sealed class EffectAnalysisTests {
                 [EffectContract(
                     SharpProofEffect.ReadsAmbientState,
                     Capabilities = SharpProofCapability.Console,
+                    IsDeterministic = true,
                     Complete = true)]
                 public static void Touch() {
                 }
@@ -650,6 +651,30 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
+    public void TrustedCompleteBodylessSourceContractIsResolved() {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            public static class Sample {
+                [SharpProofTrusted("reviewed native implementation")]
+                [EffectContract(SharpProofEffect.None, Complete = true)]
+                public static extern void Boundary();
+
+                public static void Invoke() => Boundary();
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Invoke"));
+
+        Assert.That(result.Summary.Completeness, Is.EqualTo(EffectCompleteness.Complete));
+        Assert.That(result.Summary.Reads.IsEmpty, Is.True);
+        Assert.That(result.Summary.Writes.IsEmpty, Is.True);
+        Assert.That(result.Summary.Throws.IsEmpty, Is.True);
+    }
+
+    [Test]
     public void ExternalSummaryRequiresBothTrustAndCompleteContract() {
         var externalReference = EffectTestHost.EmitReference(
             """
@@ -672,6 +697,16 @@ public sealed class EffectAnalysisTests {
                 public static void Both() {
                 }
 
+                [SharpProofTrusted("reviewed implementation")]
+                [EffectContract(SharpProofEffect.None, Complete = false)]
+                public static void Incomplete() {
+                }
+
+                [SharpProofTrusted("reviewed implementation")]
+                [EffectContract(SharpProofEffect.None)]
+                public static void ImplicitDefaults() {
+                }
+
                 [SharpProofTrusted(" ")]
                 [EffectContract(SharpProofEffect.None, Complete = true)]
                 public static void InvalidReason() {
@@ -688,6 +723,8 @@ public sealed class EffectAnalysisTests {
                      "Neither",
                      "TrustOnly",
                      "ContractOnly",
+                     "Incomplete",
+                     "ImplicitDefaults",
                      "InvalidReason"
                  }) {
             var result = session.Analyze(
@@ -772,6 +809,26 @@ public sealed class EffectAnalysisTests {
                 public static void Explicit(Exception exception) => throw exception;
                 public static int Divide(int left, int right) => left / right;
                 public static int Remainder(int left, int right) => left % right;
+                public static int? NullableDivide(int? left, int? right) =>
+                    left / right;
+                public static int? NullableRemainder(int? left, int? right) =>
+                    left % right;
+                public static uint? NullableUnsignedDivide(
+                    uint? left,
+                    uint? right) => left / right;
+                public static uint? NullableUnsignedRemainder(
+                    uint? left,
+                    uint? right) => left % right;
+                public static nint NativeDivide(nint left, nint right) =>
+                    left / right;
+                public static nint NativeRemainder(nint left, nint right) =>
+                    left % right;
+                public static nuint NativeUnsignedDivide(
+                    nuint left,
+                    nuint right) => left / right;
+                public static nuint NativeUnsignedRemainder(
+                    nuint left,
+                    nuint right) => left % right;
                 public static int CompoundDivide(int left, int right) {
                     left /= right;
                     return left;
@@ -811,6 +868,34 @@ public sealed class EffectAnalysisTests {
             session.Analyze(Method(compilation, "Remainder")).Summary,
             "System.DivideByZeroException",
             "System.OverflowException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "NullableDivide")).Summary,
+            "System.DivideByZeroException",
+            "System.OverflowException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "NullableRemainder")).Summary,
+            "System.DivideByZeroException",
+            "System.OverflowException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "NullableUnsignedDivide")).Summary,
+            "System.DivideByZeroException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "NullableUnsignedRemainder")).Summary,
+            "System.DivideByZeroException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "NativeDivide")).Summary,
+            "System.DivideByZeroException",
+            "System.OverflowException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "NativeRemainder")).Summary,
+            "System.DivideByZeroException",
+            "System.OverflowException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "NativeUnsignedDivide")).Summary,
+            "System.DivideByZeroException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "NativeUnsignedRemainder")).Summary,
+            "System.DivideByZeroException");
         AssertThrows(
             session.Analyze(Method(compilation, "CompoundDivide")).Summary,
             "System.DivideByZeroException",
@@ -1185,6 +1270,61 @@ public sealed class EffectAnalysisTests {
         Assert.That(
             result.Projection.Effects,
             Is.EqualTo(SharpProofEffect.WritesStaticState));
+    }
+
+    [Test]
+    public void UntrustedSourceContractRetainsItsDecodedSummaryForChecking() {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            public static class Sample {
+                [EffectContract(SharpProofEffect.None, Complete = true)]
+                public static void Empty() {
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var resolution = session.ResolveExternalContract(
+            Method(compilation, "Empty"));
+
+        Assert.That(
+            resolution.Kind,
+            Is.EqualTo(EffectContractResolutionKind.Untrusted));
+        Assert.That(
+            resolution.Summary.Completeness,
+            Is.EqualTo(EffectCompleteness.Complete));
+        Assert.That(resolution.Summary.Reads.IsEmpty, Is.True);
+        Assert.That(resolution.Summary.Writes.IsEmpty, Is.True);
+        Assert.That(
+            resolution.Summary.Capabilities.Contains(
+                EffectCapabilityKind.Randomness),
+            Is.True);
+    }
+
+    [Test]
+    public void AnalyzeBuildsOnlyTheRequestedReachableCallGraph() {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                private static int Reachable(int value) => value + 1;
+                public static int Selected(int value) => Reachable(value);
+                public static int Unselected(int value) => value - 1;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var selected = Method(compilation, "Selected");
+
+        var first = session.Analyze(selected);
+        var second = session.Analyze(selected);
+
+        Assert.That(session.AnalyzedSourceMethodCount, Is.EqualTo(2));
+        Assert.That(ReferenceEquals(first.Summary, second.Summary), Is.True);
+
+        session.Analyze(Method(compilation, "Unselected"));
+
+        Assert.That(session.AnalyzedSourceMethodCount, Is.EqualTo(3));
+        Assert.That(session.AnalyzeAll(), Has.Length.EqualTo(3));
     }
 
     [Test]

@@ -187,6 +187,39 @@ public sealed class AnalyzerModeAndEffectTests {
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EquivalentTo(["SP0016", "SP0045", "SP0046"]));
+        Assert.That(
+            diagnostics.Single(static diagnostic => diagnostic.Id == "SP0045")
+                .GetMessage(CultureInfo.InvariantCulture),
+            Does.Contain("AllocationUnknown"));
+        Assert.That(
+            diagnostics.Single(static diagnostic => diagnostic.Id == "SP0016")
+                .GetMessage(CultureInfo.InvariantCulture),
+            Does.Contain("CapabilitySetUnknown"));
+        Assert.That(
+            diagnostics.Single(static diagnostic => diagnostic.Id == "SP0046")
+                .GetMessage(CultureInfo.InvariantCulture),
+            Does.Contain("ExceptionSetUnknown"));
+    }
+
+    [Test]
+    public async Task IncompleteUnrelatedFacetsDoNotBlockIndependentContracts() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System.Collections.Generic;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [DoesNotThrow]
+                public static int[] Empty() => System.Array.Empty<int>();
+
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static void Add(List<int> values) => values.Add(1);
+            }
+            """,
+            "effects",
+            ["SP0016", "SP0046"]);
+
+        Assert.That(diagnostics, Is.Empty);
     }
 
     [Test]
@@ -535,6 +568,169 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
+    public async Task AbstractAndExternSelectionsCannotDisappearWithoutAnOutcome() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public interface IFixture {
+                [ZeroAllocations]
+                int SelectedEffect();
+
+                [return: Positive]
+                int SelectedContract();
+
+                int Unannotated();
+            }
+
+            public abstract class Fixture {
+                [DoesNotThrow]
+                public abstract void SelectedException();
+
+                [SharpProofSuppress("Reviewed unsupported boundary.")]
+                [ZeroAllocations]
+                public abstract void Suppressed();
+            }
+
+            public static class NativeFixture {
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static extern int SelectedExtern();
+            }
+            """,
+            mode: null,
+            ["SP0047"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0047", 4)));
+        Assert.That(
+            diagnostics.Select(diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Has.All.Contain("MissingOperationRoot"));
+    }
+
+    [Test]
+    public async Task OnlyValidTrustedCompleteBodylessEffectContractsAreAccepted() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class NativeFixture {
+                [SharpProofTrusted("Reviewed native implementation.")]
+                [EffectContract(SharpProofEffect.None, Complete = true)]
+                public static extern int Accepted();
+
+                [EffectContract(SharpProofEffect.None, Complete = true)]
+                public static extern int Untrusted();
+
+                [SharpProofTrusted("Reviewed native implementation.")]
+                [EffectContract(SharpProofEffect.None, Complete = false)]
+                public static extern int Incomplete();
+
+                [SharpProofTrusted("Reviewed native implementation.")]
+                [EffectContract((SharpProofEffect)(1L << 40), Complete = true)]
+                public static extern int Invalid();
+
+                [SharpProofTrusted("Reviewed native implementation.")]
+                [EffectContract(SharpProofEffect.None)]
+                [EffectContract(SharpProofEffect.Allocates)]
+                public static extern int Conflicting();
+
+                [DoesNotThrow]
+                [SharpProofTrusted("Reviewed native implementation.")]
+                [EffectContract(
+                    SharpProofEffect.Throws,
+                    ThrownExceptions = new[] { typeof(InvalidOperationException) },
+                    Complete = true)]
+                public static extern int Contradictory();
+            }
+            """,
+            mode: null,
+            ["SP0024", "SP0046", "SP0047"]);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SP0024"),
+            Is.EqualTo(2));
+        Assert.That(
+            diagnostics.Where(static diagnostic => diagnostic.Id == "SP0024")
+                .Select(diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Has.All.Contain("[EffectContract]"));
+        var incomplete = diagnostics
+            .Where(static diagnostic => diagnostic.Id == "SP0047")
+            .Select(diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture))
+            .ToArray();
+        Assert.That(
+            incomplete,
+            Has.Length.EqualTo(4),
+            string.Join(Environment.NewLine, incomplete));
+        Assert.That(incomplete, Has.None.Contain("'Accepted'"));
+        Assert.That(incomplete, Has.Some.Contain("'Untrusted'"));
+        Assert.That(incomplete, Has.Some.Contain("'Incomplete'"));
+        Assert.That(incomplete, Has.Some.Contain("'Invalid'"));
+        Assert.That(incomplete, Has.Some.Contain("'Conflicting'"));
+        Assert.That(
+            diagnostics.Where(static diagnostic => diagnostic.Id == "SP0046")
+                .Select(diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Has.Some.Contain("'Contradictory'"));
+    }
+
+    [Test]
+    public async Task NullableAndNativeDivisionCannotSatisfyDoesNotThrow() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [DoesNotThrow]
+                public static int? NullableDivide(int? left, int? right) =>
+                    left / right;
+
+                [DoesNotThrow]
+                public static int? NullableRemainder(int? left, int? right) =>
+                    left % right;
+
+                [DoesNotThrow]
+                public static uint? NullableUnsignedDivide(
+                    uint? left,
+                    uint? right) => left / right;
+
+                [DoesNotThrow]
+                public static uint? NullableUnsignedRemainder(
+                    uint? left,
+                    uint? right) => left % right;
+
+                [DoesNotThrow]
+                public static nint NativeDivide(nint left, nint right) =>
+                    left / right;
+
+                [DoesNotThrow]
+                public static nint NativeRemainder(nint left, nint right) =>
+                    left % right;
+
+                [DoesNotThrow]
+                public static nuint NativeUnsignedDivide(
+                    nuint left,
+                    nuint right) => left / right;
+
+                [DoesNotThrow]
+                public static nuint NativeUnsignedRemainder(
+                    nuint left,
+                    nuint right) => left % right;
+            }
+            """,
+            "effects",
+            ["SP0046"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0046", 8)));
+    }
+
+    [Test]
     public async Task EffectContractSelectsUnsupportedMethod() {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
@@ -555,6 +751,86 @@ public sealed class AnalyzerModeAndEffectTests {
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(["SP0047"]));
+    }
+
+    [Test]
+    public async Task CompleteSourceEffectContractCanBeProvenFromAnEmptyBody() {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [EffectContract(SharpProofEffect.None, Complete = true)]
+                public static void Empty() {
+                }
+            }
+            """,
+            mode: null,
+            ["SP0047"],
+            new SharpProofAnalyzer(factory),
+            features: "effects");
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(
+            factory.Outcomes["Empty"],
+            Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+    }
+
+    [Test]
+    public async Task CompleteSourceEffectContractReportsAnUncoveredStateWrite() {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int state;
+
+                [EffectContract(SharpProofEffect.None, Complete = true)]
+                public static void Write() => state = 1;
+            }
+            """,
+            mode: null,
+            ["SP0047"],
+            new SharpProofAnalyzer(factory),
+            features: "effects");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0047"]));
+        Assert.That(
+            diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+            Does.Contain("EffectContractDoesNotCoverBodySummary"));
+        Assert.That(
+            factory.Outcomes["Write"],
+            Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+    }
+
+    [Test]
+    public async Task ContractsOnlyStillRejectsInvalidEffectContractBits() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [EffectContract(
+                    (SharpProofEffect)(1L << 40),
+                    Complete = true)]
+                public static void Invalid() {
+                }
+            }
+            """,
+            mode: null,
+            ["SP0024"],
+            features: "contracts");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0024"]));
+        Assert.That(
+            diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+            Does.Contain("[EffectContract]"));
     }
 
     [Test]

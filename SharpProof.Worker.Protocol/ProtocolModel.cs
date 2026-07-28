@@ -2,10 +2,10 @@ using System.Collections.Immutable;
 
 namespace SharpProof.Worker.Protocol;
 public static class WorkerProtocolVersions {
-    public const string Current = "5";
+    public const string Current = "6";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
-public static class WorkerCacheVersions { public const int Current = 6; }
+public static class WorkerCacheVersions { public const int Current = 7; }
 public static class WorkerManifestVersions { public const int Current = 2; }
 public static class WorkerLauncherDefaults { public const int TerminationGraceMilliseconds = 1_000; }
 public sealed class WorkerVerifyRequest {
@@ -80,7 +80,8 @@ public enum WorkerClaimReason {
     Unspecified, None, UnsupportedCallable, UnsupportedContract, UnsupportedBody,
     UnsupportedExpression, DeepPostcondition, MissingReturnValue, ResourceLimit,
     MethodTimeout, ProjectTimeout, Canceled, BackendUnavailable, InfrastructureFailure,
-    MalformedBackendResult, CounterexampleReplayFailed
+    MalformedBackendResult, CounterexampleReplayFailed, PostconditionMayBeUndefined,
+    CounterexampleNotReplayable
 }
 public enum WorkerAssumptionKind {
     Unspecified, Precondition, UserAssume, TrustedBoundary, ApiSpecification,

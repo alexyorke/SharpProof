@@ -22,7 +22,8 @@ internal static class Program {
             Console.Error.WriteLine(
                 "Usage: SharpProof.Worker.Launcher verify --worker <path> --request <path> --result <path> " +
                 "--compiler-manifest <path> --verify-policy <policy> --assumption-policy <policy> " +
-                "[--publish-request <path> --publish-result <path> --publish-compiler-manifest <path>] [budget options]");
+                "[--publish-request <path> --publish-result <path> --publish-compiler-manifest <path> " +
+                "[--publish-sarif <path>]] [budget options]");
             return 2;
         }
 
@@ -252,7 +253,9 @@ internal static class Program {
         var incompleteError = incomplete.Length != 0 &&
             request.VerifyPolicy == WorkerVerifyPolicy.RequireProven;
         var assumptionError = ReportAssumptions(request.AssumptionPolicy, response);
-        PrintSummary(response);
+        Console.WriteLine("SharpProof summary " + JsonSerializer.Serialize(
+            new { response.RunStatus, response.FailureReason, response.Summary },
+            WorkerProtocolJson.Options));
         if (response.RunStatus != WorkerRunStatus.Complete) {
             Console.Error.WriteLine("SharpProof worker run " + response.RunStatus +
                 " (" + response.FailureReason + ").");
@@ -269,11 +272,10 @@ internal static class Program {
     private static bool ReportAssumptions(
         WorkerAssumptionPolicy policy, WorkerVerifyResponse response) {
         var assumptions = response.Summary.Assumptions;
-        var declared = assumptions.User + assumptions.Trusted;
-        if (declared == 0) return false;
+        if (assumptions.User + assumptions.Trusted == 0) return false;
         ReportDiagnostic(response.Manifest.Callables[0].Location, Severity(policy), "SP0048",
             FormattableString.Invariant(
-                $"User assumption/trusted evidence declared: total={declared}, user={assumptions.User}, trusted={assumptions.Trusted}."));
+                $"User assumption/trusted evidence declared: total={assumptions.User + assumptions.Trusted}, user={assumptions.User}, trusted={assumptions.Trusted}."));
         return policy == WorkerAssumptionPolicy.Error;
     }
 
@@ -295,11 +297,6 @@ internal static class Program {
         (severity == "info" ? Console.Out : Console.Error).WriteLine(diagnostic);
     }
 
-    private static void PrintSummary(WorkerVerifyResponse response) =>
-        Console.WriteLine("SharpProof summary " + JsonSerializer.Serialize(
-            new { response.RunStatus, response.FailureReason, response.Summary },
-            WorkerProtocolJson.Options));
-
     private static void PublishOutputs(
         LauncherArguments arguments, WorkerVerifyRequest request,
         CompilerManifestArtifact artifact, byte[] artifactBytes, string expectedInputHash) {
@@ -307,6 +304,7 @@ internal static class Program {
         var requestPath = arguments.PublishRequestPath;
         var resultPath = arguments.PublishResultPath!;
         var manifestPath = arguments.PublishCompilerManifestPath!;
+        var sarifPath = arguments.PublishSarifPath;
         using var publication = new Mutex(false, "Local\\SharpProof.Publish");
         var ownsPublication = false;
         try {
@@ -320,12 +318,12 @@ internal static class Program {
                 throw new IOException(
                     "Timed out waiting to publish SharpProof results.");
             DeleteIfExists(resultPath);
+            DeleteIfExists(sarifPath);
             AtomicFile.WriteBytesAsync(manifestPath, artifactBytes)
                 .GetAwaiter().GetResult();
             request.CompilerManifest.Path = Path.GetFullPath(manifestPath);
-            AtomicFile.WriteUtf8Async(
-                requestPath, WorkerProtocolJson.SerializeRequest(request))
-                .GetAwaiter().GetResult();
+            AtomicFile.WriteUtf8(
+                requestPath, WorkerProtocolJson.SerializeRequest(request));
             var response = WorkerProtocolJson.DeserializeResponse(
                 File.ReadAllText(arguments.ResultPath)) ??
                 throw new IOException("The worker response is missing.");
@@ -334,9 +332,16 @@ internal static class Program {
                     response, response.RequestHash, expectedInputHash,
                     artifact.Manifest, request.Budgets).IsValid)
                 throw new IOException("The worker response binding is invalid.");
-            AtomicFile.WriteUtf8Async(
-                resultPath, WorkerProtocolJson.SerializeResponse(response))
-                .GetAwaiter().GetResult();
+            if (sarifPath != null)
+                AtomicFile.WriteUtf8(
+                    sarifPath, SarifProjection.Serialize(request, response));
+            AtomicFile.WriteUtf8(
+                resultPath, WorkerProtocolJson.SerializeResponse(response));
+        }
+        catch {
+            DeleteIfExists(resultPath);
+            DeleteIfExists(sarifPath);
+            throw;
         }
         finally {
             if (ownsPublication) publication.ReleaseMutex();
@@ -378,7 +383,7 @@ internal sealed class LauncherArguments {
     ];
     private static readonly string[] s_publication = ["publish-request", "publish-result", "publish-compiler-manifest"];
     private static readonly HashSet<string> s_allowed = [
-        .. s_required, .. s_publication, "termination-grace-ms",
+        .. s_required, .. s_publication, "publish-sarif", "termination-grace-ms",
         "query-rlimit", "method-rlimit", "method-wall-ms", "project-wall-ms",
         "max-parallelism", "max-expression-depth", "process-memory-bytes", "max-worker-processes",
         "cache-enabled", "cache-directory", "cache-maximum-bytes"
@@ -391,6 +396,7 @@ internal sealed class LauncherArguments {
     internal string ResultPath => FullPath("result"); internal string CompilerManifestPath => FullPath("compiler-manifest");
     internal string? PublishRequestPath => OptionalFullPath("publish-request"); internal string? PublishResultPath => OptionalFullPath("publish-result");
     internal string? PublishCompilerManifestPath => OptionalFullPath("publish-compiler-manifest");
+    internal string? PublishSarifPath => OptionalFullPath("publish-sarif");
     internal int TerminationGraceMilliseconds => Number("termination-grace-ms", WorkerLauncherDefaults.TerminationGraceMilliseconds);
 
     internal static bool TryParse(string[] args, out LauncherArguments arguments) {
@@ -409,6 +415,9 @@ internal sealed class LauncherArguments {
             return false;
         var publicationCount = s_publication.Count(key => values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value));
         if (publicationCount is not (0 or 3)) return false;
+        if (values.TryGetValue("publish-sarif", out var sarif) &&
+            (string.IsNullOrWhiteSpace(sarif) || publicationCount != 3))
+            return false;
         arguments = new LauncherArguments(values);
         return true;
     }
@@ -425,7 +434,8 @@ internal sealed class LauncherArguments {
 
     private void ValidateDistinctPaths() {
         string?[] candidates = [RequestPath, ResultPath, CompilerManifestPath,
-            PublishRequestPath, PublishResultPath, PublishCompilerManifestPath];
+            PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
+            PublishSarifPath];
         var paths = candidates.OfType<string>().ToArray();
         if (paths.Distinct(StringComparer.OrdinalIgnoreCase).Count() != paths.Length)
             throw new ArgumentException("SharpProof I/O paths must be distinct.");
