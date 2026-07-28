@@ -12,9 +12,17 @@ internal static class AnalyzerFeaturePipeline {
             method, session, context.ReportDiagnostic);
         ClosedContractDiagnostics.Validate(
             method, session, context.ReportDiagnostic);
-        _ = SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
+        var isSuppressed = SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
             method, session, context.ReportDiagnostic,
             context.CancellationToken);
+        if ((!method.IsAbstract && !method.IsExtern) || !IsSelected(method, session)) return;
+        if (isSuppressed) { session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Suppressed); return; }
+        context.ReportDiagnostic(Diagnostic.Create(
+            GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+            AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(method, context.CancellationToken),
+            method.Name,
+            LanguageSubsetAbstentionReason.MissingOperationRoot));
+        session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Abstained);
     }
 
     internal static void AnalyzeOperationBlock(
@@ -24,9 +32,7 @@ internal static class AnalyzerFeaturePipeline {
         if (context.OwningSymbol is not IMethodSymbol method)
             return;
         if (method.DeclaringSyntaxReferences.IsDefaultOrEmpty) {
-            session.RecordSemanticOutcome(
-                method,
-                AnalyzerSemanticOutcome.Abstained);
+            session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Abstained);
             return;
         }
 
@@ -35,9 +41,7 @@ internal static class AnalyzerFeaturePipeline {
             context.OperationBlocks,
             context.CancellationToken);
         if (declaration == null) {
-            session.RecordSemanticOutcome(
-                method,
-                AnalyzerSemanticOutcome.Abstained);
+            session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Abstained);
             return;
         }
         ValidateContractClauses(
@@ -50,9 +54,7 @@ internal static class AnalyzerFeaturePipeline {
             context.ReportDiagnostic,
             context.CancellationToken);
         if (isSuppressed) {
-            session.RecordSemanticOutcome(
-                method,
-                AnalyzerSemanticOutcome.Suppressed);
+            session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Suppressed);
             return;
         }
 
@@ -76,9 +78,7 @@ internal static class AnalyzerFeaturePipeline {
                     subset.OperationKind is { } operation
                         ? subset.Reason + " (" + operation + ")"
                         : subset.Reason.ToString()));
-            session.RecordSemanticOutcome(
-                method,
-                AnalyzerSemanticOutcome.Abstained);
+            session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Abstained);
             return;
         }
 

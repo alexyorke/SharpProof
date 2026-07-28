@@ -535,6 +535,48 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
+    public async Task AbstractAndExternSelectionsCannotDisappearWithoutAnOutcome() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public interface IFixture {
+                [ZeroAllocations]
+                int SelectedEffect();
+
+                [return: Positive]
+                int SelectedContract();
+
+                int Unannotated();
+            }
+
+            public abstract class Fixture {
+                [DoesNotThrow]
+                public abstract void SelectedException();
+
+                [SharpProofSuppress("Reviewed unsupported boundary.")]
+                [ZeroAllocations]
+                public abstract void Suppressed();
+            }
+
+            public static class NativeFixture {
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static extern int SelectedExtern();
+            }
+            """,
+            mode: null,
+            ["SP0047"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0047", 4)));
+        Assert.That(
+            diagnostics.Select(diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Has.All.Contain("MissingOperationRoot"));
+    }
+
+    [Test]
     public async Task EffectContractSelectsUnsupportedMethod() {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
