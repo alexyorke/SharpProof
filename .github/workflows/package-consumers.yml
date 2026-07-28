@@ -84,7 +84,7 @@ jobs:
         run: >-
           .\scripts\Invoke-SharpProofDotnet.ps1
           restore SharpProof.sln
-          -p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION
+          /p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION
 
       - name: Build package payloads
         shell: pwsh
@@ -93,7 +93,7 @@ jobs:
           build SharpProof.sln
           --configuration Release
           --no-restore
-          -p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION
+          /p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION
 
       - name: Pack and validate the three-package graph
         shell: pwsh
@@ -116,7 +116,7 @@ jobs:
               --configuration Release `
               --no-build `
               --output nupkgs `
-              -p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION
+              /p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 

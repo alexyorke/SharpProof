@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -412,6 +413,40 @@ public sealed class ArchitectureTests {
                     StringComparer.Ordinal)),
                 component.Key);
         }
+    }
+
+    [Test]
+    public void WorkflowCommandsUsePowerShellSafeMsBuildSwitches() {
+        var workflowRoot = Path.Combine(RepositoryRoot(), ".github", "workflows");
+        var violations = Directory
+            .EnumerateFiles(workflowRoot, "*.yml", SearchOption.TopDirectoryOnly)
+            .Concat(Directory.EnumerateFiles(
+                workflowRoot,
+                "*.yaml",
+                SearchOption.TopDirectoryOnly))
+            .SelectMany(path => File.ReadLines(path)
+                .Select((line, index) => new {
+                    Path = path,
+                    Line = line,
+                    Number = index + 1
+                }))
+            .Where(static entry => Regex.IsMatch(
+                entry.Line,
+                @"(?:^|\s)-[mp]:",
+                RegexOptions.CultureInvariant |
+                RegexOptions.IgnoreCase))
+            .Select(static entry =>
+                $"{Path.GetFileName(entry.Path)}:{entry.Number}: " +
+                entry.Line.Trim())
+            .ToArray();
+
+        Assert.That(
+            violations,
+            Is.Empty,
+            "Use /p: and /m: in workflow PowerShell commands so script " +
+            "parameter binding cannot consume MSBuild switches." +
+            Environment.NewLine +
+            string.Join(Environment.NewLine, violations));
     }
 
     [Test]
