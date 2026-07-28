@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(ContinuousIntegrationBuild)' == 'true'">
+    <SharpProofProfile>strict</SharpProofProfile>
+    <SharpProofFeatures>contracts</SharpProofFeatures>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SharpProof.Attributes"
+                      Version="$(SharpProofSamplePackageVersion)" />
+    <PackageReference Include="SharpProof"
+                      Version="$(SharpProofSamplePackageVersion)"
+                      PrivateAssets="all" />
+    <PackageReference Include="SharpProof.Verifier.Win-x64"
+                      Version="$(SharpProofSamplePackageVersion)"
+                      PrivateAssets="all"
+                      Condition="'$(ContinuousIntegrationBuild)' == 'true'" />
+  </ItemGroup>
+</Project>

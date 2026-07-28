@@ -245,8 +245,7 @@ public static class IServiceContracts {
     public static string? Find(IService receiver, string key) {
         Contract.Requires(receiver is not null);
         Contract.Requires(key.Length > 0);
-        Contract.Ensures(
-            Contract.Result<string?>() is null or not null);
+        Contract.Ensures(Contract.Result<string?>() == null);
         return null;
     }
 }

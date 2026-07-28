@@ -153,12 +153,18 @@ An external metadata call is modeled only when an exact built-in `ApiSpec`
 resolves, or when the boundary has both:
 
 ```csharp
-[SharpProofTrusted("Reviewed against the external implementation.")]
-[EffectContract(
-    SharpProofEffect.ReadsAmbientState,
-    Complete = true,
-    IsDeterministic = true)]
-public static extern int ReadExternalState();
+using System.Runtime.InteropServices;
+using SharpProof.Attributes;
+
+public static class ExternalBoundary {
+    [DllImport("reviewed-native-library")]
+    [SharpProofTrusted("Reviewed against the external implementation.")]
+    [EffectContract(
+        SharpProofEffect.ReadsAmbientState,
+        Complete = true,
+        IsDeterministic = true)]
+    public static extern int ReadExternalState();
+}
 ```
 
 Trust without an explicit complete contract proves nothing. A
@@ -449,11 +455,28 @@ references fail artifact collection as SP0049.
 
 The compiler-to-worker reconstruction cutover, independent whole-body
 counterexample-replay gate, three-package split, symbols, package validation,
-hash manifest, SBOM, and build attestations are complete for this bounded
-subset, but SharpProof is not production-ready. SARIF output, protected-tag
-promotion of already-tested bytes, trusted NuGet publishing, broader host
-qualification, pilot-library evidence, and the remaining independent release
-reviews are still outstanding.
+hash manifest, SBOM, build attestations, public API IntelliSense coverage, and
+package-backed samples are complete for this bounded subset, but SharpProof is
+not production-ready. SARIF output, protected-tag promotion of already-tested
+bytes, trusted NuGet publishing, pilot-library evidence, and the remaining
+independent release reviews are still outstanding.
+
+## Package-backed examples
+
+The [sample matrix](samples/README.md) demonstrates effects, preconditions,
+`ContractFor`, a reviewed external boundary, library authoring, strict CI,
+expected diagnostics, and exact `Proven`/`Refuted`/`Unknown` worker records.
+Every sample restores packed NuGet artifacts from an isolated feed; none uses
+a repository project reference.
+
+Run the complete host-aware matrix with:
+
+```powershell
+.\scripts\Test-SharpProofSamples.ps1
+```
+
+The supported consumer surface and its XML-documentation guarantee are listed
+in [Supported public API](docs/public-api.md).
 
 ## Build and validate this repository
 
@@ -487,6 +510,10 @@ cache/concurrency/cancellation tests, the pinned corpus, a fixed-seed
   lists shipping worker and performance budgets.
 - [Diagnostics](https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md)
   documents analyzer and `ContractFor` generator IDs.
+- [Supported public API](https://github.com/alexyorke/SharpProof/blob/master/docs/public-api.md)
+  defines the contract API compatibility boundary.
+- [Package-backed samples](https://github.com/alexyorke/SharpProof/blob/master/samples/README.md)
+  exercise passing, diagnostic, and mixed worker outcomes.
 - [Typed Unknown reasons](https://github.com/alexyorke/SharpProof/blob/master/docs/unknown-reasons.md)
   explains fail-closed abstentions.
 - [Native SMT packaging](https://github.com/alexyorke/SharpProof/blob/master/docs/native-smt-packaging.md)

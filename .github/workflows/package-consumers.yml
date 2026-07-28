@@ -160,3 +160,12 @@ jobs:
             -Configuration Release `
             -ExpectedSmt '${{ matrix.expected_smt }}' `
             -PackageSource $packageSource
+
+      - name: Run package-backed samples against the same bytes
+        shell: pwsh
+        run: |
+          $packageSource = (Resolve-Path ./nupkgs).Path
+          ./scripts/Test-SharpProofSamples.ps1 `
+            -Configuration Release `
+            -ExpectedSmt '${{ matrix.expected_smt }}' `
+            -PackageSource $packageSource

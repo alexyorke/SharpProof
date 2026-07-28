@@ -1,0 +1,16 @@
+<Project>
+  <Import Project="../SharpProof.Release.props" />
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <NuGetAudit>false</NuGetAudit>
+    <SharpProofSamplePackageVersion>$(SharpProofPackageVersion)</SharpProofSamplePackageVersion>
+    <SharpProofProfile>advisory</SharpProofProfile>
+    <SharpProofFeatures>all</SharpProofFeatures>
+  </PropertyGroup>
+</Project>

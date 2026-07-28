@@ -1,0 +1,5 @@
+is_global = true
+global_level = 100
+
+dotnet_diagnostic.SP0045.severity = warning
+dotnet_diagnostic.SP0047.severity = warning

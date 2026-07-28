@@ -1,0 +1,264 @@
+<?xml version="1.0"?>
+<doc>
+  <assembly>
+    <name>SharpProof.Attributes</name>
+  </assembly>
+  <members>
+    <member name="T:SharpProof.Attributes.AllowedCapabilitiesAttribute">
+      <summary>Declares the ambient capabilities that a member may use.</summary>
+    </member>
+    <member name="M:SharpProof.Attributes.AllowedCapabilitiesAttribute.#ctor(SharpProof.Attributes.SharpProofCapability)">
+      <summary>Creates a capability allowance.</summary>
+      <param name="capabilities">The allowed capability flags.</param>
+    </member>
+    <member name="P:SharpProof.Attributes.AllowedCapabilitiesAttribute.Capabilities">
+      <summary>Gets the allowed capability flags.</summary>
+      <value>The allowed capabilities.</value>
+    </member>
+    <member name="T:SharpProof.Attributes.AllowedExceptionsAttribute">
+      <summary>Declares the exception types that a member may let escape.</summary>
+    </member>
+    <member name="M:SharpProof.Attributes.AllowedExceptionsAttribute.#ctor(System.Type[])">
+      <summary>Creates an escaping-exception allowance.</summary>
+      <param name="exceptionTypes">The allowed exception types.</param>
+    </member>
+    <member name="P:SharpProof.Attributes.AllowedExceptionsAttribute.ExceptionTypes">
+      <summary>Gets the allowed exception types.</summary>
+      <value>The allowed exception types.</value>
+    </member>
+    <member name="T:SharpProof.Attributes.Contract">
+      <summary>Provides compiler-bound static contract clauses and contract expressions.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.Contract.ConditionalSymbol">
+      <summary>Names the conditional-compilation symbol that emits contract statement calls.</summary>
+    </member>
+    <member name="M:SharpProof.Attributes.Contract.Requires(System.Boolean)">
+      <summary>Declares a precondition in the direct contract prologue.</summary>
+      <param name="condition">The condition required on entry.</param>
+    </member>
+    <member name="M:SharpProof.Attributes.Contract.Ensures(System.Boolean)">
+      <summary>Declares a postcondition in the direct contract prologue.</summary>
+      <param name="condition">The condition required on normal return.</param>
+    </member>
+    <member name="M:SharpProof.Attributes.Contract.Assume(System.Boolean)">
+      <summary>Declares explicit user-supplied proof evidence in the direct contract prologue.</summary>
+      <param name="condition">The condition to assume for static analysis.</param>
+    </member>
+    <member name="M:SharpProof.Attributes.Contract.Result``1">
+      <summary>Represents the normal return value inside a postcondition.</summary>
+      <typeparam name="T">The callable return type.</typeparam>
+      <returns>A static-analysis placeholder for the normal return value.</returns>
+    </member>
+    <member name="M:SharpProof.Attributes.Contract.Old``1(``0)">
+      <summary>Represents the entry value of an expression inside a postcondition.</summary>
+      <typeparam name="T">The expression value type.</typeparam>
+      <param name="value">The expression whose entry value is requested.</param>
+      <returns>A static-analysis placeholder for the entry value.</returns>
+    </member>
+    <member name="T:SharpProof.Attributes.ContractForAttribute">
+      <summary>Associates a static contract companion class with its target type.</summary>
+    </member>
+    <member name="M:SharpProof.Attributes.ContractForAttribute.#ctor(System.Type)">
+      <summary>Creates a contract-companion association.</summary>
+      <param name="targetType">The interface or class described by the companion.</param>
+    </member>
+    <member name="P:SharpProof.Attributes.ContractForAttribute.TargetType">
+      <summary>Gets the type described by the companion.</summary>
+      <value>The target type.</value>
+    </member>
+    <member name="T:SharpProof.Attributes.DoesNotThrowAttribute">
+      <summary>Requires a member to prove that no exception can escape.</summary>
+    </member>
+    <member name="M:SharpProof.Attributes.DoesNotThrowAttribute.#ctor">
+      <summary>Creates a no-escaping-exceptions contract.</summary>
+    </member>
+    <member name="T:SharpProof.Attributes.EffectContractAttribute">
+      <summary>Declares a complete or partial effect summary for a member boundary.</summary>
+    </member>
+    <member name="M:SharpProof.Attributes.EffectContractAttribute.#ctor(SharpProof.Attributes.SharpProofEffect)">
+      <summary>Creates an effect summary.</summary>
+      <param name="effects">The effects performed by the member.</param>
+    </member>
+    <member name="P:SharpProof.Attributes.EffectContractAttribute.Effects">
+      <summary>Gets the declared effect flags.</summary>
+      <value>The declared effects.</value>
+    </member>
+    <member name="P:SharpProof.Attributes.EffectContractAttribute.Capabilities">
+      <summary>Gets or sets the ambient capabilities used by the member.</summary>
+      <value>The used capabilities.</value>
+    </member>
+    <member name="P:SharpProof.Attributes.EffectContractAttribute.ThrownExceptions">
+      <summary>Gets or sets the exception types that may escape.</summary>
+      <value>The escaping exception types.</value>
+    </member>
+    <member name="P:SharpProof.Attributes.EffectContractAttribute.IsDeterministic">
+      <summary>Gets or sets whether the member is deterministic under its declared inputs and ambient reads.</summary>
+      <value>True when the summary declares deterministic behavior.</value>
+    </member>
+    <member name="P:SharpProof.Attributes.EffectContractAttribute.Complete">
+      <summary>Gets or sets whether the declaration is a complete effect summary.</summary>
+      <value>True when omitted effects are asserted absent.</value>
+    </member>
+    <member name="T:SharpProof.Attributes.EnforcePureAttribute">
+      <summary>Requires a member to prove observable purity.</summary>
+    </member>
+    <member name="M:SharpProof.Attributes.EnforcePureAttribute.#ctor">
+      <summary>Creates an observable-purity contract.</summary>
+    </member>
+    <member name="T:SharpProof.Attributes.InRangeAttribute">
+      <summary>Declares an inclusive integral range for a parameter or return value.</summary>
+    </member>
+    <member name="M:SharpProof.Attributes.InRangeAttribute.#ctor(System.Int64,System.Int64)">
+      <summary>Creates an inclusive range contract.</summary>
+      <param name="minimum">The inclusive minimum.</param>
+      <param name="maximum">The inclusive maximum.</param>
+    </member>
+    <member name="P:SharpProof.Attributes.InRangeAttribute.Minimum">
+      <summary>Gets the inclusive minimum.</summary>
+      <value>The inclusive minimum.</value>
+    </member>
+    <member name="P:SharpProof.Attributes.InRangeAttribute.Maximum">
+      <summary>Gets the inclusive maximum.</summary>
+      <value>The inclusive maximum.</value>
+    </member>
+    <member name="T:SharpProof.Attributes.NotNullAttribute">
+      <summary>Declares that a parameter or return value is non-null.</summary>
+    </member>
+    <member name="M:SharpProof.Attributes.NotNullAttribute.#ctor">
+      <summary>Creates a non-null contract.</summary>
+    </member>
+    <member name="T:SharpProof.Attributes.PositiveAttribute">
+      <summary>Declares that a parameter or return value is greater than zero.</summary>
+    </member>
+    <member name="M:SharpProof.Attributes.PositiveAttribute.#ctor">
+      <summary>Creates a positive-value contract.</summary>
+    </member>
+    <member name="T:SharpProof.Attributes.SharpProofCapability">
+      <summary>Identifies ambient capabilities tracked by effect analysis.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofCapability.None">
+      <summary>Uses no tracked ambient capability.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofCapability.IO">
+      <summary>Uses general input or output.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofCapability.FileRead">
+      <summary>Reads from the file system.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofCapability.FileWrite">
+      <summary>Writes to the file system.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofCapability.Network">
+      <summary>Uses a network resource.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofCapability.Console">
+      <summary>Uses the process console.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofCapability.Process">
+      <summary>Uses process-management facilities.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofCapability.Environment">
+      <summary>Reads or writes process environment state.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofCapability.Registry">
+      <summary>Uses the Windows registry.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofCapability.Clock">
+      <summary>Reads time or timer state.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofCapability.Randomness">
+      <summary>Uses a source of randomness.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofCapability.Reflection">
+      <summary>Uses reflection facilities.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofCapability.Synchronization">
+      <summary>Uses synchronization facilities.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofCapability.NativeInterop">
+      <summary>Crosses a native-code boundary.</summary>
+    </member>
+    <member name="T:SharpProof.Attributes.SharpProofEffect">
+      <summary>Identifies effects tracked by SharpProof summaries.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofEffect.None">
+      <summary>Performs no tracked effect.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofEffect.ReadsReceiverState">
+      <summary>Reads state reachable from the receiver.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofEffect.ReadsArgumentState">
+      <summary>Reads state reachable from an argument.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofEffect.ReadsCapturedState">
+      <summary>Reads captured state.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofEffect.ReadsStaticState">
+      <summary>Reads static managed state.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofEffect.ReadsAmbientState">
+      <summary>Reads ambient state.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofEffect.WritesReceiverState">
+      <summary>Writes state reachable from the receiver.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofEffect.WritesArgumentState">
+      <summary>Writes state reachable from an argument.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofEffect.WritesCapturedState">
+      <summary>Writes captured state.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofEffect.WritesStaticState">
+      <summary>Writes static managed state.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofEffect.WritesAmbientState">
+      <summary>Writes ambient state.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofEffect.Allocates">
+      <summary>Allocates managed storage.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofEffect.Throws">
+      <summary>May let an exception escape.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofEffect.Synchronizes">
+      <summary>Uses synchronization.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofEffect.UsesNondeterminism">
+      <summary>Uses nondeterministic behavior.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofEffect.UsesNativeCode">
+      <summary>Uses native code.</summary>
+    </member>
+    <member name="F:SharpProof.Attributes.SharpProofEffect.UsesReflection">
+      <summary>Uses reflection.</summary>
+    </member>
+    <member name="T:SharpProof.Attributes.SharpProofSuppressAttribute">
+      <summary>Suppresses SharpProof reporting without adding proof evidence.</summary>
+    </member>
+    <member name="M:SharpProof.Attributes.SharpProofSuppressAttribute.#ctor(System.String)">
+      <summary>Creates a documented reporting suppression.</summary>
+      <param name="reason">The nonempty suppression rationale.</param>
+    </member>
+    <member name="P:SharpProof.Attributes.SharpProofSuppressAttribute.Reason">
+      <summary>Gets the suppression rationale.</summary>
+      <value>The suppression rationale.</value>
+    </member>
+    <member name="T:SharpProof.Attributes.SharpProofTrustedAttribute">
+      <summary>Marks an explicitly reviewed trust boundary that still requires a complete contract.</summary>
+    </member>
+    <member name="M:SharpProof.Attributes.SharpProofTrustedAttribute.#ctor(System.String)">
+      <summary>Creates a documented trust declaration.</summary>
+      <param name="reason">The nonempty trust rationale.</param>
+    </member>
+    <member name="P:SharpProof.Attributes.SharpProofTrustedAttribute.Reason">
+      <summary>Gets the trust rationale.</summary>
+      <value>The trust rationale.</value>
+    </member>
+    <member name="T:SharpProof.Attributes.ZeroAllocationsAttribute">
+      <summary>Requires a member to prove that it performs no managed allocation.</summary>
+    </member>
+    <member name="M:SharpProof.Attributes.ZeroAllocationsAttribute.#ctor">
+      <summary>Creates a zero-allocation contract.</summary>
+    </member>
+  </members>
+</doc>

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SharpProof"
+                      Version="$(SharpProofSamplePackageVersion)"
+                      PrivateAssets="all" />
+  </ItemGroup>
+</Project>

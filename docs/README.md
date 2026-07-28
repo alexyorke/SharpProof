@@ -9,7 +9,9 @@ jobs; they are not interchangeable sources of truth.
 |---|---|---|
 | [Project README](../README.md) | Package users | Installation, activation, examples, and the short product overview |
 | [Coverage and limits](coverage-and-limits.md) | Users and contributors | Authoritative inventory of the currently implemented analyzer, worker, language, contract, and API-spec surface |
+| [Supported public API](public-api.md) | Library authors | Supported contract types, package boundary, and XML-documentation guarantee |
 | [Diagnostics](diagnostic-examples.md) | Analyzer and verifier users | Current `SP`, `SPCF`, SP0047, SP0048, and SP0049 diagnostics, defaults, policies, and examples |
+| [Package-backed samples](../samples/README.md) | Evaluators and CI owners | Passing, diagnostic, mixed-outcome, strict-library, and host-rejection examples against packed artifacts |
 | [Analysis limits](analysis-limits.md) | Build and CI owners | Shipping profile/feature/policy properties, worker bounds, and acceptance-only budgets |
 | [Typed abstention reasons](unknown-reasons.md) | Tool integrators | Exact typed reasons, run statuses, callable coverage, claim outcomes, and cache states |
 
@@ -73,10 +75,11 @@ Independent whole-body counterexample replay is implemented for the admitted
 program subset. The proof kernel checks exact model closure and the lowered
 assumptions/goal before the worker independently executes the compiler-produced
 whole-body CFG. The three-package split, portable SourceLink symbols, package
-validation, deterministic hashes, SPDX SBOM generation, and GitHub build/SBOM
-attestations are implemented. SARIF projection, protected-tag promotion,
-trusted NuGet publishing, broader host qualification, and the remaining
-release reviews are future work. Current behavior and limits are recorded in
+validation, deterministic hashes, SPDX SBOM generation, GitHub build/SBOM
+attestations, package-backed sample matrix, and exact public API XML coverage
+are implemented. SARIF projection, protected-tag promotion, trusted NuGet
+publishing, pilot-library evidence, and the remaining release reviews are
+future work. Current behavior and limits are recorded in
 [Coverage and limits](coverage-and-limits.md#closed-compiler-artifact-and-remaining-limits).
 
 ## Machine-owned Markdown
@@ -91,7 +94,8 @@ release reviews are future work. Current behavior and limits are recorded in
 Markdown is hand-maintained. `scripts/Generate-Readme.ps1 -Verify` validates
 code-derived versions, acceptance-contract versions, configuration values,
 diagnostics, API-spec IDs, worker properties, protocol enums, local links,
-anchors, line endings, and BOM policy; it does not
+anchors, XML and PowerShell fences, line endings, and BOM policy; the analyzer
+test suite compiles every maintained C# fence. The script does not
 generate these files. When behavior changes, update the relevant source-owned
 table first, then update the coverage, diagnostic, limit, or reason reference
 that mirrors it. Dated soundness notes remain subject to link and file-format
