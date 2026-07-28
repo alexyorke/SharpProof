@@ -153,37 +153,28 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator {
             return;
         }
 
-        var targetMethods = companion.Target.GetMembers()
-            .OfType<IMethodSymbol>()
-            .Where(static method =>
-                method.MethodKind == MethodKind.Ordinary &&
-                !method.IsImplicitlyDeclared)
-            .ToImmutableArray();
-        var companionMethods = companion.Companion.GetMembers()
-            .OfType<IMethodSymbol>()
-            .Where(static method =>
-                method.MethodKind == MethodKind.Ordinary &&
-                !method.IsImplicitlyDeclared)
-            .ToImmutableArray();
-        var matchesByTarget = new Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>>(
-            SymbolEqualityComparer.Default);
-        var matchesByCompanion = new Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>>(
-            SymbolEqualityComparer.Default);
-
-        foreach (var target in targetMethods)
-            matchesByTarget.Add(
-                target,
-                [.. companionMethods.Where(candidate =>
+        var targetMethods = ContractForSymbolMatcher.GetOrdinaryMethods(
+            companion.Target);
+        var companionMethods = ContractForSymbolMatcher.GetOrdinaryMethods(
+            companion.Companion);
+        var symbolComparer =
+            (IEqualityComparer<IMethodSymbol>)SymbolEqualityComparer.Default;
+        var matchesByTarget = targetMethods.ToDictionary(
+            static target => target,
+            target => companionMethods.Where(candidate =>
                     ContractForSymbolMatcher.MemberSignaturesMatch(
                         target,
-                        candidate))]);
-        foreach (var candidate in companionMethods)
-            matchesByCompanion.Add(
-                candidate,
-                [.. targetMethods.Where(target =>
+                        candidate))
+                .ToImmutableArray(),
+            symbolComparer);
+        var matchesByCompanion = companionMethods.ToDictionary(
+            static candidate => candidate,
+            candidate => targetMethods.Where(target =>
                     ContractForSymbolMatcher.MemberSignaturesMatch(
                         target,
-                        candidate))]);
+                        candidate))
+                .ToImmutableArray(),
+            symbolComparer);
 
         var diagnosedCandidates = new HashSet<IMethodSymbol>(
             SymbolEqualityComparer.Default);
@@ -256,7 +247,7 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator {
             var candidate = matches[0];
             if (matchesByCompanion[candidate].Length != 1) continue;
             ValidateBody(
-                NormalizePartialMethod(candidate),
+                ContractClauseInventoryBuilder.NormalizeCallable(candidate),
                 clauses,
                 diagnostics,
                 companion.AttributeLocation,
@@ -280,7 +271,8 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator {
         }
         foreach (var clause in inventory.Clauses) {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!clause.IsValid)
+            if (!clause.IsValid &&
+                clause.Placement != ContractClausePlacement.NestedCallable)
                 diagnostics.Add(Diagnostic.Create(
                     GeneratedDiagnosticDescriptors.InvalidClausePlacement,
                     clause.Location,
@@ -289,9 +281,6 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator {
                     clause.Placement));
         }
     }
-
-    private static IMethodSymbol NormalizePartialMethod(IMethodSymbol method) =>
-        method.PartialImplementationPart ?? method;
 
     private static Location GetAttributeLocation(
         AttributeData attribute,

@@ -48,9 +48,24 @@ exact values:
 - `UnsupportedType`
 - `UnsupportedOperationShape`
 
-This gate runs before feature analysis. Unsupported analyzer callables emit no
-feature diagnostic. Corpus instrumentation records their internal semantic
-status so silence is not counted as proof.
+The effect gate runs before effect-summary analysis. Contract call-site
+analysis still runs independently, so an unrelated unsupported effect
+operation cannot hide a concrete SP0027 precondition refutation. Unsupported
+unannotated analyzer callables emit no incomplete-analysis diagnostic. Corpus
+instrumentation records their internal semantic status so silence is not
+counted as proof.
+
+Effect not-proven messages identify the incomplete facet with one of these
+stable reason prefixes:
+
+- `AllocationUnknown` - only allocation evidence was insufficient;
+- `CapabilitySetUnknown` - only capability evidence was insufficient; and
+- `ExceptionSetUnknown` - only escaping-exception evidence was insufficient.
+
+Uncertainty in one facet does not block a result for an independent facet.
+Purity depends on observable read/write regions and capabilities;
+zero-allocation depends on allocation; capability contracts depend on the
+capability set; and exception contracts depend on the escaping-exception set.
 
 ## Approximation provenance
 
@@ -99,6 +114,7 @@ value accompanies backend `Unknown` and is mapped through the proof kernel.
 | `InfrastructureFailure` | Non-semantic worker/backend infrastructure failed |
 | `MalformedBackendResult` | Status, core, or model shape is invalid |
 | `CounterexampleReplayFailed` | A SAT model failed exact assignment-closure or lowered-term replay |
+| `PostconditionMayBeUndefined` | A candidate input makes the postcondition expression throw instead of yielding a Boolean value |
 
 Only the proof kernel constructs proof outcomes. Backend UNSAT becomes
 `Proven` only after evidence-core hygiene. Backend SAT becomes `Refuted` only
@@ -109,7 +125,7 @@ before assembling a `Refuted` record.
 
 ## Worker verification records
 
-Protocol version 5 binds compiler-manifest evidence and separates run state,
+Protocol version 6 binds compiler-manifest evidence and separates run state,
 callable coverage, and claim outcome.
 Every enum reserves `Unspecified` as its zero value; a valid request or response
 must use a permitted nonzero value where the field is required.
@@ -193,7 +209,9 @@ Every manifest claim has exactly one non-`Unspecified` outcome.
 | `BackendUnavailable` | Z3/backend loading or availability failed |
 | `InfrastructureFailure` | Non-semantic worker infrastructure failed |
 | `MalformedBackendResult` | The backend result cannot pass structural/kernel validation |
-| `CounterexampleReplayFailed` | A candidate refutation failed exact term replay or could not be reproduced along the compiler-produced whole-body CFG |
+| `CounterexampleReplayFailed` | Exact term replay or an otherwise executable compiler-produced whole-body replay disagreed with the candidate model; the assembled run fails |
+| `PostconditionMayBeUndefined` | Evaluating the postcondition can throw for a candidate input, so its Boolean truth value is not defined on every modeled normal-return state |
+| `CounterexampleNotReplayable` | The candidate model depends on a modeled call that the independent whole-body interpreter intentionally does not execute |
 
 The worker intentionally coalesces some lower-layer distinctions. For example,
 proof `UnsupportedOperation`, `ApproximationTouchedGoal`,
@@ -203,12 +221,12 @@ proof `UnsupportedOperation`, `ApproximationTouchedGoal`,
 according to their closed failure kind.
 
 Whole-body replay executes only the concrete path selected by the model.
-Executed spec calls and unsupported IR operations fail closed to
-`CounterexampleReplayFailed`; the same instructions on unselected paths do not
-block replay. Contract-only ordinary `void` methods use exact zero-step replay.
-Constructor postconditions are `UnsupportedBody` until base-constructor and
-field-initializer semantics are lowered. Successful refutations expose only
-canonical user-model variables.
+Executed modeled calls produce `CounterexampleNotReplayable`; other unsupported
+IR operations or inconsistent replay state produce `CounterexampleReplayFailed`.
+The same instructions on unselected paths do not block replay. Contract-only
+ordinary `void` methods use exact zero-step replay. Constructor postconditions
+are `UnsupportedBody` until base-constructor and field-initializer semantics are
+lowered. Successful refutations expose only canonical user-model variables.
 
 The callable record prevents a zero-claim selected method from disappearing.
 The sealed manifest and response must have exact callable/result and
@@ -265,5 +283,6 @@ Unknown outcomes, protocol errors, cancellation, timeout, malformed results,
 backend failures, and failed replay are never semantic cache entries. Only a
 `Complete`, exact-manifest response with complete callable coverage and claims
 that are hygienic `Proven` or replay-validated `Refuted` is cacheable. Cache
-schema version 6 stores the semantic payload; every read revalidates it against
-the complete current manifest.
+schema version 7 stores the semantic payload; every read revalidates it against
+the complete current manifest. `require-proven` runs bypass this local semantic
+cache.

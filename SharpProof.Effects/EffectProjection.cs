@@ -1,28 +1,16 @@
 namespace SharpProof.Effects;
 
-public readonly struct EffectProjection(
-    EffectContractKind effects,
-    EffectContractCapabilityKind capabilities,
-    bool isComplete)
-    : IEquatable<EffectProjection> {
-    public EffectContractKind Effects { get; } = effects;
-    public EffectContractCapabilityKind Capabilities { get; } = capabilities;
-    public bool IsComplete { get; } = isComplete;
+public readonly record struct EffectProjection {
+    public EffectProjection(
+        EffectContractKind effects,
+        EffectContractCapabilityKind capabilities,
+        bool isComplete) =>
+        (Effects, Capabilities, IsComplete) =
+            (effects, capabilities, isComplete);
 
-    public bool Equals(EffectProjection other) =>
-        Effects == other.Effects &&
-        Capabilities == other.Capabilities &&
-        IsComplete == other.IsComplete;
-    public override bool Equals(object? obj) =>
-        obj is EffectProjection other && Equals(other);
-    public override int GetHashCode() =>
-        unchecked(
-            (((int)Effects * 397) ^ (int)Capabilities) * 397 ^
-            (IsComplete ? 1 : 0));
-    public static bool operator ==(EffectProjection left, EffectProjection right) =>
-        left.Equals(right);
-    public static bool operator !=(EffectProjection left, EffectProjection right) =>
-        !left.Equals(right);
+    public EffectContractKind Effects { get; }
+    public EffectContractCapabilityKind Capabilities { get; }
+    public bool IsComplete { get; }
 }
 
 public static class EffectSummaryProjector {
@@ -78,20 +66,17 @@ public static class EffectSummaryProjector {
     }
 
     private static EffectContractKind ProjectRegion(
-        EffectRegionKind kind, bool isWrite) =>
-        (kind, isWrite) switch {
-            (EffectRegionKind.Receiver, false) => EffectContractKind.ReadsReceiverState,
-            (EffectRegionKind.Parameter, false) => EffectContractKind.ReadsArgumentState,
-            (EffectRegionKind.Captured, false) => EffectContractKind.ReadsCapturedState,
-            (EffectRegionKind.Static, false) => EffectContractKind.ReadsStaticState,
-            (EffectRegionKind.Ambient, false) => EffectContractKind.ReadsAmbientState,
-            (EffectRegionKind.Receiver, true) => EffectContractKind.WritesReceiverState,
-            (EffectRegionKind.Parameter, true) => EffectContractKind.WritesArgumentState,
-            (EffectRegionKind.Captured, true) => EffectContractKind.WritesCapturedState,
-            (EffectRegionKind.Static, true) => EffectContractKind.WritesStaticState,
-            (EffectRegionKind.Fresh, true) => EffectContractKind.None,
-            (EffectRegionKind.Ambient, true) => EffectContractKind.WritesAmbientState,
-            (EffectRegionKind.Unknown, _) => EffectContractKind.None,
-            _ => EffectContractKind.None
+        EffectRegionKind kind, bool isWrite) {
+        var offset = kind switch {
+            EffectRegionKind.Receiver => 0,
+            EffectRegionKind.Parameter => 1,
+            EffectRegionKind.Captured => 2,
+            EffectRegionKind.Static => 3,
+            EffectRegionKind.Ambient => 4,
+            _ => -1
         };
+        return offset < 0
+            ? EffectContractKind.None
+            : (EffectContractKind)(1L << (offset + (isWrite ? 5 : 0)));
+    }
 }

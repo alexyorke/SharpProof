@@ -15,3 +15,10 @@ public static class IServiceContracts {
         return null;
     }
 }
+
+public static class ServiceConsumer {
+    public static string? FindKnownKey(IService? service) {
+        Contract.Requires(service is not null);
+        return service!.Find("known-key");
+    }
+}

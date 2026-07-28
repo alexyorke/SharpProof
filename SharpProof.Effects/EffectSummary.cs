@@ -1,6 +1,6 @@
 namespace SharpProof.Effects;
 
-public sealed class EffectSummary : IEquatable<EffectSummary> {
+public sealed record EffectSummary {
     private EffectSummary(bool isBottom) {
         (IsBottom, Reads, Writes, Allocation) =
             (isBottom, EffectRegionSet.Empty, EffectRegionSet.Empty, EffectAllocationKind.None);
@@ -59,38 +59,6 @@ public sealed class EffectSummary : IEquatable<EffectSummary> {
     public EffectTermination Termination { get; }
     public EffectCompleteness Completeness { get; }
     public EffectUncertainty Uncertainty { get; }
-
-    public bool Equals(EffectSummary? other) {
-        if (ReferenceEquals(this, other)) return true;
-        if (other == null || IsBottom != other.IsBottom) return false;
-        return IsBottom ||
-               Reads == other.Reads &&
-               Writes == other.Writes &&
-               Allocation == other.Allocation &&
-               Capabilities == other.Capabilities &&
-               Throws == other.Throws &&
-               Termination == other.Termination &&
-               Completeness == other.Completeness &&
-               Uncertainty == other.Uncertainty;
-    }
-
-    public override bool Equals(object? obj) => Equals(obj as EffectSummary);
-
-    public override int GetHashCode() {
-        if (IsBottom) return 0;
-        unchecked {
-            var hash = 17;
-            hash = hash * 31 + Reads.GetHashCode();
-            hash = hash * 31 + Writes.GetHashCode();
-            hash = hash * 31 + (int)Allocation;
-            hash = hash * 31 + Capabilities.GetHashCode();
-            hash = hash * 31 + Throws.GetHashCode();
-            hash = hash * 31 + (int)Termination;
-            hash = hash * 31 + (int)Completeness;
-            hash = hash * 31 + (int)Uncertainty;
-            return hash;
-        }
-    }
 
     private static void ValidateAllocation(EffectAllocationKind allocation) {
         if ((allocation & ~EffectAllocationKind.Unknown) != 0)

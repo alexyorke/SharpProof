@@ -141,7 +141,7 @@ public sealed class PackageLayoutSmokeTests {
     [Test]
     public async Task ReleaseEvidenceIsDeterministicAndComplete() {
         var feed = await PackagedProductFeed.GetAsync();
-        using var workspace = ReleaseEvidenceWorkspace.Create();
+        using var workspace = ReleaseEvidenceWorkspace.Create(feed.Version);
         var script = Path.Combine(
             FindRepositoryRoot(),
             "scripts",
@@ -153,11 +153,21 @@ public sealed class PackageLayoutSmokeTests {
             script,
             "-PackageSource",
             feed.Source,
-            "-SbomPath",
-            workspace.SbomPath,
             "-OutputDirectory",
             workspace.OutputDirectory
         };
+        var invalidSbom = await RunProcessAsync(
+            FindRepositoryRoot(),
+            "pwsh",
+            [
+                .. arguments,
+                "-SbomPath",
+                workspace.InvalidSbomPath
+            ]);
+        Assert.That(invalidSbom.ExitCode, Is.Not.Zero, invalidSbom.Output);
+        Assert.That(
+            invalidSbom.Output,
+            Does.Contain("SPDX SBOM is missing its package graph"));
         var firstRun = await RunProcessAsync(
             FindRepositoryRoot(),
             "pwsh",
@@ -167,6 +177,8 @@ public sealed class PackageLayoutSmokeTests {
             workspace.ManifestPath);
         var firstSums = await File.ReadAllBytesAsync(
             workspace.SumsPath);
+        var firstSbom = await File.ReadAllBytesAsync(
+            workspace.SbomPath);
         var secondRun = await RunProcessAsync(
             FindRepositoryRoot(),
             "pwsh",
@@ -179,16 +191,20 @@ public sealed class PackageLayoutSmokeTests {
             await File.ReadAllBytesAsync(workspace.SumsPath),
             Is.EqualTo(firstSums));
         Assert.That(
+            await File.ReadAllBytesAsync(workspace.SbomPath),
+            Is.EqualTo(firstSbom));
+        Assert.That(
             firstManifest.Take(3),
             Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
         Assert.That(Encoding.UTF8.GetString(firstManifest), Does.Not.Contain('\r'));
         Assert.That(Encoding.UTF8.GetString(firstSums), Does.Not.Contain('\r'));
+        Assert.That(Encoding.UTF8.GetString(firstSbom), Does.Not.Contain('\r'));
 
         using var document = JsonDocument.Parse(firstManifest);
         var root = document.RootElement;
         Assert.That(
             root.GetProperty("schemaVersion").GetInt32(),
-            Is.EqualTo(1));
+            Is.EqualTo(2));
         Assert.That(
             root.GetProperty("packageVersion").GetString(),
             Is.EqualTo(feed.Version));
@@ -228,12 +244,66 @@ public sealed class PackageLayoutSmokeTests {
                 Is.EqualTo(new FileInfo(path).Length),
                 fileName);
         }
+        var thirdPartyComponents = root
+            .GetProperty("thirdPartyComponents")
+            .EnumerateArray()
+            .ToArray();
+        Assert.That(thirdPartyComponents, Has.Length.EqualTo(16));
+        Assert.That(
+            thirdPartyComponents.Select(static component =>
+                component.GetProperty("license").GetString()),
+            Is.All.EqualTo("MIT"));
+        Assert.That(
+            thirdPartyComponents.Select(static component =>
+                component.GetProperty("packageId").GetString())
+                .Distinct(StringComparer.Ordinal),
+            Is.EquivalentTo([
+                PackagedProductFeed.PortablePackageId,
+                PackagedProductFeed.VerifierPackageId
+            ]));
         Assert.That(
             await File.ReadAllLinesAsync(workspace.SumsPath),
             Is.EqualTo(artifacts.Select(static artifact =>
                 artifact.GetProperty("sha256").GetString() +
                 "  " +
                 artifact.GetProperty("fileName").GetString())));
+
+        foreach (var packagePath in Directory.EnumerateFiles(
+            feed.Source,
+            "*.nupkg")) {
+            File.Copy(
+                packagePath,
+                Path.Combine(
+                    workspace.OutputDirectory,
+                    Path.GetFileName(packagePath)));
+        }
+        foreach (var symbolsPath in Directory.EnumerateFiles(
+            feed.Source,
+            "*.snupkg")) {
+            File.Copy(
+                symbolsPath,
+                Path.Combine(
+                    workspace.OutputDirectory,
+                    Path.GetFileName(symbolsPath)));
+        }
+        var validationScript = Path.Combine(
+            FindRepositoryRoot(),
+            "scripts",
+            "Test-SharpProofReleaseArtifacts.ps1");
+        var validation = await RunProcessAsync(
+            FindRepositoryRoot(),
+            "pwsh",
+            [
+                "-NoLogo",
+                "-NoProfile",
+                "-File",
+                validationScript,
+                "-PackageSource",
+                workspace.OutputDirectory,
+                "-ExpectedTag",
+                "v" + feed.Version
+            ]);
+        Assert.That(validation.ExitCode, Is.Zero, validation.Output);
     }
 
     [Test]
@@ -243,6 +313,34 @@ public sealed class PackageLayoutSmokeTests {
         workspace.WriteConsumer(feed.Version, PackagedProductFeed.PortablePackageId);
         var restore = await RestoreConsumerAsync(workspace, feed);
         Assert.That(restore.ExitCode, Is.Zero, restore.Output);
+
+        var unsupportedCompiler = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "msbuild",
+            workspace.ConsumerProject,
+            "-t:_SharpProofValidateConfiguration",
+            "-p:NETCoreSdkVersion=9.0.200",
+            "--nologo");
+        Assert.That(
+            unsupportedCompiler.ExitCode,
+            Is.Not.Zero,
+            unsupportedCompiler.Output);
+        Assert.That(
+            unsupportedCompiler.Output,
+            Does.Contain("requires .NET SDK 9.0.300 or newer")
+                .And.Contain("Roslyn 4.14 or newer"));
+        var disabledOnUnsupportedCompiler = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "msbuild",
+            workspace.ConsumerProject,
+            "-t:_SharpProofValidateConfiguration",
+            "-p:SharpProofProfile=off",
+            "-p:NETCoreSdkVersion=9.0.200",
+            "--nologo");
+        Assert.That(
+            disabledOnUnsupportedCompiler.ExitCode,
+            Is.Zero,
+            disabledOnUnsupportedCompiler.Output);
 
         var disabledItems = await RunDotNetAsync(
             workspace.ConsumerDirectory,
@@ -929,6 +1027,7 @@ public sealed class PackageLayoutSmokeTests {
                     "<generated>.psmdcp",
                 "README.md",
                 "SharpProof.nuspec",
+                "THIRD-PARTY-NOTICES.txt",
                 .. ExpectedConditionalAnalyzerEntries
             ]);
         VerifyPortableLayout(portable.Path);
@@ -1521,40 +1620,64 @@ public sealed class PackageLayoutSmokeTests {
     private sealed class ReleaseEvidenceWorkspace : IDisposable {
         private readonly string _root;
 
-        private ReleaseEvidenceWorkspace(string root) {
+        private ReleaseEvidenceWorkspace(string root, string version) {
             _root = root;
             OutputDirectory = Path.Combine(root, "output");
-            SbomPath = Path.Combine(root, "SharpProof.spdx.json");
+            SbomPath = Path.Combine(
+                OutputDirectory,
+                "SharpProof.spdx.json");
+            InvalidSbomPath = Path.Combine(root, "invalid.spdx.json");
             ManifestPath = Path.Combine(
                 OutputDirectory,
                 "SharpProof.release.json");
             SumsPath = Path.Combine(OutputDirectory, "SHA256SUMS");
             File.WriteAllText(
-                SbomPath,
+                InvalidSbomPath,
                 """
                 {
                   "spdxVersion": "SPDX-2.3",
                   "dataLicense": "CC0-1.0",
                   "SPDXID": "SPDXRef-DOCUMENT",
                   "name": "SharpProof package test",
-                  "documentNamespace": "https://github.com/alexyorke/SharpProof/test"
+                  "documentNamespace": "https://github.com/alexyorke/SharpProof/test",
+                  "packages": [
+                    {
+                      "SPDXID": "SPDXRef-SharpProof",
+                      "name": "SharpProof",
+                      "versionInfo": "0.2.0-preview.1"
+                    },
+                    {
+                      "SPDXID": "SPDXRef-SharpProof-Attributes",
+                      "name": "SharpProof.Attributes",
+                      "versionInfo": "0.2.0-preview.1"
+                    },
+                    {
+                      "SPDXID": "SPDXRef-SharpProof-Verifier-Win-x64",
+                      "name": "SharpProof.Verifier.Win-x64",
+                      "versionInfo": "0.2.0-preview.1"
+                    }
+                  ]
                 }
-                """,
+                """.Replace(
+                    "0.2.0-preview.1",
+                    version,
+                    StringComparison.Ordinal),
                 new UTF8Encoding(false));
         }
 
         internal string OutputDirectory { get; }
         internal string SbomPath { get; }
+        internal string InvalidSbomPath { get; }
         internal string ManifestPath { get; }
         internal string SumsPath { get; }
 
-        internal static ReleaseEvidenceWorkspace Create() {
+        internal static ReleaseEvidenceWorkspace Create(string version) {
             var root = Path.Combine(
                 Path.GetTempPath(),
                 "SharpProof.ReleaseEvidence.Test",
                 Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
-            return new ReleaseEvidenceWorkspace(root);
+            return new ReleaseEvidenceWorkspace(root, version);
         }
 
         public void Dispose() {

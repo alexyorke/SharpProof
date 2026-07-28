@@ -21,14 +21,18 @@ internal sealed class DefaultAnalyzerSessionFactory : IAnalyzerSessionFactory {
 }
 
 internal sealed class AnalyzerSession {
-    private readonly EffectAnalysisSession? _effects;
+    private readonly EffectAnalysisSession _effects;
     private readonly ContractClauseInventoryBuilder _contractClauses;
     private readonly ContractBinder _contractBinder;
+    private readonly ContractIntrinsicValidator _contractIntrinsics;
     private readonly ResolvedApiSpecTable _apiSpecs;
     private readonly Action<IMethodSymbol, AnalyzerSemanticOutcome>? _outcomeObserver;
     private readonly ConcurrentDictionary<
         (SyntaxTree Tree, TextSpan Span),
         byte> _validatedAttributes = new();
+    private readonly ConcurrentDictionary<
+        (SyntaxTree Tree, TextSpan Span),
+        byte> _validatedContractIntrinsics = new();
 
     internal AnalyzerSession(
         Compilation compilation,
@@ -47,9 +51,9 @@ internal sealed class AnalyzerSession {
             compilation,
             IrFactory,
             _contractClauses);
+        _contractIntrinsics = new ContractIntrinsicValidator(compilation);
         _apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
-        if (configuration.EffectsEnabled)
-            _effects = new EffectAnalysisSession(compilation, _apiSpecs);
+        _effects = new EffectAnalysisSession(compilation, _apiSpecs);
     }
 
     internal Compilation Compilation { get; }
@@ -57,20 +61,31 @@ internal sealed class AnalyzerSession {
     internal AnalyzerAttributeSymbols Attributes { get; }
     internal IrFactory IrFactory { get; } = new();
     internal ResolvedApiSpecTable ApiSpecs => _apiSpecs;
-    internal ResolvedApiSpecTable? EffectApiSpecs => _effects?.ApiSpecs;
+    internal ResolvedApiSpecTable? EffectApiSpecs =>
+        Configuration.EffectsEnabled ? _effects.ApiSpecs : null;
     internal ContractClauseInventory GetContractClauses(IMethodSymbol method) =>
         _contractClauses.Create(method);
     internal ContractBindingResult BindRequires(IMethodSymbol method) =>
         _contractBinder.BindRequires(method);
+    internal ImmutableArray<ContractIntrinsicViolation>
+        GetContractIntrinsicViolations(
+            ContractClauseInventory inventory) =>
+        _contractIntrinsics.Validate(
+            inventory.Callable,
+            inventory.ImplementationBody,
+            includeNestedCallables: true);
+
+    internal EffectContractResolution ResolveEffectContract(IMethodSymbol method) =>
+        _effects.ResolveExternalContract(method);
 
     internal EffectMethodResult AnalyzeEffects(
         IMethodSymbol method,
         CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
-        return (_effects ??
-                throw new InvalidOperationException(
-                    "Effect analysis was not enabled for this compilation."))
-            .Analyze(method, cancellationToken);
+        if (!Configuration.EffectsEnabled)
+            throw new InvalidOperationException(
+                "Effect analysis was not enabled for this compilation.");
+        return _effects.Analyze(method, cancellationToken);
     }
 
     internal bool HasResolvedApiSpec(IMethodSymbol method) =>
@@ -91,4 +106,12 @@ internal sealed class AnalyzerSession {
                    (reference.SyntaxTree, reference.Span),
                    0);
     }
+
+    internal bool TryMarkContractIntrinsicValidated(
+        ContractIntrinsicViolation violation) =>
+        _validatedContractIntrinsics.TryAdd(
+            (
+                violation.Invocation.Syntax.SyntaxTree,
+                violation.Invocation.Syntax.Span),
+            0);
 }

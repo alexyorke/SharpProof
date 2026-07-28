@@ -1,20 +1,23 @@
 <Project>
   <Import Project="$(MSBuildThisFileDirectory)SharpProof.Release.props" />
   <PropertyGroup>
-    <MicrosoftZ3PackageVersion>4.12.2</MicrosoftZ3PackageVersion>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
     <Deterministic>true</Deterministic>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>portable</DebugType>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
     <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
     <ImplicitUsings Condition="'$(ImplicitUsings)' == ''">enable</ImplicitUsings>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <!-- Run every built-in .NET analyzer rule, including rules disabled by default. -->
     <AnalysisLevel>latest-all</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <WarningsAsErrors>$(WarningsAsErrors);CA1811;CS8019;IDE0051;IDE0052;IDE0060</WarningsAsErrors>
+    <WarningsAsErrors>$(WarningsAsErrors);CA1811;CS8019;IDE0051;IDE0052;IDE0060;NU1901;NU1902;NU1903;NU1904</WarningsAsErrors>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <SharpProofTestProject Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(MSBuildProjectName)', 'Test$'))">true</SharpProofTestProject>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -39,7 +42,6 @@
 
   <ItemGroup Condition="'$(SharpProofProductionProject)' == 'true'">
     <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers"
-                      Version="5.6.0"
                       PrivateAssets="all" />
     <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt"
                      Link="BannedSymbols.txt" />
@@ -47,5 +49,22 @@
 
   <PropertyGroup Condition="'$(SharpProofProductionProject)' == 'true'">
     <WarningsAsErrors>$(WarningsAsErrors);RS0030</WarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(SharpProofTestProject)' == 'true'">
+    <PackageReference Include="coverlet.collector"
+                      PrivateAssets="all"
+                      IncludeAssets="runtime;build;native;contentfiles;analyzers;buildtransitive" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Attributes'">
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers"
+                      PrivateAssets="all" />
+    <AdditionalFiles Include="$(MSBuildProjectDirectory)\PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="$(MSBuildProjectDirectory)\PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Attributes'">
+    <WarningsAsErrors>$(WarningsAsErrors);RS0016;RS0017</WarningsAsErrors>
   </PropertyGroup>
 </Project>

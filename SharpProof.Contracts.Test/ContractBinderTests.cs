@@ -76,6 +76,113 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
+    public void InvalidDirectIntrinsicCannotBeHiddenByACompanion() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public sealed class Target {
+                public long Read(long value) {
+                    _ = Contract.Result<long>();
+                    return value;
+                }
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static long Read(Target receiver, long value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("Target", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.ResultOutsideEnsures));
+    }
+
+    [TestCase(
+        "_ = Contract.Result<long>();",
+        ContractBindingFailure.ResultOutsideEnsures)]
+    [TestCase(
+        "_ = Contract.Old(value);",
+        ContractBindingFailure.OldOutsideEnsures)]
+    public void StandaloneIntrinsicsFailClosed(
+        string statement,
+        ContractBindingFailure expected) {
+        var source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static long Read(long value) {
+                    STATEMENT
+                    return value;
+                }
+            }
+            """.Replace("STATEMENT", statement, StringComparison.Ordinal);
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("Target", "Read").Failure,
+            Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void TypeCompanionDoesNotHijackConstructorClosedContracts() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public sealed class Target {
+                public Target([Positive] long value) {
+                }
+                public long Read(long value) => value;
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static long Read(Target receiver, long value) => value;
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.BindConstructor("Target");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.UsesCompanion, Is.False);
+        Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
+        Assert.That(
+            result.Contracts.Clauses[0].Evidence,
+            Is.EqualTo(BoundContractEvidence.ClosedAttribute));
+    }
+
+    [Test]
+    public void NestedCallableClausesDoNotPoisonContainingContracts() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static long Read(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    long Local(long candidate) {
+                        Contract.Requires(candidate > 0);
+                        return candidate;
+                    }
+                    _ = Local(value);
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.Clauses, Has.Length.EqualTo(1));
+        Assert.That(
+            result.Contracts.Clauses[0].Kind,
+            Is.EqualTo(BoundContractKind.Ensures));
+    }
+
+    [Test]
     public void ResultAndOldBindToTypedResultAndPreStateVariables() {
         const string source =
             """
@@ -172,6 +279,54 @@ public sealed class ContractBinderTests {
         Assert.That(
             subject.Bind("Target", "Invalid").Failure,
             Is.EqualTo(ContractBindingFailure.InvalidIntrinsicSignature));
+    }
+
+    [TestCase("ulong")]
+    [TestCase("nint")]
+    [TestCase("nuint")]
+    [TestCase("float")]
+    [TestCase("double")]
+    [TestCase("decimal")]
+    [TestCase("Choice")]
+    public void EqualityWithAnUnmodeledValueDomainFailsClosed(
+        string typeName) {
+        var source =
+            """
+            using SharpProof.Attributes;
+            public enum Choice { First, Second }
+            public static class Target {
+                public static TYPE Echo(TYPE value) {
+                    Contract.Ensures(
+                        Contract.Result<TYPE>() == value);
+                    return value;
+                }
+            }
+            """.Replace("TYPE", typeName, StringComparison.Ordinal);
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("Target", "Echo").Failure,
+            Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
+    }
+
+    [Test]
+    public void EqualityRetainsTheAdmittedUnsignedIntegerDomain() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static uint Echo(uint value) {
+                    Contract.Ensures(
+                        Contract.Result<uint>() == value);
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("Target", "Echo").IsSuccess,
+            Is.True);
     }
 
     [TestCase(
@@ -275,6 +430,49 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
+    public void ConditionalAndUnaryPostconditionsBindExactly() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static long Read(long value, bool choose) {
+                    Contract.Ensures(
+                        choose
+                            ? checked(-Contract.Result<long>()) <= 0
+                            : !choose);
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.Clauses, Has.Length.EqualTo(1));
+    }
+
+    [Test]
+    public void NarrowingConversionInAPostconditionFailsClosed() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static long Read(long value) {
+                    Contract.Ensures(
+                        Contract.Result<long>() == (long)(int)value);
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("Target", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
+    }
+
+    [Test]
     public void PlacementFailuresAreTypedAndBindingsAreCompilationCached() {
         const string source =
             """
@@ -335,6 +533,67 @@ public sealed class ContractBinderTests {
             result.Contracts.Clauses.All(static clause =>
                 clause.Evidence == BoundContractEvidence.ClosedAttribute),
             Is.True);
+    }
+
+    [TestCase("Value")]
+    [TestCase("Choice")]
+    [TestCase("System.DateTime")]
+    [TestCase("System.IntPtr")]
+    [TestCase("Value?")]
+    public void NotNullRejectsNonReferenceDomains(string typeName) {
+        var source =
+            """
+            using SharpProof.Attributes;
+            public struct Value {
+            }
+            public enum Choice {
+                First
+            }
+            public static class Target {
+                public static void Read([NotNull] TYPE value) {
+                }
+            }
+            """.Replace("TYPE", typeName, StringComparison.Ordinal);
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("Target", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+    }
+
+    [Test]
+    public void ClosedPreconditionRejectsOutParameters() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static void Read([Positive] out long value) {
+                    value = 1;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("Target", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+    }
+
+    [Test]
+    public void InvalidClosedReturnContractFailsAtReturnBinding() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                [return: Positive]
+                public static string Read() => string.Empty;
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("Target", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
     }
 
     [Test]
@@ -803,6 +1062,14 @@ public sealed class ContractBinderTests {
             string methodName) {
             var method = GetMethod(typeName, methodName);
             return _binder.BindRequires(method);
+        }
+
+        internal ContractBindingResult BindConstructor(string typeName) {
+            var type = Compilation.GetTypeByMetadataName(typeName) ??
+                       throw new InvalidOperationException(typeName);
+            var constructor = type.InstanceConstructors.Single(
+                static method => !method.IsImplicitlyDeclared);
+            return _binder.Bind(constructor);
         }
 
         internal ContractBindingResult BindCallRequires(

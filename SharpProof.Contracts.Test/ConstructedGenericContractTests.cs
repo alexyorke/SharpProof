@@ -11,6 +11,58 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ConstructedGenericContractTests {
     [Test]
+    public void OuterTypeParametersAreSpecializedForNestedMembers() =>
+        AssertBinds(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Outer<T> where T : class {
+                public sealed class Reader {
+                    public T Read(T value) {
+                        Contract.Ensures(
+                            Contract.Result<T>() != null);
+                        return value;
+                    }
+                }
+            }
+
+            public static class Caller {
+                public static string Call(
+                    Outer<string>.Reader reader,
+                    string value) => reader.Read(value);
+            }
+            """,
+            expectedClauses: 1);
+
+    [Test]
+    public void NestedNamedTypesPreserveConstructedContainingTypes() =>
+        AssertBinds(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Outer<T> {
+                public sealed class Value {
+                }
+
+                public sealed class Reader {
+                    public Value Read(Value value) {
+                        Contract.Requires(value != null);
+                        Contract.Ensures(
+                            Contract.Result<Value>() != null);
+                        return value;
+                    }
+                }
+            }
+
+            public static class Caller {
+                public static Outer<string>.Value Call(
+                    Outer<string>.Reader reader,
+                    Outer<string>.Value value) => reader.Read(value);
+            }
+            """,
+            expectedClauses: 2);
+
+    [Test]
     public void NamedTypeArgumentsAreRecursivelySpecialized() =>
         AssertBinds(
             """

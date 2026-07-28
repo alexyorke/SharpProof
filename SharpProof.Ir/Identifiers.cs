@@ -1,11 +1,8 @@
 namespace SharpProof.Ir;
 
 internal static class IrIdentifierHash {
-    internal static int Create(long scope, int value) {
-        unchecked {
-            return ((int)scope * 397) ^ (int)(scope >> 32) ^ value;
-        }
-    }
+    internal static int Create(long scope, int value) =>
+        unchecked(((int)scope * 397) ^ (int)(scope >> 32) ^ value);
 }
 
 public readonly record struct IrIdentityId {

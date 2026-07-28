@@ -99,6 +99,29 @@ public sealed class ContractClauseInventoryTests {
     }
 
     [Test]
+    public void EmptyStatementBreaksTheContiguousPrologue() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static void Analyze(bool condition) {
+                    Contract.Requires(condition);
+                    ;
+                    Contract.Ensures(condition);
+                }
+            }
+            """;
+        var inventory = CreateInventory(source, "Target", "Analyze");
+
+        Assert.That(
+            inventory.Clauses.Select(static clause => clause.Placement),
+            Is.EqualTo([
+                ContractClausePlacement.ValidPrologue,
+                ContractClausePlacement.Late
+            ]));
+    }
+
+    [Test]
     public void CompilerSymbolIdentityRejectsTextualShadows() {
         const string source =
             """

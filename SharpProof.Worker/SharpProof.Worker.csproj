@@ -4,11 +4,10 @@
     <TargetFramework>net9.0</TargetFramework>
     <LangVersion>12.0</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Version>$(SharpProofPackageVersion)</Version>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="System.Text.Json" Version="10.0.10" />
+    <PackageReference Include="System.Text.Json" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.CompilerArtifact\SharpProof.CompilerArtifact.csproj" />

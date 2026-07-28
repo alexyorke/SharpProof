@@ -9,6 +9,7 @@
                         Required="true" />
       <RequestPath ParameterType="System.String" />
       <ManifestPath ParameterType="System.String" />
+      <SarifPath ParameterType="System.String" />
       <InvocationRequestPath ParameterType="System.String" />
       <InvocationResultPath ParameterType="System.String" />
       <InvocationManifestPath ParameterType="System.String" />
@@ -22,17 +23,23 @@
             System.IO.Path.GetFullPath(System.IO.Path.IsPathRooted(path)
                 ? path
                 : System.IO.Path.Combine(projectDirectory, path));
-        var resultPath = resolvePath(ResultPath);
+        var outputPaths = new[] { ResultPath, SarifPath }
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(resolvePath)
+            .ToArray();
+        var aliasesOutput = outputPaths
+            .Distinct(System.StringComparer.OrdinalIgnoreCase)
+            .Count() != outputPaths.Length;
         var protectedPaths = new[] {
             RequestPath, ManifestPath, InvocationRequestPath,
             InvocationResultPath, InvocationManifestPath
-        };
-        var aliasesInput = protectedPaths
-            .Where(path => !string.IsNullOrWhiteSpace(path))
+        }.Where(path => !string.IsNullOrWhiteSpace(path))
             .Select(resolvePath)
-            .Any(path => string.Equals(
-                resultPath, path, System.StringComparison.OrdinalIgnoreCase));
-        if (!aliasesInput) {
+            .ToArray();
+        var aliasesInput = outputPaths
+            .Any(output => protectedPaths.Any(input => string.Equals(
+                output, input, System.StringComparison.OrdinalIgnoreCase)));
+        if (!aliasesInput && !aliasesOutput) {
             using (var publication =
                 new System.Threading.Mutex(false, @"Local\SharpProof.Publish")) {
                 var ownsPublication = false;
@@ -46,9 +53,11 @@
                     }
                     if (!ownsPublication)
                         Log.LogError(
-                            "Timed out waiting to invalidate the prior SharpProof result.");
-                    else if (System.IO.File.Exists(resultPath))
-                        System.IO.File.Delete(resultPath);
+                            "Timed out waiting to invalidate prior SharpProof outputs.");
+                    else
+                        foreach (var path in outputPaths)
+                            if (System.IO.File.Exists(path))
+                                System.IO.File.Delete(path);
                 }
                 finally {
                     if (ownsPublication) publication.ReleaseMutex();
@@ -92,6 +101,7 @@
         ProjectDirectory="$(MSBuildProjectDirectory)"
         RequestPath="$(SharpProofVerifyRequestFile)"
         ManifestPath="$(SharpProofCompilerManifestFile)"
+        SarifPath="$(SharpProofVerifySarifFile)"
         InvocationRequestPath="$(_SharpProofInvocationRequestFile)"
         InvocationResultPath="$(_SharpProofInvocationResultFile)"
         InvocationManifestPath="$(_SharpProofCompilerManifestPath)" />
@@ -102,6 +112,7 @@
     <PropertyGroup>
       <SharpProofNativeZ3Path Condition="'$(SharpProofNativeZ3Path)' == ''">$([System.IO.Path]::GetDirectoryName('$(_SharpProofWorkerPath)'))/runtimes/win-x64/native/libz3.dll</SharpProofNativeZ3Path>
       <_SharpProofNativeZ3Path>$([System.IO.Path]::GetFullPath('$(SharpProofNativeZ3Path)'))</_SharpProofNativeZ3Path>
+      <_SharpProofVerifySarifArgument Condition="'$(SharpProofVerifySarifFile)' != ''"> --publish-sarif &quot;$(SharpProofVerifySarifFile)&quot;</_SharpProofVerifySarifArgument>
     </PropertyGroup>
     <Error Condition="'$(_SharpProofVerifierHostSupported)' != 'true'"
            Text="SharpProof out-of-process verification is supported only on Windows x64. Portable analyzer profiles remain available on this host." />
@@ -119,7 +130,7 @@
     <Error Condition="!Exists('$(_SharpProofNativeZ3Path)')"
            Text="SharpProof verifier native Z3 payload was not found at '$(_SharpProofNativeZ3Path)'." />
     <MakeDir Directories="$(_SharpProofInvocationDirectory)" />
-    <Exec Command="&quot;$(SharpProofDotNetHost)&quot; &quot;$(_SharpProofLauncherPath)&quot; verify --worker &quot;$(_SharpProofWorkerPath)&quot; --request &quot;$(_SharpProofInvocationRequestFile)&quot; --result &quot;$(_SharpProofInvocationResultFile)&quot; --publish-request &quot;$(SharpProofVerifyRequestFile)&quot; --publish-result &quot;$(SharpProofVerifyResultFile)&quot; --compiler-manifest &quot;$(_SharpProofCompilerManifestPath)&quot; --publish-compiler-manifest &quot;$(SharpProofCompilerManifestFile)&quot; --verify-policy &quot;$(_SharpProofVerifyPolicyNormalized)&quot; --assumption-policy &quot;$(_SharpProofAssumptionPolicyNormalized)&quot; --query-rlimit &quot;$(SharpProofVerifyQueryRlimit)&quot; --method-rlimit &quot;$(SharpProofVerifyMethodRlimit)&quot; --method-wall-ms &quot;$(SharpProofVerifyMethodWallTimeMilliseconds)&quot; --project-wall-ms &quot;$(SharpProofVerifyProjectWallTimeMilliseconds)&quot; --max-parallelism &quot;$(SharpProofVerifyMaxParallelism)&quot; --max-expression-depth &quot;$(SharpProofVerifyMaximumExpressionDepth)&quot; --process-memory-bytes &quot;$(SharpProofVerifyProcessMemoryLimitBytes)&quot; --max-worker-processes &quot;$(SharpProofVerifyMaxWorkerProcesses)&quot; --termination-grace-ms &quot;$(SharpProofVerifyTerminationGraceMilliseconds)&quot; --cache-enabled &quot;$(SharpProofVerifyCacheEnabled)&quot; --cache-directory &quot;$(SharpProofVerifyCacheDirectory)&quot; --cache-maximum-bytes &quot;$(SharpProofVerifyCacheMaximumBytes)&quot;"
+    <Exec Command="&quot;$(SharpProofDotNetHost)&quot; &quot;$(_SharpProofLauncherPath)&quot; verify --worker &quot;$(_SharpProofWorkerPath)&quot; --request &quot;$(_SharpProofInvocationRequestFile)&quot; --result &quot;$(_SharpProofInvocationResultFile)&quot; --publish-request &quot;$(SharpProofVerifyRequestFile)&quot; --publish-result &quot;$(SharpProofVerifyResultFile)&quot; --compiler-manifest &quot;$(_SharpProofCompilerManifestPath)&quot; --publish-compiler-manifest &quot;$(SharpProofCompilerManifestFile)&quot; --verify-policy &quot;$(_SharpProofVerifyPolicyNormalized)&quot; --assumption-policy &quot;$(_SharpProofAssumptionPolicyNormalized)&quot; --query-rlimit &quot;$(SharpProofVerifyQueryRlimit)&quot; --method-rlimit &quot;$(SharpProofVerifyMethodRlimit)&quot; --method-wall-ms &quot;$(SharpProofVerifyMethodWallTimeMilliseconds)&quot; --project-wall-ms &quot;$(SharpProofVerifyProjectWallTimeMilliseconds)&quot; --max-parallelism &quot;$(SharpProofVerifyMaxParallelism)&quot; --max-expression-depth &quot;$(SharpProofVerifyMaximumExpressionDepth)&quot; --process-memory-bytes &quot;$(SharpProofVerifyProcessMemoryLimitBytes)&quot; --max-worker-processes &quot;$(SharpProofVerifyMaxWorkerProcesses)&quot; --termination-grace-ms &quot;$(SharpProofVerifyTerminationGraceMilliseconds)&quot; --cache-enabled &quot;$(SharpProofVerifyCacheEnabled)&quot; --cache-directory &quot;$(SharpProofVerifyCacheDirectory)&quot; --cache-maximum-bytes &quot;$(SharpProofVerifyCacheMaximumBytes)&quot;$(_SharpProofVerifySarifArgument)"
           WorkingDirectory="$(MSBuildProjectDirectory)"
           StandardOutputImportance="High"
           StandardErrorImportance="High"
@@ -132,6 +143,9 @@
            Text="SharpProof verifier failed with exit code $(_SharpProofVerifierExitCode)." />
     <Message Importance="High"
              Text="SharpProof verifier result: $(SharpProofVerifyResultFile)" />
+    <Message Condition="'$(SharpProofVerifySarifFile)' != ''"
+             Importance="High"
+             Text="SharpProof verifier SARIF result: $(SharpProofVerifySarifFile)" />
   </Target>
 
   <Target Name="SharpProofVerify"

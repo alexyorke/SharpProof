@@ -10,8 +10,7 @@ public enum EffectRegionKind {
     Unknown
 }
 
-public readonly struct EffectRegionId :
-    IEquatable<EffectRegionId>, IComparable<EffectRegionId> {
+public readonly record struct EffectRegionId : IComparable<EffectRegionId> {
     public EffectRegionId(EffectRegionKind kind, int ordinal = 0) {
         if (!Enum.IsDefined(typeof(EffectRegionKind), kind))
             throw new ArgumentOutOfRangeException(nameof(kind));
@@ -46,16 +45,6 @@ public readonly struct EffectRegionId :
             ? kind
             : Ordinal.CompareTo(other.Ordinal);
 
-    public bool Equals(EffectRegionId other) =>
-        Kind == other.Kind && Ordinal == other.Ordinal;
-
-    public override bool Equals(object? obj) => obj is EffectRegionId other && Equals(other);
-
-    public override int GetHashCode() =>
-        unchecked(((int)Kind * 397) ^ Ordinal);
-
-    public static bool operator ==(EffectRegionId left, EffectRegionId right) => left.Equals(right);
-    public static bool operator !=(EffectRegionId left, EffectRegionId right) => !left.Equals(right);
 }
 
 public readonly struct EffectRegionSet : IEquatable<EffectRegionSet> {

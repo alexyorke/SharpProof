@@ -78,6 +78,6 @@ than guessed.
   counterexample that requires executing such a call remains `Unknown` when
   independent replay cannot execute it.
 - The project remains a bounded preview rather than an arbitrary-C# verifier.
-  SARIF, real Visual Studio/Rider and Windows ARM64 qualification, pilot-library
-  cycles, protected release promotion, trusted publication, and independent
-  human soundness reviews remain release gates.
+  Real Visual Studio/Rider qualification, pilot-library cycles, protected
+  release promotion, first private/public publication, and independent human
+  soundness reviews remain release gates.

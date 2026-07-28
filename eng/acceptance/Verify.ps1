@@ -3,7 +3,9 @@ param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
 
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+
+    [switch]$SkipTests
 )
 
 Set-StrictMode -Version Latest
@@ -164,7 +166,7 @@ function Measure-RepositoryNonblankLines {
 }
 
 Assert-Equal $contract.schemaVersion 3 'schemaVersion'
-Assert-Equal $contract.releaseLine '0.2.0-preview' 'releaseLine'
+Assert-Equal $contract.releaseLine '1.0.0-preview' 'releaseLine'
 Assert-Equal $contract.flagship 'effects' 'flagship'
 Assert-Equal $contract.analyzer.defaultProfile 'advisory' 'analyzer.defaultProfile'
 Assert-Equal $contract.analyzer.defaultFeatures 'all' 'analyzer.defaultFeatures'
@@ -191,7 +193,7 @@ Assert-Equal `
     $contract.analyzer.defaultAssumptionPolicy `
     'SharpProofAssumptionPolicy'
 Assert-Equal ($contract.supportedTargetFrameworks -join ',') 'netstandard2.0,net8.0,net472' 'supportedTargetFrameworks'
-Assert-Equal $contract.worker.protocolVersion 5 'worker.protocolVersion'
+Assert-Equal $contract.worker.protocolVersion 6 'worker.protocolVersion'
 Assert-Equal $contract.worker.manifestSchemaVersion 2 'worker.manifestSchemaVersion'
 Assert-Equal $contract.worker.compilerArtifactSchemaVersion 3 'worker.compilerArtifactSchemaVersion'
 Assert-Equal $contract.worker.maximumParallelism 4 'worker.maximumParallelism'
@@ -201,7 +203,7 @@ Assert-Equal $contract.worker.methodRlimit 20000000 'worker.methodRlimit'
 Assert-Equal $contract.worker.maximumMethodWallSeconds 10 'worker.maximumMethodWallSeconds'
 Assert-Equal $contract.worker.maximumProjectWallSeconds 300 'worker.maximumProjectWallSeconds'
 Assert-Equal $contract.worker.forcedTerminationMilliseconds 1000 'worker.forcedTerminationMilliseconds'
-Assert-Equal $contract.cache.schemaVersion 6 'cache.schemaVersion'
+Assert-Equal $contract.cache.schemaVersion 7 'cache.schemaVersion'
 Assert-Equal $contract.cache.maximumMiB 512 'cache.maximumMiB'
 Assert-Equal ($contract.cache.cacheableOutcomes -join ',') 'Proven,Refuted' 'cache.cacheableOutcomes'
 Assert-Equal `
@@ -391,6 +393,9 @@ try {
     )
 
     foreach ($testProject in $testProjects) {
+        if ($SkipTests) {
+            break
+        }
         $resolvedTestProject = Join-Path $repositoryRoot $testProject
         if (-not (Test-Path -LiteralPath $resolvedTestProject -PathType Leaf)) {
             throw "Required test project is missing: $testProject"
@@ -412,32 +417,34 @@ try {
         )
     }
 
-    Invoke-SharpProofDotnet -Arguments @(
-        'run',
-        '--project',
-        'Tools\SharpProof.Fuzz\SharpProof.Fuzz.csproj',
-        '-c',
-        $Configuration,
-        '--no-build',
-        '--',
-        '--cases',
-        [string]$contract.fuzz.pullRequestCases,
-        '--seed',
-        '23063',
-        '--max-parallelism',
-        [string]$contract.fuzz.maximumParallelism
-    )
+    if (-not $SkipTests) {
+        Invoke-SharpProofDotnet -Arguments @(
+            'run',
+            '--project',
+            'Tools\SharpProof.Fuzz\SharpProof.Fuzz.csproj',
+            '-c',
+            $Configuration,
+            '--no-build',
+            '--',
+            '--cases',
+            [string]$contract.fuzz.pullRequestCases,
+            '--seed',
+            '23063',
+            '--max-parallelism',
+            [string]$contract.fuzz.maximumParallelism
+        )
 
-    Invoke-SharpProofDotnet -Arguments @(
-        'run',
-        '--project',
-        'SharpProof.Gates\SharpProof.Gates.csproj',
-        '-c',
-        $Configuration,
-        '--no-build',
-        '--',
-        'all'
-    )
+        Invoke-SharpProofDotnet -Arguments @(
+            'run',
+            '--project',
+            'SharpProof.Gates\SharpProof.Gates.csproj',
+            '-c',
+            $Configuration,
+            '--no-build',
+            '--',
+            'all'
+        )
+    }
 }
 finally {
     Pop-Location

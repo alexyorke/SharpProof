@@ -1,6 +1,6 @@
 # SharpProof soundness-first acceptance contract
 
-This directory defines the active acceptance contract for the 0.2 preview.
+This directory defines the active acceptance contract for the 1.0 preview.
 
 The current contract is outcome-based. It intentionally does not freeze individual
 test files, public metadata, diagnostic severities, or package layout. A change
@@ -9,7 +9,7 @@ is acceptable only when:
 - the supported-language gate is exhaustive, unsupported unannotated analyzer
   methods remain quiet, and unsupported explicitly selected methods report
   SP0047;
-- protocol version 5 binds compiler-manifest evidence and manifests every
+- protocol version 6 binds compiler-manifest evidence and manifests every
   selected callable and postcondition with a
   stable semantic ID, every lowered callable exactly matches that manifest,
   and every response has exact manifest/result equality;
@@ -64,8 +64,11 @@ cache identity rather than runtime compatibility gates.
 Exact backend-model closure and independent whole-body counterexample replay
 are implemented for the admitted subset, and package validation covers the
 exact Attributes -> portable analyzer -> Windows verifier dependency chain.
-SARIF projection, release provenance, protected publishing, and independent
-human release reviews remain open gates.
+The release workflow validates and promotes the already-tested bytes with
+hash, SBOM, repository, package-version, and tag checks. Optional SARIF 2.1.0
+projects only validated worker responses. Owner-enforced
+branch/tag/environment protection, pilot evidence, and independent human
+release reviews remain open gates.
 
 Changes to the trusted-kernel paths, assumption construction, complete effect
 summaries, API specifications, or proof-producing outcome construction require

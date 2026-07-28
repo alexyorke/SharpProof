@@ -1,6 +1,13 @@
-using System.Globalization;
-
 namespace SharpProof.Effects;
+
+internal enum EffectContractResolutionKind {
+    Missing, Untrusted, Incomplete, Invalid, Valid
+}
+internal readonly record struct EffectContractResolution(
+    EffectContractResolutionKind Kind,
+    EffectSummary Summary,
+    AttributeData? InvalidAttribute = null,
+    string InvalidReason = "");
 
 internal sealed class ExternalEffectResolver {
     private readonly Compilation _compilation;
@@ -36,8 +43,12 @@ internal sealed class ExternalEffectResolver {
     internal ResolvedApiSpecTable ApiSpecs => _specs;
 
     internal EffectSummary Resolve(IMethodSymbol method) {
-        if (TryResolveContract(method, out var contract))
-            return contract;
+        var resolution = ResolveContract(method);
+        if (resolution.Kind is
+            EffectContractResolutionKind.Valid or
+            EffectContractResolutionKind.Incomplete or
+            EffectContractResolutionKind.Invalid)
+            return resolution.Summary;
         if (_specs.TryGet(method, out var spec))
             return ResolveSpec(spec.Template);
         return EffectSummaryOperations.UnknownBoundary(
@@ -55,26 +66,39 @@ internal sealed class ExternalEffectResolver {
         return EffectThrowSet.Create(types);
     }
 
-    private bool TryResolveContract(
-        IMethodSymbol method, out EffectSummary summary) {
+    internal EffectContractResolution ResolveContract(IMethodSymbol method) {
         var attributes = EnumerateDirectContractAttributes(method).ToImmutableArray();
-        if (attributes.IsDefaultOrEmpty || !HasValidTrustReason(method)) {
-            summary = EffectSummary.Bottom;
-            return false;
-        }
+        if (attributes.IsDefaultOrEmpty)
+            return new(EffectContractResolutionKind.Missing, EffectSummary.Bottom);
         EffectSummary? resolved = null;
         foreach (var attribute in attributes) {
-            if (!TryDecodeContract(method, attribute, out var candidate) ||
-                resolved != null && !resolved.Equals(candidate)) {
-                summary = EffectSummaryOperations.UnknownBoundary(
-                    EffectUncertainty.InvalidContract);
-                return true;
+            if (!TryDecodeContract(method, attribute, out var candidate)) {
+                return Invalid(
+                    attribute,
+                    "expected a complete, internally consistent effect summary");
+            }
+            if (resolved != null && !resolved.Equals(candidate)) {
+                return Invalid(
+                    attribute,
+                    "expected duplicate declarations to describe identical effects");
             }
             resolved = candidate;
         }
-        summary = resolved!;
-        return true;
+        if (!HasValidTrustReason(method))
+            return new(EffectContractResolutionKind.Untrusted, resolved!);
+        if (resolved!.Completeness != EffectCompleteness.Complete)
+            return new(EffectContractResolutionKind.Incomplete, EffectSummary.Top);
+        return new(EffectContractResolutionKind.Valid, resolved!);
     }
+
+    private static EffectContractResolution Invalid(
+        AttributeData attribute, string reason) =>
+        new(
+            EffectContractResolutionKind.Invalid,
+            EffectSummaryOperations.UnknownBoundary(
+                EffectUncertainty.InvalidContract),
+            attribute,
+            reason);
 
     private bool HasValidTrustReason(IMethodSymbol method) {
         if (_trustedAttribute == null) return false;
@@ -117,8 +141,8 @@ internal sealed class ExternalEffectResolver {
             (effects & ~EffectContractMetadata.AllEffects) != 0)
             return false;
         var capabilities = EffectContractCapabilityKind.None;
-        var complete = true;
-        var deterministic = true;
+        var complete = false;
+        var deterministic = false;
         ImmutableArray<TypedConstant> thrown = [];
         foreach (var argument in attribute.NamedArguments) {
             switch (argument.Key) {
@@ -150,8 +174,6 @@ internal sealed class ExternalEffectResolver {
             }
         }
 
-        if (!complete)
-            return false;
         var exceptionTypes = new List<INamedTypeSymbol>();
         foreach (var constant in thrown) {
             if (constant.Value is not INamedTypeSymbol type || !IsException(type))
@@ -192,7 +214,10 @@ internal sealed class ExternalEffectResolver {
         summary = new EffectSummary(
             reads, writes, allocation, new EffectCapabilitySet(capabilityKinds),
             EffectThrowSet.Create(exceptionTypes), EffectTermination.Unknown,
-            EffectCompleteness.Complete, EffectUncertainty.None);
+            complete
+                ? EffectCompleteness.Complete
+                : EffectCompleteness.Incomplete,
+            EffectUncertainty.None);
         return true;
     }
 
@@ -287,45 +312,26 @@ internal sealed class ExternalEffectResolver {
             attribute.AttributeClass?.OriginalDefinition,
             attributeType.OriginalDefinition);
 
-    private bool IsException(INamedTypeSymbol type) {
-        if (_exceptionType == null) return false;
-        for (var current = type; current != null; current = current.BaseType)
-            if (SymbolEqualityComparer.Default.Equals(
-                    current.OriginalDefinition,
-                    _exceptionType.OriginalDefinition))
-                return true;
-        return false;
-    }
+    private bool IsException(INamedTypeSymbol type) =>
+        _exceptionType != null &&
+        EffectTypeFacts.IsDerivedFrom(type, _exceptionType);
 
     private static EffectRegionSet ContractRegions(
         IMethodSymbol method, EffectContractKind effects, bool isWrite) {
         var result = EffectRegionSet.Empty;
-        var receiverFlag = isWrite
-            ? EffectContractKind.WritesReceiverState
-            : EffectContractKind.ReadsReceiverState;
-        var argumentFlag = isWrite
-            ? EffectContractKind.WritesArgumentState
-            : EffectContractKind.ReadsArgumentState;
-        var capturedFlag = isWrite
-            ? EffectContractKind.WritesCapturedState
-            : EffectContractKind.ReadsCapturedState;
-        var staticFlag = isWrite
-            ? EffectContractKind.WritesStaticState
-            : EffectContractKind.ReadsStaticState;
-        var ambientFlag = isWrite
-            ? EffectContractKind.WritesAmbientState
-            : EffectContractKind.ReadsAmbientState;
-        if ((effects & receiverFlag) != 0)
-            result = result.Union(EffectRegionSet.Create(EffectRegionId.Receiver));
-        if ((effects & argumentFlag) != 0)
-            result = result.Union(ParameterRegions(method.Parameters.Length));
-        if ((effects & capturedFlag) != 0)
-            result = result.Union(EffectRegionSet.Create(EffectRegionId.Captured(0)));
-        if ((effects & staticFlag) != 0)
-            result = result.Union(EffectRegionSet.Create(EffectRegionId.Static()));
-        if ((effects & ambientFlag) != 0)
-            result = result.Union(EffectRegionSet.Create(EffectRegionId.Ambient));
+        var flagOffset = isWrite ? 5 : 0;
+        Add(0, EffectRegionSet.Create(EffectRegionId.Receiver));
+        Add(1, ParameterRegions(method.Parameters.Length));
+        Add(2, EffectRegionSet.Create(EffectRegionId.Captured(0)));
+        Add(3, EffectRegionSet.Create(EffectRegionId.Static()));
+        Add(4, EffectRegionSet.Create(EffectRegionId.Ambient));
         return result;
+
+        void Add(int offset, EffectRegionSet regions) {
+            var flag = (EffectContractKind)(1L << (flagOffset + offset));
+            if ((effects & flag) != 0)
+                result = result.Union(regions);
+        }
     }
 
     private static EffectRegionSet ParameterRegions(int count) {
@@ -341,7 +347,9 @@ internal sealed class ExternalEffectResolver {
 
     private static bool TryConvertEffects(
         object value, out EffectContractKind effects) {
-        var converted = TryConvertEnumValue(value, wide: true, out var result);
+        var converted = EffectContractMetadata.TryConvertInt64(
+            value,
+            out var result);
         effects = converted
             ? (EffectContractKind)result
             : EffectContractKind.None;
@@ -350,27 +358,13 @@ internal sealed class ExternalEffectResolver {
 
     private static bool TryConvertCapabilities(
         object value, out EffectContractCapabilityKind capabilities) {
-        var converted = TryConvertEnumValue(value, wide: false, out var result);
+        var converted = EffectContractMetadata.TryConvertInt64(
+            value,
+            out var result) &&
+            result is >= int.MinValue and <= int.MaxValue;
         capabilities = converted
             ? (EffectContractCapabilityKind)result
             : EffectContractCapabilityKind.None;
         return converted;
-    }
-
-    private static bool TryConvertEnumValue(
-        object value, bool wide, out long result) {
-        try {
-            result = wide
-                ? Convert.ToInt64(value, CultureInfo.InvariantCulture)
-                : Convert.ToInt32(value, CultureInfo.InvariantCulture);
-            return true;
-        }
-        catch (Exception exception) when (
-            exception is InvalidCastException or
-            FormatException or
-            OverflowException) {
-            result = 0;
-            return false;
-        }
     }
 }

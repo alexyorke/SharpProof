@@ -28,16 +28,20 @@ as `UnsupportedBody` until base-constructor and field-initializer semantics are
 lowered. Only canonical user-model variables are exposed in the result;
 lowered temporaries remain internal.
 
-An executed spec-modeled call or other unsupported IR operation cannot be
-independently replayed, so the candidate is reported as claim `Unknown` with
-`CounterexampleReplayFailed`; an operation on an unselected CFG path does not
-block replay. An UNSAT result becomes `Proven` only when every core item has
-admissible justification. Unsupported encoding, resource limits, and method
-boundaries produce typed claim-level `Unknown` results. Backend unavailability,
-malformed backend results, replay failure, containment failure, and
-infrastructure failure make the protocol version 5 run `Failed` and fail the
-build under every policy. Project timeout and caller cancellation use the
-separate `TimedOut` and `Canceled` run statuses.
+An executed spec-modeled call cannot be independently replayed, so the
+candidate is reported as claim `Unknown` with
+`CounterexampleNotReplayable`; an operation on an unselected CFG path does not
+block replay. Other unsupported or inconsistent replay state remains the
+fatal `CounterexampleReplayFailed` discrepancy. An UNSAT result becomes
+`Proven` only when every core item has admissible justification. Unsupported
+encoding, resource limits, and method boundaries produce typed claim-level
+`Unknown` results. An undefined postcondition is also a typed `Unknown`
+result. Backend unavailability, malformed backend results, failure to replay
+an otherwise replayable counterexample, containment failure, and
+infrastructure failure make the protocol version 6 run `Failed` and fail the
+build under every policy.
+Project timeout and caller cancellation use the separate `TimedOut` and
+`Canceled` run statuses.
 
 `SharpProofVerifyPolicy` controls whether otherwise valid incomplete selected
 analysis is informational, warning, or error SP0047 output.
@@ -48,8 +52,9 @@ run into success.
 Only exact-manifest, complete `Proven` and replay-validated `Refuted` project
 results enter the content-addressed disk cache. Cache keys include protocol,
 semantics, tool, target framework, the exact closed compiler artifact and
-lowered IR, budgets, and spec versions. Cache schema version 6 revalidates the
-stored semantic payload against the complete current manifest.
+lowered IR, budgets, and spec versions. Cache schema version 7 revalidates the
+stored semantic payload against the complete current manifest. Strict
+`require-proven` runs do not consume or write this local semantic cache.
 
 See [Typed abstention reasons](unknown-reasons.md) for exact statuses and
 reasons, and [Analysis limits](analysis-limits.md) for configured and fixed

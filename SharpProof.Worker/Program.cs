@@ -1,5 +1,5 @@
 namespace SharpProof.Worker;
-#pragma warning disable IDE0055 // Compact process boundary preserves the fixed production-size ceiling.
+
 internal static class Program {
     internal static async Task<int> Main(string[] args) {
         if (!TryParseArguments(args, out var requestPath, out var resultPath, out var startEventName)) {
@@ -30,11 +30,8 @@ internal static class Program {
         };
         Console.CancelKeyPress += handler;
         try {
-            var validation = WorkerProtocolJson.Validate(request);
-            if (!validation.IsValid) return await Respond(Failure(
-                WorkerRunFailureReason.InvalidRequest, validation.Errors, new WorkerBudgets())).ConfigureAwait(false);
-            using var worker = SharpProofWorker.Create(request!.Budgets);
-            var response = await worker.VerifyAsync(request, cancellation.Token).ConfigureAwait(false);
+            using var worker = SharpProofWorker.Create(request?.Budgets ?? new WorkerBudgets());
+            var response = await worker.VerifyAsync(request!, cancellation.Token).ConfigureAwait(false);
             return await Respond(response).ConfigureAwait(false);
         }
         catch (OperationCanceledException) {
@@ -52,7 +49,8 @@ internal static class Program {
                     Message = (backendUnavailable ? "The native SMT backend is unavailable." :
                         "The worker failed before producing a semantic result.") + " " + exception.GetBaseException().Message
                 }], request?.Budgets ?? new WorkerBudgets())).ConfigureAwait(false);
-        } finally { Console.CancelKeyPress -= handler; }
+        }
+        finally { Console.CancelKeyPress -= handler; }
     }
     private static WorkerVerifyResponse Failure(WorkerRunFailureReason reason,
         IEnumerable<WorkerProtocolError> errors, WorkerBudgets budgets) =>
@@ -61,15 +59,16 @@ internal static class Program {
             WorkerRunStatus.Failed, reason, [], [], budgets, WorkerCacheStatus.Disabled, 0, errors);
     private static bool TryParseArguments(
         string[] args, out string request, out string result, out string startEvent) {
-        request = string.Empty; result = string.Empty; startEvent = string.Empty;
-        if (args.Length != 7 ||
-            !string.Equals(args[0], "verify", StringComparison.Ordinal) ||
-            !string.Equals(args[1], "--request", StringComparison.Ordinal) ||
-            !string.Equals(args[3], "--result", StringComparison.Ordinal) ||
-            !string.Equals(args[5], "--start-event", StringComparison.Ordinal))
+        if (args is not ["verify", "--request", var requestValue,
+                "--result", var resultValue, "--start-event", var eventValue] ||
+            string.IsNullOrWhiteSpace(eventValue)) {
+            request = result = startEvent = string.Empty;
             return false;
-        request = Path.GetFullPath(args[2]); result = Path.GetFullPath(args[4]); startEvent = args[6];
-        return !string.IsNullOrWhiteSpace(startEvent);
+        }
+        request = Path.GetFullPath(requestValue);
+        result = Path.GetFullPath(resultValue);
+        startEvent = eventValue;
+        return true;
     }
     private static bool WaitForStart(string eventName) {
         if (!OperatingSystem.IsWindows()) return false;

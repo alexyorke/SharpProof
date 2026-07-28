@@ -1,6 +1,6 @@
 # Coverage and limits
 
-This document is the authoritative inventory of SharpProof 0.2's implemented
+This document is the authoritative inventory of SharpProof 1.0's implemented
 product surface. [SEMANTICS.md](../SEMANTICS.md) remains normative: if a
 semantic rule here conflicts with it, `SEMANTICS.md` wins.
 
@@ -15,11 +15,11 @@ unsupported expressions, approximate facts, and exhausted budgets remain
 |---|---|---|---|
 | Effect contracts | Analyzer with `SharpProofFeatures=effects` or `all` | Computes path-insensitive may summaries for reads, writes, allocation, capabilities, exceptions, termination, and completeness; checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, and `[AllowedExceptions]` | A possible or unresolved violation produces a not-proven diagnostic, not a definitive effect witness |
 | Call-site preconditions | Analyzer with `SharpProofFeatures=contracts` or `all` | Binds source `Contract.Requires` clauses and closed parameter attributes with compiler symbols for ordinary calls and object creation; reports only when receiver, arguments, and required prefix evaluation are exact and non-throwing and the instantiated predicate concretely evaluates to false | Unknown values and possible throws remain silent at unannotated sites; unsupported explicitly selected methods report SP0047 |
-| Postconditions | Optional Windows x64 worker with `SharpProofFeatures=contracts` or `all`; strict enables the worker by default | Manifests `Contract.Ensures` and return attributes, including directly owned local-function, lambda, anonymous-method, and top-level claims, then proves admitted bounded obligations over normal-return paths with Boolean/integer SMT and replay-gated counterexamples | The additional callable forms are currently visible as `UnsupportedCallable`; `effects` excludes postcondition claims; this is bounded `Ensures` verification, not arbitrary deep, recursive, looping, heap, or sequence verification |
+| Postconditions | Optional Windows x64 worker with `SharpProofFeatures=contracts` or `all`; strict enables the worker by default | Manifests `Contract.Ensures` and return attributes, including directly owned local-function, lambda, anonymous-method, and top-level claims, then proves admitted bounded obligations over normal-return paths with Boolean logic, bounded integer comparisons, checked `long` arithmetic, and replay-gated counterexamples | The additional callable forms are currently visible as `UnsupportedCallable`; `effects` excludes postcondition claims; this is bounded `Ensures` verification, not arbitrary deep, recursive, looping, heap, or sequence verification |
 | Worker body execution | Compiler collector plus opt-in Windows x64 worker | The compiler emits portable whole-body CFG/IR; the worker executes its bounded acyclic subset with locals, reassignment, branches, multiple returns, entry-state `Old`, supported expressions, and eligible resolved API specs | Loops, stateful instructions outside the narrow admitted model, unresolved calls, unsupported mutation, and exceeded bounds abstain |
 | `ContractFor` validation | Incremental generator loaded with any non-`off` profile | Validates companion type and member identity, including receiver, overload, generic constraints, ref/scoped kinds, nullability, defaults, and return shape | It validates and binds existing source; it emits no generated source and does not make an unsupported contract provable |
 | External calls | Analyzer, compiler collector, and worker | Analyzer/compiler stages resolve exact original symbols against `ApiSpecTable`; the artifact binds an admitted lowered call to its exact witness identifier, which the worker revalidates against the matching spec table | The worker does not turn arbitrary trusted metadata contracts into proof facts; missing, ambiguous, untrusted, incomplete, or target-framework-inapplicable models fail closed |
-| SMT | Worker only | Encodes supported Boolean and signed-integer obligations; creates `Proven` only after unsat-core hygiene and `Refuted` only after executable replay | No Z3 or verifier payload is loaded into the IDE analyzer |
+| SMT | Worker only | Encodes the admitted Boolean and bounded-integer obligations; creates `Proven` only after unsat-core hygiene and `Refuted` only after executable replay | No Z3 or verifier payload is loaded into the IDE analyzer |
 
 Effect exception contracts cover modeled synchronous managed exception flows.
 Ambient catastrophic runtime failures such as memory or stack exhaustion are
@@ -27,7 +27,7 @@ outside that universe unless source or an exact boundary explicitly throws or
 declares them. An unmodeled ordinary synchronous exception remains incomplete;
 it is not silently excluded.
 
-Not active as 0.2 product features:
+Not active as 1.0 preview product features:
 
 - complexity classification or complexity diagnostics;
 - regex-to-SMT translation;
@@ -154,13 +154,15 @@ invocation; they are not BCL coverage.
   Contract-only ordinary `void` methods replay as exact zero-step programs.
   Constructor postconditions are `UnsupportedBody` until base-constructor and
   field-initializer semantics are lowered.
-  An executed spec-modeled call or unsupported operation fails replay to
-  `Unknown` with `CounterexampleReplayFailed`; one on an unselected path does
-  not block the refutation. Result models expose only canonical user variables.
+  An executed spec-modeled call becomes `Unknown` with
+  `CounterexampleNotReplayable`. Any other unsupported or inconsistent replay
+  state is a fatal `CounterexampleReplayFailed`; one on an unselected path
+  does not block the refutation. Result models expose only canonical user
+  variables.
 - `Unknown` covers unsupported, unresolved, approximate, method-time-limited,
   or resource-exhausted claim analysis. Unsupported unannotated analyzer
   callables are silent; unsupported selected callables produce SP0047.
-- Protocol version 5 binds a compiler-manifest artifact and separately records
+- Protocol version 6 binds a compiler-manifest artifact and separately records
   run status, callable coverage, and one
   outcome for each stable manifest claim ID. Exact manifest/result equality is
   mandatory.
@@ -172,10 +174,10 @@ invocation; they are not BCL coverage.
 - Caller cancellation is run status `Canceled`, project timeout is
   `TimedOut`, and infrastructure/protocol/backend/replay failure is `Failed`.
   None is a successful claim outcome.
-- Cache schema version 6 stores only complete validated payloads. Cache reads
+- Cache schema version 7 stores only complete validated payloads. Cache reads
   are checked against the entire current manifest. Unknown, cancellation,
   timeout, malformed result, infrastructure failure, and failed replay are not
-  semantic cache entries.
+  semantic cache entries. `require-proven` disables the local semantic cache.
 - `SharpProofVerifyPolicy` maps incomplete selected analysis to informational,
   warning, or error SP0047 reporting. `SharpProofAssumptionPolicy` maps user or
   trusted evidence to SP0048. These policies do not make fatal runs successful.
@@ -232,13 +234,24 @@ whole-body replay. The three-package split is complete. Each package has a
 matching portable-PDB `.snupkg` with SourceLink bound to the package repository
 commit, and package builds run SDK package validation. The package workflow
 publishes the six NuGet artifacts with a deterministic SHA-256 manifest, an
-SPDX JSON SBOM, and SLSA build-provenance and SBOM attestations for canonical
-`master` builds.
+SPDX 2.3 package/component SBOM, and SLSA build-provenance and SBOM
+attestations for canonical `master` builds. Pull requests do not receive OIDC
+or attestation-write permission.
 
-The remaining integration limits are SARIF projection, protected-tag
-promotion and trusted NuGet publishing, and broader host qualification; they
-are not worker-side compilation reconstruction, counterexample replay,
-package separation, or release-artifact provenance work.
+The remaining integration limits are owner configuration of protected tags
+and the private/public NuGet environments, the first publications, and broader
+host qualification. Deterministic SARIF 2.1.0 is available as an opt-in
+projection of the validated worker response. The workflow already promotes
+only the tested bytes after revalidating tag, version, master ancestry,
+predecessor-tag order, hashes, SBOM, repository identity, and package
+inventory. Before publication, all existing V3 main-package payloads must
+match the tested ZIP entries byte-for-byte, excluding only the repository
+signature. Verified retries publish main and symbol packages separately in
+dependency order and use duplicate skipping only after that match. The symbol
+service has no symmetric V3 download surface, so exact retry preflight applies
+to the main package; the tested `.snupkg` is resubmitted separately. These
+limits are not worker-side compilation reconstruction, counterexample replay,
+package separation, SARIF, or release-artifact provenance work.
 
 See [Typed abstention reasons](unknown-reasons.md) for the exact enums and
 [Analysis limits](analysis-limits.md) for configured budgets.

@@ -13,10 +13,11 @@ public static class TrustedBoundaryExamples {
         [SharpProofTrusted(
             "The signature and effect summary were reviewed against Win32.")]
         [EffectContract(
-            SharpProofEffect.UsesNativeCode,
+            SharpProofEffect.ReadsAmbientState |
+                SharpProofEffect.UsesNativeCode,
             Capabilities = SharpProofCapability.NativeInterop,
             Complete = true,
-            IsDeterministic = true)]
+            IsDeterministic = false)]
         internal static extern int GetCurrentProcessId();
     }
 }

@@ -1,6 +1,6 @@
-# SharpProof 0.2 architecture
+# SharpProof 1.0 preview architecture
 
-SharpProof 0.2 is an effect-first, soundness-first preview. The supported
+SharpProof 1.0 is an effect-first, soundness-first preview. The supported
 product is the effect cluster plus compiler-bound call-site preconditions.
 Unsupported code is an abstention, not an invitation to guess.
 
@@ -121,7 +121,7 @@ indices. Formula construction, worklists, specs, proof cores, diagnostics, and
 serialized responses are stably ordered. Z3 uses resource limits; wall time is
 an outer process kill boundary.
 
-Protocol version 5 binds each request to a compiler-produced closed artifact.
+Protocol version 6 binds each request to a compiler-produced closed artifact.
 Stable semantic IDs identify selected callables, postcondition claims, and
 user/trusted evidence independently of formatting. The protocol separates run
 status, callable coverage, and per-claim outcome. Central validation requires
@@ -141,7 +141,7 @@ first, the manifest and request are atomically replaced, and the result is
 written last as the commit marker. A failed publication therefore cannot leave
 a stale successful result associated with a partly updated evidence set. The
 content-addressed cache includes semantic, protocol, tool, compilation,
-reference, option, target-framework, and spec identity. Cache schema version 6
+reference, option, target-framework, and spec identity. Cache schema version 7
 stores only the validated semantic payload. A hit is accepted only when its
 manifest hash and complete result set match the current manifest. Only
 complete callables whose claims are hygienic `Proven` or replay-validated
@@ -189,10 +189,12 @@ This closes both the compiler-to-worker lowered-artifact cutover and the
 independent whole-body replay gate for the bounded verifier subset. Replay
 executes only the concrete CFG path selected by the model, so unsupported
 operations or spec-modeled calls on other paths do not block a refutation. If
-one is executed, replay fails closed to `Unknown` with
-`CounterexampleReplayFailed`. Result JSON includes only canonical user-model
-variables, not temporary lowered variables. Deterministic JSON is emitted, but
-SARIF projection is future work.
+a modeled call is executed, the candidate becomes `Unknown` with
+`CounterexampleNotReplayable`; other unsupported or inconsistent replay state
+is a fatal `CounterexampleReplayFailed`. Result JSON includes only canonical
+user-model variables, not temporary lowered variables. Optional deterministic
+SARIF 2.1.0 projects the validated response under the same atomic publication
+boundary and does not participate in semantic verification.
 
 ## Activation and release gates
 

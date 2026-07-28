@@ -18,4 +18,15 @@ public static class DiagnosticExamples {
         Func<int> value = () => 1;
         return value();
     }
+
+    public static PositiveBox RefutedConstructor() => new(0);
+}
+
+public sealed class PositiveBox {
+    public PositiveBox(int value) {
+        Contract.Requires(value > 0);
+        Value = value;
+    }
+
+    public int Value { get; }
 }

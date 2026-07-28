@@ -2,7 +2,7 @@
   <PropertyGroup>
     <SharpProofProductName>SharpProof</SharpProofProductName>
     <SharpProofPublisher>Alex Yorke</SharpProofPublisher>
-    <SharpProofVersionPrefix>0.2.0</SharpProofVersionPrefix>
+    <SharpProofVersionPrefix>1.0.0</SharpProofVersionPrefix>
     <SharpProofAssemblyVersion>$(SharpProofVersionPrefix).0</SharpProofAssemblyVersion>
     <SharpProofPackageVersion>$(SharpProofVersionPrefix)-preview.1</SharpProofPackageVersion>
     <Version>$(SharpProofPackageVersion)</Version>
@@ -10,7 +10,7 @@
     <AssemblyVersion>$(SharpProofAssemblyVersion)</AssemblyVersion>
     <FileVersion>$(SharpProofAssemblyVersion)</FileVersion>
     <InformationalVersion>$(SharpProofPackageVersion)</InformationalVersion>
-    <SharpProofProductDescription>SharpProof soundness-first C# effect analysis for purity, zero-allocation, capabilities, exception contracts, and compiler-bound preconditions. Unsupported code is handled conservatively and proof-producing features are opt-in.</SharpProofProductDescription>
+    <SharpProofProductDescription>Portable SharpProof Roslyn analysis and contract generation for bounded effect contracts, compiler-bound preconditions, and accountable postcondition verification. Unsupported selected code remains visibly incomplete.</SharpProofProductDescription>
     <SharpProofProjectUrl>https://github.com/alexyorke/SharpProof</SharpProofProjectUrl>
   </PropertyGroup>
 </Project>

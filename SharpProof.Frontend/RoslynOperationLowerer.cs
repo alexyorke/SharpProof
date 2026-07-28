@@ -367,6 +367,11 @@ public sealed class RoslynOperationLowerer {
                     operation.OperatorMethod);
             if (operation.IsLifted)
                 return OpaqueBinary(operation, FrontendAbstention.LiftedOperator);
+            if (!RoslynOperatorSemantics.SupportsBuiltInOperands(
+                    operation.OperatorKind,
+                    operation.LeftOperand.Type,
+                    operation.RightOperand.Type))
+                return OpaqueBinary(operation, FrontendAbstention.UnsupportedType);
 
             var left = _owner.LowerCore(operation.LeftOperand);
             if (operation.OperatorKind == BinaryOperatorKind.ConditionalAnd &&

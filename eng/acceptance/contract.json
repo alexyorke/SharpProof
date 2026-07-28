@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "flagship": "effects",
-  "releaseLine": "0.2.0-preview",
+  "releaseLine": "1.0.0-preview",
   "supportedTargetFrameworks": [
     "netstandard2.0",
     "net8.0",
@@ -18,7 +18,7 @@
     "unsupportedSelectedCallableDiagnostic": "SP0047"
   },
   "worker": {
-    "protocolVersion": 5,
+    "protocolVersion": 6,
     "manifestSchemaVersion": 2,
     "compilerArtifactSchemaVersion": 3,
     "maximumParallelism": 4,
@@ -31,7 +31,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 6,
+    "schemaVersion": 7,
     "maximumMiB": 512,
     "cacheableOutcomes": [
       "Proven",
@@ -68,6 +68,7 @@
           "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
           "SharpProof.Contracts/ContractBinder.cs",
           "SharpProof.Contracts/ContractExpressionBinder.cs",
+          "SharpProof.Contracts/ContractIntrinsicValidator.cs",
           "SharpProof.Frontend/RoslynOperationLowerer.cs",
           "SharpProof.Frontend/RoslynProgramLowerer.cs"
         ],
@@ -114,7 +115,6 @@
           "SharpProof.Worker.Protocol/ProtocolJson.cs",
           "SharpProof.Worker.Protocol/WorkerResultAssembler.cs",
           "SharpProof.Worker/WorkerInputSnapshot.cs",
-          "SharpProof.Worker/CacheableWorkerResponse.cs",
           "SharpProof.Worker/VerificationCache.cs"
         ],
         "maximumNonblankLines": 910

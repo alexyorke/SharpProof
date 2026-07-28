@@ -341,6 +341,7 @@ public sealed class WorkerTests {
                 deterministic: false));
         var snapshot = await WorkerInputSnapshot.LoadAsync(
             request,
+            WorkerCacheIdentity.Current,
             CancellationToken.None);
 
         var parse = snapshot.CompilerManifest.Compilation.SyntaxTrees.Single();
@@ -766,6 +767,7 @@ public sealed class WorkerTests {
         var request = project.CreateRequest(cacheEnabled: false);
         var snapshot = await WorkerInputSnapshot.LoadAsync(
             request,
+            WorkerCacheIdentity.Current,
             CancellationToken.None);
         var expectedUsedId = snapshot.CompilerManifest.Callables.Single()
             .Clauses.First(static clause =>
@@ -1153,7 +1155,7 @@ public sealed class WorkerTests {
     }
 
     [Test]
-    public async Task SpecModeledCallCannotEmitAnUnreplayedCounterexample() {
+    public async Task SpecModeledCallProducesTypedNonfatalUnreplayableCounterexample() {
         using var project = TestProject.Create(
             """
             using System;
@@ -1176,18 +1178,17 @@ public sealed class WorkerTests {
         using (Assert.EnterMultipleScope()) {
             Assert.That(
                 response.RunStatus,
-                Is.EqualTo(WorkerRunStatus.Failed));
+                Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(
                 response.FailureReason,
-                Is.EqualTo(
-                    WorkerRunFailureReason.CounterexampleReplayFailed));
+                Is.EqualTo(WorkerRunFailureReason.None));
             Assert.That(
                 record.Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 record.Reason,
                 Is.EqualTo(
-                    WorkerClaimReason.CounterexampleReplayFailed));
+                    WorkerClaimReason.CounterexampleNotReplayable));
             Assert.That(record.ProofCore, Is.Empty);
             Assert.That(record.Model, Is.Empty);
         }
@@ -1452,7 +1453,7 @@ public sealed class WorkerTests {
     }
 
     [Test]
-    public async Task UndefinedPostconditionCannotProduceAProof() {
+    public async Task UndefinedPostconditionProducesTypedNonfatalUnknown() {
         using var project = TestProject.Create(
             """
             using SharpProof.Attributes;
@@ -1474,18 +1475,17 @@ public sealed class WorkerTests {
         using (Assert.EnterMultipleScope()) {
             Assert.That(
                 response.RunStatus,
-                Is.EqualTo(WorkerRunStatus.Failed));
+                Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(
                 response.FailureReason,
-                Is.EqualTo(
-                    WorkerRunFailureReason.CounterexampleReplayFailed));
+                Is.EqualTo(WorkerRunFailureReason.None));
             Assert.That(
                 record.Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 record.Reason,
                 Is.EqualTo(
-                    WorkerClaimReason.CounterexampleReplayFailed));
+                    WorkerClaimReason.PostconditionMayBeUndefined));
         }
     }
 
@@ -1672,7 +1672,7 @@ public sealed class WorkerTests {
     }
 
     [Test]
-    public async Task ReportingPoliciesReuseTheSameSemanticCacheEntry() {
+    public async Task RequireProvenDoesNotReuseTheAdvisorySemanticCache() {
         using var project = TestProject.Create(TautologySource);
         var request = project.CreateRequest(cacheEnabled: true);
         var backend = new CountingBackend(BackendCheckResult.Unsatisfiable([]));
@@ -1684,10 +1684,10 @@ public sealed class WorkerTests {
         var second = await worker.VerifyAsync(request);
 
         using (Assert.EnterMultipleScope()) {
-            Assert.That(backend.CallCount, Is.EqualTo(1));
+            Assert.That(backend.CallCount, Is.EqualTo(2));
             Assert.That(second.InputHash, Is.EqualTo(first.InputHash));
             Assert.That(second.RequestHash, Is.Not.EqualTo(first.RequestHash));
-            Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+            Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Disabled));
         }
     }
 
@@ -1747,6 +1747,44 @@ public sealed class WorkerTests {
                 response.ClaimResults.Single().Reason,
                 Is.EqualTo(claimReason));
         }
+    }
+
+    [Test]
+    public async Task UnexpectedBackendExceptionBecomesTypedInfrastructureFailure() {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = new SharpProofWorker(new ThrowingBackend());
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.InfrastructureFailure));
+            Assert.That(
+                response.CallableResults.Single().Reason,
+                Is.EqualTo(
+                    WorkerCallableCoverageReason.InfrastructureFailure));
+            Assert.That(
+                response.ClaimResults.Single().Reason,
+                Is.EqualTo(WorkerClaimReason.InfrastructureFailure));
+        }
+    }
+
+    [Test]
+    public async Task UnexpectedCounterexampleReplayFailureStillFailsTheRun() {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = new SharpProofWorker(new SpuriousModelBackend());
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
+        Assert.That(response.FailureReason,
+            Is.EqualTo(WorkerRunFailureReason.CounterexampleReplayFailed));
+        Assert.That(response.ClaimResults.Single().Reason,
+            Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
     }
 
     [Test]
@@ -1834,44 +1872,32 @@ public sealed class WorkerTests {
             0);
 
         Assert.That(
-            CacheableWorkerResponse.TryCreate(
-                response,
-                response.InputHash,
-                manifest,
-                out var proven),
+            VerificationCache.IsCacheable(response, response.InputHash, manifest),
             Is.True);
-        Assert.That(proven, Is.Not.Null);
+        Assert.That(
+            VerificationCache.IsCacheable(response, "not-a-sha-256-hash", manifest),
+            Is.False);
+        Assert.That(
+            VerificationCache.IsCacheable(response, response.InputHash, null!),
+            Is.False);
 
         response.ClaimResults[0].Outcome = WorkerClaimOutcome.Refuted;
         response.Summary.OutcomeCounts[0].Outcome =
             WorkerClaimOutcome.Refuted;
         Assert.That(
-            CacheableWorkerResponse.TryCreate(
-                response,
-                response.InputHash,
-                manifest,
-                out var refuted),
+            VerificationCache.IsCacheable(response, response.InputHash, manifest),
             Is.True);
-        Assert.That(refuted, Is.Not.Null);
 
         response.ClaimResults[0].Outcome = WorkerClaimOutcome.Unknown;
         Assert.That(
-            CacheableWorkerResponse.TryCreate(
-                response,
-                response.InputHash,
-                manifest,
-                out _),
+            VerificationCache.IsCacheable(response, response.InputHash, manifest),
             Is.False);
 
         response.ClaimResults[0].Outcome = WorkerClaimOutcome.Proven;
         response.ClaimResults[0].Reason =
             WorkerClaimReason.InfrastructureFailure;
         Assert.That(
-            CacheableWorkerResponse.TryCreate(
-                response,
-                response.InputHash,
-                manifest,
-                out _),
+            VerificationCache.IsCacheable(response, response.InputHash, manifest),
             Is.False);
 
         response.ClaimResults[0].Reason = WorkerClaimReason.None;
@@ -1882,30 +1908,19 @@ public sealed class WorkerTests {
             }
         ];
         Assert.That(
-            CacheableWorkerResponse.TryCreate(
-                response,
-                response.InputHash,
-                manifest,
-                out _),
+            VerificationCache.IsCacheable(response, response.InputHash, manifest),
             Is.False);
         Assert.That(
-            CacheableWorkerResponse.TryCreate(
-                response,
-                new string('b', 64),
-                manifest,
-                out _),
-            Is.False);
-        Assert.That(
-            CacheableWorkerResponse.TryCreate(
-                response,
-                "not-a-sha-256-hash",
-                manifest,
-                out _),
+            VerificationCache.IsCacheable(response, new string('b', 64), manifest),
             Is.False);
         response.Errors = [];
         response.ClaimResults[0].Assumptions = [];
-        Assert.That(CacheableWorkerResponse.TryCreate(
-            response, response.InputHash, manifest, out _), Is.False);
+        Assert.That(VerificationCache.IsCacheable(
+            response, response.InputHash, manifest), Is.False);
+
+        response.ClaimResults = [null!];
+        Assert.That(VerificationCache.IsCacheable(
+            response, response.InputHash, manifest), Is.False);
     }
 
     [Test]
@@ -2053,11 +2068,90 @@ public sealed class WorkerTests {
     }
 
     [Test]
+    public async Task BackendFactoryCreatesIsolatedConcurrentSolverLanes() {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long A(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return value;
+                }
+                public static long B(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        request.Budgets.MaxParallelism = 2;
+        var coordination = new ConcurrentLaneState(expectedLanes: 2);
+        using var worker = new SharpProofWorker(
+            () => new CoordinatedBackend(coordination));
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(response.ClaimResults.Select(static result => result.Outcome),
+                Is.All.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(coordination.Created, Is.EqualTo(2));
+            Assert.That(coordination.MaximumActive, Is.EqualTo(2));
+            Assert.That(coordination.Disposed, Is.EqualTo(2));
+            var callableIds = response.CallableResults.Select(static result => result.CallableId).ToArray();
+            Assert.That(callableIds, Is.EqualTo(callableIds.OrderBy(static value => value, StringComparer.Ordinal)));
+        }
+    }
+
+    [Test]
+    public async Task BackendFactoryCannotReuseAnInstanceAcrossSolverLanes() {
+        using var project = TestProject.Create(
+            TautologySource + "\n" + TautologySource
+                .Replace("using SharpProof.Attributes;\n", string.Empty, StringComparison.Ordinal)
+                .Replace("Subject", "Second", StringComparison.Ordinal));
+        var request = project.CreateRequest(cacheEnabled: false);
+        request.Budgets.MaxParallelism = 2;
+        var backend = new CountingBackend(BackendCheckResult.Unsatisfiable([]));
+        using var worker = new SharpProofWorker(() => backend);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
+        Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.BackendUnavailable));
+        Assert.That(response.ClaimResults.Select(static result => result.Reason),
+            Is.All.EqualTo(WorkerClaimReason.BackendUnavailable));
+        Assert.That(backend.CallCount, Is.Zero);
+    }
+
+    [Test]
     public async Task BuiltInBackendChargesTheMethodRlimit() {
         using var project = TestProject.Create(MultipleEnsuresSource);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MethodRlimit = request.Budgets.QueryRlimit;
         using var worker = SharpProofWorker.Create(request.Budgets);
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(
+            response.ClaimResults[0].Outcome,
+            Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(
+            response.ClaimResults.Skip(1).Select(static record => record.Reason),
+            Is.All.EqualTo(WorkerClaimReason.ResourceLimit));
+    }
+
+    [Test]
+    public async Task InjectedBuiltInBackendStillChargesTheMethodRlimit() {
+        using var project = TestProject.Create(MultipleEnsuresSource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        request.Budgets.MethodRlimit = request.Budgets.QueryRlimit;
+        using var backend = new SharpProof.Smt.IrSmtBackend(
+            new SharpProof.Smt.IrSmtBackendOptions(
+                request.Budgets.QueryRlimit));
+        using var worker = new SharpProofWorker(
+            backend,
+            readConsumedResourceCount: null);
+
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
@@ -2158,7 +2252,7 @@ public sealed class WorkerTests {
     }
 
     [Test]
-    public async Task ProjectBoundaryCoversArtifactLoadingAndDecoding() {
+    public async Task ProjectBoundaryPermitsWorkThatFinishesBeforeItsDeadline() {
         var sources = Enumerable.Range(0, 512)
             .Select(index => ($"Padding{index}.cs", $"internal sealed class Padding{index} {{ }}"))
             .Prepend(("Subject.cs", TautologySource))
@@ -2172,12 +2266,17 @@ public sealed class WorkerTests {
 
         var response = await worker.VerifyAsync(request);
 
-        using (Assert.EnterMultipleScope()) {
-            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.TimedOut));
-            Assert.That(response.Manifest.Claims, Has.Length.EqualTo(1));
-            Assert.That(response.ClaimResults.Single().Reason, Is.EqualTo(WorkerClaimReason.ProjectTimeout));
+        Assert.That(response.Manifest.Claims, Has.Length.EqualTo(1));
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        var reason = response.ClaimResults.Single().Reason;
+        if (response.RunStatus == WorkerRunStatus.TimedOut) {
+            Assert.That(reason, Is.EqualTo(WorkerClaimReason.ProjectTimeout));
             Assert.That(backend.CallCount, Is.Zero);
-            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        }
+        else {
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(backend.CallCount, Is.EqualTo(1));
         }
     }
 
@@ -2548,6 +2647,63 @@ public sealed class WorkerTests {
             return BackendCheckResult.Unknown(
                 BackendFailureReason.InfrastructureFailure);
         }
+    }
+
+    private sealed class ThrowingBackend : ISmtBackend {
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken) =>
+            throw new NotSupportedException(
+                "Injected unexpected backend failure.");
+    }
+
+    private sealed class SpuriousModelBackend : ISmtBackend {
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query, CancellationToken cancellationToken) {
+            cancellationToken.ThrowIfCancellationRequested();
+            var assignments = query.ModelVariables.Select(variable =>
+                KeyValuePair.Create(variable,
+                    query.Factory.GetVariableInfo(variable).Type == query.Factory.BooleanType
+                        ? query.Factory.CreateBooleanValue(false)
+                        : query.Factory.CreateIntegerValue(0)));
+            return Task.FromResult(BackendCheckResult.Satisfiable(
+                new BackendModel(assignments)));
+        }
+    }
+
+    private sealed class ConcurrentLaneState(int expectedLanes) {
+        private readonly object _gate = new();
+        private readonly TaskCompletionSource _allActive =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _active;
+        internal int Created { get; private set; }
+        internal int Disposed { get; private set; }
+        internal int MaximumActive { get; private set; }
+        internal void CreatedBackend() { lock (_gate) Created++; }
+        internal void DisposedBackend() { lock (_gate) Disposed++; }
+        internal async Task<BackendCheckResult> CheckAsync(CancellationToken cancellationToken) {
+            lock (_gate) {
+                _active++;
+                MaximumActive = Math.Max(MaximumActive, _active);
+                if (_active == expectedLanes) _allActive.TrySetResult();
+            }
+            try {
+                await _allActive.Task.WaitAsync(cancellationToken);
+                return BackendCheckResult.Unsatisfiable([]);
+            }
+            finally { lock (_gate) _active--; }
+        }
+    }
+
+    private sealed class CoordinatedBackend : ISmtBackend, IDisposable {
+        private readonly ConcurrentLaneState _state;
+        internal CoordinatedBackend(ConcurrentLaneState state) {
+            _state = state; state.CreatedBackend();
+        }
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query, CancellationToken cancellationToken) =>
+            _state.CheckAsync(cancellationToken);
+        public void Dispose() => _state.DisposedBackend();
     }
 
     private sealed class UnavailableThenDelayingBackend : ISmtBackend {

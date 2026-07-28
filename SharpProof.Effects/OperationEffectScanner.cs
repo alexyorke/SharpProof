@@ -1,13 +1,9 @@
 namespace SharpProof.Effects;
 
-internal sealed class EffectCallSite(
-    IMethodSymbol target,
-    EffectRegionSet receiver,
-    ImmutableArray<EffectRegionSet> arguments) {
-    internal IMethodSymbol Target { get; } = target;
-    internal EffectRegionSet Receiver { get; } = receiver;
-    internal ImmutableArray<EffectRegionSet> Arguments { get; } = arguments;
-}
+internal readonly record struct EffectCallSite(
+    IMethodSymbol Target,
+    EffectRegionSet Receiver,
+    ImmutableArray<EffectRegionSet> Arguments);
 
 internal sealed class OperationEffectScanner {
     private readonly List<EffectCallSite> _calls;
@@ -146,20 +142,31 @@ internal sealed class OperationEffectScanner {
     }
 
     private EffectSummary ScanProperty(
-        IPropertyReferenceOperation property, EffectAccess access) {
-        if (access == EffectAccess.Write)
-            return EffectSummaryOperations.Unsupported();
-        var getter = property.Property.GetMethod;
-        return getter == null
-            ? EffectSummaryOperations.Join(
-                ScanCallChildren(property.Instance, property.Arguments),
-                EffectSummaryOperations.Unsupported())
-            : ScanCall(
-                getter,
-                property.Instance,
-                property.Arguments,
-                ClassifyArguments(property.Arguments, getter.Parameters.Length),
-                IsDispatchUncertain(getter));
+        IPropertyReferenceOperation property,
+        EffectAccess access,
+        IOperation? assignedValue = null) {
+        var accessor = access == EffectAccess.Read
+            ? property.Property.GetMethod
+            : property.Property.SetMethod;
+        if (accessor == null)
+            return access == EffectAccess.Write
+                ? EffectSummaryOperations.Unsupported()
+                : EffectSummaryOperations.Join(
+                    ScanCallChildren(property.Instance, property.Arguments),
+                    EffectSummaryOperations.Unsupported());
+        var arguments = ClassifyArguments(
+            property.Arguments,
+            accessor.Parameters.Length);
+        if (assignedValue != null)
+            arguments = arguments.SetItem(
+                accessor.Parameters.Length - 1,
+                ClassifyRegion(assignedValue));
+        return ScanCall(
+            accessor,
+            property.Instance,
+            property.Arguments,
+            arguments,
+            IsDispatchUncertain(accessor));
     }
 
     private EffectSummary ScanArrayElement(
@@ -190,7 +197,8 @@ internal sealed class OperationEffectScanner {
             IFieldReferenceOperation field => ScanField(field, EffectAccess.Write),
             IArrayElementReferenceOperation element =>
                 ScanArrayElement(element, EffectAccess.Write),
-            IPropertyReferenceOperation property => ScanPropertySetter(property, value),
+            IPropertyReferenceOperation property =>
+                ScanProperty(property, EffectAccess.Write, value),
             IParameterReferenceOperation parameter
                 when parameter.Parameter.RefKind is RefKind.Ref or RefKind.Out =>
                 EffectSummaryOperations.Write(ClassifyParameter(parameter.Parameter)),
@@ -201,26 +209,6 @@ internal sealed class OperationEffectScanner {
                 Scan(target),
                 EffectSummaryOperations.Unsupported())
         };
-
-    private EffectSummary ScanPropertySetter(
-        IPropertyReferenceOperation property, IOperation value) {
-        var setter = property.Property.SetMethod;
-        if (setter == null) return EffectSummaryOperations.Unsupported();
-        var receiver = ClassifyRegion(property.Instance);
-        var arguments = ClassifyArguments(
-            property.Arguments,
-            setter.Parameters.Length);
-        arguments = arguments.SetItem(
-            setter.Parameters.Length - 1,
-            ClassifyRegion(value));
-        return ScanCall(
-            setter,
-            property.Instance,
-            property.Arguments,
-            arguments,
-            IsDispatchUncertain(setter),
-            receiver);
-    }
 
     private EffectSummary ScanCompoundAssignment(ICompoundAssignmentOperation assignment) {
         var operatorCall = ScanOperatorCall(
@@ -386,7 +374,7 @@ internal sealed class OperationEffectScanner {
         if (conversion.IsNullable)
             return ClassifyNullableAndCheckedConversion(operation);
         if (conversion.IsNumeric || conversion.IsEnumeration)
-            return CheckedConversionException(operation);
+            return CheckedOverflow(operation.IsChecked);
         if (conversion.IsInterpolatedString)
             return EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
         if (conversion.IsAnonymousFunction || conversion.IsMethodGroup)
@@ -409,7 +397,7 @@ internal sealed class OperationEffectScanner {
 
     private EffectSummary ClassifyNullableAndCheckedConversion(
         IConversionOperation operation) {
-        var result = CheckedConversionException(operation);
+        var result = CheckedOverflow(operation.IsChecked);
         if (IsNullableType(operation.Operand.Type) &&
             !IsNullableType(operation.Type))
             result = EffectSummaryOperations.Join(
@@ -417,10 +405,6 @@ internal sealed class OperationEffectScanner {
                 Throw(FrameworkTypeMetadataNames.InvalidOperationException));
         return result;
     }
-
-    private EffectSummary CheckedConversionException(
-        IConversionOperation operation) =>
-        CheckedOverflow(operation.IsChecked);
 
     private EffectSummary CheckedOverflow(bool isChecked) =>
         isChecked
@@ -605,7 +589,7 @@ internal sealed class OperationEffectScanner {
                         continue;
                 }
                 if (value == null) continue;
-                var discovered = ClassifyAliasSource(value);
+                var discovered = ClassifyRegion(value, aliasSource: true);
                 var previous = _localRegions.TryGetValue(target, out var existing)
                     ? existing
                     : EffectRegionSet.Empty;
@@ -616,9 +600,6 @@ internal sealed class OperationEffectScanner {
             }
         }
     }
-
-    private EffectRegionSet ClassifyAliasSource(IOperation operation) =>
-        ClassifyRegion(operation, aliasSource: true);
 
     private static bool IsInsideNestedCallable(
         IOperation operation, IOperation root) {
@@ -631,20 +612,15 @@ internal sealed class OperationEffectScanner {
         return false;
     }
 
-    private static EffectRegionSet[] CreateUnknownArguments(int count) {
-        var result = new EffectRegionSet[count];
-        for (var index = 0; index < result.Length; index++)
-            result[index] = EffectRegionSet.Unknown;
-        return result;
-    }
-
     private ImmutableArray<EffectRegionSet> ClassifyArguments(
         IEnumerable<IArgumentOperation> arguments, int parameterCount) {
         var result = new EffectRegionSet[parameterCount];
         foreach (var argument in arguments) {
             var ordinal = argument.Parameter?.Ordinal ?? -1;
             if (ordinal < 0 || ordinal >= result.Length)
-                return [.. CreateUnknownArguments(parameterCount)];
+                return [.. Enumerable.Repeat(
+                    EffectRegionSet.Unknown,
+                    parameterCount)];
             result[ordinal] = result[ordinal].Union(
                 ClassifyRegion(argument.Value));
         }
@@ -672,23 +648,35 @@ internal sealed class OperationEffectScanner {
             OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
         };
 
-    private static bool IsIntegral(ITypeSymbol? type) => type?.SpecialType is
-        SpecialType.System_SByte or
-        SpecialType.System_Byte or
-        SpecialType.System_Int16 or
-        SpecialType.System_UInt16 or
-        SpecialType.System_Int32 or
-        SpecialType.System_UInt32 or
-        SpecialType.System_Int64 or
-        SpecialType.System_UInt64 or
-        SpecialType.System_Char;
+    private static bool IsIntegral(ITypeSymbol? type) =>
+        UnwrapNullable(type)?.SpecialType is
+            SpecialType.System_SByte or
+            SpecialType.System_Byte or
+            SpecialType.System_Int16 or
+            SpecialType.System_UInt16 or
+            SpecialType.System_Int32 or
+            SpecialType.System_UInt32 or
+            SpecialType.System_Int64 or
+            SpecialType.System_UInt64 or
+            SpecialType.System_IntPtr or
+            SpecialType.System_UIntPtr or
+            SpecialType.System_Char;
 
     private static bool IsSignedIntegral(ITypeSymbol? type) =>
-        type?.SpecialType is
+        UnwrapNullable(type)?.SpecialType is
             SpecialType.System_SByte or
             SpecialType.System_Int16 or
             SpecialType.System_Int32 or
-            SpecialType.System_Int64;
+            SpecialType.System_Int64 or
+            SpecialType.System_IntPtr;
+
+    private static ITypeSymbol? UnwrapNullable(ITypeSymbol? type) =>
+        type is INamedTypeSymbol {
+            OriginalDefinition.SpecialType: SpecialType.System_Nullable_T,
+            TypeArguments.Length: 1
+        } nullable
+            ? nullable.TypeArguments[0]
+            : type;
 
     private static bool IsEffectNeutralContainer(IOperation operation) => operation is
         IBlockOperation or

@@ -6,7 +6,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />
+    <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\SharpProof.Specs\Polyfills\IsExternalInit.cs"

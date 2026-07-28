@@ -25,34 +25,30 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         CancellationToken cancellationToken) {
         if (query == null) throw new ArgumentNullException(nameof(query));
         cancellationToken.ThrowIfCancellationRequested();
-        lock (_gate) {
-            if (_disposed) return Task.FromResult(
-                BackendCheckResult.Unknown(BackendFailureReason.Unavailable));
-            using var registration = cancellationToken.Register(
-                static state => ((Context)state!).Interrupt(),
-                _context);
-            try {
-                var result = CheckCore(query, cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-                return Task.FromResult(result);
+        return Task.Run(() => {
+            lock (_gate) {
+                if (_disposed) return BackendCheckResult.Unknown(BackendFailureReason.Unavailable);
+                using var registration = cancellationToken.Register(
+                    static state => ((Context)state!).Interrupt(),
+                    _context);
+                try {
+                    var result = CheckCore(query, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return result;
+                }
+                catch (UnsupportedIrEncodingException) {
+                    return BackendCheckResult.Unknown(BackendFailureReason.UnsupportedEncoding);
+                }
+                catch (Exception exception) when (exception is
+                    Z3Exception or
+                    InvalidOperationException or
+                    ArgumentException or
+                    ArithmeticException) {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return BackendCheckResult.Unknown(BackendFailureReason.InfrastructureFailure);
+                }
             }
-            catch (OperationCanceledException) {
-                throw;
-            }
-            catch (UnsupportedIrEncodingException) {
-                return Task.FromResult(
-                    BackendCheckResult.Unknown(BackendFailureReason.UnsupportedEncoding));
-            }
-            catch (Exception exception) when (exception is
-                Z3Exception or
-                InvalidOperationException or
-                ArgumentException or
-                ArithmeticException) {
-                cancellationToken.ThrowIfCancellationRequested();
-                return Task.FromResult(
-                    BackendCheckResult.Unknown(BackendFailureReason.InfrastructureFailure));
-            }
-        }
+        }, cancellationToken);
     }
 
     public void Dispose() {
@@ -186,10 +182,6 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 value = factory.CreateIntegerValue(number);
                 return true;
             }
-        }
-        else if (type == factory.StringType && expression.IsString) {
-            value = factory.CreateStringValue(expression.String);
-            return true;
         }
         value = null;
         return false;

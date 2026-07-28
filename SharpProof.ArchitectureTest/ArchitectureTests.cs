@@ -347,6 +347,7 @@ public sealed class ArchitectureTests {
                 "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
                 "SharpProof.Contracts/ContractBinder.cs",
                 "SharpProof.Contracts/ContractExpressionBinder.cs",
+                "SharpProof.Contracts/ContractIntrinsicValidator.cs",
                 "SharpProof.Frontend/RoslynOperationLowerer.cs",
                 "SharpProof.Frontend/RoslynProgramLowerer.cs"
             ],
@@ -371,7 +372,6 @@ public sealed class ArchitectureTests {
                 "SharpProof.Worker.Protocol/ProtocolJson.cs",
                 "SharpProof.Worker.Protocol/WorkerResultAssembler.cs",
                 "SharpProof.Worker/WorkerInputSnapshot.cs",
-                "SharpProof.Worker/CacheableWorkerResponse.cs",
                 "SharpProof.Worker/VerificationCache.cs"
             ]
         };

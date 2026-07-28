@@ -1,7 +1,8 @@
 namespace SharpProof.Worker;
-#pragma warning disable IDE0055 // Compact verification kernel preserves the fixed production-size ceiling.
 
 internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressionDepth) {
+    private const int MaximumBodyPaths = 64;
+    private const int MaximumExecutionStates = 4096;
     private readonly ProofKernel _kernel = new(backend ?? throw new ArgumentNullException(nameof(backend)));
     private readonly int _maximumExpressionDepth = maximumExpressionDepth > 0 ? maximumExpressionDepth
         : throw new ArgumentOutOfRangeException(nameof(maximumExpressionDepth));
@@ -17,16 +18,17 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 target.Entry.ClaimIds, StringComparer.Ordinal))
             return CallableClaimResultAssembler.Unknowns(target, WorkerClaimReason.UnsupportedContract);
         if (ensures.IsDefaultOrEmpty) return [];
-        var body = target.Body switch {
-            { Kind: CompilerPreparedBodyKind.Trivial } => BodyLoweringResult.Trivial(factory),
+        var paths = target.Body switch {
+            { Kind: CompilerPreparedBodyKind.Trivial } => TrivialBody(factory),
             { Kind: CompilerPreparedBodyKind.Program, Program: not null } prepared when HasBoundSpecCalls(prepared) =>
                 ExecuteAcyclicBody(target.Variables, factory, prepared.Program,
                     prepared.SpecCalls, prepared.ParameterBindings.ToImmutableDictionary(
                         static item => item.Key, item => (IrTerm)factory.Variable(item.Value)),
-                    prepared.ParameterBindings, 64, 4096),
-            _ => BodyLoweringResult.Fail(WorkerClaimReason.UnsupportedBody)
+                    prepared.ParameterBindings),
+            _ => default
         };
-        if (!body.IsSuccess) return CallableClaimResultAssembler.Unknowns(target, body.Reason);
+        if (paths.IsDefault)
+            return CallableClaimResultAssembler.Unknowns(target, WorkerClaimReason.UnsupportedBody);
 
         var assumptions = ImmutableArray.CreateBuilder<Assumption>();
         var assumptionLabels = new Dictionary<ProofJustification, string>(ReferenceEqualityComparer.Instance);
@@ -34,7 +36,8 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
         var assumptionOrdinal = 0;
         foreach (var clause in target.Clauses) {
             if (clause.Kind == CompilerContractKind.Ensures) continue;
-            var predicate = ApplyEntrySubstitutions(factory, clause.Condition, target.Variables);
+            var predicate = ApplyBodySubstitutions(factory, clause.Condition, target.Variables,
+                null, ImmutableDictionary<IrVarId, IrTerm>.Empty, allowMissingResult: true);
             if (predicate == null || GetDepth(predicate) > _maximumExpressionDepth)
                 return CallableClaimResultAssembler.Unknowns(target, WorkerClaimReason.UnsupportedExpression);
             ProofJustification justification = clause.Kind == CompilerContractKind.Assume
@@ -47,7 +50,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 assumptionOrdinal.ToString(CultureInfo.InvariantCulture));
             assumptionOrdinal++;
         }
-        foreach (var path in body.Paths) {
+        foreach (var path in paths) {
             foreach (var specAssumption in path.SpecAssumptions) {
                 var pathCondition = SpecResultDomainProjection.Rewrite(factory, path.Condition, path.SpecResultProjections);
                 var specPredicate = SpecResultDomainProjection.Rewrite(factory, specAssumption.Predicate, path.SpecResultProjections);
@@ -59,9 +62,9 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 assumptionLabels.Add(justification, "spec:" + specAssumption.WitnessIdentifier);
             }
         }
-        if (!TryAddSourceDomainAssumptions(factory, target.Variables, body.Paths, assumptions, assumptionLabels))
+        if (!TryAddSourceDomainAssumptions(factory, target.Variables, paths, assumptions, assumptionLabels))
             return CallableClaimResultAssembler.Unknowns(target, WorkerClaimReason.UnsupportedExpression);
-        AddNormalCompletionAssumption(factory, body.Paths, assumptions, assumptionLabels);
+        AddNormalCompletionAssumption(factory, paths, assumptions, assumptionLabels);
         if (assumptions.Any(assumption =>
                 GetDepth(assumption.Predicate) > _maximumExpressionDepth))
             return CallableClaimResultAssembler.Unknowns(target, WorkerClaimReason.UnsupportedExpression);
@@ -75,9 +78,9 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
         var records = ImmutableArray.CreateBuilder<WorkerClaimResult>(ensures.Length);
         for (var index = 0; index < ensures.Length; index++) {
             cancellationToken.ThrowIfCancellationRequested();
-            var pathObligations = ImmutableArray.CreateBuilder<IrTerm>(body.Paths.Length);
+            var pathObligations = ImmutableArray.CreateBuilder<IrTerm>(paths.Length);
             var missingReturnValue = false;
-            foreach (var path in body.Paths) {
+            foreach (var path in paths) {
                 var pathCondition = ApplyBodySubstitutions(factory, ensures[index].Condition,
                     target.Variables, path.ReturnTerm, path.CurrentStates);
                 if (pathCondition == null) { missingReturnValue = true; break; }
@@ -99,7 +102,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 continue;
             }
             if (!resourceBudget.TryStartQuery()) {
-                CallableClaimResultAssembler.AppendResourceLimit(records, target, index, ensures.Length);
+                records.AddRange(CallableClaimResultAssembler.Unknowns(target, WorkerClaimReason.ResourceLimit).Skip(index));
                 break;
             }
             var query = new VerificationQuery(factory, assumptions,
@@ -107,12 +110,13 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 replayVariables);
             var outcome = await _kernel.VerifyAsync(query, cancellationToken).ConfigureAwait(false);
             if (resourceBudget.IsExceeded) {
-                CallableClaimResultAssembler.AppendResourceLimit(records, target, index, ensures.Length);
+                records.AddRange(CallableClaimResultAssembler.Unknowns(target, WorkerClaimReason.ResourceLimit).Skip(index));
                 break;
             }
-            var replayed = outcome is not RefutedOutcome refuted ||
-                CallableCounterexampleReplayer.TryReplay(
-                    target, index, refuted.Model.Assignments, cancellationToken);
+            var replayed = outcome is RefutedOutcome refuted
+                ? CallableCounterexampleReplayer.Replay(
+                    target, index, refuted.Model.Assignments, cancellationToken)
+                : WorkerClaimReason.None;
             cancellationToken.ThrowIfCancellationRequested();
             records.Add(CallableClaimResultAssembler.FromOutcome(target, index, outcome, target.Variables,
                 assumptionLabels, userAssumptionIds, replayed));
@@ -183,8 +187,10 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
     }
 
     private static int GetDomainRoleOrder(CompilerVariableRole role) => role switch {
-        CompilerVariableRole.Receiver => 0, CompilerVariableRole.Parameter => 1,
-        CompilerVariableRole.Result => 2, _ => 3
+        CompilerVariableRole.Receiver => 0,
+        CompilerVariableRole.Parameter => 1,
+        CompilerVariableRole.Result => 2,
+        _ => 3
     };
 
     private static string CreateDomainLabel(CompilerCanonicalVariable variable) => variable.Role switch {
@@ -211,20 +217,19 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
         return true;
     }
 
-    private BodyLoweringResult ExecuteAcyclicBody(ImmutableArray<CompilerCanonicalVariable> variables,
+    private ImmutableArray<BodyPath> ExecuteAcyclicBody(ImmutableArray<CompilerCanonicalVariable> variables,
         IrFactory factory, IrProgram program,
         ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> specCalls,
         ImmutableDictionary<IrVarId, IrTerm> initialEnvironment,
-        ImmutableDictionary<IrVarId, IrVarId> parameterBindings,
-        int maximumBodyPaths, int maximumExecutionStates) {
+        ImmutableDictionary<IrVarId, IrVarId> parameterBindings) {
         var pending = new Stack<SymbolicExecutionState>();
         pending.Push(new SymbolicExecutionState(program.Entry, initialEnvironment, factory.Boolean(true),
             ImmutableDictionary<IrVarId, SpecResultProjection>.Empty, []));
         var paths = ImmutableArray.CreateBuilder<BodyPath>();
         var executionStates = 0;
         while (pending.Count != 0) {
-            if (++executionStates > maximumExecutionStates)
-                return BodyLoweringResult.Fail(WorkerClaimReason.UnsupportedBody);
+            if (++executionStates > MaximumExecutionStates)
+                return default;
             var state = pending.Pop(); var block = program.GetBlock(state.Block);
             var environment = state.Environment;
             var specResultProjections = state.SpecResultProjections;
@@ -238,22 +243,22 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                         havoc.Operation == expectedOperation && havoc.HavocKind == IrHavocKind.Memory &&
                         havoc.Variables.IsEmpty)
                         continue;
-                    return BodyLoweringResult.Fail(WorkerClaimReason.UnsupportedBody);
+                    return default;
                 }
                 switch (instruction) {
                     case IrAssignInstruction assign:
                         if (!TrySubstitute(factory, assign.Value, environment, out var assigned) ||
                             GetDepth(assigned) > _maximumExpressionDepth)
-                            return BodyLoweringResult.Fail(WorkerClaimReason.UnsupportedBody);
+                            return default;
                         environment = environment.SetItem(assign.Target, assigned);
                         break;
                     case IrCallInstruction call:
                         if (!specCalls.TryGetValue(call.Id, out var specCall) ||
                             !TryApplySpecCall(factory, call, specCall, environment, out var resultTerm,
                                 out var addedAssumptions, out var resultProjection, out var consumesMemoryHavoc))
-                            return BodyLoweringResult.Fail(WorkerClaimReason.UnsupportedBody);
+                            return default;
                         environment = environment.SetItem(call.Target!.Value, resultTerm);
-                        if (resultProjection.HasFacts)
+                        if (resultProjection != default)
                             specResultProjections = specResultProjections.SetItem(call.Target.Value, resultProjection);
                         specAssumptions = specAssumptions.AddRange(addedAssumptions);
                         expectedMemoryHavoc = consumesMemoryHavoc ? call.Operation : null;
@@ -262,7 +267,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                         if (!TrySubstitute(factory, branch.Condition, environment, out var condition) ||
                             condition.Type != factory.BooleanType ||
                             GetDepth(condition) > _maximumExpressionDepth)
-                            return BodyLoweringResult.Fail(WorkerClaimReason.UnsupportedBody);
+                            return default;
                         if (condition is IrBooleanTerm literal) {
                             pending.Push(new SymbolicExecutionState(literal.Value ? branch.WhenTrue : branch.WhenFalse,
                                 environment, state.PathCondition, specResultProjections, specAssumptions));
@@ -272,7 +277,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                             var whenFalse = factory.Binary(IrBinaryOperator.AndAlso, state.PathCondition,
                                 factory.Unary(IrUnaryOperator.Not, condition));
                             if (GetDepth(whenTrue) > _maximumExpressionDepth || GetDepth(whenFalse) > _maximumExpressionDepth)
-                                return BodyLoweringResult.Fail(WorkerClaimReason.UnsupportedBody);
+                                return default;
                             pending.Push(new SymbolicExecutionState(branch.WhenFalse, environment, whenFalse,
                                 specResultProjections, specAssumptions));
                             pending.Push(new SymbolicExecutionState(branch.WhenTrue, environment, whenTrue,
@@ -288,12 +293,12 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                     case IrReturnInstruction returned:
                         if (returned.Value == null || !TrySubstitute(factory, returned.Value, environment, out var returnTerm) ||
                             GetDepth(returnTerm) > _maximumExpressionDepth)
-                            return BodyLoweringResult.Fail(WorkerClaimReason.UnsupportedBody);
+                            return default;
                         paths.Add(new BodyPath(state.PathCondition, returnTerm,
                             CreateCurrentStates(variables, factory, environment, parameterBindings),
                             specResultProjections, specAssumptions));
-                        if (paths.Count > maximumBodyPaths)
-                            return BodyLoweringResult.Fail(WorkerClaimReason.UnsupportedBody);
+                        if (paths.Count > MaximumBodyPaths)
+                            return default;
                         transferred = true;
                         break;
                     case IrLoadInstruction:
@@ -302,15 +307,13 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                     case IrAssumeInstruction:
                     case IrAssertInstruction:
                     default:
-                        return BodyLoweringResult.Fail(WorkerClaimReason.UnsupportedBody);
+                        return default;
                 }
                 if (transferred) break;
             }
-            if (!transferred) return BodyLoweringResult.Fail(WorkerClaimReason.UnsupportedBody);
+            if (!transferred) return default;
         }
-        return paths.Count == 0
-            ? BodyLoweringResult.Fail(WorkerClaimReason.UnsupportedBody)
-            : BodyLoweringResult.Success(paths.ToImmutable());
+        return paths.Count == 0 ? default : paths.ToImmutable();
     }
 
     private bool TryApplySpecCall(IrFactory factory, IrCallInstruction call, CompilerPreparedSpecCall specCall,
@@ -349,7 +352,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
         if (instantiated.Status != SpecInstantiationStatus.Succeeded) {
             resultTerm = null; projection = default; return false;
         }
-        var projectionMap = projection.HasFacts
+        var projectionMap = projection != default
             ? ImmutableDictionary<IrVarId, SpecResultProjection>.Empty.Add(call.Target.Value, projection)
             : ImmutableDictionary<IrVarId, SpecResultProjection>.Empty;
         var predicates = instantiated.Postconditions.Select(predicate =>
@@ -394,30 +397,23 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
     private static bool TrySubstitute(IrFactory factory, IrTerm term,
         IReadOnlyDictionary<IrVarId, IrTerm> environment,
         [NotNullWhen(true)] out IrTerm? substituted) {
-        foreach (var variable in IrTraversal.CollectVariables(term)) {
-            if (environment.ContainsKey(variable)) continue;
-            substituted = null; return false;
+        if (!IrTraversal.CollectVariables(term).All(environment.ContainsKey)) {
+            substituted = null;
+            return false;
         }
         try {
-            substituted = IrSubstitution.Substitute(factory, term, environment); return true;
+            substituted = IrSubstitution.Substitute(factory, term, environment);
+            return true;
         }
         catch (ArgumentException) {
-            substituted = null; return false;
+            substituted = null;
+            return false;
         }
     }
 
-    private static IrTerm? ApplyEntrySubstitutions(IrFactory factory, IrTerm term,
-        ImmutableArray<CompilerCanonicalVariable> variables) => ApplyBodySubstitutions(
-            factory, term, variables, null, ImmutableDictionary<IrVarId, IrTerm>.Empty, allowMissingResult: true);
-
     private static IrTerm? ApplyBodySubstitutions(IrFactory factory, IrTerm term,
         ImmutableArray<CompilerCanonicalVariable> variables, IrTerm? returnTerm,
-        IReadOnlyDictionary<IrVarId, IrTerm> currentStates) =>
-        ApplyBodySubstitutions(factory, term, variables, returnTerm, currentStates, allowMissingResult: false);
-
-    private static IrTerm? ApplyBodySubstitutions(IrFactory factory, IrTerm term,
-        ImmutableArray<CompilerCanonicalVariable> variables, IrTerm? returnTerm,
-        IReadOnlyDictionary<IrVarId, IrTerm> currentStates, bool allowMissingResult) {
+        IReadOnlyDictionary<IrVarId, IrTerm> currentStates, bool allowMissingResult = false) {
         var replacements = new Dictionary<IrVarId, IrTerm>();
         foreach (var variable in variables) {
             if (variable.Role == CompilerVariableRole.PreState &&
@@ -441,32 +437,14 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
         catch (ArgumentException) { return null; }
     }
 
-    private static IrTerm Guard(
-        IrFactory factory,
-        IrTerm condition,
-        IrTerm consequence) =>
-        factory.Binary(
-            IrBinaryOperator.OrElse,
-            factory.Unary(IrUnaryOperator.Not, condition),
-            consequence);
+    private static IrTerm Guard(IrFactory factory, IrTerm condition, IrTerm consequence) =>
+        factory.Binary(IrBinaryOperator.OrElse, factory.Unary(IrUnaryOperator.Not, condition), consequence);
 
-    private static IrTerm Conjoin(
-        IrFactory factory,
-        IReadOnlyList<IrTerm> terms) =>
-        Combine(
-            factory,
-            terms,
-            IrBinaryOperator.AndAlso,
-            identity: true);
+    private static IrTerm Conjoin(IrFactory factory, IReadOnlyList<IrTerm> terms) =>
+        Combine(factory, terms, IrBinaryOperator.AndAlso, identity: true);
 
-    private static IrTerm Disjoin(
-        IrFactory factory,
-        IReadOnlyList<IrTerm> terms) =>
-        Combine(
-            factory,
-            terms,
-            IrBinaryOperator.OrElse,
-            identity: false);
+    private static IrTerm Disjoin(IrFactory factory, IReadOnlyList<IrTerm> terms) =>
+        Combine(factory, terms, IrBinaryOperator.OrElse, identity: false);
 
     private static IrTerm Combine(
         IrFactory factory,
@@ -501,35 +479,19 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
         }
     }
 
-    private readonly record struct BodyLoweringResult(
-        ImmutableArray<BodyPath> Paths, WorkerClaimReason Reason) {
-        internal bool IsSuccess => Reason == WorkerClaimReason.None;
-        internal static BodyLoweringResult Trivial(IrFactory factory) => Success([new BodyPath(
-            factory.Boolean(true), null, ImmutableDictionary<IrVarId, IrTerm>.Empty,
-            ImmutableDictionary<IrVarId, SpecResultProjection>.Empty, [])]);
-        internal static BodyLoweringResult Success(ImmutableArray<BodyPath> paths) =>
-            new(paths, WorkerClaimReason.None);
-        internal static BodyLoweringResult Fail(WorkerClaimReason reason) => new([], reason);
-    }
+    private static ImmutableArray<BodyPath> TrivialBody(IrFactory factory) =>
+        [new BodyPath(factory.Boolean(true), null, ImmutableDictionary<IrVarId, IrTerm>.Empty,
+            ImmutableDictionary<IrVarId, SpecResultProjection>.Empty, [])];
 
-    private sealed record SymbolicExecutionState(
-        IrBlockId Block,
-        ImmutableDictionary<IrVarId, IrTerm> Environment,
-        IrTerm PathCondition,
-        ImmutableDictionary<IrVarId, SpecResultProjection>
-            SpecResultProjections,
+    private sealed record SymbolicExecutionState(IrBlockId Block,
+        ImmutableDictionary<IrVarId, IrTerm> Environment, IrTerm PathCondition,
+        ImmutableDictionary<IrVarId, SpecResultProjection> SpecResultProjections,
         ImmutableArray<BodySpecAssumption> SpecAssumptions);
 
-    private readonly record struct BodyPath(
-        IrTerm Condition,
-        IrTerm? ReturnTerm,
+    private readonly record struct BodyPath(IrTerm Condition, IrTerm? ReturnTerm,
         ImmutableDictionary<IrVarId, IrTerm> CurrentStates,
-        ImmutableDictionary<IrVarId, SpecResultProjection>
-            SpecResultProjections,
+        ImmutableDictionary<IrVarId, SpecResultProjection> SpecResultProjections,
         ImmutableArray<BodySpecAssumption> SpecAssumptions);
 
-    private readonly record struct BodySpecAssumption(
-        SpecId Spec,
-        string WitnessIdentifier,
-        IrTerm Predicate);
+    private readonly record struct BodySpecAssumption(SpecId Spec, string WitnessIdentifier, IrTerm Predicate);
 }

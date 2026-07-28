@@ -30,6 +30,17 @@ public sealed class SharpProofSoundnessAnalyzerTests {
         "SPMETA001")]
     [TestCase(
         """
+        using Microsoft.CodeAnalysis;
+        namespace SharpProof.Frontend;
+        static class C {
+            static void M(SemanticModel model) {
+                _ = model.GetDiagnostics();
+            }
+        }
+        """,
+        "SPMETA001")]
+    [TestCase(
+        """
         namespace SharpProof.Analyzer;
         static class C { private static int state; }
         """,

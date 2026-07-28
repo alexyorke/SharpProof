@@ -9,10 +9,11 @@ public sealed class ContractBinder(
     private readonly IrFactory _factory =
         factory ?? throw new ArgumentNullException(nameof(factory));
     private readonly ContractApiSymbols? _api =
-        ContractApiSymbols.TryCreate(
-            compilation ?? throw new ArgumentNullException(nameof(compilation)));
+        ContractApiSymbols.TryCreate(compilation);
+    private readonly ContractIntrinsicValidator _intrinsics =
+        new(compilation);
     private readonly RoslynOperationLowerer _types =
-        new(factory ?? throw new ArgumentNullException(nameof(factory)));
+        new(factory);
     private readonly ContractClauseInventoryBuilder _clauseInventory =
         clauseInventory ?? new(compilation);
     private readonly ConcurrentDictionary<IMethodSymbol, ContractBindingResult>
@@ -43,7 +44,7 @@ public sealed class ContractBinder(
     }
 
     public ContractClauseInventory GetClauseInventory(IMethodSymbol target) =>
-        _clauseInventory.Create(NormalizePartialMethod(
+        _clauseInventory.Create(ContractClauseInventoryBuilder.NormalizeCallable(
             target ?? throw new ArgumentNullException(nameof(target))));
 
     private ContractBindingResult BindUncached(IMethodSymbol target) =>
@@ -56,7 +57,6 @@ public sealed class ContractBinder(
         IMethodSymbol target,
         IOperation? implementationBody,
         bool requiresOnly) {
-        if (target == null) throw new ArgumentNullException(nameof(target));
         if (_api == null)
             return ContractBindingResult.Fail(
                 ContractBindingFailure.ContractApiUnavailable);
@@ -65,7 +65,7 @@ public sealed class ContractBinder(
             return ContractBindingResult.Fail(
                 ContractBindingFailure.UnsupportedTarget);
 
-        var source = NormalizePartialMethod(target);
+        var source = ContractClauseInventoryBuilder.NormalizeCallable(target);
         var usesCompanion = false;
         var inventory = _clauseInventory.Create(source, implementationBody);
         var sourceBody = inventory.ImplementationBody;
@@ -73,7 +73,14 @@ public sealed class ContractBinder(
             return ContractBindingResult.Fail(
                 ContractBindingFailure.InvalidClausePlacement);
 
-        if (!inventory.Clauses.Any(static clause => clause.IsValid)) {
+        if (!inventory.Clauses.Any(static clause => clause.IsValid) &&
+            target.MethodKind == MethodKind.Ordinary) {
+            var directFailure = ValidateIntrinsics(
+                source,
+                sourceBody,
+                requiresOnly);
+            if (directFailure != ContractBindingFailure.None)
+                return ContractBindingResult.Fail(directFailure);
             var companion = ResolveCompanion(target);
             if (companion.Failure != ContractBindingFailure.None)
                 return ContractBindingResult.Fail(companion.Failure);
@@ -98,8 +105,6 @@ public sealed class ContractBinder(
             CreateTypeSpecializer(source));
         var invocationResult = BindInvocations(
             expressionBinder,
-            source,
-            sourceBody,
             inventory,
             usesCompanion,
             requiresOnly);
@@ -110,7 +115,6 @@ public sealed class ContractBinder(
             target,
             includeResult: !requiresOnly);
         var substitutions = CreateCanonicalSubstitutions(
-            target,
             source,
             usesCompanion,
             expressionBinder,
@@ -156,57 +160,36 @@ public sealed class ContractBinder(
                 usesCompanion));
     }
 
-    private InvocationBindingResult BindInvocations(
+    private ClauseBindingResult BindInvocations(
         ContractExpressionBinder expressionBinder,
-        IMethodSymbol source,
-        IOperation? body,
         ContractClauseInventory inventory,
         bool usesCompanion,
         bool requiresOnly) {
-        if (body == null) return InvocationBindingResult.Empty;
-        var invocations = body.DescendantsAndSelf()
-            .OfType<IInvocationOperation>()
-            .Where(invocation => IsOwnedBy(invocation, source))
-            .OrderBy(static invocation => invocation.Syntax.SpanStart)
-            .ToImmutableArray();
-
-        foreach (var invocation in invocations) {
-            if (!_api!.IsResult(invocation.TargetMethod) &&
-                !_api.IsOld(invocation.TargetMethod))
-                continue;
-            var enclosingClause = FindEnclosingClause(invocation);
-            if (requiresOnly &&
-                (enclosingClause == null ||
-                 _api.GetClauseKind(enclosingClause.TargetMethod) !=
-                 BoundContractKind.Requires))
-                continue;
-            if (enclosingClause == null ||
-                _api.GetClauseKind(enclosingClause.TargetMethod) !=
-                BoundContractKind.Ensures)
-                return new InvocationBindingResult(
-                    [],
-                    _api.IsResult(invocation.TargetMethod)
-                        ? ContractBindingFailure.ResultOutsideEnsures
-                        : ContractBindingFailure.OldOutsideEnsures);
-        }
-
+        var body = inventory.ImplementationBody;
+        if (body == null) return ClauseBindingResult.Empty;
+        var failure = ValidateIntrinsics(
+            inventory.Callable,
+            body,
+            requiresOnly);
+        if (failure != ContractBindingFailure.None)
+            return new ClauseBindingResult([], failure);
         var clauses = ImmutableArray.CreateBuilder<BoundContractClause>();
         foreach (var occurrence in inventory.Clauses) {
+            if (!occurrence.IsValid) continue;
             if (requiresOnly &&
                 occurrence.Kind != BoundContractKind.Requires)
                 continue;
             var invocation = occurrence.Invocation;
             if (invocation.Arguments.Length != 1)
-                return new InvocationBindingResult(
+                return new ClauseBindingResult(
                     [],
                     ContractBindingFailure.InvalidIntrinsicSignature);
             var expression = expressionBinder.Bind(
-                invocation.Arguments[0].Value,
-                occurrence.Kind);
+                invocation.Arguments[0].Value);
             if (!expression.IsSuccess)
-                return new InvocationBindingResult([], expression.Failure);
+                return new ClauseBindingResult([], expression.Failure);
             if (expression.Term!.Type != _factory.BooleanType)
-                return new InvocationBindingResult(
+                return new ClauseBindingResult(
                     [],
                     ContractBindingFailure.NonBooleanCondition);
             clauses.Add(new BoundContractClause(
@@ -220,32 +203,21 @@ public sealed class ContractBinder(
                     ? BoundContractEvidence.Companion
                     : BoundContractEvidence.CompilerBoundInvocation));
         }
-        return new InvocationBindingResult(
+        return new ClauseBindingResult(
             clauses.ToImmutable(),
             ContractBindingFailure.None);
     }
 
-    private IInvocationOperation? FindEnclosingClause(IOperation operation) {
-        for (var parent = operation.Parent; parent != null; parent = parent.Parent) {
-            if (parent is IInvocationOperation invocation &&
-                _api!.GetClauseKind(invocation.TargetMethod).HasValue)
-                return invocation;
-        }
-        return null;
+    private ContractBindingFailure ValidateIntrinsics(
+        IMethodSymbol source,
+        IOperation? body,
+        bool requiresOnly) {
+        foreach (var violation in _intrinsics.Validate(source, body))
+            if (!requiresOnly ||
+                violation.EnclosingClauseKind == BoundContractKind.Requires)
+                return violation.Failure;
+        return ContractBindingFailure.None;
     }
-
-    private static bool IsOwnedBy(IOperation operation, IMethodSymbol method) {
-        var enclosing = operation.SemanticModel?.GetEnclosingSymbol(
-            operation.Syntax.SpanStart);
-        return enclosing is IMethodSymbol enclosingMethod &&
-               SymbolEqualityComparer.Default.Equals(
-                   enclosingMethod.OriginalDefinition,
-                   method.OriginalDefinition);
-    }
-
-    private static IMethodSymbol NormalizePartialMethod(
-        IMethodSymbol method) =>
-        method.PartialImplementationPart ?? method;
 
     private CompanionResolution ResolveCompanion(IMethodSymbol target) {
         var companions = _companionBindings.GetOrAdd(
@@ -266,12 +238,8 @@ public sealed class ContractBinder(
         var signatureTarget = companion.Target.IsOpen
             ? target.OriginalDefinition
             : target.ConstructedFrom;
-        var methods = companion.Type.GetMembers()
-            .OfType<IMethodSymbol>()
-            .Where(static method =>
-                method.MethodKind == MethodKind.Ordinary &&
-                !method.IsImplicitlyDeclared)
-            .ToImmutableArray();
+        var methods = ContractForSymbolMatcher.GetOrdinaryMethods(
+            companion.Type);
         var named = methods
             .Where(candidate => string.Equals(
                 candidate.Name,
@@ -322,7 +290,7 @@ public sealed class ContractBinder(
             if (method.Arity != 0)
                 method = method.Construct([.. target.TypeArguments]);
             return CompanionResolution.Success(
-                NormalizePartialMethod(method));
+                ContractClauseInventoryBuilder.NormalizeCallable(method));
         }
         catch (ArgumentException) {
             return CompanionResolution.Fail(
@@ -335,16 +303,8 @@ public sealed class ContractBinder(
         ITypeSymbol? Specialize(ITypeSymbol? type) {
             if (type == null) return null;
             if (type is ITypeParameterSymbol parameter) {
-                var parameterArguments = SymbolEqualityComparer.Default.Equals(
-                        parameter.ContainingSymbol, source.OriginalDefinition)
-                    ? source.TypeArguments
-                    : SymbolEqualityComparer.Default.Equals(
-                        parameter.ContainingSymbol,
-                        source.ContainingType.OriginalDefinition)
-                        ? source.ContainingType.TypeArguments
-                        : default;
-                if (parameterArguments.IsDefault) return type;
-                var replacement = parameterArguments[parameter.Ordinal];
+                var replacement = FindTypeArgument(parameter);
+                if (replacement == null) return type;
                 return type.NullableAnnotation == NullableAnnotation.Annotated
                     ? replacement.WithNullableAnnotation(NullableAnnotation.Annotated)
                     : replacement;
@@ -364,14 +324,48 @@ public sealed class ContractBinder(
                 if (specialized == null) return null;
                 arguments.Add(specialized);
             }
-            var changed = !arguments.SequenceEqual(named.TypeArguments, SymbolEqualityComparer.IncludeNullability);
+            var containing = Specialize(named.ContainingType)
+                as INamedTypeSymbol;
+            if (named.ContainingType != null && containing == null)
+                return null;
+            var changed = !arguments.SequenceEqual(
+                named.TypeArguments,
+                SymbolEqualityComparer.IncludeNullability) ||
+                !SymbolEqualityComparer.IncludeNullability.Equals(
+                    named.ContainingType,
+                    containing);
             if (!changed) return named;
             if (named.IsTupleType) return null;
             try {
-                return named.OriginalDefinition.Construct([.. arguments])
+                var definition = containing == null
+                    ? named.OriginalDefinition
+                    : containing.GetTypeMembers(
+                        named.Name,
+                        named.Arity).SingleOrDefault();
+                if (definition == null) return null;
+                return (definition.Arity == 0
+                        ? definition
+                        : definition.Construct([.. arguments]))
                     .WithNullableAnnotation(named.NullableAnnotation);
             }
             catch (ArgumentException) { return null; }
+        }
+
+        ITypeSymbol? FindTypeArgument(ITypeParameterSymbol parameter) {
+            if (parameter.TypeParameterKind == TypeParameterKind.Method)
+                return SymbolEqualityComparer.Default.Equals(
+                    parameter.ContainingSymbol,
+                    source.OriginalDefinition)
+                    ? source.TypeArguments[parameter.Ordinal]
+                    : null;
+            for (var type = source.ContainingType;
+                 type != null;
+                 type = type.ContainingType)
+                if (SymbolEqualityComparer.Default.Equals(
+                        parameter.ContainingType!.OriginalDefinition,
+                        type.OriginalDefinition))
+                    return type.TypeArguments[parameter.Ordinal];
+            return null;
         }
     }
 
@@ -379,8 +373,7 @@ public sealed class ContractBinder(
         INamedTypeSymbol targetType) =>
         [.. GetAllTypes(_compilation.Assembly.GlobalNamespace)
             .Select(type => TryGetCompanion(type, targetType))
-            .Where(static companion => companion.HasValue)
-            .Select(static companion => companion!.Value)];
+            .OfType<CompanionCandidate>()];
 
     private CompanionCandidate? TryGetCompanion(
         INamedTypeSymbol candidate,
@@ -402,11 +395,7 @@ public sealed class ContractBinder(
     private static bool HasUniqueTarget(
         IMethodSymbol target,
         IMethodSymbol companion) =>
-        target.ContainingType.GetMembers()
-            .OfType<IMethodSymbol>()
-            .Where(static method =>
-                method.MethodKind == MethodKind.Ordinary &&
-                !method.IsImplicitlyDeclared)
+        ContractForSymbolMatcher.GetOrdinaryMethods(target.ContainingType)
             .Count(candidate =>
                 ContractForSymbolMatcher.MemberSignaturesMatch(
                     candidate,
@@ -446,29 +435,25 @@ public sealed class ContractBinder(
     }
 
     private Dictionary<IrVarId, IrTerm>? CreateCanonicalSubstitutions(
-        IMethodSymbol target,
         IMethodSymbol source,
         bool usesCompanion,
         ContractExpressionBinder expressionBinder,
         CanonicalVariables canonical) {
         var replacements = new Dictionary<IrVarId, IrTerm>();
-        var sourceBindings = expressionBinder.VariableBindings;
-        foreach (var binding in sourceBindings) {
+        foreach (var binding in expressionBinder.VariableBindings) {
             IrVarId? canonicalVariable = null;
             if (binding.Symbol is IParameterSymbol parameter &&
                 parameter.ContainingSymbol is IMethodSymbol owner &&
                 SymbolEqualityComparer.Default.Equals(
                     owner.OriginalDefinition,
                     source.OriginalDefinition)) {
-                if (usesCompanion && !target.IsStatic) {
-                    if (parameter.Ordinal == 0)
-                        canonicalVariable = canonical.Receiver;
-                    else if (parameter.Ordinal - 1 < canonical.Parameters.Count)
-                        canonicalVariable = canonical.Parameters[parameter.Ordinal - 1];
-                }
-                else if (parameter.Ordinal < canonical.Parameters.Count) {
-                    canonicalVariable = canonical.Parameters[parameter.Ordinal];
-                }
+                var ordinal = parameter.Ordinal -
+                    (usesCompanion && canonical.Receiver.HasValue ? 1 : 0);
+                canonicalVariable = ordinal < 0
+                    ? canonical.Receiver
+                    : ordinal < canonical.Parameters.Count
+                        ? canonical.Parameters[ordinal]
+                        : null;
             }
             if (!canonicalVariable.HasValue) return null;
             replacements[binding.Variable] =
@@ -498,7 +483,7 @@ public sealed class ContractBinder(
         return replacements;
     }
 
-    private ClosedAttributeBindingResult BindClosedAttributes(
+    private ClauseBindingResult BindClosedAttributes(
         IMethodSymbol target,
         CanonicalVariables variables,
         bool requiresOnly) {
@@ -506,36 +491,56 @@ public sealed class ContractBinder(
         for (var index = 0; index < target.Parameters.Length; index++) {
             var result = BindValueAttributes(
                 target.Parameters[index].GetAttributes(),
+                target.Parameters[index].Type,
+                target.Parameters[index].RefKind,
                 _factory.Variable(variables.Parameters[index]),
                 BoundContractKind.Requires,
                 clauses);
             if (result != ContractBindingFailure.None)
-                return ClosedAttributeBindingResult.Fail(result);
+                return ClauseBindingResult.Fail(result);
         }
         if (!requiresOnly && variables.Result.HasValue) {
             var result = BindValueAttributes(
                 target.GetReturnTypeAttributes(),
+                target.ReturnType,
+                RefKind.None,
                 _factory.Variable(variables.Result.Value),
                 BoundContractKind.Ensures,
                 clauses);
             if (result != ContractBindingFailure.None)
-                return ClosedAttributeBindingResult.Fail(result);
+                return ClauseBindingResult.Fail(result);
         }
-        return new ClosedAttributeBindingResult(
+        return new ClauseBindingResult(
             clauses.ToImmutable(),
             ContractBindingFailure.None);
     }
 
     private ContractBindingFailure BindValueAttributes(
         ImmutableArray<AttributeData> attributes,
+        ITypeSymbol sourceType,
+        RefKind refKind,
         IrTerm value,
         BoundContractKind kind,
         ImmutableArray<BoundContractClause>.Builder clauses) {
         foreach (var attribute in attributes) {
+            var isNotNull = ContractApiSymbols.IsAttribute(
+                attribute,
+                _api!.NotNull);
+            var isPositive = ContractApiSymbols.IsAttribute(
+                attribute,
+                _api.Positive);
+            var isInRange = ContractApiSymbols.IsAttribute(
+                attribute,
+                _api.InRange);
+            if (!isNotNull && !isPositive && !isInRange) continue;
+            if (refKind == RefKind.Out)
+                return ContractBindingFailure.InvalidClosedAttribute;
+
             IrTerm? condition = null;
-            if (ContractApiSymbols.IsAttribute(attribute, _api!.NotNull)) {
+            if (isNotNull) {
                 var type = _factory.GetTypeInfo(value.Type);
-                if (type.Kind is not (
+                if (!sourceType.IsReferenceType ||
+                    type.Kind is not (
                         IrTypeKind.Reference or IrTypeKind.String or
                         IrTypeKind.Sequence))
                     return ContractBindingFailure.InvalidClosedAttribute;
@@ -544,16 +549,18 @@ public sealed class ContractBinder(
                     value,
                     _factory.Null(value.Type));
             }
-            else if (ContractApiSymbols.IsAttribute(attribute, _api.Positive)) {
-                if (value.Type != _factory.IntegerType)
+            else if (isPositive) {
+                if (!IsSupportedInteger(sourceType) ||
+                    value.Type != _factory.IntegerType)
                     return ContractBindingFailure.InvalidClosedAttribute;
                 condition = _factory.Binary(
                     IrBinaryOperator.GreaterThan,
                     value,
                     _factory.Integer(0));
             }
-            else if (ContractApiSymbols.IsAttribute(attribute, _api.InRange)) {
-                if (value.Type != _factory.IntegerType ||
+            else {
+                if (!IsSupportedInteger(sourceType) ||
+                    value.Type != _factory.IntegerType ||
                     attribute.ConstructorArguments.Length != 2 ||
                     !TryGetInt64(attribute.ConstructorArguments[0], out var minimum) ||
                     !TryGetInt64(attribute.ConstructorArguments[1], out var maximum) ||
@@ -580,57 +587,58 @@ public sealed class ContractBinder(
         return ContractBindingFailure.None;
     }
 
+    private static bool IsSupportedInteger(ITypeSymbol type) =>
+        type.SpecialType is
+            SpecialType.System_SByte or SpecialType.System_Byte or
+            SpecialType.System_Int16 or SpecialType.System_UInt16 or
+            SpecialType.System_Char or SpecialType.System_Int32 or
+            SpecialType.System_UInt32 or SpecialType.System_Int64;
+
     private static bool TryGetInt64(TypedConstant value, out long result) {
-        switch (value.Value) {
-            case sbyte number: result = number; return true;
-            case byte number: result = number; return true;
-            case short number: result = number; return true;
-            case ushort number: result = number; return true;
-            case int number: result = number; return true;
-            case uint number: result = number; return true;
-            case long number: result = number; return true;
-            default: result = 0; return false;
+        if (value.Value is long number) {
+            result = number;
+            return true;
         }
+        result = 0;
+        return false;
     }
 
     private static IEnumerable<INamedTypeSymbol> GetAllTypes(
-        INamespaceSymbol value) {
+        INamespaceOrTypeSymbol value) {
         foreach (var type in value.GetTypeMembers()) {
             yield return type;
-            foreach (var nested in GetNestedTypes(type))
+            foreach (var nested in GetAllTypes(type))
                 yield return nested;
         }
-        foreach (var child in value.GetNamespaceMembers())
-            foreach (var type in GetAllTypes(child))
-                yield return type;
+        if (value is INamespaceSymbol namespaced)
+            foreach (var child in namespaced.GetNamespaceMembers())
+                foreach (var type in GetAllTypes(child))
+                    yield return type;
     }
 
-    private static IEnumerable<INamedTypeSymbol> GetNestedTypes(
-        INamedTypeSymbol value) {
-        foreach (var type in value.GetTypeMembers()) {
-            yield return type;
-            foreach (var nested in GetNestedTypes(type))
-                yield return nested;
-        }
-    }
-
-    private readonly struct InvocationBindingResult(
-        ImmutableArray<BoundContractClause> clauses, ContractBindingFailure failure) {
+    private sealed class ClauseBindingResult(
+        ImmutableArray<BoundContractClause> clauses,
+        ContractBindingFailure failure) {
         internal ImmutableArray<BoundContractClause> Clauses { get; } = clauses;
         internal ContractBindingFailure Failure { get; } = failure;
-        internal static InvocationBindingResult Empty { get; } =
+        internal static ClauseBindingResult Empty { get; } =
             new([], ContractBindingFailure.None);
+        internal static ClauseBindingResult Fail(
+            ContractBindingFailure failure) =>
+            new([], failure);
     }
 
-    private readonly struct CompanionCandidate(INamedTypeSymbol type,
+    private sealed class CompanionCandidate(
+        INamedTypeSymbol type,
         (INamedTypeSymbol Target, bool IsOpen) target) {
         internal INamedTypeSymbol Type { get; } = type;
         internal (INamedTypeSymbol Target, bool IsOpen) Target { get; } =
             target;
     }
 
-    private readonly struct CompanionResolution(
-        IMethodSymbol? method, ContractBindingFailure failure) {
+    private sealed class CompanionResolution(
+        IMethodSymbol? method,
+        ContractBindingFailure failure) {
         internal IMethodSymbol? Method { get; } = method;
         internal ContractBindingFailure Failure { get; } = failure;
         internal static CompanionResolution None { get; } =
@@ -641,22 +649,11 @@ public sealed class ContractBinder(
             new(null, failure);
     }
 
-    private readonly struct ClosedAttributeBindingResult(
-        ImmutableArray<BoundContractClause> clauses,
-        ContractBindingFailure failure) {
-        internal ImmutableArray<BoundContractClause> Clauses { get; } = clauses;
-        internal ContractBindingFailure Failure { get; } = failure;
-        internal static ClosedAttributeBindingResult Fail(
-            ContractBindingFailure failure) =>
-            new([], failure);
-    }
-
-    private sealed class CanonicalVariables {
-        private readonly IrFactory _factory;
+    private sealed class CanonicalVariables(IrFactory factory) {
+        private readonly IrFactory _factory = factory;
         private readonly List<BoundContractVariable> _variables = [];
         private readonly Dictionary<IrVarId, IrVarId> _preState = [];
 
-        internal CanonicalVariables(IrFactory factory) => _factory = factory;
         internal IrVarId? Receiver { get; set; }
         internal List<IrVarId> Parameters { get; } = [];
         internal IrVarId? Result { get; set; }

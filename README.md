@@ -1,6 +1,6 @@
 # SharpProof
 
-SharpProof 0.2.0-preview.1 is a soundness-first Roslyn analyzer and bounded
+SharpProof 1.0.0-preview.1 is a soundness-first Roslyn analyzer and bounded
 out-of-process verifier for C#. It deliberately supports a narrow,
 compiler-bound subset.
 
@@ -20,7 +20,7 @@ SP0047 instead of disappearing. Diagnostic silence is still not a proof.
 |---|---|---|
 | Effect analyzer | Checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, and `[AllowedExceptions]` over the admitted source subset | Advisory "not proven" diagnostics on selected code |
 | Contract analyzer | Replays definitely executed, compiler-bound `Contract.Requires(...)` clauses with exact call inputs | SP0027 only when the precondition concretely evaluates to false |
-| Worker | Builds an accountable claim manifest and verifies bounded `Contract.Ensures(...)` obligations over acyclic Boolean/integer bodies and a few exact API-result facts | One `Proven`, replay-validated `Refuted`, or typed `Unknown` result for every manifest claim |
+| Worker | Builds an accountable claim manifest and verifies bounded `Contract.Ensures(...)` obligations over acyclic Boolean bodies, admitted integer comparisons, checked `long` arithmetic, and a few exact API-result facts | One `Proven`, replay-validated `Refuted`, or typed `Unknown` result for every manifest claim |
 
 The analyzer does not run SMT or load Z3. General source-callee
 assume/guarantee verification, loops in the worker, mutable-heap
@@ -29,18 +29,30 @@ are not implemented.
 
 ## Install and enable
 
+The portable analyzer and generator require a compiler host with Roslyn 4.14
+or newer. For command-line builds, use .NET SDK 9.0.300 or newer. The
+`SharpProof.Attributes` contract API alone remains a `netstandard2.0` library,
+and `SharpProofProfile=off` omits analyzer/generator loading on an older host.
+Visual Studio and Rider qualification with Roslyn 4.14 or newer remains a
+release gate.
+
+The coordinates below are the intended preview packages, but no SharpProof
+package has been promoted to the public NuGet feed yet. Until the first
+preview publication, use the repository's package-backed sample matrix; it
+packs the exact three-package graph into an isolated local feed before restore.
+
 Library projects that publish SharpProof annotations should reference the
 contract API normally:
 
 ```xml
 <PackageReference Include="SharpProof.Attributes"
-                  Version="0.2.0-preview.1" />
+                  Version="1.0.0-preview.1" />
 ```
 
 Add the portable analyzer and generator as a development-only dependency:
 
 ```xml
-<PackageReference Include="SharpProof" Version="0.2.0-preview.1"
+<PackageReference Include="SharpProof" Version="1.0.0-preview.1"
                   PrivateAssets="all" />
 ```
 
@@ -75,8 +87,10 @@ can use the compilation-global
 `sharpproof_profile` and `sharpproof_features` analyzer-config keys. Tree-local
 values are invalid because selection is compilation-global.
 
-Feature diagnostics are enabled `Info` diagnostics by default. Use normal
-Roslyn configuration to promote, demote, or suppress the IDs:
+Most feature and incomplete-proof diagnostics are enabled `Info` diagnostics
+by default. Concrete SP0027 precondition refutations are `Warning`; malformed
+contracts and compiler-artifact failures are `Error`. Use normal Roslyn
+configuration to promote, demote, or suppress the IDs:
 
 ```ini
 [*.cs]
@@ -102,7 +116,7 @@ For strict CI:
 ```xml
 <ItemGroup>
   <PackageReference Include="SharpProof.Verifier.Win-x64"
-                    Version="0.2.0-preview.1"
+                    Version="1.0.0-preview.1"
                     PrivateAssets="all" />
 </ItemGroup>
 <PropertyGroup>
@@ -144,6 +158,12 @@ observable state access, disallowed capability, escaping exception, or
 incomplete boundary prevents proof. It does not become a definitive violation
 without a replayable effect trace.
 
+Each contract consumes only its relevant evidence facet: purity uses observable
+read/write regions and capabilities, zero-allocation uses allocation,
+capability contracts use capabilities, and exception contracts use escaping
+exceptions. An unrelated unknown facet therefore no longer blocks a result.
+Not-proven messages identify the missing facet with a stable reason prefix.
+
 Observable purity permits fresh allocation and writes confined to fresh owned
 state; `[ZeroAllocations]` does not. Implicit exceptions from dereferences,
 indexing, division, casts, checked arithmetic, and similar operations count
@@ -172,7 +192,11 @@ public static class ExternalBoundary {
 }
 ```
 
-Trust without an explicit complete contract proves nothing. A
+`EffectContractAttribute` defaults to no declared capability or escaping
+exception, `Complete=false`, and `IsDeterministic=false`. A reviewed boundary
+must explicitly opt into every stronger fact, and its effects describe the
+whole observable call boundary. Trust without an explicit complete contract
+proves nothing. A
 `[SharpProofSuppress("reason")]` changes reporting only; it does not add facts.
 
 The analyzer admits a checked subset of ordinary methods, explicit
@@ -273,7 +297,7 @@ current manifest/request/result set. The default result is published under:
 obj/<Configuration>/<TargetFramework>/SharpProof/result.json
 ```
 
-Worker protocol version 5 separates the project run from semantic claim
+Worker protocol version 6 separates the project run from semantic claim
 outcomes. The compiler artifact records the effective `SharpProofFeatures`
 selection before manifest construction. A compiler-symbol-based manifest
 selects callables and assigns stable `spc1:` semantic IDs to direct clauses,
@@ -309,21 +333,29 @@ under every policy. The worker uses deterministic query, method, project,
 expression-depth, memory, process, and parallelism limits. Its
 content-addressed cache defaults to
 `obj/<Configuration>/<TargetFramework>/SharpProof/cache` in the MSBuild
-integration. Cache schema version 6 stores only a semantically complete
+integration. Cache schema version 7 stores only a semantically complete
 payload whose manifest hash and exact claim set validate against the current
 request and whose outcomes are all `Proven` or replay-validated `Refuted`.
 Timeout, cancellation, `Unknown`, malformed, infrastructure, and failed-replay
-responses are not reusable.
+responses are not reusable. `require-proven` runs bypass this local semantic
+cache so strict CI never relies on untrusted cached proof output.
 
 The result includes deterministic JSON counts by outcome and reason, assumption
 counts, cache status, versions, budgets, and elapsed time. SARIF projection is
-not implemented yet.
+opt-in: set `SharpProofVerifySarifFile` to emit deterministic SARIF 2.1.0 from
+the already validated response. It preserves `Proven`, `Refuted`, `Unknown`,
+SP0047, SP0048, and typed run-failure information with policy-matched levels.
+The SARIF file is published atomically under the same lock as the JSON result
+and cannot make an unsuccessful verifier run succeed.
 
 The current body executor is capped at 64 reachable blocks, 64 return paths,
-and 4,096 execution states. It supports a Boolean/integer SMT proof domain.
-Loops, arbitrary source calls, loads/stores, mutable heap state, unsupported
-conversions, excessive expression depth, and exceeded bounds produce
-`Unknown`.
+and 4,096 execution states. Its exact scalar subset includes Boolean logic,
+equality and ordering over bounded integer types through `uint`, and checked
+`long` arithmetic. Arithmetic over narrower or unsigned types, `ulong`,
+native integers, floating-point, `decimal`, enum equality, unchecked
+wrapping, loops, arbitrary source calls, loads/stores, mutable heap state,
+unsupported conversions, excessive expression depth, and exceeded bounds
+produce `Unknown`.
 
 Manifest discovery also accounts for postconditions in local functions,
 lambdas, anonymous methods, and top-level statements exactly once. Those
@@ -337,10 +369,13 @@ The worker also has narrow, spec-justified support for:
 - `Array.Empty<T>()` result non-nullness and zero array length.
 
 It does not treat `Enumerable.Empty<T>()` as array-backed sequence state.
-During counterexample replay, an executed spec-modeled call or other
-unsupported instruction cannot be independently reproduced, so the candidate
-becomes `Unknown` with `CounterexampleReplayFailed`. A call on a CFG path that
-the concrete model does not select does not block replay.
+During counterexample replay, an executed modeled call cannot be independently
+reproduced, so the candidate becomes `Unknown` with
+`CounterexampleNotReplayable`. An `Ensures` expression that can throw for a
+candidate input is `Unknown` with `PostconditionMayBeUndefined`. A call on a
+CFG path that the concrete model does not select does not block replay. A
+genuine discrepancy while replaying an otherwise executable counterexample
+remains a fatal `CounterexampleReplayFailed`.
 
 For a SAT answer, the proof kernel first requires the backend assignments to
 close exactly over the requested Boolean/integer model variables, then
@@ -433,10 +468,47 @@ Every package build runs SDK package validation and emits a matching `.snupkg`
 with portable PDBs. Package tests require the main packages to remain PDB-free,
 require one PDB for every shipped SharpProof assembly, parse every PDB as
 portable metadata, and verify SourceLink against the exact repository commit.
-The package workflow also emits an SPDX JSON SBOM, `SHA256SUMS`, and a
-deterministic `SharpProof.release.json` manifest for the six NuGet artifacts.
-Canonical `master` builds attach both SLSA build-provenance and SBOM
-attestations; workflow actions are pinned to immutable commits.
+The package workflow also emits a deterministic SPDX 2.3 JSON SBOM,
+`SHA256SUMS`, and `SharpProof.release.json` for the six NuGet artifacts. The
+SBOM binds each main package to its SHA-256 hash, inventories bundled
+third-party components, and checks component versions against restored assets.
+Pull-request packaging has read-only repository permission. A separate
+canonical-push job attaches SLSA build-provenance and SBOM attestations;
+workflow actions are pinned to immutable commits.
+
+Release-tag promotion is allowlisted to the approved sequence. Each tag must
+match the checked-in package version, identify a commit contained in `master`,
+and descend from the preceding release tag. Tag `v1.0.0-preview.1` uses the
+owner-protected `nuget.private-preview`
+environment and its configured private source; `v1.0.0-preview.2`,
+`v1.0.0-rc.1`, and `v1.0.0` use the owner-protected `nuget.org` environment
+and temporary OIDC credentials. Both paths download, revalidate, and promote
+the exact package bytes that passed the cross-platform consumer matrix.
+Before any write, the publisher validates `SharpProof.release.json` and every
+artifact hash, then queries the feed's V3 `PackageBaseAddress` for all three
+IDs. An existing package is reusable only when its exact ZIP entry names and
+uncompressed payloads match the tested local package; only the repository
+signature entry `.signature.p7s` may differ. The publisher then sends main and
+symbol packages separately in dependency order: Attributes, SharpProof, then
+the verifier. `--skip-duplicate` is used only after that remote main-package
+match, so an interrupted main/symbol publication can resume without accepting
+unknown remote bytes. A mismatched payload or an unverified publication race
+fails closed before it can be skipped.
+Repository owners must configure `NUGET_PRIVATE_SOURCE` and
+`NUGET_PRIVATE_API_KEY` in the private-preview environment, and `NUGET_USER`
+plus a matching NuGet trusted-publishing policy in the public environment.
+The private source must be an HTTPS NuGet V3 service index, and its API key
+must permit V3 package reads plus package and symbol publication. NuGet V3 has
+no corresponding symbol-package download resource, so retry safety anchors on
+the exact downloadable main package and resubmits the tested `.snupkg`
+separately. The workflow contains no feed credential values. An offline plan
+and local remote-payload simulation are available through:
+
+```powershell
+.\scripts\Publish-SharpProofRelease.ps1 `
+  -PackageSource nupkgs `
+  -PlanOnly
+```
 
 ## Closed compiler artifact and remaining release gaps
 
@@ -469,11 +541,13 @@ references fail artifact collection as SP0049.
 
 The compiler-to-worker reconstruction cutover, independent whole-body
 counterexample-replay gate, three-package split, symbols, package validation,
-hash manifest, SBOM, build attestations, public API IntelliSense coverage, and
+hash manifest, SBOM, build attestations, immutable tagged-byte validation,
+trusted-publishing workflow, public API IntelliSense coverage, and
 package-backed samples are complete for this bounded subset, but SharpProof is
-not production-ready. SARIF output, protected-tag promotion of already-tested
-bytes, trusted NuGet publishing, pilot-library evidence, and the remaining
-independent release reviews are still outstanding.
+not production-ready. Owner configuration of protected tags and the two NuGet
+publishing environments, the first private/public publications, pilot-library
+evidence, and the remaining independent release reviews are still
+outstanding.
 
 ## Package-backed examples
 

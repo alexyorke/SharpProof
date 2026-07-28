@@ -136,6 +136,18 @@ public sealed class FrontendLoweringTests {
             FrontendAbstention.UnsupportedType);
         AssertClassification(
             """
+            public static int Target(int left, int right) => left / right;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+        AssertClassification(
+            """
+            public static uint Target(uint left, uint right) => left % right;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+        AssertClassification(
+            """
             public static long Target(int value) => value;
             """,
             FrontendSubsetDecision.Exact,
@@ -152,6 +164,63 @@ public sealed class FrontendLoweringTests {
             """,
             FrontendSubsetDecision.Exact,
             FrontendAbstention.None);
+    }
+
+    [Test]
+    public void UnsupportedIntegralDomainsCannotMasqueradeAsReferenceEquality() {
+        AssertClassification(
+            """
+            public static bool Target(ulong left, ulong right) => left == right;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+        AssertClassification(
+            """
+            public static bool Target(nint left, nint right) => left == right;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+        AssertClassification(
+            """
+            public static bool Target(nuint left, nuint right) => left == right;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+    }
+
+    [Test]
+    public void UnsupportedValueDomainsCannotMasqueradeAsReferenceEquality() {
+        AssertClassification(
+            """
+            public static bool Target(double left, double right) => left == right;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+        AssertClassification(
+            """
+            public enum Choice {
+                First,
+                Second
+            }
+            public static bool Target(Choice left, Choice right) => left == right;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+    }
+
+    [Test]
+    public void SupportedUnsignedComparisonsRetainTheirNumericMeaning() {
+        using var compiled = CompiledMethod.Create(
+            """
+            public static bool Target(uint left, uint right) => left > right;
+            """);
+
+        Assert.That(
+            compiled.CompareWithInterpreter(uint.MaxValue, uint.MinValue),
+            Is.EqualTo(true));
+        Assert.That(
+            compiled.CompareWithInterpreter(uint.MinValue, uint.MaxValue),
+            Is.EqualTo(false));
     }
 
     [Test]

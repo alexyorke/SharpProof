@@ -1,0 +1,81 @@
+#nullable enable
+const SharpProof.Attributes.Contract.ConditionalSymbol = "SHARPPROOF_CONTRACTS" -> string!
+SharpProof.Attributes.AllowedCapabilitiesAttribute
+SharpProof.Attributes.AllowedCapabilitiesAttribute.AllowedCapabilitiesAttribute(SharpProof.Attributes.SharpProofCapability capabilities) -> void
+SharpProof.Attributes.AllowedCapabilitiesAttribute.Capabilities.get -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.AllowedExceptionsAttribute
+SharpProof.Attributes.AllowedExceptionsAttribute.AllowedExceptionsAttribute(params System.Type![]! exceptionTypes) -> void
+SharpProof.Attributes.AllowedExceptionsAttribute.ExceptionTypes.get -> System.Type![]!
+SharpProof.Attributes.Contract
+SharpProof.Attributes.ContractForAttribute
+SharpProof.Attributes.ContractForAttribute.ContractForAttribute(System.Type! targetType) -> void
+SharpProof.Attributes.ContractForAttribute.TargetType.get -> System.Type!
+SharpProof.Attributes.DoesNotThrowAttribute
+SharpProof.Attributes.DoesNotThrowAttribute.DoesNotThrowAttribute() -> void
+SharpProof.Attributes.EffectContractAttribute
+SharpProof.Attributes.EffectContractAttribute.Capabilities.get -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.EffectContractAttribute.Capabilities.set -> void
+SharpProof.Attributes.EffectContractAttribute.Complete.get -> bool
+SharpProof.Attributes.EffectContractAttribute.Complete.set -> void
+SharpProof.Attributes.EffectContractAttribute.EffectContractAttribute(SharpProof.Attributes.SharpProofEffect effects) -> void
+SharpProof.Attributes.EffectContractAttribute.Effects.get -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.EffectContractAttribute.IsDeterministic.get -> bool
+SharpProof.Attributes.EffectContractAttribute.IsDeterministic.set -> void
+SharpProof.Attributes.EffectContractAttribute.ThrownExceptions.get -> System.Type![]!
+SharpProof.Attributes.EffectContractAttribute.ThrownExceptions.set -> void
+SharpProof.Attributes.EnforcePureAttribute
+SharpProof.Attributes.EnforcePureAttribute.EnforcePureAttribute() -> void
+SharpProof.Attributes.InRangeAttribute
+SharpProof.Attributes.InRangeAttribute.InRangeAttribute(long minimum, long maximum) -> void
+SharpProof.Attributes.InRangeAttribute.Maximum.get -> long
+SharpProof.Attributes.InRangeAttribute.Minimum.get -> long
+SharpProof.Attributes.NotNullAttribute
+SharpProof.Attributes.NotNullAttribute.NotNullAttribute() -> void
+SharpProof.Attributes.PositiveAttribute
+SharpProof.Attributes.PositiveAttribute.PositiveAttribute() -> void
+SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Clock = 256 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Console = 16 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Environment = 64 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.FileRead = 2 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.FileWrite = 4 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.IO = 1 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.NativeInterop = 4096 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Network = 8 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.None = 0 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Process = 32 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Randomness = 512 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Reflection = 1024 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Registry = 128 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofCapability.Synchronization = 2048 -> SharpProof.Attributes.SharpProofCapability
+SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.Allocates = 1024 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.None = 0 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.ReadsAmbientState = 16 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.ReadsArgumentState = 2 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.ReadsCapturedState = 4 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.ReadsReceiverState = 1 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.ReadsStaticState = 8 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.Synchronizes = 4096 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.Throws = 2048 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.UsesNativeCode = 16384 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.UsesNondeterminism = 8192 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.UsesReflection = 32768 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.WritesAmbientState = 512 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.WritesArgumentState = 64 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.WritesCapturedState = 128 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.WritesReceiverState = 32 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofEffect.WritesStaticState = 256 -> SharpProof.Attributes.SharpProofEffect
+SharpProof.Attributes.SharpProofSuppressAttribute
+SharpProof.Attributes.SharpProofSuppressAttribute.Reason.get -> string!
+SharpProof.Attributes.SharpProofSuppressAttribute.SharpProofSuppressAttribute(string! reason) -> void
+SharpProof.Attributes.SharpProofTrustedAttribute
+SharpProof.Attributes.SharpProofTrustedAttribute.Reason.get -> string!
+SharpProof.Attributes.SharpProofTrustedAttribute.SharpProofTrustedAttribute(string! reason) -> void
+SharpProof.Attributes.ZeroAllocationsAttribute
+SharpProof.Attributes.ZeroAllocationsAttribute.ZeroAllocationsAttribute() -> void
+static SharpProof.Attributes.Contract.Assume(bool condition) -> void
+static SharpProof.Attributes.Contract.Ensures(bool condition) -> void
+static SharpProof.Attributes.Contract.Old<T>(T value) -> T
+static SharpProof.Attributes.Contract.Requires(bool condition) -> void
+static SharpProof.Attributes.Contract.Result<T>() -> T

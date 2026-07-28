@@ -16,15 +16,11 @@ public enum BackendFailureReason {
     InfrastructureFailure
 }
 
-public sealed class BackendModel {
-    public BackendModel(IEnumerable<KeyValuePair<IrVarId, IrValue>> assignments) {
-        if (assignments == null) throw new ArgumentNullException(nameof(assignments));
-        Assignments = assignments.ToImmutableDictionary(
+public sealed class BackendModel(IEnumerable<KeyValuePair<IrVarId, IrValue>> assignments) {
+    public ImmutableDictionary<IrVarId, IrValue> Assignments { get; } =
+        (assignments ?? throw new ArgumentNullException(nameof(assignments))).ToImmutableDictionary(
             static assignment => assignment.Key,
             static assignment => assignment.Value);
-    }
-
-    public ImmutableDictionary<IrVarId, IrValue> Assignments { get; }
 }
 
 public sealed class BackendCheckResult {
@@ -46,19 +42,13 @@ public sealed class BackendCheckResult {
 
     public static BackendCheckResult Unsatisfiable(IEnumerable<int> assumptionIndices) {
         if (assumptionIndices == null) throw new ArgumentNullException(nameof(assumptionIndices));
-        return new BackendCheckResult(
-            BackendCheckStatus.Unsatisfiable,
-            [.. assumptionIndices],
-            null,
-            BackendFailureReason.None);
+        return new BackendCheckResult(BackendCheckStatus.Unsatisfiable,
+            [.. assumptionIndices], null, BackendFailureReason.None);
     }
 
     public static BackendCheckResult Satisfiable(BackendModel model) =>
-        new(
-            BackendCheckStatus.Satisfiable,
-            [],
-            model ?? throw new ArgumentNullException(nameof(model)),
-            BackendFailureReason.None);
+        new(BackendCheckStatus.Satisfiable, [],
+            model ?? throw new ArgumentNullException(nameof(model)), BackendFailureReason.None);
 
     public static BackendCheckResult Unknown(BackendFailureReason reason) {
         if (reason == BackendFailureReason.None)
@@ -80,8 +70,7 @@ public sealed class VerificationQuery {
         Goal goal,
         ImmutableArray<IrVarId> modelVariables = default) {
         Factory = factory ?? throw new ArgumentNullException(nameof(factory));
-        if (assumptions == null) throw new ArgumentNullException(nameof(assumptions));
-        Assumptions = [.. assumptions];
+        Assumptions = [.. assumptions ?? throw new ArgumentNullException(nameof(assumptions))];
         if (Assumptions.Any(static assumption => assumption == null))
             throw new ArgumentException("Assumptions cannot contain null.", nameof(assumptions));
         Goal = goal ?? throw new ArgumentNullException(nameof(goal));

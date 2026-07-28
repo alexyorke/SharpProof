@@ -43,7 +43,9 @@ The supported effect attributes are:
 `SharpProofEffect` and `SharpProofCapability` are closed flag enums. Unknown
 bits are invalid contract data. A complete `EffectContractAttribute` can
 describe a reviewed external boundary; `SharpProofTrustedAttribute` alone does
-not supply an effect fact.
+not supply an effect fact. The attribute defaults are conservative:
+`Capabilities=None`, `ThrownExceptions=[]`, `IsDeterministic=false`, and
+`Complete=false`. Every stronger boundary fact must be written explicitly.
 
 ## Reporting and trust controls
 
