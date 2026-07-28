@@ -409,6 +409,15 @@ and macOS ARM64. Only Windows x64 executes the packaged worker; every other
 matrix host asserts the explicit unsupported-host rejection. Real Visual
 Studio, Rider, and Windows ARM64 validation remain outstanding release gates.
 
+Every package build runs SDK package validation and emits a matching `.snupkg`
+with portable PDBs. Package tests require the main packages to remain PDB-free,
+require one PDB for every shipped SharpProof assembly, parse every PDB as
+portable metadata, and verify SourceLink against the exact repository commit.
+The package workflow also emits an SPDX JSON SBOM, `SHA256SUMS`, and a
+deterministic `SharpProof.release.json` manifest for the six NuGet artifacts.
+Canonical `master` builds attach both SLSA build-provenance and SBOM
+attestations; workflow actions are pinned to immutable commits.
+
 ## Closed compiler artifact and remaining release gaps
 
 The build-only collector now emits compiler artifact schema version 3 from the
@@ -439,10 +448,12 @@ supersession, custom assembly-identity comparers, and non-file or unreadable
 references fail artifact collection as SP0049.
 
 The compiler-to-worker reconstruction cutover, independent whole-body
-counterexample-replay gate, and three-package split are complete for this
-bounded subset, but SharpProof is not production-ready. SARIF output, release
-artifact provenance, broader host qualification, pilot-library evidence, and
-the remaining independent release reviews are still outstanding.
+counterexample-replay gate, three-package split, symbols, package validation,
+hash manifest, SBOM, and build attestations are complete for this bounded
+subset, but SharpProof is not production-ready. SARIF output, protected-tag
+promotion of already-tested bytes, trusted NuGet publishing, broader host
+qualification, pilot-library evidence, and the remaining independent release
+reviews are still outstanding.
 
 ## Build and validate this repository
 

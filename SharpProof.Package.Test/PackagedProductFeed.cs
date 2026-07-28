@@ -39,16 +39,19 @@ internal sealed class PackagedProductFeed : IDisposable {
     private PackagedProductFeed(
         string source,
         IReadOnlyList<PackagedPackage> packages,
+        IReadOnlyList<PackagedPackage> symbolPackages,
         bool ownsRoot,
         string? ownedRoot) {
         Source = source;
         Packages = packages;
+        SymbolPackages = symbolPackages;
         _ownsRoot = ownsRoot;
         _ownedRoot = ownedRoot;
     }
 
     internal string Source { get; }
     internal IReadOnlyList<PackagedPackage> Packages { get; }
+    internal IReadOnlyList<PackagedPackage> SymbolPackages { get; }
     internal string Version => Packages[0].Version;
 
     internal static Task<PackagedProductFeed> GetAsync() =>
@@ -67,6 +70,10 @@ internal sealed class PackagedProductFeed : IDisposable {
 
     internal string GetPackagePath(string id) =>
         GetPackage(id).Path;
+
+    internal string GetSymbolPackagePath(string id) =>
+        SymbolPackages.Single(package =>
+            string.Equals(package.Id, id, StringComparison.Ordinal)).Path;
 
     public void Dispose() {
         if (!_ownsRoot || _ownedRoot == null)
@@ -145,23 +152,50 @@ internal sealed class PackagedProductFeed : IDisposable {
         string source,
         bool ownsRoot,
         string? ownedRoot) {
-        var packages = Directory.EnumerateFiles(
+        var packages = ReadPackages(source, ".nupkg");
+        var symbolPackages = ReadPackages(source, ".snupkg");
+        ValidatePackages(packages, "package");
+        ValidatePackages(symbolPackages, "symbol package");
+        if (!string.Equals(
+                packages[0].Version,
+                symbolPackages[0].Version,
+                StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                "All SharpProof packages and symbol packages must have " +
+                "the same version.");
+        return new PackagedProductFeed(
+            source,
+            packages,
+            symbolPackages,
+            ownsRoot,
+            ownedRoot);
+    }
+
+    private static PackagedPackage[] ReadPackages(
+        string source,
+        string extension) => [
+            .. Directory.EnumerateFiles(
                 source,
                 "*",
                 SearchOption.TopDirectoryOnly)
-            .Where(static path => string.Equals(
+            .Where(path => string.Equals(
                 Path.GetExtension(path),
-                ".nupkg",
+                extension,
                 StringComparison.OrdinalIgnoreCase))
             .Select(ReadPackage)
             .OrderBy(package => Array.IndexOf(
                 s_expectedPackageIds,
                 package.Id))
-            .ToArray();
+        ];
+
+    private static void ValidatePackages(
+        PackagedPackage[] packages,
+        string kind) {
         if (!packages.Select(static package => package.Id)
                 .SequenceEqual(s_expectedPackageIds, StringComparer.Ordinal))
             throw new InvalidOperationException(
-                "The package source must contain exactly one package for " +
+                "The package source must contain exactly one " + kind +
+                " for " +
                 string.Join(", ", s_expectedPackageIds) + ". Found: " +
                 string.Join(
                     ", ",
@@ -170,12 +204,7 @@ internal sealed class PackagedProductFeed : IDisposable {
         if (packages.Select(static package => package.Version)
                 .Distinct(StringComparer.Ordinal).Count() != 1)
             throw new InvalidOperationException(
-                "All SharpProof packages must have the same version.");
-        return new PackagedProductFeed(
-            source,
-            packages,
-            ownsRoot,
-            ownedRoot);
+                "All SharpProof " + kind + "s must have the same version.");
     }
 
     private static PackagedPackage ReadPackage(string path) {

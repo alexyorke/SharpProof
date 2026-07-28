@@ -86,8 +86,18 @@ function Resolve-SharpProofPackageSource {
     if ($packageFiles.Count -ne 3) {
         throw "SharpProof package source must contain exactly three nupkg files; found $($packageFiles.Count)."
     }
+    $symbolPackageFiles = @(
+        Get-ChildItem -LiteralPath $resolved -File -Filter '*.snupkg'
+    )
+    if ($symbolPackageFiles.Count -ne 3) {
+        throw "SharpProof package source must contain exactly three snupkg files; found $($symbolPackageFiles.Count)."
+    }
     $identities = @(
         $packageFiles |
+            ForEach-Object { Get-PackageIdentity -Path $_.FullName }
+    )
+    $symbolIdentities = @(
+        $symbolPackageFiles |
             ForEach-Object { Get-PackageIdentity -Path $_.FullName }
     )
     $expectedIds = @(
@@ -99,9 +109,17 @@ function Resolve-SharpProofPackageSource {
     if (($actualIds -join '|') -ne ($expectedIds -join '|')) {
         throw "SharpProof package source IDs must be exactly '$($expectedIds -join ', ')'; found '$($actualIds -join ', ')'."
     }
-    $versions = @($identities.Version | Sort-Object -Unique)
+    $actualSymbolIds = @($symbolIdentities.Id | Sort-Object)
+    if (($actualSymbolIds -join '|') -ne ($expectedIds -join '|')) {
+        throw "SharpProof symbol package source IDs must be exactly '$($expectedIds -join ', ')'; found '$($actualSymbolIds -join ', ')'."
+    }
+    $versions = @(
+        (@($identities.Version) +
+            @($symbolIdentities.Version)) |
+            Sort-Object -Unique
+    )
     if ($versions.Count -ne 1) {
-        throw "SharpProof package versions must match; found '$($versions -join ', ')'."
+        throw "SharpProof package and symbol package versions must match; found '$($versions -join ', ')'."
     }
     return $resolved
 }

@@ -14,6 +14,18 @@ $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
+$directoryBuildPropsPath = Join-Path `
+    $repositoryRoot `
+    'Directory.Build.props'
+[xml]$directoryBuildProps = Get-Content `
+    -LiteralPath $directoryBuildPropsPath `
+    -Raw
+$packageMetadataPath = Join-Path `
+    $repositoryRoot `
+    'SharpProof.PackageMetadata.props'
+[xml]$packageMetadata = Get-Content `
+    -LiteralPath $packageMetadataPath `
+    -Raw
 $portablePropsPath = Join-Path `
     $repositoryRoot `
     'SharpProof.Package\buildTransitive\SharpProof.props'
@@ -201,6 +213,38 @@ Assert-Equal `
     'true' `
     '_SharpProofVerifierPackagePresent'
 Assert-Equal $packageManifest.schemaVersion 1 'package manifest schemaVersion'
+Assert-Equal `
+    (Get-MsBuildProperty $directoryBuildProps 'Deterministic' 'repository build') `
+    'true' `
+    'Deterministic'
+Assert-Equal `
+    (Get-MsBuildProperty $directoryBuildProps 'DebugSymbols' 'repository build') `
+    'true' `
+    'DebugSymbols'
+Assert-Equal `
+    (Get-MsBuildProperty $directoryBuildProps 'DebugType' 'repository build') `
+    'portable' `
+    'DebugType'
+Assert-Equal `
+    (Get-MsBuildProperty $directoryBuildProps 'EmbedUntrackedSources' 'repository build') `
+    'true' `
+    'EmbedUntrackedSources'
+Assert-Equal `
+    (Get-MsBuildProperty $packageMetadata 'PublishRepositoryUrl' 'package metadata') `
+    'true' `
+    'PublishRepositoryUrl'
+Assert-Equal `
+    (Get-MsBuildProperty $packageMetadata 'IncludeSymbols' 'package metadata') `
+    'true' `
+    'IncludeSymbols'
+Assert-Equal `
+    (Get-MsBuildProperty $packageMetadata 'SymbolPackageFormat' 'package metadata') `
+    'snupkg' `
+    'SymbolPackageFormat'
+Assert-Equal `
+    (Get-MsBuildProperty $packageMetadata 'EnablePackageValidation' 'package metadata') `
+    'true' `
+    'EnablePackageValidation'
 $expectedPackageProjects = @(
     'SharpProof.Attributes/SharpProof.Attributes.csproj',
     'SharpProof.Package/SharpProof.Package.csproj',

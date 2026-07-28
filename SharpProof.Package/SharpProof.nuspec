@@ -25,16 +25,26 @@
     <file src="..\README.md" />
     <file src="..\LICENSE" />
     <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Analyzer.dll" target="tools\analyzers\dotnet\cs" />
+    <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Analyzer.pdb" target="tools\analyzers\dotnet\cs" />
     <file src="..\SharpProof.ContractForGenerator\bin\$configuration$\netstandard2.0\SharpProof.ContractForGenerator.dll" target="tools\analyzers\dotnet\cs" />
+    <file src="..\SharpProof.ContractForGenerator\bin\$configuration$\netstandard2.0\SharpProof.ContractForGenerator.pdb" target="tools\analyzers\dotnet\cs" />
     <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\Microsoft.Bcl.AsyncInterfaces.dll" target="tools\analyzers\dotnet\cs" />
     <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.CompilerArtifact.dll" target="tools\analyzers\dotnet\cs" />
+    <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.CompilerArtifact.pdb" target="tools\analyzers\dotnet\cs" />
     <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Contracts.dll" target="tools\analyzers\dotnet\cs" />
+    <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Contracts.pdb" target="tools\analyzers\dotnet\cs" />
     <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Dataflow.dll" target="tools\analyzers\dotnet\cs" />
+    <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Dataflow.pdb" target="tools\analyzers\dotnet\cs" />
     <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Effects.dll" target="tools\analyzers\dotnet\cs" />
+    <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Effects.pdb" target="tools\analyzers\dotnet\cs" />
     <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Frontend.dll" target="tools\analyzers\dotnet\cs" />
+    <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Frontend.pdb" target="tools\analyzers\dotnet\cs" />
     <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Ir.dll" target="tools\analyzers\dotnet\cs" />
+    <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Ir.pdb" target="tools\analyzers\dotnet\cs" />
     <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Specs.dll" target="tools\analyzers\dotnet\cs" />
+    <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Specs.pdb" target="tools\analyzers\dotnet\cs" />
     <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Worker.Protocol.dll" target="tools\analyzers\dotnet\cs" />
+    <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Worker.Protocol.pdb" target="tools\analyzers\dotnet\cs" />
     <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\System.Buffers.dll" target="tools\analyzers\dotnet\cs" />
     <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\System.Collections.Immutable.dll" target="tools\analyzers\dotnet\cs" />
     <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\System.IO.Pipelines.dll" target="tools\analyzers\dotnet\cs" />
