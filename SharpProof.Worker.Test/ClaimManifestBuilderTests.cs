@@ -205,6 +205,36 @@ public sealed class ClaimManifestBuilderTests {
     }
 
     [Test]
+    public void DirectClausesOwnTheEntireContractSource() {
+        var result = Build((
+            "Subject.cs",
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long Identity(long value) {
+                    Contract.Ensures(
+                        Contract.Result<long>() == value);
+                    return value;
+                }
+            }
+            [ContractFor(typeof(Subject))]
+            public static class SubjectContracts {
+                public static long Identity(long value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """));
+
+        var target = result.Targets.Values.Single();
+        Assert.That(target.Claims, Has.Length.EqualTo(1));
+        Assert.That(
+            target.Claims[0].Entry.Evidence,
+            Is.EqualTo(WorkerClaimEvidence.DirectClause));
+        Assert.That(target.Entry.Assumptions, Is.Empty);
+    }
+
+    [Test]
     public void InvalidPlacementDoesNotHideAnyPostcondition() {
         const string source =
             """

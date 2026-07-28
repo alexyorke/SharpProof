@@ -65,6 +65,7 @@ internal sealed class OperationEffectScanner {
                 IInstanceReferenceOperation or
                 IDefaultValueOperation or
                 ITypeOfOperation or
+                INameOfOperation or
                 ISizeOfOperation => EffectSummary.Empty,
             IParameterReferenceOperation parameter =>
                 parameter.Parameter.RefKind is RefKind.Ref or RefKind.Out
@@ -94,6 +95,7 @@ internal sealed class OperationEffectScanner {
             IDelegateCreationOperation delegateCreation => EffectSummaryOperations.Join(
                 ScanChildren(delegateCreation),
                 EffectSummaryOperations.Allocate(EffectAllocationKind.Managed)),
+            IInterpolatedStringOperation interpolated when interpolated.ConstantValue.HasValue => EffectSummary.Empty,
             IAnonymousObjectCreationOperation anonymousObject => EffectSummaryOperations.Join(
                 ScanChildren(anonymousObject),
                 EffectSummaryOperations.Allocate(EffectAllocationKind.Managed)),
@@ -298,7 +300,7 @@ internal sealed class OperationEffectScanner {
             creation.Initializer == null
                 ? EffectSummary.Empty
                 : ScanChildren(creation.Initializer),
-            EffectSummaryOperations.Allocate(EffectAllocationKind.Managed),
+            creation.Type?.IsValueType == true ? EffectSummary.Empty : EffectSummaryOperations.Allocate(EffectAllocationKind.Managed),
             constructor == null
                 ? EffectSummaryOperations.Unsupported()
                 : _session.ResolveCall(

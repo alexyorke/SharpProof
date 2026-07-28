@@ -24,19 +24,42 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void RuntimeStringConcatenationIsAManagedAllocation() {
+    public void NameOfIsAnExactEffectFreeCompileTimeOperation() {
+        var result = Analyze(
+            """
+            public static class Sample {
+                public static string Name() => nameof(Sample);
+            }
+            """,
+            "Sample",
+            "Name");
+
+        Assert.That(result.Summary.Allocation, Is.EqualTo(EffectAllocationKind.None));
+        Assert.That(result.Summary.Throws.IsEmpty, Is.True);
+        Assert.That(result.Summary.Completeness, Is.EqualTo(EffectCompleteness.Complete));
+        Assert.That(result.Projection.IsComplete, Is.True);
+    }
+
+    [Test]
+    public void StringConstructionDistinguishesKnownAndUnknownAllocation() {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class Sample {
                 public static string Runtime(string left, string right) =>
                     left + right;
                 public static string Constant() => "sharp" + "proof";
+                public static string Interpolated(int value) =>
+                    $"value: {value}";
+                public static string InterpolatedConstant() => $"sharp";
             }
             """);
         var session = new EffectAnalysisSession(compilation);
 
         var runtime = session.Analyze(Method(compilation, "Runtime"));
         var constant = session.Analyze(Method(compilation, "Constant"));
+        var interpolated = session.Analyze(Method(compilation, "Interpolated"));
+        var interpolatedConstant = session.Analyze(
+            Method(compilation, "InterpolatedConstant"));
 
         Assert.That(
             runtime.Summary.Allocation,
@@ -46,6 +69,14 @@ public sealed class EffectAnalysisTests {
             Is.EqualTo(SharpProofEffect.Allocates));
         Assert.That(
             constant.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.None));
+        Assert.That(
+            interpolated.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Unknown));
+        Assert.That(interpolated.Summary.Throws.IncludesUnknown, Is.True);
+        Assert.That(interpolated.Projection.IsComplete, Is.False);
+        Assert.That(
+            interpolatedConstant.Summary.Allocation,
             Is.EqualTo(EffectAllocationKind.None));
     }
 
@@ -119,6 +150,28 @@ public sealed class EffectAnalysisTests {
             result.Projection.Effects,
             Is.EqualTo(SharpProofEffect.Allocates));
         Assert.That(result.Projection.IsComplete, Is.True);
+    }
+
+    [Test]
+    public void ValueTypeConstructionDoesNotReportManagedAllocation() {
+        var result = Analyze(
+            """
+            public readonly struct Token {
+                public Token(int value) {
+                }
+            }
+            public static class Sample {
+                public static Token Create() => new Token(1);
+            }
+            """,
+            "Sample",
+            "Create");
+
+        Assert.That(result.Summary.Allocation, Is.EqualTo(EffectAllocationKind.None));
+        Assert.That(
+            result.Projection.Effects & SharpProofEffect.Allocates,
+            Is.EqualTo(SharpProofEffect.None));
+        Assert.That(result.Summary.Completeness, Is.EqualTo(EffectCompleteness.Complete));
     }
 
     [Test]

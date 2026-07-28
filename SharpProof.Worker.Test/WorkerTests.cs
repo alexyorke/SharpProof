@@ -938,6 +938,38 @@ public sealed class WorkerTests {
     }
 
     [Test]
+    public async Task ArrayReferenceEqualityIsNotStructuralSequenceEquality() {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static void Invalid(
+                    [NotNull] int[] left,
+                    [NotNull] int[] right) {
+                    Contract.Requires(left.Length == 1);
+                    Contract.Requires(right.Length == 1);
+                    Contract.Ensures(
+                        left == right || left[0] != right[0]);
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        var record = response.ClaimResults.Single();
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(record.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                record.Reason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
+            Assert.That(record.ProofCore, Is.Empty);
+        }
+    }
+
+    [Test]
     public async Task ArraySummaryDoesNotAuthorizeALaterImpureCallHavoc() {
         using var project = TestProject.Create(
             """

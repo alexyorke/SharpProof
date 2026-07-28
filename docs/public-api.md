@@ -18,6 +18,10 @@ either placeholder directly throws.
 interface or class. The generator validates the association and member
 matching by compiler symbol identity.
 
+Direct and companion clauses are alternative sources, not additive ones. Any
+direct clause on a target member makes that member the source for all of its
+clauses; companion clauses are used only when the target has none.
+
 ## Closed parameter and return contracts
 
 `NotNullAttribute`, `PositiveAttribute`, and `InRangeAttribute` apply only to

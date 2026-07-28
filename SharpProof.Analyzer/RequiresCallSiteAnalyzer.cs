@@ -36,32 +36,34 @@ internal static class RequiresCallSiteAnalyzer {
         SemanticModel semanticModel,
         CancellationToken cancellationToken) {
         ControlFlowGraph? graph;
+        IOperation? operationRoot;
         try {
-            graph = ControlFlowGraph.Create(
-                declaration,
-                semanticModel,
-                cancellationToken);
+            var flowSyntax = GetPropertyExpression(declaration) ?? declaration; operationRoot = semanticModel.GetOperation(flowSyntax, cancellationToken);
+            while (operationRoot?.Parent != null) operationRoot = operationRoot.Parent;
+            graph = operationRoot switch {
+                IMethodBodyOperation method => ControlFlowGraph.Create(method, cancellationToken),
+                IConstructorBodyOperation constructor => ControlFlowGraph.Create(constructor, cancellationToken),
+                IBlockOperation block => ControlFlowGraph.Create(block, cancellationToken),
+                _ => ControlFlowGraph.Create(declaration, semanticModel, cancellationToken)
+            };
         }
-        catch (ArgumentException) {
+        catch (Exception exception) when (
+            exception is ArgumentException or InvalidOperationException) {
             return null;
         }
-        catch (InvalidOperationException) {
-            return null;
-        }
-        if (graph == null)
-            return null;
+        if (graph == null) return null;
 
         var definitelyExecuted = GetDefinitelyExecutedBlocks(graph);
-        var callSites = new Dictionary<
-            (SyntaxTree Tree, TextSpan Span),
-            CallSiteCandidate>();
+        var callSites = new Dictionary<(SyntaxTree Tree, TextSpan Span), CallSiteCandidate>();
+        var initializer = (operationRoot as IConstructorBodyOperation)?.Initializer;
         foreach (var block in graph.Blocks) {
             cancellationToken.ThrowIfCancellationRequested();
             if (!block.IsReachable) continue;
             foreach (var root in block.Operations
                          .Concat(block.BranchValue == null
-                             ? []
-                             : [block.BranchValue])) {
+                              ? []
+                              : [block.BranchValue])
+                         .Concat(block.Ordinal == graph.Blocks[0].Ordinal && initializer != null ? [initializer] : [])) {
                 foreach (var operation in root.DescendantsAndSelf()) {
                     var call = operation switch {
                         IInvocationOperation invocation => (
@@ -156,6 +158,10 @@ internal static class RequiresCallSiteAnalyzer {
             ExpressionBody.Expression: { } accessorExpression
         })
             return accessorExpression.Span == callSite.Syntax.Span;
+        var propertyExpression = GetPropertyExpression(declaration); if (propertyExpression != null)
+            return propertyExpression.Span == callSite.Syntax.Span;
+        if (declaration is ConstructorDeclarationSyntax constructor && callSite.Syntax is ConstructorInitializerSyntax initializer &&
+            ReferenceEquals(initializer.Parent, constructor)) return true;
 
         var body = declaration switch {
             BaseMethodDeclarationSyntax method => method.Body,
@@ -189,6 +195,12 @@ internal static class RequiresCallSiteAnalyzer {
                 return false;
         return true;
     }
+
+    private static ExpressionSyntax? GetPropertyExpression(SyntaxNode declaration) => declaration switch {
+        PropertyDeclarationSyntax property => property.ExpressionBody?.Expression,
+        IndexerDeclarationSyntax indexer => indexer.ExpressionBody?.Expression,
+        _ => null
+    };
 
     private sealed class NonThrowingAnalysis(
         Compilation compilation,
@@ -261,6 +273,7 @@ internal static class RequiresCallSiteAnalyzer {
             operation.ChildOperations.All(IsDefinitelyNonThrowing);
 
         private bool IsDefinitelyNonThrowingSourceMethod(IMethodSymbol method) {
+            if (method.IsStatic && method.ContainingType.StaticConstructors.Length != 0) return false;
             var normalized = method.OriginalDefinition;
             if (normalized.DeclaringSyntaxReferences.Length != 1 ||
                 !_activeMethods.Add(normalized))
@@ -309,6 +322,7 @@ internal static class RequiresCallSiteAnalyzer {
                     cancellationToken),
                 caller))
             return AnalyzerSemanticOutcome.NotApplicable;
+        if ((candidate.TargetMethod.IsStatic || candidate.TargetMethod.MethodKind == MethodKind.Constructor) && candidate.TargetMethod.ContainingType.StaticConstructors.Length != 0) return AnalyzerSemanticOutcome.Unknown;
 
         var factory = session.IrFactory;
         var binding = session.BindRequires(candidate.TargetMethod);
@@ -399,7 +413,8 @@ internal static class RequiresCallSiteAnalyzer {
         if (callSite.Instance != null) {
             var receiver = lowerer.Lower(callSite.Instance);
             if (!receiver.IsExact) return null;
-            inputs.Add((receiver.Term, true));
+            if (callSite.Instance is not IInstanceReferenceOperation)
+                inputs.Add((receiver.Term, true));
         }
         foreach (var argument in callSite.Arguments
                      .OrderBy(static argument =>

@@ -80,6 +80,25 @@ public sealed class RequiresAndControlTests {
                     Contract.Requires(value > 0);
                 }
 
+                private static class Initialization {
+                    static Initialization() => throw new System.Exception();
+                    internal static int Identity(int value) => value;
+                }
+
+                private static class StaticTarget {
+                    static StaticTarget() => throw new System.Exception();
+                    internal static void Positive(int value) {
+                        Contract.Requires(value > 0);
+                    }
+                }
+
+                private sealed class ConstructedTarget {
+                    static ConstructedTarget() => throw new System.Exception();
+                    internal ConstructedTarget(int value) {
+                        Contract.Requires(value > 0);
+                    }
+                }
+
                 public static void ThrowingEarlierArgument() {
                     Positive(((string)null!).Length, -1);
                 }
@@ -98,6 +117,19 @@ public sealed class RequiresAndControlTests {
                     Receiver receiver = null!;
                     _ = receiver.Identity(0);
                     Positive(0, -1);
+                }
+
+                public static void TypeInitializerPriorStatement() {
+                    _ = Initialization.Identity(0);
+                    Positive(0, -1);
+                }
+
+                public static void TargetTypeInitializer() {
+                    StaticTarget.Positive(-1);
+                }
+
+                public static void ConstructorTypeInitializer() {
+                    new ConstructedTarget(-1);
                 }
             }
             """,
@@ -157,6 +189,110 @@ public sealed class RequiresAndControlTests {
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
+    public async Task ExpressionBodiedPropertiesReplayConcretePreconditions() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Property => Positive(-1);
+                public int this[int index] => Positive(-2);
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027", "SP0027"]));
+    }
+
+    [Test]
+    public async Task ConstructorInitializersReplayConcretePreconditions() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public class Base {
+                protected Base(int value) {
+                    Contract.Requires(value > 0);
+                }
+            }
+
+            public sealed class Derived : Base {
+                public Derived() : base(-1) {
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
+    public async Task ImplicitThisReceiverReplaysConcretePreconditions() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Fixture {
+                private int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public int Call() => Positive(-1);
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
+    public async Task DirectClauseSourceDoesNotMixInCompanionPreconditions() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static int Positive(int value) {
+                    Contract.Ensures(
+                        Contract.Result<int>() == value);
+                    return value;
+                }
+
+                public static void Call() {
+                    Positive(-1);
+                }
+            }
+
+            [ContractFor(typeof(Fixture))]
+            public static class FixtureContracts {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Is.Empty);
     }
 
     [Test]

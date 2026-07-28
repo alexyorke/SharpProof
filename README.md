@@ -360,6 +360,11 @@ kinds, nullability, and return type. SPCF0001-SPCF0008 are enabled Error
 diagnostics for invalid companion declarations when the package analyzer
 payload is loaded.
 
+Contract clauses are not merged across sources. If a target member declares
+any direct clause, all of its clauses come from that member; otherwise they may
+come from its matching companion. Closed parameter and return attributes still
+apply in either case.
+
 Direct `Contract.Requires`, `Ensures`, and `Assume` clauses used by the worker
 must be direct expression statements in one contiguous method-body prologue.
 `Result<T>` is valid only inside `Ensures`; `Old(...)` is valid only inside
@@ -524,6 +529,8 @@ cache/concurrency/cancellation tests, the pinned corpus, a fixed-seed
   records the bounded nullness/cardinality integration.
 - [Hardening audit](https://github.com/alexyorke/SharpProof/blob/master/docs/soundness-notes/2026-07-25-hardening.md)
   records validation evidence and outstanding checkpoints.
+- [Product bug sweep](https://github.com/alexyorke/SharpProof/blob/master/docs/soundness-notes/2026-07-27-product-sweep.md)
+  records the latest analyzer, contract, effect, and worker adversarial review.
 - [Acceptance contract](https://github.com/alexyorke/SharpProof/blob/master/eng/acceptance/README.md)
   describes the active release gate.
 
