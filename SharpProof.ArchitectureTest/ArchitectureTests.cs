@@ -450,6 +450,14 @@ public sealed class ArchitectureTests {
     }
 
     [Test]
+    public void PackageTestsDeclareReleaseEvidenceAssetDependencies() {
+        var references = GetProjectReferences("SharpProof.Package.Test").ToArray();
+
+        Assert.That(references, Does.Contain("SharpProof.Package"));
+        Assert.That(references, Does.Contain("SharpProof.Worker"));
+    }
+
+    [Test]
     public void ReplacedAlgorithmLayersStayWithinSizeCaps() {
         var violations = new List<string>();
         foreach (var entry in ReadSizeRatchetManifest().Files) {
