@@ -90,6 +90,7 @@ function Invoke-CapturedDotNet {
         @(& dotnet @effectiveArguments 2>&1)
     }
     $exitCode = $LASTEXITCODE
+    $global:LASTEXITCODE = 0
     $capturedOutput =
         @($lines | ForEach-Object { $_.ToString() }) -join "`n"
     $loggedOutput = if ($null -ne $logPath -and
