@@ -212,6 +212,36 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
+    public async Task ExactConstantAndPropertyIncrementEffectsSatisfyContracts() {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Fixture {
+                private const int Answer = 42;
+                private int _value;
+
+                private int Value {
+                    get => _value;
+                    set => _value = value;
+                }
+
+                [EnforcePure]
+                public static int ReadConstant() => Answer;
+
+                [ZeroAllocations]
+                [DoesNotThrow]
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public void Increment() => Value++;
+            }
+            """,
+            "effects",
+            ["SP0002", "SP0016", "SP0045", "SP0046"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public async Task SemanticOutcomeDoesNotTreatSilentCallSiteAsProven() {
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

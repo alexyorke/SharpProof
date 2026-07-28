@@ -186,6 +186,62 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
+    public void CompileTimeConstantsDoNotReadStaticState() {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                private const int Answer = 42;
+
+                public static int ReadConstant() => Answer;
+                public static System.DayOfWeek ReadEnum() =>
+                    System.DayOfWeek.Monday;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                session.Analyze(Method(compilation, "ReadConstant"))
+                    .Summary.Reads.IsEmpty,
+                Is.True);
+            Assert.That(
+                session.Analyze(Method(compilation, "ReadEnum"))
+                    .Summary.Reads.IsEmpty,
+                Is.True);
+        }
+    }
+
+    [Test]
+    public void PropertyIncrementUsesBothAccessorsWithoutBecomingIncomplete() {
+        var result = Analyze(
+            """
+            public sealed class Sample {
+                private int _value;
+
+                private int Value {
+                    get => _value;
+                    set => _value = value;
+                }
+
+                public void Increment() => Value++;
+            }
+            """,
+            "Sample",
+            "Increment");
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(result.Summary.Reads.Regions, Does.Contain(
+                EffectRegionId.Receiver));
+            Assert.That(result.Summary.Writes.Regions, Does.Contain(
+                EffectRegionId.Receiver));
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(result.Projection.IsComplete, Is.True);
+        }
+    }
+
+    [Test]
     public void ValueTypeConstructionDoesNotReportManagedAllocation() {
         var result = Analyze(
             """

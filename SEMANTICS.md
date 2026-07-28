@@ -132,6 +132,10 @@ Observable purity excludes:
 Fresh allocation and writes confined to fresh owned regions are compatible with
 observable purity. They are not compatible with `[ZeroAllocations]`.
 
+Compile-time constant and enum-member references are values, not static-state
+reads. Built-in compound assignments and increments over properties include
+the effects of both the getter and setter.
+
 An operation that may throw and is not discharged by the analysis makes
 `[DoesNotThrow]` unknown. This includes implicit exceptions from dereferences,
 array and index access, division, casts, checked arithmetic, and similar runtime
