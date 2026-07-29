@@ -385,6 +385,7 @@ public sealed class ArchitectureTests
                 "SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs",
                 "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
                 "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
+                "SharpProof.Contracts/ClosedContractAttributeValidator.cs",
                 "SharpProof.Contracts/ContractBinder.cs",
                 "SharpProof.Contracts/ContractCanonicalization.cs",
                 "SharpProof.Contracts/ContractExpressionBinder.cs",

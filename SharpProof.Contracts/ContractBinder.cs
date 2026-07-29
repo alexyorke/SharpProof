@@ -288,82 +288,77 @@ public sealed class ContractBinder(
     {
         foreach (var attribute in attributes)
         {
-            var isNotNull = ContractSelectionInventory.Is(attribute, _api!.Selections.NotNull);
-            var isPositive = ContractSelectionInventory.Is(attribute, _api.Selections.Positive);
-            var isInRange = ContractSelectionInventory.Is(attribute, _api.Selections.InRange);
-            if (!isNotNull && !isPositive && !isInRange)
+            var validation = ClosedContractAttributeValidator.Validate(
+                attribute,
+                sourceType,
+                refKind,
+                _api!.Selections);
+            if (!validation.IsRecognized)
             {
                 continue;
             }
 
-            if (refKind == RefKind.Out)
+            if (!validation.IsValid)
             {
                 return ContractBindingFailure.InvalidClosedAttribute;
             }
 
-            IrTerm? condition = null;
-            if (isNotNull)
+            IrTerm condition;
+            switch (validation.Kind)
             {
-                var type = _factory.GetTypeInfo(value.Type);
-                if (!sourceType.IsReferenceType ||
-                    type.Kind is not (IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence))
-                {
-                    return ContractBindingFailure.InvalidClosedAttribute;
-                }
+                case ClosedContractAttributeKind.NotNull:
+                    var type = _factory.GetTypeInfo(value.Type);
+                    if (type.Kind is not (
+                            IrTypeKind.Reference or
+                            IrTypeKind.String or
+                            IrTypeKind.Sequence))
+                    {
+                        return ContractBindingFailure.InvalidClosedAttribute;
+                    }
 
-                condition = _factory.Binary(IrBinaryOperator.NotEqual, value, _factory.Null(value.Type));
-            }
-            else if (isPositive)
-            {
-                if (!IsSupportedInteger(sourceType) || value.Type != _factory.IntegerType)
-                {
-                    return ContractBindingFailure.InvalidClosedAttribute;
-                }
+                    condition = _factory.Binary(
+                        IrBinaryOperator.NotEqual,
+                        value,
+                        _factory.Null(value.Type));
+                    break;
+                case ClosedContractAttributeKind.Positive:
+                    if (value.Type != _factory.IntegerType)
+                    {
+                        return ContractBindingFailure.InvalidClosedAttribute;
+                    }
 
-                condition = _factory.Binary(IrBinaryOperator.GreaterThan, value, _factory.Integer(0));
-            }
-            else
-            {
-                if (!IsSupportedInteger(sourceType) ||
-                    value.Type != _factory.IntegerType ||
-                    attribute.ConstructorArguments.Length != 2 ||
-                    !TryGetInt64(attribute.ConstructorArguments[0], out var minimum) ||
-                    !TryGetInt64(attribute.ConstructorArguments[1], out var maximum) ||
-                    minimum > maximum)
-                {
-                    return ContractBindingFailure.InvalidClosedAttribute;
-                }
+                    condition = _factory.Binary(
+                        IrBinaryOperator.GreaterThan,
+                        value,
+                        _factory.Integer(0));
+                    break;
+                case ClosedContractAttributeKind.InRange:
+                    if (value.Type != _factory.IntegerType)
+                    {
+                        return ContractBindingFailure.InvalidClosedAttribute;
+                    }
 
-                condition = _factory.Binary(
-                    IrBinaryOperator.AndAlso,
-                    _factory.Binary(IrBinaryOperator.GreaterThanOrEqual, value, _factory.Integer(minimum)),
-                    _factory.Binary(IrBinaryOperator.LessThanOrEqual, value, _factory.Integer(maximum)));
-            }
-            if (condition == null)
-            {
-                continue;
+                    condition = _factory.Binary(
+                        IrBinaryOperator.AndAlso,
+                        _factory.Binary(
+                            IrBinaryOperator.GreaterThanOrEqual,
+                            value,
+                            _factory.Integer(validation.Minimum)),
+                        _factory.Binary(
+                            IrBinaryOperator.LessThanOrEqual,
+                            value,
+                            _factory.Integer(validation.Maximum)));
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        "Unknown closed contract attribute kind: " +
+                        validation.Kind);
             }
 
             clauses.Add(new BoundContractClause(
                 kind, condition, _factory.CreateOperation("closed-attribute"), BoundContractEvidence.ClosedAttribute));
         }
         return ContractBindingFailure.None;
-    }
-
-    private static bool IsSupportedInteger(ITypeSymbol type)
-    {
-        return CSharpScalarSemantics.IsSupportedInteger(type.SpecialType);
-    }
-
-    private static bool TryGetInt64(TypedConstant value, out long result)
-    {
-        if (value.Value is long number)
-        {
-            result = number;
-            return true;
-        }
-        result = 0;
-        return false;
     }
 
     private sealed class ClauseBindingResult(

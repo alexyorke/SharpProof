@@ -970,6 +970,70 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task ClosedContractValidationPrecedesCallableAbstention()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static void PositiveOut(
+                    [Positive] out int value) {
+                    value = 1;
+                }
+
+                public static void NotNullOut(
+                    [NotNull] out string value) {
+                    value = "";
+                }
+
+                public static void Unconstrained<T>(
+                    [NotNull] T value) {
+                }
+
+                public static void ReferenceConstrained<T>(
+                    [NotNull] T value)
+                    where T : class {
+                }
+            }
+            """,
+            "contracts",
+            ["SP0024", "SP0047"]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Count(static diagnostic =>
+                    diagnostic.Id == "SP0024"),
+                Is.EqualTo(3));
+            Assert.That(
+                diagnostics.Count(static diagnostic =>
+                    diagnostic.Id == "SP0047"),
+                Is.EqualTo(4));
+        }
+        var malformed = diagnostics
+            .Where(static diagnostic => diagnostic.Id == "SP0024")
+            .Select(diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture))
+            .ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                malformed.Count(static message =>
+                    message.Contains(
+                        "out parameters have no entry value",
+                        StringComparison.Ordinal)),
+                Is.EqualTo(2));
+            Assert.That(
+                malformed.Count(static message =>
+                    message.Contains(
+                        "definitely reference-capable",
+                        StringComparison.Ordinal)),
+                Is.EqualTo(1));
+        }
+    }
+
+    [Test]
     public async Task BodylessDeclarationsReportEveryMalformedAttribute()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
