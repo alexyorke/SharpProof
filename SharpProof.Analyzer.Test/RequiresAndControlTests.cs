@@ -728,6 +728,129 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task ReducedExtensionCallsMapReceiverAndNamedArguments()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public static class Extensions {
+                public static void Positive(
+                    this string receiver,
+                    int ignored,
+                    int value) {
+                    Contract.Requires(receiver != null);
+                    Contract.Requires(value > 0);
+                }
+            }
+
+            public static class Fixture {
+                public static void Valid() {
+                    "value".Positive(0, 1);
+                }
+
+                public static void InvalidValue() {
+                    "value".Positive(value: -1, ignored: 0);
+                }
+
+                public static void InvalidReceiver() {
+                    ((string)null!).Positive(0, 1);
+                }
+
+                public static void ThrowingReceiverPrefix() {
+                    ((string)null!).ToString().Positive(0, -1);
+                }
+
+                public static void ThrowingArgumentPrefix() {
+                    "value".Positive(((string)null!).Length, -1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027", "SP0027"]));
+        Assert.That(
+            diagnostics.Select(diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Has.All.Contain("Positive"));
+    }
+
+    [Test]
+    public async Task ReducedExtensionCallsUseBranchRefinedReceiverAndArguments()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public static class Extensions {
+                public static void Positive(
+                    this string receiver,
+                    int value) {
+                    Contract.Requires(receiver != null);
+                    Contract.Requires(value > 0);
+                }
+            }
+
+            public static class Fixture {
+                public static void InvalidValue(bool condition) {
+                    int value;
+                    if (condition) {
+                        value = -2;
+                    }
+                    else {
+                        value = -1;
+                    }
+                    "value".Positive(value);
+                }
+
+                public static void ValidValue(bool condition) {
+                    int value;
+                    if (condition) {
+                        value = 1;
+                    }
+                    else {
+                        value = 2;
+                    }
+                    "value".Positive(value);
+                }
+
+                public static void InvalidReceiver(bool condition) {
+                    string? value;
+                    if (condition) {
+                        value = null;
+                    }
+                    else {
+                        value = null;
+                    }
+                    value!.Positive(1);
+                }
+
+                public static void UnknownReceiver(bool condition) {
+                    string? value;
+                    if (condition) {
+                        value = null;
+                    }
+                    else {
+                        value = "value";
+                    }
+                    value!.Positive(1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027", "SP0027"]));
+    }
+
+    [Test]
     public async Task DirectClauseSourceDoesNotMixInCompanionPreconditions()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

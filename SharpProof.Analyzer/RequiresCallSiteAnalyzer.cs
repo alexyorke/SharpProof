@@ -55,14 +55,17 @@ internal static class RequiresCallSiteAnalyzer
                 return AnalyzerSemanticOutcome.NotApplicable;
             }
 
-            if ((candidate.TargetMethod.IsStatic ||
-                 candidate.TargetMethod.MethodKind == MethodKind.Constructor) &&
-                candidate.TargetMethod.ContainingType.StaticConstructors.Length != 0)
+            var contractTarget =
+                candidate.TargetMethod.ReducedFrom ??
+                candidate.TargetMethod;
+            if ((contractTarget.IsStatic ||
+                 contractTarget.MethodKind == MethodKind.Constructor) &&
+                contractTarget.ContainingType.StaticConstructors.Length != 0)
             {
                 return AnalyzerSemanticOutcome.Unknown;
             }
 
-            var binding = session.BindRequires(candidate.TargetMethod);
+            var binding = session.BindRequires(contractTarget);
             if (!binding.IsSuccess || binding.Contracts == null)
             {
                 return AnalyzerSemanticOutcome.Unknown;
@@ -150,8 +153,7 @@ internal static class RequiresCallSiteAnalyzer
             BoundMethodContracts contracts,
             ImmutableArray<BoundContractClause> requires)
         {
-            if (callSite.TargetMethod.ReducedFrom != null ||
-                callSite.TargetMethod.Parameters.Any(
+            if (contracts.Target.Parameters.Any(
                     static parameter => parameter.RefKind != RefKind.None))
             {
                 return null;
@@ -252,12 +254,20 @@ internal static class RequiresCallSiteAnalyzer
         RequiresCallSiteCandidate callSite,
         BoundContractVariable variable)
     {
+        var isReducedExtension =
+            callSite.TargetMethod.ReducedFrom != null;
         return variable.Role switch
         {
             BoundContractVariableRole.Receiver => callSite.Instance,
+            BoundContractVariableRole.Parameter
+                when isReducedExtension && variable.Ordinal == 0 =>
+                callSite.Instance,
             BoundContractVariableRole.Parameter =>
                 callSite.Arguments.FirstOrDefault(argument =>
-                    argument.Parameter?.Ordinal == variable.Ordinal)?.Value,
+                    argument.Parameter?.Ordinal ==
+                    (isReducedExtension
+                        ? variable.Ordinal - 1
+                        : variable.Ordinal))?.Value,
             _ => null
         };
     }

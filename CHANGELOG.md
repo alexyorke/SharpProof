@@ -92,6 +92,8 @@ contain documented breaking changes.
 
 ### Fixed
 
+- Preconditions on reduced extension-method calls now bind the extension
+  receiver and reduced arguments to their original parameter ordinals.
 - `SharpProofEffect.Throws` no longer implicitly permits managed allocation;
   every declared effect flag is enforced independently.
 - Throwing a possibly null exception expression now includes the possible
