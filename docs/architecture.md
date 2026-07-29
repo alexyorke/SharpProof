@@ -174,7 +174,7 @@ complete callables whose claims are hygienic `Proven` or replay-validated
 
 During Windows verification, the production analyzer observes the final
 post-generator Roslyn `Compilation` and atomically emits compiler artifact
-schema version 7. The compiler owns selection, contract/spec binding, effect
+schema version 8. The compiler owns selection, contract/spec binding, effect
 evaluation, and body
 lowering. Every selected callable has either a typed failure record or a
 portable graph containing its bound clauses, canonical variables, whole-body
@@ -188,9 +188,11 @@ the sealed constraint. Callable IDs, claim ownership, and user-assumption IDs
 remain tied to the sealed manifest.
 
 The artifact also contains compiler error diagnostics with mapped locations,
-handwritten and generated tree hashes and parse settings, the bounded
-proof-relevant compilation-option set, assembly and target identity, and
-compiler/reference provenance. It intentionally contains no source text.
+handwritten and generated tree hashes, raw and effective per-tree preprocessor
+symbols, parse settings, the bounded proof-relevant compilation-option set,
+assembly and target identity, and compiler/reference provenance. An effective
+`SHARPPROOF_CONTRACTS` symbol invalidates the artifact before worker
+verification. It intentionally contains no source text.
 Readable file-backed references are required while the compiler records their
 path, image hash, identity, kind, embed flag, and aliases. Resolver-dependent
 `#r`/`#load`, missing-assembly resolver mode, reference supersession, and custom

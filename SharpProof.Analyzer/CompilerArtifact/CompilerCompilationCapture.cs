@@ -79,6 +79,10 @@ internal static class CompilerCompilationCapture
             DocumentationMode = parse.DocumentationMode.ToString(),
             Kind = parse.Kind.ToString(),
             PreprocessorSymbols = [.. parse.PreprocessorSymbolNames.OrderBy(static value => value, StringComparer.Ordinal)],
+            EffectivePreprocessorSymbols = [
+                .. CSharpPreprocessorSymbols.GetDefined(tree, cancellationToken)
+                    .OrderBy(static value => value, StringComparer.Ordinal)
+            ],
             Features = [.. parse.Features.OrderBy(static value => value.Key, StringComparer.Ordinal)
                 .Select(static value => new CompilerFeatureSnapshot { Key = value.Key, Value = value.Value })]
         };

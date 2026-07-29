@@ -295,6 +295,86 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void NestedOnlyClausesDoNotSelectTheirContainingMethod()
+    {
+        var result = Build((
+            "Subject.cs",
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long Outer(long value) {
+                    long Local(long item) {
+                        Contract.Ensures(
+                            Contract.Result<long>() == item);
+                        return item;
+                    }
+                    return Local(value);
+                }
+            }
+            """));
+
+        var target = result.Targets.Values.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                target.Method.MethodKind,
+                Is.EqualTo(MethodKind.LocalFunction));
+            Assert.That(result.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(result.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(
+                result.Manifest.Callables.Any(static callable =>
+                    callable.CallableId.Contains(
+                        "Outer",
+                        StringComparison.Ordinal) &&
+                    !callable.CallableId.Contains(
+                        "Local",
+                        StringComparison.Ordinal)),
+                Is.False);
+        }
+    }
+
+    [Test]
+    public void MalformedCompanionSelectionFailsClosed()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public sealed class Subject {
+                public long Identity(long value) => value;
+            }
+            [ContractFor(typeof(Subject))]
+            public static class SubjectContracts {
+                public static long Identity(
+                    Subject receiver,
+                    string unexpected) {
+                    Contract.Ensures(true);
+                    return unexpected.Length;
+                }
+            }
+            """;
+        var compilation = GetCompilation(("Subject.cs", source));
+        var result = new ClaimManifestBuilder(compilation).Build();
+        var target = result.Targets.Values.Single();
+        var binding = new ContractBinder(
+            compilation,
+            new SharpProof.Ir.IrFactory()).Bind(
+                target.Method);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                target.Entry.SelectedFeatures,
+                Is.EqualTo([WorkerSelectedFeature.Contracts]));
+            Assert.That(target.Claims, Is.Empty);
+            Assert.That(target.Entry.Assumptions, Is.Empty);
+            Assert.That(
+                binding.Failure,
+                Is.EqualTo(
+                    ContractBindingFailure.CompanionSignatureMismatch));
+        }
+    }
+
+    [Test]
     public void DirectClausesOwnTheEntireContractSource()
     {
         var result = Build((
@@ -768,6 +848,71 @@ public sealed class ClaimManifestBuilderTests
             Assert.That(evidence.EvidenceSha256, Does.Match("^[0-9a-f]{64}$"));
             Assert.That(second.Manifest.Claims.Single().ClaimId,
                 Is.EqualTo(claim.ClaimId));
+        }
+    }
+
+    [Test]
+    public void ExceptionConstructorEvidenceRequiresAnExactApprovedSpec()
+    {
+        var discovery = Build((
+            "Subject.cs",
+            """
+            using System;
+            using System.Collections.Generic;
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                [DoesNotThrow]
+                public static InvalidOperationException SafeConstruction() =>
+                    new InvalidOperationException("message");
+
+                [DoesNotThrow]
+                public static AggregateException UnmodeledConstruction() =>
+                    new AggregateException(
+                        (IEnumerable<Exception>)null!);
+
+                [AllowedExceptions(typeof(ArgumentException))]
+                public static void DefiniteWrongThrow() =>
+                    throw new InvalidOperationException();
+
+                [AllowedExceptions(typeof(ArgumentException))]
+                public static void UnmodeledThrow() =>
+                    throw new AggregateException(
+                        (IEnumerable<Exception>)null!);
+            }
+            """));
+        var evidence = discovery.Targets.Values.ToDictionary(
+            static target => target.Method.Name,
+            static target => target.EffectClaims.Single().Evidence,
+            StringComparer.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                evidence["SafeConstruction"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                evidence["UnmodeledConstruction"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence["UnmodeledConstruction"].Reason,
+                Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
+            Assert.That(
+                evidence["UnmodeledConstruction"].Evidence,
+                Does.Contain("UnmodeledCall"));
+            Assert.That(
+                evidence["UnmodeledConstruction"].Witness,
+                Is.Null);
+            Assert.That(
+                evidence["DefiniteWrongThrow"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(
+                evidence["DefiniteWrongThrow"].Witness?.Kind,
+                Is.EqualTo("explicit-throw"));
+            Assert.That(
+                evidence["UnmodeledThrow"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(evidence["UnmodeledThrow"].Witness, Is.Null);
         }
     }
 

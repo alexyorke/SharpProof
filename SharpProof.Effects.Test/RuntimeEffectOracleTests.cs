@@ -382,6 +382,61 @@ public sealed class RuntimeEffectOracleTests
         });
     }
 
+    [Test]
+    public void UnmodeledExceptionConstructorRuntimeFailureRemainsUnknown()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            using System.Collections.Generic;
+
+            public static class RuntimeFixture {
+                public static AggregateException Create() =>
+                    new AggregateException(
+                        (IEnumerable<Exception>)null!);
+            }
+            """);
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            EffectTestHost.RequireMethod(
+                compilation,
+                "RuntimeFixture",
+                "Create"));
+        var image = EffectTestHost.EmitImage(compilation);
+        string? observedException = null;
+
+        WithRuntimeAssembly(image, assembly =>
+        {
+            try
+            {
+                _ = RequireMethod(
+                    assembly,
+                    "RuntimeFixture",
+                    "Create").Invoke(null, null);
+            }
+            catch (TargetInvocationException exception)
+            {
+                observedException = exception.InnerException?.GetType().FullName;
+            }
+        });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                observedException,
+                Is.EqualTo("System.ArgumentNullException"));
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(result.Summary.Throws.IncludesUnknown, Is.True);
+            Assert.That(
+                result.Summary.Uncertainty & EffectUncertainty.UnmodeledCall,
+                Is.EqualTo(EffectUncertainty.UnmodeledCall));
+            Assert.That(
+                result.DirectWitnesses.Select(static witness => witness.Kind),
+                Is.EqualTo(["managed-allocation"]));
+        }
+    }
+
     private static void WithRuntimeAssembly(
         EmittedAssemblyImage image,
         Action<Assembly> action)

@@ -4,7 +4,7 @@
   "jsonNamingPolicy": "camelCase",
   "artifactEnvelope": {
     "schema": "SharpProof.CompilerManifest",
-    "version": 7
+    "version": 8
   },
   "declarations": [
     {
@@ -21,7 +21,7 @@
           "accessibility": "internal",
           "name": "Current",
           "type": "int",
-          "value": 7
+          "value": 8
         }
       ]
     },
@@ -2014,6 +2014,16 @@
         {
           "name": "PreprocessorSymbols",
           "jsonName": "preprocessorSymbols",
+          "type": "string[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "EffectivePreprocessorSymbols",
+          "jsonName": "effectivePreprocessorSymbols",
           "type": "string[]",
           "accessibility": "public",
           "set": "set",

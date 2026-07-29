@@ -42,6 +42,38 @@ public sealed class FinalCompilationCollectorTests
     }
 
     [Test]
+    public async Task RuntimeEnabledGhostContractsPreventArtifactEmission()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("runtime-contracts");
+        var compilation = CreateCompilation(
+            """
+            #define SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+
+            internal static class Subject {
+                internal static int Identity(int value) {
+                    Contract.Ensures(
+                        Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """);
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            Options(path));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0025"]));
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
+    [Test]
     public async Task FinalCompilationSealIsCanonicalAndIncludesGeneratedInputs()
     {
         using var workspace = new CollectorWorkspace();
@@ -88,7 +120,7 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(first.Take(3), Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
             Assert.That(first, Does.Not.Contain((byte)'\r'));
             Assert.That(artifact.Schema, Is.EqualTo("SharpProof.CompilerManifest"));
-            Assert.That(artifact.SchemaVersion, Is.EqualTo(7));
+            Assert.That(artifact.SchemaVersion, Is.EqualTo(8));
             Assert.That(artifact.ProtocolVersion, Is.EqualTo("9"));
             Assert.That(artifact.Compilation.TargetFramework, Is.EqualTo("net9.0"));
             Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.All));

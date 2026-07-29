@@ -373,10 +373,13 @@ public sealed class ArchitectureTests
             StringComparer.Ordinal)
         {
             ["discovery"] = [
+                "SharpProof.Analyzer/ContractRuntimePolicy.cs",
                 "SharpProof.Analyzer/FinalCompilationCollector.cs",
                 "SharpProof.Analyzer/CompilerArtifact/ClaimManifestBuilder.cs",
                 "SharpProof.Analyzer/CompilerArtifact/SemanticClaimIdentity.cs",
                 "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
+                "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
+                "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
                 "SharpProof.Frontend/ContractApiMetadata.cs"
             ],
             ["lowering"] = [

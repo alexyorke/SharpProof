@@ -251,15 +251,17 @@ and primary constructors. A closed constructed generic API call is accepted only
 when a specification resolves for that exact call. Every Roslyn `OperationKind`
 is classified by a checked-in decision table; an unknown future kind is rejected.
 
-The packaged verifier consumes compiler artifact schema version 7 produced
+The packaged verifier consumes compiler artifact schema version 8 produced
 from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed
 lowering failure or portable whole-body CFG/IR with bound clauses, canonical
 variables, body-entry state, parameter mappings, and bound API-spec witness
 metadata. It also carries compiler error diagnostics and mapped locations,
-handwritten and generated tree hashes and parse evidence, a bounded
-proof-relevant compilation-option set, assembly and target identity, and
-compiler/reference provenance. It contains no source text.
+handwritten and generated tree hashes, raw and effective per-tree preprocessor
+symbols, and parse evidence, plus a bounded proof-relevant compilation-option
+set, assembly and target identity, and compiler/reference provenance. An
+effective `SHARPPROOF_CONTRACTS` symbol invalidates the artifact before
+verification. The artifact contains no source text.
 
 Before cache lookup or backend creation, the worker validates the artifact
 digest and canonical shape, requires the compiler-visible maximum expression

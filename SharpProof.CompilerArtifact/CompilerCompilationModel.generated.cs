@@ -48,6 +48,7 @@ internal sealed class CompilerSyntaxTreeSnapshot
     public string DocumentationMode { get; set; } = string.Empty;
     public string Kind { get; set; } = string.Empty;
     public string[] PreprocessorSymbols { get; set; } = [];
+    public string[] EffectivePreprocessorSymbols { get; set; } = [];
     public CompilerFeatureSnapshot[] Features { get; set; } = [];
 }
 

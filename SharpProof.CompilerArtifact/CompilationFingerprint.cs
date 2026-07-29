@@ -4,6 +4,9 @@ namespace SharpProof.CompilerArtifact;
 
 internal static class CompilationFingerprint
 {
+    private const string RuntimeContractEvaluationSymbol =
+        "SHARPPROOF_CONTRACTS";
+
     internal static string ComputeSha256(CompilerCompilationSnapshot snapshot)
     {
         if (snapshot == null)
@@ -14,7 +17,7 @@ internal static class CompilationFingerprint
         using var hash = new CanonicalHashWriter();
         hash.Add(
             "SharpProof.CompilerCompilationSnapshot",
-            4,
+            5,
             JsonSerializer.Serialize(snapshot, WorkerProtocolJson.Options));
         return hash.Finish();
     }
@@ -66,6 +69,10 @@ internal static class CompilationFingerprint
         value.DocumentationMode is "None" or "Parse" or "Diagnose" &&
         value.Kind is "Regular" or "Script" &&
         All(value.PreprocessorSymbols, HasText) &&
+        All(value.EffectivePreprocessorSymbols, HasText) &&
+        !value.EffectivePreprocessorSymbols.Contains(
+            RuntimeContractEvaluationSymbol,
+            StringComparer.Ordinal) &&
         All(value.Features, ValidFeature);
     }
 

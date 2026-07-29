@@ -49,7 +49,7 @@ consumer checks. Only Windows x64 additionally enables verification, launches
 the packaged worker, and validates its versioned JSON result; unsupported
 hosts reject requested verification explicitly.
 
-The worker receives compiler artifact schema version 7 with portable lowered
+The worker receives compiler artifact schema version 8 with portable lowered
 CFG/IR. It does not construct a Roslyn compilation, parse source, or reread
 reference files; compiler and reference identities are provenance only.
 Independent whole-body counterexample replay and immutable tagged-byte

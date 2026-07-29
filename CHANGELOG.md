@@ -49,6 +49,9 @@ contain documented breaking changes.
 - Protocol version 9 and cache schema 10 distinguish undefined
   postconditions, non-replayable modeled calls, genuine replay failures,
   effect-evidence certainty, and explicit vacuity evidence.
+- Compiler artifact schema 8 records both raw and effective per-tree
+  preprocessor symbols and binds them through compilation fingerprint domain
+  5; worker-side validation rejects runtime-enabled ghost contracts.
 - `require-proven` runs bypass the local semantic cache.
 - Effect contracts consume independent read/write, allocation, capability,
   and escaping-exception evidence facets; an unrelated unknown facet no
@@ -72,6 +75,9 @@ contain documented breaking changes.
 
 ### Security
 
+- Enabled analysis rejects `SHARPPROOF_CONTRACTS` from project constants,
+  source directives, and generated trees so compiler-elided ghost expressions
+  cannot execute in a supposedly verified runtime body.
 - SAT models must exactly match the requested scalar model closure and pass
   independent replay before SharpProof emits `Refuted`.
 - Built-in API specifications approve only exact assembly-name,
@@ -85,13 +91,30 @@ contain documented breaking changes.
 - Trusted complete effect contracts on bodyless source boundaries are honored,
   while malformed, incomplete, conflicting, or untrusted boundaries remain
   visible instead of disappearing.
-- Compiler artifact schema 7 binds exception constraints and exact witness
+- Compiler artifact schema 8 binds exception constraints and exact witness
   hierarchies to canonical full assembly identities, including version,
   culture, and public-key token, plus constructed-type reference IDs, so
   aliased same-name assemblies cannot collide during independent worker replay.
 
 ### Fixed
 
+- Explicit `ref` and `in` precondition arguments now read aliased local or
+  parameter storage at call-entry state after later argument side effects;
+  unsupported aliases remain `Unknown`.
+- Concrete precondition replay preserves potentially failing object-to-string
+  casts and proves them only from definite string runtime-type evidence.
+- Analyzer, binder, and manifest discovery now share one effective contract
+  source rule: valid direct clauses take precedence, otherwise a valid
+  `ContractFor` companion remains usable despite misplaced or nested target
+  clauses, and malformed companion intent stays visible.
+- Every selected body with entry contracts or assumptions is admitted through
+  symbolic subset validation even when it has no postcondition claim.
+- Vacuity evidence now includes only source-level receiver, parameter, and
+  explicit-precondition entry domains; facts learned from a body, result, user
+  assumption, or API specification cannot make a proof vacuously succeed.
+- Framework exception constructors are no longer blanket-trusted. Exact
+  declarative throw and termination facets are required for a definite
+  direct-throw witness; all other constructors fail closed.
 - Preconditions on reduced extension-method calls now bind the extension
   receiver and reduced arguments to their original parameter ordinals.
 - Closed parameter contracts now use one validator in the analyzer and binder;

@@ -77,7 +77,7 @@ both implemented feature groups:
   verification.
 
 `SharpProofFeatures` values are `effects`, `contracts`, and `all` (the
-default). The effective selection is sealed into the schema-7 compiler
+default). The effective selection is sealed into the schema-8 compiler
 artifact and filters its manifest: `contracts` excludes effect-only
 annotations, `effects` excludes postcondition claims and contract assumptions,
 and `all` selects both surfaces. Every effective effect contract has one typed
@@ -258,8 +258,11 @@ definitely non-throwing, expression-bodied member, and constructor initializer.
 calls and do not evaluate their arguments. They are static-analysis contracts,
 not runtime guards.
 
-Do not define `SHARPPROOF_CONTRACTS` in an ordinary application or test build.
-Doing so emits the contract calls and evaluates their arguments.
+SharpProof analysis rejects `SHARPPROOF_CONTRACTS` because defining it emits
+the ghost contract calls and evaluates their arguments. The portable package
+also rejects the symbol in `DefineConstants`; compiler-side validation covers
+source-local directives and generated trees. Set `SharpProofProfile=off` only
+when intentionally compiling without SharpProof analysis.
 `Contract.Result<T>()` and `Contract.Old(...)` throw
 `InvalidOperationException` when directly executed.
 
@@ -345,11 +348,12 @@ path-dependent, static-initialization-sensitive, or may-only conflicts remain
 `Unknown(EffectSummaryIncomplete)`. Exception constraints and exact witness
 hierarchies use full assembly identity plus type-reference documentation ID, so
 aliased same-simple-name assemblies remain distinct during worker replay.
-Exact exception-type refutation is limited
-to admitted framework exception construction; a user exception constructor
-still establishes that some exception escapes, but not its exact type. The
-certainty field distinguishes `DefiniteViolation`, complete or incomplete
-may-effect summaries, trusted complete boundaries, and unavailable evidence.
+Exact exception-type refutation requires an exact framework constructor row
+whose complete throw facet is `DoesNotThrow` and whose termination facet is
+`Terminates`. Unmodeled framework and user exception constructors remain typed
+`Unknown`; they cannot create a definite direct-throw witness. The certainty
+field distinguishes `DefiniteViolation`, complete or incomplete may-effect
+summaries, trusted complete boundaries, and unavailable evidence.
 
 Proven postconditions explicitly record `ContradictoryPreconditions` or
 `NoModeledNormalReturn` when the proof is vacuous under partial-correctness
@@ -474,11 +478,15 @@ return targets. The inactive `[Pure]` attribute has been removed; use
 
 ## Exact built-in API specifications
 
-The default table contains these seven BCL rows:
+The default table contains these eleven BCL rows:
 
 | API | Current modeled facts |
 |---|---|
 | `Array.Empty<T>()` | Effects and allocation unknown across type initialization; does not throw; non-null empty array result |
+| `Exception()` | Writes only the fresh receiver, has no additional allocation, and does not throw |
+| `Exception(string)` | Writes only the fresh receiver, has no additional allocation, and does not throw |
+| `InvalidOperationException()` | Writes only the fresh receiver, has no additional allocation, and does not throw |
+| `InvalidOperationException(string)` | Writes only the fresh receiver, has no additional allocation, and does not throw |
 | `object` constructor | Call boundary has no effects or allocation and does not throw; `new object()` still allocates the object |
 | `string.Length` | Reads receiver state; no allocation; does not throw inside the resolved call boundary |
 | `string.Concat(string, string)` | No side effects; may allocate; does not throw; non-null result |
@@ -562,7 +570,7 @@ and local remote-payload simulation are available through:
 
 ## Closed compiler artifact and remaining release gaps
 
-The build-only collector now emits compiler artifact schema version 7 from the
+The build-only collector now emits compiler artifact schema version 8 from the
 final post-generator Roslyn `Compilation`. It seals the feature-selected claim
 manifest and, for each selected callable, either a typed lowering failure or
 portable whole-body CFG/IR with bound contract clauses, canonical variables,

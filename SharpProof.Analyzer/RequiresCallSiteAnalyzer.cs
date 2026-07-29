@@ -116,12 +116,28 @@ internal static class RequiresCallSiteAnalyzer
             }
 
             var variables = new Dictionary<IrVarId, ManagedAbstractValue>();
+            var definitelyStrings = new HashSet<IrVarId>();
             foreach (var variable in GetInputVariables(contracts))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var actual = GetActual(candidate, variable);
-                if (actual == null ||
-                    !candidate.Flow.TryEvaluate(candidate.Operation, actual, out var value))
+                if (actual == null)
+                {
+                    return AnalyzerSemanticOutcome.Unknown;
+                }
+
+                var alias = GetAliasEvaluation(candidate, variable, actual);
+                ManagedAbstractValue value;
+                if (alias == AliasEvaluation.Unsupported ||
+                    !(alias == AliasEvaluation.CallEntry
+                        ? candidate.Flow.TryEvaluateAtOrigin(
+                            candidate.Operation,
+                            actual,
+                            out value)
+                        : candidate.Flow.TryEvaluate(
+                            candidate.Operation,
+                            actual,
+                            out value)))
                 {
                     return AnalyzerSemanticOutcome.Unknown;
                 }
@@ -134,6 +150,10 @@ internal static class RequiresCallSiteAnalyzer
                 }
 
                 variables.Add(variable.Variable, value);
+                if (IsDefinitelyString(actual))
+                {
+                    definitelyStrings.Add(variable.Variable);
+                }
             }
 
             return CompleteEvaluation(
@@ -141,7 +161,10 @@ internal static class RequiresCallSiteAnalyzer
                 requires.Select(clause =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var value = ManagedContractFacts.Evaluate(clause.Condition, variables);
+                    var value = ManagedContractFacts.Evaluate(
+                        clause.Condition,
+                        variables,
+                        definitelyStrings);
                     return new ClauseEvaluation(
                         value.TryGetBoolean(out var proven) ? proven : null,
                         clause.Condition);
@@ -154,7 +177,10 @@ internal static class RequiresCallSiteAnalyzer
             ImmutableArray<BoundContractClause> requires)
         {
             if (contracts.Target.Parameters.Any(
-                    static parameter => parameter.RefKind != RefKind.None))
+                    static parameter => parameter.RefKind != RefKind.None) ||
+                requires.Any(static clause =>
+                    ManagedContractFacts.ContainsPotentiallyFailingCast(
+                        clause.Condition)))
             {
                 return null;
             }
@@ -270,6 +296,72 @@ internal static class RequiresCallSiteAnalyzer
                         : variable.Ordinal))?.Value,
             _ => null
         };
+    }
+
+    private static AliasEvaluation GetAliasEvaluation(
+        RequiresCallSiteCandidate callSite,
+        BoundContractVariable variable,
+        IOperation actual)
+    {
+        if (variable.Role != BoundContractVariableRole.Parameter)
+        {
+            return AliasEvaluation.Snapshot;
+        }
+
+        var isReducedExtension = callSite.TargetMethod.ReducedFrom != null;
+        if (isReducedExtension && variable.Ordinal == 0)
+        {
+            var receiverKind =
+                callSite.TargetMethod.ReducedFrom!.Parameters[0].RefKind;
+            return receiverKind is RefKind.Ref or RefKind.In
+                ? IsLocalAlias(actual)
+                    ? AliasEvaluation.CallEntry
+                    : AliasEvaluation.Unsupported
+                : AliasEvaluation.Snapshot;
+        }
+
+        var argument = callSite.Arguments.FirstOrDefault(candidate =>
+            candidate.Parameter?.Ordinal ==
+            (isReducedExtension
+                ? variable.Ordinal - 1
+                : variable.Ordinal));
+        if (argument == null ||
+            argument.Parameter?.RefKind is not (RefKind.Ref or RefKind.In))
+        {
+            return AliasEvaluation.Snapshot;
+        }
+
+        if (argument.Syntax is not ArgumentSyntax syntax ||
+            syntax.RefKindKeyword.Kind() is not (
+                SyntaxKind.RefKeyword or SyntaxKind.InKeyword))
+        {
+            return AliasEvaluation.Snapshot;
+        }
+
+        return IsLocalAlias(actual)
+            ? AliasEvaluation.CallEntry
+            : AliasEvaluation.Unsupported;
+    }
+
+    private static bool IsLocalAlias(IOperation operation)
+    {
+        operation = DefiniteOperationFacts.UnwrapHarmlessValue(operation);
+        return operation is
+            ILocalReferenceOperation or
+            IParameterReferenceOperation;
+    }
+
+    private static bool IsDefinitelyString(IOperation operation)
+    {
+        return DefiniteOperationFacts.UnwrapHarmlessValue(operation)
+            .Type?.SpecialType == SpecialType.System_String;
+    }
+
+    private enum AliasEvaluation
+    {
+        Snapshot,
+        CallEntry,
+        Unsupported
     }
 
     private readonly record struct ClauseEvaluation(bool? Value, IrTerm Condition);

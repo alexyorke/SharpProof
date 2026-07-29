@@ -252,7 +252,7 @@ internal static class AnalyzerFeaturePipeline
         var features = session.Attributes.Select(
             method,
             session.Configuration.ContractsEnabled &&
-            !session.GetContractClauses(method).Clauses.IsEmpty) &
+            session.ResolveContractSource(method).HasSelectedContractIntent) &
             ((session.Configuration.ContractsEnabled
                   ? ContractSelectionFeatures.Contracts
                   : ContractSelectionFeatures.None) |

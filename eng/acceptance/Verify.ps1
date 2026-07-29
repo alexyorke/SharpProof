@@ -236,7 +236,7 @@ Assert-Equal `
 Assert-Equal ($contract.supportedTargetFrameworks -join ',') 'netstandard2.0,net8.0,net472' 'supportedTargetFrameworks'
 Assert-Equal $contract.worker.protocolVersion 9 'worker.protocolVersion'
 Assert-Equal $contract.worker.manifestSchemaVersion 4 'worker.manifestSchemaVersion'
-Assert-Equal $contract.worker.compilerArtifactSchemaVersion 7 'worker.compilerArtifactSchemaVersion'
+Assert-Equal $contract.worker.compilerArtifactSchemaVersion 8 'worker.compilerArtifactSchemaVersion'
 Assert-Equal $contract.worker.maximumParallelism 4 'worker.maximumParallelism'
 Assert-Equal $contract.worker.maximumMemoryMiB 2048 'worker.maximumMemoryMiB'
 Assert-Equal $contract.worker.queryRlimit 3000000 'worker.queryRlimit'

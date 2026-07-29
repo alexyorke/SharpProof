@@ -342,6 +342,49 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void UnmodeledExceptionConstructorCannotFabricateAReplayWitness()
+    {
+        var artifact = CreateContractArtifact(
+            """
+            using System;
+            using System.Collections.Generic;
+            using SharpProof.Attributes;
+
+            internal static class Subject {
+                [DoesNotThrow]
+                internal static AggregateException Create() =>
+                    new AggregateException(
+                        (IEnumerable<Exception>)null!);
+            }
+            """);
+        var target = CompilerManifestArtifactJson.DecodeCallables(artifact).Single();
+        var evidence = target.EffectClaims.Single();
+        var result = EffectWitnessReplayer.Assemble(target, evidence);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                evidence.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence.Reason,
+                Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
+            Assert.That(
+                evidence.Certainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary));
+            Assert.That(evidence.Evidence, Does.Contain("UnmodeledCall"));
+            Assert.That(evidence.Witness, Is.Null);
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                result.Reason,
+                Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
+            Assert.That(result.EffectWitness, Is.Null);
+            Assert.That(result.Model, Is.Empty);
+        }
+    }
+
+    [Test]
     public void ContractPredicatesAreBoundToCompilerInventory()
     {
         const string source =
@@ -621,8 +664,7 @@ public sealed class CompilerManifestArtifactTests
     private static CompilerManifestArtifact CreateContractArtifact(string? source = null)
     {
         var parse = new CSharpParseOptions(
-            LanguageVersion.CSharp12,
-            preprocessorSymbols: [Contract.ConditionalSymbol]);
+            LanguageVersion.CSharp12);
         var compilation = CreateCompilation(
             parse,
             source ?? """

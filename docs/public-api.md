@@ -12,7 +12,9 @@ contributes build tooling and a Windows x64 worker, not an application API.
 contiguous prologue clauses. They are compiler-elided unless
 `SHARPPROOF_CONTRACTS` is defined. `Contract.Result<T>()` and
 `Contract.Old<T>(T)` are expressions for use inside postconditions; executing
-either placeholder directly throws.
+either placeholder directly throws. SharpProof analysis rejects the reserved
+conditional symbol so a proof cannot silently assume compiler-elided ghost
+expressions that execute in the emitted program.
 
 `ContractForAttribute` associates a static companion class with a target
 interface or class. The generator validates the association and member

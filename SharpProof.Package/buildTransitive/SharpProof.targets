@@ -19,6 +19,8 @@
     <SharpProofMode>$(_SharpProofEffectiveLegacyMode)</SharpProofMode>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">true</SharpProofVerify>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == ''">false</SharpProofVerify>
+    <_SharpProofContractsRuntimeEnabled
+        Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(DefineConstants)', '(^|[;,])\s*SHARPPROOF_CONTRACTS\s*($|[;,])'))">true</_SharpProofContractsRuntimeEnabled>
   </PropertyGroup>
   <ItemGroup Condition="'$(_SharpProofProfileNormalized)' != 'off'">
     <Analyzer Include="
@@ -74,6 +76,8 @@
            Text="SharpProofVerify must be true or false." />
     <Error Condition="'$(_SharpProofProfileNormalized)' == 'strict' AND '$(SharpProofVerify)' != 'true'"
            Text="SharpProofProfile=strict requires SharpProofVerify=true; use the advisory profile to make verification optional." />
+    <Error Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofContractsRuntimeEnabled)' == 'true'"
+           Text="SHARPPROOF_CONTRACTS enables runtime evaluation of ghost contracts and is not supported while SharpProof analysis is enabled. Remove it from DefineConstants or set SharpProofProfile=off." />
     <Warning Condition="'$(_SharpProofLegacyModeProvided)' == 'true'"
              Text="SharpProofMode='$(_SharpProofLegacyModeValue)' is deprecated during preview. Use SharpProofProfile and SharpProofFeatures; all-experimental maps to SharpProofFeatures=all." />
   </Target>

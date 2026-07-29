@@ -10,6 +10,9 @@ param(
     [string]$DocumentationOutputPath,
 
     [Parameter()]
+    [string]$RuntimeWitnessOutputPath,
+
+    [Parameter()]
     [Alias('Check')]
     [switch]$Verify
 )
@@ -29,10 +32,17 @@ if ([string]::IsNullOrWhiteSpace($SourceOutputPath)) {
 if ([string]::IsNullOrWhiteSpace($DocumentationOutputPath)) {
     $DocumentationOutputPath = Join-Path $repositoryRoot 'docs\api-spec-catalog.generated.md'
 }
+if ([string]::IsNullOrWhiteSpace($RuntimeWitnessOutputPath)) {
+    $RuntimeWitnessOutputPath = Join-Path `
+        $repositoryRoot `
+        'SharpProof.Specs.Test\ApiSpecRuntimeWitnesses.generated.cs'
+}
 
 $CatalogPath = [IO.Path]::GetFullPath($CatalogPath)
 $SourceOutputPath = [IO.Path]::GetFullPath($SourceOutputPath)
 $DocumentationOutputPath = [IO.Path]::GetFullPath($DocumentationOutputPath)
+$RuntimeWitnessOutputPath = [IO.Path]::GetFullPath(
+    $RuntimeWitnessOutputPath)
 if (-not [IO.File]::Exists($CatalogPath)) {
     throw "API-spec catalog not found: $CatalogPath"
 }
@@ -55,6 +65,7 @@ $allowedEnums = @{
         'Nondeterminism')
     SpecAllocationBehavior = @('None', 'MayAllocate', 'Unknown')
     SpecThrowBehavior = @('DoesNotThrow', 'MayThrow', 'Unknown')
+    SpecTerminationBehavior = @('Terminates', 'Unknown')
     SpecNullness = @(
         'NotApplicable',
         'NonNull',
@@ -735,6 +746,21 @@ foreach ($declaration in $declarations) {
     $cardinalityEvidence = Get-EvidenceVariable `
         -Reference $facets.cardinality.evidence `
         -Context "$context.facets.cardinality.evidence"
+    $terminationFacet = Get-OptionalProperty $facets 'termination'
+    $termination = if ($null -eq $terminationFacet) {
+        'null'
+    }
+    else {
+        $terminationBehavior = Format-EnumValue `
+            -Value $terminationFacet.behavior `
+            -Type 'SpecTerminationBehavior' `
+            -Context "$context.facets.termination.behavior"
+        $terminationEvidence = Get-EvidenceVariable `
+            -Reference $terminationFacet.evidence `
+            -Context "$context.facets.termination.evidence"
+        "new SpecTerminationFacet($terminationBehavior, " +
+            "$terminationEvidence)"
+    }
 
     $source.Add('            new ApiSpecDeclaration(')
     $source.Add('                new ApiSpecTarget(')
@@ -770,7 +796,8 @@ foreach ($declaration in $declarations) {
         "$nullness, $nullnessEvidence),")
     $source.Add(
         '                    new SpecCardinalityFacet(' +
-        "$cardinality, $exactCount, $cardinalityEvidence)),")
+        "$cardinality, $exactCount, $cardinalityEvidence),")
+    $source.Add("                    $termination),")
 
     $postconditions = @($declaration.postconditions)
     if ($postconditions.Count -eq 0) {
@@ -886,6 +913,15 @@ foreach ($declaration in $declarations) {
     else {
         [string]$facets.cardinality.exactCount
     }
+    $terminationFacet = Get-OptionalProperty $facets 'termination'
+    $terminationText = if ($null -eq $terminationFacet) {
+        ''
+    }
+    else {
+        '; termination=' + $terminationFacet.behavior + ' [' +
+            (Format-EvidenceDocumentation $terminationFacet.evidence) +
+            ']'
+    }
     $facetText = (
         "effects=$effectValues [" +
         (Format-EvidenceDocumentation $facets.effects.evidence) +
@@ -897,7 +933,7 @@ foreach ($declaration in $declarations) {
         (Format-EvidenceDocumentation $facets.nullness.evidence) +
         "]; cardinality=$($facets.cardinality.result)($exact) [" +
         (Format-EvidenceDocumentation $facets.cardinality.evidence) +
-        ']')
+        ']' + $terminationText)
     $postconditions = @($declaration.postconditions)
     $postconditionText = if ($postconditions.Count -eq 0) {
         '-'
@@ -949,6 +985,9 @@ Assert-ExactGeneratedFile `
     -Content $documentationText `
     -DisplayPath $DocumentationOutputPath
 
-& (Join-Path $repositoryRoot 'SharpProof.Specs.Test\Generate-ApiSpecRuntimeWitnesses.ps1') -CatalogPath $CatalogPath -Verify:$Verify
+& (Join-Path $repositoryRoot 'SharpProof.Specs.Test\Generate-ApiSpecRuntimeWitnesses.ps1') `
+    -CatalogPath $CatalogPath `
+    -OutputPath $RuntimeWitnessOutputPath `
+    -Verify:$Verify
 $verb = if ($Verify) { 'Verified' } else { 'Generated' }
 Write-Host "$verb deterministic API-spec catalog source and documentation."

@@ -77,7 +77,9 @@ support.
 
 The compiler elides `Requires`, `Ensures`, and `Assume` calls unless
 `SHARPPROOF_CONTRACTS` is defined. SharpProof binds their compiler operations;
-it does not parse free-form contract strings.
+it does not parse free-form contract strings. Enabled analysis rejects that
+reserved symbol through both package configuration and the final compiler
+compilation, including source-local directives and generated syntax trees.
 
 ### Closed attributes
 
@@ -109,7 +111,7 @@ compiler-elided call, including its argument evaluation.
 
 ## Resolved API specification inventory
 
-The default table has seven BCL rows. Every row resolves by documentation
+The default table has eleven BCL rows. Every row resolves by documentation
 comment ID and original symbol identity across the supported reference
 surfaces. Effects, allocation, throws, nullness, and cardinality are separate
 facets; an exact fact in one facet does not make an unknown facet exact.
@@ -117,6 +119,10 @@ facets; an exact fact in one facet does not make an unknown facet exact.
 | Spec ID and row | Effects | Allocation | Throws | Result fact |
 |---|---|---|---|---|
 | `bcl.array.empty` - `System.Array.Empty<T>()` | Unknown because the generic cache can trigger type initialization | Unknown | Does not throw | Non-null, empty sequence |
+| `bcl.exception.ctor` - `System.Exception..ctor()` | Writes the fresh receiver | None at the call boundary | Does not throw | None |
+| `bcl.exception.ctor.string` - `System.Exception..ctor(string)` | Writes the fresh receiver | None at the call boundary | Does not throw | None |
+| `bcl.invalid-operation-exception.ctor` - `System.InvalidOperationException..ctor()` | Writes the fresh receiver | None at the call boundary | Does not throw | None |
+| `bcl.invalid-operation-exception.ctor.string` - `System.InvalidOperationException..ctor(string)` | Writes the fresh receiver | None at the call boundary | Does not throw | None |
 | `bcl.object.ctor` - `System.Object..ctor()` | None at the call boundary | None at the call boundary | Does not throw | None |
 | `bcl.string.length` - `System.String.Length` getter | Reads receiver state | None | Does not throw | Result equals receiver length |
 | `bcl.string.concat.string-string` - `System.String.Concat(string, string)` | None | May allocate | Does not throw | Non-null string |
@@ -124,9 +130,15 @@ facets; an exact fact in one facet does not make an unknown facet exact.
 | `bcl.math.abs.int32` - `Math.Abs(int)` | None | None | May throw `OverflowException` | Result is non-negative on normal return |
 | `bcl.enumerable.empty` - `Enumerable.Empty<T>()` | Unknown because the generic cache can trigger type initialization | Unknown | Does not throw | Non-null, empty sequence |
 
-These seven rows are the complete supported built-in BCL surface. Anything
+These eleven rows are the complete supported built-in BCL surface. Anything
 outside this table, or any row that does not resolve exactly for the current
-target framework, fails closed.
+target framework, fails closed. Object creation always analyzes a source
+constructor or resolves an exact catalog row; exception constructors are not
+implicitly trusted. In particular,
+`AggregateException(IEnumerable<Exception>)` is unmodeled and produces an
+incomplete effect result. A direct `throw new` refutation witness is available
+only when the exact constructor has approved `DoesNotThrow` and `Terminates`
+facets; either facet remaining unknown prevents a definite witness.
 
 The worker projects validated call-result facets only into bounded proxies:
 
@@ -203,7 +215,7 @@ invocation; they are not BCL coverage.
 ## Closed compiler artifact and remaining limits
 
 During Windows verification, the production analyzer captures compiler
-artifact schema version 7 from the post-generator compilation. The artifact
+artifact schema version 8 from the post-generator compilation. The artifact
 contains:
 
 - the feature-selected, sealed claim manifest;

@@ -270,7 +270,7 @@ public sealed class ScalarDifferentialMatrixTests
 
         internal WorkerVerifyRequest CreateRequest()
         {
-            var compilation = CreateCompilation(includeContracts: true);
+            var compilation = CreateCompilation(includeContracts: false);
             var discovery = new ClaimManifestBuilder(compilation).Build();
             var artifact = CompilerManifestArtifactProducer.Create(
                 compilation,

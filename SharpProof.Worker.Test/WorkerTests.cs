@@ -1077,7 +1077,7 @@ public sealed class WorkerTests
             outputKind: OutputKind.NetModule));
         Add(compilationOptions: CreateRoslynOptions(platform: Platform.X64));
         Add(parseOptions: CreateParseOptions(
-            preprocessorSymbols: [Contract.ConditionalSymbol, "EXTRA"]));
+            preprocessorSymbols: ["EXTRA"]));
         var backend = new CountingBackend(
             BackendCheckResult.Unsatisfiable([]));
         using var worker = new SharpProofWorker(backend);
@@ -4149,8 +4149,7 @@ public sealed class WorkerTests
     {
         return new(
             languageVersion,
-            preprocessorSymbols: preprocessorSymbols ??
-                [Contract.ConditionalSymbol]);
+            preprocessorSymbols: preprocessorSymbols ?? []);
     }
 
     private static CSharpCompilationOptions CreateRoslynOptions(

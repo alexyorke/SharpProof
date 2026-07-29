@@ -262,6 +262,11 @@ public sealed partial class ApiSpecTable
         ValidateEvidence(facets.Throws?.Evidence, nameof(facets));
         ValidateEvidence(facets.Nullness?.Evidence, nameof(facets));
         ValidateEvidence(facets.Cardinality?.Evidence, nameof(facets));
+        if (facets.Termination != null)
+        {
+            ValidateEvidence(facets.Termination.Evidence, nameof(facets));
+            ValidateDefined(facets.Termination.Behavior, nameof(facets));
+        }
         var (effects, allocation, throws, nullness, cardinality) =
             (facets.Effects!, facets.Allocation!, facets.Throws!, facets.Nullness!, facets.Cardinality!);
         if ((effects.Effects & ~DefinedEffects) != 0)

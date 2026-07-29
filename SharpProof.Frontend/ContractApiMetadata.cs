@@ -8,6 +8,7 @@ internal static class ContractApiMetadata
 {
     private const string Namespace = "SharpProof.Attributes.";
 
+    internal const string ConditionalSymbol = "SHARPPROOF_CONTRACTS";
     internal const string Contract = Namespace + "Contract";
     internal const string ContractFor = Namespace + "ContractForAttribute";
     internal const string EnforcePure = Namespace + "EnforcePureAttribute";

@@ -1,3 +1,5 @@
+using SharpProof.Specs;
+
 namespace SharpProof.Effects.Test;
 
 [TestFixture]
@@ -2315,7 +2317,7 @@ public sealed class EffectAnalysisTests
         AssertKinds("Allocate", "managed-allocation");
         AssertKinds("AllocateArray", "managed-array-allocation");
         AssertKinds("Throw", "managed-allocation", "explicit-throw");
-        AssertKinds("ThrowUser", "managed-allocation", "explicit-throw");
+        AssertKinds("ThrowUser", "managed-allocation");
         AssertKinds("Write", "direct-field-write");
         AssertKinds("Read", "direct-field-read");
         AssertKinds("VolatileWrite", "direct-field-write", "volatile-field-access");
@@ -2326,12 +2328,10 @@ public sealed class EffectAnalysisTests
         AssertKinds("Multiple");
 
         var frameworkThrow = Witnesses("Throw");
-        var userThrow = Witnesses("ThrowUser");
         using (Assert.EnterMultipleScope())
         {
             Assert.That(frameworkThrow[1].ExceptionType?.MetadataName,
                 Is.EqualTo(nameof(InvalidOperationException)));
-            Assert.That(userThrow[1].ExceptionType, Is.Null);
             Assert.That(Witnesses("VolatileRead")[1].Capabilities,
                 Is.EqualTo(EffectContractCapabilityKind.Synchronization));
             Assert.That(Witnesses("Synchronize")[0].Effects,
@@ -2348,6 +2348,134 @@ public sealed class EffectAnalysisTests
         {
             Assert.That(Witnesses(name).Select(static witness => witness.Kind),
                 Is.EqualTo(expected), name);
+        }
+    }
+
+    [Test]
+    public void ExceptionConstructorsRequireExactSpecsAndGateThrowWitnesses()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            using System.Collections.Generic;
+
+            public static class Sample {
+                public static InvalidOperationException Safe() =>
+                    new InvalidOperationException("message");
+
+                public static AggregateException Unmodeled() =>
+                    new AggregateException(
+                        (IEnumerable<Exception>)null!);
+
+                public static void ThrowSafe() =>
+                    throw new InvalidOperationException();
+
+                public static void ThrowUnmodeled() =>
+                    throw new AggregateException(
+                        (IEnumerable<Exception>)null!);
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var safe = session.Analyze(Method(compilation, "Safe"));
+        var unmodeled = session.Analyze(Method(compilation, "Unmodeled"));
+        var safeThrow = session.Analyze(Method(compilation, "ThrowSafe"));
+        var unmodeledThrow = session.Analyze(Method(compilation, "ThrowUnmodeled"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(safe.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(safe.Summary.Throws.IsEmpty, Is.True);
+            Assert.That(
+                safe.Summary.Termination,
+                Is.EqualTo(EffectTermination.Terminates));
+            Assert.That(unmodeled.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(unmodeled.Summary.Throws.IncludesUnknown, Is.True);
+            Assert.That(
+                unmodeled.Summary.Uncertainty & EffectUncertainty.UnmodeledCall,
+                Is.EqualTo(EffectUncertainty.UnmodeledCall));
+            Assert.That(
+                safeThrow.DirectWitnesses.Select(static witness => witness.Kind),
+                Is.EqualTo(["managed-allocation", "explicit-throw"]));
+            Assert.That(
+                safeThrow.DirectWitnesses[1].ExceptionType?.ToDisplayString(),
+                Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(
+                unmodeledThrow.DirectWitnesses.Select(static witness => witness.Kind),
+                Is.EqualTo(["managed-allocation"]));
+        }
+    }
+
+    [Test]
+    public void NonThrowingSpecWithoutTerminationCannotYieldAThrowWitness()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            using System.Collections.Generic;
+
+            public static class Sample {
+                public static void Throw() =>
+                    throw new AggregateException(
+                        (IEnumerable<Exception>)null!);
+            }
+            """);
+        var frameworkAssemblies = ApiSpecTable.Default.Templates.Single(
+            static template =>
+                template.Target.WitnessIdentifier == "bcl.object.ctor")
+            .Target.ApprovedAssemblies;
+        var evidence = new SpecEvidence(
+            SpecEvidenceKind.Observed,
+            "synthetic-non-terminating-constructor");
+        var table = ApiSpecTable.Create([
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "synthetic.aggregate.ctor",
+                    "M:System.AggregateException.#ctor(System.Collections.Generic.IEnumerable{System.Exception})",
+                    "System.AggregateException",
+                    SpecTargetMemberKind.Constructor,
+                    ".ctor",
+                    false,
+                    0,
+                    SpecValueType.Reference,
+                    [SpecValueType.Reference],
+                    null,
+                    frameworkAssemblies),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.None, evidence),
+                    new SpecAllocationFacet(
+                        SpecAllocationBehavior.None,
+                        evidence),
+                    new SpecThrowFacet(
+                        SpecThrowBehavior.DoesNotThrow,
+                        [],
+                        evidence),
+                    new SpecNullnessFacet(
+                        SpecNullness.NotApplicable,
+                        evidence),
+                    new SpecCardinalityFacet(
+                        SpecCardinality.NotApplicable,
+                        null,
+                        evidence)),
+                [])
+        ]);
+        var result = new EffectAnalysisSession(compilation, table).Analyze(
+            Method(compilation, "Throw"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Summary.Throws.IncludesUnknown, Is.False);
+            Assert.That(
+                result.Summary.Throws.Types.Select(static type =>
+                    type.ToDisplayString()),
+                Does.Contain("System.AggregateException"));
+            Assert.That(
+                result.Summary.Termination,
+                Is.EqualTo(EffectTermination.Unknown));
+            Assert.That(
+                result.DirectWitnesses.Select(static witness => witness.Kind),
+                Is.EqualTo(["managed-allocation"]));
         }
     }
 

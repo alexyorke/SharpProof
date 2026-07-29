@@ -13,10 +13,10 @@ internal sealed class ClaimManifestBuilder(
         ContractClauseInventoryBuilder.ForCompilation(compilation);
     private readonly ContractSelectionInventory _attributes =
         ContractSelectionInventory.ForCompilation(compilation);
+    private readonly EffectiveContractSourceResolver _contractSources =
+        EffectiveContractSourceResolver.ForCompilation(compilation);
     private readonly AnalyzerSession _effectSession =
         new(compilation, AnalyzerConfiguration.AdvisoryAll, cancellationToken);
-    private readonly ImmutableArray<ContractForSymbolMatcher.CompanionDescriptor> _companions =
-        ContractForSymbolMatcher.DiscoverCompanions(compilation, cancellationToken);
 
     internal ClaimManifestBuildResult Build()
     {
@@ -48,19 +48,13 @@ internal sealed class ClaimManifestBuilder(
     private ManifestCallableTarget? BuildTarget(CallableSeed seed, string callableId)
     {
         var target = seed.Method;
-        var inventory = _clauses.Create(target);
-        var source = target;
-        var usesCompanion = false;
-        if (!inventory.Clauses.Any(static clause => clause.IsValid) &&
-            ContractForSymbolMatcher.ResolveCompanion(_companions, target).Method is { } companion)
-        {
-            source = companion;
-            inventory = _clauses.Create(source);
-            usesCompanion = true;
-        }
+        var resolution = _contractSources.Resolve(target);
+        var source = resolution.Source;
+        var inventory = resolution.Inventory;
+        var usesCompanion = resolution.UsesCompanion;
         var postconditions = CreatePostconditions(
             target, source, inventory, usesCompanion, callableId);
-        var selected = SelectFeatures(target, inventory);
+        var selected = SelectFeatures(target, resolution);
         var assumptions = CreateAssumptions(
             target, source, inventory, usesCompanion, callableId);
         if (postconditions.IsDefaultOrEmpty && selected.IsDefaultOrEmpty && assumptions.IsDefaultOrEmpty)
@@ -174,12 +168,11 @@ internal sealed class ClaimManifestBuilder(
 
     private ImmutableArray<WorkerSelectedFeature> SelectFeatures(
         IMethodSymbol method,
-        ContractClauseInventory inventory)
+        EffectiveContractSourceResolution resolution)
     {
         var selected = _attributes.Select(
             method,
-            inventory.Clauses.Any(static clause =>
-                clause.Placement != ContractClausePlacement.NestedCallable),
+            resolution.HasSelectedContractIntent,
             TrustedAttributes(method).Any());
         var result = ImmutableArray.CreateBuilder<WorkerSelectedFeature>(2);
         if (EffectsEnabled && (selected & ContractSelectionFeatures.Effects) != 0)
@@ -444,7 +437,7 @@ internal sealed class ClaimManifestBuilder(
                 }
             }
         }
-        foreach (var companion in _companions)
+        foreach (var companion in _contractSources.Companions)
         {
             foreach (var method in ContractForSymbolMatcher.GetOrdinaryMethods(companion.Target))
             {
@@ -458,7 +451,9 @@ internal sealed class ClaimManifestBuilder(
         void Add(IMethodSymbol? method)
         {
             if (method != null &&
-                !ContractForSymbolMatcher.IsCompanionType(_companions, method.ContainingType))
+                !ContractForSymbolMatcher.IsCompanionType(
+                    _contractSources.Companions,
+                    method.ContainingType))
             {
                 methods.Add(ContractClauseInventoryBuilder.NormalizeCallable(method));
             }

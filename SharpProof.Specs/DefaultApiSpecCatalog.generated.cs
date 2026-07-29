@@ -8,7 +8,7 @@ namespace SharpProof.Specs;
 public sealed partial class ApiSpecTable
 {
     public const string DefaultTableIdentity = "SharpProof.ApiSpec.Default";
-    public const string DefaultTableVersion = "3";
+    public const string DefaultTableVersion = "5";
 
     private static ImmutableArray<ApiSpecDeclaration> CreateDefaultDeclarations()
     {
@@ -54,7 +54,8 @@ public sealed partial class ApiSpecTable
                     new SpecAllocationFacet(SpecAllocationBehavior.Unknown, evidenceObserved),
                     new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceDocumented),
                     new SpecNullnessFacet(SpecNullness.NonNull, evidenceDocumented),
-                    new SpecCardinalityFacet(SpecCardinality.Empty, null, evidenceDocumented)),
+                    new SpecCardinalityFacet(SpecCardinality.Empty, null, evidenceDocumented),
+                    null),
                 []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
@@ -69,7 +70,72 @@ public sealed partial class ApiSpecTable
                     new SpecAllocationFacet(SpecAllocationBehavior.Unknown, evidenceObserved),
                     new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
                     new SpecNullnessFacet(SpecNullness.NonNull, evidenceDocumented),
-                    new SpecCardinalityFacet(SpecCardinality.Empty, null, evidenceDocumented)),
+                    new SpecCardinalityFacet(SpecCardinality.Empty, null, evidenceDocumented),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.exception.ctor",
+                    "M:System.Exception.#ctor",
+                    "System.Exception",
+                    SpecTargetMemberKind.Constructor, ".ctor",
+                    false, 0, SpecValueType.Reference, [], null,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.WritesReceiverState, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.exception.ctor.string",
+                    "M:System.Exception.#ctor(System.String)",
+                    "System.Exception",
+                    SpecTargetMemberKind.Constructor, ".ctor",
+                    false, 0, SpecValueType.Reference, [SpecValueType.String], null,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.WritesReceiverState, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.invalid-operation-exception.ctor",
+                    "M:System.InvalidOperationException.#ctor",
+                    "System.InvalidOperationException",
+                    SpecTargetMemberKind.Constructor, ".ctor",
+                    false, 0, SpecValueType.Reference, [], null,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.WritesReceiverState, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.invalid-operation-exception.ctor.string",
+                    "M:System.InvalidOperationException.#ctor(System.String)",
+                    "System.InvalidOperationException",
+                    SpecTargetMemberKind.Constructor, ".ctor",
+                    false, 0, SpecValueType.Reference, [SpecValueType.String], null,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.WritesReceiverState, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
                 []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
@@ -84,7 +150,8 @@ public sealed partial class ApiSpecTable
                     new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceObserved),
                     new SpecThrowFacet(SpecThrowBehavior.Unknown, [], evidenceDocumented),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
-                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented)),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
                 []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
@@ -99,7 +166,8 @@ public sealed partial class ApiSpecTable
                     new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
                     new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.OverflowException"], evidenceDocumented),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
-                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented)),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
                 [
                     new SpecPostconditionDeclaration(
                         new SpecBinaryDeclaration(SpecBinaryOperator.GreaterThanOrEqual, new SpecVariableDeclaration(SpecVariableRole.Result, -1, SpecValueType.Integer), new SpecIntegerDeclaration(0), SpecValueType.Boolean),
@@ -118,7 +186,8 @@ public sealed partial class ApiSpecTable
                     new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
                     new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
-                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented)),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
                 []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
@@ -133,7 +202,8 @@ public sealed partial class ApiSpecTable
                     new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceDocumented),
                     new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceDocumented),
                     new SpecNullnessFacet(SpecNullness.NonNull, evidenceDocumented),
-                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented)),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
                 []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
@@ -148,7 +218,8 @@ public sealed partial class ApiSpecTable
                     new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
                     new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
-                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented)),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
                 [
                     new SpecPostconditionDeclaration(
                         new SpecBinaryDeclaration(SpecBinaryOperator.Equal, new SpecVariableDeclaration(SpecVariableRole.Result, -1, SpecValueType.Integer), new SpecLengthDeclaration(new SpecVariableDeclaration(SpecVariableRole.Receiver, -1, SpecValueType.String)), SpecValueType.Boolean),
@@ -167,7 +238,8 @@ public sealed partial class ApiSpecTable
                     new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceContractSemantics),
                     new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceContractSemantics),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceContractSemantics),
-                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceContractSemantics)),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceContractSemantics),
+                    null),
                 []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
@@ -182,7 +254,8 @@ public sealed partial class ApiSpecTable
                     new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceContractSemantics),
                     new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceContractSemantics),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceContractSemantics),
-                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceContractSemantics)),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceContractSemantics),
+                    null),
                 []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
@@ -197,7 +270,8 @@ public sealed partial class ApiSpecTable
                     new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceContractSemantics),
                     new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.InvalidOperationException"], evidenceContractSemantics),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceContractSemantics),
-                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceContractSemantics)),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceContractSemantics),
+                    null),
                 []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
@@ -212,7 +286,8 @@ public sealed partial class ApiSpecTable
                     new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceContractSemantics),
                     new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceContractSemantics),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceContractSemantics),
-                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceContractSemantics)),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceContractSemantics),
+                    null),
                 []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
@@ -227,7 +302,8 @@ public sealed partial class ApiSpecTable
                     new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceContractSemantics),
                     new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.InvalidOperationException"], evidenceContractSemantics),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceContractSemantics),
-                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceContractSemantics)),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceContractSemantics),
+                    null),
                 []),
         ];
     }

@@ -38,6 +38,12 @@ public enum SpecThrowBehavior
     Unknown
 }
 
+public enum SpecTerminationBehavior
+{
+    Terminates,
+    Unknown
+}
+
 public enum SpecNullness
 {
     NotApplicable,
@@ -112,6 +118,9 @@ public sealed record SpecAllocationFacet(SpecAllocationBehavior Behavior, SpecEv
 public sealed record SpecThrowFacet(
     SpecThrowBehavior Behavior, ImmutableArray<string> ExceptionMetadataNames, SpecEvidence Evidence);
 
+public sealed record SpecTerminationFacet(
+    SpecTerminationBehavior Behavior, SpecEvidence Evidence);
+
 public sealed record SpecNullnessFacet(SpecNullness Result, SpecEvidence Evidence);
 
 public sealed record SpecCardinalityFacet(
@@ -130,7 +139,8 @@ public enum ApiSpecReferenceFamily
 public sealed record ApiSpecFacets(
     SpecEffectFacet Effects, SpecAllocationFacet Allocation,
     SpecThrowFacet Throws, SpecNullnessFacet Nullness,
-    SpecCardinalityFacet Cardinality);
+    SpecCardinalityFacet Cardinality,
+    SpecTerminationFacet? Termination = null);
 
 public sealed record ApiSpecAssemblyIdentity(
     string Name,

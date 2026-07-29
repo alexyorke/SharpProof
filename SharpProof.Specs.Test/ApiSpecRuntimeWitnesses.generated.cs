@@ -13,6 +13,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
     [
         new("bcl.array.empty", CreateBclArrayEmptyWitness),
         new("bcl.enumerable.empty", CreateBclEnumerableEmptyWitness),
+        new("bcl.exception.ctor", CreateBclExceptionCtorWitness),
+        new("bcl.exception.ctor.string", CreateBclExceptionCtorStringWitness),
+        new("bcl.invalid-operation-exception.ctor", CreateBclInvalidOperationExceptionCtorWitness),
+        new("bcl.invalid-operation-exception.ctor.string", CreateBclInvalidOperationExceptionCtorStringWitness),
         new("bcl.list.add", CreateBclListAddWitness),
         new("bcl.math.abs.int32", CreateBclMathAbsInt32Witness),
         new("bcl.object.ctor", CreateBclObjectCtorWitness),

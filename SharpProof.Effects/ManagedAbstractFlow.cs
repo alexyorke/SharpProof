@@ -1039,6 +1039,20 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
         return false;
     }
 
+    internal bool TryEvaluateAtOrigin(
+        IOperation origin,
+        IOperation value,
+        out ManagedAbstractValue result)
+    {
+        if (TryGetState(origin, out var state))
+        {
+            result = flow.Evaluate(value, state);
+            return true;
+        }
+        result = ManagedAbstractValue.Unknown;
+        return false;
+    }
+
     internal bool ProvesNonNull(IOperation origin, IOperation value)
     {
         return TryEvaluate(origin, value, out var result) && result.IsDefinitelyNonNull;

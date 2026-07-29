@@ -1250,6 +1250,91 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task NestedOnlyContractsDoNotSelectTheirContainingMethod()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System.Threading.Tasks;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static async Task Outer() {
+                    void Local() {
+                        Contract.Requires(true);
+                    }
+                    Local();
+                    await Task.Yield();
+                }
+            }
+            """,
+            "contracts",
+            ["SP0047"]);
+
+        Assert.That(
+            diagnostics.Select(diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Has.None.Contain("'Outer'"));
+    }
+
+    [Test]
+    public async Task CompanionSelectionMakesUnsupportedTargetsVisibleAndFailsClosed()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class ValidSubject {
+                public int SelectedByCompanion() {
+                    Func<int> value = () => 1;
+                    return value();
+                }
+            }
+
+            [ContractFor(typeof(ValidSubject))]
+            public static class ValidSubjectContracts {
+                public static int SelectedByCompanion(
+                    ValidSubject receiver) {
+                    Contract.Ensures(true);
+                    return 1;
+                }
+            }
+
+            public sealed class MalformedSubject {
+                public int SelectedByMalformedCompanion() {
+                    Func<int> value = () => 1;
+                    return value();
+                }
+            }
+
+            [ContractFor(typeof(MalformedSubject))]
+            public static class MalformedSubjectContracts {
+                public static int SelectedByMalformedCompanion(
+                    MalformedSubject receiver,
+                    int unexpected) {
+                    Contract.Ensures(true);
+                    return unexpected;
+                }
+            }
+            """,
+            "contracts",
+            ["SP0047"]);
+
+        var messages = diagnostics.Select(diagnostic =>
+            diagnostic.GetMessage(CultureInfo.InvariantCulture)).ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(messages, Has.Length.EqualTo(2));
+            Assert.That(
+                messages,
+                Has.Some.Contain("'SelectedByCompanion'"));
+            Assert.That(
+                messages,
+                Has.Some.Contain("'SelectedByMalformedCompanion'"));
+        }
+    }
+
+    [Test]
     public async Task SuppressionOnlyChangesReportingAndTrustDoesNotSharpen()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

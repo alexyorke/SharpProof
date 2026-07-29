@@ -352,6 +352,34 @@ public sealed class PackageLayoutSmokeTests
             Is.Zero,
             disabledOnUnsupportedCompiler.Output);
 
+        var runtimeContracts = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "msbuild",
+            workspace.ConsumerProject,
+            "-t:_SharpProofValidateConfiguration",
+            "-p:DefineConstants=SHARPPROOF_CONTRACTS",
+            "--nologo");
+        Assert.That(
+            runtimeContracts.ExitCode,
+            Is.Not.Zero,
+            runtimeContracts.Output);
+        Assert.That(
+            runtimeContracts.Output,
+            Does.Contain(
+                "SHARPPROOF_CONTRACTS enables runtime evaluation of ghost contracts"));
+        var disabledRuntimeContracts = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "msbuild",
+            workspace.ConsumerProject,
+            "-t:_SharpProofValidateConfiguration",
+            "-p:SharpProofProfile=off",
+            "-p:DefineConstants=SHARPPROOF_CONTRACTS",
+            "--nologo");
+        Assert.That(
+            disabledRuntimeContracts.ExitCode,
+            Is.Zero,
+            disabledRuntimeContracts.Output);
+
         var disabledItems = await RunDotNetAsync(
             workspace.ConsumerDirectory,
             "msbuild",

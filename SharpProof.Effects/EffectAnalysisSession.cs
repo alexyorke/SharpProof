@@ -154,7 +154,7 @@ public sealed class EffectAnalysisSession
     internal bool IsConditionallyElided(IInvocationOperation invocation)
     {
         if (_conditionalAttribute == null ||
-            invocation.Syntax.SyntaxTree.Options is not CSharpParseOptions options)
+            invocation.Syntax.SyntaxTree.Options is not CSharpParseOptions)
         {
             return false;
         }
@@ -173,35 +173,19 @@ public sealed class EffectAnalysisSession
             return false;
         }
 
-        var definedSymbols = GetDefinedPreprocessorSymbols(invocation.Syntax.SyntaxTree, options);
+        var definedSymbols = GetDefinedPreprocessorSymbols(invocation.Syntax.SyntaxTree);
         return conditionalSymbols.All(symbol => !definedSymbols.Contains(symbol!));
     }
 
     private ImmutableHashSet<string> GetDefinedPreprocessorSymbols(
-        SyntaxTree tree, CSharpParseOptions options)
+        SyntaxTree tree)
     {
         if (_definedPreprocessorSymbols.TryGetValue(tree, out var cached))
         {
             return cached;
         }
 
-        var definedSymbols = options.PreprocessorSymbolNames
-            .ToImmutableHashSet(StringComparer.Ordinal)
-            .ToBuilder();
-        foreach (var trivia in tree.GetRoot().DescendantTrivia(descendIntoTrivia: true))
-        {
-            var directive = trivia.GetStructure();
-            switch (directive)
-            {
-                case DefineDirectiveTriviaSyntax { IsActive: true } define:
-                    definedSymbols.Add(define.Name.ValueText);
-                    break;
-                case UndefDirectiveTriviaSyntax { IsActive: true } undef:
-                    definedSymbols.Remove(undef.Name.ValueText);
-                    break;
-            }
-        }
-        cached = definedSymbols.ToImmutable();
+        cached = CSharpPreprocessorSymbols.GetDefined(tree);
         _definedPreprocessorSymbols.Add(tree, cached);
         return cached;
     }

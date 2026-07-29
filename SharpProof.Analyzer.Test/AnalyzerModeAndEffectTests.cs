@@ -1194,6 +1194,65 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task ExceptionConstructorContractsUseOnlyExactApprovedSpecs()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using System.Collections.Generic;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [DoesNotThrow]
+                public static InvalidOperationException SafeConstruction() =>
+                    new InvalidOperationException("message");
+
+                [DoesNotThrow]
+                public static AggregateException UnmodeledConstruction() =>
+                    new AggregateException(
+                        (IEnumerable<Exception>)null!);
+
+                [AllowedExceptions(typeof(ArgumentException))]
+                public static void DefiniteWrongThrow() =>
+                    throw new InvalidOperationException();
+
+                [AllowedExceptions(typeof(ArgumentException))]
+                public static void UnmodeledThrow() =>
+                    throw new AggregateException(
+                        (IEnumerable<Exception>)null!);
+            }
+            """,
+            mode: null,
+            ["SP0046"],
+            new SharpProofAnalyzer(factory),
+            features: "effects");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0046", "SP0046", "SP0046"]));
+            Assert.That(
+                factory.Outcomes["SafeConstruction"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["UnmodeledConstruction"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["DefiniteWrongThrow"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
+            Assert.That(
+                factory.Outcomes["UnmodeledThrow"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                diagnostics.Select(diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+                Has.Some.Contain("UnmodeledCall"));
+        }
+    }
+
+    [Test]
     public async Task ThrowsOnlyDoesNotCoverAllocationButStillCoversThrowingExistingException()
     {
         var factory = new RecordingSessionFactory();

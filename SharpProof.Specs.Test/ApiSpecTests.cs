@@ -506,6 +506,55 @@ public sealed class ApiSpecTests
     }
 
     [Test]
+    public void ExceptionConstructorSpecsRequireAnExactMemberMatch()
+    {
+        var compilation = CreatePlatformCompilation();
+        var resolved = new ApiSpecResolver(ApiSpecTable.Default)
+            .Resolve(compilation);
+        var exception = compilation.GetTypeByMetadataName("System.Exception")!;
+        var invalidOperation = compilation.GetTypeByMetadataName(
+            "System.InvalidOperationException")!;
+        var aggregate = compilation.GetTypeByMetadataName(
+            "System.AggregateException")!;
+        var supported = exception.InstanceConstructors
+            .Concat(invalidOperation.InstanceConstructors)
+            .Where(static constructor =>
+                constructor.Parameters.Length == 0 ||
+                constructor.Parameters is [
+                    {
+                        Type.SpecialType: SpecialType.System_String
+                    }])
+            .ToArray();
+        var aggregateEnumerable = aggregate.InstanceConstructors.Single(
+            static constructor =>
+                constructor.Parameters is [
+                {
+                    Type: INamedTypeSymbol
+                    {
+                        MetadataName: "IEnumerable`1"
+                    }
+                }]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(supported, Has.Length.EqualTo(4));
+            Assert.That(
+                supported.All(constructor =>
+                    resolved.TryGet(constructor, out var spec) &&
+                    spec.Template.Facets.Throws.Behavior ==
+                    SpecThrowBehavior.DoesNotThrow &&
+                    spec.Template.Facets.Termination?.Behavior ==
+                    SpecTerminationBehavior.Terminates &&
+                    spec.Template.Facets.Effects.Effects ==
+                    SpecEffect.WritesReceiverState),
+                Is.True);
+            Assert.That(
+                resolved.Lookup(aggregateEnumerable).Status,
+                Is.EqualTo(ApiSpecLookupStatus.Unknown));
+        }
+    }
+
+    [Test]
     public void PureOpaqueEligibilityComesOnlyFromResolvedSpecFacets()
     {
         var compilation = CreatePlatformCompilation();
@@ -572,7 +621,7 @@ public sealed class ApiSpecTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(templates.Length, Is.EqualTo(12));
+            Assert.That(templates.Length, Is.EqualTo(16));
             Assert.That(
                 templates.Select(static row => row.Target.WitnessIdentifier),
                 Is.Unique.And.All.Not.Empty);
@@ -592,7 +641,10 @@ public sealed class ApiSpecTests
             row.Facets.Throws.Evidence,
             row.Facets.Nullness.Evidence,
             row.Facets.Cardinality.Evidence
-        }).Concat(ApiSpecTable.Default.Templates.SelectMany(
+        }).Concat(ApiSpecTable.Default.Templates
+            .Where(static row => row.Facets.Termination != null)
+            .Select(static row => row.Facets.Termination!.Evidence))
+        .Concat(ApiSpecTable.Default.Templates.SelectMany(
             static row => row.Postconditions.Select(static postcondition => postcondition.Evidence)));
 
         Assert.Multiple(() =>

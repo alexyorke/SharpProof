@@ -16,8 +16,10 @@ public sealed class ContractBinder(
         new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<IMethodSymbol, ContractBindingResult> _requiresBindings =
         new(SymbolEqualityComparer.Default);
-    private readonly ImmutableArray<ContractForSymbolMatcher.CompanionDescriptor> _companions =
-        compilation == null ? [] : ContractForSymbolMatcher.DiscoverCompanions(compilation);
+    private readonly EffectiveContractSourceResolver _contractSources =
+        clauseInventory == null
+            ? EffectiveContractSourceResolver.ForCompilation(compilation)
+            : new EffectiveContractSourceResolver(compilation, clauseInventory);
 
     public ContractBindingResult Bind(
         IMethodSymbol target,
@@ -79,47 +81,27 @@ public sealed class ContractBinder(
             return ContractBindingResult.Fail(ContractBindingFailure.UnsupportedTarget);
         }
 
-        var source = ContractClauseInventoryBuilder.NormalizeCallable(target);
-        var usesCompanion = false;
-        var inventory = _clauseInventory.Create(source, implementationBody);
-        var sourceBody = inventory.ImplementationBody;
-        var hasValidDirectClause = inventory.Clauses.Any(static clause => clause.IsValid);
-        if (!hasValidDirectClause && target.MethodKind == MethodKind.Ordinary)
+        var resolution = _contractSources.Resolve(target, implementationBody);
+        if (!resolution.HasValidDirectClause &&
+            target.MethodKind == MethodKind.Ordinary)
         {
-            var directFailure = ValidateIntrinsics(source, sourceBody, requiresOnly);
+            var directFailure = ValidateIntrinsics(
+                resolution.DirectInventory.Callable,
+                resolution.DirectInventory.ImplementationBody,
+                requiresOnly);
             if (directFailure != ContractBindingFailure.None)
             {
                 return ContractBindingResult.Fail(directFailure);
             }
-
-            var companion = ContractForSymbolMatcher.ResolveCompanion(_companions, target);
-            if (companion.Failure != ContractBindingFailure.None)
-            {
-                return ContractBindingResult.Fail(companion.Failure);
-            }
-
-            if (companion.Method != null)
-            {
-                source = companion.Method;
-                inventory = _clauseInventory.Create(source);
-                sourceBody = inventory.ImplementationBody;
-                if (sourceBody == null)
-                {
-                    return ContractBindingResult.Fail(ContractBindingFailure.CompanionBodyUnavailable);
-                }
-
-                usesCompanion = true;
-                if (inventory.HasPlacementErrors)
-                {
-                    return ContractBindingResult.Fail(ContractBindingFailure.InvalidClausePlacement);
-                }
-            }
         }
-        if (!usesCompanion && inventory.HasPlacementErrors)
+        if (resolution.Failure != ContractBindingFailure.None)
         {
-            return ContractBindingResult.Fail(ContractBindingFailure.InvalidClausePlacement);
+            return ContractBindingResult.Fail(resolution.Failure);
         }
 
+        var source = resolution.Source;
+        var inventory = resolution.Inventory;
+        var usesCompanion = resolution.UsesCompanion;
         var expressionBinder = new ContractExpressionBinder(
             _factory,
             _api,

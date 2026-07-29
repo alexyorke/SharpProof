@@ -42,6 +42,19 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        if (ContractRuntimePolicy.IsRuntimeEvaluationEnabled(
+                context.Compilation,
+                context.CancellationToken))
+        {
+            context.RegisterCompilationEndAction(endContext =>
+            {
+                ReportInvalidConfiguration(endContext, configuration);
+                endContext.ReportDiagnostic(CreateInvalidConfigurationDiagnostic(
+                    ContractRuntimePolicy.InvalidConfiguration()));
+            });
+            return;
+        }
+
         var session = _sessionFactory.Create(
             context.Compilation,
             configuration,

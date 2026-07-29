@@ -407,8 +407,6 @@ internal sealed class OperationEffectScanner
             creation.Type?.IsValueType == true ? EffectSummary.Empty : EffectSummaryOperations.Allocate(EffectAllocationKind.Managed),
             constructor == null
                 ? EffectSummaryOperations.Unsupported()
-                : IsFrameworkExceptionConstructor(constructor)
-                    ? EffectSummary.Empty
                 : _session.ResolveCall(
                     constructor,
                     receiver,
@@ -416,13 +414,6 @@ internal sealed class OperationEffectScanner
                     false,
                     _calls,
                     creation));
-    }
-
-    private bool IsFrameworkExceptionConstructor(IMethodSymbol constructor)
-    {
-        return _exceptionType != null &&
-        SymbolEqualityComparer.Default.Equals(constructor.ContainingAssembly, _exceptionType.ContainingAssembly) &&
-        EffectTypeFacts.IsDerivedFrom(constructor.ContainingType, _exceptionType);
     }
 
     private EffectSummary ScanBinary(IBinaryOperation binary)
@@ -681,7 +672,8 @@ internal sealed class OperationEffectScanner
                 {
                     Type: INamedTypeSymbol exceptionType
                 } creation &&
-                RecordAllocation(creation):
+                RecordAllocation(creation) &&
+                HasNonThrowingConstructorSpec(creation):
                 var exact = IsFrameworkException(exceptionType);
                 AddWitness(EffectContractKind.Throws, "explicit-throw",
                     Symbol(exceptionType) + (exact ? ";exact-type=true" : ";exact-type=false"),
@@ -778,6 +770,16 @@ internal sealed class OperationEffectScanner
         return _exceptionType != null &&
         SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, _exceptionType.ContainingAssembly) &&
         EffectTypeFacts.IsDerivedFrom(type, _exceptionType);
+    }
+
+    private bool HasNonThrowingConstructorSpec(IObjectCreationOperation creation)
+    {
+        return creation.Constructor != null &&
+               _session.ApiSpecs.TryGet(creation.Constructor, out var spec) &&
+               spec.Template.Facets.Throws.Behavior ==
+               SpecThrowBehavior.DoesNotThrow &&
+               spec.Template.Facets.Termination?.Behavior ==
+               SpecTerminationBehavior.Terminates;
     }
 
     private void AddWitness(

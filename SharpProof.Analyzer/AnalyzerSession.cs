@@ -29,6 +29,7 @@ internal sealed class AnalyzerSession
 {
     private readonly EffectAnalysisSession _effects;
     private readonly ContractClauseInventoryBuilder _contractClauses;
+    private readonly EffectiveContractSourceResolver _contractSources;
     private readonly ContractBinder _contractBinder;
     private readonly ContractIntrinsicValidator _contractIntrinsics;
     private readonly ResolvedApiSpecTable _apiSpecs;
@@ -50,7 +51,8 @@ internal sealed class AnalyzerSession
         _outcomeObserver = outcomeObserver;
         Attributes = ContractSelectionInventory.ForCompilation(compilation);
         _contractClauses = ContractClauseInventoryBuilder.ForCompilation(compilation);
-        _contractBinder = new ContractBinder(compilation, IrFactory, _contractClauses);
+        _contractSources = EffectiveContractSourceResolver.ForCompilation(compilation);
+        _contractBinder = new ContractBinder(compilation, IrFactory);
         _contractIntrinsics = new ContractIntrinsicValidator(compilation);
         _apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         _effects = new EffectAnalysisSession(compilation, _apiSpecs);
@@ -76,6 +78,12 @@ internal sealed class AnalyzerSession
     internal ContractClauseInventory GetContractClauses(IMethodSymbol method)
     {
         return _contractClauses.Create(method);
+    }
+
+    internal EffectiveContractSourceResolution ResolveContractSource(
+        IMethodSymbol method)
+    {
+        return _contractSources.Resolve(method);
     }
 
     internal ContractBindingResult BindRequires(IMethodSymbol method)

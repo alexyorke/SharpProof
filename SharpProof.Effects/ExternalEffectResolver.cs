@@ -357,9 +357,13 @@ internal sealed class ExternalEffectResolver
             exceptions = EffectThrowSet.Unknown;
             completeness = EffectCompleteness.Incomplete;
         }
+        var termination = spec.Facets.Termination?.Behavior ==
+            SpecTerminationBehavior.Terminates
+                ? EffectTermination.Terminates
+                : EffectTermination.Unknown;
         return new EffectSummary(
             reads, writes, allocation, new EffectCapabilitySet(capabilities),
-            exceptions, EffectTermination.Unknown, completeness);
+            exceptions, termination, completeness);
     }
 
     private static EffectRegionSet SpecRegions(

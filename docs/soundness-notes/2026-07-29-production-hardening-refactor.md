@@ -7,9 +7,10 @@ compiler-host, protocol, and analyzer maintenance risks.
 
 ## Compiler and artifact boundary
 
-- Compiler artifact schema 7 replaces compiler-option strings with closed wire
-  enums. Roslyn-to-wire conversion is exhaustive and unknown future values fail
-  closed.
+- Compiler artifact schema 8 retains closed compiler-option wire enums and
+  adds raw plus effective per-tree preprocessor symbols. Roslyn-to-wire
+  conversion is exhaustive, unknown future values fail closed, and an
+  effective runtime-contract symbol is rejected independently by the worker.
 - Exception constraints, evidence text, and exact witness hierarchies use one
   canonical encoder containing the full assembly identity and documentation
   type-reference ID. Independent replay therefore distinguishes aliased

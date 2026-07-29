@@ -63,7 +63,7 @@ effect-only artifacts exclude postcondition claims.
 under every policy. `SharpProofMode` is a deprecated preview compatibility
 alias.
 
-This acceptance contract covers compiler artifact schema version 7,
+This acceptance contract covers compiler artifact schema version 8,
 generated-tree accountability, portable whole-body lowered CFG/IR, exact
 manifest/lowered-callable/result equality, compiler-diagnostic propagation, and
 fail-closed option/provenance validation. The worker consumes that closed
