@@ -18,6 +18,8 @@ internal sealed class EffectiveContractSourceResolution(
         Failure is not (
             ContractBindingFailure.None or
             ContractBindingFailure.MissingCompanion) ||
+        DirectInventory.HasRejectedContractApiUsage ||
+        Inventory.HasRejectedContractApiUsage ||
         Inventory.Clauses.Any(static clause =>
             clause.Placement != ContractClausePlacement.NestedCallable);
 }

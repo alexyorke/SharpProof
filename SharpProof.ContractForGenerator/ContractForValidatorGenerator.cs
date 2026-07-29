@@ -36,6 +36,22 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator
         var contractFor = ContractSelectionInventory.ForCompilation(compilation).ContractFor;
         if (contractFor == null)
         {
+            foreach (var candidate in candidates
+                         .Distinct((IEqualityComparer<INamedTypeSymbol>)
+                             SymbolEqualityComparer.Default)
+                         .OrderBy(static candidate =>
+                             candidate.Locations.FirstOrDefault()?.SourceTree?.FilePath,
+                             StringComparer.Ordinal)
+                         .ThenBy(static candidate =>
+                             candidate.Locations.FirstOrDefault()?.SourceSpan.Start ??
+                             int.MaxValue))
+            {
+                context.CancellationToken.ThrowIfCancellationRequested();
+                context.ReportDiagnostic(At(
+                    GeneratedDiagnosticDescriptors.InvalidTarget,
+                    GetSourceLocation(candidate, Location.None),
+                    candidate.Name));
+            }
             return;
         }
 

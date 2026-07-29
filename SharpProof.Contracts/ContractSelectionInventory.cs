@@ -15,6 +15,7 @@ internal sealed class ContractSelectionInventory
 
     internal const string ContractForMetadataName =
         ContractApiMetadata.ContractFor;
+    private readonly ContractApiIdentityResolver _identity;
 
     private ContractSelectionInventory(Compilation compilation)
     {
@@ -23,19 +24,19 @@ internal sealed class ContractSelectionInventory
             throw new ArgumentNullException(nameof(compilation));
         }
 
-        ContractFor = compilation.GetTypeByMetadataName(
-            ContractApiMetadata.ContractFor);
-        EnforcePure = Resolve(compilation, ContractApiMetadata.EnforcePure);
-        ZeroAllocations = Resolve(compilation, ContractApiMetadata.ZeroAllocations);
-        AllowedCapabilities = Resolve(compilation, ContractApiMetadata.AllowedCapabilities);
-        DoesNotThrow = Resolve(compilation, ContractApiMetadata.DoesNotThrow);
-        AllowedExceptions = Resolve(compilation, ContractApiMetadata.AllowedExceptions);
-        EffectContract = Resolve(compilation, ContractApiMetadata.EffectContract);
-        NotNull = Resolve(compilation, ContractApiMetadata.NotNull);
-        Positive = Resolve(compilation, ContractApiMetadata.Positive);
-        InRange = Resolve(compilation, ContractApiMetadata.InRange);
-        Suppress = Resolve(compilation, ContractApiMetadata.Suppress);
-        Trusted = Resolve(compilation, ContractApiMetadata.Trusted);
+        _identity = ContractApiIdentityResolver.ForCompilation(compilation);
+        ContractFor = _identity.ResolveAttribute(ContractApiMetadata.ContractFor);
+        EnforcePure = _identity.ResolveAttribute(ContractApiMetadata.EnforcePure);
+        ZeroAllocations = _identity.ResolveAttribute(ContractApiMetadata.ZeroAllocations);
+        AllowedCapabilities = _identity.ResolveAttribute(ContractApiMetadata.AllowedCapabilities);
+        DoesNotThrow = _identity.ResolveAttribute(ContractApiMetadata.DoesNotThrow);
+        AllowedExceptions = _identity.ResolveAttribute(ContractApiMetadata.AllowedExceptions);
+        EffectContract = _identity.ResolveAttribute(ContractApiMetadata.EffectContract);
+        NotNull = _identity.ResolveAttribute(ContractApiMetadata.NotNull);
+        Positive = _identity.ResolveAttribute(ContractApiMetadata.Positive);
+        InRange = _identity.ResolveAttribute(ContractApiMetadata.InRange);
+        Suppress = _identity.ResolveAttribute(ContractApiMetadata.Suppress);
+        Trusted = _identity.ResolveAttribute(ContractApiMetadata.Trusted);
     }
 
     internal static ContractSelectionInventory ForCompilation(
@@ -129,10 +130,68 @@ internal sealed class ContractSelectionInventory
             selected |= ContractSelectionFeatures.Effects;
         }
 
-        return trusted
-            ? ContractSelectionFeatures.Contracts |
-              ContractSelectionFeatures.Effects
-            : selected;
+        if (trusted)
+        {
+            selected |= ContractSelectionFeatures.Contracts |
+                ContractSelectionFeatures.Effects;
+        }
+
+        return selected | GetRejectedSelectionFeatures(method);
+    }
+
+    internal ContractSelectionFeatures GetRejectedSelectionFeatures(
+        IMethodSymbol method)
+    {
+        var selected = ContractSelectionFeatures.None;
+        foreach (var attribute in GetCallableAttributes(method))
+        {
+            selected |= GetRejectedFeature(attribute);
+        }
+
+        foreach (var parameter in method.Parameters)
+        {
+            foreach (var attribute in parameter.GetAttributes())
+            {
+                selected |= GetRejectedFeature(attribute);
+            }
+        }
+
+        foreach (var attribute in method.GetReturnTypeAttributes())
+        {
+            selected |= GetRejectedFeature(attribute);
+        }
+
+        for (var type = method.ContainingType;
+             type != null;
+             type = type.ContainingType)
+        {
+            selected |= GetRejectedControlFeatures(type.GetAttributes());
+        }
+
+        selected |= GetRejectedControlFeatures(
+            method.ContainingAssembly.GetAttributes());
+        return selected;
+    }
+
+    private ContractSelectionFeatures GetRejectedControlFeatures(
+        ImmutableArray<AttributeData> attributes)
+    {
+        var selected = ContractSelectionFeatures.None;
+        foreach (var attribute in attributes)
+        {
+            if (_identity.TryGetRejectedAttributeMetadataName(
+                    attribute,
+                    out var metadataName) &&
+                metadataName is
+                    ContractApiMetadata.Trusted or
+                    ContractApiMetadata.Suppress)
+            {
+                selected |= ContractSelectionFeatures.Contracts |
+                    ContractSelectionFeatures.Effects;
+            }
+        }
+
+        return selected;
     }
 
     internal static bool Is(
@@ -162,10 +221,30 @@ internal sealed class ContractSelectionInventory
         }
     }
 
-    private static INamedTypeSymbol? Resolve(
-        Compilation compilation,
-        string metadataName)
+    private ContractSelectionFeatures GetRejectedFeature(
+        AttributeData attribute)
     {
-        return compilation.GetTypeByMetadataName(metadataName);
+        if (!_identity.TryGetRejectedAttributeMetadataName(
+                attribute,
+                out var metadataName))
+        {
+            return ContractSelectionFeatures.None;
+        }
+
+        return metadataName switch
+        {
+            ContractApiMetadata.EnforcePure or
+            ContractApiMetadata.ZeroAllocations or
+            ContractApiMetadata.AllowedCapabilities or
+            ContractApiMetadata.DoesNotThrow or
+            ContractApiMetadata.AllowedExceptions or
+            ContractApiMetadata.EffectContract =>
+                ContractSelectionFeatures.Effects,
+            ContractApiMetadata.Trusted or
+            ContractApiMetadata.Suppress =>
+                ContractSelectionFeatures.Contracts |
+                ContractSelectionFeatures.Effects,
+            _ => ContractSelectionFeatures.Contracts
+        };
     }
 }

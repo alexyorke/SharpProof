@@ -146,6 +146,14 @@ calls do not evaluate their arguments. A direct runtime invocation of
 throw `InvalidOperationException`; their effect specs describe that direct-call
 behavior.
 
+Contract clauses and annotations are evidence only when their symbols resolve
+to the `SharpProof.Attributes` assembly identity matching the analyzer and the
+`Contract` type has the exact supported shape. Each clause method must carry
+exactly one real `Conditional("SHARPPROOF_CONTRACTS")` attribute. A source,
+project, identity, or shape lookalike is selected only for accountable
+abstention; it contributes no assumption, postcondition, effect, suppression,
+or trust fact.
+
 Callee postconditions may be assumed only after verification or explicit trust.
 
 ## Effects

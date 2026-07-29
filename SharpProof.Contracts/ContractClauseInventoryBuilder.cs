@@ -5,6 +5,8 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     private static readonly ConditionalWeakTable<Compilation, ContractClauseInventoryBuilder> Cache = new();
     private readonly Compilation _compilation =
         compilation ?? throw new ArgumentNullException(nameof(compilation));
+    private readonly ContractApiIdentityResolver _identity =
+        ContractApiIdentityResolver.ForCompilation(compilation);
     private readonly ContractClauseSymbols? _api = ContractClauseSymbols.TryCreate(compilation);
     private readonly Dictionary<SyntaxTree, int> _treeOrdinals = compilation.SyntaxTrees
         .Select(static (tree, ordinal) => (tree, ordinal))
@@ -52,6 +54,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             IInvocationOperation Invocation,
             int TreeOrdinal)>();
         var resolvedBody = implementationBody;
+        var hasRejectedContractApiUsage = false;
         foreach (var body in GetBodies(callable, implementationBody))
         {
             var model = SharpProof.Frontend.Host.CompilationModelProvider
@@ -67,6 +70,9 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             {
                 if (_api?.GetClauseKind(invocation.TargetMethod) is not { } kind)
                 {
+                    hasRejectedContractApiUsage |=
+                        _identity.IsRejectedClauseMethod(
+                            invocation.TargetMethod);
                     continue;
                 }
 
@@ -90,7 +96,12 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
                     ref assumeOrdinal),
                 sourceOrdinal++, clause.Invocation))
             .ToImmutableArray();
-        return new ContractClauseInventory(callable, _api != null, resolvedBody, clauses);
+        return new ContractClauseInventory(
+            callable,
+            _api != null,
+            hasRejectedContractApiUsage,
+            resolvedBody,
+            clauses);
     }
 
     private static int NextOrdinal(

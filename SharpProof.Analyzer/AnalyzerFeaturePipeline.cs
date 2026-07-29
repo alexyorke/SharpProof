@@ -15,6 +15,17 @@ internal static class AnalyzerFeaturePipeline
 
         EffectContractDiagnostics.ValidateArguments(method, session, context.ReportDiagnostic);
         ClosedContractDiagnostics.Validate(method, session, context.ReportDiagnostic);
+        var rejectedContractApi =
+            session.Attributes.GetRejectedSelectionFeatures(method) !=
+            ContractSelectionFeatures.None;
+        if (rejectedContractApi &&
+            session.TryMarkRejectedContractApiReported(method))
+        {
+            ReportRejectedContractApi(
+                method,
+                context.ReportDiagnostic,
+                context.CancellationToken);
+        }
         var selection = GetSelection(
             method, session, context.ReportDiagnostic, context.CancellationToken);
         if ((!method.IsAbstract && !method.IsExtern) || !selection.Any)
@@ -25,6 +36,13 @@ internal static class AnalyzerFeaturePipeline
         if (selection.IsSuppressed)
         {
             session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Suppressed);
+            return;
+        }
+        if (rejectedContractApi)
+        {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Abstained);
             return;
         }
         if (!selection.Contracts &&
@@ -76,9 +94,25 @@ internal static class AnalyzerFeaturePipeline
             return;
         }
         var hasInvalidContractClauses =
-            ValidateContractClauses(method, session, context.ReportDiagnostic);
+            ValidateContractClauses(
+                method,
+                session,
+                context.ReportDiagnostic,
+                context.CancellationToken);
+        var rejectedContractApi =
+            session.Attributes.GetRejectedSelectionFeatures(method) !=
+                ContractSelectionFeatures.None ||
+            session.GetContractClauses(method)
+                .HasRejectedContractApiUsage;
         var selection = GetSelection(
             method, session, context.ReportDiagnostic, context.CancellationToken);
+        if (rejectedContractApi)
+        {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Abstained);
+            return;
+        }
         if (selection.IsSuppressed)
         {
             session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Suppressed);
@@ -162,9 +196,18 @@ internal static class AnalyzerFeaturePipeline
     private static bool ValidateContractClauses(
         IMethodSymbol method,
         AnalyzerSession session,
-        Action<Diagnostic> reportDiagnostic)
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken)
     {
         var inventory = session.GetContractClauses(method);
+        if (inventory.HasRejectedContractApiUsage &&
+            session.TryMarkRejectedContractApiReported(method))
+        {
+            ReportRejectedContractApi(
+                method,
+                reportDiagnostic,
+                cancellationToken);
+        }
         var intrinsicViolations =
             session.GetContractIntrinsicViolations(inventory);
         ReportInvalidIntrinsics(intrinsicViolations, session, reportDiagnostic);
@@ -173,8 +216,23 @@ internal static class AnalyzerFeaturePipeline
         {
             ReportInvalidClauses(session.GetContractClauses(owner).Clauses, reportDiagnostic);
         }
-        return inventory.HasPlacementErrors ||
+        return inventory.HasRejectedContractApiUsage ||
+            inventory.HasPlacementErrors ||
             !intrinsicViolations.IsDefaultOrEmpty;
+    }
+
+    private static void ReportRejectedContractApi(
+        IMethodSymbol method,
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken)
+    {
+        reportDiagnostic(Diagnostic.Create(
+            GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+            AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
+                method,
+                cancellationToken),
+            method.Name,
+            "ContractApiIdentityRejected"));
     }
 
     private static IEnumerable<IMethodSymbol> GetNestedOwners(

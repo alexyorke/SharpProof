@@ -460,6 +460,14 @@ must be direct expression statements in one contiguous method-body prologue.
 `Result<T>` is valid only inside `Ensures`; `Old(...)` is valid only inside
 `Ensures` and cannot be nested.
 
+SharpProof accepts these APIs only from the `SharpProof.Attributes` assembly
+whose version and public key match the analyzer payload. It also validates the
+exact `Contract` type and requires one real
+`[Conditional("SHARPPROOF_CONTRACTS")]` on each clause method. Source or
+project lookalikes, mismatched package identities, and malformed clause APIs
+contribute no facts and report SP0047; a rejected `ContractFor` lookalike
+reports SPCF0001.
+
 The currently consumed closed value attributes are:
 
 - `[NotNull]`

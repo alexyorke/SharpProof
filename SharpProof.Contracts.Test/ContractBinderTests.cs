@@ -1088,6 +1088,40 @@ public sealed class ContractBinderTests
         Assert.That(result.Contracts.Clauses, Is.Empty);
     }
 
+    [Test]
+    public void SourceShadowedRuntimeContractApiCannotBecomeProofEvidence()
+    {
+        const string source =
+            """
+            namespace SharpProof.Attributes {
+                public static class Contract {
+                    public static void Requires(bool condition) {
+                        System.Console.WriteLine(condition);
+                    }
+                    public static void Ensures(bool condition) {
+                        System.Console.WriteLine(condition);
+                    }
+                    public static void Assume(bool condition) {
+                        System.Console.WriteLine(condition);
+                    }
+                }
+            }
+            public static class Target {
+                public static int Read(int value) {
+                    SharpProof.Attributes.Contract.Ensures(value > 0);
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(
+            result.Failure,
+            Is.EqualTo(ContractBindingFailure.ContractApiUnavailable));
+    }
+
     [TestCase(
         """
         [ContractFor(typeof(Target))]

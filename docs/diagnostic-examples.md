@@ -203,6 +203,11 @@ This includes selected abstract, interface, and `extern` declarations that have
 no operation body. Unannotated or explicitly suppressed unsupported methods
 remain silent.
 
+SP0047 also reports `ContractApiIdentityRejected` when a clause or annotation
+binds to a source/project lookalike, a mismatched `SharpProof.Attributes`
+assembly, or a malformed non-elided contract API. The rejected symbol supplies
+no proof fact.
+
 The verifier launcher also emits SP0047 when one or more selected callables
 have incomplete coverage or an `Unknown` claim. Its severity comes from
 `SharpProofVerifyPolicy`: `advisory` is information,

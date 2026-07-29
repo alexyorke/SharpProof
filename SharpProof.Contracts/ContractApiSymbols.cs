@@ -16,9 +16,7 @@ internal sealed class ContractApiSymbols(
         var clauses = ContractClauseSymbols.TryCreate(compilation);
         var selections =
             ContractSelectionInventory.ForCompilation(compilation);
-        if (clauses == null || selections.ContractFor == null ||
-            selections.NotNull == null || selections.Positive == null ||
-            selections.InRange == null)
+        if (clauses == null)
         {
             return null;
         }
@@ -72,7 +70,7 @@ internal sealed class ContractClauseSymbols(INamedTypeSymbol contractType)
 
     internal static ContractClauseSymbols? TryCreate(Compilation compilation)
     {
-        return compilation.GetTypeByMetadataName(ContractApiMetadata.Contract)
+        return ContractApiIdentityResolver.ForCompilation(compilation).Contract
             is { } contract
             ? new(contract)
             : null;

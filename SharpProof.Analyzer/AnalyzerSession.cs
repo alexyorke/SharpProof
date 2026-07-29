@@ -38,6 +38,9 @@ internal sealed class AnalyzerSession
         _validatedAttributes = new();
     private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
         _validatedContractIntrinsics = new();
+    private readonly ConcurrentDictionary<IMethodSymbol, byte>
+        _reportedRejectedContractApis =
+            new(SymbolEqualityComparer.Default);
 
     internal AnalyzerSession(
         Compilation compilation,
@@ -150,6 +153,14 @@ internal sealed class AnalyzerSession
         return _validatedContractIntrinsics.TryAdd(
             (violation.Invocation.Syntax.SyntaxTree,
              violation.Invocation.Syntax.Span),
+            0);
+    }
+
+    internal bool TryMarkRejectedContractApiReported(
+        IMethodSymbol method)
+    {
+        return _reportedRejectedContractApis.TryAdd(
+            ContractClauseInventoryBuilder.NormalizeCallable(method),
             0);
     }
 }

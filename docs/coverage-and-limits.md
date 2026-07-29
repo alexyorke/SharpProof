@@ -157,6 +157,13 @@ The table also contains compiler-bound ghost rows for `Contract.Requires`,
 contract semantics and the throwing behavior of direct `Result`/`Old`
 invocation; they are not BCL coverage.
 
+Contract API symbols are accepted only from the `SharpProof.Attributes`
+assembly identity matching the analyzer payload. Clause methods also require
+the exact supported signatures and one real
+`Conditional("SHARPPROOF_CONTRACTS")` attribute. Rejected source/project
+shadows, identity mismatches, and malformed lookalikes remain visibly selected
+but contribute no contract, effect, trust, or suppression evidence.
+
 ## Outcomes, accountability, and cache boundary
 
 - `Proven` requires a hygienic core containing only lowered facts, resolved

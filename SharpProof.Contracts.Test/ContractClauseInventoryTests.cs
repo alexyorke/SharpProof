@@ -197,7 +197,7 @@ public sealed class ContractClauseInventoryTests
     }
 
     [Test]
-    public void ClauseInventoryDoesNotRequireUnrelatedSharpProofApis()
+    public void SourceDefinedRuntimeContractApiIsRejected()
     {
         const string source =
             """
@@ -220,9 +220,10 @@ public sealed class ContractClauseInventoryTests
             "Analyze",
             includeSharpProofReference: false);
 
-        Assert.That(inventory.ContractApiAvailable, Is.True);
+        Assert.That(inventory.ContractApiAvailable, Is.False);
+        Assert.That(inventory.HasRejectedContractApiUsage, Is.True);
         Assert.That(inventory.ImplementationBody, Is.Not.Null);
-        Assert.That(inventory.Clauses.Single().IsValid, Is.True);
+        Assert.That(inventory.Clauses, Is.Empty);
     }
 
     [Test]

@@ -377,6 +377,7 @@ public sealed class ArchitectureTests
                 "SharpProof.Analyzer/FinalCompilationCollector.cs",
                 "SharpProof.Analyzer/CompilerArtifact/ClaimManifestBuilder.cs",
                 "SharpProof.Analyzer/CompilerArtifact/SemanticClaimIdentity.cs",
+                "SharpProof.Contracts/ContractApiIdentityResolver.cs",
                 "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
                 "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
                 "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
