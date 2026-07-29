@@ -32,142 +32,170 @@ internal static class CorpusCatalog
         Effect(
             "E01",
             CorpusVerdict.Proven,
+            CorpusSupport.Supported,
             "[EnforcePure]",
             "return $INPUT$ + 1;"),
         Effect(
             "E02",
             CorpusVerdict.Unknown,
+            CorpusSupport.IntentionallyUnsupported,
             "[EnforcePure]",
             "State = $INPUT$; return $INPUT$;",
             "private static int State;"),
         Effect(
             "E03",
             CorpusVerdict.Proven,
+            CorpusSupport.Supported,
             "[EnforcePure]",
             "var buffer = new int[1]; buffer[0] = $INPUT$; return buffer[0];"),
         Effect(
             "E04",
             CorpusVerdict.Proven,
+            CorpusSupport.Supported,
             "[ZeroAllocations]",
             "return $INPUT$ * 2;"),
         Effect(
             "E05",
             CorpusVerdict.Unknown,
+            CorpusSupport.IntentionallyUnsupported,
             "[ZeroAllocations]",
             "_ = new object(); return $INPUT$;"),
         Effect(
             "E06",
             CorpusVerdict.Unknown,
+            CorpusSupport.IntentionallyUnsupported,
             "[ZeroAllocations]",
             "_ = new int[1]; return $INPUT$;"),
         Effect(
             "E07",
             CorpusVerdict.Unknown,
+            CorpusSupport.IntentionallyUnsupported,
             "[ZeroAllocations]",
             "_ = Guid.NewGuid(); return $INPUT$;"),
         Effect(
             "E08",
             CorpusVerdict.Proven,
+            CorpusSupport.Supported,
             "[DoesNotThrow]",
             "return $INPUT$ + 1;"),
         Effect(
             "E09",
             CorpusVerdict.Unknown,
+            CorpusSupport.IntentionallyUnsupported,
             "[DoesNotThrow]",
             "return 1 / $INPUT$;"),
         Effect(
             "E10",
             CorpusVerdict.Unknown,
+            CorpusSupport.IntentionallyUnsupported,
             "[DoesNotThrow]",
             "_ = Guid.NewGuid(); return $INPUT$;"),
         Effect(
             "E11",
             CorpusVerdict.Proven,
+            CorpusSupport.Supported,
             "[AllowedCapabilities(SharpProofCapability.None)]",
             "return $INPUT$ - 1;"),
         Effect(
             "E12",
             CorpusVerdict.Unknown,
+            CorpusSupport.IntentionallyUnsupported,
             "[AllowedCapabilities(SharpProofCapability.None)]",
             "_ = Guid.NewGuid(); return $INPUT$;"),
         Effect(
             "E13",
             CorpusVerdict.Unknown,
+            CorpusSupport.IntentionallyUnsupported,
             "[AllowedCapabilities(SharpProofCapability.None)]",
             "ExternalCorpusEffects.Synchronize(); return $INPUT$;"),
         Effect(
             "E14",
             CorpusVerdict.Proven,
+            CorpusSupport.Supported,
             "[AllowedCapabilities(SharpProofCapability.Synchronization)]",
             "ExternalCorpusEffects.Synchronize(); return $INPUT$;"),
         Effect(
             "E15",
             CorpusVerdict.Proven,
+            CorpusSupport.Supported,
             "[AllowedExceptions(typeof(Exception))]",
             "return 1 / $INPUT$;"),
         Effect(
             "E16",
             CorpusVerdict.Unknown,
+            CorpusSupport.IntentionallyUnsupported,
             "[AllowedExceptions(typeof(InvalidOperationException))]",
             "return 1 / $INPUT$;"),
         Effect(
             "E17",
             CorpusVerdict.Proven,
+            CorpusSupport.Supported,
             "[ZeroAllocations] [DoesNotThrow]",
             "return $INPUT$ + 1;"),
         Effect(
             "E18",
             CorpusVerdict.Unknown,
+            CorpusSupport.IntentionallyUnsupported,
             "[ZeroAllocations] [DoesNotThrow]",
             "_ = new object(); return 1 / $INPUT$;"),
         Contract(
             "C01",
             CorpusVerdict.Proven,
+            CorpusSupport.Supported,
             "Positive(1); return $INPUT$;",
             PositiveMember),
         Contract(
             "C02",
             CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "Positive(-1); return $INPUT$;",
             PositiveMember),
         Contract(
             "C03",
             CorpusVerdict.Proven,
+            CorpusSupport.Supported,
             "EqualTo(4, 4); return $INPUT$;",
             EqualMember),
         Contract(
             "C04",
             CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "EqualTo(4, 5); return $INPUT$;",
             EqualMember),
         Contract(
             "C05",
             CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "MustBe(false); return $INPUT$;",
             "private static void MustBe(bool condition) { Contract.Requires(condition); }"),
         Contract(
             "C06",
             CorpusVerdict.SilentUnknown,
+            CorpusSupport.IntentionallyUnsupported,
             "Positive(Unknown()); return $INPUT$;",
             PositiveMember + " private static int Unknown() => -1;"),
         Contract(
             "C07",
             CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "Range(value: -1, minimum: 0); return $INPUT$;",
             RangeMember),
         Contract(
             "C08",
             CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "NonNegative(-1); return $INPUT$;",
             "private static void NonNegative(int value) { Contract.Requires(value >= 0); }"),
         Contract(
             "C09",
             CorpusVerdict.Proven,
+            CorpusSupport.Supported,
             "Between(5); return $INPUT$;",
             BetweenMember),
         Contract(
             "C10",
             CorpusVerdict.Refuted,
+            CorpusSupport.Supported,
             "Between(15); return $INPUT$;",
             BetweenMember)
     ];
@@ -184,20 +212,48 @@ internal static class CorpusCatalog
     private static CorpusSeed Effect(
         string id,
         CorpusVerdict expected,
+        CorpusSupport support,
         string attributes,
         string body,
         string additionalMembers = "")
     {
-        return new(id, "effects", expected, attributes, body, additionalMembers);
+        return new(
+            id,
+            "effects",
+            expected,
+            RequireExplicitSupport(id, support),
+            attributes,
+            body,
+            additionalMembers);
     }
 
     private static CorpusSeed Contract(
         string id,
         CorpusVerdict expected,
+        CorpusSupport support,
         string body,
         string additionalMembers)
     {
-        return new(id, "contracts", expected, "", body, additionalMembers);
+        return new(
+            id,
+            "contracts",
+            expected,
+            RequireExplicitSupport(id, support),
+            "",
+            body,
+            additionalMembers);
+    }
+
+    private static CorpusSupport RequireExplicitSupport(
+        string id,
+        CorpusSupport support)
+    {
+        return support is
+            CorpusSupport.Supported or
+            CorpusSupport.IntentionallyUnsupported
+                ? support
+                : throw new InvalidDataException(
+                    $"Corpus seed {id} requires an explicit support classification.");
     }
 
     private static IEnumerable<CorpusCase> CreateCases(CorpusSeed seed)
@@ -290,15 +346,8 @@ internal static class CorpusCatalog
             variant,
             seed.Mode,
             seed.ExpectedVerdict,
-            ToSupport(seed.ExpectedVerdict),
+            seed.Support,
             builder.ToString());
-    }
-
-    private static CorpusSupport ToSupport(CorpusVerdict verdict)
-    {
-        return verdict is CorpusVerdict.Proven or CorpusVerdict.Refuted
-            ? CorpusSupport.Supported
-            : CorpusSupport.IntentionallyUnsupported;
     }
 
     private static string CreatePrelude(

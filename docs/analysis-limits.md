@@ -181,8 +181,8 @@ is the observed runner total rather than the requested budget.
 | IDE edit p95 | At most 100 ms |
 | IDE edit maximum | At most 250 ms |
 
-The active contract also fixes protocol version 8, cache schema version 9,
-claim-manifest schema version 4, and compiler artifact schema version 6, along
+The active contract also fixes protocol version 9, cache schema version 10,
+claim-manifest schema version 4, and compiler artifact schema version 7, along
 with exact proof-kernel and component TCB path inventories, formatting-neutral
 Roslyn complexity ratchets, and the reference surfaces `netstandard2.0`,
 `net8.0`, and `net472`.

@@ -168,7 +168,7 @@ invocation; they are not BCL coverage.
 - `Unknown` covers unsupported, unresolved, approximate, method-time-limited,
   or resource-exhausted claim analysis. Unsupported unannotated analyzer
   callables are silent; unsupported selected callables produce SP0047.
-- Protocol version 8 binds a compiler-manifest artifact and separately records
+- Protocol version 9 binds a compiler-manifest artifact and separately records
   run status, callable coverage, and one
   outcome for each stable manifest claim ID. Exact manifest/result equality is
   mandatory.
@@ -192,7 +192,7 @@ invocation; they are not BCL coverage.
 - Caller cancellation is run status `Canceled`, project timeout is
   `TimedOut`, and infrastructure/protocol/backend/replay failure is `Failed`.
   None is a successful claim outcome.
-- Cache schema version 9 stores only complete validated payloads. Cache reads
+- Cache schema version 10 stores only complete validated payloads. Cache reads
   are checked against the entire current manifest. Unknown, cancellation,
   timeout, malformed result, infrastructure failure, and failed replay are not
   semantic cache entries. `require-proven` disables the local semantic cache.
@@ -203,7 +203,7 @@ invocation; they are not BCL coverage.
 ## Closed compiler artifact and remaining limits
 
 During Windows verification, the production analyzer captures compiler
-artifact schema version 6 from the post-generator compilation. The artifact
+artifact schema version 7 from the post-generator compilation. The artifact
 contains:
 
 - the feature-selected, sealed claim manifest;

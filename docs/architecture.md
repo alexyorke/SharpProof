@@ -144,7 +144,7 @@ indices. Formula construction, worklists, specs, proof cores, diagnostics, and
 serialized responses are stably ordered. Z3 uses resource limits; wall time is
 an outer process kill boundary.
 
-Protocol version 8 binds each request to a compiler-produced closed artifact.
+Protocol version 9 binds each request to a compiler-produced closed artifact.
 Stable semantic IDs identify selected callables, postcondition/effect claims, and
 user/trusted evidence independently of formatting. The protocol separates run
 status, callable coverage, and per-claim outcome. Central validation requires
@@ -166,7 +166,7 @@ a stale successful result associated with a partly updated evidence set. The
 content-addressed cache includes semantic, protocol, tool, compilation,
 reference, option, target-framework, canonical packaged worker runtime-closure,
 and spec-content identity.
-Cache schema version 9
+Cache schema version 10
 stores only the validated semantic payload. A hit is accepted only when its
 manifest hash and complete result set match the current manifest. Only
 complete callables whose claims are hygienic `Proven` or replay-validated
@@ -174,7 +174,7 @@ complete callables whose claims are hygienic `Proven` or replay-validated
 
 During Windows verification, the production analyzer observes the final
 post-generator Roslyn `Compilation` and atomically emits compiler artifact
-schema version 6. The compiler owns selection, contract/spec binding, effect
+schema version 7. The compiler owns selection, contract/spec binding, effect
 evaluation, and body
 lowering. Every selected callable has either a typed failure record or a
 portable graph containing its bound clauses, canonical variables, whole-body

@@ -303,7 +303,7 @@ internal sealed class ClaimManifestBuilder(
                 AllowedEffects = ToWorkerEffects(evaluation.Constraint.Effects),
                 AllowedCapabilities = ToWorkerCapabilities(evaluation.Constraint.Capabilities),
                 AllowedExceptionTypes = [.. evaluation.Constraint.ExceptionTypes
-                    .Select(EffectTypeIdentity)
+                    .Select(CompilerExceptionTypeIdentity.Encode)
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(static value => value, StringComparer.Ordinal)]
             },
@@ -315,7 +315,9 @@ internal sealed class ClaimManifestBuilder(
                     Detail = witness.Detail,
                     Effects = ToWorkerEffects(witness.Effects),
                     Capabilities = ToWorkerCapabilities(witness.Capabilities),
-                    ExactExceptionTypeHierarchy = CreateExceptionHierarchy(witness.ExceptionType),
+                    ExactExceptionTypeHierarchy =
+                        CompilerExceptionTypeIdentity.EncodeHierarchy(
+                            witness.ExceptionType),
                     Location = ToSourceLocation(witness.Location)
                 },
             Evidence = evaluation.Evidence
@@ -592,22 +594,6 @@ internal sealed class ClaimManifestBuilder(
             Line = mapped.StartLinePosition.Line + 1,
             Column = mapped.StartLinePosition.Character + 1
         };
-    }
-
-    private static string[] CreateExceptionHierarchy(INamedTypeSymbol? type)
-    {
-        var identities = new List<string>();
-        for (var current = type; current != null; current = current.BaseType)
-        {
-            identities.Add(EffectTypeIdentity(current));
-        }
-
-        return [.. identities.OrderBy(static value => value, StringComparer.Ordinal)];
-    }
-    private static string EffectTypeIdentity(INamedTypeSymbol type)
-    {
-        return (type.ContainingAssembly?.Identity.Name ?? string.Empty) + ":" +
-        (DocumentationCommentId.CreateDeclarationId(type) ?? type.MetadataName);
     }
 
     private readonly record struct ClaimCandidate(

@@ -40,7 +40,7 @@ encoding, resource limits, and method boundaries produce typed claim-level
 `Unknown` results. An undefined postcondition is also a typed `Unknown`
 result. Backend unavailability, malformed backend results, failure to replay
 an otherwise replayable counterexample, containment failure, and
-infrastructure failure make the protocol version 8 run `Failed` and fail the
+infrastructure failure make the protocol version 9 run `Failed` and fail the
 build under every policy.
 Project timeout and caller cancellation use the separate `TimedOut` and
 `Canceled` run statuses.
@@ -56,7 +56,7 @@ results enter the content-addressed disk cache. Cache keys include protocol,
 semantics, tool identity and canonical packaged worker runtime-closure digest,
 target framework, the exact
 closed compiler artifact and lowered IR, budgets, spec versions, and a
-canonical digest of the complete trusted spec content. Cache schema version 9
+canonical digest of the complete trusted spec content. Cache schema version 10
 revalidates the stored semantic payload against the complete current manifest.
 Strict `require-proven` runs do not consume or write this local semantic cache.
 

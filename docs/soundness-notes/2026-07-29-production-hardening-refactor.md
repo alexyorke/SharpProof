@@ -7,9 +7,13 @@ compiler-host, protocol, and analyzer maintenance risks.
 
 ## Compiler and artifact boundary
 
-- Compiler artifact schema 6 replaces compiler-option strings with closed wire
+- Compiler artifact schema 7 replaces compiler-option strings with closed wire
   enums. Roslyn-to-wire conversion is exhaustive and unknown future values fail
   closed.
+- Exception constraints, evidence text, and exact witness hierarchies use one
+  canonical encoder containing the full assembly identity and documentation
+  type-reference ID. Independent replay therefore distinguishes aliased
+  same-simple-name assemblies.
 - The internal `ReferencesSupersedeLowerVersions` option is read through a
   shape-checked Roslyn property rather than a compiler-generated backing-field
   name.

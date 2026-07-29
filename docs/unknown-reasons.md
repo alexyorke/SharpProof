@@ -125,7 +125,7 @@ before assembling a `Refuted` record.
 
 ## Worker verification records
 
-Protocol version 8 binds compiler-manifest evidence and separates run state,
+Protocol version 9 binds compiler-manifest evidence and separates run state,
 callable coverage, and claim outcome.
 Every enum reserves `Unspecified` as its zero value; a valid request or response
 must use a permitted nonzero value where the field is required.
@@ -320,6 +320,6 @@ Unknown outcomes, protocol errors, cancellation, timeout, malformed results,
 backend failures, and failed replay are never semantic cache entries. Only a
 `Complete`, exact-manifest response with complete callable coverage and claims
 that are hygienic `Proven` or replay-validated `Refuted` is cacheable. Cache
-schema version 9 stores the semantic payload; every read revalidates it against
+schema version 10 stores the semantic payload; every read revalidates it against
 the complete current manifest. `require-proven` runs bypass this local semantic
 cache.

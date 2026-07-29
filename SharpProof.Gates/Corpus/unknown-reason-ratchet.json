@@ -1,5 +1,7 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "minimumSupportedCases": 171,
+  "minimumSupportedOpenSourceMethods": 1,
   "maximumTotalUnknown": 309,
   "maximumByReason": {
     "SP0002": 28,

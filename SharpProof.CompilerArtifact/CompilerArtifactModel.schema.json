@@ -4,7 +4,7 @@
   "jsonNamingPolicy": "camelCase",
   "artifactEnvelope": {
     "schema": "SharpProof.CompilerManifest",
-    "version": 6
+    "version": 7
   },
   "declarations": [
     {
@@ -21,7 +21,7 @@
           "accessibility": "internal",
           "name": "Current",
           "type": "int",
-          "value": 6
+          "value": 7
         }
       ]
     },
@@ -2347,7 +2347,7 @@
   ],
   "effectEvidence": {
     "domain": "SharpProof.CompilerEffectClaimEvidence",
-    "version": 6,
+    "version": 7,
     "unknownReasons": [
       "UnsupportedContract",
       "EffectSummaryIncomplete",

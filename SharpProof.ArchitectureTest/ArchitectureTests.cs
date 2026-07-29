@@ -475,6 +475,8 @@ public sealed class ArchitectureTests
                 "SharpProof.CompilerArtifact/CompilationFingerprint.cs"
             ],
             ["canonicalIdentityEncoding"] = [
+                "SharpProof.Analyzer/CompilerArtifact/CompilerExceptionTypeIdentity.cs",
+                "SharpProof.Frontend/CompilerIdentityBridge.cs",
                 "SharpProof.Ir/CanonicalHashWriter.cs"
             ],
             ["protocolValidation"] = [

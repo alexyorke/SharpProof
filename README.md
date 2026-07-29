@@ -77,7 +77,7 @@ both implemented feature groups:
   verification.
 
 `SharpProofFeatures` values are `effects`, `contracts`, and `all` (the
-default). The effective selection is sealed into the schema-6 compiler
+default). The effective selection is sealed into the schema-7 compiler
 artifact and filters its manifest: `contracts` excludes effect-only
 annotations, `effects` excludes postcondition claims and contract assumptions,
 and `all` selects both surfaces. Every effective effect contract has one typed
@@ -308,7 +308,7 @@ current manifest/request/result set. The default result is published under:
 obj/<Configuration>/<TargetFramework>/SharpProof/result.json
 ```
 
-Worker protocol version 8 separates the project run from semantic claim
+Worker protocol version 9 separates the project run from semantic claim
 outcomes. The compiler artifact records the effective `SharpProofFeatures`
 selection before manifest construction. A compiler-symbol-based manifest
 selects callables and assigns stable `spc1:` semantic IDs to direct clauses,
@@ -342,7 +342,10 @@ subset covers simple managed object/array allocation, explicit throw,
 receiver-field access, empty `lock`, and exact `Monitor` calls. Conditional,
 path-dependent, static-initialization-sensitive, or may-only conflicts remain
 `Unknown(EffectContractNotEstablished)`; incomplete summaries remain
-`Unknown(EffectSummaryIncomplete)`. Exact exception-type refutation is limited
+`Unknown(EffectSummaryIncomplete)`. Exception constraints and exact witness
+hierarchies use full assembly identity plus type-reference documentation ID, so
+aliased same-simple-name assemblies remain distinct during worker replay.
+Exact exception-type refutation is limited
 to admitted framework exception construction; a user exception constructor
 still establishes that some exception escapes, but not its exact type. The
 certainty field distinguishes `DefiniteViolation`, complete or incomplete
@@ -370,7 +373,7 @@ under every policy. The worker uses deterministic query, method, project,
 expression-depth, memory, process, and parallelism limits. Its
 content-addressed cache defaults to
 `obj/<Configuration>/<TargetFramework>/SharpProof/cache` in the MSBuild
-integration. Cache schema version 9 stores only a semantically complete
+integration. Cache schema version 10 stores only a semantically complete
 payload whose manifest hash and exact claim set validate against the current
 request and whose outcomes are all `Proven` or replay-validated `Refuted`.
 Timeout, cancellation, `Unknown`, malformed, infrastructure, and failed-replay
@@ -559,7 +562,7 @@ and local remote-payload simulation are available through:
 
 ## Closed compiler artifact and remaining release gaps
 
-The build-only collector now emits compiler artifact schema version 6 from the
+The build-only collector now emits compiler artifact schema version 7 from the
 final post-generator Roslyn `Compilation`. It seals the feature-selected claim
 manifest and, for each selected callable, either a typed lowering failure or
 portable whole-body CFG/IR with bound contract clauses, canonical variables,
@@ -630,9 +633,11 @@ inventories, and formatting-neutral Roslyn complexity ratchets,
 builds the solution, runs architecture and banned-API checks, lattice and
 finite-CFG laws, runtime and differential oracles, worker/package integration,
 cache/concurrency/cancellation tests, the pinned corpus, a fixed-seed
-1,000-case fuzz run, and performance budgets. Corpus cases carry reviewed
-support labels: supported cases have zero `Unknown` tolerance, while
-intentionally unsupported Unknown buckets are capped by a checked-in ratchet.
+1,000-case fuzz run, and performance budgets. Corpus cases carry explicit
+reviewed support labels independently from their expected verdicts and
+snapshots: supported cases have zero `Unknown` tolerance, supported totals
+cannot decrease, and intentionally unsupported Unknown buckets are capped by a
+checked-in ratchet.
 Nightly and release qualification additionally require every deterministic
 trusted-boundary mutation, including both replay paths, to be killed and retain
 the commit-bound JSON evidence.

@@ -74,7 +74,7 @@ public sealed class CompilerArtifactModelSchemaTests
             Assert.That(
                 evidence.GetProperty("domain").GetString(),
                 Is.EqualTo("SharpProof.CompilerEffectClaimEvidence"));
-            Assert.That(evidence.GetProperty("version").GetInt32(), Is.EqualTo(6));
+            Assert.That(evidence.GetProperty("version").GetInt32(), Is.EqualTo(7));
         }
 
         var codec = typeof(PortableIrGraphCodec);

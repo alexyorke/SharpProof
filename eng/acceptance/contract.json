@@ -18,9 +18,9 @@
     "unsupportedSelectedCallableDiagnostic": "SP0047"
   },
   "worker": {
-    "protocolVersion": 8,
+    "protocolVersion": 9,
     "manifestSchemaVersion": 4,
-    "compilerArtifactSchemaVersion": 6,
+    "compilerArtifactSchemaVersion": 7,
     "maximumParallelism": 4,
     "maximumMemoryMiB": 2048,
     "queryRlimit": 3000000,
@@ -31,7 +31,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 9,
+    "schemaVersion": 10,
     "maximumMiB": 512,
     "cacheableOutcomes": [
       "Proven",
@@ -200,6 +200,8 @@
       {
         "name": "canonicalIdentityEncoding",
         "paths": [
+          "SharpProof.Analyzer/CompilerArtifact/CompilerExceptionTypeIdentity.cs",
+          "SharpProof.Frontend/CompilerIdentityBridge.cs",
           "SharpProof.Ir/CanonicalHashWriter.cs"
         ]
       },

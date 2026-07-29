@@ -52,15 +52,17 @@ analyzes one synthetic case per variant concurrently. See
 `Corpus/README.md` for licensing, instrumentation, and the reproducible import
 workflow.
 
-Every case also carries a reviewed `Supported` or
-`IntentionallyUnsupported` label. A supported case that produces either
+Every case also carries an explicit reviewed `Supported` or
+`IntentionallyUnsupported` label that is stored independently from its
+expected verdict and canonical snapshot. A supported case that produces either
 `Unknown` or `SilentUnknown` fails with zero tolerance; supported cases must
 produce an accountable `Proven` or `Refuted` semantic outcome. Unknown results
 in the intentionally unsupported set are counted by deterministic diagnostic-ID
-bucket (or `silent-unclassified`). `Corpus/unknown-reason-ratchet.json` caps
-both the total and every known bucket. A new bucket or any count above its
-reviewed maximum fails, so rewriting the canonical snapshot cannot silently
-expand the unsupported surface.
+bucket (or `silent-unclassified`). `Corpus/unknown-reason-ratchet.json` floors
+the supported total and supported OSS-method count and caps both the total
+Unknown count and every known bucket. A new bucket, a reduced supported count,
+or any Unknown count above its reviewed maximum fails, so rewriting the
+canonical snapshot cannot silently expand the unsupported surface.
 
 Any diagnostic mismatch fails except an expected `Proven` result becoming
 `Unknown` when the exact case is listed in `Corpus/proven-to-unknown.json`
@@ -94,10 +96,10 @@ measures cancel-to-exit latency, while a real launcher process test measures
 the forced-termination deadline independently. The off-profile and IDE
 analyzer performance paths reference neither SMT nor Z3.
 
-Worker/package tests also exercise protocol version 8 manifest equality,
+Worker/package tests also exercise protocol version 9 manifest equality,
 stable claim IDs, policy-controlled SP0047/SP0048 output, cache validation
 against the current manifest, fatal run handling, and compiler artifact schema
-version 6, including generated contracts, portable whole-body CFG/IR,
+version 7, including generated contracts, portable whole-body CFG/IR,
 compiler diagnostics, exact lowered-callable hydration, and independent
 whole-body counterexample replay. Package tests also cover deterministic,
 policy-aware SARIF 2.1.0 projection of validated responses.

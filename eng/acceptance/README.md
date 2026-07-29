@@ -9,7 +9,7 @@ is acceptable only when:
 - the supported-language gate is exhaustive, unsupported unannotated analyzer
   methods remain quiet, and unsupported explicitly selected methods report
   SP0047;
-- protocol version 8 binds compiler-manifest evidence and manifests every
+- protocol version 9 binds compiler-manifest evidence and manifests every
   selected callable, postcondition, and selected effect-attribute occurrence
   with a stable semantic ID, every lowered callable exactly matches that manifest,
   and every response has exact manifest/result equality;
@@ -25,10 +25,11 @@ is acceptable only when:
   infrastructure results are never cached as semantic answers;
 - cache, worklist, formatting, renaming, and concurrency variants produce the
   same canonical outcomes;
-- every corpus case carries a reviewed support label; `Supported` cases have
-  zero tolerance for `Unknown`/`SilentUnknown`, while total and per-reason
-  Unknown counts for `IntentionallyUnsupported` cases cannot exceed the
-  checked-in ratchet;
+- every corpus case carries an explicit reviewed support label independent
+  from its expected verdict and snapshot; `Supported` cases have zero
+  tolerance for `Unknown`/`SilentUnknown`, while supported-case and supported
+  OSS-method floors cannot decrease and total and per-reason Unknown counts for
+  `IntentionallyUnsupported` cases cannot exceed the checked-in ratchet;
 - the snapshot includes 200-500 distinct methods from pinned, licensed OSS
   source (currently 200 methods across 87 files); synthetic transformations do
   not count toward that floor;
@@ -62,7 +63,7 @@ effect-only artifacts exclude postcondition claims.
 under every policy. `SharpProofMode` is a deprecated preview compatibility
 alias.
 
-This acceptance contract covers compiler artifact schema version 6,
+This acceptance contract covers compiler artifact schema version 7,
 generated-tree accountability, portable whole-body lowered CFG/IR, exact
 manifest/lowered-callable/result equality, compiler-diagnostic propagation, and
 fail-closed option/provenance validation. The worker consumes that closed

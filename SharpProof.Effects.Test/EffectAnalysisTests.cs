@@ -974,6 +974,45 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void PossiblyNullThrownExpressionIncludesNullReferenceExceptionUnlessRequiredNonNull()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            #nullable enable
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Sample {
+                public static void MaybeNull(
+                    InvalidOperationException? exception) =>
+                    throw exception;
+
+                public static void RequiredNonNull(
+                    InvalidOperationException? exception) {
+                    Contract.Requires(exception != null);
+                    throw exception;
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var maybeNull = session.Analyze(
+            Method(compilation, "MaybeNull")).Summary;
+        var requiredNonNull = session.Analyze(
+            Method(compilation, "RequiredNonNull")).Summary;
+
+        AssertThrows(
+            maybeNull,
+            "System.InvalidOperationException",
+            "System.NullReferenceException");
+        AssertThrows(
+            requiredNonNull,
+            "System.InvalidOperationException");
+        AssertDoesNotThrow(
+            requiredNonNull,
+            "System.NullReferenceException");
+    }
+
+    [Test]
     public void ApiSpecMakesModeledExternalCallComplete()
     {
         var result = Analyze(
@@ -1272,6 +1311,55 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void SealedReferenceArrayStoreOmitsArrayTypeMismatchException()
+    {
+        var result = Analyze(
+            """
+            public static class Sample {
+                public static void Store(string[] values, string value) =>
+                    values[0] = value;
+            }
+            """,
+            "Sample",
+            "Store");
+
+        AssertThrows(
+            result.Summary,
+            "System.NullReferenceException",
+            "System.IndexOutOfRangeException");
+        AssertDoesNotThrow(
+            result.Summary,
+            "System.ArrayTypeMismatchException");
+    }
+
+    [Test]
+    public void DefinitelyNullReferenceArrayStoreOmitsArrayTypeMismatchException()
+    {
+        var result = Analyze(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public static class Sample {
+                public static void Store(object[] values, object? value) {
+                    Contract.Requires(value is null);
+                    values[0] = value;
+                }
+            }
+            """,
+            "Sample",
+            "Store");
+
+        AssertThrows(
+            result.Summary,
+            "System.NullReferenceException",
+            "System.IndexOutOfRangeException");
+        AssertDoesNotThrow(
+            result.Summary,
+            "System.ArrayTypeMismatchException");
+    }
+
+    [Test]
     public void ResolvedNullReceiverThrowSurvivesUnknownDispatch()
     {
         var result = Analyze(
@@ -1543,11 +1631,14 @@ public sealed class EffectAnalysisTests
         var compilation = EffectTestHost.CreateCompilation(
             """
             using System;
+            using SharpProof.Attributes;
 
             public static class Sample {
                 private static void ThrowInvalid(
-                    InvalidOperationException exception) =>
+                    InvalidOperationException exception) {
+                    Contract.Requires(exception != null);
                     throw exception;
+                }
 
                 private static bool ThrowFilter(
                     ApplicationException exception) =>
@@ -2189,6 +2280,22 @@ public sealed class EffectAnalysisTests
             Assert.That(
                 actual,
                 Does.Contain(metadataName));
+        }
+    }
+
+    private static void AssertDoesNotThrow(
+        EffectSummary summary,
+        params string[] metadataNames)
+    {
+        var actual = summary.Throws.Types
+            .Select(static type =>
+                type.ContainingNamespace.MetadataName + "." + type.MetadataName)
+            .ToImmutableArray();
+        foreach (var metadataName in metadataNames)
+        {
+            Assert.That(
+                actual,
+                Does.Not.Contain(metadataName));
         }
     }
 

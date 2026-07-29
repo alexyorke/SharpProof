@@ -745,7 +745,7 @@ public sealed class ClaimManifestBuilderTests
             using SharpProof.Attributes;
             public static class Subject {
                 [EffectContract(
-                    SharpProofEffect.Throws,
+                    SharpProofEffect.Throws | SharpProofEffect.Allocates,
                     ThrownExceptions = new[] { typeof(Exception) },
                     Complete = true)]
                 public static void ThrowDerived() =>
@@ -782,11 +782,11 @@ public sealed class ClaimManifestBuilderTests
                 [AllowedExceptions(typeof(Exception))]
                 [AllowedExceptions(typeof(InvalidOperationException))]
                 [EffectContract(
-                    SharpProofEffect.Throws,
+                    SharpProofEffect.Throws | SharpProofEffect.Allocates,
                     ThrownExceptions = new[] { typeof(Exception) },
                     Complete = true)]
                 [EffectContract(
-                    SharpProofEffect.Throws,
+                    SharpProofEffect.Throws | SharpProofEffect.Allocates,
                     ThrownExceptions = new[] { typeof(Exception) },
                     Complete = true)]
                 public static void Throw() =>

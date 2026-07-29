@@ -204,6 +204,163 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task ThrowsOnlyDoesNotCoverDirectAllocationButCoversThrowingExistingException()
+    {
+        using var project = TestProject.Create(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                [EffectContract(
+                    SharpProofEffect.Throws,
+                    ThrownExceptions = new[] { typeof(Exception) },
+                    Complete = true)]
+                public static object AllocateOnly() => new object();
+
+                [EffectContract(
+                    SharpProofEffect.Throws,
+                    ThrownExceptions = new[] { typeof(Exception) },
+                    Complete = true)]
+                public static void ThrowExisting(Exception exception) {
+                    Contract.Requires(exception != null);
+                    throw exception;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        var backend = new CountingBackend(
+            BackendCheckResult.Unsatisfiable([]));
+        using var worker = new SharpProofWorker(backend);
+
+        var response = await worker.VerifyAsync(request);
+        Assert.That(
+            response.ClaimResults,
+            Has.Length.EqualTo(2),
+            string.Join(
+                Environment.NewLine,
+                response.Manifest.Claims.Select(static claim =>
+                    claim.CallableId + " / " +
+                    claim.Kind + " / " +
+                    claim.Evidence)));
+        var allocation = response.ClaimResults.Single(result =>
+            GetCallableId(response, result).Contains(
+                ".AllocateOnly",
+                StringComparison.Ordinal));
+        var throwing = response.ClaimResults.Single(result =>
+            GetCallableId(response, result).Contains(
+                ".ThrowExisting(",
+                StringComparison.Ordinal));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                allocation.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(
+                allocation.Reason,
+                Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                allocation.EffectCertainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.DefiniteViolation));
+            Assert.That(allocation.EffectWitness, Is.Not.Null);
+            Assert.That(
+                allocation.EffectWitness!.Kind,
+                Is.EqualTo("managed-allocation"));
+            Assert.That(
+                throwing.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                throwing.Reason,
+                Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                response.CallableResults.Select(static result => result.Coverage),
+                Is.All.EqualTo(WorkerCallableCoverage.Complete));
+            Assert.That(backend.CallCount, Is.Zero);
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        }
+    }
+
+    [Test]
+    public async Task AllowedExceptionsAccountsForPossiblyNullThrownExpressions()
+    {
+        using var project = TestProject.Create(
+            """
+            #nullable enable
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                [AllowedExceptions(typeof(InvalidOperationException))]
+                public static void MaybeNull(
+                    InvalidOperationException? exception) =>
+                    throw exception;
+
+                [AllowedExceptions(typeof(InvalidOperationException))]
+                public static void RequiredNonNull(
+                    InvalidOperationException? exception) {
+                    Contract.Requires(exception != null);
+                    throw exception;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        var backend = new CountingBackend(
+            BackendCheckResult.Unsatisfiable([]));
+        using var worker = new SharpProofWorker(backend);
+
+        var response = await worker.VerifyAsync(request);
+        var maybeNull = response.ClaimResults.Single(result =>
+            GetCallableId(response, result).Contains(
+                ".MaybeNull(",
+                StringComparison.Ordinal));
+        var requiredNonNull = response.ClaimResults.Single(result =>
+            GetCallableId(response, result).Contains(
+                ".RequiredNonNull(",
+                StringComparison.Ordinal));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                maybeNull.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                maybeNull.Reason,
+                Is.EqualTo(
+                    WorkerClaimReason.EffectContractNotEstablished));
+            Assert.That(
+                maybeNull.EffectCertainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.CompleteMayEffectSummary));
+            Assert.That(maybeNull.EffectWitness, Is.Null);
+            Assert.That(
+                requiredNonNull.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                requiredNonNull.Reason,
+                Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                response.CallableResults.Single(result =>
+                    result.CallableId.Contains(
+                        ".MaybeNull(",
+                        StringComparison.Ordinal)).Coverage,
+                Is.EqualTo(WorkerCallableCoverage.Incomplete));
+            Assert.That(
+                response.CallableResults.Single(result =>
+                    result.CallableId.Contains(
+                        ".RequiredNonNull(",
+                        StringComparison.Ordinal)).Coverage,
+                Is.EqualTo(WorkerCallableCoverage.Complete));
+            Assert.That(backend.CallCount, Is.Zero);
+            Assert.That(
+                WorkerProtocolJson.Validate(response).IsValid,
+                Is.True);
+        }
+    }
+
+    [Test]
     public async Task DefiniteEffectViolationIsRefutedWithConcreteWitness()
     {
         using var project = TestProject.Create(

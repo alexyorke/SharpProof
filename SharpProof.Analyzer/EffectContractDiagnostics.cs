@@ -397,9 +397,7 @@ internal static class EffectContractDiagnostics
     private static string FormatTypes(IEnumerable<INamedTypeSymbol> types)
     {
         return string.Join(",", types
-            .Select(static type =>
-                (type.ContainingAssembly?.Identity.Name ?? string.Empty) + ":" +
-                (DocumentationCommentId.CreateDeclarationId(type) ?? type.MetadataName))
+            .Select(CompilerExceptionTypeIdentity.Encode)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static value => value, StringComparer.Ordinal));
     }

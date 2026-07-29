@@ -304,6 +304,49 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task SealedArrayStoreProvesDoesNotThrowButCovariantStoreRemainsUnknown()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [DoesNotThrow]
+                public static void StoreSealed(string value) {
+                    var values = new string[1];
+                    values[0] = value;
+                }
+
+                [DoesNotThrow]
+                public static void StoreCovariant(object value) {
+                    object[] values = new string[1];
+                    values[0] = value;
+                }
+            }
+            """,
+            "effects",
+            ["SP0046"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0046"]));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("'StoreCovariant'"));
+            Assert.That(
+                factory.Outcomes["StoreSealed"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["StoreCovariant"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+        }
+    }
+
+    [Test]
     public async Task VolatileFieldReadCannotProvePurityOrNoSynchronization()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
@@ -1132,7 +1175,7 @@ public sealed class AnalyzerModeAndEffectTests
 
             public static class Fixture {
                 [EffectContract(
-                    SharpProofEffect.Throws,
+                    SharpProofEffect.Throws | SharpProofEffect.Allocates,
                     ThrownExceptions = new[] { typeof(Exception) },
                     Complete = true)]
                 public static void ThrowDerived() =>
@@ -1148,6 +1191,100 @@ public sealed class AnalyzerModeAndEffectTests
         Assert.That(
             factory.Outcomes["ThrowDerived"],
             Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+    }
+
+    [Test]
+    public async Task ThrowsOnlyDoesNotCoverAllocationButStillCoversThrowingExistingException()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [EffectContract(
+                    SharpProofEffect.Throws,
+                    ThrownExceptions = new[] { typeof(Exception) },
+                    Complete = true)]
+                public static object AllocateOnly() => new object();
+
+                [EffectContract(
+                    SharpProofEffect.Throws,
+                    ThrownExceptions = new[] { typeof(Exception) },
+                    Complete = true)]
+                public static void ThrowExisting(Exception exception) {
+                    Contract.Requires(exception != null);
+                    throw exception;
+                }
+            }
+            """,
+            mode: null,
+            ["SP0047"],
+            new SharpProofAnalyzer(factory),
+            features: "effects");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0047"]));
+            Assert.That(
+                diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("EffectContractDoesNotCoverBodySummary"));
+            Assert.That(
+                factory.Outcomes["AllocateOnly"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
+            Assert.That(
+                factory.Outcomes["ThrowExisting"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+        }
+    }
+
+    [Test]
+    public async Task AllowedExceptionsAccountsForPossiblyNullThrownExpressions()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            #nullable enable
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [AllowedExceptions(typeof(InvalidOperationException))]
+                public static void MaybeNull(
+                    InvalidOperationException? exception) =>
+                    throw exception;
+
+                [AllowedExceptions(typeof(InvalidOperationException))]
+                public static void RequiredNonNull(
+                    InvalidOperationException? exception) {
+                    Contract.Requires(exception != null);
+                    throw exception;
+                }
+            }
+            """,
+            mode: null,
+            ["SP0046"],
+            new SharpProofAnalyzer(factory),
+            features: "effects");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0046"]));
+            Assert.That(
+                diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("NullReferenceException"));
+            Assert.That(
+                factory.Outcomes["MaybeNull"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["RequiredNonNull"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+        }
     }
 
     [Test]

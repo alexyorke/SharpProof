@@ -78,14 +78,7 @@ internal static class EffectWitnessReplayer
         WorkerEffectViolationWitness witness,
         CompilerEffectConstraintArtifact constraint)
     {
-        var effects = witness.Effects;
-        if ((effects & WorkerEffectSet.Allocates) != 0 &&
-            (constraint.AllowedEffects & WorkerEffectSet.Throws) != 0)
-        {
-            effects &= ~WorkerEffectSet.Allocates;
-        }
-
-        return (effects & ~constraint.AllowedEffects) != 0 ||
+        return (witness.Effects & ~constraint.AllowedEffects) != 0 ||
                (witness.Capabilities &
                 ~constraint.AllowedCapabilities) != 0 ||
                HasDisallowedException(witness, constraint);

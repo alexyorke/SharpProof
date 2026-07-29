@@ -23,7 +23,7 @@ depends on a modeled call which the independent interpreter cannot execute is
 also `Unknown`; it is never reported as a refutation. Backend unavailability,
 infrastructure failure, malformed backend output, containment failure, and a
 failed replay of an otherwise replayable counterexample make protocol version
-8 mark the whole run `Failed`; these conditions are fatal under every build
+9 mark the whole run `Failed`; these conditions are fatal under every build
 policy. Unsupported unannotated analyzer callables remain silent. Explicitly
 selected unsupported callables produce SP0047.
 
@@ -40,7 +40,7 @@ exhaustion, and all `Unknown` outcomes are not reusable proof-cache entries.
 
 ## Accountable selection and worker runs
 
-Worker protocol version 8 separates `WorkerRunStatus` from
+Worker protocol version 9 separates `WorkerRunStatus` from
 `WorkerClaimOutcome`. The compiler-symbol-based manifest is sealed before
 verification. It contains every selected callable, every discovered
 postcondition, and every selected effect-attribute occurrence with a stable
@@ -66,6 +66,14 @@ constraint. Conditional and may-only conflicts remain
 `Unknown(EffectSummaryIncomplete)`. Other certainty values distinguish a
 complete or incomplete may-effect summary, a trusted complete boundary, and
 unavailable evidence.
+
+Exception constraints and exact witness hierarchies use the type-reference
+documentation ID qualified by the full compiler assembly identity: name,
+version, culture, and public-key token. Compiler classification and worker
+replay therefore cannot confuse types imported through aliases from distinct
+same-simple-name assemblies. Type-reference IDs preserve constructed generic
+arguments. Exact user-defined generic exception witnesses remain outside the
+admitted direct-refutation subset and therefore remain `Unknown`.
 
 Every selected callable has explicit `Complete` or `Incomplete` coverage.
 Every manifest claim has exactly one `Proven`, `Refuted`, or `Unknown` result.
@@ -243,7 +251,7 @@ and primary constructors. A closed constructed generic API call is accepted only
 when a specification resolves for that exact call. Every Roslyn `OperationKind`
 is classified by a checked-in decision table; an unknown future kind is rejected.
 
-The packaged verifier consumes compiler artifact schema version 6 produced
+The packaged verifier consumes compiler artifact schema version 7 produced
 from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed
 lowering failure or portable whole-body CFG/IR with bound clauses, canonical

@@ -98,9 +98,7 @@ internal sealed class OperationEffectScanner
                     EffectSummaryOperations.Capability(EffectCapabilityKind.Synchronization)),
                 IThrowOperation thrown when IsSourceThrow(thrown) => EffectExceptionFlow.KeepEscaping(
                     EffectSummaryOperations.Throw(
-                        thrown.Exception == null
-                            ? EffectExceptionFlow.ResolveRethrow(thrown)
-                            : _session.ResolveThrownException(thrown.Exception)),
+                        ResolveThrownException(thrown)),
                     thrown, _session.Compilation),
                 _ => EffectSummary.Empty
             };
@@ -138,7 +136,7 @@ internal sealed class OperationEffectScanner
             ICompoundAssignmentOperation assignment => ScanCompoundAssignment(assignment),
             IIncrementOrDecrementOperation increment => EffectSummaryOperations.Join(
                 Scan(increment.Target, EffectAccess.Read),
-                ScanWriteTarget(increment.Target, increment.Target),
+                ScanWriteTarget(increment.Target, increment.Target, valueIsStoredDirectly: false),
                 CheckedOverflow(increment.IsChecked, increment),
                 ScanOperatorCall(increment.OperatorMethod, EffectRegionSet.Empty,
                     [ClassifyRegion(increment.Target)], increment)),
@@ -156,9 +154,7 @@ internal sealed class OperationEffectScanner
             IThrowOperation thrown when IsSourceThrow(thrown) => EffectSummaryOperations.Join(
                 ScanChildren(thrown),
                 EffectSummaryOperations.Throw(
-                    thrown.Exception == null
-                        ? EffectExceptionFlow.ResolveRethrow(thrown)
-                        : _session.ResolveThrownException(thrown.Exception))),
+                    ResolveThrownException(thrown))),
             IThrowOperation => EffectSummary.Empty,
             IBinaryOperation binary => ScanBinary(binary),
             IUnaryOperation unary => ScanUnary(unary),
@@ -242,7 +238,10 @@ internal sealed class OperationEffectScanner
             property);
     }
 
-    private EffectSummary ScanArrayElement(IArrayElementReferenceOperation element, EffectAccess access)
+    private EffectSummary ScanArrayElement(
+        IArrayElementReferenceOperation element,
+        EffectAccess access,
+        IOperation? assignedValue = null)
     {
         var region = ClassifyRegion(element.ArrayReference);
         var accessSummary = access == EffectAccess.Write
@@ -261,7 +260,8 @@ internal sealed class OperationEffectScanner
 
         if (access == EffectAccess.Write &&
             element.ArrayReference.Type is IArrayTypeSymbol arrayType &&
-            !arrayType.ElementType.IsValueType)
+            !arrayType.ElementType.IsValueType &&
+            !ArrayStoreIsDefinitelyCompatible(element, arrayType, assignedValue))
         {
             exceptions = EffectSummaryOperations.Join(exceptions, Throw(FrameworkTypeMetadataNames.ArrayTypeMismatchException));
         }
@@ -273,13 +273,19 @@ internal sealed class OperationEffectScanner
             exceptions);
     }
 
-    private EffectSummary ScanWriteTarget(IOperation target, IOperation value)
+    private EffectSummary ScanWriteTarget(
+        IOperation target,
+        IOperation value,
+        bool valueIsStoredDirectly = true)
     {
         return target switch
         {
             IFieldReferenceOperation field => ScanField(field, EffectAccess.Write),
             IArrayElementReferenceOperation element =>
-                ScanArrayElement(element, EffectAccess.Write),
+                ScanArrayElement(
+                    element,
+                    EffectAccess.Write,
+                    valueIsStoredDirectly ? value : null),
             IPropertyReferenceOperation property => ScanProperty(property, EffectAccess.Write, value),
             IParameterReferenceOperation parameter
                 when parameter.Parameter.RefKind is RefKind.Ref or RefKind.Out =>
@@ -301,10 +307,26 @@ internal sealed class OperationEffectScanner
         return EffectSummaryOperations.Join(
             Scan(assignment.Target, EffectAccess.Read),
             Scan(assignment.Value),
-            ScanWriteTarget(assignment.Target, assignment.Value),
+            ScanWriteTarget(assignment.Target, assignment.Value, valueIsStoredDirectly: false),
             operatorCall,
             exceptions,
             CheckedOverflow(assignment.IsChecked, assignment));
+    }
+
+    private bool ArrayStoreIsDefinitelyCompatible(
+        IArrayElementReferenceOperation element,
+        IArrayTypeSymbol arrayType,
+        IOperation? assignedValue)
+    {
+        if (arrayType.ElementType.IsSealed)
+        {
+            return true;
+        }
+
+        return assignedValue != null &&
+            (assignedValue.ConstantValue is { HasValue: true, Value: null } ||
+             _abstractFlow?.TryEvaluate(element, assignedValue, out var value) == true &&
+             value.IsDefinitelyNull);
     }
 
     private EffectSummary IntegralDivisionExceptions(
@@ -611,6 +633,25 @@ internal sealed class OperationEffectScanner
             _abstractFlow?.ProvesNonNegative(creation, size) == true)
             ? EffectSummary.Empty
             : Throw(FrameworkTypeMetadataNames.OverflowException);
+    }
+
+    private EffectThrowSet ResolveThrownException(IThrowOperation thrown)
+    {
+        if (thrown.Exception == null)
+        {
+            return EffectExceptionFlow.ResolveRethrow(thrown);
+        }
+
+        var exceptions = _session.ResolveThrownException(thrown.Exception);
+        if (DefiniteOperationFacts.IsDefinitelyNonNull(thrown.Exception) ||
+            _abstractFlow?.ProvesNonNull(thrown, thrown.Exception) == true)
+        {
+            return exceptions;
+        }
+
+        return exceptions.Union(
+            _session.ResolveExceptionSet(
+                FrameworkTypeMetadataNames.NullReferenceException));
     }
 
     private static bool IsDefinitelyNonNegative(IOperation operation)

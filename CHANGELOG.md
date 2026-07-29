@@ -46,7 +46,7 @@ contain documented breaking changes.
 
 - The verifier consumes the final compiler compilation artifact instead of
   reconstructing a compilation from source files.
-- Protocol version 8 and cache schema 9 distinguish undefined
+- Protocol version 9 and cache schema 10 distinguish undefined
   postconditions, non-replayable modeled calls, genuine replay failures,
   effect-evidence certainty, and explicit vacuity evidence.
 - `require-proven` runs bypass the local semantic cache.
@@ -82,9 +82,22 @@ contain documented breaking changes.
 - Trusted complete effect contracts on bodyless source boundaries are honored,
   while malformed, incomplete, conflicting, or untrusted boundaries remain
   visible instead of disappearing.
+- Compiler artifact schema 7 binds exception constraints and exact witness
+  hierarchies to canonical full assembly identities, including version,
+  culture, and public-key token, plus constructed-type reference IDs, so
+  aliased same-name assemblies cannot collide during independent worker replay.
 
 ### Fixed
 
+- `SharpProofEffect.Throws` no longer implicitly permits managed allocation;
+  every declared effect flag is enforced independently.
+- Throwing a possibly null exception expression now includes the possible
+  `NullReferenceException`; a proven non-null precondition removes that risk.
+- Reference-array stores no longer report a spurious
+  `ArrayTypeMismatchException` when the element type is sealed or the stored
+  value is proven null.
+- Exception replay no longer downgrades a definite violation because distinct
+  same-simple-name assembly types collapsed to the same evidence identity.
 - Nullable and native-sized division/remainder now contribute their exact
   modeled exception behavior to effect contracts.
 - Constructor calls participate in concrete precondition checking.

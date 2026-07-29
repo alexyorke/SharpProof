@@ -11,7 +11,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 6;
+    internal const int Current = 7;
 }
 
 internal enum CompilerContractKind
@@ -327,7 +327,7 @@ internal static class CompilerEffectClaimArtifactCodec
         var witness = value.Witness;
         var constraint = value.Constraint;
         using var hash = new CanonicalHashWriter();
-        hash.Add("SharpProof.CompilerEffectClaimEvidence", 6, value.ClaimId,
+        hash.Add("SharpProof.CompilerEffectClaimEvidence", 7, value.ClaimId,
             value.ContractKind, value.Outcome, value.Reason, value.Certainty,
             constraint.AllowedEffects, constraint.AllowedCapabilities);
         foreach (var type in constraint.AllowedExceptionTypes
