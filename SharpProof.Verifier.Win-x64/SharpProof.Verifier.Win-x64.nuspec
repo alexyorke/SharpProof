@@ -44,6 +44,7 @@
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.deps.json" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.runtimeconfig.json" target="tools\net9" />
+    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.Collections.Immutable.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.IO.Pipelines.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.Text.Encodings.Web.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.Text.Json.dll" target="tools\net9" />

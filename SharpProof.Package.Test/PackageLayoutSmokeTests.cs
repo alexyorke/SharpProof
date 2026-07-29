@@ -88,6 +88,7 @@ public sealed class PackageLayoutSmokeTests
         "tools/net9/SharpProof.Worker.Launcher.runtimeconfig.json",
         "tools/net9/SharpProof.Worker.Protocol.dll",
         "tools/net9/SharpProof.Worker.runtimeconfig.json",
+        "tools/net9/System.Collections.Immutable.dll",
         "tools/net9/System.IO.Pipelines.dll",
         "tools/net9/System.Text.Encodings.Web.dll",
         "tools/net9/System.Text.Json.dll",
@@ -254,7 +255,7 @@ public sealed class PackageLayoutSmokeTests
             .GetProperty("thirdPartyComponents")
             .EnumerateArray()
             .ToArray();
-        Assert.That(thirdPartyComponents, Has.Length.EqualTo(16));
+        Assert.That(thirdPartyComponents, Has.Length.EqualTo(17));
         Assert.That(
             thirdPartyComponents.Select(static component =>
                 component.GetProperty("license").GetString()),

@@ -66,6 +66,9 @@ contain documented breaking changes.
   Linux x64, macOS x64, and macOS ARM64.
 - Package builds run SDK package validation, and GitHub Actions dependencies
   are pinned to immutable commits.
+- `System.Collections.Immutable` is updated to 9.0.18, and the verifier package
+  carries that exact runtime asset so isolated consumers do not depend on an
+  ambient shared-framework copy.
 
 ### Security
 

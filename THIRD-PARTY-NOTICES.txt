@@ -9,7 +9,7 @@ release package.
 
 Package: Microsoft.Bcl.AsyncInterfaces 10.0.10
 Package: System.Buffers 4.6.1
-Package: System.Collections.Immutable 9.0.0
+Package: System.Collections.Immutable 9.0.18
 Package: System.IO.Pipelines 10.0.10
 Package: System.Memory 4.6.3
 Package: System.Numerics.Vectors 4.6.1
