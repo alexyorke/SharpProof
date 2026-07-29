@@ -1591,6 +1591,90 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task EntryDomainsAndClosedAttributesProduceExplicitPreconditionVacuity()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static byte ByteImpossible(byte value) {
+                    Contract.Requires(value > 300);
+                    Contract.Ensures(false);
+                    return value;
+                }
+
+                public static uint UIntImpossible(uint value) {
+                    Contract.Requires(value > 5000000000L);
+                    Contract.Ensures(false);
+                    return value;
+                }
+
+                public static int PositiveImpossible(
+                    [Positive] int value) {
+                    Contract.Requires(value <= 0);
+                    Contract.Ensures(false);
+                    return value;
+                }
+
+                public static int RangeImpossible(
+                    [InRange(5, 10)] int value) {
+                    Contract.Requires(value < 5);
+                    Contract.Ensures(false);
+                    return value;
+                }
+
+                public static int AssumeOnly(int value) {
+                    Contract.Assume(false);
+                    Contract.Ensures(false);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+        var contradictory = new[]
+        {
+            Result("ByteImpossible"),
+            Result("UIntImpossible"),
+            Result("PositiveImpossible"),
+            Result("RangeImpossible")
+        };
+        var assumeOnly = Result("AssumeOnly");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.Errors, Is.Empty);
+            Assert.That(response.ClaimResults, Has.Length.EqualTo(5));
+            Assert.That(
+                contradictory.Select(static result => result.Outcome),
+                Is.All.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                contradictory.Select(static result => result.Vacuity),
+                Is.All.EqualTo(
+                    WorkerVacuityKind.ContradictoryPreconditions));
+            Assert.That(
+                assumeOnly.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                assumeOnly.Vacuity,
+                Is.EqualTo(WorkerVacuityKind.None));
+            Assert.That(
+                WorkerProtocolJson.Validate(response).IsValid,
+                Is.True);
+        }
+
+        WorkerClaimResult Result(string methodName)
+        {
+            return response.ClaimResults.Single(result =>
+                GetCallableId(response, result).Contains(
+                    "." + methodName + "(",
+                    StringComparison.Ordinal));
+        }
+    }
+
+    [Test]
     public async Task DirectMathAbsReturnIsProvenFromItsApiSpec()
     {
         using var project = TestProject.Create(

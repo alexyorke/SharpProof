@@ -290,6 +290,72 @@ public sealed class WorkerTcbEdgeCaseTests
     }
 
     [Test]
+    public async Task ResultSourceDomainCannotCreatePreconditionVacuity()
+    {
+        var factory = new IrFactory();
+        var resultVariable = factory.CreateVariable(
+            "result",
+            factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        builder.Return(
+            entry,
+            factory.CreateOperation(),
+            factory.Integer(-1));
+        var target = CreateTarget(
+            factory,
+            factory.Boolean(false),
+            [new CompilerCanonicalVariable(
+                CompilerVariableRole.Result,
+                -1,
+                resultVariable,
+                null,
+                new CompilerIntegerInterval(0, byte.MaxValue),
+                "result")],
+            CompilerPreparedBody.ProgramBody(
+                builder.Build(),
+                ImmutableDictionary<IrVarId, IrVarId>.Empty,
+                ImmutableDictionary<
+                    IrInstructionId,
+                    CompilerPreparedSpecCall>.Empty));
+
+        var result = await VerifyWithSmtAsync(target);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.None));
+        }
+    }
+
+    [Test]
+    public async Task UserAssumeCannotCreatePreconditionVacuity()
+    {
+        var factory = new IrFactory();
+        var target = CreateTarget(
+            factory,
+            [
+                new CompilerPreparedClause(
+                    CompilerContractKind.Assume,
+                    factory.Boolean(false),
+                    CompilerContractEvidence.CompilerBoundInvocation,
+                    null,
+                    "assume"),
+                Ensures(factory.Boolean(false))
+            ],
+            [],
+            CompilerPreparedBody.Trivial());
+
+        var result = await VerifyWithSmtAsync(target);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.None));
+        }
+    }
+
+    [Test]
     public async Task SatisfiablePreconditionProducesOrdinaryProof()
     {
         var factory = new IrFactory();

@@ -8,6 +8,7 @@ internal static class PostconditionObligationBuilder
         IrFactory factory, ImmutableArray<CompilerCanonicalVariable> variables, ImmutableArray<SymbolicReturn> returns,
         ImmutableDictionary<IrVarId, SpecResultProjection> projections,
         ImmutableArray<Assumption>.Builder assumptions,
+        ImmutableArray<Assumption>.Builder entryDomainAssumptions,
         Dictionary<ProofJustification, string> assumptionLabels)
     {
         var seenPredicates = assumptions.Select(static assumption => assumption.Predicate.Id).ToHashSet();
@@ -57,7 +58,14 @@ internal static class PostconditionObligationBuilder
             var label = Domain(variable).Label;
             ProofJustification justification =
                 new LoweredJustification(factory.CreateOperation("source-" + label));
-            assumptions.Add(new Assumption(factory, predicate, justification));
+            var assumption = new Assumption(factory, predicate, justification);
+            assumptions.Add(assumption);
+            if (variable.Role is
+                CompilerVariableRole.Receiver or
+                CompilerVariableRole.Parameter)
+            {
+                entryDomainAssumptions.Add(assumption);
+            }
             assumptionLabels.Add(justification, label);
         }
     }

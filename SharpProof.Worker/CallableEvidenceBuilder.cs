@@ -13,6 +13,8 @@ internal static class CallableEvidenceBuilder
         var factory = target.Factory;
         var assumptions = ImmutableArray.CreateBuilder<Assumption>();
         var preconditions = ImmutableArray.CreateBuilder<Assumption>();
+        var entryDomainAssumptions =
+            ImmutableArray.CreateBuilder<Assumption>();
         var labels = new Dictionary<ProofJustification, string>(
             ReferenceEqualityComparer.Instance);
         var userAssumptionIds = new Dictionary<ProofJustification, string>(
@@ -104,6 +106,7 @@ internal static class CallableEvidenceBuilder
                 body.Returns,
                 body.SpecResultProjections,
                 assumptions,
+                entryDomainAssumptions,
                 labels))
         {
             return CallableEvidenceBuildResult.Fail(
@@ -140,6 +143,7 @@ internal static class CallableEvidenceBuilder
         return CallableEvidenceBuildResult.Success(new CallableEvidence(
             evidence,
             preconditions.ToImmutable(),
+            entryDomainAssumptions.ToImmutable(),
             labels,
             userAssumptionIds,
             normalCompletion,
@@ -165,6 +169,7 @@ internal static class CallableEvidenceBuilder
 internal sealed record CallableEvidence(
     ImmutableArray<Assumption> Assumptions,
     ImmutableArray<Assumption> Preconditions,
+    ImmutableArray<Assumption> EntryDomainAssumptions,
     IReadOnlyDictionary<ProofJustification, string> AssumptionLabels,
     IReadOnlyDictionary<ProofJustification, string> UserAssumptionIds,
     IrTerm NormalCompletion,

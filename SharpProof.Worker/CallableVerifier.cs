@@ -66,19 +66,23 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
         var evidence = evidenceResult.Evidence!;
         var assumptions = evidence.Assumptions;
         var preconditions = evidence.Preconditions;
+        ImmutableArray<Assumption> preconditionEvidence = [
+            .. preconditions,
+            .. evidence.EntryDomainAssumptions
+        ];
         var assumptionLabels = evidence.AssumptionLabels;
         var userAssumptionIds = evidence.UserAssumptionIds;
         var normalCompletion = evidence.NormalCompletion;
         var replayVariables = evidence.ReplayVariables;
         ProofOutcome? vacuityUnknown = null;
-        var contradictoryPreconditions = preconditions.Any(static assumption =>
+        var contradictoryPreconditions = preconditionEvidence.Any(static assumption =>
             assumption.Predicate is IrBooleanTerm { Value: false });
         if (!contradictoryPreconditions && preconditions.Any(static assumption =>
                 assumption.Predicate is not IrBooleanTerm { Value: true }))
         {
             var preconditionOutcome = await ProbeSatisfiabilityAsync(
                     factory,
-                    preconditions,
+                    preconditionEvidence,
                     replayVariables,
                     resourceBudget,
                     cancellationToken)
