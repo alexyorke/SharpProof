@@ -476,6 +476,7 @@ public sealed class ArchitectureTests
             ],
             ["protocolValidation"] = [
                 "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
+                "SharpProof.Worker.Protocol/ProtocolManifest.cs",
                 "SharpProof.Worker.Protocol/ProtocolJson.cs",
                 "SharpProof.Worker.Protocol/ProtocolJsonSupport.cs"
             ],
