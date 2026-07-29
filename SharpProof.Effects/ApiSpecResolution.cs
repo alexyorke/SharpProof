@@ -266,7 +266,12 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
 
         var reference = compilation.GetMetadataReference(assembly) as PortableExecutableReference;
         var path = reference?.FilePath ?? string.Empty;
-        var family = ClassifyReferenceFamily(identity.Name, reference, path);
+        var family = ClassifyReferenceFamily(
+            compilation,
+            identity.Name,
+            assembly,
+            reference,
+            path);
         return (
             true,
             target.ApprovedAssemblies.Any(approved =>
@@ -277,7 +282,11 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
             path);
     }
     private static ApiSpecReferenceFamily ClassifyReferenceFamily(
-        string assemblyName, PortableExecutableReference? reference, string path)
+        Compilation compilation,
+        string assemblyName,
+        IAssemblySymbol assembly,
+        PortableExecutableReference? reference,
+        string path)
     {
         var normalized = path.Replace('\\', '/');
         foreach (var (marker, family) in ReferenceFamilyMarkers)
@@ -291,7 +300,9 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
 
         return assemblyName == "SharpProof.Attributes" &&
             string.Equals(Path.GetFileName(path), "SharpProof.Attributes.dll",
-                StringComparison.OrdinalIgnoreCase)
+                StringComparison.OrdinalIgnoreCase) &&
+            ContractApiIdentityResolver.ForCompilation(compilation)
+                .IsResolvedContractAssembly(assembly)
             ? ApiSpecReferenceFamily.SharpProofPackage
             : ApiSpecReferenceFamily.Unspecified;
     }

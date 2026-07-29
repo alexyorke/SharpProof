@@ -152,7 +152,7 @@ to the `SharpProof.Attributes` assembly identity matching the analyzer and the
 exactly one real `Conditional("SHARPPROOF_CONTRACTS")` attribute. A source,
 project, identity, or shape lookalike is selected only for accountable
 abstention; it contributes no assumption, postcondition, effect, suppression,
-or trust fact.
+trust fact, or compiler-bound ghost specification.
 
 Callee postconditions may be assumed only after verification or explicit trust.
 

@@ -117,10 +117,11 @@ contain documented breaking changes.
   now emit one SP0047; unselected advisory callers remain quiet.
 - Concrete precondition replay preserves potentially failing object-to-string
   casts and proves them only from definite string runtime-type evidence.
-- Contract discovery now admits the contract API only from the matching
-  `SharpProof.Attributes` assembly identity and exact compiler-elision shape.
-  Source, project, version, key, and malformed API lookalikes produce visible
-  incomplete analysis and contribute no proof facts.
+- Contract discovery and compiler-bound ghost specification resolution now
+  admit the contract API only from the matching `SharpProof.Attributes`
+  assembly identity and exact compiler-elision shape. Source, project,
+  version, key, and malformed API lookalikes produce visible incomplete
+  analysis and contribute no proof facts.
 - Unsupported value-type defaults and unary-plus expressions no longer acquire
   exact reference-shaped IR; they abstain with `UnsupportedType`.
 - Analyzer, binder, and manifest discovery now share one effective contract

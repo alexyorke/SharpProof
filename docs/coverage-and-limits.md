@@ -162,7 +162,8 @@ assembly identity matching the analyzer payload. Clause methods also require
 the exact supported signatures and one real
 `Conditional("SHARPPROOF_CONTRACTS")` attribute. Rejected source/project
 shadows, identity mismatches, and malformed lookalikes remain visibly selected
-but contribute no contract, effect, trust, or suppression evidence.
+but contribute no contract, effect, trust, suppression, or compiler-bound
+ghost specification evidence.
 
 ## Outcomes, accountability, and cache boundary
 

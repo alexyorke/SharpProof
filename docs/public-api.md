@@ -21,8 +21,9 @@ key to match the analyzer payload. The `Contract` type must have the exact
 supported signatures, and each clause method must carry exactly one real
 `Conditional("SHARPPROOF_CONTRACTS")` attribute. Source/project shadows,
 mismatched assemblies, and malformed lookalikes are not compatibility
-substitutes: they contribute no evidence and produce SP0047. A rejected
-`ContractForAttribute` lookalike produces SPCF0001.
+substitutes: they contribute no evidence, including compiler-bound ghost API
+specifications, and produce SP0047. A rejected `ContractForAttribute`
+lookalike produces SPCF0001.
 
 `ContractForAttribute` associates a static companion class with a target
 interface or class. The generator validates the association and member

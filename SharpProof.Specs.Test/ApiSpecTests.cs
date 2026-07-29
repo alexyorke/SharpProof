@@ -204,6 +204,141 @@ public sealed class ApiSpecTests
         });
     }
 
+    [Test]
+    public void SharpProofPackageSpecsResolveAgainstGenuineAttributes()
+    {
+        var reference = MetadataReference.CreateFromFile(
+            typeof(Contract).Assembly.Location);
+
+        var resolved = ResolveContractRequires(reference, string.Empty);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resolved.Failures, Is.Empty);
+            Assert.That(
+                resolved.Specs.Single().Template.Target.WitnessIdentifier,
+                Is.EqualTo("contract.requires.test"));
+        });
+    }
+
+    [Test]
+    public void SharpProofPackageSpecsRejectContractWithoutConditionalElision()
+    {
+        var package = CreateSharpProofPackageReference(
+            CreateContractSource(
+                typeof(Contract).Assembly.GetName().Version!,
+                includeConditionalAttributes: false));
+        try
+        {
+            var resolved = ResolveContractRequires(
+                package.Reference,
+                string.Empty);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(resolved.Specs, Is.Empty);
+                Assert.That(
+                    resolved.Failures.Single().Kind,
+                    Is.EqualTo(
+                        ApiSpecResolutionFailureKind
+                            .UnapprovedReferenceFamily));
+            });
+        }
+        finally
+        {
+            Directory.Delete(package.Root, recursive: true);
+        }
+    }
+
+    [Test]
+    public void SharpProofPackageSpecsRejectVersionMismatch()
+    {
+        var package = CreateSharpProofPackageReference(
+            CreateContractSource(
+                new Version(9, 0, 0, 0),
+                includeConditionalAttributes: true));
+        try
+        {
+            var resolved = ResolveContractRequires(
+                package.Reference,
+                string.Empty);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(resolved.Specs, Is.Empty);
+                Assert.That(
+                    resolved.Failures.Single().Kind,
+                    Is.EqualTo(
+                        ApiSpecResolutionFailureKind
+                            .UnapprovedReferenceFamily));
+            });
+        }
+        finally
+        {
+            Directory.Delete(package.Root, recursive: true);
+        }
+    }
+
+    [Test]
+    public void SharpProofPackageSpecsRejectPublicKeyMismatch()
+    {
+        var publicKey = typeof(object).Assembly.GetName().GetPublicKey();
+        Assert.That(publicKey, Is.Not.Null.And.Not.Empty);
+        var package = CreateSharpProofPackageReference(
+            CreateContractSource(
+                typeof(Contract).Assembly.GetName().Version!,
+                includeConditionalAttributes: true),
+            [.. publicKey!]);
+        try
+        {
+            var token = GetPublicKeyToken(package.Reference);
+            Assert.That(token, Is.Not.Empty);
+
+            var resolved = ResolveContractRequires(
+                package.Reference,
+                token);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(resolved.Specs, Is.Empty);
+                Assert.That(
+                    resolved.Failures.Single().Kind,
+                    Is.EqualTo(
+                        ApiSpecResolutionFailureKind
+                            .UnapprovedReferenceFamily));
+            });
+        }
+        finally
+        {
+            Directory.Delete(package.Root, recursive: true);
+        }
+    }
+
+    [Test]
+    public void SharpProofPackageSpecsAcceptMatchingIdentityAndContractShape()
+    {
+        var package = CreateSharpProofPackageReference(
+            CreateContractSource(
+                typeof(Contract).Assembly.GetName().Version!,
+                includeConditionalAttributes: true));
+        try
+        {
+            var resolved = ResolveContractRequires(
+                package.Reference,
+                string.Empty);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(resolved.Failures, Is.Empty);
+                Assert.That(resolved.Specs, Has.Length.EqualTo(1));
+            });
+        }
+        finally
+        {
+            Directory.Delete(package.Root, recursive: true);
+        }
+    }
+
     [TestCase("netstandard2.0")]
     [TestCase("net8.0")]
     [TestCase("net472")]
@@ -528,12 +663,12 @@ public sealed class ApiSpecTests
         var aggregateEnumerable = aggregate.InstanceConstructors.Single(
             static constructor =>
                 constructor.Parameters is [
-                {
-                    Type: INamedTypeSymbol
                     {
-                        MetadataName: "IEnumerable`1"
-                    }
-                }]);
+                        Type: INamedTypeSymbol
+                        {
+                            MetadataName: "IEnumerable`1"
+                        }
+                    }]);
 
         using (Assert.EnterMultipleScope())
         {
@@ -711,7 +846,185 @@ public sealed class ApiSpecTests
                 value.ToString("x2", System.Globalization.CultureInfo.InvariantCulture))));
     }
 
+    private static ResolvedApiSpecTable ResolveContractRequires(
+        MetadataReference attributesReference,
+        string publicKeyToken)
+    {
+        var compilation = CSharpCompilation.Create(
+            "ContractSpecConsumer",
+            references: PlatformReferences().Append(
+                attributesReference),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        return new ApiSpecResolver(ApiSpecTable.Create([
+            ContractRequiresDeclaration(publicKeyToken)
+        ])).Resolve(compilation);
+    }
+
+    private static ApiSpecDeclaration ContractRequiresDeclaration(
+        string publicKeyToken)
+    {
+        var evidence = new SpecEvidence(
+            SpecEvidenceKind.Documented,
+            "test-contract-semantics");
+        return new ApiSpecDeclaration(
+            new ApiSpecTarget(
+                "contract.requires.test",
+                "M:SharpProof.Attributes.Contract.Requires(System.Boolean)",
+                "SharpProof.Attributes.Contract",
+                SpecTargetMemberKind.Method,
+                "Requires",
+                true,
+                0,
+                null,
+                [SpecValueType.Boolean],
+                null,
+                [
+                    new ApiSpecAssemblyIdentity(
+                        "SharpProof.Attributes",
+                        publicKeyToken,
+                        ApiSpecReferenceFamily.SharpProofPackage)
+                ]),
+            new ApiSpecFacets(
+                new SpecEffectFacet(SpecEffect.None, evidence),
+                new SpecAllocationFacet(
+                    SpecAllocationBehavior.None,
+                    evidence),
+                new SpecThrowFacet(
+                    SpecThrowBehavior.DoesNotThrow,
+                    [],
+                    evidence),
+                new SpecNullnessFacet(
+                    SpecNullness.NotApplicable,
+                    evidence),
+                new SpecCardinalityFacet(
+                    SpecCardinality.NotApplicable,
+                    null,
+                    evidence)),
+            []);
+    }
+
+    private static string CreateContractSource(
+        Version assemblyVersion,
+        bool includeConditionalAttributes)
+    {
+        var conditional = includeConditionalAttributes
+            ? "[Conditional(ConditionalSymbol)]"
+            : string.Empty;
+        return $$"""
+            using System.Diagnostics;
+            using System.Reflection;
+
+            [assembly: AssemblyVersion("{{assemblyVersion}}")]
+
+            namespace SharpProof.Attributes;
+
+            public static class Contract
+            {
+                public const string ConditionalSymbol =
+                    "SHARPPROOF_CONTRACTS";
+
+                {{conditional}}
+                public static void Requires(bool condition)
+                {
+                }
+
+                {{conditional}}
+                public static void Ensures(bool condition)
+                {
+                }
+
+                {{conditional}}
+                public static void Assume(bool condition)
+                {
+                }
+
+                public static T Result<T>()
+                {
+                    return default;
+                }
+
+                public static T Old<T>(T value)
+                {
+                    return value;
+                }
+            }
+            """;
+    }
+
+    private static (
+        string Root,
+        PortableExecutableReference Reference)
+        CreateSharpProofPackageReference(
+            string source,
+            ImmutableArray<byte> publicKey = default)
+    {
+        var root = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SharpProofPackage",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var path = Path.Combine(root, "SharpProof.Attributes.dll");
+        var options = new CSharpCompilationOptions(
+            OutputKind.DynamicallyLinkedLibrary);
+        if (!publicKey.IsDefaultOrEmpty)
+        {
+            options = options
+                .WithCryptoPublicKey(publicKey)
+                .WithDelaySign(true);
+        }
+
+        var compilation = CSharpCompilation.Create(
+            "SharpProof.Attributes",
+            [CSharpSyntaxTree.ParseText(source)],
+            [CoreReference],
+            options);
+        var emit = compilation.Emit(path);
+        if (!emit.Success)
+        {
+            Directory.Delete(root, recursive: true);
+            throw new InvalidOperationException(string.Join(
+                Environment.NewLine,
+                emit.Diagnostics.Select(static diagnostic =>
+                    diagnostic.ToString())));
+        }
+
+        return (
+            root,
+            MetadataReference.CreateFromFile(path));
+    }
+
+    private static string GetPublicKeyToken(
+        MetadataReference reference)
+    {
+        var compilation = CSharpCompilation.Create(
+            "AssemblyIdentityProbe",
+            references: [CoreReference, reference],
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var symbol = compilation.GetAssemblyOrModuleSymbol(reference)
+            as IAssemblySymbol ??
+            throw new InvalidOperationException(
+                "The test reference did not resolve to an assembly.");
+        return string.Concat(symbol.Identity.PublicKeyToken.Select(
+            static value => value.ToString(
+                "x2",
+                System.Globalization.CultureInfo.InvariantCulture)));
+    }
+
     private static CSharpCompilation CreatePlatformCompilation()
+    {
+        var references = PlatformReferences().Append(
+            MetadataReference.CreateFromFile(
+                typeof(Contract).Assembly.Location));
+        return CSharpCompilation.Create(
+            "ApiSpecTests",
+            references: references,
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+    }
+
+    private static IEnumerable<MetadataReference> PlatformReferences()
     {
         var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
         if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
@@ -719,14 +1032,14 @@ public sealed class ApiSpecTests
             throw new InvalidOperationException("Trusted platform assemblies are unavailable.");
         }
 
-        var references = trustedPlatformAssemblies
+        return trustedPlatformAssemblies
             .Split(Path.PathSeparator)
-            .Select(static path => MetadataReference.CreateFromFile(path))
-            .Append(MetadataReference.CreateFromFile(typeof(Contract).Assembly.Location));
-        return CSharpCompilation.Create(
-            "ApiSpecTests",
-            references: references,
-            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            .Where(static path => !string.Equals(
+                Path.GetFileName(path),
+                "SharpProof.Attributes.dll",
+                StringComparison.OrdinalIgnoreCase))
+            .Select(static path =>
+                (MetadataReference)MetadataReference.CreateFromFile(path));
     }
 
     private static CSharpCompilation CreateTargetFrameworkCompilation(

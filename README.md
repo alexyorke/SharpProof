@@ -466,7 +466,8 @@ exact `Contract` type and requires one real
 `[Conditional("SHARPPROOF_CONTRACTS")]` on each clause method. Source or
 project lookalikes, mismatched package identities, and malformed clause APIs
 contribute no facts and report SP0047; a rejected `ContractFor` lookalike
-reports SPCF0001.
+reports SPCF0001. The compiler-bound ghost API specifications use this same
+identity and shape gate.
 
 The currently consumed closed value attributes are:
 

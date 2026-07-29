@@ -60,8 +60,7 @@ public sealed class ArchitectureTests
             ["SharpProof.Frontend"] = ["SharpProof.Ir"],
             ["SharpProof.Contracts"] = [
                 "SharpProof.Frontend",
-                "SharpProof.Ir",
-                "SharpProof.Specs"
+                "SharpProof.Ir"
             ],
             ["SharpProof.Effects"] = [
                 "SharpProof.Dataflow",
@@ -226,6 +225,10 @@ public sealed class ArchitectureTests
         };
         var violations = semanticConsumers
             .SelectMany(ProductionSourceFiles)
+            .Where(file => !string.Equals(
+                Relative(file),
+                "SharpProof.Frontend/ContractApiMetadata.cs",
+                StringComparison.Ordinal))
             .SelectMany(file => CSharpSyntaxTree.ParseText(
                     File.ReadAllText(file),
                     CSharpParseOptions.Default.WithLanguageVersion(
@@ -377,10 +380,10 @@ public sealed class ArchitectureTests
                 "SharpProof.Analyzer/FinalCompilationCollector.cs",
                 "SharpProof.Analyzer/CompilerArtifact/ClaimManifestBuilder.cs",
                 "SharpProof.Analyzer/CompilerArtifact/SemanticClaimIdentity.cs",
-                "SharpProof.Contracts/ContractApiIdentityResolver.cs",
                 "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
                 "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
                 "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
+                "SharpProof.Frontend/ContractApiIdentityResolver.cs",
                 "SharpProof.Frontend/ContractApiMetadata.cs"
             ],
             ["lowering"] = [

@@ -14,7 +14,7 @@ Ir
 Dataflow
 Specs                 -> Ir
 Frontend              -> Ir
-Contracts             -> Frontend, Ir, Specs
+Contracts             -> Frontend, Ir
 Effects               -> Dataflow, Frontend, Specs
 Verify                -> Ir, Specs
 Smt                   -> Ir, Verify

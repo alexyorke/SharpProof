@@ -1,4 +1,7 @@
-namespace SharpProof.Contracts;
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
+
+namespace SharpProof.Frontend;
 
 internal sealed class ContractApiIdentityResolver
 {
@@ -6,7 +9,7 @@ internal sealed class ContractApiIdentityResolver
     private static readonly Version AttributesAssemblyVersion =
         typeof(ContractApiIdentityResolver).Assembly.GetName().Version ??
         throw new InvalidOperationException(
-            "SharpProof.Contracts has no assembly version.");
+            "SharpProof.Frontend has no assembly version.");
     private static readonly ImmutableArray<byte> AttributesAssemblyPublicKey =
         [.. typeof(ContractApiIdentityResolver).Assembly
             .GetName()
@@ -39,9 +42,9 @@ internal sealed class ContractApiIdentityResolver
         _compilation = compilation ??
             throw new ArgumentNullException(nameof(compilation));
         _attribute = compilation.GetTypeByMetadataName(
-            FrameworkTypeMetadataNames.Attribute);
+            ContractApiMetadata.Attribute);
         _conditionalAttribute = compilation.GetTypeByMetadataName(
-            FrameworkTypeMetadataNames.ConditionalAttribute);
+            ContractApiMetadata.ConditionalAttribute);
         var candidate = compilation.GetTypeByMetadataName(
             ContractApiMetadata.Contract);
         Contract = IsTrustedReferenceType(
@@ -55,6 +58,15 @@ internal sealed class ContractApiIdentityResolver
     internal INamedTypeSymbol? Contract
     {
         get;
+    }
+
+    internal bool IsResolvedContractAssembly(IAssemblySymbol assembly)
+    {
+        return assembly != null &&
+            Contract is { } contract &&
+            SymbolEqualityComparer.Default.Equals(
+                contract.ContainingAssembly,
+                assembly);
     }
 
     internal static ContractApiIdentityResolver ForCompilation(
@@ -222,7 +234,7 @@ internal sealed class ContractApiIdentityResolver
         var attributes = method.GetAttributes()
             .Where(attribute => HasMetadataName(
                 attribute.AttributeClass,
-                FrameworkTypeMetadataNames.ConditionalAttribute))
+                ContractApiMetadata.ConditionalAttribute))
             .ToImmutableArray();
         return attributes.Length == 1 &&
             SymbolEqualityComparer.Default.Equals(
