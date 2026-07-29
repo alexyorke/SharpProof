@@ -427,6 +427,8 @@ public sealed class ArchitectureTests
                 "SharpProof.Analyzer/AnalyzerSession.cs",
                 "SharpProof.Contracts/ContractSelectionInventory.cs",
                 "SharpProof.Effects/EffectAnalysisSession.cs",
+                "SharpProof.Effects/EffectCallGraph.cs",
+                "SharpProof.Effects/EffectMethodNodeBuilder.cs",
                 "SharpProof.Effects/EffectContractMappings.cs",
                 "SharpProof.Effects/OperationEffectScanner.cs",
                 "SharpProof.Effects/EffectExceptionFlow.cs",
