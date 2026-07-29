@@ -66,8 +66,11 @@ public sealed class SharpProofWorker : IDisposable
         VerificationLane[] solverLanes = [];
         try
         {
+            // A timeout or cancellation result must remain accountable to the
+            // authoritative manifest. The launcher hard limit still bounds a
+            // snapshot load that does not complete.
             snapshot = await WorkerInputSnapshot.LoadAsync(
-                request, WorkerCacheIdentity.Current, projectBoundary.Token).ConfigureAwait(false);
+                request, WorkerCacheIdentity.Current, CancellationToken.None).ConfigureAwait(false);
         }
         catch (OperationCanceledException) { return Interrupted(); }
         catch (IOException exception) when (exception.Message == WorkerInputSnapshot.ManifestUnavailable)

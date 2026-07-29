@@ -3157,30 +3157,27 @@ public sealed class WorkerTests
                 Is.EqualTo(WorkerClaimReason.MethodTimeout));
         }
 
-        using var projectProject = TestProject.Create(
-            TautologySource.Replace(
-                "Proof(long value)",
-                "Proof(long value)",
-                StringComparison.Ordinal) +
-            """
-            public static class Second {
-                public static long Proof(long value) {
-                    SharpProof.Attributes.Contract.Ensures(
-                        SharpProof.Attributes.Contract.Result<long>() == value);
-                    return value;
-                }
-            }
-            """);
+        var projectSources = Enumerable.Range(0, 8)
+            .Select(index => (
+                $"Subject{index}.cs",
+                TautologySource.Replace(
+                    "Subject",
+                    $"Subject{index}",
+                    StringComparison.Ordinal)))
+            .ToArray();
+        using var projectProject = TestProject.Create(projectSources);
         var projectRequest = projectProject.CreateRequest(cacheEnabled: false);
         projectRequest.Budgets.MethodWallTimeMilliseconds = 40;
-        projectRequest.Budgets.ProjectWallTimeMilliseconds = 40;
+        projectRequest.Budgets.ProjectWallTimeMilliseconds = 100;
         projectRequest.Budgets.MaxParallelism = 1;
-        using var projectWorker = new SharpProofWorker(new DelayingBackend());
+        using var projectWorker = new SharpProofWorker(
+            static () => new DelayingBackend());
         var projectResponse = await projectWorker.VerifyAsync(projectRequest);
         Assert.That(
             projectResponse.ClaimResults,
             Has.Some.Property(nameof(WorkerClaimResult.Reason))
-                .EqualTo(WorkerClaimReason.ProjectTimeout));
+                .EqualTo(WorkerClaimReason.ProjectTimeout),
+            WorkerProtocolJson.SerializeResponse(projectResponse));
     }
 
     [Test]
