@@ -2004,7 +2004,7 @@ public sealed class PackageLayoutSmokeTests
             WriteProbeInput("first-input");
             var escapedVersion = SecurityElement.Escape(version);
             var escapedProbe = SecurityElement.Escape(
-                CompilerProbeContract.AssemblyPath);
+                ProductBuildOutputs.CompilerProbeAssemblyPath());
             var escapedAlias = SecurityElement.Escape(
                 typeof(Assert).Assembly.Location);
             File.WriteAllText(
