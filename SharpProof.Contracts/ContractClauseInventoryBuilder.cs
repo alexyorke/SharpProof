@@ -74,17 +74,38 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
                     GetTreeOrdinal(invocation.Syntax.SyntaxTree)));
             }
         }
-        var kindOrdinals = new int[3];
+        var requiresOrdinal = 0;
+        var ensuresOrdinal = 0;
+        var assumeOrdinal = 0;
         var sourceOrdinal = 0;
         var clauses = found
             .OrderBy(static clause => clause.TreeOrdinal)
             .ThenBy(static clause => clause.Invocation.Syntax.SpanStart)
             .ThenBy(static clause => clause.Invocation.Syntax.Span.Length)
             .Select(clause => new ContractClauseOccurrence(
-                clause.Kind, clause.Placement, kindOrdinals[(int)clause.Kind]++,
+                clause.Kind, clause.Placement, NextOrdinal(
+                    clause.Kind,
+                    ref requiresOrdinal,
+                    ref ensuresOrdinal,
+                    ref assumeOrdinal),
                 sourceOrdinal++, clause.Invocation))
             .ToImmutableArray();
         return new ContractClauseInventory(callable, _api != null, resolvedBody, clauses);
+    }
+
+    private static int NextOrdinal(
+        BoundContractKind kind,
+        ref int requiresOrdinal,
+        ref int ensuresOrdinal,
+        ref int assumeOrdinal)
+    {
+        return kind switch
+        {
+            BoundContractKind.Requires => requiresOrdinal++,
+            BoundContractKind.Ensures => ensuresOrdinal++,
+            BoundContractKind.Assume => assumeOrdinal++,
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown contract kind.")
+        };
     }
 
     private ContractClausePlacement Classify(

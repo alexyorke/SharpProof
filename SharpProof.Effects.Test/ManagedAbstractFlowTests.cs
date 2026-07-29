@@ -145,6 +145,80 @@ public sealed class ManagedAbstractFlowTests
     }
 
     [Test]
+    public void EqualityBranchesIntersectBothVariableIntervals()
+    {
+        var (analysis, call) = AnalyzeSingleCall(
+            """
+            public static class Sample {
+                private static void Sink(int left, int right) {
+                }
+
+                public static void Calls(
+                    [SharpProof.Attributes.InRange(0, 10)] int left,
+                    [SharpProof.Attributes.InRange(3, 7)] int right) {
+                    if (left == right)
+                        Sink(left, right);
+                }
+            }
+            """);
+
+        Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
+        Assert.That(
+            analysis.Result!.TryEvaluate(
+                call,
+                call.Arguments[0].Value,
+                out var left),
+            Is.True);
+        Assert.That(
+            analysis.Result.TryEvaluate(
+                call,
+                call.Arguments[1].Value,
+                out var right),
+            Is.True);
+        Assert.That(left.TryGetInteger(out var leftInterval), Is.True);
+        Assert.That(right.TryGetInteger(out var rightInterval), Is.True);
+        Assert.That(leftInterval, Is.EqualTo(IntervalValue.Range(3, 7)));
+        Assert.That(rightInterval, Is.EqualTo(IntervalValue.Range(3, 7)));
+    }
+
+    [Test]
+    public void OrderedBranchesRefineBothVariableIntervals()
+    {
+        var (analysis, call) = AnalyzeSingleCall(
+            """
+            public static class Sample {
+                private static void Sink(int left, int right) {
+                }
+
+                public static void Calls(
+                    [SharpProof.Attributes.InRange(0, 10)] int left,
+                    [SharpProof.Attributes.InRange(3, 7)] int right) {
+                    if (left < right)
+                        Sink(left, right);
+                }
+            }
+            """);
+
+        Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
+        Assert.That(
+            analysis.Result!.TryEvaluate(
+                call,
+                call.Arguments[0].Value,
+                out var left),
+            Is.True);
+        Assert.That(
+            analysis.Result.TryEvaluate(
+                call,
+                call.Arguments[1].Value,
+                out var right),
+            Is.True);
+        Assert.That(left.TryGetInteger(out var leftInterval), Is.True);
+        Assert.That(right.TryGetInteger(out var rightInterval), Is.True);
+        Assert.That(leftInterval, Is.EqualTo(IntervalValue.Range(0, 6)));
+        Assert.That(rightInterval, Is.EqualTo(IntervalValue.Range(3, 7)));
+    }
+
+    [Test]
     public void SharedEdgeRefinementPreservesBooleanFactsAcrossOperationIdentity()
     {
         var compilation = EffectTestHost.CreateCompilation(
@@ -176,6 +250,22 @@ public sealed class ManagedAbstractFlowTests
         Assert.That(flow!.TryEvaluate(call, call.Arguments[0].Value, out var value), Is.True);
         Assert.That(value.TryGetBoolean(out var boolean), Is.True);
         Assert.That(boolean, Is.False);
+    }
+
+    private static (ManagedFlowAnalysis Analysis, IInvocationOperation Call)
+        AnalyzeSingleCall(string source)
+    {
+        var compilation = EffectTestHost.CreateCompilation(source);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Calls");
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var call = root.Descendants().OfType<IInvocationOperation>().Single();
+        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
+            .Analyze(method, ControlFlowGraph.Create(root), null, default);
+        return (analysis, call);
     }
 
     [Test]

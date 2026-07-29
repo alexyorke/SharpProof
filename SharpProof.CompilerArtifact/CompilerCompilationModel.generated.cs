@@ -26,18 +26,18 @@ internal sealed class CompilerCompilationSnapshot
 
 internal sealed class CompilerCompilationOptionsSnapshot
 {
-    public string OutputKind { get; set; } = string.Empty;
-    public string OptimizationLevel { get; set; } = string.Empty;
-    public string Platform { get; set; } = string.Empty;
-    public string NullableContext { get; set; } = string.Empty;
-    public string MetadataImportOptions { get; set; } = string.Empty;
+    public CompilerOutputKind OutputKind { get; set; }
+    public CompilerOptimizationLevel OptimizationLevel { get; set; }
+    public CompilerPlatform Platform { get; set; }
+    public CompilerNullableContext NullableContext { get; set; }
+    public CompilerMetadataImportOptions MetadataImportOptions { get; set; }
     public bool CheckOverflow { get; set; }
     public bool AllowUnsafe { get; set; }
     public bool Deterministic { get; set; }
     public bool ReferencesSupersedeLowerVersions { get; set; }
-    public string AssemblyIdentityComparer { get; set; } = string.Empty;
+    public CompilerAssemblyIdentityComparer AssemblyIdentityComparer { get; set; }
     public string[] Usings { get; set; } = [];
-    public string ResolverPolicy { get; set; } = string.Empty;
+    public CompilerResolverPolicy ResolverPolicy { get; set; }
 }
 
 internal sealed class CompilerSyntaxTreeSnapshot

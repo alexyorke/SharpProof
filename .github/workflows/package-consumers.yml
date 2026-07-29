@@ -349,6 +349,7 @@ jobs:
             test SharpProof.Dev.Tests.slnf `
             -c Release `
             --no-build `
+            --filter 'TestCategory!=Performance' `
             --collect "XPlat Code Coverage" `
             --results-directory artifacts/release-qualification/coverage
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

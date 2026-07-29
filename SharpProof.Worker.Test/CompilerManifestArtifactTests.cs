@@ -70,7 +70,7 @@ public sealed class CompilerManifestArtifactTests
                 Is.EqualTo(parse.Features));
             Assert.That(
                 artifact.Compilation.Options.ResolverPolicy,
-                Is.EqualTo("EvidenceOnly"));
+                Is.EqualTo(CompilerResolverPolicy.EvidenceOnly));
             Assert.That(json, Does.Not.Contain(SourceMarker));
             Assert.That(json, Does.Not.Contain("\"text\":"));
         }
@@ -100,8 +100,8 @@ public sealed class CompilerManifestArtifactTests
     public void RecomputedOuterHashCannotHideMalformedNestedEvidence()
     {
         Action<CompilerCompilationSnapshot>[] corruptions = [
-            snapshot => snapshot.Options.OutputKind = "invalid",
-            snapshot => snapshot.Options.ResolverPolicy = "ignored",
+            snapshot => snapshot.Options.ReferencesSupersedeLowerVersions = true,
+            snapshot => snapshot.Options.Usings = [string.Empty],
             snapshot => snapshot.SyntaxTrees[0].Features = null!,
             snapshot => snapshot.SyntaxTrees[0].Sha256 = "invalid",
             snapshot => snapshot.References[0].Aliases = null!,
@@ -124,6 +124,19 @@ public sealed class CompilerManifestArtifactTests
                 (Action)(() =>
                     CompilerManifestArtifactJson.Deserialize(json)));
         }
+    }
+
+    [Test]
+    public void UnknownCompilerOptionNameIsRejected()
+    {
+        var json = CompilerManifestArtifactJson.Serialize(CreateArtifact())
+            .Replace(
+                "\"outputKind\":\"DynamicallyLinkedLibrary\"",
+                "\"outputKind\":\"FutureOutputKind\"",
+                StringComparison.Ordinal);
+
+        Assert.Throws<JsonException>(
+            (Action)(() => CompilerManifestArtifactJson.Deserialize(json)));
     }
 
     [Test]

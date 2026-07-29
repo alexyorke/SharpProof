@@ -243,7 +243,7 @@ and primary constructors. A closed constructed generic API call is accepted only
 when a specification resolves for that exact call. Every Roslyn `OperationKind`
 is classified by a checked-in decision table; an unknown future kind is rejected.
 
-The packaged verifier consumes compiler artifact schema version 5 produced
+The packaged verifier consumes compiler artifact schema version 6 produced
 from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed
 lowering failure or portable whole-body CFG/IR with bound clauses, canonical

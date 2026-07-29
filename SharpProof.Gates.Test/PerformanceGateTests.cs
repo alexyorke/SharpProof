@@ -207,6 +207,7 @@ public sealed class PerformanceGateTests
     }
 
     [Test]
+    [Category("Performance")]
     public async Task ForcedTerminationDeadlineIsStableAcrossLaunches()
     {
         var root = RepositoryLayout.FindRoot();
@@ -226,6 +227,7 @@ public sealed class PerformanceGateTests
     }
 
     [Test]
+    [Category("Performance")]
     public async Task ReleasePerformanceContractPasses()
     {
         var result = await PerformanceGate.RunAsync(

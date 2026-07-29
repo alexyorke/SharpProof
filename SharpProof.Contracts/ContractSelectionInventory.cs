@@ -14,7 +14,7 @@ internal sealed class ContractSelectionInventory
         Compilation, ContractSelectionInventory> Cache = new();
 
     internal const string ContractForMetadataName =
-        "SharpProof.Attributes.ContractForAttribute";
+        ContractApiMetadata.ContractFor;
 
     private ContractSelectionInventory(Compilation compilation)
     {
@@ -24,18 +24,18 @@ internal sealed class ContractSelectionInventory
         }
 
         ContractFor = compilation.GetTypeByMetadataName(
-            ContractForMetadataName);
-        EnforcePure = Resolve(compilation, "EnforcePure");
-        ZeroAllocations = Resolve(compilation, "ZeroAllocations");
-        AllowedCapabilities = Resolve(compilation, "AllowedCapabilities");
-        DoesNotThrow = Resolve(compilation, "DoesNotThrow");
-        AllowedExceptions = Resolve(compilation, "AllowedExceptions");
-        EffectContract = Resolve(compilation, "EffectContract");
-        NotNull = Resolve(compilation, "NotNull");
-        Positive = Resolve(compilation, "Positive");
-        InRange = Resolve(compilation, "InRange");
-        Suppress = Resolve(compilation, "SharpProofSuppress");
-        Trusted = Resolve(compilation, "SharpProofTrusted");
+            ContractApiMetadata.ContractFor);
+        EnforcePure = Resolve(compilation, ContractApiMetadata.EnforcePure);
+        ZeroAllocations = Resolve(compilation, ContractApiMetadata.ZeroAllocations);
+        AllowedCapabilities = Resolve(compilation, ContractApiMetadata.AllowedCapabilities);
+        DoesNotThrow = Resolve(compilation, ContractApiMetadata.DoesNotThrow);
+        AllowedExceptions = Resolve(compilation, ContractApiMetadata.AllowedExceptions);
+        EffectContract = Resolve(compilation, ContractApiMetadata.EffectContract);
+        NotNull = Resolve(compilation, ContractApiMetadata.NotNull);
+        Positive = Resolve(compilation, ContractApiMetadata.Positive);
+        InRange = Resolve(compilation, ContractApiMetadata.InRange);
+        Suppress = Resolve(compilation, ContractApiMetadata.Suppress);
+        Trusted = Resolve(compilation, ContractApiMetadata.Trusted);
     }
 
     internal static ContractSelectionInventory ForCompilation(
@@ -164,9 +164,8 @@ internal sealed class ContractSelectionInventory
 
     private static INamedTypeSymbol? Resolve(
         Compilation compilation,
-        string name)
+        string metadataName)
     {
-        return compilation.GetTypeByMetadataName(
-            "SharpProof.Attributes." + name + "Attribute");
+        return compilation.GetTypeByMetadataName(metadataName);
     }
 }

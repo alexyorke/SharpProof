@@ -72,7 +72,7 @@ internal sealed class ContractClauseSymbols(INamedTypeSymbol contractType)
 
     internal static ContractClauseSymbols? TryCreate(Compilation compilation)
     {
-        return compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract")
+        return compilation.GetTypeByMetadataName(ContractApiMetadata.Contract)
             is { } contract
             ? new(contract)
             : null;

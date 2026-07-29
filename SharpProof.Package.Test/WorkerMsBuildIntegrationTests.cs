@@ -1524,7 +1524,7 @@ public sealed class WorkerMsBuildIntegrationTests
                     Is.EqualTo("SharpProof.CompilerManifest"));
                 Assert.That(
                     root.GetProperty("schemaVersion").GetInt32(),
-                    Is.EqualTo(5));
+                    Is.EqualTo(6));
                 Assert.That(
                     root.GetProperty("protocolVersion").GetString(),
                     Is.EqualTo(WorkerProtocolVersions.Current));

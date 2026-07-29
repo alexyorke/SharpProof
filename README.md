@@ -77,7 +77,7 @@ both implemented feature groups:
   verification.
 
 `SharpProofFeatures` values are `effects`, `contracts`, and `all` (the
-default). The effective selection is sealed into the schema-5 compiler
+default). The effective selection is sealed into the schema-6 compiler
 artifact and filters its manifest: `contracts` excludes effect-only
 annotations, `effects` excludes postcondition claims and contract assumptions,
 and `all` selects both surfaces. Every effective effect contract has one typed
@@ -239,7 +239,8 @@ SP0027 covers ordinary invocations and object creation. Exact concrete
 expressions use compiler-bound IR replay. Other definitely executed calls use
 a compilation-scoped CFG analysis that tracks Boolean facts, nullness, integer
 intervals, sequence cardinality, and effects through branches and joins. The
-analysis propagates caller `Requires` clauses and parameter attributes, so it
+analysis refines both scalar operands on comparison edges and propagates caller
+`Requires` clauses and parameter attributes, so it
 can establish non-null, division, bounds, range, and overflow facts without
 running Z3 in the live analyzer.
 
@@ -558,7 +559,7 @@ and local remote-payload simulation are available through:
 
 ## Closed compiler artifact and remaining release gaps
 
-The build-only collector now emits compiler artifact schema version 5 from the
+The build-only collector now emits compiler artifact schema version 6 from the
 final post-generator Roslyn `Compilation`. It seals the feature-selected claim
 manifest and, for each selected callable, either a typed lowering failure or
 portable whole-body CFG/IR with bound contract clauses, canonical variables,

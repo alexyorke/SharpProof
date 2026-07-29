@@ -376,7 +376,8 @@ public sealed class ArchitectureTests
                 "SharpProof.Analyzer/FinalCompilationCollector.cs",
                 "SharpProof.Analyzer/CompilerArtifact/ClaimManifestBuilder.cs",
                 "SharpProof.Analyzer/CompilerArtifact/SemanticClaimIdentity.cs",
-                "SharpProof.Contracts/ContractClauseInventoryBuilder.cs"
+                "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
+                "SharpProof.Frontend/ContractApiMetadata.cs"
             ],
             ["lowering"] = [
                 "SharpProof.Analyzer/CompilerArtifact/CompilerCallableLowerer.cs",
@@ -385,8 +386,10 @@ public sealed class ArchitectureTests
                 "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
                 "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
                 "SharpProof.Contracts/ContractBinder.cs",
+                "SharpProof.Contracts/ContractCanonicalization.cs",
                 "SharpProof.Contracts/ContractExpressionBinder.cs",
                 "SharpProof.Contracts/ContractIntrinsicValidator.cs",
+                "SharpProof.Frontend/OperationSupportCatalog.cs",
                 "SharpProof.Frontend/RoslynOperationLowerer.cs",
                 "SharpProof.Frontend/RoslynProgramLowerer.cs"
             ],
@@ -463,6 +466,7 @@ public sealed class ArchitectureTests
             ],
             ["compilerInputIdentity"] = [
                 "SharpProof.Analyzer/CompilerArtifact/CompilerCompilationCapture.cs",
+                "SharpProof.Analyzer/CompilerArtifact/CompilerOptionWireMappings.cs",
                 "SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs",
                 "SharpProof.CompilerArtifact/CompilationFingerprint.cs"
             ],
@@ -471,7 +475,8 @@ public sealed class ArchitectureTests
             ],
             ["protocolValidation"] = [
                 "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
-                "SharpProof.Worker.Protocol/ProtocolJson.cs"
+                "SharpProof.Worker.Protocol/ProtocolJson.cs",
+                "SharpProof.Worker.Protocol/ProtocolJsonSupport.cs"
             ],
             ["cacheValidation"] = [
                 "SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs",
@@ -560,6 +565,77 @@ public sealed class ArchitectureTests
             "parameter binding cannot consume MSBuild switches." +
             Environment.NewLine +
             string.Join(Environment.NewLine, violations));
+    }
+
+    [Test]
+    public void PerformanceContractIsIsolatedFromBroadTestAndCoverageRuns()
+    {
+        var root = RepositoryRoot();
+        var performanceTests = File.ReadAllText(Path.Combine(
+            root,
+            "SharpProof.Gates.Test",
+            "PerformanceGateTests.cs"));
+        Assert.That(
+            performanceTests.Split("[Category(\"Performance\")]", StringSplitOptions.None),
+            Has.Length.EqualTo(3));
+
+        foreach (var workflow in new[] {
+                     ".github/workflows/ci.yml",
+                     ".github/workflows/coverage.yml",
+                     ".github/workflows/package-consumers.yml"
+                 })
+        {
+            var contents = File.ReadAllText(Path.Combine(
+                root,
+                workflow.Replace('/', Path.DirectorySeparatorChar)));
+            Assert.That(
+                contents,
+                Does.Contain("TestCategory!=Performance"),
+                workflow);
+        }
+
+        var fastWorkflow = File.ReadAllText(Path.Combine(
+            root,
+            ".github",
+            "workflows",
+            "ci.yml"));
+        Assert.That(fastWorkflow, Does.Contain("TestCategory=Performance"));
+    }
+
+    [Test]
+    public void ContractApiMetadataNamesHaveOneSourceOfTruth()
+    {
+        var root = RepositoryRoot();
+        var catalog = Path.GetFullPath(Path.Combine(
+            root,
+            "SharpProof.Frontend",
+            "ContractApiMetadata.cs"));
+        var violations = ProductionProjects
+            .SelectMany(project => Directory.EnumerateFiles(
+                Path.Combine(root, project),
+                "*.cs",
+                SearchOption.AllDirectories))
+            .Where(path => !string.Equals(
+                Path.GetFullPath(path),
+                catalog,
+                StringComparison.OrdinalIgnoreCase) &&
+                !path.EndsWith(
+                    ".generated.cs",
+                    StringComparison.OrdinalIgnoreCase))
+            .SelectMany(path => File.ReadLines(path)
+                .Select((line, index) => (Path: path, Line: line, Number: index + 1)))
+            .Where(static entry =>
+                entry.Line.Contains(
+                    "SharpProof.Attributes.",
+                    StringComparison.Ordinal) &&
+                !entry.Line.Contains(
+                    "SharpProof.Attributes.dll",
+                    StringComparison.Ordinal))
+            .Select(entry =>
+                $"{Path.GetRelativePath(root, entry.Path)}:{entry.Number}")
+            .ToArray();
+
+        Assert.That(violations, Is.Empty);
     }
 
     [Test]

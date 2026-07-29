@@ -26,9 +26,9 @@ public enum EffectContractCapabilityKind
 internal static class EffectContractMetadata
 {
     internal const string AttributeMetadataName =
-        "SharpProof.Attributes.EffectContractAttribute";
+        ContractApiMetadata.EffectContract;
     internal const string TrustedAttributeMetadataName =
-        "SharpProof.Attributes.SharpProofTrustedAttribute";
+        ContractApiMetadata.Trusted;
     internal const string CapabilitiesPropertyName = "Capabilities";
     internal const string CompletePropertyName = "Complete";
     internal const string IsDeterministicPropertyName = "IsDeterministic";

@@ -11,7 +11,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 5;
+    internal const int Current = 6;
 }
 
 internal enum CompilerContractKind
@@ -188,6 +188,59 @@ internal sealed class CompilerSpecCallArtifact
     public int Instruction { get; set; } = -1;
     public string WitnessIdentifier { get; set; } = string.Empty;
     public bool ConsumesMemoryHavoc { get; set; }
+}
+
+internal enum CompilerOutputKind
+{
+    ConsoleApplication = 0,
+    WindowsApplication = 1,
+    DynamicallyLinkedLibrary = 2,
+    NetModule = 3,
+    WindowsRuntimeMetadata = 4,
+    WindowsRuntimeApplication = 5
+}
+
+internal enum CompilerOptimizationLevel
+{
+    Debug = 0,
+    Release = 1
+}
+
+internal enum CompilerPlatform
+{
+    AnyCpu = 0,
+    AnyCpu32BitPreferred = 1,
+    Arm = 2,
+    Arm64 = 3,
+    Itanium = 4,
+    X64 = 5,
+    X86 = 6
+}
+
+internal enum CompilerNullableContext
+{
+    Disable = 0,
+    Warnings = 1,
+    Annotations = 2,
+    Enable = 3
+}
+
+internal enum CompilerMetadataImportOptions
+{
+    Public = 0,
+    Internal = 1,
+    All = 2
+}
+
+internal enum CompilerAssemblyIdentityComparer
+{
+    Default = 0,
+    Desktop = 1
+}
+
+internal enum CompilerResolverPolicy
+{
+    EvidenceOnly = 0
 }
 
 internal sealed class CompilerDiagnosticArtifact

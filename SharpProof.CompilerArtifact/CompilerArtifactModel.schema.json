@@ -4,7 +4,7 @@
   "jsonNamingPolicy": "camelCase",
   "artifactEnvelope": {
     "schema": "SharpProof.CompilerManifest",
-    "version": 5
+    "version": 6
   },
   "declarations": [
     {
@@ -21,7 +21,7 @@
           "accessibility": "internal",
           "name": "Current",
           "type": "int",
-          "value": 5
+          "value": 6
         }
       ]
     },
@@ -1765,57 +1765,124 @@
       ]
     },
     {
+      "kind": "enum",
+      "name": "CompilerOutputKind",
+      "members": [
+        { "name": "ConsoleApplication", "value": 0 },
+        { "name": "WindowsApplication", "value": 1 },
+        { "name": "DynamicallyLinkedLibrary", "value": 2 },
+        { "name": "NetModule", "value": 3 },
+        { "name": "WindowsRuntimeMetadata", "value": 4 },
+        { "name": "WindowsRuntimeApplication", "value": 5 }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "CompilerOptimizationLevel",
+      "members": [
+        { "name": "Debug", "value": 0 },
+        { "name": "Release", "value": 1 }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "CompilerPlatform",
+      "members": [
+        { "name": "AnyCpu", "value": 0 },
+        { "name": "AnyCpu32BitPreferred", "value": 1 },
+        { "name": "Arm", "value": 2 },
+        { "name": "Arm64", "value": 3 },
+        { "name": "Itanium", "value": 4 },
+        { "name": "X64", "value": 5 },
+        { "name": "X86", "value": 6 }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "CompilerNullableContext",
+      "members": [
+        { "name": "Disable", "value": 0 },
+        { "name": "Warnings", "value": 1 },
+        { "name": "Annotations", "value": 2 },
+        { "name": "Enable", "value": 3 }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "CompilerMetadataImportOptions",
+      "members": [
+        { "name": "Public", "value": 0 },
+        { "name": "Internal", "value": 1 },
+        { "name": "All", "value": 2 }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "CompilerAssemblyIdentityComparer",
+      "members": [
+        { "name": "Default", "value": 0 },
+        { "name": "Desktop", "value": 1 }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "CompilerResolverPolicy",
+      "members": [
+        { "name": "EvidenceOnly", "value": 0 }
+      ]
+    },
+    {
       "kind": "class",
       "name": "CompilerCompilationOptionsSnapshot",
       "properties": [
         {
           "name": "OutputKind",
           "jsonName": "outputKind",
-          "type": "string",
+          "type": "CompilerOutputKind",
           "accessibility": "public",
           "set": "set",
           "default": {
-            "kind": "stringEmpty"
+            "kind": "implicit"
           }
         },
         {
           "name": "OptimizationLevel",
           "jsonName": "optimizationLevel",
-          "type": "string",
+          "type": "CompilerOptimizationLevel",
           "accessibility": "public",
           "set": "set",
           "default": {
-            "kind": "stringEmpty"
+            "kind": "implicit"
           }
         },
         {
           "name": "Platform",
           "jsonName": "platform",
-          "type": "string",
+          "type": "CompilerPlatform",
           "accessibility": "public",
           "set": "set",
           "default": {
-            "kind": "stringEmpty"
+            "kind": "implicit"
           }
         },
         {
           "name": "NullableContext",
           "jsonName": "nullableContext",
-          "type": "string",
+          "type": "CompilerNullableContext",
           "accessibility": "public",
           "set": "set",
           "default": {
-            "kind": "stringEmpty"
+            "kind": "implicit"
           }
         },
         {
           "name": "MetadataImportOptions",
           "jsonName": "metadataImportOptions",
-          "type": "string",
+          "type": "CompilerMetadataImportOptions",
           "accessibility": "public",
           "set": "set",
           "default": {
-            "kind": "stringEmpty"
+            "kind": "implicit"
           }
         },
         {
@@ -1861,11 +1928,11 @@
         {
           "name": "AssemblyIdentityComparer",
           "jsonName": "assemblyIdentityComparer",
-          "type": "string",
+          "type": "CompilerAssemblyIdentityComparer",
           "accessibility": "public",
           "set": "set",
           "default": {
-            "kind": "stringEmpty"
+            "kind": "implicit"
           }
         },
         {
@@ -1881,11 +1948,11 @@
         {
           "name": "ResolverPolicy",
           "jsonName": "resolverPolicy",
-          "type": "string",
+          "type": "CompilerResolverPolicy",
           "accessibility": "public",
           "set": "set",
           "default": {
-            "kind": "stringEmpty"
+            "kind": "implicit"
           }
         }
       ]

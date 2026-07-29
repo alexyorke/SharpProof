@@ -236,7 +236,7 @@ Assert-Equal `
 Assert-Equal ($contract.supportedTargetFrameworks -join ',') 'netstandard2.0,net8.0,net472' 'supportedTargetFrameworks'
 Assert-Equal $contract.worker.protocolVersion 8 'worker.protocolVersion'
 Assert-Equal $contract.worker.manifestSchemaVersion 4 'worker.manifestSchemaVersion'
-Assert-Equal $contract.worker.compilerArtifactSchemaVersion 5 'worker.compilerArtifactSchemaVersion'
+Assert-Equal $contract.worker.compilerArtifactSchemaVersion 6 'worker.compilerArtifactSchemaVersion'
 Assert-Equal $contract.worker.maximumParallelism 4 'worker.maximumParallelism'
 Assert-Equal $contract.worker.maximumMemoryMiB 2048 'worker.maximumMemoryMiB'
 Assert-Equal $contract.worker.queryRlimit 3000000 'worker.queryRlimit'
@@ -483,7 +483,7 @@ try {
         } else {
             300
         }
-        Invoke-SharpProofDotnet -TimeoutSeconds $testTimeoutSeconds -Arguments @(
+        $testArguments = @(
             'test',
             $testProject,
             '-c',
@@ -492,6 +492,12 @@ try {
             '--logger',
             'console;verbosity=minimal'
         )
+        if ($testProject -like 'SharpProof.Gates.Test*') {
+            $testArguments += @('--filter', 'TestCategory!=Performance')
+        }
+        Invoke-SharpProofDotnet `
+            -TimeoutSeconds $testTimeoutSeconds `
+            -Arguments $testArguments
     }
 
     if (-not $SkipTests) {

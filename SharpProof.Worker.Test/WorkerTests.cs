@@ -876,19 +876,19 @@ public sealed class WorkerTests
                 Is.EqualTo(LanguageVersion.CSharp13.ToString()));
             Assert.That(
                 options.NullableContext,
-                Is.EqualTo(NullableContextOptions.Warnings.ToString()));
+                Is.EqualTo(CompilerNullableContext.Warnings));
             Assert.That(
                 options.OptimizationLevel,
-                Is.EqualTo(OptimizationLevel.Debug.ToString()));
+                Is.EqualTo(CompilerOptimizationLevel.Debug));
             Assert.That(options.CheckOverflow, Is.True);
             Assert.That(options.AllowUnsafe, Is.True);
             Assert.That(options.Deterministic, Is.False);
             Assert.That(
                 options.OutputKind,
-                Is.EqualTo(OutputKind.ConsoleApplication.ToString()));
+                Is.EqualTo(CompilerOutputKind.ConsoleApplication));
             Assert.That(
                 options.Platform,
-                Is.EqualTo(Platform.X64.ToString()));
+                Is.EqualTo(CompilerPlatform.X64));
         }
     }
 

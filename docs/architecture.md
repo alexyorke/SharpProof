@@ -86,6 +86,11 @@ exact IR; every unsupported case returns a typed opaque term or program
 abstention. There are no `TryLower(..., out ...)` branches, syntax reparsing,
 speculative semantic models, or display-string identity.
 
+Compiler-facing stages share a closed operation-support catalog, with separate
+decisions for contract-expression lowering and effect discovery. Stage-owned
+shape and type validation remains independent, so sharing the inventory cannot
+widen a stage's semantics. Unknown future Roslyn operation kinds fail closed.
+
 `SharpProof.Dataflow` supplies deterministic fixpoint evaluation, partial
 orders, joins, widening, havoc, and interval/congruence, sequence-cardinality,
 and nullness domains. Source method effects are solved by stable SCC order.
@@ -113,7 +118,8 @@ compiler-bound `ApiSpec` rows within its admitted call boundary. This is not
 general source-callee modular assume/guarantee verification. The analyzer
 combines exact compiler-bound replay with a managed CFG abstract interpreter
 over Boolean, nullness, integer-interval, sequence-cardinality, and effect
-facts. It reports a `Requires` violation only at a definitely executed call
+facts. Comparison edges refine both scalar operands and retain only joined facts
+valid on every incoming path. It reports a `Requires` violation only at a definitely executed call
 whose receiver/argument prefix completes normally and whose instantiated
 condition is definitely false. The worker checks only the bounded `Ensures`
 subset supported by its admitted acyclic CFG executor; deep or otherwise
@@ -168,7 +174,7 @@ complete callables whose claims are hygienic `Proven` or replay-validated
 
 During Windows verification, the production analyzer observes the final
 post-generator Roslyn `Compilation` and atomically emits compiler artifact
-schema version 5. The compiler owns selection, contract/spec binding, effect
+schema version 6. The compiler owns selection, contract/spec binding, effect
 evaluation, and body
 lowering. Every selected callable has either a typed failure record or a
 portable graph containing its bound clauses, canonical variables, whole-body

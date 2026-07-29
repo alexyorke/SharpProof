@@ -25,7 +25,9 @@ internal static class CompilerCompilationCapture
             additionalFiles = [];
         }
 
-        var supersedes = InternalBoolean(options, "ReferencesSupersedeLowerVersions");
+        var supersedes = CompilerOptionWireMappings.ReadInternalBoolean(
+            options,
+            "ReferencesSupersedeLowerVersions");
         if (supersedes || options.MetadataReferenceResolver?.ResolveMissingAssemblies == true ||
             compilation.SyntaxTrees.Any(tree => HasResolverDirective(tree, cancellationToken)))
         {
@@ -45,18 +47,18 @@ internal static class CompilerCompilationCapture
             CSharpCompilerMvid = Mvid(typeof(CSharpCompilation)),
             Options = new CompilerCompilationOptionsSnapshot
             {
-                OutputKind = options.OutputKind.ToString(),
-                OptimizationLevel = options.OptimizationLevel.ToString(),
-                Platform = options.Platform.ToString(),
-                NullableContext = options.NullableContextOptions.ToString(),
-                MetadataImportOptions = options.MetadataImportOptions.ToString(),
+                OutputKind = CompilerOptionWireMappings.Map(options.OutputKind),
+                OptimizationLevel = CompilerOptionWireMappings.Map(options.OptimizationLevel),
+                Platform = CompilerOptionWireMappings.Map(options.Platform),
+                NullableContext = CompilerOptionWireMappings.Map(options.NullableContextOptions),
+                MetadataImportOptions = CompilerOptionWireMappings.Map(options.MetadataImportOptions),
                 CheckOverflow = options.CheckOverflow,
                 AllowUnsafe = options.AllowUnsafe,
                 Deterministic = options.Deterministic,
                 ReferencesSupersedeLowerVersions = supersedes,
-                AssemblyIdentityComparer = Comparer(options.AssemblyIdentityComparer),
+                AssemblyIdentityComparer = CompilerOptionWireMappings.Map(options.AssemblyIdentityComparer),
                 Usings = [.. options.Usings],
-                ResolverPolicy = "EvidenceOnly"
+                ResolverPolicy = CompilerResolverPolicy.EvidenceOnly
             },
             SyntaxTrees = [.. compilation.SyntaxTrees.Select(tree => CaptureTree(tree, cancellationToken))],
             References = [.. compilation.References.Select(reference => CaptureReference(compilation, reference, cancellationToken))],
@@ -135,22 +137,6 @@ internal static class CompilerCompilationCapture
     {
         return tree.GetRoot(cancellationToken).DescendantTrivia(descendIntoTrivia: true)
                 .Any(static trivia => trivia.IsKind(SyntaxKind.LoadDirectiveTrivia) || trivia.IsKind(SyntaxKind.ReferenceDirectiveTrivia));
-    }
-
-    private static string Comparer(AssemblyIdentityComparer value)
-    {
-        return ReferenceEquals(value, AssemblyIdentityComparer.Default) ? "Default" :
-            ReferenceEquals(value, DesktopAssemblyIdentityComparer.Default) ? "Desktop" :
-            throw new InvalidOperationException("A custom assembly identity comparer is unsupported.");
-    }
-
-    private static bool InternalBoolean(CSharpCompilationOptions options, string name)
-    {
-        return (bool)(typeof(CompilationOptions).GetField(
-            $"<{name}>k__BackingField",
-            System.Reflection.BindingFlags.Instance |
-            System.Reflection.BindingFlags.NonPublic)?.GetValue(options) ??
-            throw new InvalidOperationException($"The compiler option '{name}' is unavailable."));
     }
 
     private static string Version(Type type)

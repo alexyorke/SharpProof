@@ -203,7 +203,7 @@ invocation; they are not BCL coverage.
 ## Closed compiler artifact and remaining limits
 
 During Windows verification, the production analyzer captures compiler
-artifact schema version 5 from the post-generator compilation. The artifact
+artifact schema version 6 from the post-generator compilation. The artifact
 contains:
 
 - the feature-selected, sealed claim manifest;
