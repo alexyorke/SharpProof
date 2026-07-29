@@ -477,6 +477,102 @@ public sealed class IrKernelTests {
         Assert.That(secondText, Is.EqualTo(firstText));
     }
 
+    [TestCase(IrUnaryOperator.Not, IrTypeKind.Boolean, "(!v0)")]
+    [TestCase(IrUnaryOperator.Negate, IrTypeKind.Integer, "(-v0)")]
+    public void UnaryOperatorMetadataPreservesTypesKeysAndTokens(
+        IrUnaryOperator @operator,
+        IrTypeKind operandKind,
+        string expectedText) {
+        var factory = new IrFactory();
+        var type = operandKind == IrTypeKind.Boolean
+            ? factory.BooleanType
+            : factory.IntegerType;
+        var operand = factory.Variable(factory.CreateVariable("value", type));
+
+        var first = factory.Unary(@operator, operand);
+        var second = factory.Unary(@operator, operand);
+
+        Assert.That(second, Is.SameAs(first));
+        Assert.That(new IrPrinter(factory).Print(first), Is.EqualTo(expectedText));
+    }
+
+    [TestCase(IrBinaryOperator.Add, IrTypeKind.Integer, "+")]
+    [TestCase(IrBinaryOperator.Subtract, IrTypeKind.Integer, "-")]
+    [TestCase(IrBinaryOperator.Multiply, IrTypeKind.Integer, "*")]
+    [TestCase(IrBinaryOperator.Divide, IrTypeKind.Integer, "/")]
+    [TestCase(IrBinaryOperator.Remainder, IrTypeKind.Integer, "%")]
+    [TestCase(IrBinaryOperator.AndAlso, IrTypeKind.Boolean, "&&")]
+    [TestCase(IrBinaryOperator.OrElse, IrTypeKind.Boolean, "||")]
+    [TestCase(IrBinaryOperator.Equal, IrTypeKind.Integer, "==")]
+    [TestCase(IrBinaryOperator.NotEqual, IrTypeKind.Integer, "!=")]
+    [TestCase(IrBinaryOperator.LessThan, IrTypeKind.Integer, "<")]
+    [TestCase(IrBinaryOperator.LessThanOrEqual, IrTypeKind.Integer, "<=")]
+    [TestCase(IrBinaryOperator.GreaterThan, IrTypeKind.Integer, ">")]
+    [TestCase(IrBinaryOperator.GreaterThanOrEqual, IrTypeKind.Integer, ">=")]
+    [TestCase(IrBinaryOperator.StringConcat, IrTypeKind.String, "++")]
+    public void BinaryOperatorMetadataPreservesTypesKeysAndTokens(
+        IrBinaryOperator @operator,
+        IrTypeKind operandKind,
+        string token) {
+        var factory = new IrFactory();
+        var type = operandKind switch {
+            IrTypeKind.Boolean => factory.BooleanType,
+            IrTypeKind.Integer => factory.IntegerType,
+            IrTypeKind.String => factory.StringType,
+            _ => throw new AssertionException("Unexpected test operand kind.")
+        };
+        var left = factory.Variable(factory.CreateVariable("left", type));
+        var right = factory.Variable(factory.CreateVariable("right", type));
+
+        var first = factory.Binary(@operator, left, right);
+        var second = factory.Binary(@operator, left, right);
+
+        Assert.That(second, Is.SameAs(first));
+        Assert.That(
+            new IrPrinter(factory).Print(first),
+            Is.EqualTo("(v0 " + token + " v1)"));
+    }
+
+    [Test]
+    public void BinaryOperatorKeysAreDistinctWithinEachTypedDomain() {
+        var factory = new IrFactory();
+        var integers = new[] {
+            factory.Variable(factory.CreateVariable("left", factory.IntegerType)),
+            factory.Variable(factory.CreateVariable("right", factory.IntegerType))
+        };
+        var booleans = new[] {
+            factory.Variable(factory.CreateVariable("first", factory.BooleanType)),
+            factory.Variable(factory.CreateVariable("second", factory.BooleanType))
+        };
+
+        AssertDistinct(
+            [IrBinaryOperator.Add, IrBinaryOperator.Subtract,
+                IrBinaryOperator.Multiply, IrBinaryOperator.Divide,
+                IrBinaryOperator.Remainder],
+            integers);
+        AssertDistinct(
+            [IrBinaryOperator.Equal, IrBinaryOperator.NotEqual,
+                IrBinaryOperator.LessThan, IrBinaryOperator.LessThanOrEqual,
+                IrBinaryOperator.GreaterThan, IrBinaryOperator.GreaterThanOrEqual],
+            integers);
+        AssertDistinct(
+            [IrBinaryOperator.AndAlso, IrBinaryOperator.OrElse],
+            booleans);
+
+        void AssertDistinct(
+            IrBinaryOperator[] operators,
+            IrTerm[] operands) {
+            var terms = operators
+                .Select(value => factory.Binary(value, operands[0], operands[1]))
+                .Cast<IrBinaryTerm>()
+                .ToArray();
+            Assert.That(terms, Is.Unique);
+            Assert.That(
+                terms.Select(static term => term.Operator),
+                Is.EqualTo(operators));
+        }
+    }
+
     [Test]
     public void InterpreterPreservesShortCircuitEvaluation() {
         var factory = new IrFactory();

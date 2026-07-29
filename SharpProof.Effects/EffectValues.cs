@@ -39,12 +39,10 @@ public readonly record struct EffectCapabilitySet {
     }
 
     public static EffectCapabilitySet Empty => default;
-    public static EffectCapabilitySet Unknown { get; } =
-        new(EffectCapabilityKind.Unknown);
+    public static EffectCapabilitySet Unknown { get; } = new(EffectCapabilityKind.Unknown);
 
     public EffectCapabilityKind Kinds { get; }
-    public bool IsUnknown =>
-        (Kinds & (EffectCapabilityKind)(1 << 13)) != 0;
+    public bool IsUnknown => (Kinds & (EffectCapabilityKind)(1 << 13)) != 0;
     public bool IsEmpty => Kinds == EffectCapabilityKind.None;
 
     public bool Contains(EffectCapabilityKind capability) =>
@@ -53,9 +51,7 @@ public readonly record struct EffectCapabilitySet {
     public bool IsSubsetOf(EffectCapabilitySet other) =>
         (Kinds & ~other.Kinds) == 0;
 
-    public EffectCapabilitySet Union(EffectCapabilitySet other) =>
-        new(Kinds | other.Kinds);
-
+    public EffectCapabilitySet Union(EffectCapabilitySet other) => new(Kinds | other.Kinds);
 }
 
 public enum EffectTermination {
@@ -68,6 +64,29 @@ public enum EffectTermination {
 public enum EffectCompleteness {
     Complete,
     Incomplete
+}
+
+[Flags]
+internal enum EffectAnalysisIncompleteReason {
+    None = 0,
+    BlockBudgetExceeded = 1 << 0,
+    OperationBudgetExceeded = 1 << 1,
+    CyclicControlFlow = 1 << 2
+}
+
+internal sealed class EffectDirectWitness(
+    EffectContractKind effects,
+    EffectContractCapabilityKind capabilities,
+    INamedTypeSymbol? exceptionType,
+    string kind,
+    string detail,
+    Location location) {
+    internal EffectContractKind Effects { get; } = effects;
+    internal EffectContractCapabilityKind Capabilities { get; } = capabilities;
+    internal INamedTypeSymbol? ExceptionType { get; } = exceptionType;
+    internal string Kind { get; } = kind;
+    internal string Detail { get; } = detail;
+    internal Location Location { get; } = location;
 }
 
 [Flags]
@@ -87,16 +106,13 @@ public enum EffectUncertainty {
 public readonly struct EffectThrowSet : IEquatable<EffectThrowSet> {
     private readonly ImmutableArray<INamedTypeSymbol> _types;
 
-    private EffectThrowSet(
-        ImmutableArray<INamedTypeSymbol> types, bool includesUnknown) =>
+    private EffectThrowSet(ImmutableArray<INamedTypeSymbol> types, bool includesUnknown) =>
         (_types, IncludesUnknown) = (types, includesUnknown);
 
     public static EffectThrowSet Empty => default;
-    public static EffectThrowSet Unknown { get; } =
-        new([], true);
+    public static EffectThrowSet Unknown { get; } = new([], true);
 
-    public ImmutableArray<INamedTypeSymbol> Types =>
-        _types.IsDefault ? [] : _types;
+    public ImmutableArray<INamedTypeSymbol> Types => _types.IsDefault ? [] : _types;
     public bool IncludesUnknown { get; }
     public bool IsEmpty => !IncludesUnknown && _types.IsDefaultOrEmpty;
 
@@ -106,46 +122,38 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet> {
         var distinct = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
         foreach (var type in types)
             distinct.Add(type ?? throw new ArgumentException(
-                "Exception type sets cannot contain null.",
-                nameof(types)));
+                "Exception type sets cannot contain null.", nameof(types)));
         return distinct.Count == 0
             ? includesUnknown ? Unknown : Empty
-            : new EffectThrowSet(
-                [.. distinct.OrderBy(
-                    static type => type,
-                    EffectSymbolComparer<INamedTypeSymbol>.Instance)],
+            : new EffectThrowSet([
+                .. distinct.OrderBy(static type => type, EffectSymbolComparer<INamedTypeSymbol>.Instance)
+            ],
                 includesUnknown);
     }
 
     public bool Contains(INamedTypeSymbol type) {
         if (type == null) throw new ArgumentNullException(nameof(type));
         return IncludesUnknown ||
-               Types.Any(candidate =>
-                   SymbolEqualityComparer.Default.Equals(candidate, type));
+               Types.Any(candidate => SymbolEqualityComparer.Default.Equals(candidate, type));
     }
 
     public bool IsSubsetOf(EffectThrowSet other) {
         if (IsEmpty || other.IncludesUnknown) return true;
         if (IncludesUnknown) return false;
         foreach (var type in Types)
-            if (!other.Contains(type))
-                return false;
+            if (!other.Contains(type)) return false;
         return true;
     }
 
     public EffectThrowSet Union(EffectThrowSet other) {
         if (IsEmpty) return other;
         if (other.IsEmpty) return this;
-        return Create(
-            Types.Concat(other.Types),
-            IncludesUnknown || other.IncludesUnknown);
+        return Create(Types.Concat(other.Types), IncludesUnknown || other.IncludesUnknown);
     }
 
     public bool Equals(EffectThrowSet other) =>
         IncludesUnknown == other.IncludesUnknown &&
-        Types.AsEnumerable().SequenceEqual(
-            other.Types,
-            SymbolEqualityComparer.Default);
+        Types.AsEnumerable().SequenceEqual(other.Types, SymbolEqualityComparer.Default);
 
     public override bool Equals(object? obj) => obj is EffectThrowSet other && Equals(other);
 
@@ -158,16 +166,13 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet> {
         }
     }
 
-    public static bool operator ==(EffectThrowSet left, EffectThrowSet right) =>
-        left.Equals(right);
-    public static bool operator !=(EffectThrowSet left, EffectThrowSet right) =>
-        !left.Equals(right);
+    public static bool operator ==(EffectThrowSet left, EffectThrowSet right) => left.Equals(right);
+    public static bool operator !=(EffectThrowSet left, EffectThrowSet right) => !left.Equals(right);
 }
 
 internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
     where TSymbol : class, ISymbol {
     internal static EffectSymbolComparer<TSymbol> Instance { get; } = new();
-
     private EffectSymbolComparer() {
     }
 
@@ -175,10 +180,8 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
         if (ReferenceEquals(left, right)) return 0;
         if (left == null) return -1;
         if (right == null) return 1;
-        var result = string.Compare(
-            left.ContainingAssembly?.Identity.Name,
-            right.ContainingAssembly?.Identity.Name,
-            StringComparison.Ordinal);
+        var result = string.Compare(left.ContainingAssembly?.Identity.Name,
+            right.ContainingAssembly?.Identity.Name, StringComparison.Ordinal);
         if (result != 0) return result;
         result = string.Compare(
             DocumentationCommentId.CreateDeclarationId(left) ??
@@ -189,10 +192,8 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
         if (result != 0) return result;
         var leftLocation = left.Locations.FirstOrDefault(static location => location.IsInSource);
         var rightLocation = right.Locations.FirstOrDefault(static location => location.IsInSource);
-        result = string.Compare(
-            leftLocation?.SourceTree?.FilePath,
-            rightLocation?.SourceTree?.FilePath,
-            StringComparison.Ordinal);
+        result = string.Compare(leftLocation?.SourceTree?.FilePath,
+            rightLocation?.SourceTree?.FilePath, StringComparison.Ordinal);
         return result != 0
             ? result
             : (leftLocation?.SourceSpan.Start ?? -1)
@@ -201,13 +202,9 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
 }
 
 internal static class EffectTypeFacts {
-    internal static bool IsDerivedFrom(
-        INamedTypeSymbol type,
-        INamedTypeSymbol expectedBase) {
+    internal static bool IsDerivedFrom(INamedTypeSymbol type, INamedTypeSymbol expectedBase) {
         for (var current = type; current != null; current = current.BaseType)
-            if (SymbolEqualityComparer.Default.Equals(
-                    current.OriginalDefinition,
-                    expectedBase.OriginalDefinition))
+            if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, expectedBase.OriginalDefinition))
                 return true;
         return false;
     }

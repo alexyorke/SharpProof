@@ -1,12 +1,17 @@
+using static SharpProof.Worker.CallableVerificationPolicy;
+
 namespace SharpProof.Worker;
 
 public sealed class SharpProofWorker : IDisposable {
-    private readonly ISmtBackend? _backend; private readonly Func<ISmtBackend>? _backendFactory;
-    private readonly Func<long>? _readConsumedResourceCount; private bool _disposed;
+    private readonly ISmtBackend? _backend;
+    private readonly Func<ISmtBackend>? _backendFactory;
+    private readonly Func<long>? _readConsumedResourceCount;
+    private bool _disposed;
     public SharpProofWorker(ISmtBackend backend) : this(
         backend, backend is IrSmtBackend concrete ? () => concrete.ConsumedResourceCount : null) { }
     internal SharpProofWorker(ISmtBackend backend, Func<long>? readConsumedResourceCount) {
-        ArgumentNullException.ThrowIfNull(backend); _backend = backend;
+        ArgumentNullException.ThrowIfNull(backend);
+        _backend = backend;
         _readConsumedResourceCount = readConsumedResourceCount;
     }
     internal SharpProofWorker(Func<ISmtBackend> backendFactory) {
@@ -14,7 +19,8 @@ public sealed class SharpProofWorker : IDisposable {
         _backendFactory = backendFactory;
     }
     public static SharpProofWorker Create(WorkerBudgets budgets) {
-        ArgumentNullException.ThrowIfNull(budgets); return new SharpProofWorker(
+        ArgumentNullException.ThrowIfNull(budgets);
+        return new SharpProofWorker(
             () => new IrSmtBackend(new IrSmtBackendOptions(budgets.QueryRlimit)));
     }
     public async Task<WorkerVerifyResponse> VerifyAsync(
@@ -77,7 +83,8 @@ public sealed class SharpProofWorker : IDisposable {
                         new WorkerProtocolError { Code = item.Code, Message = item.Message }));
             ImmutableArray<CompilerCallablePreparation> targets;
             try { targets = CompilerManifestArtifactJson.DecodeCallables(snapshot.CompilerManifest); }
-            catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException and not OperationCanceledException) {
+            catch (Exception exception) when (exception is not OutOfMemoryException and
+                not StackOverflowException and not OperationCanceledException) {
                 return FailedAfterManifest(WorkerRunFailureReason.CompilerManifestMismatch,
                     Error("compiler_manifest.lowered_ir",
                         "The lowered compiler artifact is invalid: " +
@@ -114,21 +121,32 @@ public sealed class SharpProofWorker : IDisposable {
             }
             var orderedTargets = targets.OrderBy(
                 static target => target.Entry.CallableId, StringComparer.Ordinal).ToArray();
-            var lanes = new CallableVerificationResult[orderedTargets.Length]; var nextTarget = -1;
+            var results = new CallableVerificationResult[orderedTargets.Length];
+            var nextTarget = -1;
             async Task RunLane(VerificationLane lane) {
                 while (true) {
                     var index = Interlocked.Increment(ref nextTarget);
                     if (index >= orderedTargets.Length) return;
-                    lanes[index] = await VerifyTargetAsync(lane.Verifier, orderedTargets[index], request.Budgets,
+                    var result = await VerifyTargetAsync(lane.Verifier, orderedTargets[index], request.Budgets,
                         lane.ReadConsumedResourceCount, request.Budgets.MethodWallTimeMilliseconds,
-                        orderedTargets[index].Entry.SelectedFeatures.Contains(WorkerSelectedFeature.Effects),
                         projectBoundary, cancellationToken).ConfigureAwait(false);
+                    results[index] = result;
+                    if ((result.Callable.Reason is WorkerCallableCoverageReason.Canceled or
+                            WorkerCallableCoverageReason.ProjectTimeout or
+                            WorkerCallableCoverageReason.MethodTimeout) &&
+                        !projectBoundary.IsCancellationRequested &&
+                        !lane.TryRenew(solverLanes, request.Budgets.MaximumExpressionDepth))
+                        return;
                 }
             }
             await Task.WhenAll(solverLanes.Select(RunLane)).ConfigureAwait(false);
             if (cancellationToken.IsCancellationRequested) return Canceled(cacheStatus);
-            var callableResults = lanes.Select(static lane => lane.Callable).ToArray();
-            var claimResults = lanes.SelectMany(static lane => lane.Claims).ToArray();
+            for (var index = 0; index < results.Length; index++)
+                results[index] ??= Unknown(orderedTargets[index],
+                    WorkerClaimReason.InfrastructureFailure,
+                    WorkerCallableCoverageReason.InfrastructureFailure);
+            var callableResults = results.Select(static result => result.Callable).ToArray();
+            var claimResults = results.SelectMany(static result => result.Claims).ToArray();
             var run = WorkerResultAssembler.Classify(callableResults, claimResults);
             var response = Assemble(run.Status, run.Failure, callableResults, claimResults, cacheStatus);
             var responseValidation = WorkerProtocolJson.Validate(response, snapshot.InputHash, manifest);
@@ -151,61 +169,14 @@ public sealed class SharpProofWorker : IDisposable {
             return response;
         }
         catch (OperationCanceledException) { return Interrupted(snapshot); }
-        finally { foreach (var lane in solverLanes) lane.OwnedBackend?.Dispose(); }
+        finally { foreach (var lane in solverLanes) lane.DisposeOwnedBackend(); }
     }
     public void Dispose() => _disposed = true;
-    private static async Task<CallableVerificationResult> VerifyTargetAsync(
-        CallableVerifier verifier, CompilerCallablePreparation target, WorkerBudgets budgets,
-        Func<long>? readConsumedResourceCount, int methodWallTimeMilliseconds,
-        bool unsupportedEffects,
-        CancellationTokenSource projectBoundary, CancellationToken callerCancellation) {
-        if (callerCancellation.IsCancellationRequested)
-            return Unknown(target, WorkerClaimReason.Canceled, WorkerCallableCoverageReason.Canceled);
-        if (!target.IsSuccess)
-            return Unknown(target, target.FailureReason,
-                target.Entry.SelectedFeatures.Contains(WorkerSelectedFeature.Effects)
-                    ? WorkerCallableCoverageReason.UnsupportedContract
-                    : target.FailureReason == WorkerClaimReason.UnsupportedCallable
-                    ? WorkerCallableCoverageReason.UnsupportedCallable
-                    : WorkerCallableCoverageReason.SemanticUnknown);
-        using var methodBoundary = CancellationTokenSource.CreateLinkedTokenSource(projectBoundary.Token);
-        methodBoundary.CancelAfter(methodWallTimeMilliseconds);
-        try {
-            var resourceBudget = new MethodResourceBudget(readConsumedResourceCount,
-                budgets.QueryRlimit, budgets.MethodRlimit);
-            var records = await verifier.VerifyAsync(target, resourceBudget, methodBoundary.Token).ConfigureAwait(false);
-            var hasUnknown = records.Any(static record => record.Outcome == WorkerClaimOutcome.Unknown);
-            var reason = unsupportedEffects ? WorkerCallableCoverageReason.UnsupportedContract
-                : hasUnknown ? WorkerCallableCoverageReason.SemanticUnknown : WorkerCallableCoverageReason.None;
-            return Result(target, reason, records);
-        }
-        catch (OperationCanceledException) {
-            if (callerCancellation.IsCancellationRequested)
-                return Unknown(target, WorkerClaimReason.Canceled, WorkerCallableCoverageReason.Canceled);
-            var project = projectBoundary.IsCancellationRequested;
-            return Unknown(target, project ? WorkerClaimReason.ProjectTimeout : WorkerClaimReason.MethodTimeout,
-                project ? WorkerCallableCoverageReason.ProjectTimeout : WorkerCallableCoverageReason.MethodTimeout);
-        }
-        catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException) {
-            return Unknown(target, WorkerClaimReason.InfrastructureFailure, WorkerCallableCoverageReason.InfrastructureFailure);
-        }
-    }
-    private static CallableVerificationResult Unknown(CompilerCallablePreparation target,
-        WorkerClaimReason claimReason, WorkerCallableCoverageReason callableReason) =>
-        Result(target, callableReason, CallableClaimResultAssembler.Unknowns(target, claimReason));
-    private static CallableVerificationResult Result(CompilerCallablePreparation target,
-        WorkerCallableCoverageReason reason, ImmutableArray<WorkerClaimResult> claims) =>
-        new(new WorkerCallableResult {
-            CallableId = target.Entry.CallableId,
-            Coverage = reason == WorkerCallableCoverageReason.None ?
-                WorkerCallableCoverage.Complete : WorkerCallableCoverage.Incomplete,
-            Reason = reason,
-            Assumptions = [.. target.Entry.Assumptions]
-        }, claims);
     private static VerificationCache? CreateCacheIfEnabled(
         WorkerVerifyRequest request, string projectDirectory, out WorkerCacheStatus status) {
         if (!request.Cache.Enabled || request.VerifyPolicy == WorkerVerifyPolicy.RequireProven) {
-            status = WorkerCacheStatus.Disabled; return null;
+            status = WorkerCacheStatus.Disabled;
+            return null;
         }
         try {
             status = WorkerCacheStatus.Miss;
@@ -218,7 +189,8 @@ public sealed class SharpProofWorker : IDisposable {
             return new VerificationCache(directory, request.Cache.MaximumBytes);
         }
         catch (Exception exception) when (exception is ArgumentException or NotSupportedException) {
-            status = WorkerCacheStatus.Unavailable; return null;
+            status = WorkerCacheStatus.Unavailable;
+            return null;
         }
     }
 
@@ -243,21 +215,21 @@ public sealed class SharpProofWorker : IDisposable {
 
     private static WorkerVersionSummary Versions() => new() {
         WorkerVersion = WorkerCacheIdentity.Current.ToolVersion,
-        ApiSpecVersion = WorkerCacheIdentity.Current.ApiSpecVersion
+        ApiSpecVersion = WorkerCacheIdentity.Current.ApiSpecVersion,
+        WorkerBinarySha256 = WorkerCacheIdentity.Current.WorkerBinarySha256,
+        ApiSpecContentSha256 = WorkerCacheIdentity.Current.ApiSpecContentSha256
     };
     private static WorkerProtocolError[] Error(string code, string message) =>
         [new WorkerProtocolError { Code = code, Message = message }];
     private static long Elapsed(long started) => (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds;
     private bool TryCreateLanes(WorkerBudgets budgets, int targetCount,
         out VerificationLane[] lanes, out string? error) {
-        lanes = []; error = null;
+        lanes = [];
+        error = null;
         if (targetCount == 0) return true;
         if (_backend != null) {
-            lanes = [
-                new VerificationLane(_backend, new CallableVerifier(_backend, budgets.MaximumExpressionDepth),
-                    _readConsumedResourceCount ?? (_backend is IrSmtBackend concrete
-                        ? () => concrete.ConsumedResourceCount : null), null)
-            ];
+            lanes = [CreateLane(_backend, budgets.MaximumExpressionDepth, null, null,
+                _readConsumedResourceCount)];
             return true;
         }
         var created = new List<VerificationLane>();
@@ -267,19 +239,68 @@ public sealed class SharpProofWorker : IDisposable {
                     throw new InvalidOperationException("The backend factory returned null.");
                 if (created.Any(lane => ReferenceEquals(lane.Backend, backend)))
                     throw new InvalidOperationException("The backend factory returned the same backend for multiple lanes.");
-                created.Add(new VerificationLane(
-                    backend, new CallableVerifier(backend, budgets.MaximumExpressionDepth),
-                    backend is IrSmtBackend concrete ? () => concrete.ConsumedResourceCount : null,
-                    backend as IDisposable));
+                created.Add(CreateLane(backend, budgets.MaximumExpressionDepth,
+                    backend as IDisposable, _backendFactory));
             }
-            lanes = [.. created]; return true;
+            lanes = [.. created];
+            return true;
         }
-        catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException and not OperationCanceledException) {
-            foreach (var lane in created) lane.OwnedBackend?.Dispose();
-            error = exception.GetBaseException().Message; return false;
+        catch (Exception exception) when (exception is not OutOfMemoryException and
+            not StackOverflowException and not OperationCanceledException) {
+            foreach (var lane in created) lane.DisposeOwnedBackend();
+            error = exception.GetBaseException().Message;
+            return false;
         }
     }
-    private sealed record VerificationLane(ISmtBackend Backend, CallableVerifier Verifier,
-        Func<long>? ReadConsumedResourceCount, IDisposable? OwnedBackend);
-    private sealed record CallableVerificationResult(WorkerCallableResult Callable, ImmutableArray<WorkerClaimResult> Claims);
+
+    private static VerificationLane CreateLane(
+        ISmtBackend backend, int maximumExpressionDepth,
+        IDisposable? owner, Func<ISmtBackend>? factory, Func<long>? resourceReader = null) =>
+        new(backend, new CallableVerifier(backend, maximumExpressionDepth),
+            resourceReader ?? ReadResources(backend), owner, factory);
+
+    private static Func<long>? ReadResources(ISmtBackend backend) =>
+        backend is IrSmtBackend concrete ? () => concrete.ConsumedResourceCount : null;
+
+    private sealed class VerificationLane(
+        ISmtBackend backend, CallableVerifier verifier, Func<long>? readConsumedResourceCount,
+        IDisposable? ownedBackend, Func<ISmtBackend>? backendFactory) {
+        private readonly Func<ISmtBackend>? _backendFactory = backendFactory;
+        private IDisposable? _ownedBackend = ownedBackend;
+        internal ISmtBackend Backend { get; private set; } = backend;
+        internal CallableVerifier Verifier { get; private set; } = verifier;
+        internal Func<long>? ReadConsumedResourceCount { get; private set; } = readConsumedResourceCount;
+        internal bool TryRenew(VerificationLane[] lanes, int maximumExpressionDepth) {
+            if (_backendFactory == null) return false;
+            lock (lanes) {
+                var prior = Backend;
+                _ownedBackend?.Dispose();
+                _ownedBackend = null;
+                IDisposable? replacementOwner = null;
+                try {
+                    var replacement = _backendFactory() ??
+                        throw new InvalidOperationException("The backend factory returned null.");
+                    if (ReferenceEquals(replacement, prior) ||
+                        lanes.Any(lane => !ReferenceEquals(lane, this) &&
+                            ReferenceEquals(lane.Backend, replacement)))
+                        return false;
+                    replacementOwner = replacement as IDisposable;
+                    Backend = replacement;
+                    Verifier = new CallableVerifier(replacement, maximumExpressionDepth);
+                    ReadConsumedResourceCount = ReadResources(replacement);
+                    _ownedBackend = replacementOwner;
+                    return true;
+                }
+                catch (Exception exception) when (exception is not OutOfMemoryException and
+                    not StackOverflowException and not OperationCanceledException) {
+                    replacementOwner?.Dispose();
+                    return false;
+                }
+            }
+        }
+        internal void DisposeOwnedBackend() {
+            _ownedBackend?.Dispose();
+            _ownedBackend = null;
+        }
+    }
 }

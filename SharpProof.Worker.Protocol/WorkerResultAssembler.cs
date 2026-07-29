@@ -23,7 +23,7 @@ internal static class WorkerResultAssembler {
                     .Select(static group => new WorkerClaimOutcomeCount { Outcome = group.Key, Count = group.Count() })],
                 ReasonCounts = [.. claims.GroupBy(static claim => claim.Reason)
                     .Select(static group => new WorkerClaimReasonCount { Reason = group.Key, Count = group.Count() })],
-                Assumptions = SummarizeAssumptions(callables, claims),
+                Assumptions = SummarizeAssumptions(callables, claims, out _),
                 CacheHit = cacheStatus == WorkerCacheStatus.Hit,
                 CacheStatus = cacheStatus,
                 Versions = versions ?? new WorkerVersionSummary { WorkerVersion = "unavailable", ApiSpecVersion = "unavailable" },
@@ -51,16 +51,21 @@ internal static class WorkerResultAssembler {
                 ClaimId = claim.ClaimId,
                 Outcome = WorkerClaimOutcome.Unknown,
                 Reason = claimReason,
+                EffectCertainty = claim.Kind == WorkerClaimKind.Effect
+                    ? WorkerEffectEvidenceCertainty.Unavailable
+                    : WorkerEffectEvidenceCertainty.Unspecified,
                 Assumptions = manifest.Callables.First(callable =>
                     callable.CallableId == claim.CallableId).Assumptions
             }),
             budgets, WorkerCacheStatus.Disabled, elapsedMilliseconds, errors, requestHash, versions);
 
-    private static WorkerAssumptionSummary SummarizeAssumptions(WorkerCallableResult[] callables, WorkerClaimResult[] claims) {
+    internal static WorkerAssumptionSummary SummarizeAssumptions(WorkerCallableResult[] callables, WorkerClaimResult[] claims,
+        out bool conflictingKinds) {
         var assumptions = callables.SelectMany(static callable => callable.Assumptions ?? [])
             .Concat(claims.SelectMany(static claim => claim.Assumptions ?? []))
             .Where(static value => value != null && !string.IsNullOrWhiteSpace(value.Id))
             .GroupBy(static value => value.Id, StringComparer.Ordinal).ToArray();
+        conflictingKinds = assumptions.Any(static group => group.Select(static value => value.Kind).Distinct().Count() != 1);
         return new WorkerAssumptionSummary {
             Total = assumptions.Length,
             Used = assumptions.Count(static group => group.Any(static value => value.Used)),

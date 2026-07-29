@@ -261,8 +261,14 @@ internal static class CorpusCatalog {
             variant,
             seed.Mode,
             seed.ExpectedVerdict,
+            ToSupport(seed.ExpectedVerdict),
             builder.ToString());
     }
+
+    private static CorpusSupport ToSupport(CorpusVerdict verdict) =>
+        verdict is CorpusVerdict.Proven or CorpusVerdict.Refuted
+            ? CorpusSupport.Supported
+            : CorpusSupport.IntentionallyUnsupported;
 
     private static string CreatePrelude(
         CorpusVariant variant,

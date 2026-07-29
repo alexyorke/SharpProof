@@ -106,17 +106,33 @@ public sealed record SpecNullnessFacet(SpecNullness Result, SpecEvidence Evidenc
 public sealed record SpecCardinalityFacet(
     SpecCardinality Result, int? ExactCount, SpecEvidence Evidence);
 
+public enum ApiSpecReferenceFamily {
+    Unspecified,
+    MicrosoftNetCoreReferencePack,
+    NetStandardReferencePack,
+    NetFrameworkReferenceAssemblies,
+    MicrosoftNetCoreRuntime,
+    SharpProofPackage
+}
+
 public sealed record ApiSpecFacets(
     SpecEffectFacet Effects, SpecAllocationFacet Allocation,
     SpecThrowFacet Throws, SpecNullnessFacet Nullness,
     SpecCardinalityFacet Cardinality);
+
+public sealed record ApiSpecAssemblyIdentity(
+    string Name,
+    string PublicKeyToken,
+    ApiSpecReferenceFamily ReferenceFamily =
+        ApiSpecReferenceFamily.Unspecified);
 
 public sealed record ApiSpecTarget(
     string WitnessIdentifier, string DocumentationCommentId,
     string ContainingTypeMetadataName, SpecTargetMemberKind MemberKind,
     string MemberName, bool IsStatic, int GenericArity,
     SpecValueType? ReceiverType, ImmutableArray<SpecValueType> ParameterTypes,
-    SpecValueType? ResultType);
+    SpecValueType? ResultType,
+    ImmutableArray<ApiSpecAssemblyIdentity> ApprovedAssemblies);
 
 public abstract record SpecTermDeclaration(SpecValueType Type);
 
@@ -161,38 +177,8 @@ public sealed record ApiSpecDeclaration(
 public sealed record SpecVariableInfo(
     SpecVarId Id, SpecVariableRole Role, int Ordinal, SpecValueType Type);
 
-public abstract record SpecTerm(SpecValueType Type);
-
-public sealed record SpecVariableTerm(SpecVarId Variable, SpecValueType Type)
-    : SpecTerm(Type);
-
-public sealed record SpecBooleanTerm(bool Value)
-    : SpecTerm(SpecValueType.Boolean);
-
-public sealed record SpecIntegerTerm(long Value)
-    : SpecTerm(SpecValueType.Integer);
-
-public sealed record SpecStringTerm(string Value)
-    : SpecTerm(SpecValueType.String);
-
-public sealed record SpecNullTerm(SpecValueType Type)
-    : SpecTerm(Type);
-
-public sealed record SpecUnaryTerm(SpecUnaryOperator Operator, SpecTerm Operand, SpecValueType Type)
-    : SpecTerm(Type);
-
-public sealed record SpecBinaryTerm(
-    SpecBinaryOperator Operator, SpecTerm Left, SpecTerm Right, SpecValueType Type)
-    : SpecTerm(Type);
-
-public sealed record SpecConditionalTerm(
-    SpecTerm Condition, SpecTerm WhenTrue, SpecTerm WhenFalse, SpecValueType Type)
-    : SpecTerm(Type);
-
-public sealed record SpecLengthTerm(SpecTerm Value)
-    : SpecTerm(SpecValueType.Integer);
-
-public sealed record SpecPostcondition(SpecTerm Condition, SpecEvidence Evidence);
+public sealed record SpecPostcondition(
+    SpecTermDeclaration Condition, SpecEvidence Evidence);
 
 public sealed class ApiSpecTemplate {
     internal ApiSpecTemplate(

@@ -58,6 +58,10 @@ public sealed class WorkerMsBuildIntegrationTests {
 
     [Test]
     public void WorkerContainmentIsMandatoryOnTheSupportedHost() {
+        Assert.That(
+            WindowsJob.KillsProcessesOnDispose,
+            Is.True,
+            "Closing the required Job Object must terminate every worker process.");
         if (!OperatingSystem.IsWindows() ||
             RuntimeInformation.ProcessArchitecture != Architecture.X64 ||
             RuntimeInformation.OSArchitecture != Architecture.X64) {
@@ -406,23 +410,37 @@ public sealed class WorkerMsBuildIntegrationTests {
     public async Task WorkerExitWithoutResultProducesTypedFailure() {
         RequireWindowsWorker();
         using var project = ConsumerProject.Create(IdentitySource);
-        var invalidWorker = project.CreateInvalidWorker();
+        var resultlessWorker = await project.CreateResultlessWorkerAsync();
 
         var build = await project.BuildAsync(
             verify: true,
-            ("SharpProofWorkerPath", invalidWorker));
+            ("SharpProofWorkerPath", resultlessWorker));
 
-        Assert.That(build.ExitCode, Is.Not.Zero);
-        Assert.That(File.Exists(project.ResultPath), Is.True);
+        Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+        Assert.That(File.Exists(project.ResultPath), Is.True, build.Output);
+        var request = WorkerProtocolJson.DeserializeRequest(
+            await File.ReadAllTextAsync(project.RequestPath))!;
         var response = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(project.ResultPath))!;
+        await AssertPublicationBindingAsync(
+            request,
+            response,
+            resultlessWorker);
         using (Assert.EnterMultipleScope()) {
+            Assert.That(build.Output, Does.Contain("worker.no_result"));
+            Assert.That(
+                build.Output,
+                Does.Contain("verifier failed with exit code 3"));
             Assert.That(
                 response.RunStatus,
                 Is.EqualTo(WorkerRunStatus.Failed));
             Assert.That(
                 response.FailureReason,
                 Is.EqualTo(WorkerRunFailureReason.MalformedResult));
+            Assert.That(response.Errors, Has.Length.EqualTo(1));
+            Assert.That(
+                response.Errors[0].Code,
+                Is.EqualTo("worker.no_result"));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
@@ -1158,6 +1176,8 @@ public sealed class WorkerMsBuildIntegrationTests {
             var exitCode = Program.ValidateAndReport(
                 path,
                 new WorkerVerifyRequest(),
+                null,
+                null,
                 out var validResponse);
 
             using (Assert.EnterMultipleScope()) {
@@ -1176,6 +1196,8 @@ public sealed class WorkerMsBuildIntegrationTests {
             exitCode = Program.ValidateAndReport(
                 path,
                 new WorkerVerifyRequest(),
+                null,
+                null,
                 out validResponse);
             using (Assert.EnterMultipleScope()) {
                 Assert.That(exitCode, Is.EqualTo(3));
@@ -1423,7 +1445,7 @@ public sealed class WorkerMsBuildIntegrationTests {
                     Is.EqualTo("SharpProof.CompilerManifest"));
                 Assert.That(
                     root.GetProperty("schemaVersion").GetInt32(),
-                    Is.EqualTo(3));
+                    Is.EqualTo(5));
                 Assert.That(
                     root.GetProperty("protocolVersion").GetString(),
                     Is.EqualTo(WorkerProtocolVersions.Current));
@@ -1494,10 +1516,47 @@ public sealed class WorkerMsBuildIntegrationTests {
             Path.Combine(_root, "obj", "Release", framework, "SharpProof",
                 fileName);
 
-        internal string CreateInvalidWorker() {
-            var path = Path.Combine(_root, "invalid-worker.dll");
-            File.Copy(WorkerOutputPath(), path);
-            return path;
+        internal async Task<string> CreateResultlessWorkerAsync() {
+            var root = Path.Combine(
+                _root,
+                "obj",
+                "test-workers",
+                "resultless-worker");
+            Directory.CreateDirectory(root);
+            var project = Path.Combine(root, "ResultlessWorker.csproj");
+            await File.WriteAllTextAsync(
+                project,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <OutputType>Exe</OutputType>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """,
+                new System.Text.UTF8Encoding(false));
+            await File.WriteAllTextAsync(
+                Path.Combine(root, "Program.cs"),
+                """
+                using System;
+                using System.Threading;
+                var eventName = args[Array.IndexOf(args, "--start-event") + 1];
+                using var start = EventWaitHandle.OpenExisting(eventName);
+                start.WaitOne();
+                """,
+                new System.Text.UTF8Encoding(false));
+            var build = await RunDotNetAsync([
+                "build", project, "-c", "Release", "--nologo",
+                "/nodeReuse:false", "-p:UseSharedCompilation=false"
+            ]);
+            if (build.ExitCode != 0)
+                throw new InvalidOperationException(build.Output);
+            return Path.Combine(
+                root,
+                "bin",
+                "Release",
+                "net8.0",
+                "ResultlessWorker.dll");
         }
 
         internal async Task<string> CreateMalformedWorkerAsync() {

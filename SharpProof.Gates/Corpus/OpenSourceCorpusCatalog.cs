@@ -43,6 +43,10 @@ internal static class OpenSourceCorpusCatalog {
                 CorpusVariant.Baseline,
                 method.Mode,
                 method.ExpectedVerdict,
+                method.ExpectedVerdict is
+                    CorpusVerdict.Proven or CorpusVerdict.Refuted
+                    ? CorpusSupport.Supported
+                    : CorpusSupport.IntentionallyUnsupported,
                 string.Empty,
                 CorpusOrigin.OpenSource,
                 $"{method.SourceId}:{method.Path}:{method.StartLine}"))];

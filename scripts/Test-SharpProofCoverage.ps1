@@ -239,6 +239,9 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
         $contract.trustedComputingBase.components |
             ForEach-Object { @($_.paths) } |
             ForEach-Object { ([string]$_).Replace('\', '/') } |
+            Where-Object {
+                $_.EndsWith('.cs', [StringComparison]::OrdinalIgnoreCase)
+            } |
             Sort-Object -Unique
     )
     $diffTarget = if ($IncludeWorkingTree) {

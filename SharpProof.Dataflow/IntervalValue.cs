@@ -9,10 +9,7 @@ public readonly struct IntervalValue : IEquatable<IntervalValue> {
     private readonly bool _hasValue;
 
     internal IntervalValue(
-        long? lowerBound,
-        long? upperBound,
-        BigInteger modulus,
-        BigInteger remainder) {
+        long? lowerBound, long? upperBound, BigInteger modulus, BigInteger remainder) {
         _hasValue = true;
         LowerBound = lowerBound;
         UpperBound = upperBound;
@@ -26,10 +23,7 @@ public readonly struct IntervalValue : IEquatable<IntervalValue> {
     public static IntervalValue Range(long? lowerBound, long? upperBound) =>
         IntervalDomain.Instance.Range(lowerBound, upperBound);
     public static IntervalValue Congruent(
-        long? lowerBound,
-        long? upperBound,
-        BigInteger modulus,
-        BigInteger remainder) =>
+        long? lowerBound, long? upperBound, BigInteger modulus, BigInteger remainder) =>
         IntervalDomain.Instance.Create(lowerBound, upperBound, modulus, remainder);
 
     public bool IsBottom => !_hasValue;
@@ -37,11 +31,8 @@ public readonly struct IntervalValue : IEquatable<IntervalValue> {
     public long? UpperBound { get; }
     public BigInteger Modulus { get; }
     public BigInteger Remainder { get; }
-    public bool IsSingleton =>
-        _hasValue &&
-        LowerBound.HasValue &&
-        UpperBound.HasValue &&
-        LowerBound.Value == UpperBound.Value;
+    public bool IsSingleton => _hasValue && LowerBound.HasValue &&
+        UpperBound.HasValue && LowerBound.Value == UpperBound.Value;
 
     public long SingletonValue {
         get {
@@ -66,7 +57,8 @@ public readonly struct IntervalValue : IEquatable<IntervalValue> {
          Modulus == other.Modulus &&
          Remainder == other.Remainder);
 
-    public override bool Equals(object? obj) => obj is IntervalValue other && Equals(other);
+    public override bool Equals(object? obj) =>
+        obj is IntervalValue other && Equals(other);
 
     public override int GetHashCode() {
         if (IsBottom) return 0;

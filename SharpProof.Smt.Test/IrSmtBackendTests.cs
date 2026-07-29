@@ -60,6 +60,40 @@ public sealed class IrSmtBackendTests {
     }
 
     [Test]
+    public async Task StrictComparisonDoesNotAcceptEqualityBoundary() {
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("value", factory.IntegerType);
+        var operation = factory.CreateOperation("equal to zero");
+        var equalToZero = factory.Binary(
+            IrBinaryOperator.Equal,
+            factory.Variable(variable),
+            factory.Integer(0));
+        var strictlyNegative = factory.Binary(
+            IrBinaryOperator.LessThan,
+            factory.Variable(variable),
+            factory.Integer(0));
+        var query = new VerificationQuery(
+            factory,
+            [new Assumption(
+                factory,
+                equalToZero,
+                new LoweredJustification(operation))],
+            new Goal(
+                factory,
+                strictlyNegative,
+                ProofDiagnosticKind.Postcondition,
+                new SourceLocationId(0)));
+
+        using var backend = new IrSmtBackend();
+        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+
+        Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
+        Assert.That(
+            ((RefutedOutcome)outcome).Model.Assignments[variable].Integer,
+            Is.Zero);
+    }
+
+    [Test]
     public async Task FormulaAndExplicitVariablesProduceOneExactModelSet() {
         var factory = new IrFactory();
         var integer = factory.CreateVariable("integer", factory.IntegerType);
@@ -411,6 +445,9 @@ public sealed class IrSmtBackendTests {
 
         Func<Task> action = async () => await check;
         Assert.ThrowsAsync<OperationCanceledException>(action);
+        var retired = backend.CheckAsync(query, CancellationToken.None)
+            .GetAwaiter().GetResult();
+        Assert.That(retired.FailureReason, Is.EqualTo(BackendFailureReason.Unavailable));
     }
 
     private static bool IsMonitorHeld(object gate) {

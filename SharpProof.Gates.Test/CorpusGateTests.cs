@@ -83,9 +83,29 @@ public sealed class CorpusGateTests {
             Assert.That(result.OpenSourceMethodCount, Is.EqualTo(200));
             Assert.That(result.OpenSourceFileCount, Is.EqualTo(87));
             Assert.That(result.SyntheticSeedCount, Is.EqualTo(28));
+            Assert.That(result.SupportedCaseCount, Is.EqualTo(171));
+            Assert.That(
+                result.IntentionallyUnsupportedCaseCount,
+                Is.EqualTo(309));
+            Assert.That(result.SupportedUnknownCount, Is.Zero);
             Assert.That(result.UnknownCount, Is.EqualTo(299));
             Assert.That(result.SilentUnknownCount, Is.EqualTo(10));
             Assert.That(result.TotalUnknownCount, Is.EqualTo(309));
+            Assert.That(
+                result.UnknownReasons
+                    .ToDictionary(
+                        static item => item.Reason,
+                        static item => item.Count),
+                Is.EquivalentTo(
+                    new Dictionary<string, int>(StringComparer.Ordinal) {
+                        ["SP0002"] = 28,
+                        ["SP0016"] = 20,
+                        ["SP0045"] = 30,
+                        ["SP0045+SP0046"] = 10,
+                        ["SP0046"] = 30,
+                        ["SP0047"] = 181,
+                        ["silent-unclassified"] = 10
+                    }));
             Assert.That(
                 result.UnknownRate,
                 Is.EqualTo(result.UnknownCount / (double)result.CaseCount));

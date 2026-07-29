@@ -76,6 +76,42 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
+    public void InvalidTargetPlacementDoesNotPoisonAValidCompanion() {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static long Read(long value) {
+                    if (value > 0) {
+                        Contract.Ensures(
+                            Contract.Result<long>() == value);
+                    }
+                    return value;
+                }
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static long Read(long value) {
+                    Contract.Ensures(
+                        Contract.Result<long>() == value);
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+            Assert.That(result.Contracts!.UsesCompanion, Is.True);
+            Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
+            Assert.That(result.Contracts.Clauses[0].Evidence,
+                Is.EqualTo(BoundContractEvidence.Companion));
+        }
+    }
+
+    [Test]
     public void InvalidDirectIntrinsicCannotBeHiddenByACompanion() {
         const string source =
             """
@@ -533,6 +569,48 @@ public sealed class ContractBinderTests {
             result.Contracts.Clauses.All(static clause =>
                 clause.Evidence == BoundContractEvidence.ClosedAttribute),
             Is.True);
+    }
+
+    [TestCase("sbyte")]
+    [TestCase("byte")]
+    [TestCase("short")]
+    [TestCase("ushort")]
+    [TestCase("char")]
+    [TestCase("int")]
+    [TestCase("uint")]
+    [TestCase("long")]
+    public void PositiveClosedContractAcceptsEveryCatalogInteger(
+        string typeName) {
+        var source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static TYPE Read([Positive] TYPE value) => value;
+            }
+            """.Replace("TYPE", typeName, StringComparison.Ordinal);
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+    }
+
+    [TestCase("ulong")]
+    [TestCase("nint")]
+    [TestCase("nuint")]
+    public void PositiveClosedContractStillRejectsUnmodeledIntegers(
+        string typeName) {
+        var source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static TYPE Read([Positive] TYPE value) => value;
+            }
+            """.Replace("TYPE", typeName, StringComparison.Ordinal);
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("Target", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
     }
 
     [TestCase("Value")]

@@ -46,9 +46,23 @@ public static class IrSubstitution {
             return replacement;
         if (memo.TryGetValue(term.Id, out var existing)) return existing;
         IrTerm Visit(IrTerm child) => Rewrite(factory, child, replacements, memo);
+        IrTerm? VisitNullable(IrTerm? child) =>
+            child == null ? null : Visit(child);
+        IrTerm[] VisitAll(ImmutableArray<IrTerm> children) =>
+            [.. children.Select(Visit)];
         var rewritten = term switch {
             IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrNullTerm or IrVariableTerm => term,
-            IrOpaqueTerm opaque => RewriteOpaque(factory, opaque, replacements, memo),
+            IrOpaqueTerm { Purity: IrOpaquePurity.Pure } opaque =>
+                factory.PureOpaque(
+                    opaque.Member,
+                    VisitNullable(opaque.Receiver),
+                    VisitAll(opaque.Arguments)),
+            IrOpaqueTerm opaque =>
+                factory.ImpureOpaque(
+                    opaque.Operation,
+                    opaque.Member,
+                    VisitNullable(opaque.Receiver),
+                    VisitAll(opaque.Arguments)),
             IrUnaryTerm unary => factory.Unary(unary.Operator, Visit(unary.Operand)),
             IrBinaryTerm binary => factory.Binary(
                 binary.Operator,
@@ -67,21 +81,5 @@ public static class IrSubstitution {
         };
         memo.Add(term.Id, rewritten);
         return rewritten;
-    }
-
-    private static IrOpaqueTerm RewriteOpaque(
-        IrFactory factory,
-        IrOpaqueTerm opaque,
-        IReadOnlyDictionary<IrVarId, IrTerm> replacements,
-        IDictionary<IrId, IrTerm> memo) {
-        var receiver = opaque.Receiver == null
-            ? null
-            : Rewrite(factory, opaque.Receiver, replacements, memo);
-        var arguments = opaque.Arguments
-            .Select(argument => Rewrite(factory, argument, replacements, memo))
-            .ToArray();
-        return opaque.Purity == IrOpaquePurity.Pure
-            ? factory.PureOpaque(opaque.Member, receiver, arguments)
-            : factory.ImpureOpaque(opaque.Operation, opaque.Member, receiver, arguments);
     }
 }

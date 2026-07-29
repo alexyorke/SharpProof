@@ -229,34 +229,43 @@ public sealed class BoundaryEnforcementTests {
     }
 
     [Test]
-    public void AnalyzerDescriptorsComeOnlyFromTheGeneratedCatalog() {
-        var analyzerDirectory =
-            Path.Combine(RepositoryRoot(), "SharpProof.Analyzer");
+    public void DiagnosticDescriptorsComeOnlyFromTheGeneratedCatalog() {
         Assert.That(
             File.Exists(Path.Combine(
-                analyzerDirectory,
+                RepositoryRoot(),
+                "SharpProof.Analyzer",
                 "AnalyzerDiagnosticCatalog.cs")),
             Is.False);
 
-        foreach (var file in SourceFiles("SharpProof.Analyzer")) {
-            var source = File.ReadAllText(file);
-            Assert.That(
-                source,
-                Does.Not.Contain("AnalyzerDiagnosticCatalog.Get("),
-                Relative(file));
-            if (Path.GetFileName(file) == "GeneratedDiagnosticDescriptors.cs")
-                continue;
-            Assert.That(
-                Regex.IsMatch(
+        string[] descriptorProjects = [
+            "SharpProof.Analyzer",
+            "SharpProof.ContractForGenerator",
+            "SharpProof.Meta.Analyzers"
+        ];
+        foreach (var project in descriptorProjects) {
+            foreach (var file in SourceFiles(project)) {
+                var source = File.ReadAllText(file);
+                Assert.That(
                     source,
-                    @"new\s+DiagnosticDescriptor\s*\("),
-                Is.False,
-                Relative(file));
+                    Does.Not.Contain("AnalyzerDiagnosticCatalog.Get("),
+                    Relative(file));
+                if (Path.GetFileName(file).EndsWith(
+                        "DiagnosticDescriptors.generated.cs",
+                        StringComparison.Ordinal))
+                    continue;
+                Assert.That(
+                    Regex.IsMatch(
+                        source,
+                        @"new\s+DiagnosticDescriptor\s*\("),
+                    Is.False,
+                    Relative(file));
+            }
         }
 
         var generated = File.ReadAllText(Path.Combine(
-            analyzerDirectory,
-            "GeneratedDiagnosticDescriptors.cs"));
+            RepositoryRoot(),
+            "SharpProof.Analyzer",
+            "GeneratedDiagnosticDescriptors.generated.cs"));
         Assert.That(
             generated,
             Does.Contain("SupportedDiagnostics"));

@@ -178,7 +178,8 @@ public sealed class SpecResultDomainProjectionTests {
                     0,
                     null,
                     [],
-                    resultType),
+                    resultType,
+                    [new ApiSpecAssemblyIdentity("Test", string.Empty)]),
                 new ApiSpecFacets(
                     new SpecEffectFacet(SpecEffect.None, evidence),
                     new SpecAllocationFacet(

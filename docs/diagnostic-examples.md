@@ -1,8 +1,11 @@
 # SharpProof diagnostics
 
-The authoritative descriptors are static fields in
-`SharpProof.Analyzer/GeneratedDiagnosticDescriptors.cs` and
-`SharpProof.ContractForGenerator/GeneratedDiagnosticDescriptors.cs`.
+The authoritative descriptor catalog is
+`eng/diagnostics/diagnostic-descriptors.v1.json`. The checked-in
+`*DiagnosticDescriptors.generated.cs` files in the analyzer, `ContractFor`
+generator, and soundness meta-analyzer are compiled projections.
+Run `.\scripts\Generate-DiagnosticDescriptors.ps1` after catalog changes; CI
+uses `-Verify` to reject stale projections.
 
 The portable `SharpProof` package defaults to advisory analysis with both
 feature groups:
@@ -220,7 +223,7 @@ artifact lowering, serialization, or write failure. The diagnostic is an error
 because the required closed compiler evidence is missing. It is an
 infrastructure failure, never a contract or proof outcome.
 
-Compiler artifact schema version 3 includes the sealed selected-claim manifest,
+Compiler artifact schema version 5 includes the sealed selected-claim manifest,
 compiler diagnostics, source/generated-tree hashes and parse evidence, and,
 for each supported selected callable, bound contract/spec metadata plus
 portable whole-body lowered CFG/IR. It contains no source text. The worker

@@ -1,5 +1,4 @@
 namespace SharpProof.CompilerArtifact;
-#pragma warning disable IDE0055 // Compact compiler producer preserves the size ratchet.
 
 internal static class CompilerManifestArtifactProducer {
     internal static CompilerManifestArtifact Create(CSharpCompilation compilation, string projectDirectory,
@@ -18,27 +17,40 @@ internal static class CompilerManifestArtifactProducer {
         CompilerCallableArtifact[] callables;
         if (diagnostics.Length != 0)
             callables = [.. targets.Select(static item => new CompilerCallableArtifact {
-                CallableId = item.Entry.CallableId, FailureReason = WorkerClaimReason.UnsupportedCallable
+                CallableId = item.Entry.CallableId, FailureReason = WorkerClaimReason.UnsupportedCallable,
+                EffectClaims = [.. item.EffectClaims.Select(static claim => claim.Evidence)]
             })];
         else {
             var lowerer = new CompilerCallableLowerer(compilation, new IrFactory());
-            callables = [.. targets.Select(item => CompilerLoweredArtifact.Encode(
-                lowerer.Prepare(item, cancellationToken)))];
+            callables = [.. targets.Select(item => {
+                var artifact = CompilerLoweredArtifact.Encode(
+                    lowerer.Prepare(item, cancellationToken));
+                artifact.EffectClaims = [.. item.EffectClaims.Select(
+                    static claim => claim.Evidence)];
+                return artifact;
+            })];
         }
         var artifact = new CompilerManifestArtifact {
-            Features = features, CompilationSha256 = CompilationFingerprint.ComputeSha256(snapshot),
-            Compilation = snapshot, Manifest = discovery.Manifest, MaximumExpressionDepth = maximumExpressionDepth,
-            CompilerDiagnostics = diagnostics, Callables = callables
+            Features = features,
+            CompilationSha256 = CompilationFingerprint.ComputeSha256(snapshot),
+            Compilation = snapshot,
+            Manifest = discovery.Manifest,
+            MaximumExpressionDepth = maximumExpressionDepth,
+            CompilerDiagnostics = diagnostics,
+            Callables = callables
         };
-        CompilerManifestArtifactJson.Validate(artifact); return artifact;
+        CompilerManifestArtifactJson.Validate(artifact);
+        return artifact;
     }
     private static CompilerDiagnosticArtifact CreateDiagnostic(Diagnostic diagnostic) {
         var source = diagnostic.Location.IsInSource;
         var span = source ? diagnostic.Location.GetMappedLineSpan() : default;
         return new CompilerDiagnosticArtifact {
-            Code = "compiler." + diagnostic.Id, Message = diagnostic.GetMessage(CultureInfo.InvariantCulture),
+            Code = "compiler." + diagnostic.Id,
+            Message = diagnostic.GetMessage(CultureInfo.InvariantCulture),
             Location = new WorkerSourceLocation {
-                Path = span.Path ?? string.Empty, Start = source ? diagnostic.Location.SourceSpan.Start : 0,
+                Path = span.Path ?? string.Empty,
+                Start = source ? diagnostic.Location.SourceSpan.Start : 0,
                 Length = source ? diagnostic.Location.SourceSpan.Length : 0,
                 Line = source ? span.StartLinePosition.Line : 0,
                 Column = source ? span.StartLinePosition.Character : 0

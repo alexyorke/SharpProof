@@ -86,7 +86,7 @@ internal sealed class VerificationCache(string directory, long maximumBytes) {
     }
 
     private static string HashText(string value) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+        WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(value));
 
     internal static bool IsCacheable(WorkerVerifyResponse? response, string expectedInputHash,
         WorkerClaimManifest expectedManifest) =>

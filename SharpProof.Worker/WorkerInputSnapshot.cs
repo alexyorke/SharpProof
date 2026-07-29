@@ -24,7 +24,8 @@ internal sealed record WorkerInputSnapshot(
             throw new IOException(ManifestInvalid, exception);
         }
         var inputHash = CompilerArtifactInputHash.Compute(request, manifestBytes, cacheIdentity.ToolIdentity,
-            cacheIdentity.ToolVersion, cacheIdentity.ApiSpecIdentity, cacheIdentity.ApiSpecVersion);
+            cacheIdentity.ToolVersion, cacheIdentity.WorkerBinarySha256, cacheIdentity.ApiSpecIdentity,
+            cacheIdentity.ApiSpecVersion, cacheIdentity.ApiSpecContentSha256);
         return new WorkerInputSnapshot(manifest, inputHash);
     }
     private static string DecodeUtf8(byte[] bytes) {
@@ -34,18 +35,27 @@ internal sealed record WorkerInputSnapshot(
 }
 
 internal sealed class WorkerCacheIdentity(
-    string toolIdentity, string toolVersion, string apiSpecIdentity, string apiSpecVersion) {
+    string toolIdentity, string toolVersion, string workerBinarySha256,
+    string apiSpecIdentity, string apiSpecVersion, string apiSpecContentSha256) {
     internal const string CurrentToolIdentity = "SharpProof.Worker";
     internal static WorkerCacheIdentity Current { get; } = new(
-        CurrentToolIdentity, ReadToolVersion(), ApiSpecTable.DefaultTableIdentity, ApiSpecTable.DefaultTableVersion);
+        CurrentToolIdentity, ReadToolVersion(),
+        WorkerBinaryIdentity.ComputeSha256(typeof(SharpProofWorker).Assembly.Location),
+        ApiSpecTable.DefaultTableIdentity, ApiSpecTable.DefaultTableVersion,
+        ApiSpecTable.Default.ContentSha256);
     internal string ToolIdentity { get; } = Required(toolIdentity, nameof(toolIdentity));
     internal string ToolVersion { get; } = Required(toolVersion, nameof(toolVersion));
+    internal string WorkerBinarySha256 { get; } = RequiredSha256(workerBinarySha256, nameof(workerBinarySha256));
     internal string ApiSpecIdentity { get; } = Required(apiSpecIdentity, nameof(apiSpecIdentity));
     internal string ApiSpecVersion { get; } = Required(apiSpecVersion, nameof(apiSpecVersion));
+    internal string ApiSpecContentSha256 { get; } = RequiredSha256(apiSpecContentSha256, nameof(apiSpecContentSha256));
     private static string ReadToolVersion() =>
         typeof(SharpProofWorker).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ??
             throw new InvalidOperationException("The worker tool version is unavailable.");
     private static string Required(string value, string parameterName) =>
         !string.IsNullOrWhiteSpace(value) ? value :
         throw new ArgumentException("Cache identity values cannot be blank.", parameterName);
+    private static string RequiredSha256(string value, string parameterName) =>
+        WorkerProtocolJson.IsSha256(value) ? value :
+        throw new ArgumentException("Cache identity digests must be SHA-256 values.", parameterName);
 }

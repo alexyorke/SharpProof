@@ -9,15 +9,9 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
     public static SequenceCardinalityDomain Instance { get; } = new();
 
     private SequenceCardinalityDomain() {
-        Empty = new SequenceCardinalityValue(
-            SequenceCardinalityKind.Empty,
-            _intervals.Constant(0));
-        NonEmpty = new SequenceCardinalityValue(
-            SequenceCardinalityKind.NonEmpty,
-            _intervals.Range(1, null));
-        Top = new SequenceCardinalityValue(
-            SequenceCardinalityKind.Top,
-            _intervals.Range(0, null));
+        Empty = new SequenceCardinalityValue(SequenceCardinalityKind.Empty, _intervals.Constant(0));
+        NonEmpty = new SequenceCardinalityValue(SequenceCardinalityKind.NonEmpty, _intervals.Range(1, null));
+        Top = new SequenceCardinalityValue(SequenceCardinalityKind.Top, _intervals.Range(0, null));
     }
 
     public override SequenceCardinalityValue Bottom => SequenceCardinalityValue.Bottom;
@@ -30,9 +24,7 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
         return Create(SequenceCardinalityKind.Top, _intervals.Constant(length));
     }
 
-    public SequenceCardinalityValue Create(
-        SequenceCardinalityKind kind,
-        IntervalValue length) {
+    public SequenceCardinalityValue Create(SequenceCardinalityKind kind, IntervalValue length) {
         Validate(kind);
         if (kind == SequenceCardinalityKind.Bottom || length.IsBottom) return Bottom;
 
@@ -53,15 +45,14 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
 
         var canonicalKind = restricted.IsSingleton && restricted.SingletonValue == 0
             ? SequenceCardinalityKind.Empty
-            : restricted.LowerBound.HasValue && restricted.LowerBound.Value >= 1
+            : restricted.LowerBound >= 1
                 ? SequenceCardinalityKind.NonEmpty
                 : SequenceCardinalityKind.Top;
         return new SequenceCardinalityValue(canonicalKind, restricted);
     }
 
     public override bool LessThanOrEqual(
-        SequenceCardinalityValue left,
-        SequenceCardinalityValue right) {
+        SequenceCardinalityValue left, SequenceCardinalityValue right) {
         Validate(left.Kind);
         Validate(right.Kind);
         if (left.IsBottom) return true;
@@ -71,8 +62,7 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
     }
 
     public override SequenceCardinalityValue Join(
-        SequenceCardinalityValue left,
-        SequenceCardinalityValue right) {
+        SequenceCardinalityValue left, SequenceCardinalityValue right) {
         Validate(left.Kind);
         Validate(right.Kind);
         if (left.IsBottom) return right;
@@ -99,8 +89,7 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
     }
 
     public SequenceCardinalityValue Append(
-        SequenceCardinalityValue value,
-        long appendedCount = 1) {
+        SequenceCardinalityValue value, long appendedCount = 1) {
         Validate(value.Kind);
         if (appendedCount < 0) throw new ArgumentOutOfRangeException(nameof(appendedCount));
         if (value.IsBottom) return Bottom;
@@ -110,8 +99,7 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
     }
 
     public SequenceCardinalityValue Concat(
-        SequenceCardinalityValue left,
-        SequenceCardinalityValue right) {
+        SequenceCardinalityValue left, SequenceCardinalityValue right) {
         Validate(left.Kind);
         Validate(right.Kind);
         if (left.IsBottom || right.IsBottom) return Bottom;
@@ -134,15 +122,13 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
     }
 
     private static bool KindLessThanOrEqual(
-        SequenceCardinalityKind left,
-        SequenceCardinalityKind right) =>
+        SequenceCardinalityKind left, SequenceCardinalityKind right) =>
         left == right ||
         left == SequenceCardinalityKind.Bottom ||
         right == SequenceCardinalityKind.Top;
 
     private static SequenceCardinalityKind JoinKind(
-        SequenceCardinalityKind left,
-        SequenceCardinalityKind right) {
+        SequenceCardinalityKind left, SequenceCardinalityKind right) {
         if (left == right) return left;
         if (left == SequenceCardinalityKind.Bottom) return right;
         if (right == SequenceCardinalityKind.Bottom) return left;

@@ -1,6 +1,5 @@
 using System.Text;
 namespace SharpProof.CompilerArtifact;
-#pragma warning disable IDE0055 // Compact compiler capture preserves the fixed production-size ceiling.
 #pragma warning disable RS1035 // Build-only compiler evidence must hash final reference images.
 
 internal static class CompilerCompilationCapture {
@@ -9,7 +8,8 @@ internal static class CompilerCompilationCapture {
         if (compilation == null) throw new ArgumentNullException(nameof(compilation));
         if (string.IsNullOrWhiteSpace(projectDirectory) || string.IsNullOrWhiteSpace(targetFramework)) throw new ArgumentException(
             "The project directory and target framework are required.");
-        var normalizedProject = NormalizePath(projectDirectory); var options = compilation.Options;
+        var normalizedProject = NormalizePath(projectDirectory);
+        var options = compilation.Options;
         if (additionalFiles.IsDefault) additionalFiles = [];
         var supersedes = InternalBoolean(options, "ReferencesSupersedeLowerVersions");
         if (supersedes || options.MetadataReferenceResolver?.ResolveMissingAssemblies == true ||
@@ -18,16 +18,25 @@ internal static class CompilerCompilationCapture {
         return new CompilerCompilationSnapshot {
             ProjectDirectory = normalizedProject,
             AssemblyName = compilation.AssemblyName ?? throw new InvalidOperationException("The assembly name is unavailable."),
-            AssemblyIdentity = compilation.Assembly.Identity.ToString(), TargetFramework = targetFramework,
-            CompilerVersion = Version(typeof(Compilation)), CompilerMvid = Mvid(typeof(Compilation)),
-            CSharpCompilerVersion = Version(typeof(CSharpCompilation)), CSharpCompilerMvid = Mvid(typeof(CSharpCompilation)),
+            AssemblyIdentity = compilation.Assembly.Identity.ToString(),
+            TargetFramework = targetFramework,
+            CompilerVersion = Version(typeof(Compilation)),
+            CompilerMvid = Mvid(typeof(Compilation)),
+            CSharpCompilerVersion = Version(typeof(CSharpCompilation)),
+            CSharpCompilerMvid = Mvid(typeof(CSharpCompilation)),
             Options = new CompilerCompilationOptionsSnapshot {
-                OutputKind = options.OutputKind.ToString(), OptimizationLevel = options.OptimizationLevel.ToString(),
-                Platform = options.Platform.ToString(), NullableContext = options.NullableContextOptions.ToString(),
-                MetadataImportOptions = options.MetadataImportOptions.ToString(), CheckOverflow = options.CheckOverflow,
-                AllowUnsafe = options.AllowUnsafe, Deterministic = options.Deterministic,
-                ReferencesSupersedeLowerVersions = supersedes, AssemblyIdentityComparer = Comparer(options.AssemblyIdentityComparer),
-                Usings = [.. options.Usings], ResolverPolicy = "EvidenceOnly"
+                OutputKind = options.OutputKind.ToString(),
+                OptimizationLevel = options.OptimizationLevel.ToString(),
+                Platform = options.Platform.ToString(),
+                NullableContext = options.NullableContextOptions.ToString(),
+                MetadataImportOptions = options.MetadataImportOptions.ToString(),
+                CheckOverflow = options.CheckOverflow,
+                AllowUnsafe = options.AllowUnsafe,
+                Deterministic = options.Deterministic,
+                ReferencesSupersedeLowerVersions = supersedes,
+                AssemblyIdentityComparer = Comparer(options.AssemblyIdentityComparer),
+                Usings = [.. options.Usings],
+                ResolverPolicy = "EvidenceOnly"
             },
             SyntaxTrees = [.. compilation.SyntaxTrees.Select(tree => CaptureTree(tree, cancellationToken))],
             References = [.. compilation.References.Select(reference => CaptureReference(compilation, reference, cancellationToken))],
@@ -37,11 +46,13 @@ internal static class CompilerCompilationCapture {
         };
     }
     private static CompilerSyntaxTreeSnapshot CaptureTree(SyntaxTree tree, CancellationToken cancellationToken) {
-        cancellationToken.ThrowIfCancellationRequested(); var parse = (CSharpParseOptions)tree.Options;
+        cancellationToken.ThrowIfCancellationRequested();
+        var parse = (CSharpParseOptions)tree.Options;
         return new CompilerSyntaxTreeSnapshot {
             Path = tree.FilePath ?? string.Empty,
             Sha256 = Hash(Encoding.UTF8.GetBytes(tree.GetText(cancellationToken).ToString())),
-            LanguageVersion = parse.LanguageVersion.ToString(), DocumentationMode = parse.DocumentationMode.ToString(),
+            LanguageVersion = parse.LanguageVersion.ToString(),
+            DocumentationMode = parse.DocumentationMode.ToString(),
             Kind = parse.Kind.ToString(),
             PreprocessorSymbols = [.. parse.PreprocessorSymbolNames.OrderBy(static value => value, StringComparer.Ordinal)],
             Features = [.. parse.Features.OrderBy(static value => value.Key, StringComparer.Ordinal)
@@ -56,10 +67,12 @@ internal static class CompilerCompilationCapture {
         var path = portable.FilePath ?? portable.Display ??
             throw new InvalidOperationException("The final compilation contains an unnamed reference.");
         return new CompilerReferenceSnapshot {
-            Path = NormalizePath(path), Kind = reference.Properties.Kind.ToString(),
+            Path = NormalizePath(path),
+            Kind = reference.Properties.Kind.ToString(),
             EmbedInteropTypes = reference.Properties.EmbedInteropTypes,
             Aliases = [.. reference.Properties.Aliases.OrderBy(static value => value, StringComparer.Ordinal)],
-            Identity = Identity(compilation, reference), Sha256 = Hash(ReadImage(path, cancellationToken))
+            Identity = Identity(compilation, reference),
+            Sha256 = Hash(ReadImage(path, cancellationToken))
         };
     }
     private static CompilerAdditionalFileSnapshot CaptureAdditionalFile(AdditionalText file, string projectDirectory,
@@ -69,12 +82,14 @@ internal static class CompilerCompilationCapture {
         var text = file.GetText(cancellationToken) ??
             throw new InvalidOperationException("An additional file has no compiler text.");
         return new CompilerAdditionalFileSnapshot {
-            Path = NormalizePath(path), Sha256 = Hash(Encoding.UTF8.GetBytes(text.ToString()))
+            Path = NormalizePath(path),
+            Sha256 = Hash(Encoding.UTF8.GetBytes(text.ToString()))
         };
     }
     private static string Identity(CSharpCompilation compilation, MetadataReference reference) =>
         compilation.GetAssemblyOrModuleSymbol(reference) switch {
-            IAssemblySymbol assembly => assembly.Identity.ToString(), IModuleSymbol module => module.Name,
+            IAssemblySymbol assembly => assembly.Identity.ToString(),
+            IModuleSymbol module => module.Name,
             _ => ((PortableExecutableReference)reference).GetMetadata() switch {
                 AssemblyMetadata assembly => assembly.GetModules()[0].GetMetadataReader().GetAssemblyDefinition().GetAssemblyName().FullName,
                 ModuleMetadata module => module.Name,
@@ -97,9 +112,11 @@ internal static class CompilerCompilationCapture {
     private static byte[] ReadImage(string path, CancellationToken cancellationToken) {
         using var input = File.OpenRead(path);
         using var output = new MemoryStream(input.Length <= int.MaxValue ? (int)input.Length : 0);
-        var buffer = new byte[81920]; int count;
+        var buffer = new byte[81920];
+        int count;
         while ((count = input.Read(buffer, 0, buffer.Length)) != 0) {
-            cancellationToken.ThrowIfCancellationRequested(); output.Write(buffer, 0, count);
+            cancellationToken.ThrowIfCancellationRequested();
+            output.Write(buffer, 0, count);
         }
         return output.ToArray();
     }

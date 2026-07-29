@@ -1,22 +1,26 @@
 namespace SharpProof.Contracts;
 
 public sealed class ContractClauseInventoryBuilder(Compilation compilation) {
+    private static readonly ConditionalWeakTable<Compilation, ContractClauseInventoryBuilder> Cache = new();
     private readonly Compilation _compilation =
         compilation ?? throw new ArgumentNullException(nameof(compilation));
-    private readonly ContractClauseSymbols? _api =
-        ContractClauseSymbols.TryCreate(compilation);
-    private readonly Dictionary<SyntaxTree, int> _treeOrdinals =
-        compilation.SyntaxTrees
-            .Select(static (tree, ordinal) => (tree, ordinal))
-            .ToDictionary(static item => item.tree, static item => item.ordinal);
-    private readonly ConcurrentDictionary<IMethodSymbol, ContractClauseInventory>
-        _cache = new(SymbolEqualityComparer.Default);
+    private readonly ContractClauseSymbols? _api = ContractClauseSymbols.TryCreate(compilation);
+    private readonly Dictionary<SyntaxTree, int> _treeOrdinals = compilation.SyntaxTrees
+        .Select(static (tree, ordinal) => (tree, ordinal))
+        .ToDictionary(static item => item.tree, static item => item.ordinal);
+    private readonly ConcurrentDictionary<IMethodSymbol, ContractClauseInventory> _cache =
+        new(SymbolEqualityComparer.Default);
+
+    internal static ContractClauseInventoryBuilder ForCompilation(Compilation compilation) =>
+        Cache.GetValue(compilation, static value => new(value));
+
+    internal int GetTreeOrdinal(SyntaxTree tree) =>
+        _treeOrdinals.TryGetValue(tree, out var ordinal) ? ordinal : int.MaxValue;
 
     public ContractClauseInventory Create(
         IMethodSymbol callable,
         IOperation? implementationBody = null) {
-        if (callable == null)
-            throw new ArgumentNullException(nameof(callable));
+        if (callable == null) throw new ArgumentNullException(nameof(callable));
         callable = NormalizeCallable(callable);
         return implementationBody == null
             ? _cache.GetOrAdd(callable, CreateUncached)
@@ -29,40 +33,24 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation) {
     private ContractClauseInventory CreateCore(
         IMethodSymbol callable,
         IOperation? implementationBody) {
-        var bodies = GetBodies(callable, implementationBody);
-        IOperation? resolvedBody = implementationBody;
         var found = new List<(
             BoundContractKind Kind,
             ContractClausePlacement Placement,
             IInvocationOperation Invocation,
             int TreeOrdinal)>();
-        foreach (var body in bodies) {
+        var resolvedBody = implementationBody;
+        foreach (var body in GetBodies(callable, implementationBody)) {
             var model = SharpProof.Frontend.Host.CompilationModelProvider
                 .GetSemanticModel(_compilation, body.SyntaxTree);
             var root = model.GetOperation(body);
             if (root == null) continue;
             resolvedBody ??= root;
-            foreach (var invocation in root.DescendantsAndSelf()
-                         .OfType<IInvocationOperation>()) {
-                var kind = _api?.GetClauseKind(invocation.TargetMethod);
-                if (!kind.HasValue) continue;
-                var syntax = invocation.Syntax;
-                found.Add((
-                    kind.Value,
-                    Classify(
-                        callable,
-                        invocation,
-                        model,
-                        body),
-                    invocation,
-                    _treeOrdinals.TryGetValue(
-                        syntax.SyntaxTree,
-                        out var ordinal)
-                        ? ordinal
-                        : int.MaxValue));
+            foreach (var invocation in root.DescendantsAndSelf().OfType<IInvocationOperation>()) {
+                if (_api?.GetClauseKind(invocation.TargetMethod) is not { } kind) continue;
+                found.Add((kind, Classify(callable, invocation, model, body), invocation,
+                    GetTreeOrdinal(invocation.Syntax.SyntaxTree)));
             }
         }
-
         var kindOrdinals = new int[3];
         var sourceOrdinal = 0;
         var clauses = found
@@ -70,30 +58,10 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation) {
             .ThenBy(static clause => clause.Invocation.Syntax.SpanStart)
             .ThenBy(static clause => clause.Invocation.Syntax.Span.Length)
             .Select(clause => new ContractClauseOccurrence(
-                clause.Kind,
-                clause.Placement,
-                kindOrdinals[(int)clause.Kind]++,
-                sourceOrdinal++,
-                clause.Invocation))
+                clause.Kind, clause.Placement, kindOrdinals[(int)clause.Kind]++,
+                sourceOrdinal++, clause.Invocation))
             .ToImmutableArray();
-        return new ContractClauseInventory(
-            callable,
-            _api != null,
-            resolvedBody,
-            clauses);
-    }
-
-    private bool TryGetDirectClause(
-        SemanticModel model,
-        StatementSyntax statement,
-        out IInvocationOperation invocation) {
-        invocation = statement is ExpressionStatementSyntax expression &&
-                     model.GetOperation(expression.Expression) is
-                         IInvocationOperation candidate &&
-                     _api!.GetClauseKind(candidate.TargetMethod).HasValue
-            ? candidate
-            : null!;
-        return invocation != null;
+        return new ContractClauseInventory(callable, _api != null, resolvedBody, clauses);
     }
 
     private ContractClausePlacement Classify(
@@ -104,21 +72,14 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation) {
         var enclosing = model.GetEnclosingSymbol(invocation.Syntax.SpanStart);
         if (enclosing is not IMethodSymbol method ||
             !SymbolEqualityComparer.Default.Equals(
-                callable.OriginalDefinition,
-                method.OriginalDefinition))
+                callable.OriginalDefinition, method.OriginalDefinition))
             return ContractClausePlacement.NestedCallable;
         if (!IsReachable(invocation.Syntax, model))
             return ContractClausePlacement.Unreachable;
-        if (TryGetDirectPlacement(
-                invocation,
-                model,
-                body,
-                out var placement))
+        if (TryGetDirectPlacement(invocation, model, body, out var placement))
             return placement;
         return invocation.Syntax.Ancestors()
-            .TakeWhile(ancestor =>
-                ancestor.SyntaxTree != body.SyntaxTree ||
-                ancestor.Span != body.Span)
+            .TakeWhile(ancestor => !HasSameSite(ancestor, body))
             .Any(IsConditional)
             ? ContractClausePlacement.Conditional
             : ContractClausePlacement.Misplaced;
@@ -129,32 +90,18 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation) {
         SemanticModel model,
         SyntaxNode body,
         out ContractClausePlacement placement) {
-        var syntax = invocation.Syntax;
         if (body is not BlockSyntax and not CompilationUnitSyntax) {
             placement = ContractClausePlacement.ValidPrologue;
-            return HasSameSite(syntax, body);
+            return HasSameSite(invocation.Syntax, body);
         }
-        if (syntax.Parent is not ExpressionStatementSyntax statement) {
-            placement = default;
-            return false;
-        }
-        IEnumerable<StatementSyntax> statements;
-        if (body is BlockSyntax block &&
-            statement.Parent is BlockSyntax parent &&
-            HasSameSite(parent, block))
-            statements = block.Statements;
-        else if (body is CompilationUnitSyntax unit &&
-                 statement.Parent is GlobalStatementSyntax global &&
-                 HasSameSite(global.Parent!, unit))
-            statements = unit.Members.OfType<GlobalStatementSyntax>()
-                .Select(static member => member.Statement);
-        else {
+        if (invocation.Syntax.Parent is not ExpressionStatementSyntax statement ||
+            !TryGetStatements(body, statement, out var statements)) {
             placement = default;
             return false;
         }
         foreach (var prior in statements) {
             if (HasSameSite(prior, statement)) break;
-            if (!TryGetDirectClause(model, prior, out _)) {
+            if (!IsDirectClause(model, prior)) {
                 placement = ContractClausePlacement.Late;
                 return true;
             }
@@ -163,10 +110,34 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation) {
         return true;
     }
 
+    private static bool TryGetStatements(
+        SyntaxNode body,
+        ExpressionStatementSyntax statement,
+        out IEnumerable<StatementSyntax> statements) {
+        if (body is BlockSyntax block &&
+            statement.Parent is BlockSyntax parent &&
+            HasSameSite(parent, block)) {
+            statements = block.Statements;
+            return true;
+        }
+        if (body is CompilationUnitSyntax unit &&
+            statement.Parent is GlobalStatementSyntax global &&
+            HasSameSite(global.Parent!, unit)) {
+            statements = unit.Members.OfType<GlobalStatementSyntax>()
+                .Select(static member => member.Statement);
+            return true;
+        }
+        statements = [];
+        return false;
+    }
+
+    private bool IsDirectClause(SemanticModel model, StatementSyntax statement) =>
+        statement is ExpressionStatementSyntax expression &&
+        model.GetOperation(expression.Expression) is IInvocationOperation invocation &&
+        _api!.GetClauseKind(invocation.TargetMethod).HasValue;
+
     private static bool IsReachable(SyntaxNode syntax, SemanticModel model) {
-        var statement = syntax.AncestorsAndSelf()
-            .OfType<StatementSyntax>()
-            .FirstOrDefault();
+        var statement = syntax.AncestorsAndSelf().OfType<StatementSyntax>().FirstOrDefault();
         if (statement == null) return true;
         try {
             var flow = model.AnalyzeControlFlow(statement);
@@ -178,50 +149,39 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation) {
     }
 
     private static bool IsConditional(SyntaxNode syntax) => syntax is
-        IfStatementSyntax or
-        ConditionalExpressionSyntax or
-        SwitchStatementSyntax or
-        SwitchExpressionSyntax or
-        WhileStatementSyntax or
-        DoStatementSyntax or
-        ForStatementSyntax or
+        IfStatementSyntax or ConditionalExpressionSyntax or
+        SwitchStatementSyntax or SwitchExpressionSyntax or
+        WhileStatementSyntax or DoStatementSyntax or ForStatementSyntax or
         CommonForEachStatementSyntax;
 
     private static ImmutableArray<SyntaxNode> GetBodies(
         IMethodSymbol callable,
-        IOperation? implementationBody) {
-        if (implementationBody != null)
-            return [GetBody(implementationBody.Syntax) ??
-                    implementationBody.Syntax];
-        return [.. callable.DeclaringSyntaxReferences
-            .Select(static reference => GetBody(reference.GetSyntax()))
-            .Where(static body => body != null)
-            .Select(static body => body!)];
-    }
+        IOperation? implementationBody) =>
+        implementationBody != null
+            ? [GetBody(implementationBody.Syntax) ?? implementationBody.Syntax]
+            : [.. callable.DeclaringSyntaxReferences
+                .Select(static reference => GetBody(reference.GetSyntax()))
+                .Where(static body => body != null)
+                .Select(static body => body!)];
 
-    private static SyntaxNode? GetBody(SyntaxNode syntax) => syntax switch {
+    internal static SyntaxNode? GetBody(SyntaxNode syntax) => syntax switch {
         BaseMethodDeclarationSyntax { Body: { } body } => body,
-        BaseMethodDeclarationSyntax {
-            ExpressionBody.Expression: { } expression
-        } => expression,
+        BaseMethodDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
         AccessorDeclarationSyntax { Body: { } body } => body,
-        AccessorDeclarationSyntax {
-            ExpressionBody.Expression: { } expression
-        } => expression,
+        AccessorDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
+        PropertyDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
+        IndexerDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
         LocalFunctionStatementSyntax { Body: { } body } => body,
-        LocalFunctionStatementSyntax {
-            ExpressionBody.Expression: { } expression
-        } => expression,
+        LocalFunctionStatementSyntax { ExpressionBody.Expression: { } expression } => expression,
         ParenthesizedLambdaExpressionSyntax { Body: { } body } => body,
         SimpleLambdaExpressionSyntax { Body: { } body } => body,
         AnonymousMethodExpressionSyntax { Block: { } block } => block,
-        BlockSyntax or ExpressionSyntax => syntax,
+        BlockSyntax or ExpressionSyntax or CompilationUnitSyntax => syntax,
         _ => null
     };
 
     private static bool HasSameSite(SyntaxNode left, SyntaxNode right) =>
         left.SyntaxTree == right.SyntaxTree && left.Span == right.Span;
-
     internal static IMethodSymbol NormalizeCallable(IMethodSymbol method) =>
         method.PartialImplementationPart ?? method;
 }

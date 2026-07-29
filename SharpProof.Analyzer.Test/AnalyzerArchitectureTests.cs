@@ -11,6 +11,7 @@ public sealed class AnalyzerArchitectureTests {
     private static readonly string[] ExpectedAnalyzerReferences = [
         "SharpProof.CompilerArtifact",
         "SharpProof.Contracts",
+        "SharpProof.Dataflow",
         "SharpProof.Effects",
         "SharpProof.Frontend",
         "SharpProof.Ir",

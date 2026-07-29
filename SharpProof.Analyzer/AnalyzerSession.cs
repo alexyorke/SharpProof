@@ -27,12 +27,10 @@ internal sealed class AnalyzerSession {
     private readonly ContractIntrinsicValidator _contractIntrinsics;
     private readonly ResolvedApiSpecTable _apiSpecs;
     private readonly Action<IMethodSymbol, AnalyzerSemanticOutcome>? _outcomeObserver;
-    private readonly ConcurrentDictionary<
-        (SyntaxTree Tree, TextSpan Span),
-        byte> _validatedAttributes = new();
-    private readonly ConcurrentDictionary<
-        (SyntaxTree Tree, TextSpan Span),
-        byte> _validatedContractIntrinsics = new();
+    private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
+        _validatedAttributes = new();
+    private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
+        _validatedContractIntrinsics = new();
 
     internal AnalyzerSession(
         Compilation compilation,
@@ -40,17 +38,12 @@ internal sealed class AnalyzerSession {
         CancellationToken cancellationToken,
         Action<IMethodSymbol, AnalyzerSemanticOutcome>? outcomeObserver = null) {
         cancellationToken.ThrowIfCancellationRequested();
-        Compilation = compilation ??
-            throw new ArgumentNullException(nameof(compilation));
-        Configuration = configuration ??
-            throw new ArgumentNullException(nameof(configuration));
+        Compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
+        Configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _outcomeObserver = outcomeObserver;
-        Attributes = new AnalyzerAttributeSymbols(compilation);
-        _contractClauses = new ContractClauseInventoryBuilder(compilation);
-        _contractBinder = new ContractBinder(
-            compilation,
-            IrFactory,
-            _contractClauses);
+        Attributes = ContractSelectionInventory.ForCompilation(compilation);
+        _contractClauses = ContractClauseInventoryBuilder.ForCompilation(compilation);
+        _contractBinder = new ContractBinder(compilation, IrFactory, _contractClauses);
         _contractIntrinsics = new ContractIntrinsicValidator(compilation);
         _apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         _effects = new EffectAnalysisSession(compilation, _apiSpecs);
@@ -58,18 +51,20 @@ internal sealed class AnalyzerSession {
 
     internal Compilation Compilation { get; }
     internal AnalyzerConfiguration Configuration { get; }
-    internal AnalyzerAttributeSymbols Attributes { get; }
+    internal ContractSelectionInventory Attributes { get; }
     internal IrFactory IrFactory { get; } = new();
     internal ResolvedApiSpecTable ApiSpecs => _apiSpecs;
     internal ResolvedApiSpecTable? EffectApiSpecs =>
         Configuration.EffectsEnabled ? _effects.ApiSpecs : null;
+
     internal ContractClauseInventory GetContractClauses(IMethodSymbol method) =>
         _contractClauses.Create(method);
+
     internal ContractBindingResult BindRequires(IMethodSymbol method) =>
         _contractBinder.BindRequires(method);
-    internal ImmutableArray<ContractIntrinsicViolation>
-        GetContractIntrinsicViolations(
-            ContractClauseInventory inventory) =>
+
+    internal ImmutableArray<ContractIntrinsicViolation> GetContractIntrinsicViolations(
+        ContractClauseInventory inventory) =>
         _contractIntrinsics.Validate(
             inventory.Callable,
             inventory.ImplementationBody,
@@ -103,15 +98,13 @@ internal sealed class AnalyzerSession {
         var reference = attribute.ApplicationSyntaxReference;
         return reference == null ||
                _validatedAttributes.TryAdd(
-                   (reference.SyntaxTree, reference.Span),
-                   0);
+                   (reference.SyntaxTree, reference.Span), 0);
     }
 
     internal bool TryMarkContractIntrinsicValidated(
         ContractIntrinsicViolation violation) =>
         _validatedContractIntrinsics.TryAdd(
-            (
-                violation.Invocation.Syntax.SyntaxTree,
-                violation.Invocation.Syntax.Span),
+            (violation.Invocation.Syntax.SyntaxTree,
+             violation.Invocation.Syntax.Span),
             0);
 }

@@ -21,6 +21,11 @@ public sealed class RoslynOperationLowerer {
     }
 
     internal Func<ITypeSymbol?, ITypeSymbol?> TypeSpecializer { get; set; } = static type => type;
+    internal Func<IOperation, (bool Handled, IrTerm? Term)> CustomLowering {
+        get;
+        set;
+    } = static _ => default;
+
     public FrontendLoweringResult Lower(IOperation operation) {
         if (operation == null) throw new ArgumentNullException(nameof(operation));
         var lowered = _visitor.Visit(operation, default);
@@ -51,16 +56,10 @@ public sealed class RoslynOperationLowerer {
                 CompilerIdentityBridge.InternType(_factory, array), element,
                 CompilerIdentityBridge.CreateTypeDisplay(array));
         }
+        if (CSharpScalarSemantics.IsSupportedInteger(type.SpecialType))
+            return _factory.IntegerType;
         return type.SpecialType switch {
             SpecialType.System_Boolean => _factory.BooleanType,
-            SpecialType.System_SByte or
-            SpecialType.System_Byte or
-            SpecialType.System_Int16 or
-            SpecialType.System_UInt16 or
-            SpecialType.System_Char or
-            SpecialType.System_Int32 or
-            SpecialType.System_UInt32 or
-            SpecialType.System_Int64 => _factory.IntegerType,
             SpecialType.System_String => _factory.StringType,
             SpecialType.System_Object => _factory.ObjectType,
             _ => _factory.GetOrCreateReferenceType(
@@ -124,6 +123,34 @@ public sealed class RoslynOperationLowerer {
         property.Arguments.IsDefaultOrEmpty &&
         (property.Instance.Type?.SpecialType == SpecialType.System_String ||
          property.Instance.Type is IArrayTypeSymbol);
+
+    private static bool TryGetNullComparisonValue(
+        IBinaryOperation operation,
+        out IOperation value) {
+        if (operation.OperatorKind is not (
+                BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals)) {
+            value = null!;
+            return false;
+        }
+        var left = UnwrapImplicitConversions(operation.LeftOperand);
+        var right = UnwrapImplicitConversions(operation.RightOperand);
+        value = IsNullConstant(right)
+            ? left
+            : IsNullConstant(left) ? right : null!;
+        return value != null;
+    }
+
+    private static IOperation UnwrapImplicitConversions(IOperation operation) {
+        while (operation is IConversionOperation {
+            IsImplicit: true,
+            OperatorMethod: null
+        } conversion)
+            operation = conversion.Operand;
+        return operation;
+    }
+
+    private static bool IsNullConstant(IOperation operation) =>
+        operation.ConstantValue is { HasValue: true, Value: null };
 
     private IrVariableTerm GetInstance(IInstanceReferenceOperation operation) {
         var type = operation.Type;
@@ -259,6 +286,13 @@ public sealed class RoslynOperationLowerer {
             IOperation? operation, LoweringContext argument) {
             if (operation == null)
                 return _owner.CreateMissingOperation();
+            var custom = _owner.CustomLowering(operation);
+            if (custom.Handled)
+                return custom.Term == null
+                    ? _owner.Opaque(
+                        operation,
+                        FrontendAbstention.UnsupportedOperationKind)
+                    : LoweredExpression.Exact(custom.Term);
             if (operation.ConstantValue.HasValue)
                 return _owner.LowerConstant(operation);
             return base.Visit(operation, argument)!;
@@ -266,11 +300,9 @@ public sealed class RoslynOperationLowerer {
 
         public override LoweredExpression DefaultVisit(
             IOperation operation, LoweringContext argument) =>
-            _owner.Opaque(
-                operation,
-                operation.Type?.TypeKind == TypeKind.Error
-                    ? FrontendAbstention.ErrorOperation
-                    : FrontendAbstention.UnsupportedOperationKind);
+            _owner.Opaque(operation, operation.Type?.TypeKind == TypeKind.Error
+                ? FrontendAbstention.ErrorOperation
+                : FrontendAbstention.UnsupportedOperationKind);
 
         public override LoweredExpression VisitInvalid(
             IInvalidOperation operation, LoweringContext argument) =>
@@ -282,13 +314,11 @@ public sealed class RoslynOperationLowerer {
 
         public override LoweredExpression VisitLocalReference(
             ILocalReferenceOperation operation, LoweringContext argument) =>
-            LoweredExpression.Exact(
-                _owner.GetVariable(operation.Local, operation.Type));
+            LoweredExpression.Exact(_owner.GetVariable(operation.Local, operation.Type));
 
         public override LoweredExpression VisitParameterReference(
             IParameterReferenceOperation operation, LoweringContext argument) =>
-            LoweredExpression.Exact(
-                _owner.GetVariable(operation.Parameter, operation.Type));
+            LoweredExpression.Exact(_owner.GetVariable(operation.Parameter, operation.Type));
 
         public override LoweredExpression VisitFlowCapture(
             IFlowCaptureOperation operation, LoweringContext argument) {
@@ -298,8 +328,7 @@ public sealed class RoslynOperationLowerer {
 
         public override LoweredExpression VisitFlowCaptureReference(
             IFlowCaptureReferenceOperation operation, LoweringContext argument) =>
-            LoweredExpression.Exact(
-                _owner.GetCapture(operation.Id, operation.Type));
+            LoweredExpression.Exact(_owner.GetCapture(operation.Id, operation.Type));
 
         public override LoweredExpression VisitInstanceReference(
             IInstanceReferenceOperation operation, LoweringContext argument) =>
@@ -310,10 +339,8 @@ public sealed class RoslynOperationLowerer {
             var type = _owner.GetTypeId(operation.Type);
             var info = _owner._factory.GetTypeInfo(type);
             return info.Kind switch {
-                IrTypeKind.Boolean =>
-                    LoweredExpression.Exact(_owner._factory.Boolean(false)),
-                IrTypeKind.Integer =>
-                    LoweredExpression.Exact(_owner._factory.Integer(0)),
+                IrTypeKind.Boolean => LoweredExpression.Exact(_owner._factory.Boolean(false)),
+                IrTypeKind.Integer => LoweredExpression.Exact(_owner._factory.Integer(0)),
                 IrTypeKind.String or IrTypeKind.Reference or IrTypeKind.Sequence =>
                     LoweredExpression.Exact(_owner._factory.Null(type)),
                 _ => _owner.Opaque(operation, FrontendAbstention.UnsupportedType)
@@ -323,51 +350,71 @@ public sealed class RoslynOperationLowerer {
         public override LoweredExpression VisitUnaryOperator(
             IUnaryOperation operation, LoweringContext argument) {
             if (operation.OperatorMethod != null)
-                return OpaqueOperand(
-                    operation, operation.Operand,
-                    FrontendAbstention.UserDefinedOperator,
-                    operation.OperatorMethod);
+                return OpaqueOperand(operation, operation.Operand,
+                    FrontendAbstention.UserDefinedOperator, operation.OperatorMethod);
             if (operation.IsLifted)
-                return OpaqueOperand(
-                    operation, operation.Operand, FrontendAbstention.LiftedOperator);
+                return OpaqueOperand(operation, operation.Operand, FrontendAbstention.LiftedOperator);
             var operand = _owner.LowerCore(operation.Operand);
             if (!operand.Classification.IsExact)
+                return OpaqueOperand(operation, operation.Operand, operand.Classification.Abstention);
+            if (!CSharpScalarSemantics.TryGetUnary(
+                    operation.OperatorKind,
+                    out var semantics))
                 return OpaqueOperand(
-                    operation, operation.Operand,
-                    operand.Classification.Abstention);
-            if (operation.OperatorKind == UnaryOperatorKind.Not &&
-                operand.Term.Type == _owner._factory.BooleanType)
-                return LoweredExpression.Exact(
-                    _owner._factory.Unary(IrUnaryOperator.Not, operand.Term));
-            if (operation.OperatorKind == UnaryOperatorKind.Minus &&
-                operand.Term.Type == _owner._factory.IntegerType) {
-                if (operation.Type?.SpecialType != SpecialType.System_Int64)
-                    return OpaqueOperand(
-                        operation, operation.Operand,
-                        FrontendAbstention.UnsupportedType);
-                if (!operation.IsChecked)
-                    return OpaqueOperand(
-                        operation, operation.Operand,
-                        FrontendAbstention.UncheckedOverflowSemantics);
-                return LoweredExpression.Exact(
-                    _owner._factory.Unary(IrUnaryOperator.Negate, operand.Term));
-            }
-            if (operation.OperatorKind == UnaryOperatorKind.Plus)
+                    operation,
+                    operation.Operand,
+                    FrontendAbstention.UnsupportedOperationKind);
+            if (semantics.IsIdentity)
                 return operand;
-            return OpaqueOperand(
-                operation, operation.Operand,
-                FrontendAbstention.UnsupportedOperationKind);
+            if (semantics.RequiresExactIntegerDomain &&
+                !CSharpScalarSemantics.SupportsExactIntegerIrArithmetic(
+                    operation.Type?.SpecialType ?? SpecialType.None))
+                return OpaqueOperand(
+                    operation,
+                    operation.Operand,
+                    FrontendAbstention.UnsupportedType);
+            if (semantics.RequiresCheckedArithmetic &&
+                !operation.IsChecked)
+                return OpaqueOperand(
+                    operation,
+                    operation.Operand,
+                    FrontendAbstention.UncheckedOverflowSemantics);
+            try {
+                return LoweredExpression.Exact(
+                    _owner._factory.Unary(
+                        semantics.IrOperator!.Value,
+                        operand.Term));
+            }
+            catch (ArgumentException) {
+                return OpaqueOperand(
+                    operation,
+                    operation.Operand,
+                    FrontendAbstention.UnsupportedType);
+            }
         }
 
         public override LoweredExpression VisitBinaryOperator(
             IBinaryOperation operation, LoweringContext argument) {
-            if (operation.OperatorMethod != null)
-                return OpaqueBinary(
-                    operation, FrontendAbstention.UserDefinedOperator,
-                    operation.OperatorMethod);
+            if (operation.OperatorMethod is { } operatorMethod)
+                return OpaqueBinary(operation, FrontendAbstention.UserDefinedOperator, operatorMethod);
             if (operation.IsLifted)
                 return OpaqueBinary(operation, FrontendAbstention.LiftedOperator);
-            if (!RoslynOperatorSemantics.SupportsBuiltInOperands(
+            if (TryGetNullComparisonValue(operation, out var compared)) {
+                var value = _owner.LowerCore(compared);
+                if (!value.Classification.IsExact)
+                    return OpaqueBinary(operation, value.Classification.Abstention);
+                try {
+                    var kind = operation.OperatorKind == BinaryOperatorKind.Equals
+                        ? IrBinaryOperator.Equal
+                        : IrBinaryOperator.NotEqual;
+                    return LoweredExpression.Exact(_owner._factory.Binary(
+                        kind, value.Term, _owner._factory.Null(value.Term.Type)));
+                }
+                catch (ArgumentException) {
+                    return OpaqueBinary(operation, FrontendAbstention.UnsupportedType);
+                }
+            }
+            if (!CSharpScalarSemantics.SupportsBuiltInOperands(
                     operation.OperatorKind,
                     operation.LeftOperand.Type,
                     operation.RightOperand.Type))
@@ -385,26 +432,22 @@ public sealed class RoslynOperationLowerer {
             if (!left.Classification.IsExact || !right.Classification.IsExact)
                 return OpaqueBinary(operation, FirstAbstention(left, right));
 
-            var mapped = RoslynOperatorSemantics.MapBinary(
-                operation.OperatorKind,
+            var mapped = CSharpScalarSemantics.MapBinary(operation.OperatorKind,
                 operation.Type?.SpecialType ?? SpecialType.None);
             if (!mapped.HasValue)
-                return OpaqueBinary(
-                    operation, FrontendAbstention.UnsupportedOperationKind);
+                return OpaqueBinary(operation, FrontendAbstention.UnsupportedOperationKind);
             if (mapped.Value != IrBinaryOperator.StringConcat &&
-                RoslynOperatorSemantics.IsIntegerArithmetic(
-                    operation.OperatorKind) &&
-                operation.Type?.SpecialType != SpecialType.System_Int64)
+                CSharpScalarSemantics.IsIntegerArithmetic(operation.OperatorKind) &&
+                !CSharpScalarSemantics.SupportsExactIntegerIrArithmetic(
+                    operation.Type?.SpecialType ?? SpecialType.None))
                 return OpaqueBinary(operation, FrontendAbstention.UnsupportedType);
             if (mapped.Value != IrBinaryOperator.StringConcat &&
-                RoslynOperatorSemantics.RequiresCheckedArithmetic(
-                    operation.OperatorKind) &&
+                CSharpScalarSemantics.RequiresCheckedArithmetic(operation.OperatorKind) &&
                 !operation.IsChecked)
-                return OpaqueBinary(
-                    operation, FrontendAbstention.UncheckedOverflowSemantics);
+                return OpaqueBinary(operation, FrontendAbstention.UncheckedOverflowSemantics);
             try {
-                return LoweredExpression.Exact(
-                    _owner._factory.Binary(mapped.Value, left.Term, right.Term));
+                return LoweredExpression.Exact(_owner._factory.Binary(
+                    mapped.Value, left.Term, right.Term));
             }
             catch (ArgumentException) {
                 return OpaqueBinary(operation, FrontendAbstention.UnsupportedType);
@@ -414,44 +457,35 @@ public sealed class RoslynOperationLowerer {
         public override LoweredExpression VisitConditional(
             IConditionalOperation operation, LoweringContext argument) {
             if (operation.WhenFalse == null)
-                return _owner.Opaque(
-                    operation,
-                    FrontendAbstention.UnsupportedOperationKind);
+                return _owner.Opaque(operation, FrontendAbstention.UnsupportedOperationKind);
             var condition = _owner.LowerCore(operation.Condition);
             if (condition.Term is IrBooleanTerm constant)
-                return _owner.LowerCore(
-                    constant.Value ? operation.WhenTrue : operation.WhenFalse);
+                return _owner.LowerCore(constant.Value
+                    ? operation.WhenTrue : operation.WhenFalse);
             var whenTrue = _owner.LowerCore(operation.WhenTrue);
             var whenFalse = _owner.LowerCore(operation.WhenFalse);
             if (!condition.Classification.IsExact ||
                 !whenTrue.Classification.IsExact ||
                 !whenFalse.Classification.IsExact)
-                return OpaqueConditional(
-                    operation, FirstAbstention(condition, whenTrue, whenFalse));
+                return OpaqueConditional(operation,
+                    FirstAbstention(condition, whenTrue, whenFalse));
             try {
-                return LoweredExpression.Exact(
-                    _owner._factory.Conditional(
-                        condition.Term,
-                        whenTrue.Term,
-                        whenFalse.Term));
+                return LoweredExpression.Exact(_owner._factory.Conditional(
+                    condition.Term, whenTrue.Term, whenFalse.Term));
             }
             catch (ArgumentException) {
-                return OpaqueConditional(
-                    operation, FrontendAbstention.UnsupportedType);
+                return OpaqueConditional(operation, FrontendAbstention.UnsupportedType);
             }
         }
 
         public override LoweredExpression VisitConversion(
             IConversionOperation operation, LoweringContext argument) {
             if (operation.OperatorMethod != null)
-                return OpaqueOperand(
-                    operation, operation.Operand,
-                    FrontendAbstention.UserDefinedOperator,
-                    operation.OperatorMethod);
+                return OpaqueOperand(operation, operation.Operand,
+                    FrontendAbstention.UserDefinedOperator, operation.OperatorMethod);
             var operand = _owner.LowerCore(operation.Operand);
             if (!operand.Classification.IsExact)
-                return OpaqueOperand(
-                    operation, operation.Operand,
+                return OpaqueOperand(operation, operation.Operand,
                     operand.Classification.Abstention);
             var target = _owner.GetTypeId(operation.Type);
             if (SymbolEqualityComparer.Default.Equals(
@@ -459,8 +493,7 @@ public sealed class RoslynOperationLowerer {
                     operation.Type))
                 return operand;
             if (target == operand.Term.Type &&
-                RoslynOperatorSemantics.IsValuePreservingIntegerConversion(
-                    operation.Operand.Type?.SpecialType ?? SpecialType.None,
+                CSharpScalarSemantics.IsValuePreservingIntegerConversion(operation.Operand.Type?.SpecialType ?? SpecialType.None,
                     operation.Type?.SpecialType ?? SpecialType.None))
                 return operand;
             if (operation.Operand.ConstantValue.HasValue)
@@ -468,12 +501,9 @@ public sealed class RoslynOperationLowerer {
             if (!operation.IsTryCast &&
                 operation.Conversion.IsReference &&
                 operation.Type?.SpecialType == SpecialType.System_String &&
-                _owner._factory.GetTypeInfo(operand.Term.Type).Kind ==
-                    IrTypeKind.Reference)
-                return LoweredExpression.Exact(
-                    _owner._factory.Cast(target, operand.Term));
-            return OpaqueOperand(
-                operation, operation.Operand,
+                _owner._factory.GetTypeInfo(operand.Term.Type).Kind == IrTypeKind.Reference)
+                return LoweredExpression.Exact(_owner._factory.Cast(target, operand.Term));
+            return OpaqueOperand(operation, operation.Operand,
                 FrontendAbstention.ConversionMayChangeValue);
         }
 
@@ -481,20 +511,16 @@ public sealed class RoslynOperationLowerer {
             IIsNullOperation operation, LoweringContext argument) {
             var operand = _owner.LowerCore(operation.Operand);
             if (!operand.Classification.IsExact)
-                return OpaqueOperand(
-                    operation, operation.Operand,
+                return OpaqueOperand(operation, operation.Operand,
                     operand.Classification.Abstention);
             var type = _owner._factory.GetTypeInfo(operand.Term.Type);
             if (type.Kind is not (
                 IrTypeKind.String or IrTypeKind.Reference or IrTypeKind.Sequence))
-                return OpaqueOperand(
-                    operation, operation.Operand,
+                return OpaqueOperand(operation, operation.Operand,
                     FrontendAbstention.UnsupportedType);
-            return LoweredExpression.Exact(
-                _owner._factory.Binary(
-                    IrBinaryOperator.Equal,
-                    operand.Term,
-                    _owner._factory.Null(operand.Term.Type)));
+            return LoweredExpression.Exact(_owner._factory.Binary(
+                IrBinaryOperator.Equal, operand.Term,
+                _owner._factory.Null(operand.Term.Type)));
         }
 
         public override LoweredExpression VisitPropertyReference(
@@ -502,17 +528,11 @@ public sealed class RoslynOperationLowerer {
             if (IsIntrinsicLength(operation)) {
                 var instance = _owner.LowerCore(operation.Instance!);
                 if (!instance.Classification.IsExact)
-                    return _owner.Opaque(
-                        operation,
-                        instance.Classification.Abstention,
-                        operation.Property,
-                        operation.Instance,
-                        []);
-                return LoweredExpression.Exact(
-                    _owner._factory.Length(instance.Term));
+                    return _owner.Opaque(operation, instance.Classification.Abstention,
+                        operation.Property, operation.Instance, []);
+                return LoweredExpression.Exact(_owner._factory.Length(instance.Term));
             }
-            return _owner.Opaque(
-                operation, FrontendAbstention.UnsupportedMemberAccess,
+            return _owner.Opaque(operation, FrontendAbstention.UnsupportedMemberAccess,
                 operation.Property, operation.Instance,
                 operation.Arguments.Select(static value => value.Value));
         }
@@ -520,26 +540,23 @@ public sealed class RoslynOperationLowerer {
         public override LoweredExpression VisitArrayElementReference(
             IArrayElementReferenceOperation operation, LoweringContext argument) {
             if (operation.Indices.Length != 1)
-                return OpaqueElement(
-                    operation, FrontendAbstention.UnsupportedMemberAccess);
+                return OpaqueElement(operation, FrontendAbstention.UnsupportedMemberAccess);
             var array = _owner.LowerCore(operation.ArrayReference);
             var index = _owner.LowerCore(operation.Indices[0]);
             if (!array.Classification.IsExact || !index.Classification.IsExact)
                 return OpaqueElement(operation, FirstAbstention(array, index));
             try {
-                return LoweredExpression.Exact(
-                    _owner._factory.SequenceAccess(array.Term, index.Term));
+                return LoweredExpression.Exact(_owner._factory.SequenceAccess(
+                    array.Term, index.Term));
             }
             catch (ArgumentException) {
-                return OpaqueElement(
-                    operation, FrontendAbstention.UnsupportedType);
+                return OpaqueElement(operation, FrontendAbstention.UnsupportedType);
             }
         }
 
         public override LoweredExpression VisitInvocation(
             IInvocationOperation operation, LoweringContext argument) =>
-            _owner.Opaque(
-                operation, FrontendAbstention.UnsupportedInvocationShape,
+            _owner.Opaque(operation, FrontendAbstention.UnsupportedInvocationShape,
                 operation.TargetMethod, operation.Instance,
                 operation.Arguments.Select(static value => value.Value));
 
@@ -554,22 +571,18 @@ public sealed class RoslynOperationLowerer {
             IOperation operand,
             FrontendAbstention abstention,
             ISymbol? symbol = null) =>
-            _owner.Opaque(
-                operation, abstention, symbol, arguments: [operand]);
+            _owner.Opaque(operation, abstention, symbol, arguments: [operand]);
 
         private LoweredExpression OpaqueConditional(
             IConditionalOperation operation,
             FrontendAbstention abstention) =>
-            _owner.Opaque(
-                operation, abstention,
-                arguments:
-                [operation.Condition, operation.WhenTrue, operation.WhenFalse!]);
+            _owner.Opaque(operation, abstention,
+                arguments: [operation.Condition, operation.WhenTrue, operation.WhenFalse!]);
 
         private LoweredExpression OpaqueElement(
             IArrayElementReferenceOperation operation,
             FrontendAbstention abstention) =>
-            _owner.Opaque(
-                operation, abstention, receiver: operation.ArrayReference,
+            _owner.Opaque(operation, abstention, receiver: operation.ArrayReference,
                 arguments: operation.Indices);
 
         private LoweredExpression OpaqueBinary(

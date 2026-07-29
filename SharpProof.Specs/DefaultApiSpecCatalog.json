@@ -1,0 +1,652 @@
+{
+  "schema": "SharpProof.ApiSpecCatalog",
+  "schemaVersion": 1,
+  "tableIdentity": "SharpProof.ApiSpec.Default",
+  "tableVersion": "3",
+  "assemblySets": [
+    {
+      "id": "framework",
+      "identities": [
+        {
+          "name": "System.Private.CoreLib",
+          "publicKeyToken": "7cec85d7bea7798e",
+          "referenceFamilies": ["MicrosoftNetCoreRuntime"]
+        },
+        {
+          "name": "mscorlib",
+          "publicKeyToken": "b77a5c561934e089",
+          "referenceFamilies": ["NetFrameworkReferenceAssemblies", "MicrosoftNetCoreReferencePack", "NetStandardReferencePack"]
+        },
+        {
+          "name": "System.Runtime",
+          "publicKeyToken": "b03f5f7f11d50a3a",
+          "referenceFamilies": ["NetFrameworkReferenceAssemblies", "MicrosoftNetCoreReferencePack", "NetStandardReferencePack"]
+        },
+        {
+          "name": "netstandard",
+          "publicKeyToken": "cc7b13ffcd2ddd51",
+          "referenceFamilies": ["MicrosoftNetCoreReferencePack", "NetStandardReferencePack"]
+        },
+        {
+          "name": "System.Collections",
+          "publicKeyToken": "b03f5f7f11d50a3a",
+          "referenceFamilies": ["NetFrameworkReferenceAssemblies", "MicrosoftNetCoreReferencePack", "NetStandardReferencePack"]
+        },
+        {
+          "name": "System.Linq",
+          "publicKeyToken": "b03f5f7f11d50a3a",
+          "referenceFamilies": ["NetFrameworkReferenceAssemblies", "MicrosoftNetCoreReferencePack", "NetStandardReferencePack", "MicrosoftNetCoreRuntime"]
+        },
+        {
+          "name": "System.Core",
+          "publicKeyToken": "b77a5c561934e089",
+          "referenceFamilies": ["NetFrameworkReferenceAssemblies", "MicrosoftNetCoreReferencePack", "NetStandardReferencePack"]
+        }
+      ]
+    },
+    {
+      "id": "sharpProofAttributes",
+      "identities": [
+        {
+          "name": "SharpProof.Attributes",
+          "publicKeyToken": "",
+          "referenceFamilies": ["SharpProofPackage"]
+        }
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "contractSemantics",
+      "kind": "Documented",
+      "source": "sharpproof-compiler-bound-ghost-contract"
+    },
+    {
+      "id": "documented",
+      "kind": "Documented",
+      "source": "dotnet-api-contract"
+    },
+    {
+      "id": "observed",
+      "kind": "Observed",
+      "source": "supported-runtime-observation"
+    },
+    {
+      "id": "typeInitialization",
+      "kind": "Documented",
+      "source": "dotnet-generic-cache-type-initialization-boundary"
+    }
+  ],
+  "declarations": [
+    {
+      "target": {
+        "witnessIdentifier": "bcl.array.empty",
+        "documentationCommentId": "M:System.Array.Empty``1",
+        "containingTypeMetadataName": "System.Array",
+        "memberKind": "Method",
+        "memberName": "Empty",
+        "isStatic": true,
+        "genericArity": 1,
+        "receiverType": null,
+        "parameterTypes": [],
+        "resultType": "Sequence",
+        "approvedAssemblySet": "framework"
+      },
+      "facets": {
+        "effects": {
+          "values": [
+            "Unknown"
+          ],
+          "evidence": "typeInitialization"
+        },
+        "allocation": {
+          "behavior": "Unknown",
+          "evidence": "observed"
+        },
+        "throws": {
+          "behavior": "DoesNotThrow",
+          "exceptionMetadataNames": [],
+          "evidence": "documented"
+        },
+        "nullness": {
+          "result": "NonNull",
+          "evidence": "documented"
+        },
+        "cardinality": {
+          "result": "Empty",
+          "exactCount": null,
+          "evidence": "documented"
+        }
+      },
+      "postconditions": []
+    },
+    {
+      "target": {
+        "witnessIdentifier": "bcl.enumerable.empty",
+        "documentationCommentId": "M:System.Linq.Enumerable.Empty``1",
+        "containingTypeMetadataName": "System.Linq.Enumerable",
+        "memberKind": "Method",
+        "memberName": "Empty",
+        "isStatic": true,
+        "genericArity": 1,
+        "receiverType": null,
+        "parameterTypes": [],
+        "resultType": "Sequence",
+        "approvedAssemblySet": "framework"
+      },
+      "facets": {
+        "effects": {
+          "values": [
+            "Unknown"
+          ],
+          "evidence": "typeInitialization"
+        },
+        "allocation": {
+          "behavior": "Unknown",
+          "evidence": "observed"
+        },
+        "throws": {
+          "behavior": "DoesNotThrow",
+          "exceptionMetadataNames": [],
+          "evidence": "observed"
+        },
+        "nullness": {
+          "result": "NonNull",
+          "evidence": "documented"
+        },
+        "cardinality": {
+          "result": "Empty",
+          "exactCount": null,
+          "evidence": "documented"
+        }
+      },
+      "postconditions": []
+    },
+    {
+      "target": {
+        "witnessIdentifier": "bcl.list.add",
+        "documentationCommentId": "M:System.Collections.Generic.List`1.Add(`0)",
+        "containingTypeMetadataName": "System.Collections.Generic.List`1",
+        "memberKind": "Method",
+        "memberName": "Add",
+        "isStatic": false,
+        "genericArity": 0,
+        "receiverType": "Reference",
+        "parameterTypes": [
+          "Reference"
+        ],
+        "resultType": null,
+        "approvedAssemblySet": "framework"
+      },
+      "facets": {
+        "effects": {
+          "values": [
+            "WritesReceiverState"
+          ],
+          "evidence": "documented"
+        },
+        "allocation": {
+          "behavior": "MayAllocate",
+          "evidence": "observed"
+        },
+        "throws": {
+          "behavior": "Unknown",
+          "exceptionMetadataNames": [],
+          "evidence": "documented"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "documented"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "documented"
+        }
+      },
+      "postconditions": []
+    },
+    {
+      "target": {
+        "witnessIdentifier": "bcl.math.abs.int32",
+        "documentationCommentId": "M:System.Math.Abs(System.Int32)",
+        "containingTypeMetadataName": "System.Math",
+        "memberKind": "Method",
+        "memberName": "Abs",
+        "isStatic": true,
+        "genericArity": 0,
+        "receiverType": null,
+        "parameterTypes": [
+          "Integer"
+        ],
+        "resultType": "Integer",
+        "approvedAssemblySet": "framework"
+      },
+      "facets": {
+        "effects": {
+          "values": [
+            "None"
+          ],
+          "evidence": "observed"
+        },
+        "allocation": {
+          "behavior": "None",
+          "evidence": "observed"
+        },
+        "throws": {
+          "behavior": "MayThrow",
+          "exceptionMetadataNames": [
+            "System.OverflowException"
+          ],
+          "evidence": "documented"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "documented"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "documented"
+        }
+      },
+      "postconditions": [
+        {
+          "condition": {
+            "kind": "binary",
+            "operator": "GreaterThanOrEqual",
+            "type": "Boolean",
+            "left": {
+              "kind": "variable",
+              "role": "Result",
+              "ordinal": -1,
+              "type": "Integer"
+            },
+            "right": {
+              "kind": "integer",
+              "value": 0,
+              "type": "Integer"
+            }
+          },
+          "evidence": "documented"
+        }
+      ]
+    },
+    {
+      "target": {
+        "witnessIdentifier": "bcl.object.ctor",
+        "documentationCommentId": "M:System.Object.#ctor",
+        "containingTypeMetadataName": "System.Object",
+        "memberKind": "Constructor",
+        "memberName": ".ctor",
+        "isStatic": false,
+        "genericArity": 0,
+        "receiverType": "Reference",
+        "parameterTypes": [],
+        "resultType": null,
+        "approvedAssemblySet": "framework"
+      },
+      "facets": {
+        "effects": {
+          "values": [
+            "None"
+          ],
+          "evidence": "observed"
+        },
+        "allocation": {
+          "behavior": "None",
+          "evidence": "observed"
+        },
+        "throws": {
+          "behavior": "DoesNotThrow",
+          "exceptionMetadataNames": [],
+          "evidence": "observed"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "documented"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "documented"
+        }
+      },
+      "postconditions": []
+    },
+    {
+      "target": {
+        "witnessIdentifier": "bcl.string.concat.string-string",
+        "documentationCommentId": "M:System.String.Concat(System.String,System.String)",
+        "containingTypeMetadataName": "System.String",
+        "memberKind": "Method",
+        "memberName": "Concat",
+        "isStatic": true,
+        "genericArity": 0,
+        "receiverType": null,
+        "parameterTypes": [
+          "String",
+          "String"
+        ],
+        "resultType": "String",
+        "approvedAssemblySet": "framework"
+      },
+      "facets": {
+        "effects": {
+          "values": [
+            "None"
+          ],
+          "evidence": "observed"
+        },
+        "allocation": {
+          "behavior": "MayAllocate",
+          "evidence": "documented"
+        },
+        "throws": {
+          "behavior": "DoesNotThrow",
+          "exceptionMetadataNames": [],
+          "evidence": "documented"
+        },
+        "nullness": {
+          "result": "NonNull",
+          "evidence": "documented"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "documented"
+        }
+      },
+      "postconditions": []
+    },
+    {
+      "target": {
+        "witnessIdentifier": "bcl.string.length",
+        "documentationCommentId": "P:System.String.Length",
+        "containingTypeMetadataName": "System.String",
+        "memberKind": "PropertyGet",
+        "memberName": "Length",
+        "isStatic": false,
+        "genericArity": 0,
+        "receiverType": "String",
+        "parameterTypes": [],
+        "resultType": "Integer",
+        "approvedAssemblySet": "framework"
+      },
+      "facets": {
+        "effects": {
+          "values": [
+            "ReadsReceiverState"
+          ],
+          "evidence": "documented"
+        },
+        "allocation": {
+          "behavior": "None",
+          "evidence": "observed"
+        },
+        "throws": {
+          "behavior": "DoesNotThrow",
+          "exceptionMetadataNames": [],
+          "evidence": "observed"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "documented"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "documented"
+        }
+      },
+      "postconditions": [
+        {
+          "condition": {
+            "kind": "binary",
+            "operator": "Equal",
+            "type": "Boolean",
+            "left": {
+              "kind": "variable",
+              "role": "Result",
+              "ordinal": -1,
+              "type": "Integer"
+            },
+            "right": {
+              "kind": "length",
+              "type": "Integer",
+              "value": {
+                "kind": "variable",
+                "role": "Receiver",
+                "ordinal": -1,
+                "type": "String"
+              }
+            }
+          },
+          "evidence": "documented"
+        }
+      ]
+    },
+    {
+      "target": {
+        "witnessIdentifier": "contract.assume",
+        "documentationCommentId": "M:SharpProof.Attributes.Contract.Assume(System.Boolean)",
+        "containingTypeMetadataName": "SharpProof.Attributes.Contract",
+        "memberKind": "Method",
+        "memberName": "Assume",
+        "isStatic": true,
+        "genericArity": 0,
+        "receiverType": null,
+        "parameterTypes": [
+          "Boolean"
+        ],
+        "resultType": null,
+        "approvedAssemblySet": "sharpProofAttributes"
+      },
+      "facets": {
+        "effects": {
+          "values": [
+            "None"
+          ],
+          "evidence": "contractSemantics"
+        },
+        "allocation": {
+          "behavior": "None",
+          "evidence": "contractSemantics"
+        },
+        "throws": {
+          "behavior": "DoesNotThrow",
+          "exceptionMetadataNames": [],
+          "evidence": "contractSemantics"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "contractSemantics"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "contractSemantics"
+        }
+      },
+      "postconditions": []
+    },
+    {
+      "target": {
+        "witnessIdentifier": "contract.ensures",
+        "documentationCommentId": "M:SharpProof.Attributes.Contract.Ensures(System.Boolean)",
+        "containingTypeMetadataName": "SharpProof.Attributes.Contract",
+        "memberKind": "Method",
+        "memberName": "Ensures",
+        "isStatic": true,
+        "genericArity": 0,
+        "receiverType": null,
+        "parameterTypes": [
+          "Boolean"
+        ],
+        "resultType": null,
+        "approvedAssemblySet": "sharpProofAttributes"
+      },
+      "facets": {
+        "effects": {
+          "values": [
+            "None"
+          ],
+          "evidence": "contractSemantics"
+        },
+        "allocation": {
+          "behavior": "None",
+          "evidence": "contractSemantics"
+        },
+        "throws": {
+          "behavior": "DoesNotThrow",
+          "exceptionMetadataNames": [],
+          "evidence": "contractSemantics"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "contractSemantics"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "contractSemantics"
+        }
+      },
+      "postconditions": []
+    },
+    {
+      "target": {
+        "witnessIdentifier": "contract.old",
+        "documentationCommentId": "M:SharpProof.Attributes.Contract.Old``1(``0)",
+        "containingTypeMetadataName": "SharpProof.Attributes.Contract",
+        "memberKind": "Method",
+        "memberName": "Old",
+        "isStatic": true,
+        "genericArity": 1,
+        "receiverType": null,
+        "parameterTypes": [
+          "Reference"
+        ],
+        "resultType": "Reference",
+        "approvedAssemblySet": "sharpProofAttributes"
+      },
+      "facets": {
+        "effects": {
+          "values": [
+            "None"
+          ],
+          "evidence": "contractSemantics"
+        },
+        "allocation": {
+          "behavior": "MayAllocate",
+          "evidence": "contractSemantics"
+        },
+        "throws": {
+          "behavior": "MayThrow",
+          "exceptionMetadataNames": [
+            "System.InvalidOperationException"
+          ],
+          "evidence": "contractSemantics"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "contractSemantics"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "contractSemantics"
+        }
+      },
+      "postconditions": []
+    },
+    {
+      "target": {
+        "witnessIdentifier": "contract.requires",
+        "documentationCommentId": "M:SharpProof.Attributes.Contract.Requires(System.Boolean)",
+        "containingTypeMetadataName": "SharpProof.Attributes.Contract",
+        "memberKind": "Method",
+        "memberName": "Requires",
+        "isStatic": true,
+        "genericArity": 0,
+        "receiverType": null,
+        "parameterTypes": [
+          "Boolean"
+        ],
+        "resultType": null,
+        "approvedAssemblySet": "sharpProofAttributes"
+      },
+      "facets": {
+        "effects": {
+          "values": [
+            "None"
+          ],
+          "evidence": "contractSemantics"
+        },
+        "allocation": {
+          "behavior": "None",
+          "evidence": "contractSemantics"
+        },
+        "throws": {
+          "behavior": "DoesNotThrow",
+          "exceptionMetadataNames": [],
+          "evidence": "contractSemantics"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "contractSemantics"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "contractSemantics"
+        }
+      },
+      "postconditions": []
+    },
+    {
+      "target": {
+        "witnessIdentifier": "contract.result",
+        "documentationCommentId": "M:SharpProof.Attributes.Contract.Result``1",
+        "containingTypeMetadataName": "SharpProof.Attributes.Contract",
+        "memberKind": "Method",
+        "memberName": "Result",
+        "isStatic": true,
+        "genericArity": 1,
+        "receiverType": null,
+        "parameterTypes": [],
+        "resultType": "Reference",
+        "approvedAssemblySet": "sharpProofAttributes"
+      },
+      "facets": {
+        "effects": {
+          "values": [
+            "None"
+          ],
+          "evidence": "contractSemantics"
+        },
+        "allocation": {
+          "behavior": "MayAllocate",
+          "evidence": "contractSemantics"
+        },
+        "throws": {
+          "behavior": "MayThrow",
+          "exceptionMetadataNames": [
+            "System.InvalidOperationException"
+          ],
+          "evidence": "contractSemantics"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "contractSemantics"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "contractSemantics"
+        }
+      },
+      "postconditions": []
+    }
+  ]
+}

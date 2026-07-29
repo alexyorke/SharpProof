@@ -66,6 +66,92 @@ public sealed class EffectContractWireParityTests {
         }
     }
 
+    [Test]
+    public void CapabilityConversionsExhaustivelyRoundTripNamedFlags() {
+        foreach (var contract in Enum.GetValues<EffectContractCapabilityKind>()) {
+            var analysis =
+                EffectContractMappings.ToAnalysisCapabilities(contract);
+            Assert.That(
+                EffectContractMappings.ToContractCapabilities(analysis),
+                Is.EqualTo(contract),
+                contract.ToString());
+        }
+    }
+
+    [Test]
+    public void CapabilityConversionsRejectValuesOutsideTheirNamedDomain() {
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                (Action)(() => _ =
+                    EffectContractMappings.ToAnalysisCapabilities(
+                        (EffectContractCapabilityKind)(1 << 13))),
+                Throws.TypeOf<ArgumentOutOfRangeException>());
+            Assert.That(
+                (Action)(() => _ =
+                    EffectContractMappings.ToContractCapabilities(
+                        EffectCapabilityKind.Unknown)),
+                Throws.TypeOf<ArgumentOutOfRangeException>());
+        }
+    }
+
+    [TestCase(EffectRegionKind.Receiver,
+        EffectContractKind.ReadsReceiverState,
+        EffectContractKind.WritesReceiverState)]
+    [TestCase(EffectRegionKind.Parameter,
+        EffectContractKind.ReadsArgumentState,
+        EffectContractKind.WritesArgumentState)]
+    [TestCase(EffectRegionKind.Captured,
+        EffectContractKind.ReadsCapturedState,
+        EffectContractKind.WritesCapturedState)]
+    [TestCase(EffectRegionKind.Static,
+        EffectContractKind.ReadsStaticState,
+        EffectContractKind.WritesStaticState)]
+    [TestCase(EffectRegionKind.Ambient,
+        EffectContractKind.ReadsAmbientState,
+        EffectContractKind.WritesAmbientState)]
+    [TestCase(EffectRegionKind.Fresh,
+        EffectContractKind.None,
+        EffectContractKind.None)]
+    [TestCase(EffectRegionKind.Unknown,
+        EffectContractKind.None,
+        EffectContractKind.None)]
+    public void RegionProjectionUsesAnExplicitNamedMapping(
+        EffectRegionKind region,
+        EffectContractKind expectedRead,
+        EffectContractKind expectedWrite) {
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                EffectContractMappings.ToContractRegion(
+                    region,
+                    isWrite: false),
+                Is.EqualTo(expectedRead));
+            Assert.That(
+                EffectContractMappings.ToContractRegion(
+                    region,
+                    isWrite: true),
+                Is.EqualTo(expectedWrite));
+        }
+    }
+
+    [Test]
+    public void EvidenceUsesOnlyValidatedNamedEnumValues() {
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                EffectContractMappings.EvidenceName(EffectContractMetadata.AllEffects),
+                Does.Not.Match(@"^-?\d"));
+            Assert.That(
+                EffectContractMappings.EvidenceName(EffectContractMetadata.AllCapabilities),
+                Does.Not.Match(@"^-?\d"));
+            Assert.That(
+                (Action)(() => _ = EffectContractMappings.EvidenceName(
+                    (EffectAllocationKind)(1 << 2))),
+                Throws.TypeOf<ArgumentOutOfRangeException>());
+            Assert.That(
+                (Action)(() => _ = EffectContractMappings.EvidenceName(DayOfWeek.Monday)),
+                Throws.TypeOf<ArgumentOutOfRangeException>());
+        }
+    }
+
     private static Dictionary<string, long> GetNamedValues(Type enumType) =>
         Enum.GetNames(enumType).ToDictionary(
             static name => name,

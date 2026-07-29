@@ -13,8 +13,8 @@ unsupported expressions, approximate facts, and exhausted budgets remain
 
 | Surface | Runs where | Implemented behavior | Current boundary |
 |---|---|---|---|
-| Effect contracts | Analyzer with `SharpProofFeatures=effects` or `all` | Computes path-insensitive may summaries for reads, writes, allocation, capabilities, exceptions, termination, and completeness; checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, and `[AllowedExceptions]` | A possible or unresolved violation produces a not-proven diagnostic, not a definitive effect witness |
-| Call-site preconditions | Analyzer with `SharpProofFeatures=contracts` or `all` | Binds source `Contract.Requires` clauses and closed parameter attributes with compiler symbols for ordinary calls and object creation; reports only when receiver, arguments, and required prefix evaluation are exact and non-throwing and the instantiated predicate concretely evaluates to false | Unknown values and possible throws remain silent at unannotated sites; unsupported explicitly selected methods report SP0047 |
+| Effect contracts | Analyzer with `SharpProofFeatures=effects` or `all` | Runs a bounded acyclic scalar CFG pass, then computes conservative may summaries for reads, writes, allocation, capabilities, exceptions, termination, and completeness; checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, `[AllowedExceptions]`, and `[EffectContract]`; emits one accountable worker claim per selected attribute | Impossible refined branches are excluded. A loop disables scalar refinement but the conservative all-block scan can still prove effect absence. Possible effects, exhausted budgets, and unresolved boundaries remain typed `Unknown`; only the narrow independently replayed direct-witness subset can be `Refuted` |
+| Call-site preconditions | Analyzer with `SharpProofFeatures=contracts` or `all` | Binds source `Contract.Requires` clauses and closed parameter attributes with compiler symbols for ordinary calls and object creation; combines exact IR replay with compilation-scoped Boolean, nullness, interval, cardinality, return-annotation, approved API-spec result, and effect facts at definite call sites | Unknown values, possible throws, cycles, and exhausted analysis budgets do not become violations or proofs; unsupported explicitly selected methods report SP0047 |
 | Postconditions | Optional Windows x64 worker with `SharpProofFeatures=contracts` or `all`; strict enables the worker by default | Manifests `Contract.Ensures` and return attributes, including directly owned local-function, lambda, anonymous-method, and top-level claims, then proves admitted bounded obligations over normal-return paths with Boolean logic, bounded integer comparisons, checked `long` arithmetic, and replay-gated counterexamples | The additional callable forms are currently visible as `UnsupportedCallable`; `effects` excludes postcondition claims; this is bounded `Ensures` verification, not arbitrary deep, recursive, looping, heap, or sequence verification |
 | Worker body execution | Compiler collector plus opt-in Windows x64 worker | The compiler emits portable whole-body CFG/IR; the worker executes its bounded acyclic subset with locals, reassignment, branches, multiple returns, entry-state `Old`, supported expressions, and eligible resolved API specs | Loops, stateful instructions outside the narrow admitted model, unresolved calls, unsupported mutation, and exceeded bounds abstain |
 | `ContractFor` validation | Incremental generator loaded with any non-`off` profile | Validates companion type and member identity, including receiver, overload, generic constraints, ref/scoped kinds, nullability, defaults, and return shape | It validates and binds existing source; it emits no generated source and does not make an unsupported contract provable |
@@ -69,7 +69,7 @@ support.
 
 | Contract | Binding and use |
 |---|---|
-| `Contract.Requires(condition)` | A precondition. The analyzer can replay it at exact call sites. The worker can use a bound precondition as a justified entry assumption. |
+| `Contract.Requires(condition)` | A precondition. The analyzer uses exact replay or managed CFG facts at definite call sites. The worker can use a bound precondition as a justified entry assumption. |
 | `Contract.Ensures(condition)` | A normal-return postcondition and worker proof goal. The analyzer does not prove postconditions. |
 | `Contract.Assume(condition)` | Explicit user evidence. It remains visible as a user-assumed proof justification. |
 | `Contract.Result<T>()` | Valid only inside `Ensures`; substitutes the callable's normal return value. A direct runtime call throws. |
@@ -86,11 +86,11 @@ constructors:
 
 | Attribute placement | Bound clause | Current consumer |
 |---|---|---|
-| `[NotNull]` on a parameter | `parameter != null` precondition for reference, string, or sequence IR values | Analyzer call-site replay and worker entry assumptions |
+| `[NotNull]` on a parameter | `parameter != null` precondition for reference, string, or sequence IR values | Analyzer exact replay/managed facts and worker entry assumptions |
 | `[NotNull]` on a return value | `result != null` postcondition | Worker |
-| `[Positive]` on a parameter | `parameter > 0` integer precondition | Analyzer call-site replay and worker entry assumptions |
+| `[Positive]` on a parameter | `parameter > 0` integer precondition | Analyzer exact replay/managed facts and worker entry assumptions |
 | `[Positive]` on a return value | `result > 0` integer postcondition | Worker |
-| `[InRange(min, max)]` on a parameter | Inclusive integer precondition `min <= parameter && parameter <= max` | Analyzer call-site replay and worker entry assumptions |
+| `[InRange(min, max)]` on a parameter | Inclusive integer precondition `min <= parameter && parameter <= max` | Analyzer exact replay/managed facts and worker entry assumptions |
 | `[InRange(min, max)]` on a return value | Inclusive integer postcondition | Worker |
 
 Invalid value types, invalid ranges, and malformed intrinsic use make contract
@@ -102,6 +102,10 @@ removed; `[EnforcePure]` is the implemented effect contract.
 compiler-bound clauses for a target type. Instance target members use an
 explicit first receiver parameter. The generator validates exact symbol shape;
 see [Diagnostics](diagnostic-examples.md#contractfor-generator-diagnostics).
+Any valid direct target clause owns the complete clause source. When no valid
+direct clause exists, a valid companion remains usable even if the target has
+a misplaced clause. That misplaced clause is SP0024 and is omitted as a whole
+compiler-elided call, including its argument evaluation.
 
 ## Resolved API specification inventory
 
@@ -145,8 +149,10 @@ invocation; they are not BCL coverage.
 
 - `Proven` requires a hygienic core containing only lowered facts, resolved
   specs, verified contracts, or explicit user assumptions.
-- `Refuted` requires executable replay of the candidate model. The analyzer's
-  current effect may-analysis does not produce definitive effect refutations.
+- `Refuted` requires executable replay of the candidate model or independent
+  validation of a compiler-produced `DefiniteViolation` effect witness. The
+  analyzer's general effect may-analysis does not by itself produce definitive
+  effect refutations.
   The proof kernel first checks exact backend-model closure and re-evaluates
   the lowered assumptions and goal. The worker then independently executes the
   compiler-produced whole-body program along the concrete CFG path and
@@ -162,19 +168,31 @@ invocation; they are not BCL coverage.
 - `Unknown` covers unsupported, unresolved, approximate, method-time-limited,
   or resource-exhausted claim analysis. Unsupported unannotated analyzer
   callables are silent; unsupported selected callables produce SP0047.
-- Protocol version 6 binds a compiler-manifest artifact and separately records
+- Protocol version 8 binds a compiler-manifest artifact and separately records
   run status, callable coverage, and one
   outcome for each stable manifest claim ID. Exact manifest/result equality is
   mandatory.
 - The compiler artifact carries `SharpProofFeatures` as `WorkerFeatureSet`.
   `contracts` excludes effect-only annotations, `effects` excludes
   postcondition claims and contract assumptions, and `all` selects both. The
-  current worker has no effect-proof claim kind, so an effect-selected callable
-  is explicitly incomplete rather than vacuously complete.
+  compiler gives every selected effect-attribute occurrence one typed claim
+  backed by sealed compiler evidence. Repeated attributes share the effective
+  combined constraint/evidence while retaining distinct IDs and ordinals.
+- Effect evidence distinguishes complete and incomplete may-effect summaries,
+  trusted complete boundaries, definite direct violations, and unavailable
+  evidence. A disallowed effect in a may-effect summary is not a replayed
+  counterexample, so it remains `Unknown(EffectContractNotEstablished)`.
+  `Refuted` is limited to simple unconditional direct managed allocation,
+  explicit throw, receiver-field access, empty `lock`, and exact `Monitor`
+  witnesses whose structured conflict is independently checked by the worker.
+  Conditional, static-initialization-sensitive, and may-only conflicts remain
+  `Unknown`.
+- Proven postconditions expose `ContradictoryPreconditions` or
+  `NoModeledNormalReturn` vacuity evidence in JSON, cache payloads, and SARIF.
 - Caller cancellation is run status `Canceled`, project timeout is
   `TimedOut`, and infrastructure/protocol/backend/replay failure is `Failed`.
   None is a successful claim outcome.
-- Cache schema version 7 stores only complete validated payloads. Cache reads
+- Cache schema version 9 stores only complete validated payloads. Cache reads
   are checked against the entire current manifest. Unknown, cancellation,
   timeout, malformed result, infrastructure failure, and failed replay are not
   semantic cache entries. `require-proven` disables the local semantic cache.
@@ -185,7 +203,7 @@ invocation; they are not BCL coverage.
 ## Closed compiler artifact and remaining limits
 
 During Windows verification, the production analyzer captures compiler
-artifact schema version 3 from the post-generator compilation. The artifact
+artifact schema version 5 from the post-generator compilation. The artifact
 contains:
 
 - the feature-selected, sealed claim manifest;

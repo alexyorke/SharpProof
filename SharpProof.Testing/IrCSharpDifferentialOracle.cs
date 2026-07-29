@@ -289,14 +289,14 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
         IDictionary<IrValue, object?> converted) {
         if (converted.TryGetValue(value, out var existing)) return existing;
         var runtimeValue = value.Kind switch {
-        IrValueKind.Boolean => value.Boolean,
-        IrValueKind.Integer => value.Integer,
-        IrValueKind.String => value.String,
-        IrValueKind.Null => null,
-        IrValueKind.Reference => value.Reference,
-        IrValueKind.Sequence => ToRuntimeArray(value, converted),
-        _ => throw new InvalidOperationException(
-            "The concrete value is outside the executable oracle subset.")
+            IrValueKind.Boolean => value.Boolean,
+            IrValueKind.Integer => value.Integer,
+            IrValueKind.String => value.String,
+            IrValueKind.Null => null,
+            IrValueKind.Reference => value.Reference,
+            IrValueKind.Sequence => ToRuntimeArray(value, converted),
+            _ => throw new InvalidOperationException(
+                "The concrete value is outside the executable oracle subset.")
         };
         converted[value] = runtimeValue;
         return runtimeValue;

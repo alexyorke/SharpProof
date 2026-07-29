@@ -31,7 +31,92 @@ public sealed class ApiSpecTests {
             Assert.That(firstA.Parameters.Single().Value, Is.Zero);
             Assert.That(firstA.Result!.Value.Value, Is.EqualTo(1));
             Assert.That(firstA.Parameters.Single().Spec, Is.EqualTo(firstA.Id));
+            Assert.That(first.ContentSha256, Is.EqualTo(second.ContentSha256));
+            Assert.That(first.ContentSha256, Does.Match("^[0-9a-f]{64}$"));
         });
+    }
+
+    [Test]
+    public void ContentDigestCoversTrustedAssemblyIdentity() {
+        var declaration = Declaration("row", "M:Missing.Row.Run", "Missing.Row");
+        var changed = declaration with {
+            Target = declaration.Target with {
+                ApprovedAssemblies = [new ApiSpecAssemblyIdentity("Different", string.Empty)]
+            }
+        };
+
+        Assert.That(
+            ApiSpecTable.Create([declaration]).ContentSha256,
+            Is.Not.EqualTo(ApiSpecTable.Create([changed]).ContentSha256));
+
+        changed = declaration with {
+            Target = declaration.Target with {
+                ApprovedAssemblies = [
+                    RuntimeAssemblyIdentity() with {
+                        ReferenceFamily =
+                            ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack
+                    }
+                ]
+            }
+        };
+        Assert.That(
+            ApiSpecTable.Create([declaration]).ContentSha256,
+            Is.Not.EqualTo(ApiSpecTable.Create([changed]).ContentSha256));
+    }
+
+    [Test]
+    public void ApprovedReferenceFamiliesMustBeDefined() {
+        var declaration = Declaration("row", "M:Missing.Row.Run", "Missing.Row");
+        declaration = declaration with {
+            Target = declaration.Target with {
+                ApprovedAssemblies = [
+                    RuntimeAssemblyIdentity() with {
+                        ReferenceFamily = (ApiSpecReferenceFamily)int.MaxValue
+                    }
+                ]
+            }
+        };
+
+        Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([declaration]));
+    }
+
+    [Test]
+    public void DefaultBclCatalogApprovesOnlyObservedFrameworkIdentities() {
+        var expected = new[] {
+            "System.Collections|b03f5f7f11d50a3a|MicrosoftNetCoreReferencePack",
+            "System.Collections|b03f5f7f11d50a3a|NetFrameworkReferenceAssemblies",
+            "System.Collections|b03f5f7f11d50a3a|NetStandardReferencePack",
+            "System.Core|b77a5c561934e089|MicrosoftNetCoreReferencePack",
+            "System.Core|b77a5c561934e089|NetFrameworkReferenceAssemblies",
+            "System.Core|b77a5c561934e089|NetStandardReferencePack",
+            "System.Linq|b03f5f7f11d50a3a|MicrosoftNetCoreReferencePack",
+            "System.Linq|b03f5f7f11d50a3a|MicrosoftNetCoreRuntime",
+            "System.Linq|b03f5f7f11d50a3a|NetFrameworkReferenceAssemblies",
+            "System.Linq|b03f5f7f11d50a3a|NetStandardReferencePack",
+            "System.Private.CoreLib|7cec85d7bea7798e|MicrosoftNetCoreRuntime",
+            "System.Runtime|b03f5f7f11d50a3a|MicrosoftNetCoreReferencePack",
+            "System.Runtime|b03f5f7f11d50a3a|NetFrameworkReferenceAssemblies",
+            "System.Runtime|b03f5f7f11d50a3a|NetStandardReferencePack",
+            "mscorlib|b77a5c561934e089|MicrosoftNetCoreReferencePack",
+            "mscorlib|b77a5c561934e089|NetFrameworkReferenceAssemblies",
+            "mscorlib|b77a5c561934e089|NetStandardReferencePack",
+            "netstandard|cc7b13ffcd2ddd51|MicrosoftNetCoreReferencePack",
+            "netstandard|cc7b13ffcd2ddd51|NetStandardReferencePack"
+        };
+
+        foreach (var template in ApiSpecTable.Default.Templates.Where(
+                     static value => value.Target.WitnessIdentifier.StartsWith(
+                         "bcl.",
+                         StringComparison.Ordinal))) {
+            Assert.That(
+                template.Target.ApprovedAssemblies
+                    .Select(static value =>
+                        value.Name + "|" + value.PublicKeyToken + "|" +
+                        value.ReferenceFamily)
+                    .OrderBy(static value => value, StringComparer.Ordinal),
+                Is.EqualTo(expected),
+                template.Target.WitnessIdentifier);
+        }
     }
 
     [Test]
@@ -169,6 +254,157 @@ public sealed class ApiSpecTests {
                 resolved.Failures.Single().Kind,
                 Is.EqualTo(ApiSpecResolutionFailureKind.AmbiguousContainingType));
         });
+    }
+
+    [Test]
+    public void ResolverRejectsATypeFromAnUnapprovedAssemblyIdentity() {
+        var reference = CreateReference(
+            "UnapprovedApi",
+            "namespace Trusted { public static class Widget { public static int Run(int value) => value; } }");
+        var compilation = CSharpCompilation.Create(
+            "IdentityConsumer",
+            references: [CoreReference, reference],
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var declaration = Declaration(
+            "trusted-row",
+            "M:Trusted.Widget.Run(System.Int32)",
+            "Trusted.Widget",
+            approvedAssemblies: [new ApiSpecAssemblyIdentity("ApprovedApi", string.Empty)]);
+
+        var resolved = new ApiSpecResolver(ApiSpecTable.Create([declaration]))
+            .Resolve(compilation);
+
+        Assert.Multiple(() => {
+            Assert.That(resolved.Specs, Is.Empty);
+            Assert.That(
+                resolved.Failures.Single().Kind,
+                Is.EqualTo(ApiSpecResolutionFailureKind.UnapprovedContainingAssembly));
+        });
+    }
+
+    [Test]
+    public void ResolverRejectsAnApprovedIdentityFromAnUnapprovedReferenceFamily() {
+        var reference = CreateReference(
+            "ApprovedApi",
+            "namespace Trusted { public static class Widget { public static int Run(int value) => value; } }");
+        var compilation = CSharpCompilation.Create(
+            "FamilyConsumer",
+            references: [CoreReference, reference],
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var declaration = Declaration(
+            "trusted-row",
+            "M:Trusted.Widget.Run(System.Int32)",
+            "Trusted.Widget",
+            approvedAssemblies: [
+                new ApiSpecAssemblyIdentity(
+                    "ApprovedApi",
+                    string.Empty,
+                    ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack)
+            ]);
+
+        var resolved = new ApiSpecResolver(ApiSpecTable.Create([declaration]))
+            .Resolve(compilation);
+
+        Assert.Multiple(() => {
+            Assert.That(resolved.Specs, Is.Empty);
+            Assert.That(
+                resolved.Failures.Single().Kind,
+                Is.EqualTo(ApiSpecResolutionFailureKind.UnapprovedReferenceFamily));
+        });
+    }
+
+    [Test]
+    public void ResolverRejectsARuntimeAssemblyCopiedIntoAReferencePackPath() {
+        var root = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "packs",
+            "Microsoft.NETCore.App.Ref",
+            Guid.NewGuid().ToString("N"));
+        var referenceDirectory = Path.Combine(root, "ref", "net8.0");
+        Directory.CreateDirectory(referenceDirectory);
+        var path = Path.Combine(referenceDirectory, "System.Private.CoreLib.dll");
+        File.Copy(typeof(object).Assembly.Location, path);
+        try {
+            var compilation = CSharpCompilation.Create(
+                "SpoofedReferenceFamily",
+                references: [MetadataReference.CreateFromFile(path)],
+                options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var declaration = Declaration(
+                "spoofed-reference-family",
+                "M:System.Math.Abs(System.Int32)",
+                "System.Math",
+                memberName: "Abs",
+                approvedAssemblies: [
+                    RuntimeAssemblyIdentity() with {
+                        ReferenceFamily =
+                            ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack
+                    }
+                ]);
+
+            var resolved = new ApiSpecResolver(ApiSpecTable.Create([declaration]))
+                .Resolve(compilation);
+
+            Assert.Multiple(() => {
+                Assert.That(resolved.Specs, Is.Empty);
+                Assert.That(
+                    resolved.Failures.Single().Kind,
+                    Is.EqualTo(ApiSpecResolutionFailureKind.UnapprovedReferenceFamily));
+            });
+        }
+        finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public void TrustedPostconditionsMustBeTotalUnderNormalReturnFacts() {
+        var evidence = new SpecEvidence(SpecEvidenceKind.Documented, "totality-test");
+        var parameter = new SpecVariableDeclaration(
+            SpecVariableRole.Parameter, 0, SpecValueType.Integer);
+        var result = new SpecVariableDeclaration(
+            SpecVariableRole.Result, -1, SpecValueType.Integer);
+        var partial = new SpecBinaryDeclaration(
+            SpecBinaryOperator.Equal,
+            result,
+            new SpecBinaryDeclaration(
+                SpecBinaryOperator.Add,
+                parameter,
+                new SpecIntegerDeclaration(1),
+                SpecValueType.Integer),
+            SpecValueType.Boolean);
+        var declaration = Declaration("partial", "M:Missing.Partial.Run(System.Int32)", "Missing.Partial")
+            with { Postconditions = [new SpecPostconditionDeclaration(partial, evidence)] };
+
+        var exception = Assert.Throws<ArgumentException>(() =>
+            ApiSpecTable.Create([declaration]));
+
+        Assert.That(exception!.Message, Does.Contain("must be total"));
+    }
+
+    [Test]
+    public void ConstantArithmeticPostconditionsAreAcceptedOnlyWhenDefined() {
+        var evidence = new SpecEvidence(SpecEvidenceKind.Documented, "totality-test");
+        ApiSpecDeclaration WithRight(long divisor) {
+            var quotient = new SpecBinaryDeclaration(
+                SpecBinaryOperator.Divide,
+                new SpecIntegerDeclaration(12),
+                new SpecIntegerDeclaration(divisor),
+                SpecValueType.Integer);
+            var condition = new SpecBinaryDeclaration(
+                SpecBinaryOperator.Equal,
+                quotient,
+                new SpecIntegerDeclaration(3),
+                SpecValueType.Boolean);
+            return Declaration(
+                "constant-" + divisor,
+                "M:Missing.Constant.Run(System.Int32)",
+                "Missing.Constant") with {
+                Postconditions = [new SpecPostconditionDeclaration(condition, evidence)]
+            };
+        }
+
+        Assert.That(ApiSpecTable.Create([WithRight(4)]).Templates, Has.Length.EqualTo(1));
+        Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([WithRight(0)]));
     }
 
     [Test]
@@ -336,7 +572,8 @@ public sealed class ApiSpecTests {
         string documentationId,
         string containingType,
         string memberName = "Run",
-        ImmutableArray<SpecValueType>? parameterTypes = null) {
+        ImmutableArray<SpecValueType>? parameterTypes = null,
+        ImmutableArray<ApiSpecAssemblyIdentity>? approvedAssemblies = null) {
         var evidence = new SpecEvidence(SpecEvidenceKind.Observed, "test-witness");
         return new ApiSpecDeclaration(
             new ApiSpecTarget(
@@ -349,7 +586,8 @@ public sealed class ApiSpecTests {
                 0,
                 null,
                 parameterTypes ?? [SpecValueType.Integer],
-                SpecValueType.Integer),
+                SpecValueType.Integer,
+                approvedAssemblies ?? [RuntimeAssemblyIdentity()]),
             new ApiSpecFacets(
                 new SpecEffectFacet(SpecEffect.Unknown, evidence),
                 new SpecAllocationFacet(SpecAllocationBehavior.Unknown, evidence),
@@ -357,6 +595,14 @@ public sealed class ApiSpecTests {
                 new SpecNullnessFacet(SpecNullness.Unknown, evidence),
                 new SpecCardinalityFacet(SpecCardinality.Unknown, null, evidence)),
             []);
+    }
+
+    private static ApiSpecAssemblyIdentity RuntimeAssemblyIdentity() {
+        var name = typeof(object).Assembly.GetName();
+        return new ApiSpecAssemblyIdentity(
+            name.Name!,
+            string.Concat((name.GetPublicKeyToken() ?? []).Select(static value =>
+                value.ToString("x2", System.Globalization.CultureInfo.InvariantCulture))));
     }
 
     private static CSharpCompilation CreatePlatformCompilation() {

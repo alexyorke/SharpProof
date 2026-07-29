@@ -15,6 +15,11 @@ $acceptanceRoot = $PSScriptRoot
 $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
+& (Join-Path $repositoryRoot 'scripts\Generate-DiagnosticDescriptors.ps1') -Verify
+& (Join-Path $repositoryRoot 'scripts\Generate-CSharpScalarSemantics.ps1') -Verify
+& (Join-Path $repositoryRoot 'scripts\Generate-ApiSpecCatalog.ps1') -Verify
+& (Join-Path $repositoryRoot 'scripts\Generate-ProtocolModel.ps1') -Verify
+& (Join-Path $repositoryRoot 'scripts\Generate-CompilerArtifactModel.ps1') -Verify
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
 $directoryBuildPropsPath = Join-Path `
     $repositoryRoot `
@@ -193,9 +198,9 @@ Assert-Equal `
     $contract.analyzer.defaultAssumptionPolicy `
     'SharpProofAssumptionPolicy'
 Assert-Equal ($contract.supportedTargetFrameworks -join ',') 'netstandard2.0,net8.0,net472' 'supportedTargetFrameworks'
-Assert-Equal $contract.worker.protocolVersion 6 'worker.protocolVersion'
-Assert-Equal $contract.worker.manifestSchemaVersion 2 'worker.manifestSchemaVersion'
-Assert-Equal $contract.worker.compilerArtifactSchemaVersion 3 'worker.compilerArtifactSchemaVersion'
+Assert-Equal $contract.worker.protocolVersion 8 'worker.protocolVersion'
+Assert-Equal $contract.worker.manifestSchemaVersion 4 'worker.manifestSchemaVersion'
+Assert-Equal $contract.worker.compilerArtifactSchemaVersion 5 'worker.compilerArtifactSchemaVersion'
 Assert-Equal $contract.worker.maximumParallelism 4 'worker.maximumParallelism'
 Assert-Equal $contract.worker.maximumMemoryMiB 2048 'worker.maximumMemoryMiB'
 Assert-Equal $contract.worker.queryRlimit 3000000 'worker.queryRlimit'
@@ -203,7 +208,7 @@ Assert-Equal $contract.worker.methodRlimit 20000000 'worker.methodRlimit'
 Assert-Equal $contract.worker.maximumMethodWallSeconds 10 'worker.maximumMethodWallSeconds'
 Assert-Equal $contract.worker.maximumProjectWallSeconds 300 'worker.maximumProjectWallSeconds'
 Assert-Equal $contract.worker.forcedTerminationMilliseconds 1000 'worker.forcedTerminationMilliseconds'
-Assert-Equal $contract.cache.schemaVersion 7 'cache.schemaVersion'
+Assert-Equal $contract.cache.schemaVersion 9 'cache.schemaVersion'
 Assert-Equal $contract.cache.maximumMiB 512 'cache.maximumMiB'
 Assert-Equal ($contract.cache.cacheableOutcomes -join ',') 'Proven,Refuted' 'cache.cacheableOutcomes'
 Assert-Equal `
@@ -317,9 +322,20 @@ try {
         'discovery',
         'lowering',
         'execution',
+        'obligationGeneration',
         'encoding',
+        'apiSpecifications',
+        'apiSpecificationIdentity',
+        'apiSpecificationCatalog',
+        'scalarSemanticsCatalog',
+        'effectAnalysis',
         'replay',
+        'effectReplay',
         'policy',
+        'resultAssembly',
+        'compilerInputIdentity',
+        'canonicalIdentityEncoding',
+        'protocolValidation',
         'cacheValidation'
     )
     $tcbComponents = @($contract.trustedComputingBase.components)
@@ -358,6 +374,54 @@ try {
         Write-Host (
             "Trusted-computing-base $name nonblank lines: " +
             "$nonblankLines (maximum $maximum)")
+    }
+
+    $reduction = $contract.productionLayerReduction
+    $minimumReduction = [double]$reduction.minimumPercent
+    $baselineCommit = [string]$reduction.baselineCommit
+    $layers = @($reduction.layers)
+    if ($minimumReduction -lt 10 -or $minimumReduction -ge 100 -or
+        $baselineCommit -notmatch '^[0-9a-f]{40}$' -or
+        $layers.Count -eq 0) {
+        throw 'The production-layer reduction contract is invalid.'
+    }
+    $layerNames = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    $layerPaths = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($layer in $layers) {
+        $name = [string]$layer.name
+        $path = [string]$layer.path
+        if ([string]::IsNullOrWhiteSpace($name) -or
+            -not $layerNames.Add($name) -or
+            -not $layerPaths.Add($path)) {
+            throw "Invalid or duplicate production-layer reduction: '$name'."
+        }
+        $object = $baselineCommit + ':' + $path
+        $baselineSource = @(& git show $object)
+        if ($LASTEXITCODE -ne 0) {
+            throw "Production-layer baseline is unavailable: $object"
+        }
+        $baselineLines = @(
+            $baselineSource |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        ).Count
+        Assert-Equal `
+            $baselineLines `
+            ([int]$layer.baselineNonblankLines) `
+            "productionLayerReduction.$name baseline"
+        $maximum = [int][Math]::Floor(
+            $baselineLines * (1 - ($minimumReduction / 100)))
+        $current = Measure-RepositoryNonblankLines `
+            -Paths @($path) `
+            -Scope "production-layer reduction '$name'"
+        if ($current -gt $maximum) {
+            throw "Production layer '$name' has $current nonblank lines; " +
+                "the $minimumReduction% reduction requires at most $maximum."
+        }
+        Write-Host (
+            "Production-layer $name nonblank lines: $current " +
+            "(baseline $baselineLines; maximum $maximum)")
     }
 
     & (Join-Path $repositoryRoot 'scripts\Test-ProductionCSharpSize.ps1')

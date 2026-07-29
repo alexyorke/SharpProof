@@ -17,8 +17,7 @@ public static class EffectSummaryProjector {
     public static EffectProjection Project(EffectSummary summary) {
         if (summary == null) throw new ArgumentNullException(nameof(summary));
         if (summary.IsBottom)
-            return new EffectProjection(
-                EffectContractKind.None, EffectContractCapabilityKind.None, isComplete: true);
+            return new EffectProjection(EffectContractKind.None, EffectContractCapabilityKind.None, isComplete: true);
 
         var effects = ProjectRegions(summary.Reads, isWrite: false) |
                       ProjectRegions(summary.Writes, isWrite: true);
@@ -28,19 +27,9 @@ public static class EffectSummaryProjector {
             effects |= EffectContractKind.Allocates;
         if (!summary.Throws.Types.IsDefaultOrEmpty)
             effects |= EffectContractKind.Throws;
-        if (!summary.Capabilities.IsUnknown) {
-            if (summary.Capabilities.Contains(EffectCapabilityKind.Synchronization))
-                effects |= EffectContractKind.Synchronizes;
-            if (summary.Capabilities.Contains(EffectCapabilityKind.Randomness) ||
-                summary.Capabilities.Contains(EffectCapabilityKind.Clock))
-                effects |= EffectContractKind.UsesNondeterminism;
-            if (summary.Capabilities.Contains(EffectCapabilityKind.Reflection))
-                effects |= EffectContractKind.UsesReflection;
-            if (summary.Capabilities.Contains(EffectCapabilityKind.NativeInterop))
-                effects |= EffectContractKind.UsesNativeCode;
-        }
-        var isComplete =
-            summary.Completeness == EffectCompleteness.Complete &&
+        if (!summary.Capabilities.IsUnknown)
+            effects |= EffectContractMappings.ToContractEffects(summary.Capabilities.Kinds);
+        var isComplete = summary.Completeness == EffectCompleteness.Complete &&
             !allocationUnknown &&
             !summary.Throws.IncludesUnknown &&
             !summary.Reads.IsUnknown &&
@@ -50,33 +39,15 @@ public static class EffectSummaryProjector {
 
         var capabilities = summary.Capabilities.IsUnknown
             ? EffectContractCapabilityKind.None
-            : (EffectContractCapabilityKind)(
-                summary.Capabilities.Kinds & EffectCapabilityKind.AllKnown);
+            : EffectContractMappings.ToContractCapabilities(summary.Capabilities.Kinds);
         return new EffectProjection(effects, capabilities, isComplete);
     }
 
-    private static EffectContractKind ProjectRegions(
-        EffectRegionSet regions, bool isWrite) {
-        if (regions.IsUnknown)
-            return EffectContractKind.None;
+    private static EffectContractKind ProjectRegions(EffectRegionSet regions, bool isWrite) {
+        if (regions.IsUnknown) return EffectContractKind.None;
         var result = EffectContractKind.None;
         foreach (var region in regions.Regions)
-            result |= ProjectRegion(region.Kind, isWrite);
+            result |= EffectContractMappings.ToContractRegion(region.Kind, isWrite);
         return result;
-    }
-
-    private static EffectContractKind ProjectRegion(
-        EffectRegionKind kind, bool isWrite) {
-        var offset = kind switch {
-            EffectRegionKind.Receiver => 0,
-            EffectRegionKind.Parameter => 1,
-            EffectRegionKind.Captured => 2,
-            EffectRegionKind.Static => 3,
-            EffectRegionKind.Ambient => 4,
-            _ => -1
-        };
-        return offset < 0
-            ? EffectContractKind.None
-            : (EffectContractKind)(1L << (offset + (isWrite ? 5 : 0)));
     }
 }

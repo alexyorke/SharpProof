@@ -18,9 +18,9 @@
     "unsupportedSelectedCallableDiagnostic": "SP0047"
   },
   "worker": {
-    "protocolVersion": 6,
-    "manifestSchemaVersion": 2,
-    "compilerArtifactSchemaVersion": 3,
+    "protocolVersion": 8,
+    "manifestSchemaVersion": 4,
+    "compilerArtifactSchemaVersion": 5,
     "maximumParallelism": 4,
     "maximumMemoryMiB": 2048,
     "queryRlimit": 3000000,
@@ -31,7 +31,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 7,
+    "schemaVersion": 9,
     "maximumMiB": 512,
     "cacheableOutcomes": [
       "Proven",
@@ -65,6 +65,7 @@
           "SharpProof.Analyzer/CompilerArtifact/CompilerCallableLowerer.cs",
           "SharpProof.Analyzer/CompilerArtifact/CompilerManifestArtifactProducer.cs",
           "SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs",
+          "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
           "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
           "SharpProof.Contracts/ContractBinder.cs",
           "SharpProof.Contracts/ContractExpressionBinder.cs",
@@ -78,10 +79,18 @@
         "name": "execution",
         "paths": [
           "SharpProof.Worker/CallableVerifier.cs",
+          "SharpProof.Worker/AcyclicBlockPredicateExecutor.cs",
           "SharpProof.Worker/SpecResultDomainProjection.cs",
           "SharpProof.Worker/SharpProofWorker.cs"
         ],
         "maximumNonblankLines": 930
+      },
+      {
+        "name": "obligationGeneration",
+        "paths": [
+          "SharpProof.Worker/PostconditionObligationBuilder.cs"
+        ],
+        "maximumNonblankLines": 130
       },
       {
         "name": "encoding",
@@ -89,6 +98,70 @@
           "SharpProof.Smt/IrSmtBackend.cs"
         ],
         "maximumNonblankLines": 410
+      },
+      {
+        "name": "apiSpecifications",
+        "paths": [
+          "SharpProof.Specs/ApiSpecTable.cs",
+          "SharpProof.Effects/ApiSpecResolution.cs",
+          "SharpProof.Specs/ApiSpecInstantiation.cs"
+        ],
+        "maximumNonblankLines": 844
+      },
+      {
+        "name": "apiSpecificationIdentity",
+        "paths": [
+          "SharpProof.Specs/ApiSpecContentDigest.cs"
+        ],
+        "maximumNonblankLines": 64
+      },
+      {
+        "name": "apiSpecificationCatalog",
+        "paths": [
+          "SharpProof.Specs/DefaultApiSpecCatalog.json",
+          "scripts/Generate-ApiSpecCatalog.ps1",
+          "SharpProof.Specs/DefaultApiSpecCatalog.generated.cs"
+        ],
+        "maximumNonblankLines": 1761
+      },
+      {
+        "name": "scalarSemanticsCatalog",
+        "paths": [
+          "SharpProof.Frontend/CSharpScalarSemantics.json",
+          "scripts/Generate-CSharpScalarSemantics.ps1",
+          "SharpProof.Frontend/CSharpScalarSemantics.generated.cs"
+        ],
+        "maximumNonblankLines": 948
+      },
+      {
+        "name": "effectAnalysis",
+        "paths": [
+          "SharpProof.Analyzer/EffectContractDiagnostics.cs",
+          "SharpProof.Analyzer/AnalyzerSession.cs",
+          "SharpProof.Contracts/ContractSelectionInventory.cs",
+          "SharpProof.Effects/EffectAnalysisSession.cs",
+          "SharpProof.Effects/EffectContractMappings.cs",
+          "SharpProof.Effects/OperationEffectScanner.cs",
+          "SharpProof.Effects/EffectExceptionFlow.cs",
+          "SharpProof.Effects/ManagedAbstractFlow.cs",
+          "SharpProof.Effects/ExternalEffectResolver.cs",
+          "SharpProof.Effects/EffectSummaryOperations.cs",
+          "SharpProof.Effects/EffectProjection.cs",
+          "SharpProof.Effects/EffectSummary.cs",
+          "SharpProof.Effects/EffectValues.cs",
+          "SharpProof.Effects/EffectRegions.cs",
+          "SharpProof.Effects/EffectContractValues.cs",
+          "SharpProof.Dataflow/ForwardDataflowAnalysis.cs",
+          "SharpProof.Dataflow/DataflowGraph.cs",
+          "SharpProof.Dataflow/IAbstractDomain.cs",
+          "SharpProof.Dataflow/ClosedAbstractDomain.cs",
+          "SharpProof.Dataflow/IntervalDomain.cs",
+          "SharpProof.Dataflow/IntervalValue.cs",
+          "SharpProof.Dataflow/NullnessDomain.cs",
+          "SharpProof.Dataflow/NullnessValue.cs",
+          "SharpProof.Specs/FrameworkTypeMetadataNames.cs"
+        ],
+        "maximumNonblankLines": 5072
       },
       {
         "name": "replay",
@@ -101,19 +174,58 @@
         "maximumNonblankLines": 711
       },
       {
+        "name": "effectReplay",
+        "paths": [
+          "SharpProof.Worker/EffectWitnessReplayer.cs"
+        ],
+        "maximumNonblankLines": 110
+      },
+      {
         "name": "policy",
         "paths": [
           "SharpProof.Worker.Launcher/Program.cs",
-          "SharpProof.Worker/CallableClaimResultAssembler.cs"
+          "SharpProof.Worker/CallableVerificationPolicy.cs"
         ],
         "maximumNonblankLines": 590
       },
       {
+        "name": "resultAssembly",
+        "paths": [
+          "SharpProof.Worker/CallableClaimResultAssembler.cs",
+          "SharpProof.Worker.Protocol/WorkerResultAssembler.cs"
+        ],
+        "maximumNonblankLines": 220
+      },
+      {
+        "name": "compilerInputIdentity",
+        "paths": [
+          "SharpProof.Analyzer/CompilerArtifact/CompilerCompilationCapture.cs",
+          "SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs",
+          "SharpProof.CompilerArtifact/CompilationFingerprint.cs"
+        ],
+        "maximumNonblankLines": 300
+      },
+      {
+        "name": "canonicalIdentityEncoding",
+        "paths": [
+          "SharpProof.Ir/CanonicalHashWriter.cs"
+        ],
+        "maximumNonblankLines": 100
+      },
+      {
+        "name": "protocolValidation",
+        "paths": [
+          "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
+          "SharpProof.Worker.Protocol/ProtocolJson.cs"
+        ],
+        "rationale": "The checked-in generated model and runtime validator are the reviewed, coverlet-visible runtime protocol boundary; CI separately verifies the schema projection is current.",
+        "maximumNonblankLines": 1150
+      },
+      {
         "name": "cacheValidation",
         "paths": [
+          "SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs",
           "SharpProof.CompilerArtifact/CompilerManifestArtifact.cs",
-          "SharpProof.Worker.Protocol/ProtocolJson.cs",
-          "SharpProof.Worker.Protocol/WorkerResultAssembler.cs",
           "SharpProof.Worker/WorkerInputSnapshot.cs",
           "SharpProof.Worker/VerificationCache.cs"
         ],
@@ -124,6 +236,57 @@
   "productionSize": {
     "maximumPhysicalLines": 19916,
     "maximumNonblankLines": 18376
+  },
+  "productionLayerReduction": {
+    "baselineCommit": "9d9ae94714c8fd3d0631f07b150e81d50a7be093",
+    "minimumPercent": 10,
+    "layers": [
+      {
+        "name": "callable-verification-coordinator",
+        "path": "SharpProof.Worker/CallableVerifier.cs",
+        "baselineNonblankLines": 467
+      },
+      {
+        "name": "contract-binder",
+        "path": "SharpProof.Contracts/ContractBinder.cs",
+        "baselineNonblankLines": 655
+      },
+      {
+        "name": "soundness-meta-analyzer",
+        "path": "SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs",
+        "baselineNonblankLines": 675
+      },
+      {
+        "name": "ir-factory",
+        "path": "SharpProof.Ir/IrFactory.cs",
+        "baselineNonblankLines": 690
+      },
+      {
+        "name": "api-spec-table",
+        "path": "SharpProof.Specs/ApiSpecTable.cs",
+        "baselineNonblankLines": 479
+      },
+      {
+        "name": "requires-call-site-analyzer",
+        "path": "SharpProof.Analyzer/RequiresCallSiteAnalyzer.cs",
+        "baselineNonblankLines": 456
+      },
+      {
+        "name": "effect-analysis-coordinator",
+        "path": "SharpProof.Effects/EffectAnalysisSession.cs",
+        "baselineNonblankLines": 554
+      },
+      {
+        "name": "contract-for-generator",
+        "path": "SharpProof.ContractForGenerator/ContractForValidatorGenerator.cs",
+        "baselineNonblankLines": 298
+      },
+      {
+        "name": "protocol-validator",
+        "path": "SharpProof.Worker.Protocol/ProtocolJson.cs",
+        "baselineNonblankLines": 559
+      }
+    ]
   },
   "fuzz": {
     "pullRequestCases": 1000,

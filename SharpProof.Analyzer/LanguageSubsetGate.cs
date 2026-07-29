@@ -9,20 +9,10 @@ internal enum LanguageSubsetAbstentionReason {
     UnsupportedOperationShape
 }
 
-internal readonly struct LanguageSubsetDecision {
-    private LanguageSubsetDecision(
-        bool isSupported,
-        LanguageSubsetAbstentionReason reason,
-        OperationKind? operationKind) {
-        IsSupported = isSupported;
-        Reason = reason;
-        OperationKind = operationKind;
-    }
-
-    internal bool IsSupported { get; }
-    internal LanguageSubsetAbstentionReason Reason { get; }
-    internal OperationKind? OperationKind { get; }
-
+internal readonly record struct LanguageSubsetDecision(
+    bool IsSupported,
+    LanguageSubsetAbstentionReason Reason,
+    OperationKind? OperationKind) {
     internal static LanguageSubsetDecision Supported { get; } =
         new(true, LanguageSubsetAbstentionReason.None, null);
 
@@ -37,32 +27,72 @@ internal readonly struct LanguageSubsetDecision {
 
 internal static class LanguageSubsetGate {
     internal static readonly ImmutableDictionary<OperationKind, bool> OperationKindDecisions =
-        Enum.GetValues(typeof(OperationKind))
-            .Cast<OperationKind>()
-            .Distinct()
-            .ToImmutableDictionary(
-                static kind => kind,
-                static kind => IsSupportedOperationKind(kind));
+        Enum.GetValues(typeof(OperationKind)).Cast<OperationKind>().Distinct()
+            .ToImmutableDictionary(static kind => kind, static kind => IsSupported(kind));
 
-    private static bool IsSupportedOperationKind(OperationKind kind) =>
-        kind is
-            >= OperationKind.Block and <= OperationKind.Return or
-            >= OperationKind.Lock and <= OperationKind.Using or
+    private static bool IsSupported(OperationKind kind) => kind is
+            OperationKind.Block or
+            OperationKind.VariableDeclarationGroup or
+            OperationKind.Switch or
+            OperationKind.Loop or
+            OperationKind.Labeled or
+            OperationKind.Branch or
+            OperationKind.Empty or
+            OperationKind.Return or
+            OperationKind.Lock or
+            OperationKind.Try or
+            OperationKind.Using or
             OperationKind.ExpressionStatement or
-            >= OperationKind.Literal and <= OperationKind.FieldReference or
+            OperationKind.Literal or
+            OperationKind.Conversion or
+            OperationKind.Invocation or
+            OperationKind.ArrayElementReference or
+            OperationKind.LocalReference or
+            OperationKind.ParameterReference or
+            OperationKind.FieldReference or
             OperationKind.PropertyReference or
-            >= OperationKind.Unary and <= OperationKind.Coalesce or
+            OperationKind.Unary or
+            OperationKind.Binary or
+            OperationKind.Conditional or
+            OperationKind.Coalesce or
             OperationKind.ObjectCreation or
-            >= OperationKind.ArrayCreation and <= OperationKind.IsType or
-            >= OperationKind.SimpleAssignment and <= OperationKind.Parenthesized or
-            >= OperationKind.ConditionalAccess and <= OperationKind.InterpolatedString or
-            >= OperationKind.ObjectOrCollectionInitializer and
-                <= OperationKind.MemberInitializer or
+            OperationKind.ArrayCreation or
+            OperationKind.InstanceReference or
+            OperationKind.IsType or
+            OperationKind.SimpleAssignment or
+            OperationKind.CompoundAssignment or
+            OperationKind.Parenthesized or
+            OperationKind.ConditionalAccess or
+            OperationKind.ConditionalAccessInstance or
+            OperationKind.InterpolatedString or
+            OperationKind.ObjectOrCollectionInitializer or
+            OperationKind.MemberInitializer or
             OperationKind.NameOf or
-            >= OperationKind.DefaultValue and <= OperationKind.TypeOf or
-            >= OperationKind.Increment and <= OperationKind.Decrement or
-            >= OperationKind.FieldInitializer and <= OperationKind.Interpolation or
-            >= OperationKind.MethodBody and <= OperationKind.CaughtException or
+            OperationKind.DefaultValue or
+            OperationKind.TypeOf or
+            OperationKind.Increment or
+            OperationKind.Throw or
+            OperationKind.Decrement or
+            OperationKind.FieldInitializer or
+            OperationKind.VariableInitializer or
+            OperationKind.PropertyInitializer or
+            OperationKind.ParameterInitializer or
+            OperationKind.ArrayInitializer or
+            OperationKind.VariableDeclarator or
+            OperationKind.VariableDeclaration or
+            OperationKind.Argument or
+            OperationKind.CatchClause or
+            OperationKind.SwitchCase or
+            OperationKind.CaseClause or
+            OperationKind.InterpolatedStringText or
+            OperationKind.Interpolation or
+            OperationKind.MethodBodyOperation or
+            OperationKind.ConstructorBodyOperation or
+            OperationKind.Discard or
+            OperationKind.FlowCapture or
+            OperationKind.FlowCaptureReference or
+            OperationKind.IsNull or
+            OperationKind.CaughtException or
             OperationKind.CoalesceAssignment or
             OperationKind.UsingDeclaration or
             OperationKind.Attribute;
@@ -86,10 +116,7 @@ internal static class LanguageSubsetGate {
         foreach (var root in roots)
             foreach (var operation in root.DescendantsAndSelf()) {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!OperationKindDecisions.TryGetValue(
-                        operation.Kind,
-                        out var supported) ||
-                    !supported)
+                if (!OperationKindDecisions.TryGetValue(operation.Kind, out var supported) || !supported)
                     return LanguageSubsetDecision.Abstain(
                         LanguageSubsetAbstentionReason.UnsupportedOperationKind,
                         operation.Kind);
@@ -97,9 +124,7 @@ internal static class LanguageSubsetGate {
                     return LanguageSubsetDecision.Abstain(
                         LanguageSubsetAbstentionReason.UnsupportedType,
                         operation.Kind);
-                if (!SupportsOperationShape(
-                        operation,
-                        hasResolvedGenericApiSpec))
+                if (!SupportsOperationShape(operation, hasResolvedGenericApiSpec))
                     return LanguageSubsetDecision.Abstain(
                         LanguageSubsetAbstentionReason.UnsupportedOperationShape,
                         operation.Kind);
@@ -113,17 +138,7 @@ internal static class LanguageSubsetGate {
         CancellationToken cancellationToken) {
         var root = semanticModel.GetOperation(declaration, cancellationToken);
         if (root != null) return [root];
-        var fallback = declaration switch {
-            BaseMethodDeclarationSyntax method =>
-                (SyntaxNode?)method.Body ?? method.ExpressionBody?.Expression,
-            AccessorDeclarationSyntax accessor =>
-                (SyntaxNode?)accessor.Body ?? accessor.ExpressionBody?.Expression,
-            PropertyDeclarationSyntax property =>
-                property.ExpressionBody?.Expression,
-            IndexerDeclarationSyntax indexer =>
-                indexer.ExpressionBody?.Expression,
-            _ => null
-        };
+        var fallback = ContractClauseInventoryBuilder.GetBody(declaration);
         root = fallback == null
             ? null
             : semanticModel.GetOperation(fallback, cancellationToken);

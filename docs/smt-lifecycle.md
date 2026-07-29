@@ -10,11 +10,13 @@ x64, macOS x64, and macOS ARM64. Every unsupported matrix host also asserts
 that requested verification is rejected explicitly. Windows ARM64 and
 non-Windows worker execution remain unsupported and are not exercised.
 
-Each `SharpProof.Worker` process owns one Z3 context and serves a bounded
-project request. Queries use Z3 resource limits rather than wall-clock solver
-timeouts, canonical variable names, stable formula ordering, typed models, and
-typed unsat cores. Cancellation interrupts the backend and remains
-cancellation.
+Each `SharpProof.Worker` process serves one bounded project request and owns
+one isolated Z3 context per configured solver lane. Queries use Z3 resource
+limits rather than wall-clock solver timeouts, canonical variable names,
+stable formula ordering, typed models, and typed unsat cores. Cancellation
+interrupts the active backend and remains cancellation. A lane interrupted by
+a method timeout is disposed and recreated before it can accept another
+query; a lane without a backend factory is retired instead.
 
 A SAT result becomes `Refuted` only after two replay layers. First, the proof
 kernel requires the extracted assignments to close exactly over every
@@ -38,7 +40,7 @@ encoding, resource limits, and method boundaries produce typed claim-level
 `Unknown` results. An undefined postcondition is also a typed `Unknown`
 result. Backend unavailability, malformed backend results, failure to replay
 an otherwise replayable counterexample, containment failure, and
-infrastructure failure make the protocol version 6 run `Failed` and fail the
+infrastructure failure make the protocol version 8 run `Failed` and fail the
 build under every policy.
 Project timeout and caller cancellation use the separate `TimedOut` and
 `Canceled` run statuses.
@@ -51,10 +53,12 @@ run into success.
 
 Only exact-manifest, complete `Proven` and replay-validated `Refuted` project
 results enter the content-addressed disk cache. Cache keys include protocol,
-semantics, tool, target framework, the exact closed compiler artifact and
-lowered IR, budgets, and spec versions. Cache schema version 7 revalidates the
-stored semantic payload against the complete current manifest. Strict
-`require-proven` runs do not consume or write this local semantic cache.
+semantics, tool identity and canonical packaged worker runtime-closure digest,
+target framework, the exact
+closed compiler artifact and lowered IR, budgets, spec versions, and a
+canonical digest of the complete trusted spec content. Cache schema version 9
+revalidates the stored semantic payload against the complete current manifest.
+Strict `require-proven` runs do not consume or write this local semantic cache.
 
 See [Typed abstention reasons](unknown-reasons.md) for exact statuses and
 reasons, and [Analysis limits](analysis-limits.md) for configured and fixed

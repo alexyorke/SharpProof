@@ -1,35 +1,18 @@
 namespace SharpProof.Dataflow;
 
 public sealed class DataflowBlock<T>(int id, Func<T, T> transfer) {
-    public int Id { get; } = id >= 0
-        ? id
-        : throw new ArgumentOutOfRangeException(nameof(id));
-    public Func<T, T> Transfer { get; } =
-        transfer ?? throw new ArgumentNullException(nameof(transfer));
+    public int Id { get; } = id >= 0 ? id : throw new ArgumentOutOfRangeException(nameof(id));
+    public Func<T, T> Transfer { get; } = transfer ?? throw new ArgumentNullException(nameof(transfer));
 }
 
-public readonly struct DataflowEdge(int sourceId, int targetId)
-    : IEquatable<DataflowEdge> {
-    public int SourceId { get; } = sourceId >= 0
-        ? sourceId
-        : throw new ArgumentOutOfRangeException(nameof(sourceId));
-    public int TargetId { get; } = targetId >= 0
-        ? targetId
-        : throw new ArgumentOutOfRangeException(nameof(targetId));
+public readonly record struct DataflowEdge {
+    public DataflowEdge(int sourceId, int targetId) =>
+        (SourceId, TargetId) = (
+            sourceId >= 0 ? sourceId : throw new ArgumentOutOfRangeException(nameof(sourceId)),
+            targetId >= 0 ? targetId : throw new ArgumentOutOfRangeException(nameof(targetId)));
 
-    public bool Equals(DataflowEdge other) =>
-        SourceId == other.SourceId && TargetId == other.TargetId;
-
-    public override bool Equals(object? obj) => obj is DataflowEdge other && Equals(other);
-
-    public override int GetHashCode() {
-        unchecked {
-            return (SourceId * 397) ^ TargetId;
-        }
-    }
-
-    public static bool operator ==(DataflowEdge left, DataflowEdge right) => left.Equals(right);
-    public static bool operator !=(DataflowEdge left, DataflowEdge right) => !left.Equals(right);
+    public int SourceId { get; }
+    public int TargetId { get; }
 }
 
 /// <summary>
@@ -64,9 +47,7 @@ public sealed class DataflowGraph<T> {
                 throw new ArgumentException("An edge references a block outside the graph.", nameof(edges));
             distinctEdges.Add(edge);
         }
-        Edges = [.. distinctEdges
-            .OrderBy(static edge => edge.SourceId)
-            .ThenBy(static edge => edge.TargetId)];
+        Edges = [.. distinctEdges.OrderBy(static edge => edge.SourceId).ThenBy(static edge => edge.TargetId)];
         EntryBlockId = entryBlockId;
 
         var predecessors = CreateAdjacency(Blocks.Length);
@@ -96,8 +77,7 @@ public sealed class DataflowGraph<T> {
         GetNeighbors(blockId, _successors);
 
     private ImmutableArray<int> GetNeighbors(
-        int blockId,
-        ImmutableArray<ImmutableArray<int>> adjacency) {
+        int blockId, ImmutableArray<ImmutableArray<int>> adjacency) {
         ValidateBlockId(blockId);
         return adjacency[blockId];
     }
@@ -114,8 +94,7 @@ public sealed class DataflowGraph<T> {
 
     private static List<int>[] CreateAdjacency(int count) {
         var result = new List<int>[count];
-        for (var index = 0; index < count; index++)
-            result[index] = [];
+        for (var index = 0; index < count; index++) result[index] = [];
         return result;
     }
 
@@ -128,14 +107,13 @@ public sealed class DataflowGraph<T> {
         return result.MoveToImmutable();
     }
 
-    private static ImmutableArray<bool> FindCyclicBlocks(
-        ImmutableArray<ImmutableArray<int>> successors) {
+    private static ImmutableArray<bool> FindCyclicBlocks(ImmutableArray<ImmutableArray<int>> successors) {
         var result = ImmutableArray.CreateBuilder<bool>(successors.Length);
         for (var start = 0; start < successors.Length; start++) {
             var seen = new HashSet<int>();
             var pending = new Stack<int>(successors[start].Reverse());
             var cyclic = false;
-            while (pending.Count != 0 && !cyclic) {
+            while (pending.Count != 0) {
                 var current = pending.Pop();
                 if (current == start) {
                     cyclic = true;

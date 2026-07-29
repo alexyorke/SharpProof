@@ -198,7 +198,6 @@ public sealed class EffectAnalysisTests {
             }
             """);
         var session = new EffectAnalysisSession(compilation);
-
         using (Assert.EnterMultipleScope()) {
             Assert.That(
                 session.Analyze(Method(compilation, "ReadConstant"))
@@ -1172,6 +1171,37 @@ public sealed class EffectAnalysisTests {
             result.Summary.Termination,
             Is.EqualTo(EffectTermination.MayDiverge));
         Assert.That(result.Summary.Completeness, Is.EqualTo(EffectCompleteness.Complete));
+        Assert.That(
+            result.Summary.AnalysisIncompleteReason,
+            Is.EqualTo(EffectAnalysisIncompleteReason.None));
+        Assert.That(result.Projection.IsComplete, Is.True);
+    }
+
+    [Test]
+    public void ScalarImpossibleBranchDoesNotContributeEffects() {
+        var result = Analyze(
+            """
+            public static class Sample {
+                public static object? Allocate(int value) {
+                    if (value > 0 && value < 0) {
+                        return new object();
+                    }
+                    return null;
+                }
+            }
+            """,
+            "Sample",
+            "Allocate");
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                result.Projection.Effects & SharpProofEffect.Allocates,
+                Is.EqualTo(SharpProofEffect.None));
+            Assert.That(result.Projection.IsComplete, Is.True);
+            Assert.That(
+                result.Summary.AnalysisIncompleteReason,
+                Is.EqualTo(EffectAnalysisIncompleteReason.None));
+        }
     }
 
     [Test]
@@ -1406,6 +1436,643 @@ public sealed class EffectAnalysisTests {
             result.Summary.Uncertainty & EffectUncertainty.UnsupportedOperation,
             Is.EqualTo(EffectUncertainty.UnsupportedOperation));
         Assert.That(result.Projection.IsComplete, Is.False);
+    }
+
+    [Test]
+    public void ConditionalAccessDoesNotInventNullReceiverExceptions() {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class Receiver {
+                public int Value => 1;
+                public int GetValue() => 1;
+                public Child? Child => null;
+            }
+
+            public sealed class Child {
+                public int Value => 1;
+            }
+
+            public static class Sample {
+                public static int? Read(Receiver? receiver) =>
+                    receiver?.Value;
+
+                public static int? Invoke(Receiver? receiver) =>
+                    receiver?.GetValue();
+
+                public static int? Nested(Receiver? receiver) =>
+                    receiver?.Child.Value;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                session.Analyze(Method(compilation, "Read"))
+                    .Summary.Throws.IsEmpty,
+                Is.True);
+            Assert.That(
+                session.Analyze(Method(compilation, "Invoke"))
+                    .Summary.Throws.IsEmpty,
+                Is.True);
+            AssertThrows(
+                session.Analyze(Method(compilation, "Nested")).Summary,
+                "System.NullReferenceException");
+        }
+    }
+
+    [Test]
+    public void ExceptionFlowReportsOnlyExceptionsThatEscape() {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Sample {
+                private static void ThrowInvalid(
+                    InvalidOperationException exception) =>
+                    throw exception;
+
+                private static bool ThrowFilter(
+                    ApplicationException exception) =>
+                    throw exception;
+
+                public static void ExactCatch(
+                    InvalidOperationException exception) {
+                    try {
+                        ThrowInvalid(exception);
+                    }
+                    catch (InvalidOperationException) {
+                    }
+                }
+
+                public static void BaseCatch(
+                    InvalidOperationException exception) {
+                    try {
+                        ThrowInvalid(exception);
+                    }
+                    catch (Exception) {
+                    }
+                }
+
+                public static void TrueFilter(
+                    InvalidOperationException exception) {
+                    try {
+                        ThrowInvalid(exception);
+                    }
+                    catch (InvalidOperationException) when (true) {
+                    }
+                }
+
+                public static void FalseFilter(
+                    InvalidOperationException exception) {
+                    try {
+                        ThrowInvalid(exception);
+                    }
+                    catch (InvalidOperationException) when (false) {
+                    }
+                }
+
+                public static void Rethrow(
+                    InvalidOperationException exception) {
+                    try {
+                        ThrowInvalid(exception);
+                    }
+                    catch (InvalidOperationException) {
+                        throw;
+                    }
+                }
+
+                public static void ThrowingFilter(
+                    InvalidOperationException exception,
+                    ApplicationException filterException) {
+                    try {
+                        ThrowInvalid(exception);
+                    }
+                    catch (InvalidOperationException)
+                        when (ThrowFilter(filterException)) {
+                    }
+                }
+
+                public static void NestedRethrow(
+                    InvalidOperationException exception) {
+                    try {
+                        try {
+                            ThrowInvalid(exception);
+                        }
+                        catch (InvalidOperationException) {
+                            throw;
+                        }
+                    }
+                    catch (Exception) {
+                    }
+                }
+
+                public static void HandlerThrows(
+                    InvalidOperationException exception,
+                    ApplicationException handlerException) {
+                    try {
+                        ThrowInvalid(exception);
+                    }
+                    catch (InvalidOperationException) {
+                        throw handlerException;
+                    }
+                }
+
+                public static void ThrowFromFinally(
+                    InvalidOperationException exception,
+                    ApplicationException finallyException) {
+                    try {
+                        ThrowInvalid(exception);
+                    }
+                    catch (InvalidOperationException) {
+                    }
+                    finally {
+                        throw finallyException;
+                    }
+                }
+
+                public static void FinallyOverrides(
+                    InvalidOperationException exception,
+                    ApplicationException finallyException) {
+                    try {
+                        ThrowInvalid(exception);
+                    }
+                    finally {
+                        throw finallyException;
+                    }
+                }
+
+                public static void NonReturningFinally(
+                    InvalidOperationException exception) {
+                    try {
+                        ThrowInvalid(exception);
+                    }
+                    finally {
+                        while (true) {
+                        }
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                session.Analyze(Method(compilation, "ExactCatch"))
+                    .Summary.Throws.IsEmpty,
+                Is.True);
+            Assert.That(
+                session.Analyze(Method(compilation, "BaseCatch"))
+                    .Summary.Throws.IsEmpty,
+                Is.True);
+            Assert.That(
+                session.Analyze(Method(compilation, "TrueFilter"))
+                    .Summary.Throws.IsEmpty,
+                Is.True);
+            AssertThrows(
+                session.Analyze(Method(compilation, "FalseFilter")).Summary,
+                "System.InvalidOperationException");
+            AssertThrows(
+                session.Analyze(Method(compilation, "Rethrow")).Summary,
+                "System.InvalidOperationException");
+            AssertThrows(
+                session.Analyze(Method(compilation, "ThrowingFilter")).Summary,
+                "System.InvalidOperationException");
+            Assert.That(
+                session.Analyze(Method(compilation, "NestedRethrow"))
+                    .Summary.Throws.IsEmpty,
+                Is.True);
+            AssertThrows(
+                session.Analyze(Method(compilation, "HandlerThrows")).Summary,
+                "System.ApplicationException");
+            AssertThrows(
+                session.Analyze(Method(compilation, "ThrowFromFinally")).Summary,
+                "System.ApplicationException");
+            AssertThrows(
+                session.Analyze(Method(compilation, "FinallyOverrides")).Summary,
+                "System.ApplicationException");
+            Assert.That(
+                session.Analyze(Method(compilation, "NonReturningFinally"))
+                    .Summary.Throws.IsEmpty,
+                Is.True);
+        }
+    }
+
+    [Test]
+    public void CatchAllConsumesUnknownManagedThrowsOnlyWhenUnfiltered() {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public interface IExternal {
+                void Run();
+            }
+
+            public static class Sample {
+                public static void CatchAll(IExternal external) {
+                    try {
+                        external.Run();
+                    }
+                    catch {
+                    }
+                }
+
+                public static void CatchException(IExternal external) {
+                    try {
+                        external.Run();
+                    }
+                    catch (Exception) {
+                    }
+                }
+
+                public static void Filtered(IExternal external) {
+                    try {
+                        external.Run();
+                    }
+                    catch (Exception) when (true) {
+                    }
+                }
+
+                public static void Rethrow(IExternal external) {
+                    try {
+                        external.Run();
+                    }
+                    catch (Exception) {
+                        throw;
+                    }
+                }
+
+                public static void NormalFinally(IExternal external) {
+                    try {
+                        external.Run();
+                    }
+                    finally {
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                session.Analyze(Method(compilation, "CatchAll"))
+                    .Summary.Throws.IsEmpty,
+                Is.True);
+            Assert.That(
+                session.Analyze(Method(compilation, "CatchException"))
+                    .Summary.Throws.IsEmpty,
+                Is.True);
+            Assert.That(
+                session.Analyze(Method(compilation, "Filtered"))
+                    .Summary.Throws.IncludesUnknown,
+                Is.True);
+            Assert.That(
+                session.Analyze(Method(compilation, "Rethrow"))
+                    .Summary.Throws.IncludesUnknown,
+                Is.True);
+            Assert.That(
+                session.Analyze(Method(compilation, "NormalFinally"))
+                    .Summary.Throws.IncludesUnknown,
+                Is.True);
+        }
+    }
+
+    [Test]
+    public void AcyclicFlowDischargesOnlyProvenImplicitExceptions() {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public static class Sample {
+                public static int RequiredDivide(
+                    [InRange(-10, 10)] int value,
+                    int divisor) {
+                    Contract.Requires(divisor != 0);
+                    return value / divisor;
+                }
+
+                public static int GuardedDivide(
+                    [InRange(-10, 10)] int value,
+                    int divisor) {
+                    if (divisor == 0) {
+                        return 0;
+                    }
+                    return value / divisor;
+                }
+
+                public static int CheckedAdd(
+                    [InRange(0, 10)] int left,
+                    [InRange(0, 10)] int right) =>
+                    checked(left + right);
+
+                public static int PositiveSize(
+                    [Positive] int length) =>
+                    new int[length].Length;
+
+                public static int GuardedIndex(int index) {
+                    var values = new int[2];
+                    if (index < 0 || index >= values.Length) {
+                        return 0;
+                    }
+                    return values[index];
+                }
+
+                public static int NonNullReceiver(
+                    [NotNull] string value) {
+                    lock (value) {
+                        return value.Length;
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var method in new[] {
+                     "RequiredDivide",
+                     "GuardedDivide",
+                     "CheckedAdd",
+                     "PositiveSize",
+                     "GuardedIndex",
+                     "NonNullReceiver"
+                 }) {
+            var throws = session.Analyze(Method(compilation, method))
+                .Summary.Throws;
+            Assert.That(
+                throws.IsEmpty,
+                Is.True,
+                method + ": unknown=" + throws.IncludesUnknown + "; " +
+                string.Join(
+                    ", ",
+                    throws.Types.Select(static type =>
+                        type.ContainingNamespace.MetadataName + "." +
+                        type.MetadataName)));
+        }
+    }
+
+    [Test]
+    public void ReassignmentsWrapAndBadIndexesRetainImplicitExceptions() {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public static class Sample {
+                public static int ReassignedDivisor(int divisor) {
+                    if (divisor == 0) {
+                        return 0;
+                    }
+                    divisor = 0;
+                    return 1 / divisor;
+                }
+
+                public static int NegativeIndex() =>
+                    (new int[2])[-1];
+
+                public static int TooLargeIndex() =>
+                    (new int[2])[2];
+
+                public static int CheckedBoundary(int value) =>
+                    checked(value + 1);
+
+                public static int NarrowedDivisor(long value) {
+                    var divisor = unchecked((int)value);
+                    return 1 / divisor;
+                }
+
+                public static int ReassignedNull(
+                    [NotNull] string value) {
+                    value = null!;
+                    return value.Length;
+                }
+
+                public static int DivisionEvaluationOrder(int value) =>
+                    value / (value = -1);
+
+                public static int CheckedEvaluationOrder(int value) =>
+                    checked(value + (value = 0));
+
+                public static int ArrayEvaluationOrder() {
+                    var first = new int[0];
+                    var other = new int[2];
+                    return first[(first = other).Length - 1];
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        AssertThrows(
+            session.Analyze(Method(compilation, "ReassignedDivisor")).Summary,
+            "System.DivideByZeroException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "NegativeIndex")).Summary,
+            "System.IndexOutOfRangeException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "TooLargeIndex")).Summary,
+            "System.IndexOutOfRangeException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "CheckedBoundary")).Summary,
+            "System.OverflowException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "NarrowedDivisor")).Summary,
+            "System.DivideByZeroException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "ReassignedNull")).Summary,
+            "System.NullReferenceException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "DivisionEvaluationOrder"))
+                .Summary,
+            "System.OverflowException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "CheckedEvaluationOrder"))
+                .Summary,
+            "System.OverflowException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "ArrayEvaluationOrder"))
+                .Summary,
+            "System.IndexOutOfRangeException");
+    }
+
+    [Test]
+    public void ReturnAnnotationsRefineReceiversDivisorsAndIndexes() {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public static class Sample {
+                [return: NotNull]
+                private static string Text() => "";
+
+                [return: Positive]
+                private static int Divisor() => 1;
+
+                [return: InRange(0, 1)]
+                private static int Index() => 1;
+
+                private static string TextProperty {
+                    [return: NotNull]
+                    get => "";
+                }
+
+                [return: InRange(2, 1)]
+                private static int Malformed() => 0;
+
+                public static int Safe() {
+                    var values = new int[2];
+                    return Text().Length +
+                        TextProperty.Length +
+                        10 / Divisor() +
+                        values[Index()];
+                }
+
+                public static int MalformedRemainsUnsafe() =>
+                    10 / Malformed();
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        Assert.That(
+            session.Analyze(Method(compilation, "Safe"))
+                .Summary.Throws.IsEmpty,
+            Is.True);
+        AssertThrows(
+            session.Analyze(Method(compilation, "MalformedRemainsUnsafe"))
+                .Summary,
+            "System.DivideByZeroException");
+    }
+
+    [Test]
+    public void CallsThatCanMutateLocalsInvalidateFlowFacts() {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                private delegate void Mutation();
+
+                private static void SetZero(ref int value) => value = 0;
+
+                private static void CreateZero(out int value) => value = 0;
+
+                public static int RefCall() {
+                    var value = 1;
+                    SetZero(ref value);
+                    return 1 / value;
+                }
+
+                public static int OutConstructor() {
+                    var value = 1;
+                    _ = new Holder(out value);
+                    return 1 / value;
+                }
+
+                public static int LocalFunctionCall() {
+                    var value = 1;
+                    void Mutate() => value = 0;
+                    Mutate();
+                    return 1 / value;
+                }
+
+                public static int DelegateCall() {
+                    var value = 1;
+                    Mutation mutate = () => value = 0;
+                    mutate();
+                    return 1 / value;
+                }
+
+                private sealed class Holder {
+                    public Holder(out int value) => CreateZero(out value);
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var method in new[] {
+                     "RefCall",
+                     "OutConstructor",
+                     "LocalFunctionCall",
+                     "DelegateCall"
+                 }) {
+            AssertContainsThrows(
+                session.Analyze(Method(compilation, method)).Summary,
+                "System.DivideByZeroException");
+        }
+    }
+
+    [Test]
+    public void DirectWitnessesAreNarrowDeterministicAndOrdered() {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            using System.Threading;
+
+            public sealed class UserException : Exception {
+            }
+
+            public sealed class Sample {
+                private int _field;
+                private volatile int _volatile;
+
+                public object Allocate() => new object();
+                public int[] AllocateArray() => new int[1];
+                public void Throw() => throw new InvalidOperationException();
+                public void ThrowUser() => throw new UserException();
+                public void Write() => _field = 1;
+                public int Read() => _field;
+                public void VolatileWrite() => _volatile = 1;
+                public int VolatileRead() => _volatile;
+
+                public void Synchronize() {
+                    lock (new object()) {
+                    }
+                }
+
+                public void EnterMonitor() => Monitor.Enter(this);
+
+                public void Conditional(bool condition) {
+                    if (condition) {
+                        _field = 1;
+                    }
+                }
+
+                public void Multiple() {
+                    _field = 1;
+                    _field = 2;
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        AssertKinds("Allocate", "managed-allocation");
+        AssertKinds("AllocateArray", "managed-array-allocation");
+        AssertKinds("Throw", "managed-allocation", "explicit-throw");
+        AssertKinds("ThrowUser", "managed-allocation", "explicit-throw");
+        AssertKinds("Write", "direct-field-write");
+        AssertKinds("Read", "direct-field-read");
+        AssertKinds("VolatileWrite", "direct-field-write", "volatile-field-access");
+        AssertKinds("VolatileRead", "direct-field-read", "volatile-field-access");
+        AssertKinds("Synchronize", "managed-allocation", "synchronization-lock");
+        AssertKinds("EnterMonitor", "synchronization-call");
+        AssertKinds("Conditional");
+        AssertKinds("Multiple");
+
+        var frameworkThrow = Witnesses("Throw");
+        var userThrow = Witnesses("ThrowUser");
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(frameworkThrow[1].ExceptionType?.MetadataName,
+                Is.EqualTo(nameof(InvalidOperationException)));
+            Assert.That(userThrow[1].ExceptionType, Is.Null);
+            Assert.That(Witnesses("VolatileRead")[1].Capabilities,
+                Is.EqualTo(EffectContractCapabilityKind.Synchronization));
+            Assert.That(Witnesses("Synchronize")[0].Effects,
+                Is.EqualTo(EffectContractKind.Allocates));
+        }
+        return;
+
+        ImmutableArray<EffectDirectWitness> Witnesses(string name) =>
+            session.Analyze(Method(compilation, name)).DirectWitnesses;
+
+        void AssertKinds(string name, params string[] expected) =>
+            Assert.That(Witnesses(name).Select(static witness => witness.Kind),
+                Is.EqualTo(expected), name);
     }
 
     private static EffectMethodResult Analyze(

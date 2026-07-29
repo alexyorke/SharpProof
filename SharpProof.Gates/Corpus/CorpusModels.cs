@@ -28,15 +28,29 @@ internal enum CorpusOrigin {
     OpenSource
 }
 
+internal enum CorpusSupport {
+    Supported,
+    IntentionallyUnsupported
+}
+
 internal sealed record CorpusCase(
     string Id,
     string SeedId,
     CorpusVariant Variant,
     string Mode,
     CorpusVerdict SemanticExpectation,
+    CorpusSupport Support,
     string Source,
     CorpusOrigin Origin = CorpusOrigin.SyntheticMetamorphic,
     string? ProvenanceId = null);
+
+internal sealed record CorpusUnknownReasonCount(
+    string Reason,
+    int Count);
+
+internal sealed record CorpusUnknownReasonRatchet(
+    int MaximumTotalUnknown,
+    ImmutableDictionary<string, int> MaximumByReason);
 
 internal sealed record CorpusObservation(
     string CaseId,

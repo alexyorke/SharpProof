@@ -15,9 +15,7 @@ public sealed class NullnessDomain : ClosedAbstractDomain<NullnessValue> {
     public override bool LessThanOrEqual(NullnessValue left, NullnessValue right) {
         Validate(left);
         Validate(right);
-        return left == right ||
-               left == NullnessValue.Bottom ||
-               right == NullnessValue.MaybeNull;
+        return left == right || left == NullnessValue.Bottom || right == NullnessValue.MaybeNull;
     }
 
     public override NullnessValue Join(NullnessValue left, NullnessValue right) {
@@ -29,18 +27,16 @@ public sealed class NullnessDomain : ClosedAbstractDomain<NullnessValue> {
         return NullnessValue.MaybeNull;
     }
 
-    public override NullnessValue Widen(NullnessValue previous, NullnessValue candidate) => Join(previous, candidate);
+    public override NullnessValue Widen(NullnessValue previous, NullnessValue candidate) =>
+        Join(previous, candidate);
 
     public override NullnessValue Havoc(NullnessValue value) {
         Validate(value);
         return value == NullnessValue.Bottom ? Bottom : Top;
     }
 
-    public NullnessValue AssumeNull(NullnessValue value) =>
-        Assume(value, NullnessValue.Null);
-
-    public NullnessValue AssumeNonNull(NullnessValue value) =>
-        Assume(value, NullnessValue.NonNull);
+    public NullnessValue AssumeNull(NullnessValue value) => Assume(value, NullnessValue.Null);
+    public NullnessValue AssumeNonNull(NullnessValue value) => Assume(value, NullnessValue.NonNull);
 
     private NullnessValue Assume(NullnessValue value, NullnessValue expected) {
         Validate(value);

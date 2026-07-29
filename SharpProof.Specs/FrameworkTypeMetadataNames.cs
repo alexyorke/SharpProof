@@ -1,5 +1,4 @@
 namespace SharpProof.Specs;
-
 /// <summary>
 /// Canonical metadata identities used by semantic analyses.
 /// Keep framework type-name declarations in the spec layer so consumers do
@@ -19,7 +18,9 @@ public static class FrameworkTypeMetadataNames {
     public const string InvalidCastException = "System.InvalidCastException";
     public const string InvalidOperationException =
         "System.InvalidOperationException";
+    public static readonly string Monitor = "System.Threading.Monitor";
     public const string NullReferenceException =
         "System.NullReferenceException";
     public const string OverflowException = "System.OverflowException";
+    public const string ReferenceAssemblyAttribute = "System.Runtime.CompilerServices.ReferenceAssemblyAttribute";
 }

@@ -30,14 +30,20 @@ The implementation remains the authority for enumerated surfaces:
   types, operation kinds, and operation shapes.
 - `SharpProof.Specs/ApiSpecTable.cs` declares typed API specifications. Not
   every witnessed facet is consumed by the worker.
-- `SharpProof.Analyzer/GeneratedDiagnosticDescriptors.cs` and
-  `SharpProof.ContractForGenerator/GeneratedDiagnosticDescriptors.cs` declare
-  diagnostic IDs, severities, defaults, and messages.
-- `SharpProof.Worker.Protocol/ProtocolModel.cs` declares protocol version 6,
-  manifest schema version 2, cache schema version 7, policies, run statuses,
-  callable coverage, claim outcomes/reasons, and summary records.
-- `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs` declares compiler
-  artifact schema version 3 and the closed compiler-evidence envelope.
+- `eng/diagnostics/diagnostic-descriptors.v1.json` declares analyzer,
+  `ContractFor`, and soundness-meta diagnostic IDs, severities, defaults,
+  messages, order, and help links. The corresponding
+  `*DiagnosticDescriptors.generated.cs` files are checked-in compiled
+  projections.
+- `SharpProof.Worker.Protocol/ProtocolModel.schema.json` declares protocol
+  version 8, manifest schema version 4, cache schema version 9, policies, run
+  statuses, callable coverage, claim outcomes/reasons, and summary records.
+  `ProtocolModel.generated.cs` is the checked-in compiled projection.
+- `SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json` is the
+  authoritative compiler-artifact model. `CompilerArtifactModel.generated.cs`
+  is its checked-in compiled projection, while
+  `CompilerManifestArtifact.cs` validates the closed compiler-evidence
+  envelope.
 - `eng/acceptance/contract.json` declares release-gate budgets. Package
   defaults that are not release-gate fields live in the portable and verifier
   build-transitive props and targets.
@@ -59,7 +65,7 @@ the current coverage inventory or normative semantics.
 ## Known production gaps
 
 During Windows verification, the production analyzer emits a deterministic
-schema-3 artifact from the final post-generator Roslyn `Compilation`. It
+schema-4 artifact from the final post-generator Roslyn `Compilation`. It
 contains the selected-claim manifest and portable lowered whole-body CFG/IR for
 supported selected callables, plus bound contract/spec metadata, compiler
 diagnostics, generated-tree hashes, bounded options, mapped locations, and

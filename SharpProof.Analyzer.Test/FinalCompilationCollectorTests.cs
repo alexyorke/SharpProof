@@ -83,8 +83,8 @@ public sealed class FinalCompilationCollectorTests {
             Assert.That(first.Take(3), Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
             Assert.That(first, Does.Not.Contain((byte)'\r'));
             Assert.That(artifact.Schema, Is.EqualTo("SharpProof.CompilerManifest"));
-            Assert.That(artifact.SchemaVersion, Is.EqualTo(3));
-            Assert.That(artifact.ProtocolVersion, Is.EqualTo("6"));
+            Assert.That(artifact.SchemaVersion, Is.EqualTo(5));
+            Assert.That(artifact.ProtocolVersion, Is.EqualTo("8"));
             Assert.That(artifact.Compilation.TargetFramework, Is.EqualTo("net9.0"));
             Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.All));
             Assert.That(

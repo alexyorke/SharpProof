@@ -266,7 +266,10 @@ public sealed class ArchitectureTests {
 
         Assert.That(
             FindRelativeCallers(productionFiles, "new Assumption("),
-            Is.EqualTo(["SharpProof.Worker/CallableVerifier.cs"]));
+            Is.EqualTo([
+                "SharpProof.Worker/CallableVerifier.cs",
+                "SharpProof.Worker/PostconditionObligationBuilder.cs"
+            ]));
         Assert.That(
             FindRelativeCallers(productionFiles, "new EffectSummary("),
             Is.EqualTo([
@@ -345,6 +348,7 @@ public sealed class ArchitectureTests {
                 "SharpProof.Analyzer/CompilerArtifact/CompilerCallableLowerer.cs",
                 "SharpProof.Analyzer/CompilerArtifact/CompilerManifestArtifactProducer.cs",
                 "SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs",
+                "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
                 "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
                 "SharpProof.Contracts/ContractBinder.cs",
                 "SharpProof.Contracts/ContractExpressionBinder.cs",
@@ -354,24 +358,90 @@ public sealed class ArchitectureTests {
             ],
             ["execution"] = [
                 "SharpProof.Worker/CallableVerifier.cs",
+                "SharpProof.Worker/AcyclicBlockPredicateExecutor.cs",
                 "SharpProof.Worker/SpecResultDomainProjection.cs",
                 "SharpProof.Worker/SharpProofWorker.cs"
             ],
+            ["obligationGeneration"] = [
+                "SharpProof.Worker/PostconditionObligationBuilder.cs"
+            ],
             ["encoding"] = ["SharpProof.Smt/IrSmtBackend.cs"],
+            ["apiSpecifications"] = [
+                "SharpProof.Specs/ApiSpecTable.cs",
+                "SharpProof.Effects/ApiSpecResolution.cs",
+                "SharpProof.Specs/ApiSpecInstantiation.cs"
+            ],
+            ["apiSpecificationIdentity"] = [
+                "SharpProof.Specs/ApiSpecContentDigest.cs"
+            ],
+            ["apiSpecificationCatalog"] = [
+                "SharpProof.Specs/DefaultApiSpecCatalog.json",
+                "scripts/Generate-ApiSpecCatalog.ps1",
+                "SharpProof.Specs/DefaultApiSpecCatalog.generated.cs"
+            ],
+            ["scalarSemanticsCatalog"] = [
+                "SharpProof.Frontend/CSharpScalarSemantics.json",
+                "scripts/Generate-CSharpScalarSemantics.ps1",
+                "SharpProof.Frontend/CSharpScalarSemantics.generated.cs"
+            ],
+            ["effectAnalysis"] = [
+                "SharpProof.Analyzer/EffectContractDiagnostics.cs",
+                "SharpProof.Analyzer/AnalyzerSession.cs",
+                "SharpProof.Contracts/ContractSelectionInventory.cs",
+                "SharpProof.Effects/EffectAnalysisSession.cs",
+                "SharpProof.Effects/EffectContractMappings.cs",
+                "SharpProof.Effects/OperationEffectScanner.cs",
+                "SharpProof.Effects/EffectExceptionFlow.cs",
+                "SharpProof.Effects/ManagedAbstractFlow.cs",
+                "SharpProof.Effects/ExternalEffectResolver.cs",
+                "SharpProof.Effects/EffectSummaryOperations.cs",
+                "SharpProof.Effects/EffectProjection.cs",
+                "SharpProof.Effects/EffectSummary.cs",
+                "SharpProof.Effects/EffectValues.cs",
+                "SharpProof.Effects/EffectRegions.cs",
+                "SharpProof.Effects/EffectContractValues.cs",
+                "SharpProof.Dataflow/ForwardDataflowAnalysis.cs",
+                "SharpProof.Dataflow/DataflowGraph.cs",
+                "SharpProof.Dataflow/IAbstractDomain.cs",
+                "SharpProof.Dataflow/ClosedAbstractDomain.cs",
+                "SharpProof.Dataflow/IntervalDomain.cs",
+                "SharpProof.Dataflow/IntervalValue.cs",
+                "SharpProof.Dataflow/NullnessDomain.cs",
+                "SharpProof.Dataflow/NullnessValue.cs",
+                "SharpProof.Specs/FrameworkTypeMetadataNames.cs"
+            ],
             ["replay"] = [
                 "SharpProof.Verify/ProofKernel.cs",
                 "SharpProof.Ir/IrInterpreter.cs",
                 "SharpProof.Ir/IrProgramInterpreter.cs",
                 "SharpProof.Worker/CallableCounterexampleReplayer.cs"
             ],
+            ["effectReplay"] = [
+                "SharpProof.Worker/EffectWitnessReplayer.cs"
+            ],
             ["policy"] = [
                 "SharpProof.Worker.Launcher/Program.cs",
-                "SharpProof.Worker/CallableClaimResultAssembler.cs"
+                "SharpProof.Worker/CallableVerificationPolicy.cs"
+            ],
+            ["resultAssembly"] = [
+                "SharpProof.Worker/CallableClaimResultAssembler.cs",
+                "SharpProof.Worker.Protocol/WorkerResultAssembler.cs"
+            ],
+            ["compilerInputIdentity"] = [
+                "SharpProof.Analyzer/CompilerArtifact/CompilerCompilationCapture.cs",
+                "SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs",
+                "SharpProof.CompilerArtifact/CompilationFingerprint.cs"
+            ],
+            ["canonicalIdentityEncoding"] = [
+                "SharpProof.Ir/CanonicalHashWriter.cs"
+            ],
+            ["protocolValidation"] = [
+                "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
+                "SharpProof.Worker.Protocol/ProtocolJson.cs"
             ],
             ["cacheValidation"] = [
+                "SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs",
                 "SharpProof.CompilerArtifact/CompilerManifestArtifact.cs",
-                "SharpProof.Worker.Protocol/ProtocolJson.cs",
-                "SharpProof.Worker.Protocol/WorkerResultAssembler.cs",
                 "SharpProof.Worker/WorkerInputSnapshot.cs",
                 "SharpProof.Worker/VerificationCache.cs"
             ]

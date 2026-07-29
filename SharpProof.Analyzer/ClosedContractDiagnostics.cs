@@ -26,14 +26,14 @@ internal static class ClosedContractDiagnostics {
         }
     }
 
-    private static (string Name, string Reason)? GetError(ITypeSymbol type, AttributeData attribute, AnalyzerAttributeSymbols symbols) =>
-        AnalyzerAttributeSymbols.Is(attribute, symbols.NotNull) &&
+    private static (string Name, string Reason)? GetError(ITypeSymbol type, AttributeData attribute, ContractSelectionInventory symbols) =>
+        ContractSelectionInventory.Is(attribute, symbols.NotNull) &&
         type.IsValueType
             ? ("[NotNull]", "expected a reference-capable value")
-            : AnalyzerAttributeSymbols.Is(attribute, symbols.Positive) &&
+            : ContractSelectionInventory.Is(attribute, symbols.Positive) &&
               !IsSupportedInteger(type)
                 ? ("[Positive]", "expected a supported integral value")
-                : AnalyzerAttributeSymbols.Is(attribute, symbols.InRange) &&
+                : ContractSelectionInventory.Is(attribute, symbols.InRange) &&
                   (!IsSupportedInteger(type) ||
                    attribute.ConstructorArguments.Length != 2 ||
                    attribute.ConstructorArguments[0].Value is not long minimum ||
@@ -42,7 +42,5 @@ internal static class ClosedContractDiagnostics {
                     ? ("[InRange]", "expected a supported integral value and ordered bounds")
                     : null;
     private static bool IsSupportedInteger(ITypeSymbol type) =>
-        type.SpecialType is SpecialType.System_SByte or SpecialType.System_Byte or SpecialType.System_Int16 or
-            SpecialType.System_UInt16 or SpecialType.System_Char or
-            SpecialType.System_Int32 or SpecialType.System_UInt32 or SpecialType.System_Int64;
+        CSharpScalarSemantics.IsSupportedInteger(type.SpecialType);
 }

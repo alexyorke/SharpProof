@@ -10,6 +10,13 @@
     <PackageReference Include="System.Text.Json" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Update="ProtocolModel.generated.cs">
+      <AutoGen>true</AutoGen>
+      <DesignTime>true</DesignTime>
+      <DependentUpon>ProtocolModel.schema.json</DependentUpon>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.CompilerArtifact" />
     <InternalsVisibleTo Include="SharpProof.Gates" />
     <InternalsVisibleTo Include="SharpProof.Worker" />

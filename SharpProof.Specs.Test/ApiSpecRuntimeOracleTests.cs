@@ -9,12 +9,15 @@ using SharpProof.Specs;
 namespace SharpProof.Specs.Test;
 
 [TestFixture]
-public sealed class ApiSpecRuntimeOracleTests {
+public sealed partial class ApiSpecRuntimeOracleTests {
     private static readonly Action<object> CallObjectConstructor =
         CreateObjectConstructorInvoker();
     private static readonly object ListItem = new();
     private static readonly string ConcatLeft = new(['l', 'e', 'f', 't']);
     private static readonly string ConcatRight = new(['r', 'i', 'g', 'h', 't']);
+    private static readonly ThrowClaim DoesNotThrowMutation = new(
+        SpecThrowBehavior.MayThrow,
+        ["System.Exception"]);
     private static readonly ImmutableDictionary<string, RowWitness> Witnesses =
         CreateWitnesses();
 
@@ -109,303 +112,295 @@ public sealed class ApiSpecRuntimeOracleTests {
         }
     }
 
-    private static ImmutableDictionary<string, RowWitness> CreateWitnesses() {
-        var doesNotThrowMutation = new ThrowClaim(
-            SpecThrowBehavior.MayThrow,
-            ["System.Exception"]);
-        return new Dictionary<string, RowWitness>(StringComparer.Ordinal) {
-            ["bcl.array.empty"] = Row(
-                throws: Throws(
-                    "reference-type and value-type generic instantiations",
-                    [
-                        ThrowEdge.For(InvokeEmptyObjectArray),
-                        ThrowEdge.For(InvokeEmptyIntegerArray)
-                    ],
-                    doesNotThrowMutation),
-                nullness: Nullness(
-                    "reference-type and value-type generic instantiations",
-                    static () => ObserveNullness(
-                        static () => Array.Empty<object>(),
-                        static () => Array.Empty<int>()),
-                    SpecNullness.Null),
-                cardinality: Cardinality(
-                    "reference-type and value-type generic instantiations",
-                    static () => ObserveCardinality(
-                        static () => Array.Empty<object>(),
-                        static () => Array.Empty<int>()),
-                    SpecCardinality.NonEmpty)),
-            ["bcl.object.ctor"] = Row(
-                Effect(
-                    "an already allocated receiver",
-                    static () => ObserveNoEffects(ObjectConstructorEdge),
-                    SpecEffect.WritesAmbientState),
-                allocation: Allocation(
-                    "an already allocated receiver, excluding newobj",
-                    [
-                        new AllocationEdge(
-                            PrepareObjectConstructorReceiver,
-                            InvokePreparedObjectConstructor)
-                    ],
-                    SpecAllocationBehavior.MayAllocate),
-                throws: Throws(
-                    "an already allocated receiver",
-                    [
-                        new ThrowEdge(
-                            PrepareObjectConstructorReceiver,
-                            InvokePreparedObjectConstructor)
-                    ],
-                    doesNotThrowMutation)),
-            ["contract.assume"] = Row(
-                Effect(
-                    "false and true compiler-bound conditions",
-                    static () => ObserveNoEffects(
-                        static () => ContractAssumeEdge(false),
-                        static () => ContractAssumeEdge(true)),
-                    SpecEffect.WritesAmbientState),
-                allocation: Allocation(
-                    "false and true compiler-bound conditions",
-                    [
-                        new AllocationEdge(
-                            PrepareGhostProbe,
-                            InvokePreparedAssumeFalse),
-                        new AllocationEdge(
-                            PrepareGhostProbe,
-                            InvokePreparedAssumeTrue)
-                    ],
-                    SpecAllocationBehavior.MayAllocate),
-                throws: Throws(
-                    "false and true compiler-bound conditions",
-                    [
-                        ThrowEdge.For(static () => ContractAssumeEdge(false)),
-                        ThrowEdge.For(static () => ContractAssumeEdge(true))
-                    ],
-                    doesNotThrowMutation)),
-            ["contract.ensures"] = Row(
-                Effect(
-                    "false and true compiler-bound conditions",
-                    static () => ObserveNoEffects(
-                        static () => ContractEnsuresEdge(false),
-                        static () => ContractEnsuresEdge(true)),
-                    SpecEffect.WritesAmbientState),
-                allocation: Allocation(
-                    "false and true compiler-bound conditions",
-                    [
-                        new AllocationEdge(
-                            PrepareGhostProbe,
-                            InvokePreparedEnsuresFalse),
-                        new AllocationEdge(
-                            PrepareGhostProbe,
-                            InvokePreparedEnsuresTrue)
-                    ],
-                    SpecAllocationBehavior.MayAllocate),
-                throws: Throws(
-                    "false and true compiler-bound conditions",
-                    [
-                        ThrowEdge.For(static () => ContractEnsuresEdge(false)),
-                        ThrowEdge.For(static () => ContractEnsuresEdge(true))
-                    ],
-                    doesNotThrowMutation)),
-            ["contract.old"] = Row(
-                Effect(
-                    "direct null and non-null arguments",
-                    static () => ObserveNoEffects(
-                        static () => ContractOldDirectHasNoEffects(null),
-                        static () => ContractOldDirectHasNoEffects(ListItem)),
-                    SpecEffect.WritesAmbientState),
-                allocation: Allocation(
-                    "direct null and non-null arguments",
-                    [
-                        new AllocationEdge(
-                            PrepareGhostProbe,
-                            InvokeAndCatchOldNull),
-                        new AllocationEdge(
-                            PrepareGhostProbe,
-                            InvokeAndCatchOldItem)
-                    ],
-                    SpecAllocationBehavior.None),
-                throws: Throws(
-                    "direct null and non-null arguments",
-                    [
-                        ThrowEdge.For(InvokeOldNullDirectly),
-                        ThrowEdge.For(InvokeOldItemDirectly)
-                    ],
-                    doesNotThrowMutation)),
-            ["contract.requires"] = Row(
-                Effect(
-                    "false and true compiler-bound conditions",
-                    static () => ObserveNoEffects(
-                        static () => ContractRequiresEdge(false),
-                        static () => ContractRequiresEdge(true)),
-                    SpecEffect.WritesAmbientState),
-                allocation: Allocation(
-                    "false and true compiler-bound conditions",
-                    [
-                        new AllocationEdge(
-                            PrepareGhostProbe,
-                            InvokePreparedRequiresFalse),
-                        new AllocationEdge(
-                            PrepareGhostProbe,
-                            InvokePreparedRequiresTrue)
-                    ],
-                    SpecAllocationBehavior.MayAllocate),
-                throws: Throws(
-                    "false and true compiler-bound conditions",
-                    [
-                        ThrowEdge.For(static () => ContractRequiresEdge(false)),
-                        ThrowEdge.For(static () => ContractRequiresEdge(true))
-                    ],
-                    doesNotThrowMutation)),
-            ["contract.result"] = Row(
-                Effect(
-                    "a direct reference result intrinsic call",
-                    static () => ObserveNoEffects(
-                        ContractResultDirectHasNoEffects),
-                    SpecEffect.WritesAmbientState),
-                allocation: Allocation(
-                    "a direct reference result intrinsic call",
-                    [
-                        new AllocationEdge(
-                            PrepareGhostProbe,
-                            InvokeAndCatchResult)
-                    ],
-                    SpecAllocationBehavior.None),
-                throws: Throws(
-                    "a direct reference result intrinsic call",
-                    [ThrowEdge.For(InvokeResultDirectly)],
-                    doesNotThrowMutation)),
-            ["bcl.string.length"] = Row(
-                Effect(
+    private static ImmutableDictionary<string, RowWitness> CreateWitnesses() =>
+        GeneratedRuntimeWitnesses.ToImmutableDictionary(
+            static descriptor => descriptor.Identifier,
+            static descriptor => descriptor.Factory(),
+            StringComparer.Ordinal);
+
+    private static RowWitness CreateBclArrayEmptyWitness() =>
+        Row(
+            throws: Throws(
+                "reference-type and value-type generic instantiations",
+                [
+                    ThrowEdge.For(InvokeEmptyObjectArray),
+                    ThrowEdge.For(InvokeEmptyIntegerArray)
+                ],
+                DoesNotThrowMutation),
+            nullness: Nullness(
+                "reference-type and value-type generic instantiations",
+                ObserveArrayEmptyNullness,
+                SpecNullness.Null),
+            cardinality: Cardinality(
+                "reference-type and value-type generic instantiations",
+                ObserveArrayEmptyCardinality,
+                SpecCardinality.NonEmpty));
+
+    private static RowWitness CreateBclEnumerableEmptyWitness() =>
+        Row(
+            throws: Throws(
+                "reference-type and value-type generic instantiations",
+                [
+                    ThrowEdge.For(EnumerateEmptyObjects),
+                    ThrowEdge.For(EnumerateEmptyIntegers)
+                ],
+                DoesNotThrowMutation),
+            nullness: Nullness(
+                "reference-type and value-type generic instantiations",
+                ObserveEnumerableEmptyNullness,
+                SpecNullness.Null),
+            cardinality: Cardinality(
+                "reference-type and value-type generic instantiations",
+                ObserveEnumerableEmptyCardinality,
+                SpecCardinality.NonEmpty));
+
+    private static RowWitness CreateBclListAddWitness() =>
+        Row(
+            effects: Effect(
+                "adding null and non-null values to empty receivers",
+                ObserveListAddEffect,
+                SpecEffect.None),
+            allocation: Allocation(
+                "first add of null and non-null values",
+                [
+                    new AllocationEdge(
+                        PrepareEmptyList,
+                        AddNullToPreparedList),
+                    new AllocationEdge(
+                        PrepareEmptyList,
+                        AddItemToPreparedList)
+                ],
+                SpecAllocationBehavior.None));
+
+    private static RowWitness CreateBclMathAbsInt32Witness() =>
+        Row(
+            effects: Effect(
+                "negative, zero, and maximum inputs",
+                ObserveMathAbsEffect,
+                SpecEffect.WritesAmbientState),
+            allocation: Allocation(
+                "negative, zero, and maximum inputs",
+                [
+                    AllocationEdge.For(AbsNegative),
+                    AllocationEdge.For(AbsZero),
+                    AllocationEdge.For(AbsMaximum)
+                ],
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "negative, zero, maximum, and minimum inputs",
+                [
+                    ThrowEdge.For(AbsNegative),
+                    ThrowEdge.For(AbsZero),
+                    ThrowEdge.For(AbsMaximum),
+                    ThrowEdge.For(AbsMinimum)
+                ],
+                new ThrowClaim(
+                    SpecThrowBehavior.MayThrow,
+                    ["System.ArgumentException"])),
+            postconditions: [
+                Postcondition(
+                    0,
+                    "negative, zero, and maximum normal returns",
+                    MathAbsNegativeCall,
+                    MathAbsZeroCall,
+                    MathAbsMaximumCall)
+            ]);
+
+    private static RowWitness CreateBclObjectCtorWitness() =>
+        Row(
+            effects: Effect(
+                "an already allocated receiver",
+                ObserveObjectConstructorEffect,
+                SpecEffect.WritesAmbientState),
+            allocation: Allocation(
+                "an already allocated receiver, excluding newobj",
+                [
+                    new AllocationEdge(
+                        PrepareObjectConstructorReceiver,
+                        InvokePreparedObjectConstructor)
+                ],
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "an already allocated receiver",
+                [
+                    new ThrowEdge(
+                        PrepareObjectConstructorReceiver,
+                        InvokePreparedObjectConstructor)
+                ],
+                DoesNotThrowMutation));
+
+    private static RowWitness CreateBclStringConcatStringStringWitness() =>
+        Row(
+            effects: Effect(
+                "null/null, null/value, and two non-empty strings",
+                ObserveStringConcatEffect,
+                SpecEffect.WritesArgumentState),
+            allocation: Allocation(
+                "null/null and two non-empty strings",
+                [
+                    AllocationEdge.For(ConcatNulls),
+                    AllocationEdge.For(ConcatNonEmpty)
+                ],
+                SpecAllocationBehavior.None),
+            throws: Throws(
+                "null/null, null/value, and two non-empty strings",
+                [
+                    ThrowEdge.For(ConcatNulls),
+                    ThrowEdge.For(ConcatNullAndValue),
+                    ThrowEdge.For(ConcatNonEmpty)
+                ],
+                DoesNotThrowMutation),
+            nullness: Nullness(
+                "null/null, null/value, and two non-empty strings",
+                ObserveStringConcatNullness,
+                SpecNullness.Null));
+
+    private static RowWitness CreateBclStringLengthWitness() =>
+        Row(
+            effects: Effect(
+                "empty and embedded-null receivers",
+                ObserveStringLengthEffect,
+                SpecEffect.None),
+            allocation: Allocation(
+                "empty and embedded-null receivers",
+                [
+                    AllocationEdge.For(ReadEmptyStringLength),
+                    AllocationEdge.For(ReadEmbeddedNullStringLength)
+                ],
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "empty and embedded-null receivers",
+                [
+                    ThrowEdge.For(ReadEmptyStringLength),
+                    ThrowEdge.For(ReadEmbeddedNullStringLength)
+                ],
+                DoesNotThrowMutation),
+            postconditions: [
+                Postcondition(
+                    0,
                     "empty and embedded-null receivers",
-                    ObserveStringLengthEffect,
-                    SpecEffect.None),
-                allocation: Allocation(
-                    "empty and embedded-null receivers",
-                    [
-                        AllocationEdge.For(ReadEmptyStringLength),
-                        AllocationEdge.For(ReadEmbeddedNullStringLength)
-                    ],
-                    SpecAllocationBehavior.MayAllocate),
-                throws: Throws(
-                    "empty and embedded-null receivers",
-                    [
-                        ThrowEdge.For(ReadEmptyStringLength),
-                        ThrowEdge.For(ReadEmbeddedNullStringLength)
-                    ],
-                    doesNotThrowMutation),
-                postconditions: [
-                    Postcondition(
-                        0,
-                        "empty and embedded-null receivers",
-                        static () => RuntimeCall.ForReceiver(
-                            string.Empty,
-                            string.Empty.Length),
-                        static () => RuntimeCall.ForReceiver(
-                            "A\0B",
-                            "A\0B".Length))
-                ]),
-            ["bcl.string.concat.string-string"] = Row(
-                Effect(
-                    "null/null, null/value, and two non-empty strings",
-                    static () => ObserveNoEffects(StringConcatEdge),
-                    SpecEffect.WritesArgumentState),
-                allocation: Allocation(
-                    "null/null and two non-empty strings",
-                    [
-                        AllocationEdge.For(ConcatNulls),
-                        AllocationEdge.For(ConcatNonEmpty)
-                    ],
-                    SpecAllocationBehavior.None),
-                throws: Throws(
-                    "null/null, null/value, and two non-empty strings",
-                    [
-                        ThrowEdge.For(ConcatNulls),
-                        ThrowEdge.For(ConcatNullAndValue),
-                        ThrowEdge.For(ConcatNonEmpty)
-                    ],
-                    doesNotThrowMutation),
-                nullness: Nullness(
-                    "null/null, null/value, and two non-empty strings",
-                    static () => ObserveNullness(
-                        static () => string.Concat(null, null),
-                        static () => string.Concat(null, ConcatRight),
-                        static () => string.Concat(ConcatLeft, ConcatRight)),
-                    SpecNullness.Null)),
-            ["bcl.list.add"] = Row(
-                Effect(
-                    "adding null and non-null values to empty receivers",
-                    ObserveListAddEffect,
-                    SpecEffect.None),
-                allocation: Allocation(
-                    "first add of null and non-null values",
-                    [
-                        new AllocationEdge(
-                            PrepareEmptyList,
-                            AddNullToPreparedList),
-                        new AllocationEdge(
-                            PrepareEmptyList,
-                            AddItemToPreparedList)
-                    ],
-                    SpecAllocationBehavior.None)),
-            ["bcl.math.abs.int32"] = Row(
-                Effect(
-                    "negative, zero, and maximum inputs",
-                    static () => ObserveNoEffects(MathAbsNormalEdges),
-                    SpecEffect.WritesAmbientState),
-                allocation: Allocation(
-                    "negative, zero, and maximum inputs",
-                    [
-                        AllocationEdge.For(AbsNegative),
-                        AllocationEdge.For(AbsZero),
-                        AllocationEdge.For(AbsMaximum)
-                    ],
-                    SpecAllocationBehavior.MayAllocate),
-                throws: Throws(
-                    "negative, zero, maximum, and minimum inputs",
-                    [
-                        ThrowEdge.For(AbsNegative),
-                        ThrowEdge.For(AbsZero),
-                        ThrowEdge.For(AbsMaximum),
-                        ThrowEdge.For(AbsMinimum)
-                    ],
-                    new ThrowClaim(
-                        SpecThrowBehavior.MayThrow,
-                        ["System.ArgumentException"])),
-                postconditions: [
-                    Postcondition(
-                        0,
-                        "negative, zero, and maximum normal returns",
-                        static () => RuntimeCall.ForParameterAndResult(
-                            -17,
-                            Math.Abs(-17)),
-                        static () => RuntimeCall.ForParameterAndResult(
-                            0,
-                            Math.Abs(0)),
-                        static () => RuntimeCall.ForParameterAndResult(
-                            int.MaxValue,
-                            Math.Abs(int.MaxValue)))
-                ]),
-            ["bcl.enumerable.empty"] = Row(
-                throws: Throws(
-                    "reference-type and value-type generic instantiations",
-                    [
-                        ThrowEdge.For(EnumerateEmptyObjects),
-                        ThrowEdge.For(EnumerateEmptyIntegers)
-                    ],
-                    doesNotThrowMutation),
-                nullness: Nullness(
-                    "reference-type and value-type generic instantiations",
-                    static () => ObserveNullness(
-                        static () => Enumerable.Empty<object>(),
-                        static () => Enumerable.Empty<int>()),
-                    SpecNullness.Null),
-                cardinality: Cardinality(
-                    "reference-type and value-type generic instantiations",
-                    static () => ObserveCardinality(
-                        static () => Enumerable.Empty<object>(),
-                        static () => Enumerable.Empty<int>()),
-                    SpecCardinality.NonEmpty))
-        }.ToImmutableDictionary(StringComparer.Ordinal);
-    }
+                    EmptyStringLengthCall,
+                    EmbeddedNullStringLengthCall)
+            ]);
+
+    private static RowWitness CreateContractAssumeWitness() =>
+        Row(
+            effects: Effect(
+                "false and true compiler-bound conditions",
+                ObserveContractAssumeEffect,
+                SpecEffect.WritesAmbientState),
+            allocation: Allocation(
+                "false and true compiler-bound conditions",
+                [
+                    new AllocationEdge(
+                        PrepareGhostProbe,
+                        InvokePreparedAssumeFalse),
+                    new AllocationEdge(
+                        PrepareGhostProbe,
+                        InvokePreparedAssumeTrue)
+                ],
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "false and true compiler-bound conditions",
+                [
+                    ThrowEdge.For(InvokeAssumeFalseDirectly),
+                    ThrowEdge.For(InvokeAssumeTrueDirectly)
+                ],
+                DoesNotThrowMutation));
+
+    private static RowWitness CreateContractEnsuresWitness() =>
+        Row(
+            effects: Effect(
+                "false and true compiler-bound conditions",
+                ObserveContractEnsuresEffect,
+                SpecEffect.WritesAmbientState),
+            allocation: Allocation(
+                "false and true compiler-bound conditions",
+                [
+                    new AllocationEdge(
+                        PrepareGhostProbe,
+                        InvokePreparedEnsuresFalse),
+                    new AllocationEdge(
+                        PrepareGhostProbe,
+                        InvokePreparedEnsuresTrue)
+                ],
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "false and true compiler-bound conditions",
+                [
+                    ThrowEdge.For(InvokeEnsuresFalseDirectly),
+                    ThrowEdge.For(InvokeEnsuresTrueDirectly)
+                ],
+                DoesNotThrowMutation));
+
+    private static RowWitness CreateContractOldWitness() =>
+        Row(
+            effects: Effect(
+                "direct null and non-null arguments",
+                ObserveContractOldEffect,
+                SpecEffect.WritesAmbientState),
+            allocation: Allocation(
+                "direct null and non-null arguments",
+                [
+                    new AllocationEdge(
+                        PrepareGhostProbe,
+                        InvokeAndCatchOldNull),
+                    new AllocationEdge(
+                        PrepareGhostProbe,
+                        InvokeAndCatchOldItem)
+                ],
+                SpecAllocationBehavior.None),
+            throws: Throws(
+                "direct null and non-null arguments",
+                [
+                    ThrowEdge.For(InvokeOldNullDirectly),
+                    ThrowEdge.For(InvokeOldItemDirectly)
+                ],
+                DoesNotThrowMutation));
+
+    private static RowWitness CreateContractRequiresWitness() =>
+        Row(
+            effects: Effect(
+                "false and true compiler-bound conditions",
+                ObserveContractRequiresEffect,
+                SpecEffect.WritesAmbientState),
+            allocation: Allocation(
+                "false and true compiler-bound conditions",
+                [
+                    new AllocationEdge(
+                        PrepareGhostProbe,
+                        InvokePreparedRequiresFalse),
+                    new AllocationEdge(
+                        PrepareGhostProbe,
+                        InvokePreparedRequiresTrue)
+                ],
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                "false and true compiler-bound conditions",
+                [
+                    ThrowEdge.For(InvokeRequiresFalseDirectly),
+                    ThrowEdge.For(InvokeRequiresTrueDirectly)
+                ],
+                DoesNotThrowMutation));
+
+    private static RowWitness CreateContractResultWitness() =>
+        Row(
+            effects: Effect(
+                "a direct reference result intrinsic call",
+                ObserveContractResultEffect,
+                SpecEffect.WritesAmbientState),
+            allocation: Allocation(
+                "a direct reference result intrinsic call",
+                [
+                    new AllocationEdge(
+                        PrepareGhostProbe,
+                        InvokeAndCatchResult)
+                ],
+                SpecAllocationBehavior.None),
+            throws: Throws(
+                "a direct reference result intrinsic call",
+                [ThrowEdge.For(InvokeResultDirectly)],
+                DoesNotThrowMutation));
 
     private static RowWitness Row(
         IFacetWitness? effects = null,
@@ -508,6 +503,38 @@ public sealed class ApiSpecRuntimeOracleTests {
     private static SpecEffect ObserveNoEffects(params Func<bool>[] edges) =>
         edges.All(static edge => edge()) ? SpecEffect.None : SpecEffect.Unknown;
 
+    private static SpecEffect ObserveObjectConstructorEffect() =>
+        ObserveNoEffects(ObjectConstructorEdge);
+
+    private static SpecEffect ObserveContractAssumeEffect() =>
+        ObserveNoEffects(
+            static () => ContractAssumeEdge(false),
+            static () => ContractAssumeEdge(true));
+
+    private static SpecEffect ObserveContractEnsuresEffect() =>
+        ObserveNoEffects(
+            static () => ContractEnsuresEdge(false),
+            static () => ContractEnsuresEdge(true));
+
+    private static SpecEffect ObserveContractOldEffect() =>
+        ObserveNoEffects(
+            static () => ContractOldDirectHasNoEffects(null),
+            static () => ContractOldDirectHasNoEffects(ListItem));
+
+    private static SpecEffect ObserveContractRequiresEffect() =>
+        ObserveNoEffects(
+            static () => ContractRequiresEdge(false),
+            static () => ContractRequiresEdge(true));
+
+    private static SpecEffect ObserveContractResultEffect() =>
+        ObserveNoEffects(ContractResultDirectHasNoEffects);
+
+    private static SpecEffect ObserveStringConcatEffect() =>
+        ObserveNoEffects(StringConcatEdge);
+
+    private static SpecEffect ObserveMathAbsEffect() =>
+        ObserveNoEffects(MathAbsNormalEdges);
+
     private static SpecEffect ObserveStringLengthEffect() {
         const string empty = "";
         const string embeddedNull = "A\0B";
@@ -601,6 +628,22 @@ public sealed class ApiSpecRuntimeOracleTests {
         return sawNonNull ? SpecNullness.NonNull : SpecNullness.Unknown;
     }
 
+    private static SpecNullness ObserveArrayEmptyNullness() =>
+        ObserveNullness(
+            static () => Array.Empty<object>(),
+            static () => Array.Empty<int>());
+
+    private static SpecNullness ObserveEnumerableEmptyNullness() =>
+        ObserveNullness(
+            static () => Enumerable.Empty<object>(),
+            static () => Enumerable.Empty<int>());
+
+    private static SpecNullness ObserveStringConcatNullness() =>
+        ObserveNullness(
+            static () => string.Concat(null, null),
+            static () => string.Concat(null, ConcatRight),
+            static () => string.Concat(ConcatLeft, ConcatRight));
+
     private static SpecCardinality ObserveCardinality(
         params Func<IEnumerable>[] edges) {
         var counts = edges.Select(static edge => Count(edge())).ToArray();
@@ -608,6 +651,16 @@ public sealed class ApiSpecRuntimeOracleTests {
         if (counts.All(static count => count > 0)) return SpecCardinality.NonEmpty;
         return SpecCardinality.Unknown;
     }
+
+    private static SpecCardinality ObserveArrayEmptyCardinality() =>
+        ObserveCardinality(
+            static () => Array.Empty<object>(),
+            static () => Array.Empty<int>());
+
+    private static SpecCardinality ObserveEnumerableEmptyCardinality() =>
+        ObserveCardinality(
+            static () => Enumerable.Empty<object>(),
+            static () => Enumerable.Empty<int>());
 
     private static int Count(IEnumerable sequence) {
         var count = 0;
@@ -620,11 +673,11 @@ public sealed class ApiSpecRuntimeOracleTests {
 
     private static bool ValidatePostcondition(
         ApiSpecTemplate template,
-        SpecTerm condition,
+        SpecTermDeclaration condition,
         ImmutableArray<Func<RuntimeCall>> edges) {
         foreach (var edge in edges) {
             var call = edge();
-            var bindings = new Dictionary<SpecVarId, object?>();
+            var bindings = new Dictionary<(SpecVariableRole, int), object?>();
             foreach (var variable in template.Variables) {
                 var value = variable.Role switch {
                     SpecVariableRole.Receiver => call.Receiver,
@@ -632,7 +685,7 @@ public sealed class ApiSpecRuntimeOracleTests {
                     SpecVariableRole.Result => call.Result,
                     _ => throw new AssertionException("Unknown spec variable role.")
                 };
-                bindings.Add(variable.Id, value);
+                bindings.Add((variable.Role, variable.Ordinal), value);
             }
             if (Evaluate(condition, bindings) is not true) return false;
         }
@@ -640,27 +693,27 @@ public sealed class ApiSpecRuntimeOracleTests {
     }
 
     private static object? Evaluate(
-        SpecTerm term,
-        IReadOnlyDictionary<SpecVarId, object?> bindings) =>
+        SpecTermDeclaration term,
+        IReadOnlyDictionary<(SpecVariableRole, int), object?> bindings) =>
         term switch {
-            SpecVariableTerm variable => bindings[variable.Variable],
-            SpecBooleanTerm boolean => boolean.Value,
-            SpecIntegerTerm integer => integer.Value,
-            SpecStringTerm text => text.Value,
-            SpecNullTerm => null,
-            SpecUnaryTerm unary => EvaluateUnary(unary, bindings),
-            SpecBinaryTerm binary => EvaluateBinary(binary, bindings),
-            SpecConditionalTerm conditional => AsBoolean(
+            SpecVariableDeclaration variable => bindings[(variable.Role, variable.Ordinal)],
+            SpecBooleanDeclaration boolean => boolean.Value,
+            SpecIntegerDeclaration integer => integer.Value,
+            SpecStringDeclaration text => text.Value,
+            SpecNullDeclaration => null,
+            SpecUnaryDeclaration unary => EvaluateUnary(unary, bindings),
+            SpecBinaryDeclaration binary => EvaluateBinary(binary, bindings),
+            SpecConditionalDeclaration conditional => AsBoolean(
                 Evaluate(conditional.Condition, bindings))
                 ? Evaluate(conditional.WhenTrue, bindings)
                 : Evaluate(conditional.WhenFalse, bindings),
-            SpecLengthTerm length => EvaluateLength(length, bindings),
+            SpecLengthDeclaration length => EvaluateLength(length, bindings),
             _ => throw new AssertionException("Unknown spec term.")
         };
 
     private static object EvaluateUnary(
-        SpecUnaryTerm unary,
-        IReadOnlyDictionary<SpecVarId, object?> bindings) =>
+        SpecUnaryDeclaration unary,
+        IReadOnlyDictionary<(SpecVariableRole, int), object?> bindings) =>
         unary.Operator switch {
             SpecUnaryOperator.Not => !AsBoolean(Evaluate(unary.Operand, bindings)),
             SpecUnaryOperator.Negate => -AsInteger(Evaluate(unary.Operand, bindings)),
@@ -668,8 +721,8 @@ public sealed class ApiSpecRuntimeOracleTests {
         };
 
     private static object EvaluateBinary(
-        SpecBinaryTerm binary,
-        IReadOnlyDictionary<SpecVarId, object?> bindings) {
+        SpecBinaryDeclaration binary,
+        IReadOnlyDictionary<(SpecVariableRole, int), object?> bindings) {
         var left = Evaluate(binary.Left, bindings);
         var right = Evaluate(binary.Right, bindings);
         return binary.Operator switch {
@@ -693,8 +746,8 @@ public sealed class ApiSpecRuntimeOracleTests {
     }
 
     private static long EvaluateLength(
-        SpecLengthTerm length,
-        IReadOnlyDictionary<SpecVarId, object?> bindings) =>
+        SpecLengthDeclaration length,
+        IReadOnlyDictionary<(SpecVariableRole, int), object?> bindings) =>
         Evaluate(length.Value, bindings) switch {
             string text => text.Length,
             IEnumerable sequence => Count(sequence),
@@ -761,6 +814,12 @@ public sealed class ApiSpecRuntimeOracleTests {
     private static void InvokePreparedAssumeTrue() =>
         Contract.Assume(s_ghostProbe.TouchBoolean(true));
 
+    private static void InvokeAssumeFalseDirectly() =>
+        _ = ContractAssumeEdge(false);
+
+    private static void InvokeAssumeTrueDirectly() =>
+        _ = ContractAssumeEdge(true);
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void InvokePreparedEnsuresFalse() =>
         Contract.Ensures(s_ghostProbe.TouchBoolean(false));
@@ -768,6 +827,12 @@ public sealed class ApiSpecRuntimeOracleTests {
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void InvokePreparedEnsuresTrue() =>
         Contract.Ensures(s_ghostProbe.TouchBoolean(true));
+
+    private static void InvokeEnsuresFalseDirectly() =>
+        _ = ContractEnsuresEdge(false);
+
+    private static void InvokeEnsuresTrueDirectly() =>
+        _ = ContractEnsuresEdge(true);
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void InvokeAndCatchOldNull() {
@@ -802,6 +867,12 @@ public sealed class ApiSpecRuntimeOracleTests {
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void InvokePreparedRequiresTrue() =>
         Contract.Requires(s_ghostProbe.TouchBoolean(true));
+
+    private static void InvokeRequiresFalseDirectly() =>
+        _ = ContractRequiresEdge(false);
+
+    private static void InvokeRequiresTrueDirectly() =>
+        _ = ContractRequiresEdge(true);
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void InvokeAndCatchResult() {
@@ -867,6 +938,12 @@ public sealed class ApiSpecRuntimeOracleTests {
     private static void ReadEmbeddedNullStringLength() =>
         s_integerSink = "A\0B".Length;
 
+    private static RuntimeCall EmptyStringLengthCall() =>
+        RuntimeCall.ForReceiver(string.Empty, string.Empty.Length);
+
+    private static RuntimeCall EmbeddedNullStringLengthCall() =>
+        RuntimeCall.ForReceiver("A\0B", "A\0B".Length);
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static bool StringConcatEdge() =>
         string.Concat(null, null).Length == 0 &&
@@ -910,6 +987,17 @@ public sealed class ApiSpecRuntimeOracleTests {
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void AbsMinimum() => s_integerSink = Math.Abs(int.MinValue);
+
+    private static RuntimeCall MathAbsNegativeCall() =>
+        RuntimeCall.ForParameterAndResult(-17, Math.Abs(-17));
+
+    private static RuntimeCall MathAbsZeroCall() =>
+        RuntimeCall.ForParameterAndResult(0, Math.Abs(0));
+
+    private static RuntimeCall MathAbsMaximumCall() =>
+        RuntimeCall.ForParameterAndResult(
+            int.MaxValue,
+            Math.Abs(int.MaxValue));
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void InvokeEmptyObjectArray() =>
@@ -961,6 +1049,10 @@ public sealed class ApiSpecRuntimeOracleTests {
         ImmutableArray<IFacetWitness> Facets,
         ImmutableArray<PostconditionWitness> Postconditions);
 
+    private sealed record RuntimeWitnessDescriptor(
+        string Identifier,
+        Func<RowWitness> Factory);
+
     private sealed record PostconditionWitness(
         int Index,
         string EdgeInputs,
@@ -973,7 +1065,7 @@ public sealed class ApiSpecRuntimeOracleTests {
 
         public bool AcceptsNegatedMutation(ApiSpecTemplate template) {
             var declared = template.Postconditions[Index].Condition;
-            var mutation = new SpecUnaryTerm(
+            var mutation = new SpecUnaryDeclaration(
                 SpecUnaryOperator.Not,
                 declared,
                 SpecValueType.Boolean);

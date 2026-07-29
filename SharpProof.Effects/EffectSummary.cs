@@ -4,9 +4,9 @@ public sealed record EffectSummary {
     private EffectSummary(bool isBottom) {
         (IsBottom, Reads, Writes, Allocation) =
             (isBottom, EffectRegionSet.Empty, EffectRegionSet.Empty, EffectAllocationKind.None);
-        (Capabilities, Throws, Termination, Completeness, Uncertainty) =
+        (Capabilities, Throws, Termination, Completeness, Uncertainty, AnalysisIncompleteReason) =
             (EffectCapabilitySet.Empty, EffectThrowSet.Empty, EffectTermination.Bottom,
-                EffectCompleteness.Complete, EffectUncertainty.None);
+                EffectCompleteness.Complete, EffectUncertainty.None, EffectAnalysisIncompleteReason.None);
     }
 
     internal EffectSummary(
@@ -17,7 +17,8 @@ public sealed record EffectSummary {
         EffectThrowSet throws,
         EffectTermination termination,
         EffectCompleteness completeness,
-        EffectUncertainty uncertainty = EffectUncertainty.None) {
+        EffectUncertainty uncertainty = EffectUncertainty.None,
+        EffectAnalysisIncompleteReason analysisIncompleteReason = EffectAnalysisIncompleteReason.None) {
         ValidateAllocation(allocation);
         if (!Enum.IsDefined(typeof(EffectTermination), termination) ||
             termination == EffectTermination.Bottom)
@@ -30,10 +31,20 @@ public sealed record EffectSummary {
         if ((uncertainty & uncertaintyMarker) != 0 &&
             uncertainty != EffectUncertainty.Unknown)
             throw new ArgumentOutOfRangeException(nameof(uncertainty));
+        if ((analysisIncompleteReason &
+             ~(EffectAnalysisIncompleteReason.BlockBudgetExceeded |
+               EffectAnalysisIncompleteReason.OperationBudgetExceeded |
+               EffectAnalysisIncompleteReason.CyclicControlFlow)) != 0)
+            throw new ArgumentOutOfRangeException(nameof(analysisIncompleteReason));
+        if (completeness == EffectCompleteness.Complete &&
+            analysisIncompleteReason != EffectAnalysisIncompleteReason.None)
+            throw new ArgumentException(
+                "A complete effect summary cannot carry an incomplete-analysis reason.",
+                nameof(analysisIncompleteReason));
         (Reads, Writes, Allocation, Capabilities) =
             (reads, writes, allocation, capabilities);
-        (Throws, Termination, Completeness, Uncertainty) =
-            (throws, termination, completeness, uncertainty);
+        (Throws, Termination, Completeness, Uncertainty, AnalysisIncompleteReason) =
+            (throws, termination, completeness, uncertainty, analysisIncompleteReason);
     }
 
     public static EffectSummary Bottom { get; } = new(true);
@@ -59,6 +70,7 @@ public sealed record EffectSummary {
     public EffectTermination Termination { get; }
     public EffectCompleteness Completeness { get; }
     public EffectUncertainty Uncertainty { get; }
+    internal EffectAnalysisIncompleteReason AnalysisIncompleteReason { get; }
 
     private static void ValidateAllocation(EffectAllocationKind allocation) {
         if ((allocation & ~EffectAllocationKind.Unknown) != 0)
@@ -111,7 +123,8 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary> {
             left.Completeness > right.Completeness
                 ? left.Completeness
                 : right.Completeness,
-            left.Uncertainty | right.Uncertainty);
+            left.Uncertainty | right.Uncertainty,
+            left.AnalysisIncompleteReason | right.AnalysisIncompleteReason);
     }
 
     public EffectSummary Widen(EffectSummary previous, EffectSummary next) =>

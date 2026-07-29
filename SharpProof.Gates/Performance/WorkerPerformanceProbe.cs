@@ -653,6 +653,37 @@ internal static class WorkerPerformanceProbe {
                 launcherRuntimeConfig,
                 Path.ChangeExtension(path, ".runtimeconfig.json"),
                 overwrite: true);
+            var targetFramework = AppContext.TargetFrameworkName ??
+                throw new InvalidOperationException(
+                    "The performance probe target framework is unavailable.");
+            File.WriteAllText(
+                Path.ChangeExtension(path, ".deps.json"),
+                $$"""
+                {
+                  "runtimeTarget": {
+                    "name": "{{targetFramework}}",
+                    "signature": ""
+                  },
+                  "compilationOptions": {},
+                  "targets": {
+                    "{{targetFramework}}": {
+                      "UncooperativeWorker/1.0.0": {
+                        "runtime": {
+                          "UncooperativeWorker.dll": {}
+                        }
+                      }
+                    }
+                  },
+                  "libraries": {
+                    "UncooperativeWorker/1.0.0": {
+                      "type": "project",
+                      "serviceable": false,
+                      "sha512": ""
+                    }
+                  }
+                }
+                """,
+                Utf8WithoutBom);
             return path;
         }
 

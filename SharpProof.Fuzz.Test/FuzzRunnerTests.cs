@@ -14,7 +14,7 @@ public sealed class FuzzRunnerTests {
         var second = await FuzzRunner.RunAsync(options);
 
         Assert.That(first, Is.EqualTo(second));
-        Assert.That(first.SchemaVersion, Is.EqualTo(3));
+        Assert.That(first.SchemaVersion, Is.EqualTo(4));
         Assert.That(first.Passed, Is.True);
         Assert.That(first.Agreements, Is.EqualTo(options.Cases));
         Assert.That(first.Abstentions, Is.Zero);
@@ -48,6 +48,27 @@ public sealed class FuzzRunnerTests {
             parallel.PartialSmtAgreements,
             Is.EqualTo(serial.PartialSmtAgreements));
         Assert.That(parallel.Failures, Is.EqualTo(serial.Failures));
+    }
+
+    [Test]
+    public void SupportedDomainAbstentionFailsTheCampaign() {
+        var coverage = new FrontendFuzzCoverage(
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+        var summary = new FuzzSummary(
+            SchemaVersion: 4,
+            Cases: 1,
+            Seed: 7,
+            MaximumParallelism: 1,
+            Agreements: 0,
+            Abstentions: 1,
+            FrontendAgreements: 1,
+            SmtAgreements: 1,
+            PartialSmtAgreements: 1,
+            FrontendCoverage: coverage,
+            CoverageSatisfied: true,
+            Failures: []);
+
+        Assert.That(summary.Passed, Is.False);
     }
 
     [Test]

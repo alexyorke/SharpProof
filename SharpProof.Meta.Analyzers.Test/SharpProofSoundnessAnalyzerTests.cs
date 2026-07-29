@@ -176,6 +176,37 @@ public sealed class SharpProofSoundnessAnalyzerTests {
         }
         """,
         "SPMETA010")]
+    [TestCase(
+        """
+        namespace SharpProof.Verify;
+        enum Answer { Proven }
+        sealed class AnswerSource {
+            internal Answer Unknown => Answer.Proven;
+        }
+        sealed class ProofCache {
+            internal void Write(Answer answer) { }
+        }
+        sealed class C {
+            void M(ProofCache cache, AnswerSource source) =>
+                cache.Write(source.Unknown);
+        }
+        """,
+        "SPMETA010")]
+    [TestCase(
+        """
+        namespace SharpProof.Verify;
+        enum Answer { Proven }
+        sealed class ProofCache {
+            internal void Write(Answer answer) { }
+        }
+        sealed class C {
+            void M(ProofCache cache) {
+                var TimeoutAnswer = Answer.Proven;
+                cache.Write(TimeoutAnswer);
+            }
+        }
+        """,
+        "SPMETA010")]
     public async Task ReportsSoundnessBoundaryViolation(string source, string expectedId) {
         var diagnostics = await Analyze(source);
         Assert.That(
@@ -339,8 +370,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
                     }
                 }
 
-                sealed class SharpProofWorker {
-                    private sealed class CallableVerificationResult { }
+                sealed class CallableVerificationResult { }
+                static class CallableVerificationPolicy {
                     private static async Task<CallableVerificationResult>
                         VerifyTargetAsync(
                             object verifier,
@@ -348,7 +379,6 @@ public sealed class SharpProofSoundnessAnalyzerTests {
                             object budgets,
                             object parallelism,
                             object resourceGate,
-                            object resourceCount,
                             object projectBoundary,
                             CancellationToken callerCancellation) {
                         await Task.Yield();
@@ -469,8 +499,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
             }
             namespace SharpProof.Worker {
                 using SharpProof.Worker.Protocol;
-                sealed class SharpProofWorker {
-                    private sealed class CallableVerificationResult { }
+                sealed class CallableVerificationResult { }
+                static class CallableVerificationPolicy {
                     private static CallableVerificationResult Unknown(
                         object target,
                         WorkerClaimReason claimReason,
@@ -483,7 +513,6 @@ public sealed class SharpProofSoundnessAnalyzerTests {
                             object budgets,
                             object parallelism,
                             object resourceGate,
-                            object resourceCount,
                             object projectBoundary,
                             CancellationToken callerCancellation) {
                         await Task.Yield();
@@ -555,8 +584,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
             }
             namespace SharpProof.Worker {
                 using SharpProof.Worker.Protocol;
-                sealed class SharpProofWorker {
-                    private sealed class CallableVerificationResult { }
+                sealed class CallableVerificationResult { }
+                static class CallableVerificationPolicy {
                     private static CallableVerificationResult Unknown(
                         object target,
                         WorkerClaimReason claimReason,
@@ -576,7 +605,6 @@ public sealed class SharpProofSoundnessAnalyzerTests {
                             object budgets,
                             object parallelism,
                             object resourceGate,
-                            object resourceCount,
                             CancellationToken unrelatedCancellation,
                             CancellationToken callerCancellation) {
                         await Task.Yield();
@@ -612,8 +640,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
             using System.Threading;
             using System.Threading.Tasks;
             namespace SharpProof.Worker {
-                sealed class SharpProofWorker {
-                    private sealed class CallableVerificationResult { }
+                sealed class CallableVerificationResult { }
+                static class CallableVerificationPolicy {
                     private static async Task<CallableVerificationResult>
                         VerifyTargetAsync(
                             object verifier,
@@ -621,7 +649,6 @@ public sealed class SharpProofSoundnessAnalyzerTests {
                             object budgets,
                             object parallelism,
                             object resourceGate,
-                            object resourceCount,
                             object projectBoundary,
                             CancellationToken callerCancellation) {
                         await Task.Yield();
@@ -713,6 +740,9 @@ public sealed class SharpProofSoundnessAnalyzerTests {
             namespace SharpProof.Worker {
                 public sealed class CallableVerifier {
                     object M() => new SharpProof.Verify.Assumption();
+                }
+                public static class PostconditionObligationBuilder {
+                    static object M() => new SharpProof.Verify.Assumption();
                 }
             }
             namespace SharpProof.Effects {

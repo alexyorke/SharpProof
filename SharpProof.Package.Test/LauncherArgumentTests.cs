@@ -51,6 +51,43 @@ public sealed class LauncherArgumentTests {
     }
 
     [Test]
+    public void ParsedPathsAndTerminationGraceAreNormalized() {
+        string[] arguments = [
+            .. ValidArguments(),
+            "--publish-request", "published-request.json",
+            "--publish-result", "published-result.json",
+            "--publish-compiler-manifest", "published-manifest.json",
+            "--publish-sarif", "published-result.sarif",
+            "--termination-grace-ms", "321"
+        ];
+
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(parsed.WorkerPath, Is.EqualTo(Path.GetFullPath("worker.dll")));
+            Assert.That(parsed.RequestPath, Is.EqualTo(Path.GetFullPath("request.json")));
+            Assert.That(parsed.ResultPath, Is.EqualTo(Path.GetFullPath("result.json")));
+            Assert.That(
+                parsed.CompilerManifestPath,
+                Is.EqualTo(Path.GetFullPath("compiler-manifest.json")));
+            Assert.That(
+                parsed.PublishRequestPath,
+                Is.EqualTo(Path.GetFullPath("published-request.json")));
+            Assert.That(
+                parsed.PublishResultPath,
+                Is.EqualTo(Path.GetFullPath("published-result.json")));
+            Assert.That(
+                parsed.PublishCompilerManifestPath,
+                Is.EqualTo(Path.GetFullPath("published-manifest.json")));
+            Assert.That(
+                parsed.PublishSarifPath,
+                Is.EqualTo(Path.GetFullPath("published-result.sarif")));
+            Assert.That(parsed.TerminationGraceMilliseconds, Is.EqualTo(321));
+        }
+    }
+
+    [Test]
     public void CombinedTimeoutOverflowIsRejectedBeforeStartingWorker() {
         Action action = () => _ = Program.ComputeHardLimit(
             int.MaxValue,
@@ -110,6 +147,111 @@ public sealed class LauncherArgumentTests {
             Assert.That(capture.ToString(), Does.Contain(expectedError));
         }
         finally {
+            Console.SetError(error);
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [Test]
+    public void BoundResultReportsUnknownClaimsAndAssumptionsAccountably() {
+        var request = new WorkerVerifyRequest {
+            VerifyPolicy = WorkerVerifyPolicy.RequireProven,
+            AssumptionPolicy = WorkerAssumptionPolicy.Error
+        };
+        var manifest = CreateSarifManifest();
+        var usedAssumption = UsedUserAssumption();
+        var response = new WorkerVerifyResponse {
+            RequestHash = WorkerProtocolJson.ComputeRequestHash(request),
+            InputHash = new('a', 64),
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            CallableResults = [
+                new WorkerCallableResult {
+                    CallableId = "C.M",
+                    Coverage = WorkerCallableCoverage.Incomplete,
+                    Reason = WorkerCallableCoverageReason.UnsupportedCallable,
+                    Assumptions = [usedAssumption]
+                },
+                new WorkerCallableResult {
+                    CallableId = "C.Unsupported",
+                    Coverage = WorkerCallableCoverage.Incomplete,
+                    Reason = WorkerCallableCoverageReason.UnsupportedCallable
+                }
+            ],
+            ClaimResults = [
+                new WorkerClaimResult {
+                    ClaimId = "claim-1",
+                    Outcome = WorkerClaimOutcome.Unknown,
+                    Reason = WorkerClaimReason.UnsupportedExpression,
+                    Assumptions = [usedAssumption]
+                }
+            ],
+            Summary = new WorkerVerificationSummary {
+                CallableCount = 2,
+                ClaimCount = 1,
+                OutcomeCounts = [
+                    new WorkerClaimOutcomeCount {
+                        Outcome = WorkerClaimOutcome.Unknown,
+                        Count = 1
+                    }
+                ],
+                ReasonCounts = [
+                    new WorkerClaimReasonCount {
+                        Reason = WorkerClaimReason.UnsupportedExpression,
+                        Count = 1
+                    }
+                ],
+                Assumptions = new WorkerAssumptionSummary {
+                    Total = 1,
+                    Used = 1,
+                    User = 1
+                },
+                CacheStatus = WorkerCacheStatus.Disabled,
+                Versions = new WorkerVersionSummary {
+                    WorkerVersion = "launcher-test",
+                    ApiSpecVersion = "launcher-test"
+                },
+                Budgets = new WorkerBudgets()
+            }
+        };
+        const string inputHash =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N") + ".json");
+        var output = Console.Out;
+        var error = Console.Error;
+        using var outputCapture = new StringWriter();
+        using var errorCapture = new StringWriter();
+        try {
+            Console.SetOut(outputCapture);
+            Console.SetError(errorCapture);
+            File.WriteAllText(
+                path,
+                WorkerProtocolJson.SerializeResponse(response));
+
+            var exitCode = Program.ValidateAndReport(
+                path,
+                request,
+                inputHash,
+                manifest,
+                out var valid);
+
+            using (Assert.EnterMultipleScope()) {
+                Assert.That(valid, Is.True, errorCapture.ToString());
+                Assert.That(exitCode, Is.EqualTo(6));
+                Assert.That(
+                    outputCapture.ToString(),
+                    Does.Contain(
+                        "SharpProof Unknown C.M Postcondition claim claim-1 " +
+                        "(UnsupportedExpression)"));
+                Assert.That(errorCapture.ToString(), Does.Contain("SP0047"));
+                Assert.That(errorCapture.ToString(), Does.Contain("SP0048"));
+            }
+        }
+        finally {
+            Console.SetOut(output);
             Console.SetError(error);
             if (File.Exists(path)) File.Delete(path);
         }
@@ -236,6 +378,114 @@ public sealed class LauncherArgumentTests {
         }
     }
 
+    [Test]
+    public void SarifProjectionPreservesVacuityAndEffectCertainty() {
+        var manifest = CreateSarifManifest();
+        manifest.Callables = [manifest.Callables[0]];
+        manifest.Callables[0].Assumptions = [];
+        var claim = manifest.Claims.Single();
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = new WorkerVerifyResponse {
+            InputHash = new('a', 64),
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            CallableResults = [
+                new WorkerCallableResult {
+                    CallableId = claim.CallableId,
+                    Coverage = WorkerCallableCoverage.Complete,
+                    Reason = WorkerCallableCoverageReason.None
+                }
+            ],
+            ClaimResults = [
+                new WorkerClaimResult {
+                    ClaimId = claim.ClaimId,
+                    Outcome = WorkerClaimOutcome.Proven,
+                    Reason = WorkerClaimReason.None,
+                    Vacuity = WorkerVacuityKind.NoModeledNormalReturn
+                }
+            ]
+        };
+        var request = new WorkerVerifyRequest();
+
+        using var vacuity = JsonDocument.Parse(
+            SarifProjection.Serialize(request, response));
+        Assert.That(
+            ResultEvidence(vacuity).GetProperty("vacuity").GetString(),
+            Is.EqualTo("NoModeledNormalReturn"));
+
+        manifest.Callables[0].SelectedFeatures = [
+            WorkerSelectedFeature.Effects
+        ];
+        manifest.Callables[0].SelectionReasons = [
+            WorkerSelectionReason.ExplicitAnnotation
+        ];
+        claim.Kind = WorkerClaimKind.Effect;
+        claim.Evidence = WorkerClaimEvidence.Attribute;
+        claim.EffectContractKind = WorkerEffectContractKind.DoesNotThrow;
+        WorkerProtocolJson.SealManifest(manifest);
+        response.ClaimResults[0].Vacuity = WorkerVacuityKind.None;
+        response.ClaimResults[0].EffectCertainty =
+            WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
+
+        using var certainty = JsonDocument.Parse(
+            SarifProjection.Serialize(request, response));
+        Assert.That(
+            ResultEvidence(certainty).GetProperty("effectCertainty").GetString(),
+            Is.EqualTo("CompleteMayEffectSummary"));
+
+        response.ClaimResults[0].Outcome = WorkerClaimOutcome.Refuted;
+        response.ClaimResults[0].EffectCertainty =
+            WorkerEffectEvidenceCertainty.DefiniteViolation;
+        response.ClaimResults[0].EffectWitness =
+            new WorkerEffectViolationWitness {
+                Kind = "explicit-throw",
+                Detail = "T:System.InvalidOperationException",
+                Effects = WorkerEffectSet.Throws,
+                ExactExceptionTypeHierarchy = [
+                    "System.Private.CoreLib:T:System.InvalidOperationException",
+                    "System.Private.CoreLib:T:System.Exception"
+                ],
+                Location = new WorkerSourceLocation {
+                    Path = "witness.cs",
+                    Start = 20,
+                    Length = 5,
+                    Line = 9,
+                    Column = 7
+                }
+            };
+        using var refuted = JsonDocument.Parse(
+            SarifProjection.Serialize(request, response));
+        var projected = refuted.RootElement.GetProperty("runs")[0]
+            .GetProperty("results")[0];
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                projected.GetProperty("ruleId").GetString(),
+                Is.EqualTo("SharpProof.Refuted"));
+            Assert.That(
+                projected.GetProperty("message").GetProperty("text")
+                    .GetString(),
+                Does.Contain("concrete explicit-throw")
+                    .And.Contain("witness.cs:9:7"));
+            Assert.That(
+                projected.GetProperty("locations")[0]
+                    .GetProperty("physicalLocation")
+                    .GetProperty("region")
+                    .GetProperty("startLine").GetInt32(),
+                Is.EqualTo(9));
+            Assert.That(
+                ResultEvidence(refuted).GetProperty("effectWitness")
+                    .GetProperty("kind").GetString(),
+                Is.EqualTo("explicit-throw"));
+        }
+
+        static JsonElement ResultEvidence(JsonDocument document) =>
+            document.RootElement.GetProperty("runs")[0]
+                .GetProperty("results")[0]
+                .GetProperty("properties")
+                .GetProperty("result");
+    }
+
     [TestCase(
         WorkerClaimOutcome.Proven, WorkerVerifyPolicy.Advisory,
         "pass", "none")]
@@ -290,6 +540,69 @@ public sealed class LauncherArgumentTests {
                 Is.EqualTo(expectedLevel));
         }
     }
+
+    [TestCase(WorkerVerifyPolicy.Advisory, "info")]
+    [TestCase(WorkerVerifyPolicy.WarnOnUnknown, "warning")]
+    [TestCase(WorkerVerifyPolicy.RequireProven, "error")]
+    public void VerifyPolicyPresentationUsesNamedMappings(
+        WorkerVerifyPolicy policy, string expected) =>
+        Assert.That(LauncherPresentation.Level(policy, "info"), Is.EqualTo(expected));
+
+    [TestCase(WorkerAssumptionPolicy.Allow, "info")]
+    [TestCase(WorkerAssumptionPolicy.Warn, "warning")]
+    [TestCase(WorkerAssumptionPolicy.Error, "error")]
+    public void AssumptionPolicyPresentationUsesNamedMappings(
+        WorkerAssumptionPolicy policy, string expected) =>
+        Assert.That(LauncherPresentation.Level(policy, "info"), Is.EqualTo(expected));
+
+    [TestCase("advisory", WorkerVerifyPolicy.Advisory)]
+    [TestCase("warn-on-unknown", WorkerVerifyPolicy.WarnOnUnknown)]
+    [TestCase("require-proven", WorkerVerifyPolicy.RequireProven)]
+    public void VerifyPolicyParsingUsesNames(
+        string value, WorkerVerifyPolicy expected) =>
+        Assert.That(LauncherPresentation.ParseVerifyPolicy(value), Is.EqualTo(expected));
+
+    [TestCase("allow", WorkerAssumptionPolicy.Allow)]
+    [TestCase("warn", WorkerAssumptionPolicy.Warn)]
+    [TestCase("error", WorkerAssumptionPolicy.Error)]
+    public void AssumptionPolicyParsingUsesNames(
+        string value, WorkerAssumptionPolicy expected) =>
+        Assert.That(LauncherPresentation.ParseAssumptionPolicy(value), Is.EqualTo(expected));
+
+    [Test]
+    public void NumericPolicyAliasesAreRejected() {
+        using (Assert.EnterMultipleScope()) {
+            Assert.Throws<ArgumentException>(
+                (Action)(() => LauncherPresentation.ParseVerifyPolicy("1")));
+            Assert.Throws<ArgumentException>(
+                (Action)(() => LauncherPresentation.ParseAssumptionPolicy("1")));
+        }
+    }
+
+    [Test]
+    public void UnknownClaimAndEffectKindsAreRejectedExhaustively() {
+        using (Assert.EnterMultipleScope()) {
+            Assert.Throws<ArgumentOutOfRangeException>(
+                (Action)(() => LauncherPresentation.ClaimKind(
+                    new WorkerClaimManifestEntry {
+                        Kind = (WorkerClaimKind)int.MaxValue
+                    })));
+            Assert.Throws<ArgumentOutOfRangeException>(
+                (Action)(() => LauncherPresentation.ClaimKind(
+                    new WorkerClaimManifestEntry {
+                        Kind = WorkerClaimKind.Effect,
+                        EffectContractKind =
+                            (WorkerEffectContractKind)int.MaxValue
+                    })));
+        }
+    }
+
+    [Test]
+    public void UnknownPresentationPolicyIsRejectedExhaustively() =>
+        Assert.Throws<InvalidOperationException>(
+            (Action)(() => LauncherPresentation.Level(
+                (WorkerVerifyPolicy)int.MaxValue,
+                "info")));
 
     [Test]
     public void SarifProjectionPreservesInfrastructureFailure() {

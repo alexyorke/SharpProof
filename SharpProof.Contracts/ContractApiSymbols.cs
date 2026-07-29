@@ -4,30 +4,19 @@ internal sealed class ContractApiSymbols(
     ContractClauseSymbols clauses,
     IMethodSymbol result,
     IMethodSymbol old,
-    INamedTypeSymbol contractFor,
-    INamedTypeSymbol notNull,
-    INamedTypeSymbol positive,
-    INamedTypeSymbol inRange) {
+    ContractSelectionInventory selections) {
     private ContractClauseSymbols Clauses { get; } = clauses;
     internal IMethodSymbol Result { get; } = result;
     internal IMethodSymbol Old { get; } = old;
-    internal INamedTypeSymbol ContractFor { get; } = contractFor;
-    internal INamedTypeSymbol NotNull { get; } = notNull;
-    internal INamedTypeSymbol Positive { get; } = positive;
-    internal INamedTypeSymbol InRange { get; } = inRange;
+    internal ContractSelectionInventory Selections { get; } = selections;
 
     internal static ContractApiSymbols? TryCreate(Compilation compilation) {
         var clauses = ContractClauseSymbols.TryCreate(compilation);
-        var contractFor = compilation.GetTypeByMetadataName(
-            ContractForSymbolMatcher.AttributeMetadataName);
-        var notNull = compilation.GetTypeByMetadataName(
-            "SharpProof.Attributes.NotNullAttribute");
-        var positive = compilation.GetTypeByMetadataName(
-            "SharpProof.Attributes.PositiveAttribute");
-        var inRange = compilation.GetTypeByMetadataName(
-            "SharpProof.Attributes.InRangeAttribute");
-        if (clauses == null || contractFor == null || notNull == null ||
-            positive == null || inRange == null)
+        var selections =
+            ContractSelectionInventory.ForCompilation(compilation);
+        if (clauses == null || selections.ContractFor == null ||
+            selections.NotNull == null || selections.Positive == null ||
+            selections.InRange == null)
             return null;
 
         var result = FindGenericIntrinsic(clauses.ContractType, "Result", 0);
@@ -38,10 +27,7 @@ internal sealed class ContractApiSymbols(
             clauses,
             result,
             old,
-            contractFor,
-            notNull,
-            positive,
-            inRange);
+            selections);
     }
 
     internal BoundContractKind? GetClauseKind(IMethodSymbol method) =>
@@ -52,15 +38,6 @@ internal sealed class ContractApiSymbols(
 
     internal bool IsOld(IMethodSymbol method) =>
         SymbolEqualityComparer.Default.Equals(method.OriginalDefinition, Old);
-
-    internal static bool IsAttribute(
-        AttributeData attribute,
-        INamedTypeSymbol? expected) =>
-        expected != null &&
-        attribute.AttributeClass != null &&
-        SymbolEqualityComparer.Default.Equals(
-            attribute.AttributeClass.OriginalDefinition,
-            expected);
 
     private static IMethodSymbol? FindGenericIntrinsic(
         INamedTypeSymbol contract,

@@ -14,14 +14,11 @@ internal static class SarifProjection {
         var callables = response.Manifest.Callables.ToDictionary(
             static callable => callable.CallableId, StringComparer.Ordinal);
         var results = response.ClaimResults
-            .Select(result => ClaimResult(
-                request, result, claims[result.ClaimId]))
-            .Concat(response.CallableResults
-                .Where(static result =>
-                    result.Coverage == WorkerCallableCoverage.Incomplete)
-                .Select(result => IncompleteResult(
-                    request, result, callables[result.CallableId])))
+            .Select(result => ClaimResult(request, result, claims[result.ClaimId]))
             .ToList();
+        results.AddRange(response.CallableResults
+            .Where(static result => result.Coverage == WorkerCallableCoverage.Incomplete)
+            .Select(result => IncompleteResult(request, result, callables[result.CallableId])));
         var notifications = response.Errors.Select(
             static error => Notification(error.Code, error.Message)).ToList();
         var assumptions = response.Summary.Assumptions;
@@ -31,9 +28,7 @@ internal static class SarifProjection {
                 "User assumption/trusted evidence declared: total=" +
                     (assumptions.User + assumptions.Trusted) + ", user=" +
                     assumptions.User + ", trusted=" + assumptions.Trusted + ".",
-                PolicyLevel(
-                    request.AssumptionPolicy == WorkerAssumptionPolicy.Error,
-                    request.AssumptionPolicy == WorkerAssumptionPolicy.Warn)));
+                LauncherPresentation.Level(request.AssumptionPolicy, "note")));
         if (response.RunStatus != WorkerRunStatus.Complete &&
             notifications.Count == 0)
             notifications.Add(Notification(
@@ -50,19 +45,15 @@ internal static class SarifProjection {
             },
             automationDetails = new { id = response.Manifest.Hash },
             invocations = new[] { new {
-                executionSuccessful = response.RunStatus ==
-                    WorkerRunStatus.Complete && response.Errors.Length == 0,
-                properties = new {
-                    response.RunStatus, response.FailureReason
-                },
+                executionSuccessful = response.RunStatus == WorkerRunStatus.Complete && response.Errors.Length == 0,
+                properties = new { response.RunStatus, response.FailureReason },
                 toolExecutionNotifications = notifications
             }},
             results,
             properties = response.Summary
         };
         var document = new Dictionary<string, object> {
-            ["$schema"] =
-                "https://json.schemastore.org/sarif-2.1.0.json",
+            ["$schema"] = "https://json.schemastore.org/sarif-2.1.0.json",
             ["version"] = "2.1.0",
             ["runs"] = new[] { run }
         };
@@ -72,20 +63,23 @@ internal static class SarifProjection {
     private static object ClaimResult(
         WorkerVerifyRequest request, WorkerClaimResult result,
         WorkerClaimManifestEntry claim) {
-        var reason = result.Reason == WorkerClaimReason.None
-            ? string.Empty : " (" + result.Reason + ")";
+        var reason = result.Reason == WorkerClaimReason.None ? string.Empty : " (" + result.Reason + ")";
+        var witness = result.EffectWitness == null
+            ? string.Empty
+            : " [concrete " + result.EffectWitness.Kind + ": " + result.EffectWitness.Detail +
+                " at " + result.EffectWitness.Location.Path + ":" + result.EffectWitness.Location.Line +
+                ":" + result.EffectWitness.Location.Column + "]";
         return Result(
             "SharpProof." + result.Outcome,
             result.Outcome == WorkerClaimOutcome.Proven ? "pass" :
                 result.Outcome == WorkerClaimOutcome.Refuted ? "fail" : "review",
             result.Outcome == WorkerClaimOutcome.Proven ? "none" :
                 result.Outcome == WorkerClaimOutcome.Refuted ? "error" :
-                PolicyLevel(
-                    request.VerifyPolicy == WorkerVerifyPolicy.RequireProven,
-                    request.VerifyPolicy == WorkerVerifyPolicy.WarnOnUnknown),
-            result.Outcome + " postcondition " + result.ClaimId +
-                " for " + claim.CallableId + reason,
-            claim.Location, result.ClaimId,
+                LauncherPresentation.Level(request.VerifyPolicy, "note"),
+            result.Outcome + " " + LauncherPresentation.ClaimKind(claim) + " " +
+                result.ClaimId + " for " + claim.CallableId + reason + witness,
+            result.EffectWitness?.Location ?? claim.Location,
+            result.ClaimId,
             new { claim, result });
     }
 
@@ -93,16 +87,12 @@ internal static class SarifProjection {
         WorkerVerifyRequest request, WorkerCallableResult result,
         WorkerCallableManifestEntry callable) =>
         Result(
-            "SP0047", "review", PolicyLevel(
-                request.VerifyPolicy == WorkerVerifyPolicy.RequireProven,
-                request.VerifyPolicy == WorkerVerifyPolicy.WarnOnUnknown),
+            "SP0047", "review",
+            LauncherPresentation.Level(request.VerifyPolicy, "note"),
             "Selected analysis is incomplete for " + result.CallableId +
                 " (" + result.Reason + ").",
             callable.Location, result.CallableId,
             new { callable, result });
-
-    private static string PolicyLevel(bool error, bool warning) =>
-        error ? "error" : warning ? "warning" : "note";
 
     private static object Result(
         string ruleId, string kind, string level, string message,

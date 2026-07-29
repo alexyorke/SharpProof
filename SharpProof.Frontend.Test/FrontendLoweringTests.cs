@@ -422,6 +422,134 @@ public sealed class FrontendLoweringTests {
                 CompilerIdentityBridge.InternType(
                     factory,
                     references[1].Parameter.Type)));
+        Assert.That(
+            CompilerIdentityBridge.CreateTypeDisplay(
+                references[0].Parameter.Type),
+            Is.Not.EqualTo(
+                CompilerIdentityBridge.CreateTypeDisplay(
+                    references[1].Parameter.Type)));
+    }
+
+    [Test]
+    public void DocumentationReferenceIdsCoverCompilerIdentityCallShapes() {
+        var tree = CSharpSyntaxTree.ParseText(
+            """
+            #nullable enable
+            public sealed class Subject<T> {
+                private int _value;
+                public ref int Value => ref _value;
+                public U Echo<U>(ref U value, U[] values) => value;
+                public static Subject<T> operator +(Subject<T> left, Subject<T> right) => left;
+                public void Overload(int value) { }
+                public void Overload(ref int value) { }
+                public object Anonymous() => new { Value = 1 };
+                public void Nullable(string? optional, string required) {
+                    static int Local(int[] values) => values.Length;
+                    _ = Local([]);
+                }
+            }
+            """,
+            new CSharpParseOptions(LanguageVersion.CSharp12));
+        var compilation = CSharpCompilation.Create(
+            "Identity.Shapes",
+            [tree],
+            PlatformReferences,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+        var errors = compilation.GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToArray();
+        Assert.That(
+            errors,
+            Is.Empty,
+            string.Join(
+                Environment.NewLine,
+                errors.Select(static diagnostic => diagnostic.ToString())));
+
+        var subject = compilation.GetTypeByMetadataName("Subject`1")!;
+        var echo = subject.GetMembers("Echo").OfType<IMethodSymbol>().Single();
+        var value = subject.GetMembers("Value").OfType<IPropertySymbol>().Single();
+        var addition = subject.GetMembers("op_Addition").OfType<IMethodSymbol>().Single();
+        var nullable = subject.GetMembers("Nullable").OfType<IMethodSymbol>().Single();
+        var overloads = subject.GetMembers("Overload")
+            .OfType<IMethodSymbol>()
+            .OrderBy(static method => method.Parameters[0].RefKind)
+            .ToArray();
+        var local = tree.GetRoot().DescendantNodes()
+            .OfType<LocalFunctionStatementSyntax>()
+            .Select(node => compilation.GetSemanticModel(tree).GetDeclaredSymbol(node))
+            .Single()!;
+        var anonymousType = tree.GetRoot().DescendantNodes()
+            .OfType<AnonymousObjectCreationExpressionSyntax>()
+            .Select(node => compilation.GetSemanticModel(tree).GetTypeInfo(node).Type)
+            .Single()!;
+        var constructed = subject.Construct(compilation.GetSpecialType(SpecialType.System_String));
+        ITypeSymbol[] types = [
+            subject,
+            constructed,
+            subject.TypeParameters[0],
+            compilation.CreateArrayTypeSymbol(subject.TypeParameters[0]),
+            compilation.CreateArrayTypeSymbol(
+                compilation.GetSpecialType(SpecialType.System_Int32),
+                rank: 2),
+            compilation.CreatePointerTypeSymbol(
+                compilation.GetSpecialType(SpecialType.System_Int32)),
+            nullable.Parameters[0].Type,
+            nullable.Parameters[1].Type
+        ];
+
+        foreach (var symbol in new ISymbol[] { echo, value, addition })
+            Assert.That(
+                DocumentationCommentId.CreateDeclarationId(symbol),
+                Is.Not.Null.And.Not.Empty,
+                symbol.MetadataName);
+        foreach (var type in types)
+            Assert.That(
+                DocumentationCommentId.CreateReferenceId(type),
+                Is.Not.Null.And.Not.Empty,
+                type.MetadataName);
+        Assert.That(
+            DocumentationCommentId.CreateDeclarationId(local),
+            Is.Not.Null.And.Not.Empty);
+        Assert.That(
+            DocumentationCommentId.CreateReferenceId(anonymousType),
+            Is.Null.Or.Empty,
+            "Anonymous types require an explicit stable fallback.");
+        Assert.That(
+            CompilerIdentityBridge.CreateSymbolDisplay(overloads[0]),
+            Is.Not.EqualTo(CompilerIdentityBridge.CreateSymbolDisplay(overloads[1])));
+        Assert.That(
+            CompilerIdentityBridge.CreateTypeDisplay(types[3]),
+            Is.Not.EqualTo(CompilerIdentityBridge.CreateTypeDisplay(types[4])));
+        Assert.That(
+            SymbolEqualityComparer.Default.Equals(
+                nullable.Parameters[0].Type,
+                nullable.Parameters[1].Type),
+            Is.True);
+        Assert.That(
+            CompilerIdentityBridge.CreateTypeDisplay(nullable.Parameters[0].Type),
+            Is.EqualTo(CompilerIdentityBridge.CreateTypeDisplay(nullable.Parameters[1].Type)),
+            "Display identity follows the compiler-symbol comparer used for interning.");
+        var fallback = CompilerIdentityBridge.CreateTypeDisplay(anonymousType);
+        var equivalentCompilation = CSharpCompilation.Create(
+            "Identity.Shapes",
+            [tree],
+            PlatformReferences,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+        var equivalentAnonymousType = tree.GetRoot().DescendantNodes()
+            .OfType<AnonymousObjectCreationExpressionSyntax>()
+            .Select(node => equivalentCompilation.GetSemanticModel(tree).GetTypeInfo(node).Type)
+            .Single()!;
+        Assert.That(
+            fallback,
+            Is.EqualTo(CompilerIdentityBridge.CreateTypeDisplay(
+                equivalentAnonymousType)));
+        Assert.That(
+            fallback,
+            Does.StartWith(compilation.Assembly.Identity + "::"));
     }
 
     [Test]

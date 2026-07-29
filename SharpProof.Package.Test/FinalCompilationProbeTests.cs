@@ -6,6 +6,7 @@ using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerProbe.TestAsset;
+using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Package.Test;
 
@@ -176,6 +177,57 @@ public sealed class FinalCompilationProbeTests {
                     verification.Output,
                     Does.Contain("SharpProof Proven"));
             }
+        }
+    }
+
+    [Test]
+    public async Task GeneratedRefutationTraversesArtifactReplayAndCache() {
+        if (!OperatingSystem.IsWindows() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64 ||
+            RuntimeInformation.OSArchitecture != Architecture.X64)
+            Assert.Ignore("The verifier is intentionally Windows x64 only.");
+
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = ProbeWorkspace.Create();
+        workspace.WritePackedConsumer(feed.Version);
+        workspace.WriteProbeInput("refute:whole-pipeline");
+
+        var restore = await workspace.RestoreAsync(feed.Source);
+        Assert.That(restore.ExitCode, Is.Zero, restore.Output);
+        var build = await workspace.RebuildAsync();
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+
+        var first = await workspace.VerifyPackedArtifactAsync();
+        Assert.That(first.ExitCode, Is.Not.Zero, first.Output);
+        var firstResponse = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(workspace.VerifyResultPath))!;
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                firstResponse.RunStatus,
+                Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(firstResponse.ClaimResults, Has.Length.EqualTo(1));
+            Assert.That(
+                firstResponse.ClaimResults[0].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(firstResponse.ClaimResults[0].Model, Is.Not.Empty);
+            Assert.That(
+                firstResponse.Summary.CacheStatus,
+                Is.EqualTo(WorkerCacheStatus.Written));
+        }
+
+        var second = await workspace.VerifyPackedArtifactAsync();
+        Assert.That(second.ExitCode, Is.Not.Zero, second.Output);
+        var secondResponse = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(workspace.VerifyResultPath))!;
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                secondResponse.ClaimResults.Select(static result =>
+                    (result.ClaimId, result.Outcome, result.Reason)),
+                Is.EqualTo(firstResponse.ClaimResults.Select(static result =>
+                    (result.ClaimId, result.Outcome, result.Reason))));
+            Assert.That(
+                secondResponse.Summary.CacheStatus,
+                Is.EqualTo(WorkerCacheStatus.Hit));
         }
     }
 
@@ -379,7 +431,7 @@ public sealed class FinalCompilationProbeTests {
                     path);
                 Assert.That(
                     root.GetProperty("schemaVersion").GetInt32(),
-                    Is.EqualTo(3),
+                    Is.EqualTo(CurrentCompilerArtifactSchemaVersion),
                     path);
                 Assert.That(
                     compilationSha256,
@@ -390,6 +442,28 @@ public sealed class FinalCompilationProbeTests {
                 bytes,
                 compilationSha256!,
                 claimPaths);
+        }
+
+        private static int CurrentCompilerArtifactSchemaVersion {
+            get {
+                const string assemblyName = "SharpProof.CompilerArtifact";
+                const string typeName =
+                    assemblyName + ".CompilerManifestArtifactVersions";
+                var assembly = AppDomain.CurrentDomain.GetAssemblies()
+                    .SingleOrDefault(static candidate =>
+                        candidate.GetName().Name == assemblyName) ??
+                    System.Reflection.Assembly.Load(assemblyName);
+                var versionType = assembly.GetType(
+                    typeName,
+                    throwOnError: true)!;
+                var current = versionType.GetField(
+                    "Current",
+                    System.Reflection.BindingFlags.Static |
+                    System.Reflection.BindingFlags.NonPublic);
+                return current?.GetRawConstantValue() as int? ??
+                    throw new InvalidDataException(
+                        "The compiler-artifact schema constant was not found.");
+            }
         }
     }
 
@@ -413,6 +487,10 @@ public sealed class FinalCompilationProbeTests {
                 "probe",
                 NetTargetFramework,
                 "final-compilation.json");
+            VerifyResultPath = Path.Combine(
+                root,
+                "published",
+                "result.json");
             SubjectPath = Path.Combine(root, "Subject.cs");
         }
 
@@ -421,6 +499,7 @@ public sealed class FinalCompilationProbeTests {
         internal string PackageCache { get; }
         internal string CompilerManifestPath { get; }
         internal string PackedProbeArtifactPath { get; }
+        internal string VerifyResultPath { get; }
         internal string SubjectPath { get; }
 
         internal static ProbeWorkspace Create() {

@@ -165,6 +165,23 @@ public sealed class IrProgramTests {
     }
 
     [Test]
+    public void SequenceLocationsRejectNullTermsWithThePublicParameterName() {
+        var factory = new IrFactory();
+        var builder = new IrProgramBuilder(factory);
+        var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
+
+        var sequenceError = Assert.Throws<ArgumentNullException>(new Action(
+            () => builder.SequenceLocation(null!, factory.Integer(0))));
+        var indexError = Assert.Throws<ArgumentNullException>(new Action(
+            () => builder.SequenceLocation(
+                factory.Null(sequenceType),
+                null!)));
+
+        Assert.That(sequenceError!.ParamName, Is.EqualTo("sequence"));
+        Assert.That(indexError!.ParamName, Is.EqualTo("index"));
+    }
+
+    [Test]
     public void ProgramIdentifiersAreScopedAndValuesAreDeterministic() {
         var first = CreateShape();
         var second = CreateShape();

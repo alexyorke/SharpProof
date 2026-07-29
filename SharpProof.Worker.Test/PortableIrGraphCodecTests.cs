@@ -101,6 +101,40 @@ public sealed class PortableIrGraphCodecTests {
     }
 
     [Test]
+    public void WireEnumCatalogsAreExhaustive() =>
+        Assert.That(PortableIrGraphCodec.HasCompleteWireEnumCatalogs, Is.True);
+
+    [TestCase(WireEnumMutation.OpaquePurity)]
+    [TestCase(WireEnumMutation.UnaryOperator)]
+    [TestCase(WireEnumMutation.BinaryOperator)]
+    [TestCase(WireEnumMutation.HavocKind)]
+    public void DecoderRejectsUnknownWireEnumCodes(WireEnumMutation mutation) {
+        var fixture = CreateFixture();
+        var graph = PortableIrGraphCodec.Encode(fixture.Program, fixture.Roots).Graph;
+
+        switch (mutation) {
+            case WireEnumMutation.OpaquePurity:
+                graph.Terms.First(static row => row.Kind == IrTermKind.Opaque).C = 999;
+                break;
+            case WireEnumMutation.UnaryOperator:
+                graph.Terms.First(static row => row.Kind == IrTermKind.Unary).A = 999;
+                break;
+            case WireEnumMutation.BinaryOperator:
+                graph.Terms.First(static row => row.Kind == IrTermKind.Binary).A = 999;
+                break;
+            case WireEnumMutation.HavocKind:
+                graph.Blocks.SelectMany(static block => block.Instructions)
+                    .First(static row => row.Kind == IrInstructionKind.Havoc).A = 999;
+                break;
+            default:
+                throw new AssertionException("Unknown mutation.");
+        }
+
+        Assert.Throws<InvalidDataException>(
+            (Action)(() => PortableIrGraphCodec.Decode(graph)));
+    }
+
+    [Test]
     public void RootsOnlyGraphDoesNotFabricateAProgram() {
         var factory = new IrFactory();
         IrTerm[] roots = [factory.Integer(42)];
@@ -123,6 +157,14 @@ public sealed class PortableIrGraphCodecTests {
     [TestCase(MalformedMutation.TermKind)]
     [TestCase(MalformedMutation.TermType)]
     [TestCase(MalformedMutation.InstructionKind)]
+    [TestCase(MalformedMutation.NullTopLevelArray)]
+    [TestCase(MalformedMutation.NullMemberParameters)]
+    [TestCase(MalformedMutation.NonCanonicalIdentity)]
+    [TestCase(MalformedMutation.CollapsedMemberPartition)]
+    [TestCase(MalformedMutation.CollapsedTermPartition)]
+    [TestCase(MalformedMutation.NullInstructionItems)]
+    [TestCase(MalformedMutation.LocationKind)]
+    [TestCase(MalformedMutation.ProgramShape)]
     public void DecoderRejectsMalformedGraphs(MalformedMutation mutation) {
         var fixture = CreateFixture();
         var graph = PortableIrGraphCodec.Encode(
@@ -156,6 +198,32 @@ public sealed class PortableIrGraphCodecTests {
                 break;
             case MalformedMutation.InstructionKind:
                 graph.Blocks[0].Instructions[0].Kind = (IrInstructionKind)999;
+                break;
+            case MalformedMutation.NullTopLevelArray:
+                graph.Roots = null!;
+                break;
+            case MalformedMutation.NullMemberParameters:
+                graph.Members[0].ParameterTypes = null!;
+                break;
+            case MalformedMutation.NonCanonicalIdentity:
+                graph.Identities[0] = 1;
+                break;
+            case MalformedMutation.CollapsedMemberPartition:
+                graph.Members[1] = graph.Members[0];
+                break;
+            case MalformedMutation.CollapsedTermPartition:
+                graph.Terms[1] = graph.Terms[0];
+                break;
+            case MalformedMutation.NullInstructionItems:
+                graph.Blocks[0].Instructions[0].Items = null!;
+                break;
+            case MalformedMutation.LocationKind:
+                graph.Blocks[0].Instructions
+                    .First(static instruction => instruction.Location != null)
+                    .Location!.Kind = (IrLocationKind)999;
+                break;
+            case MalformedMutation.ProgramShape:
+                graph.HasProgram = false;
                 break;
             default:
                 throw new AssertionException("Unknown mutation.");
@@ -331,12 +399,27 @@ public sealed class PortableIrGraphCodecTests {
         TypeCycle,
         TermKind,
         TermType,
-        InstructionKind
+        InstructionKind,
+        NullTopLevelArray,
+        NullMemberParameters,
+        NonCanonicalIdentity,
+        CollapsedMemberPartition,
+        CollapsedTermPartition,
+        NullInstructionItems,
+        LocationKind,
+        ProgramShape
     }
 
     public enum DeepGraphKind {
         Terms,
         Types
+    }
+
+    public enum WireEnumMutation {
+        OpaquePurity,
+        UnaryOperator,
+        BinaryOperator,
+        HavocKind
     }
 
     private sealed record CodecFixture(

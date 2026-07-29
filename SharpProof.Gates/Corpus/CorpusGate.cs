@@ -17,6 +17,9 @@ internal sealed record CorpusGateResult(
     int SyntheticSeedCount,
     int VariantCount,
     int DiagnosticCount,
+    int SupportedCaseCount,
+    int IntentionallyUnsupportedCaseCount,
+    int SupportedUnknownCount,
     int UnknownCount,
     int SilentUnknownCount,
     int TotalUnknownCount,
@@ -25,6 +28,7 @@ internal sealed record CorpusGateResult(
     double TotalUnknownRate,
     int CacheReplayCount,
     int ConcurrentReplayCount,
+    ImmutableArray<CorpusUnknownReasonCount> UnknownReasons,
     ImmutableArray<string> AllowedDegradations,
     ImmutableArray<string> Failures);
 
@@ -47,8 +51,15 @@ internal static class CorpusGate {
             "SharpProof.Gates",
             "Corpus",
             "proven-to-unknown.json");
+        var unknownReasonRatchetPath = Path.Combine(
+            repositoryRoot,
+            "SharpProof.Gates",
+            "Corpus",
+            "unknown-reason-ratchet.json");
         var expected = LoadSnapshot(snapshotPath);
         var allowances = LoadAllowances(allowancePath);
+        var unknownReasonRatchet = LoadUnknownReasonRatchet(
+            unknownReasonRatchetPath);
         var observations = ImmutableArray.CreateBuilder<CorpusObservation>();
         foreach (var item in cases.Where(static item =>
                      item.Origin == CorpusOrigin.SyntheticMetamorphic)) {
@@ -138,6 +149,26 @@ internal static class CorpusGate {
         var silentUnknownCount = immutableObservations.Count(static observation =>
             observation.Verdict == CorpusVerdict.SilentUnknown);
         var totalUnknownCount = unknownCount + silentUnknownCount;
+        var casesById = cases.ToImmutableDictionary(
+            static item => item.Id,
+            StringComparer.Ordinal);
+        var supportedCaseCount = cases.Count(static item =>
+            item.Support == CorpusSupport.Supported);
+        var intentionallyUnsupportedCaseCount = cases.Length - supportedCaseCount;
+        var supportedUnknownCount = immutableObservations.Count(observation =>
+            casesById[observation.CaseId].Support == CorpusSupport.Supported &&
+            observation.Verdict is
+                CorpusVerdict.Unknown or CorpusVerdict.SilentUnknown);
+        if (supportedUnknownCount != 0)
+            failures.Add(
+                $"{supportedUnknownCount} supported corpus cases produced Unknown; " +
+                "supported cases must have an accountable Proven or Refuted result.");
+        var unknownReasons = CountUnknownReasons(immutableObservations);
+        ValidateUnknownReasonRatchet(
+            unknownReasonRatchet,
+            unknownReasons,
+            totalUnknownCount,
+            failures);
         var observationCount = immutableObservations.Length;
         return new CorpusGateResult(
             failures.Count == 0,
@@ -152,6 +183,9 @@ internal static class CorpusGate {
             CorpusCatalog.Variants.Length,
             observations.Sum(static observation =>
                 observation.Diagnostics.Length),
+            supportedCaseCount,
+            intentionallyUnsupportedCaseCount,
+            supportedUnknownCount,
             unknownCount,
             silentUnknownCount,
             totalUnknownCount,
@@ -166,6 +200,7 @@ internal static class CorpusGate {
                 : totalUnknownCount / (double)observationCount,
             CorpusCatalog.Seeds.Length,
             CorpusCatalog.Variants.Length,
+            unknownReasons,
             allowedDegradations.ToImmutable(),
             failures.ToImmutable());
     }
@@ -437,6 +472,92 @@ internal static class CorpusGate {
             CultureInfo.InvariantCulture,
             $"{path}:{start.Line + 1}:{start.Character + 1}-" +
             $"{end.Line + 1}:{end.Character + 1}");
+    }
+
+    private static ImmutableArray<CorpusUnknownReasonCount> CountUnknownReasons(
+        ImmutableArray<CorpusObservation> observations) =>
+        [.. observations
+            .Where(static observation => observation.Verdict is
+                CorpusVerdict.Unknown or CorpusVerdict.SilentUnknown)
+            .GroupBy(GetUnknownReason, StringComparer.Ordinal)
+            .OrderBy(static group => group.Key, StringComparer.Ordinal)
+            .Select(static group =>
+                new CorpusUnknownReasonCount(group.Key, group.Count()))];
+
+    private static string GetUnknownReason(CorpusObservation observation) {
+        if (observation.Diagnostics.IsDefaultOrEmpty)
+            return observation.Verdict == CorpusVerdict.SilentUnknown
+                ? "silent-unclassified"
+                : "unknown-unclassified";
+        return string.Join(
+            "+",
+            observation.Diagnostics
+                .Select(static diagnostic => {
+                    var separator = diagnostic.IndexOf(
+                        '@',
+                        StringComparison.Ordinal);
+                    return separator < 0
+                        ? diagnostic
+                        : diagnostic[..separator];
+                })
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(static diagnostic => diagnostic, StringComparer.Ordinal));
+    }
+
+    private static void ValidateUnknownReasonRatchet(
+        CorpusUnknownReasonRatchet ratchet,
+        ImmutableArray<CorpusUnknownReasonCount> actual,
+        int totalUnknownCount,
+        ImmutableArray<string>.Builder failures) {
+        if (totalUnknownCount > ratchet.MaximumTotalUnknown)
+            failures.Add(
+                $"Corpus Unknown count regressed from the ratcheted maximum " +
+                $"{ratchet.MaximumTotalUnknown} to {totalUnknownCount}.");
+        foreach (var item in actual) {
+            if (!ratchet.MaximumByReason.TryGetValue(
+                    item.Reason,
+                    out var maximum)) {
+                failures.Add(
+                    $"Corpus produced a new unreviewed Unknown reason " +
+                    $"'{item.Reason}' ({item.Count} cases).");
+                continue;
+            }
+            if (item.Count > maximum)
+                failures.Add(
+                    $"Corpus Unknown reason '{item.Reason}' regressed from " +
+                    $"the ratcheted maximum {maximum} to {item.Count}.");
+        }
+    }
+
+    private static CorpusUnknownReasonRatchet LoadUnknownReasonRatchet(
+        string path) {
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        var root = document.RootElement;
+        if (root.GetProperty("schemaVersion").GetInt32() != 1)
+            throw new InvalidDataException(
+                "Unsupported corpus Unknown-reason ratchet schema.");
+        var maximumTotalUnknown =
+            root.GetProperty("maximumTotalUnknown").GetInt32();
+        if (maximumTotalUnknown < 0)
+            throw new InvalidDataException(
+                "The corpus Unknown maximum cannot be negative.");
+        var maximumByReason =
+            ImmutableDictionary.CreateBuilder<string, int>(
+                StringComparer.Ordinal);
+        foreach (var property in root.GetProperty("maximumByReason")
+                     .EnumerateObject()) {
+            var maximum = property.Value.GetInt32();
+            if (string.IsNullOrWhiteSpace(property.Name) || maximum < 0)
+                throw new InvalidDataException(
+                    "Corpus Unknown-reason maxima need a name and " +
+                    "a non-negative count.");
+            if (!maximumByReason.TryAdd(property.Name, maximum))
+                throw new InvalidDataException(
+                    $"Duplicate corpus Unknown reason: {property.Name}.");
+        }
+        return new CorpusUnknownReasonRatchet(
+            maximumTotalUnknown,
+            maximumByReason.ToImmutable());
     }
 
     private static ImmutableDictionary<string, ProvenToUnknownAllowance>

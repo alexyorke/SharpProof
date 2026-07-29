@@ -19,8 +19,11 @@ interface or class. The generator validates the association and member
 matching by compiler symbol identity.
 
 Direct and companion clauses are alternative sources, not additive ones. Any
-direct clause on a target member makes that member the source for all of its
-clauses; companion clauses are used only when the target has none.
+valid direct clause on a target member makes that member the source for all of
+its clauses; companion clauses are used only when the target has no valid
+direct clause. Misplaced direct clauses still produce SP0024. They do not
+displace a valid companion, and their complete compiler-elided invocation,
+including argument evaluation, is omitted from verifier body execution.
 
 ## Closed parameter and return contracts
 

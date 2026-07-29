@@ -177,16 +177,16 @@ public sealed class CompilerManifestArtifactTests {
                 }
             }
             """);
-        var block = artifact.Callables[0].Graph!.Blocks.Single();
-        var assignment = block.Instructions.Single(static instruction =>
+        var block = artifact.Callables[0].Graph!.Blocks.First(static candidate =>
+            candidate.Instructions.Any(static instruction =>
+                instruction.Kind == IrInstructionKind.Assign));
+        var assignment = block.Instructions.First(static instruction =>
             instruction.Kind == IrInstructionKind.Assign);
-        var returned = block.Instructions.Single(static instruction =>
-            instruction.Kind == IrInstructionKind.Return);
         block.Instructions = [
             .. Enumerable.Repeat(
                 assignment,
                 CompilerPreparedBody.MaximumInstructions),
-            returned
+            .. block.Instructions
         ];
 
         Assert.Throws<InvalidDataException>((Action)(() =>
@@ -229,6 +229,80 @@ public sealed class CompilerManifestArtifactTests {
             Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerManifestArtifactJson.DecodeCallables(artifact)));
         }
+    }
+
+    [Test]
+    public void EffectEvidenceExactlyMatchesManifestAndFailsClosed() {
+        var valid = CreateEffectArtifact();
+        var claim = valid.Manifest.Claims.Single();
+        var evidence = valid.Callables.Single().EffectClaims.Single();
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(claim.Kind, Is.EqualTo(WorkerClaimKind.Effect));
+            Assert.That(claim.EffectContractKind,
+                Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
+            Assert.That(evidence.ClaimId, Is.EqualTo(claim.ClaimId));
+            Assert.That(evidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(evidence.Certainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.CompleteMayEffectSummary));
+            Assert.That(CompilerManifestArtifactJson.DecodeCallables(valid).Single()
+                .EffectClaims, Has.Length.EqualTo(1));
+        }
+
+        Action<CompilerCallableArtifact>[] corruptions = [
+            value => value.EffectClaims = [],
+            value => value.EffectClaims = [value.EffectClaims[0], value.EffectClaims[0]],
+            value => value.EffectClaims[0].ClaimId = "spc1:invented",
+            value => value.EffectClaims[0].ContractKind =
+                WorkerEffectContractKind.ZeroAllocations,
+            value => value.EffectClaims[0].Evidence += ";invented=true",
+            value => value.EffectClaims[0].Outcome = WorkerClaimOutcome.Refuted,
+            value => value.EffectClaims[0].Certainty =
+                WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary
+        ];
+        foreach (var corrupt in corruptions) {
+            var artifact = CreateEffectArtifact();
+            corrupt(artifact.Callables[0]);
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerManifestArtifactJson.DecodeCallables(artifact)));
+        }
+    }
+
+    [Test]
+    public void DefiniteEffectViolationCarriesSealedSourceWitness() {
+        var artifact = CreateContractArtifact(
+            """
+            using System;
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [DoesNotThrow]
+                internal static void Throw() =>
+                    throw new InvalidOperationException();
+            }
+            """);
+        var evidence = artifact.Callables.Single().EffectClaims.Single();
+
+        using (Assert.EnterMultipleScope()) {
+            Assert.That(
+                evidence.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(
+                evidence.Certainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.DefiniteViolation));
+            Assert.That(evidence.Witness, Is.Not.Null);
+            Assert.That(evidence.Witness!.Kind, Is.EqualTo("explicit-throw"));
+            Assert.That(evidence.Witness.Location.Path, Does.EndWith(".cs"));
+            Assert.That(
+                CompilerManifestArtifactJson.DecodeCallables(artifact)
+                    .Single().EffectClaims.Single().Witness!.Detail,
+                Does.Contain("InvalidOperationException"));
+        }
+
+        evidence.Witness = null;
+        CompilerEffectClaimArtifactCodec.Seal(evidence);
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
     }
 
     [Test]
@@ -519,6 +593,16 @@ public sealed class CompilerManifestArtifactTests {
             WorkerBudgets.DefaultMaximumExpressionDepth,
             CancellationToken.None);
     }
+
+    private static CompilerManifestArtifact CreateEffectArtifact() =>
+        CreateContractArtifact(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [DoesNotThrow]
+                internal static int Identity(int value) => value;
+            }
+            """);
 
     private sealed class UnexpectedBackend : ISmtBackend {
         public Task<BackendCheckResult> CheckAsync(

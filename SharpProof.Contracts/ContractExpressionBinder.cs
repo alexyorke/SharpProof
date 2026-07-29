@@ -5,7 +5,6 @@ internal sealed class ContractExpressionBinder {
     private readonly ContractApiSymbols _api;
     private readonly IMethodSymbol _source;
     private readonly RoslynOperationLowerer _lowerer;
-    private readonly Func<ITypeSymbol?, ITypeSymbol?> _specializeType;
     private readonly Dictionary<ISymbol, IrVarId> _variables =
         new(SymbolEqualityComparer.Default);
     private readonly HashSet<IrVarId> _receiverVariables = [];
@@ -20,9 +19,9 @@ internal sealed class ContractExpressionBinder {
         _factory = factory;
         _api = api;
         _source = source;
-        _specializeType = specializeType ?? (static type => type);
         _lowerer = new RoslynOperationLowerer(factory) {
-            TypeSpecializer = _specializeType
+            TypeSpecializer = specializeType ?? (static type => type),
+            CustomLowering = BindIntrinsic
         };
     }
 
@@ -37,168 +36,43 @@ internal sealed class ContractExpressionBinder {
 
     internal IrVarId? ResultVariable => _result;
 
-    internal ExpressionBindingResult Bind(IOperation operation) => BindCore(operation);
+    internal ExpressionBindingResult Bind(IOperation operation) =>
+        BindWithFrontend(operation);
 
-    private ExpressionBindingResult BindCore(IOperation operation) {
-        if (operation is IBinaryOperation nullComparison &&
-            nullComparison.OperatorMethod == null &&
-            !nullComparison.IsLifted &&
-            nullComparison.OperatorKind is (
-                BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals) &&
-            TryGetNullComparisonValue(nullComparison, out var comparedValue)) {
-            var value = BindCore(comparedValue);
-            if (!value.IsSuccess) return value;
-            var operationKind = nullComparison.OperatorKind ==
-                BinaryOperatorKind.Equals
-                ? IrBinaryOperator.Equal
-                : IrBinaryOperator.NotEqual;
-            return TryCreate(() => _factory.Binary(
-                operationKind,
-                value.Term!,
-                _factory.Null(value.Term!.Type)));
+    private (bool Handled, IrTerm? Term) BindIntrinsic(IOperation operation) {
+        if (operation is not IInvocationOperation invocation)
+            return default;
+        if (_api.IsResult(invocation.TargetMethod)) {
+            _result ??= _factory.CreateVariable(
+                "source-result",
+                _lowerer.GetTypeId(_source.ReturnType));
+            return (true, _factory.Variable(_result.Value));
         }
-        if (!ContainsIntrinsic(operation))
-            return BindWithFrontend(operation);
-
-        if (operation is IInvocationOperation invocation) {
-            if (_api.IsResult(invocation.TargetMethod)) {
-                _result ??= _factory.CreateVariable(
-                    "source-result",
-                    _lowerer.GetTypeId(_source.ReturnType));
-                return ExpressionBindingResult.Success(
-                    _factory.Variable(_result.Value));
+        if (!_api.IsOld(invocation.TargetMethod))
+            return default;
+        if (invocation.Arguments.Length != 1)
+            return (true, null);
+        var value = Bind(invocation.Arguments[0].Value);
+        if (!value.IsSuccess)
+            return (true, null);
+        var substitutions = new Dictionary<IrVarId, IrTerm>();
+        foreach (var variable in IrTraversal.CollectVariables(value.Term!)) {
+            if (!_preState.TryGetValue(variable, out var preState)) {
+                var info = _factory.GetVariableInfo(variable);
+                preState = _factory.CreateVariable(
+                    "source-pre:" +
+                    variable.Value.ToString(
+                        System.Globalization.CultureInfo.InvariantCulture),
+                    info.Type);
+                _preState.Add(variable, preState);
             }
-            if (_api.IsOld(invocation.TargetMethod)) {
-                var value = BindCore(invocation.Arguments[0].Value);
-                if (!value.IsSuccess) return value;
-                var substitutions = new Dictionary<IrVarId, IrTerm>();
-                foreach (var variable in IrTraversal.CollectVariables(value.Term!)) {
-                    if (!_preState.TryGetValue(variable, out var preState)) {
-                        var info = _factory.GetVariableInfo(variable);
-                        preState = _factory.CreateVariable(
-                            "source-pre:" +
-                            variable.Value.ToString(
-                                System.Globalization.CultureInfo.InvariantCulture),
-                            info.Type);
-                        _preState.Add(variable, preState);
-                    }
-                    substitutions[variable] = _factory.Variable(preState);
-                }
-                return ExpressionBindingResult.Success(
-                    IrSubstitution.Substitute(
-                        _factory,
-                        value.Term!,
-                        substitutions));
-            }
+            substitutions[variable] = _factory.Variable(preState);
         }
-
-        if (operation is IPropertyReferenceOperation property &&
-            property.Instance is { Type: IArrayTypeSymbol { Rank: 1 } } instance &&
-            property.Property.Name == nameof(Array.Length) &&
-            property.Type?.SpecialType == SpecialType.System_Int32) {
-            var value = BindCore(instance);
-            if (!value.IsSuccess) return value;
-            return TryCreate(() => _factory.Length(value.Term!));
-        }
-
-        if (operation is IConversionOperation conversion) {
-            var operand = BindCore(conversion.Operand);
-            if (!operand.IsSuccess) return operand;
-            var targetType = _lowerer.GetTypeId(conversion.Type);
-            if (SymbolEqualityComparer.Default.Equals(
-                    conversion.Operand.Type,
-                    conversion.Type))
-                return operand;
-            if (targetType == operand.Term!.Type &&
-                RoslynOperatorSemantics.IsValuePreservingIntegerConversion(
-                    conversion.Operand.Type?.SpecialType ?? SpecialType.None,
-                    conversion.Type?.SpecialType ?? SpecialType.None))
-                return operand;
-            return ExpressionBindingResult.Unsupported;
-        }
-        if (operation is IUnaryOperation unary && unary.OperatorMethod == null) {
-            var operand = BindCore(unary.Operand);
-            if (!operand.IsSuccess) return operand;
-            var mapped = unary.OperatorKind switch {
-                UnaryOperatorKind.Not => IrUnaryOperator.Not,
-                UnaryOperatorKind.Minus => IrUnaryOperator.Negate,
-                _ => (IrUnaryOperator?)null
-            };
-            if (!mapped.HasValue) return ExpressionBindingResult.Unsupported;
-            if (mapped == IrUnaryOperator.Negate &&
-                (unary.Type?.SpecialType != SpecialType.System_Int64 ||
-                 !unary.IsChecked))
-                return ExpressionBindingResult.Unsupported;
-            return TryCreate(() =>
-                _factory.Unary(mapped.Value, operand.Term!));
-        }
-        if (operation is IBinaryOperation binary &&
-            binary.OperatorMethod == null &&
-            !binary.IsLifted) {
-            if (!RoslynOperatorSemantics.SupportsBuiltInOperands(
-                    binary.OperatorKind,
-                    binary.LeftOperand.Type,
-                    binary.RightOperand.Type))
-                return ExpressionBindingResult.Unsupported;
-            var left = BindCore(binary.LeftOperand);
-            if (!left.IsSuccess) return left;
-            var right = BindCore(binary.RightOperand);
-            if (!right.IsSuccess) return right;
-            var mapped = RoslynOperatorSemantics.MapBinary(
-                binary.OperatorKind,
-                binary.Type?.SpecialType ?? SpecialType.None);
-            if (!mapped.HasValue) return ExpressionBindingResult.Unsupported;
-            if (mapped == IrBinaryOperator.StringConcat ||
-                RoslynOperatorSemantics.IsIntegerArithmetic(
-                    binary.OperatorKind) &&
-                (binary.Type?.SpecialType != SpecialType.System_Int64 ||
-                 RoslynOperatorSemantics.RequiresCheckedArithmetic(
-                     binary.OperatorKind) &&
-                 !binary.IsChecked))
-                return ExpressionBindingResult.Unsupported;
-            return TryCreate(() =>
-                _factory.Binary(mapped.Value, left.Term!, right.Term!));
-        }
-        if (operation is IConditionalOperation conditional &&
-            conditional.WhenFalse != null) {
-            var condition = BindCore(conditional.Condition);
-            if (!condition.IsSuccess) return condition;
-            var whenTrue = BindCore(conditional.WhenTrue);
-            if (!whenTrue.IsSuccess) return whenTrue;
-            var whenFalse = BindCore(conditional.WhenFalse);
-            if (!whenFalse.IsSuccess) return whenFalse;
-            return TryCreate(() => _factory.Conditional(
-                condition.Term!,
-                whenTrue.Term!,
-                whenFalse.Term!));
-        }
-        return ExpressionBindingResult.Unsupported;
+        return (true, IrSubstitution.Substitute(
+            _factory,
+            value.Term!,
+            substitutions));
     }
-
-    private static bool TryGetNullComparisonValue(
-        IBinaryOperation operation,
-        out IOperation value) {
-        var left = UnwrapImplicitConversions(operation.LeftOperand);
-        var right = UnwrapImplicitConversions(operation.RightOperand);
-        value = IsNullConstant(right)
-            ? left
-            : IsNullConstant(left)
-                ? right
-                : null!;
-        return value != null;
-    }
-
-    private static IOperation UnwrapImplicitConversions(IOperation operation) {
-        while (operation is IConversionOperation {
-            IsImplicit: true,
-            OperatorMethod: null
-        } conversion)
-            operation = conversion.Operand;
-        return operation;
-    }
-
-    private static bool IsNullConstant(IOperation operation) =>
-        operation.ConstantValue is { HasValue: true, Value: null };
 
     private ExpressionBindingResult BindWithFrontend(IOperation operation) {
         var result = _lowerer.Lower(operation);
@@ -210,29 +84,16 @@ internal sealed class ContractExpressionBinder {
         var boundVariables = new HashSet<IrVarId>(
             result.Variables.Select(static binding => binding.Variable));
         foreach (var variable in IrTraversal.CollectVariables(result.Term)) {
-            if (boundVariables.Contains(variable)) continue;
+            if (boundVariables.Contains(variable) ||
+                variable == _result ||
+                _preState.ContainsValue(variable))
+                continue;
             if (_source.IsStatic)
                 return ExpressionBindingResult.Unsupported;
             _receiverVariables.Add(variable);
         }
         return ExpressionBindingResult.Success(result.Term);
     }
-
-    private static ExpressionBindingResult TryCreate(Func<IrTerm> create) {
-        try {
-            return ExpressionBindingResult.Success(create());
-        }
-        catch (ArgumentException) {
-            return ExpressionBindingResult.Unsupported;
-        }
-    }
-
-    private bool ContainsIntrinsic(IOperation root) =>
-        root.DescendantsAndSelf()
-            .OfType<IInvocationOperation>()
-            .Any(invocation =>
-                _api.IsResult(invocation.TargetMethod) ||
-                _api.IsOld(invocation.TargetMethod));
 
 }
 

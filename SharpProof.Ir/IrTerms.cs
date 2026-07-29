@@ -50,6 +50,39 @@ public enum IrOpaquePurity {
     Impure
 }
 
+internal static class IrOperatorCatalog {
+    internal static (int Key, IrTypeKind Operand, string Token) Get(
+        IrUnaryOperator @operator) =>
+        @operator switch {
+            IrUnaryOperator.Not => (0, IrTypeKind.Boolean, "!"),
+            IrUnaryOperator.Negate => (1, IrTypeKind.Integer, "-"),
+            _ => throw new ArgumentOutOfRangeException(nameof(@operator))
+        };
+
+    internal static (
+        int Key,
+        IrTypeKind? Operand,
+        IrTypeKind Result,
+        string Token) Get(IrBinaryOperator @operator) =>
+        @operator switch {
+            IrBinaryOperator.Add => (0, IrTypeKind.Integer, IrTypeKind.Integer, "+"),
+            IrBinaryOperator.Subtract => (1, IrTypeKind.Integer, IrTypeKind.Integer, "-"),
+            IrBinaryOperator.Multiply => (2, IrTypeKind.Integer, IrTypeKind.Integer, "*"),
+            IrBinaryOperator.Divide => (3, IrTypeKind.Integer, IrTypeKind.Integer, "/"),
+            IrBinaryOperator.Remainder => (4, IrTypeKind.Integer, IrTypeKind.Integer, "%"),
+            IrBinaryOperator.AndAlso => (5, IrTypeKind.Boolean, IrTypeKind.Boolean, "&&"),
+            IrBinaryOperator.OrElse => (6, IrTypeKind.Boolean, IrTypeKind.Boolean, "||"),
+            IrBinaryOperator.Equal => (7, null, IrTypeKind.Boolean, "=="),
+            IrBinaryOperator.NotEqual => (8, null, IrTypeKind.Boolean, "!="),
+            IrBinaryOperator.LessThan => (9, IrTypeKind.Integer, IrTypeKind.Boolean, "<"),
+            IrBinaryOperator.LessThanOrEqual => (10, IrTypeKind.Integer, IrTypeKind.Boolean, "<="),
+            IrBinaryOperator.GreaterThan => (11, IrTypeKind.Integer, IrTypeKind.Boolean, ">"),
+            IrBinaryOperator.GreaterThanOrEqual => (12, IrTypeKind.Integer, IrTypeKind.Boolean, ">="),
+            IrBinaryOperator.StringConcat => (13, IrTypeKind.String, IrTypeKind.String, "++"),
+            _ => throw new ArgumentOutOfRangeException(nameof(@operator))
+        };
+}
+
 public sealed class IrTypeInfo {
     internal IrTypeInfo(IrTypeId id, IrStringId name, IrTypeKind kind, IrTypeId? elementType) =>
         (Id, Name, Kind, ElementType) = (id, name, kind, elementType);

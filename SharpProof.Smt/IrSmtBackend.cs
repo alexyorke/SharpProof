@@ -7,6 +7,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         options ?? throw new ArgumentNullException(nameof(options));
     private long _consumedResourceCount;
     private long _lastObservedResourceCount;
+    private bool _interrupted;
     private bool _disposed;
 
     public IrSmtBackend()
@@ -27,10 +28,11 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         cancellationToken.ThrowIfCancellationRequested();
         return Task.Run(() => {
             lock (_gate) {
-                if (_disposed) return BackendCheckResult.Unknown(BackendFailureReason.Unavailable);
+                if (_disposed || Volatile.Read(ref _interrupted))
+                    return BackendCheckResult.Unknown(BackendFailureReason.Unavailable);
                 using var registration = cancellationToken.Register(
-                    static state => ((Context)state!).Interrupt(),
-                    _context);
+                    static state => ((IrSmtBackend)state!).Interrupt(),
+                    this);
                 try {
                     var result = CheckCore(query, cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
@@ -49,6 +51,11 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 }
             }
         }, cancellationToken);
+    }
+
+    private void Interrupt() {
+        Volatile.Write(ref _interrupted, true);
+        _context.Interrupt();
     }
 
     public void Dispose() {
@@ -164,27 +171,17 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         out IrValue? value) {
         var type = factory.GetVariableInfo(variable).Type;
         if (type == factory.BooleanType) {
-            if (expression.IsTrue) {
-                value = factory.CreateBooleanValue(true);
-                return true;
-            }
-            if (expression.IsFalse) {
-                value = factory.CreateBooleanValue(false);
-                return true;
-            }
+            bool? boolean = expression.IsTrue ? true : expression.IsFalse ? false : null;
+            value = boolean.HasValue ? factory.CreateBooleanValue(boolean.Value) : null;
         }
-        else if (type == factory.IntegerType && expression is IntNum integer) {
-            if (long.TryParse(
-                    integer.ToString(),
-                    NumberStyles.AllowLeadingSign,
-                    CultureInfo.InvariantCulture,
-                    out var number)) {
-                value = factory.CreateIntegerValue(number);
-                return true;
-            }
+        else if (type == factory.IntegerType &&
+                 expression is IntNum integer &&
+                 long.TryParse(integer.ToString(), NumberStyles.AllowLeadingSign,
+                     CultureInfo.InvariantCulture, out var number)) {
+            value = factory.CreateIntegerValue(number);
         }
-        value = null;
-        return false;
+        else value = null;
+        return value != null;
     }
 
     private sealed class QueryEncoder : IDisposable {
@@ -282,63 +279,32 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                         _context.MkOr(leftOrBoolean, right.Defined)));
             var defined = _context.MkAnd(left.Defined, right.Defined);
             return binary.Operator switch {
-                IrBinaryOperator.Add => Bounded(
-                    _context.MkAdd(Integer(left), Integer(right)),
-                    defined),
-                IrBinaryOperator.Subtract => Bounded(
-                    _context.MkSub(Integer(left), Integer(right)),
-                    defined),
-                IrBinaryOperator.Multiply => Bounded(
-                    _context.MkMul(Integer(left), Integer(right)),
-                    defined),
-                IrBinaryOperator.Divide => EncodeDivide(left, right, defined),
-                IrBinaryOperator.Remainder => EncodeRemainder(left, right, defined),
-                IrBinaryOperator.Equal => new EncodedValue(
-                    _context.MkEq(left.Value, right.Value),
-                    defined),
+                IrBinaryOperator.Add => Bounded(_context.MkAdd(Integer(left), Integer(right)), defined),
+                IrBinaryOperator.Subtract => Bounded(_context.MkSub(Integer(left), Integer(right)), defined),
+                IrBinaryOperator.Multiply => Bounded(_context.MkMul(Integer(left), Integer(right)), defined),
+                IrBinaryOperator.Divide or IrBinaryOperator.Remainder =>
+                    EncodeDivision(binary.Operator, left, right, defined),
+                IrBinaryOperator.Equal => new EncodedValue(_context.MkEq(left.Value, right.Value), defined),
                 IrBinaryOperator.NotEqual => new EncodedValue(
-                    _context.MkNot(_context.MkEq(left.Value, right.Value)),
-                    defined),
-                IrBinaryOperator.LessThan => Comparison(
-                    _context.MkLt(Integer(left), Integer(right)),
-                    defined),
-                IrBinaryOperator.LessThanOrEqual => Comparison(
-                    _context.MkLe(Integer(left), Integer(right)),
-                    defined),
-                IrBinaryOperator.GreaterThan => Comparison(
-                    _context.MkGt(Integer(left), Integer(right)),
-                    defined),
-                IrBinaryOperator.GreaterThanOrEqual => Comparison(
-                    _context.MkGe(Integer(left), Integer(right)),
-                    defined),
+                    _context.MkNot(_context.MkEq(left.Value, right.Value)), defined),
+                IrBinaryOperator.LessThan => Comparison(_context.MkLt(Integer(left), Integer(right)), defined),
+                IrBinaryOperator.LessThanOrEqual => Comparison(_context.MkLe(Integer(left), Integer(right)), defined),
+                IrBinaryOperator.GreaterThan => Comparison(_context.MkGt(Integer(left), Integer(right)), defined),
+                IrBinaryOperator.GreaterThanOrEqual => Comparison(_context.MkGe(Integer(left), Integer(right)), defined),
                 _ => throw new UnsupportedIrEncodingException()
             };
         }
 
-        private EncodedValue EncodeDivide(
-            EncodedValue left,
-            EncodedValue right,
-            BoolExpr defined) {
+        private EncodedValue EncodeDivision(
+            IrBinaryOperator @operator, EncodedValue left,
+            EncodedValue right, BoolExpr defined) {
             var leftInteger = Integer(left);
             var rightInteger = Integer(right);
             var quotient = DivideTowardZero(leftInteger, rightInteger);
-            return Bounded(
-                quotient,
-                _context.MkAnd(defined, DivisionDefined(leftInteger, rightInteger)));
-        }
-
-        private EncodedValue EncodeRemainder(
-            EncodedValue left,
-            EncodedValue right,
-            BoolExpr defined) {
-            var leftInteger = Integer(left);
-            var rightInteger = Integer(right);
-            var quotient = DivideTowardZero(leftInteger, rightInteger);
-            var remainder = _context.MkSub(
-                leftInteger,
-                _context.MkMul(quotient, rightInteger));
-            return Bounded(
-                remainder,
+            var result = @operator == IrBinaryOperator.Divide
+                ? quotient
+                : _context.MkSub(leftInteger, _context.MkMul(quotient, rightInteger));
+            return Bounded(result,
                 _context.MkAnd(defined, DivisionDefined(leftInteger, rightInteger)));
         }
 
@@ -413,14 +379,9 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
 
     }
 
-    private sealed class EncodedValue : IDisposable {
-        internal EncodedValue(Expr value, BoolExpr defined) {
-            Value = value;
-            Defined = defined;
-        }
-
-        internal Expr Value { get; }
-        internal BoolExpr Defined { get; }
+    private sealed class EncodedValue(Expr value, BoolExpr defined) : IDisposable {
+        internal Expr Value { get; } = value;
+        internal BoolExpr Defined { get; } = defined;
 
         public void Dispose() {
             Value.Dispose();

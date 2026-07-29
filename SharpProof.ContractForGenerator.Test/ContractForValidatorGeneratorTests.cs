@@ -291,6 +291,29 @@ public sealed class ContractForValidatorGeneratorTests {
             Does.Contain("ContractFor"));
     }
 
+    [TestCase("public struct Target { }")]
+    [TestCase("public enum Target { Value }")]
+    [TestCase("public delegate void Target();")]
+    public void ContractForTargetMustBeAClassOrInterface(
+        string targetDeclaration) {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+            """ +
+            targetDeclaration +
+            """
+
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+            }
+            """);
+
+        var diagnostic = AssertSingle(run, "SPCF0001");
+        Assert.That(
+            GetLocatedText(diagnostic),
+            Does.Contain("ContractFor"));
+    }
+
     [Test]
     public void LookalikeAttributeIsNotTrusted() {
         var run = Run(

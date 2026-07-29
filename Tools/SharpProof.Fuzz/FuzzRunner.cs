@@ -58,7 +58,14 @@ public sealed record FuzzSummary(
     FrontendFuzzCoverage FrontendCoverage,
     bool CoverageSatisfied,
     ImmutableArray<FuzzFailure> Failures) {
-    public bool Passed => Failures.IsDefaultOrEmpty && CoverageSatisfied;
+    public bool Passed =>
+        Failures.IsDefaultOrEmpty &&
+        CoverageSatisfied &&
+        Abstentions == 0 &&
+        Agreements == Cases &&
+        FrontendAgreements == Cases &&
+        SmtAgreements == Cases &&
+        PartialSmtAgreements == Cases;
 }
 
 public static class FuzzRunner {
@@ -224,7 +231,7 @@ public static class FuzzRunner {
             });
 
         return new FuzzSummary(
-            SchemaVersion: 3,
+            SchemaVersion: 4,
             options.Cases,
             options.Seed,
             options.MaximumParallelism,

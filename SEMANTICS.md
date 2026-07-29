@@ -11,8 +11,8 @@ SharpProof has three semantic outcomes:
 - `Proven` means that the goal follows from lowered program facts, resolved API
   specifications, verified contracts, and any explicitly declared user
   assumptions.
-- `Refuted` means that a validated counterexample or effect trace violates the
-  goal.
+- `Refuted` means that a replay-validated concrete counterexample violates the
+  goal. The current effect analyzer does not emit this outcome.
 - `Unknown` means that SharpProof cannot establish either result within its
   supported language, models, or resource limits.
 
@@ -23,7 +23,7 @@ depends on a modeled call which the independent interpreter cannot execute is
 also `Unknown`; it is never reported as a refutation. Backend unavailability,
 infrastructure failure, malformed backend output, containment failure, and a
 failed replay of an otherwise replayable counterexample make protocol version
-6 mark the whole run `Failed`; these conditions are fatal under every build
+8 mark the whole run `Failed`; these conditions are fatal under every build
 policy. Unsupported unannotated analyzer callables remain silent. Explicitly
 selected unsupported callables produce SP0047.
 
@@ -40,10 +40,11 @@ exhaustion, and all `Unknown` outcomes are not reusable proof-cache entries.
 
 ## Accountable selection and worker runs
 
-Worker protocol version 6 separates `WorkerRunStatus` from
+Worker protocol version 8 separates `WorkerRunStatus` from
 `WorkerClaimOutcome`. The compiler-symbol-based manifest is sealed before
-verification. It contains every selected callable and every discovered
-postcondition with a stable semantic claim ID, evidence kind, dense ordinal,
+verification. It contains every selected callable, every discovered
+postcondition, and every selected effect-attribute occurrence with a stable
+semantic claim ID, evidence kind, dense ordinal,
 and mapped source location. A valid response has exact manifest/result
 equality: no claim may be missing, duplicated, invented, or assigned to the
 wrong callable.
@@ -54,15 +55,32 @@ assumptions, and postcondition claims while excluding effect-only annotations.
 `Effects` includes effect-selected callables while excluding postcondition
 claims and contract assumptions. `All` is their union. Strict accountability
 applies to everything selected by that feature set; disabled features are not
-silently counted as analyzed. Because the current worker does not produce
-effect-proof claims, an effect-selected callable has explicit incomplete
-coverage rather than an empty success.
+silently counted as analyzed. Repeated effect attributes receive distinct
+manifest claims while sharing the effective combined constraint and evidence.
+Each effect claim is `Proven` only when a complete compiler-produced effect
+summary establishes its contract. It is `Refuted` only for a structured
+`DefiniteViolation` witness produced from a simple unconditional direct
+operation and independently checked by the worker against the sealed
+constraint. Conditional and may-only conflicts remain
+`Unknown(EffectContractNotEstablished)`; incomplete evidence is
+`Unknown(EffectSummaryIncomplete)`. Other certainty values distinguish a
+complete or incomplete may-effect summary, a trusted complete boundary, and
+unavailable evidence.
 
 Every selected callable has explicit `Complete` or `Incomplete` coverage.
 Every manifest claim has exactly one `Proven`, `Refuted`, or `Unknown` result.
 The worker must never fabricate a clause-zero claim to describe a callable
 failure. User assumptions and trusted boundaries have stable evidence IDs and
 remain visible whether or not they enter an individual proof core.
+
+A `Proven` postcondition also records explicit vacuity evidence when its
+preconditions are proven unsatisfiable or when the bounded executor has no
+modeled normal return. Nonliteral normal-completion predicates are checked
+under non-user assumptions, and an inconclusive check prevents `Proven`.
+These are respectively
+`ContradictoryPreconditions` and `NoModeledNormalReturn`; ordinary
+non-vacuous proofs record `None`. The evidence is part of the canonical JSON
+claim result and therefore survives cache reuse and SARIF projection.
 
 A `Complete` run means the worker finished and produced a structurally valid
 accounting response; it does not mean every claim was proven. `TimedOut`,
@@ -162,11 +180,23 @@ one-time execution is not modeled there, the summary is `Unknown`.
 Metadata static-field access has no callable summary that can cover type
 initialization and therefore fails closed.
 
-The analyzer's effect summary is a path-insensitive may analysis. A possible
+The analyzer's general effect summary is a conservative two-phase may analysis.
+A bounded acyclic CFG pass first refines scalar reachability; effect analysis
+then joins summaries across the remaining branches. Impossible refined
+branches do not contribute effects, while a reachable cycle or exhausted block
+or operation budget makes selected effect claims `Unknown`. A possible
 allocation, disallowed capability, observable access, or disallowed exception
-therefore makes the corresponding contract `Unknown`; it is not a validated
-effect trace and cannot produce `Refuted`. The definitive SP0013, SP0015, and
-SP0030 diagnostics are reserved until concrete effect-trace replay exists.
+therefore makes the corresponding contract `Unknown`; a may-effect alone cannot
+produce `Refuted`. Separately, the compiler recognizes a narrow set of simple
+unconditional direct operations: managed object/array allocation, explicit
+throw, receiver-field access, empty `lock`, and exact `Monitor` calls. It
+records a source-located structured witness, and the worker independently
+validates the witness/constraint conflict before returning `Refuted`.
+Static-field access, conditional/path-dependent operations, and
+user-constructed exact exception types remain outside that refutation subset.
+The analyzer's definitive SP0013, SP0015, and SP0030 diagnostics remain
+reserved; direct violations are accountable through worker claim results and
+SARIF.
 
 ## Analyzer activation and language boundary
 
@@ -213,7 +243,7 @@ and primary constructors. A closed constructed generic API call is accepted only
 when a specification resolves for that exact call. Every Roslyn `OperationKind`
 is classified by a checked-in decision table; an unknown future kind is rejected.
 
-The packaged verifier consumes compiler artifact schema version 3 produced
+The packaged verifier consumes compiler artifact schema version 5 produced
 from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed
 lowering failure or portable whole-body CFG/IR with bound clauses, canonical
