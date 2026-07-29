@@ -1,6 +1,7 @@
 namespace SharpProof.Contracts;
 
-internal sealed class ContractExpressionBinder {
+internal sealed class ContractExpressionBinder
+{
     private readonly IrFactory _factory;
     private readonly ContractApiSymbols _api;
     private readonly IMethodSymbol _source;
@@ -15,11 +16,13 @@ internal sealed class ContractExpressionBinder {
         IrFactory factory,
         ContractApiSymbols api,
         IMethodSymbol source,
-        Func<ITypeSymbol?, ITypeSymbol?>? specializeType = null) {
+        Func<ITypeSymbol?, ITypeSymbol?>? specializeType = null)
+    {
         _factory = factory;
         _api = api;
         _source = source;
-        _lowerer = new RoslynOperationLowerer(factory) {
+        _lowerer = new RoslynOperationLowerer(factory)
+        {
             TypeSpecializer = specializeType ?? (static type => type),
             CustomLowering = BindIntrinsic
         };
@@ -36,28 +39,46 @@ internal sealed class ContractExpressionBinder {
 
     internal IrVarId? ResultVariable => _result;
 
-    internal ExpressionBindingResult Bind(IOperation operation) =>
-        BindWithFrontend(operation);
+    internal ExpressionBindingResult Bind(IOperation operation)
+    {
+        return BindWithFrontend(operation);
+    }
 
-    private (bool Handled, IrTerm? Term) BindIntrinsic(IOperation operation) {
+    private (bool Handled, IrTerm? Term) BindIntrinsic(IOperation operation)
+    {
         if (operation is not IInvocationOperation invocation)
+        {
             return default;
-        if (_api.IsResult(invocation.TargetMethod)) {
+        }
+
+        if (_api.IsResult(invocation.TargetMethod))
+        {
             _result ??= _factory.CreateVariable(
                 "source-result",
                 _lowerer.GetTypeId(_source.ReturnType));
             return (true, _factory.Variable(_result.Value));
         }
         if (!_api.IsOld(invocation.TargetMethod))
+        {
             return default;
+        }
+
         if (invocation.Arguments.Length != 1)
+        {
             return (true, null);
+        }
+
         var value = Bind(invocation.Arguments[0].Value);
         if (!value.IsSuccess)
+        {
             return (true, null);
+        }
+
         var substitutions = new Dictionary<IrVarId, IrTerm>();
-        foreach (var variable in IrTraversal.CollectVariables(value.Term!)) {
-            if (!_preState.TryGetValue(variable, out var preState)) {
+        foreach (var variable in IrTraversal.CollectVariables(value.Term!))
+        {
+            if (!_preState.TryGetValue(variable, out var preState))
+            {
                 var info = _factory.GetVariableInfo(variable);
                 preState = _factory.CreateVariable(
                     "source-pre:" +
@@ -74,22 +95,35 @@ internal sealed class ContractExpressionBinder {
             substitutions));
     }
 
-    private ExpressionBindingResult BindWithFrontend(IOperation operation) {
+    private ExpressionBindingResult BindWithFrontend(IOperation operation)
+    {
         var result = _lowerer.Lower(operation);
         if (!result.IsExact)
+        {
             return ExpressionBindingResult.Unsupported;
+        }
+
         foreach (var binding in result.Variables)
+        {
             _variables[binding.Symbol] = binding.Variable;
+        }
 
         var boundVariables = new HashSet<IrVarId>(
             result.Variables.Select(static binding => binding.Variable));
-        foreach (var variable in IrTraversal.CollectVariables(result.Term)) {
+        foreach (var variable in IrTraversal.CollectVariables(result.Term))
+        {
             if (boundVariables.Contains(variable) ||
                 variable == _result ||
                 _preState.ContainsValue(variable))
+            {
                 continue;
+            }
+
             if (_source.IsStatic)
+            {
                 return ExpressionBindingResult.Unsupported;
+            }
+
             _receiverVariables.Add(variable);
         }
         return ExpressionBindingResult.Success(result.Term);
@@ -99,18 +133,26 @@ internal sealed class ContractExpressionBinder {
 
 internal readonly struct ExpressionBindingResult(
     IrTerm? term,
-    ContractBindingFailure failure) {
+    ContractBindingFailure failure)
+{
     internal IrTerm? Term { get; } = term;
     internal ContractBindingFailure Failure { get; } = failure;
     internal bool IsSuccess => Failure == ContractBindingFailure.None;
 
-    internal static ExpressionBindingResult Success(IrTerm term) =>
-        new(term, ContractBindingFailure.None);
+    internal static ExpressionBindingResult Success(IrTerm term)
+    {
+        return new(term, ContractBindingFailure.None);
+    }
 
     internal static ExpressionBindingResult Fail(
-        ContractBindingFailure failure) =>
-        new(null, failure);
+        ContractBindingFailure failure)
+    {
+        return new(null, failure);
+    }
 
-    internal static ExpressionBindingResult Unsupported { get; } =
+    internal static ExpressionBindingResult Unsupported
+    {
+        get;
+    } =
         Fail(ContractBindingFailure.UnsupportedExpression);
 }

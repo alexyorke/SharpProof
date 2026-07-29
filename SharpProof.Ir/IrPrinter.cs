@@ -1,18 +1,25 @@
 namespace SharpProof.Ir;
 
-public sealed class IrPrinter(IrFactory factory) {
+public sealed class IrPrinter(IrFactory factory)
+{
     private readonly IrFactory _factory =
         factory ?? throw new ArgumentNullException(nameof(factory));
 
-    public string Print(IrTerm term) {
+    public string Print(IrTerm term)
+    {
         if (term == null)
+        {
             throw new ArgumentNullException(nameof(term));
+        }
+
         _factory.EnsureTerm(term, nameof(term));
         return Format(term);
     }
 
-    private string Format(IrTerm term) =>
-        term switch {
+    private string Format(IrTerm term)
+    {
+        return term switch
+        {
             IrBooleanTerm value => value.Value ? "true" : "false",
             IrIntegerTerm value =>
                 value.Value.ToString(CultureInfo.InvariantCulture),
@@ -37,8 +44,10 @@ public sealed class IrPrinter(IrFactory factory) {
             _ => throw new InvalidOperationException(
                 "Unknown IR term kind: " + term.Kind + ".")
         };
+    }
 
-    private string FormatOpaque(IrOpaqueTerm opaque) {
+    private string FormatOpaque(IrOpaqueTerm opaque)
+    {
         var prefix = opaque.Purity == IrOpaquePurity.Pure
             ? "pure:"
             : "impure:" + opaque.Operation + ":";
@@ -52,13 +61,18 @@ public sealed class IrPrinter(IrFactory factory) {
         return prefix + opaque.Member + "(" + receiver + arguments + ")";
     }
 
-    private string TypeName(IrTypeId type) =>
-        _factory.GetString(_factory.GetTypeInfo(type).Name);
+    private string TypeName(IrTypeId type)
+    {
+        return _factory.GetString(_factory.GetTypeInfo(type).Name);
+    }
 
-    private static string Quote(string value) {
+    private static string Quote(string value)
+    {
         var builder = new StringBuilder().Append('"');
-        foreach (var character in value) {
-            var escape = character switch {
+        foreach (var character in value)
+        {
+            var escape = character switch
+            {
                 '"' => "\\\"",
                 '\\' => "\\\\",
                 '\n' => "\\n",
@@ -66,17 +80,22 @@ public sealed class IrPrinter(IrFactory factory) {
                 '\t' => "\\t",
                 _ => null
             };
-            if (escape != null) {
+            if (escape != null)
+            {
                 builder.Append(escape);
                 continue;
             }
             if (character is < ' ' or > '~')
+            {
                 builder.Append("\\u").Append(
                     ((int)character).ToString(
                         "X4",
                         CultureInfo.InvariantCulture));
+            }
             else
+            {
                 builder.Append(character);
+            }
         }
         return builder.Append('"').ToString();
     }

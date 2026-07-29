@@ -10,7 +10,8 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Analyzer.Test;
 
 [TestFixture]
-public sealed class FinalCompilationCollectorTests {
+public sealed class FinalCompilationCollectorTests
+{
     private const string OutputKey =
         "build_property._SharpProofCompilerManifestPath";
     private const string TargetFrameworkKey =
@@ -20,7 +21,8 @@ public sealed class FinalCompilationCollectorTests {
         "build_property.SharpProofVerifyMaximumExpressionDepth";
 
     [Test]
-    public async Task CollectorIsInactiveWithoutAPathAndForTheOffProfile() {
+    public async Task CollectorIsInactiveWithoutAPathAndForTheOffProfile()
+    {
         using var workspace = new CollectorWorkspace();
         var compilation = CreateCompilation();
 
@@ -31,7 +33,8 @@ public sealed class FinalCompilationCollectorTests {
             compilation,
             Options(workspace.SealPath("off"), profile: "off"));
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(withoutPath, Is.Empty);
             Assert.That(off, Is.Empty);
             Assert.That(Directory.EnumerateFiles(workspace.Path), Is.Empty);
@@ -39,7 +42,8 @@ public sealed class FinalCompilationCollectorTests {
     }
 
     [Test]
-    public async Task FinalCompilationSealIsCanonicalAndIncludesGeneratedInputs() {
+    public async Task FinalCompilationSealIsCanonicalAndIncludesGeneratedInputs()
+    {
         using var workspace = new CollectorWorkspace();
         var compilation = CreateCompilation();
         var generated = CSharpSyntaxTree.ParseText(
@@ -76,7 +80,8 @@ public sealed class FinalCompilationCollectorTests {
         var artifact = CompilerManifestArtifactJson.Deserialize(
             Encoding.UTF8.GetString(first));
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(firstDiagnostics, Is.Empty);
             Assert.That(secondDiagnostics, Is.Empty);
             Assert.That(second, Is.EqualTo(first));
@@ -101,7 +106,8 @@ public sealed class FinalCompilationCollectorTests {
     }
 
     [Test]
-    public async Task SemanticCompilerInputsInvalidateTheSeal() {
+    public async Task SemanticCompilerInputsInvalidateTheSeal()
+    {
         using var workspace = new CollectorWorkspace();
         var baseline = CreateCompilation();
         var baselineHash = await EmitHash(
@@ -149,7 +155,8 @@ public sealed class FinalCompilationCollectorTests {
             additional: "value=1",
             features: "effects");
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 new[] {
                     baselineHash, sourceHash, parseHash, aliasHash,
@@ -166,7 +173,8 @@ public sealed class FinalCompilationCollectorTests {
     }
 
     [Test]
-    public async Task EmissionFailureIsTypedAndDoesNotEscapeAsAd0001() {
+    public async Task EmissionFailureIsTypedAndDoesNotEscapeAsAd0001()
+    {
         using var workspace = new CollectorWorkspace();
 
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
@@ -184,7 +192,8 @@ public sealed class FinalCompilationCollectorTests {
     [TestCase("0")]
     [TestCase("257")]
     [TestCase("not-a-number")]
-    public async Task InvalidExpressionDepthFailsArtifactEmission(string value) {
+    public async Task InvalidExpressionDepthFailsArtifactEmission(string value)
+    {
         using var workspace = new CollectorWorkspace();
 
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
@@ -199,7 +208,8 @@ public sealed class FinalCompilationCollectorTests {
     }
 
     [Test]
-    public async Task NonFileReferenceFailsWithTypedInfrastructureDiagnostic() {
+    public async Task NonFileReferenceFailsWithTypedInfrastructureDiagnostic()
+    {
         using var workspace = new CollectorWorkspace();
         var compilation = CreateCompilation();
         var reference = compilation.References
@@ -223,7 +233,8 @@ public sealed class FinalCompilationCollectorTests {
         string additional,
         string verifyPolicy = "advisory",
         string assumptionPolicy = "allow",
-        string features = "all") {
+        string features = "all")
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             compilation,
             Options(
@@ -235,7 +246,8 @@ public sealed class FinalCompilationCollectorTests {
         Assert.That(diagnostics, Is.Empty);
         var artifact = CompilerManifestArtifactJson.Deserialize(
             await File.ReadAllTextAsync(path));
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(artifact.Compilation.AdditionalFiles, Has.Length.EqualTo(1));
             Assert.That(
                 artifact.Compilation.AdditionalFiles[0].Path,
@@ -248,8 +260,10 @@ public sealed class FinalCompilationCollectorTests {
     }
 
     private static CSharpCompilation CreateCompilation(
-        string source = "internal static class Fixture { const int Value = 1; }") =>
-        AnalyzerTestHost.CreateCompilation(source, []);
+        string source = "internal static class Fixture { const int Value = 1; }")
+    {
+        return AnalyzerTestHost.CreateCompilation(source, []);
+    }
 
     private static Dictionary<string, string> Options(
         string? path,
@@ -257,9 +271,11 @@ public sealed class FinalCompilationCollectorTests {
         string features = "all",
         string verifyPolicy = "advisory",
         string assumptionPolicy = "allow",
-        string maximumExpressionDepth = "64") {
+        string maximumExpressionDepth = "64")
+    {
         var values = new Dictionary<string, string>(
-            StringComparer.OrdinalIgnoreCase) {
+            StringComparer.OrdinalIgnoreCase)
+        {
             [TargetFrameworkKey] = "net9.0",
             [ProjectDirectoryKey] = Environment.CurrentDirectory,
             [MaximumExpressionDepthKey] = maximumExpressionDepth,
@@ -268,21 +284,30 @@ public sealed class FinalCompilationCollectorTests {
             ["build_property.SharpProofVerifyPolicy"] = verifyPolicy,
             ["build_property.SharpProofAssumptionPolicy"] = assumptionPolicy
         };
-        if (path != null) values[OutputKey] = path;
+        if (path != null)
+        {
+            values[OutputKey] = path;
+        }
+
         return values;
     }
 
     private sealed class MemoryAdditionalText(
         string path,
-        string content) : AdditionalText {
+        string content) : AdditionalText
+    {
         public override string Path { get; } = path;
         public override SourceText GetText(
-            CancellationToken cancellationToken = default) =>
-            SourceText.From(content, Encoding.UTF8);
+            CancellationToken cancellationToken = default)
+        {
+            return SourceText.From(content, Encoding.UTF8);
+        }
     }
 
-    private sealed class CollectorWorkspace : IDisposable {
-        internal CollectorWorkspace() {
+    private sealed class CollectorWorkspace : IDisposable
+    {
+        internal CollectorWorkspace()
+        {
             Path = System.IO.Path.Combine(
                 System.IO.Path.GetTempPath(),
                 "SharpProof.FinalCompilationCollector",
@@ -290,11 +315,17 @@ public sealed class FinalCompilationCollectorTests {
             Directory.CreateDirectory(Path);
         }
 
-        internal string Path { get; }
-        internal string SealPath(string name) =>
-            System.IO.Path.Combine(Path, name + ".seal");
+        internal string Path
+        {
+            get;
+        }
+        internal string SealPath(string name)
+        {
+            return System.IO.Path.Combine(Path, name + ".seal");
+        }
 
-        public void Dispose() {
+        public void Dispose()
+        {
             var resolved = System.IO.Path.GetFullPath(Path);
             var root = System.IO.Path.GetFullPath(System.IO.Path.Combine(
                 System.IO.Path.GetTempPath(),
@@ -302,8 +333,11 @@ public sealed class FinalCompilationCollectorTests {
             if (!resolved.StartsWith(
                     root + System.IO.Path.DirectorySeparatorChar,
                     StringComparison.OrdinalIgnoreCase))
+            {
                 throw new InvalidOperationException(
                     "Collector workspace escaped its temporary root.");
+            }
+
             Directory.Delete(resolved, recursive: true);
         }
     }

@@ -16,11 +16,11 @@ is acceptable only when:
 - every new `Proven` outcome is backed by hygienic evidence and every
   `Refuted` outcome has a replay-validated witness;
 - proof construction and the discovery, lowering, execution, encoding, replay,
-  policy, API-specification, and cache-validation TCB components stay within their explicit path
-  sets and nonblank LOC budgets;
+  policy, API-specification, and cache-validation TCB components stay within
+  their exact, non-overlapping path inventories;
 - replaced frontend, dataflow, effects, proof-kernel, execution, and replay
-  algorithm files stay within the physical-file and Roslyn member-size
-  ratchets declared in `algorithm-size-ratchets.json`;
+  algorithm files stay within the formatting-neutral Roslyn expression and
+  decision-point ratchets declared in `algorithm-size-ratchets.json`;
 - `Unknown`, timeout, cancellation, malformed, backend/replay, containment, and
   infrastructure results are never cached as semantic answers;
 - cache, worklist, formatting, renaming, and concurrency variants produce the
@@ -81,20 +81,22 @@ release reviews remain open gates.
 Changes to the trusted-kernel paths, assumption construction, complete effect
 summaries, API specifications, or proof-producing outcome construction require
 two human reviewers and a soundness note identifying the executable regression
-that covers the change. CI enforces the construction boundaries and LOC budget;
-the two-approval rule must also be enabled in repository branch protection.
+that covers the change. CI enforces construction boundaries, exact TCB path
+ownership, and structural-complexity budgets; the two-approval rule must also
+be enabled in repository branch protection.
 
 Run the active local gate from the repository root:
 
 ```powershell
+.\scripts\Format-CSharp.ps1 -Verify
 .\eng\acceptance\Verify.ps1
 ```
 
-The verifier checks contract invariants, the repository-wide production-size
-ceiling, and the historical 10% reduction for every replaced coordinator
-listed in `productionLayerReduction`. It recomputes the pinned baseline directly
-from Git; extracted components retain their dedicated trusted-boundary caps.
-It then builds the repository under the bounded Job Object wrapper and runs
+The verifier checks contract invariants, exact trusted-boundary path ownership,
+and formatting-neutral production, coordinator, file, and member complexity
+ratchets. Expression nodes, decision points, and declarations are release
+gates; physical and nonblank lines are informational only. It then builds the
+repository under the bounded Job Object wrapper and runs
 every current architecture, semantic, corpus, fuzz, worker, package,
 cancellation, and performance gate. Off-profile performance compares real
 baseline and SharpProof-imported MSBuild rebuilds and separately checks the

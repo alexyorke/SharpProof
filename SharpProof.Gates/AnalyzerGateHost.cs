@@ -20,7 +20,8 @@ internal sealed record AnalyzerGateAnalysis(
     CompilationOptions CompilationOptions,
     ImmutableArray<AnalyzerMethodSemanticOutcome> SemanticOutcomes);
 
-internal static class AnalyzerGateHost {
+internal static class AnalyzerGateHost
+{
     internal static readonly CSharpParseOptions ParseOptions =
         new(LanguageVersion.Preview);
     internal static readonly ImmutableArray<string> DiagnosticIds = [
@@ -42,7 +43,8 @@ internal static class AnalyzerGateHost {
 
     internal static CSharpCompilation CreateCompilation(
         string source,
-        string assemblyName = "SharpProofGate") {
+        string assemblyName = "SharpProofGate")
+    {
         var options = new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release)
@@ -61,19 +63,23 @@ internal static class AnalyzerGateHost {
     internal static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         string source,
         string? mode,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default)
+    {
         var compilation = CreateCompilation(source);
         var errors = compilation.GetDiagnostics(cancellationToken)
             .Where(static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error)
             .ToImmutableArray();
         if (!errors.IsDefaultOrEmpty)
+        {
             throw new InvalidOperationException(
                 "Corpus source did not compile:" +
                 Environment.NewLine +
                 string.Join(
                     Environment.NewLine,
                     errors.Select(static diagnostic => diagnostic.ToString())));
+        }
+
         return AnalyzeAsync(
             compilation,
             new SharpProofAnalyzer(),
@@ -86,7 +92,8 @@ internal static class AnalyzerGateHost {
         AnalyzeWithSemanticOutcomesAsync(
             string source,
             string? mode,
-            CancellationToken cancellationToken = default) {
+            CancellationToken cancellationToken = default)
+    {
         var compilation = CreateCompilation(source);
         ThrowIfCompilationHasErrors(compilation, cancellationToken);
         return await AnalyzeWithSemanticOutcomesAsync(
@@ -102,7 +109,8 @@ internal static class AnalyzerGateHost {
             Compilation compilation,
             string? mode,
             bool concurrentAnalysis,
-            CancellationToken cancellationToken = default) {
+            CancellationToken cancellationToken = default)
+    {
         var factory = new RecordingAnalyzerSessionFactory();
         var diagnostics = await AnalyzeAsync(
                 compilation,
@@ -122,11 +130,15 @@ internal static class AnalyzerGateHost {
         DiagnosticAnalyzer analyzer,
         string? mode,
         bool concurrentAnalysis,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default)
+    {
         var values = new Dictionary<string, string>(
             StringComparer.OrdinalIgnoreCase);
         if (mode != null)
+        {
             values.Add("sharpproof_mode", mode);
+        }
+
         var options = new AnalyzerOptions(
             [],
             new GateOptionsProvider(values));
@@ -145,31 +157,39 @@ internal static class AnalyzerGateHost {
             .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)];
     }
 
-    internal static AnalyzerOptions CreateOptions(string? mode) {
+    internal static AnalyzerOptions CreateOptions(string? mode)
+    {
         var values = new Dictionary<string, string>(
             StringComparer.OrdinalIgnoreCase);
         if (mode != null)
+        {
             values.Add("sharpproof_mode", mode);
+        }
+
         return new AnalyzerOptions([], new GateOptionsProvider(values));
     }
 
     private static void ThrowIfCompilationHasErrors(
         Compilation compilation,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var errors = compilation.GetDiagnostics(cancellationToken)
             .Where(static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error)
             .ToImmutableArray();
         if (!errors.IsDefaultOrEmpty)
+        {
             throw new InvalidOperationException(
                 "Corpus source did not compile:" +
                 Environment.NewLine +
                 string.Join(
                     Environment.NewLine,
                     errors.Select(static diagnostic => diagnostic.ToString())));
+        }
     }
 
-    private static ImmutableArray<MetadataReference> CreateReferences() {
+    private static ImmutableArray<MetadataReference> CreateReferences()
+    {
         var trustedPlatformAssemblies =
             (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
             throw new InvalidOperationException(
@@ -207,18 +227,22 @@ internal static class AnalyzerGateHost {
         using var stream = new MemoryStream();
         var emit = externalCompilation.Emit(stream);
         if (!emit.Success)
+        {
             throw new InvalidOperationException(
                 "Could not create the corpus effect-contract reference: " +
                 string.Join(
                     Environment.NewLine,
                     emit.Diagnostics.Select(static diagnostic =>
                         diagnostic.ToString())));
+        }
+
         return references.Add(MetadataReference.CreateFromImage(stream.ToArray()));
     }
 
     private sealed class GateOptionsProvider(
         IReadOnlyDictionary<string, string> globalValues)
-        : AnalyzerConfigOptionsProvider {
+        : AnalyzerConfigOptionsProvider
+    {
         private static readonly AnalyzerConfigOptions Empty =
             new GateOptions(new Dictionary<string, string>());
         private readonly AnalyzerConfigOptions _global =
@@ -226,19 +250,26 @@ internal static class AnalyzerGateHost {
 
         public override AnalyzerConfigOptions GlobalOptions => _global;
 
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) =>
-            Empty;
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
+        {
+            return Empty;
+        }
 
         public override AnalyzerConfigOptions GetOptions(
-            AdditionalText textFile) =>
-            Empty;
+            AdditionalText textFile)
+        {
+            return Empty;
+        }
     }
 
     private sealed class GateOptions(
         IReadOnlyDictionary<string, string> values)
-        : AnalyzerConfigOptions {
-        public override bool TryGetValue(string key, out string value) {
-            if (values.TryGetValue(key, out var found)) {
+        : AnalyzerConfigOptions
+    {
+        public override bool TryGetValue(string key, out string value)
+        {
+            if (values.TryGetValue(key, out var found))
+            {
                 value = found;
                 return true;
             }
@@ -248,7 +279,8 @@ internal static class AnalyzerGateHost {
     }
 
     private sealed class RecordingAnalyzerSessionFactory
-        : IAnalyzerSessionFactory {
+        : IAnalyzerSessionFactory
+    {
         private readonly ConcurrentDictionary<
             MethodOutcomeKey,
             AnalyzerSemanticOutcome> _outcomes = new();
@@ -256,15 +288,18 @@ internal static class AnalyzerGateHost {
         public AnalyzerSession Create(
             Compilation compilation,
             AnalyzerConfiguration configuration,
-            CancellationToken cancellationToken) =>
-            new(
+            CancellationToken cancellationToken)
+        {
+            return new(
                 compilation,
                 configuration,
                 cancellationToken,
                 Record);
+        }
 
-        internal ImmutableArray<AnalyzerMethodSemanticOutcome> GetOutcomes() =>
-            [.. _outcomes
+        internal ImmutableArray<AnalyzerMethodSemanticOutcome> GetOutcomes()
+        {
+            return [.. _outcomes
                 .OrderBy(static pair => pair.Key.SourceStart)
                 .ThenBy(static pair => pair.Key.MethodName, StringComparer.Ordinal)
                 .Select(static pair => new AnalyzerMethodSemanticOutcome(
@@ -272,10 +307,12 @@ internal static class AnalyzerGateHost {
                     pair.Key.Accessibility,
                     pair.Key.SourceStart,
                     pair.Value))];
+        }
 
         private void Record(
             IMethodSymbol method,
-            AnalyzerSemanticOutcome outcome) {
+            AnalyzerSemanticOutcome outcome)
+        {
             var sourceStart = method.Locations
                 .FirstOrDefault(static location => location.IsInSource)
                 ?.SourceSpan.Start ?? -1;

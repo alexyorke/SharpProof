@@ -3,9 +3,11 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Launcher;
 
-internal static class SarifProjection {
+internal static class SarifProjection
+{
     internal static string Serialize(
-        WorkerVerifyRequest request, WorkerVerifyResponse response) {
+        WorkerVerifyRequest request, WorkerVerifyResponse response)
+    {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(response);
         WorkerProtocolJson.Canonicalize(response);
@@ -23,27 +25,39 @@ internal static class SarifProjection {
             static error => Notification(error.Code, error.Message)).ToList();
         var assumptions = response.Summary.Assumptions;
         if (assumptions.User + assumptions.Trusted != 0)
+        {
             notifications.Add(Notification(
                 "SP0048",
                 "User assumption/trusted evidence declared: total=" +
                     (assumptions.User + assumptions.Trusted) + ", user=" +
                     assumptions.User + ", trusted=" + assumptions.Trusted + ".",
                 LauncherPresentation.Level(request.AssumptionPolicy, "note")));
+        }
+
         if (response.RunStatus != WorkerRunStatus.Complete &&
             notifications.Count == 0)
+        {
             notifications.Add(Notification(
                 "worker." + response.RunStatus,
                 "SharpProof worker run " + response.RunStatus +
                     " (" + response.FailureReason + ")."));
-        var run = new {
-            tool = new {
-                driver = new {
+        }
+
+        var run = new
+        {
+            tool = new
+            {
+                driver = new
+                {
                     name = "SharpProof",
                     informationUri = "https://github.com/alexyorke/SharpProof",
                     version = response.Summary.Versions.WorkerVersion
                 }
             },
-            automationDetails = new { id = response.Manifest.Hash },
+            automationDetails = new
+            {
+                id = response.Manifest.Hash
+            },
             invocations = new[] { new {
                 executionSuccessful = response.RunStatus == WorkerRunStatus.Complete && response.Errors.Length == 0,
                 properties = new { response.RunStatus, response.FailureReason },
@@ -52,7 +66,8 @@ internal static class SarifProjection {
             results,
             properties = response.Summary
         };
-        var document = new Dictionary<string, object> {
+        var document = new Dictionary<string, object>
+        {
             ["$schema"] = "https://json.schemastore.org/sarif-2.1.0.json",
             ["version"] = "2.1.0",
             ["runs"] = new[] { run }
@@ -62,7 +77,8 @@ internal static class SarifProjection {
 
     private static object ClaimResult(
         WorkerVerifyRequest request, WorkerClaimResult result,
-        WorkerClaimManifestEntry claim) {
+        WorkerClaimManifestEntry claim)
+    {
         var reason = result.Reason == WorkerClaimReason.None ? string.Empty : " (" + result.Reason + ")";
         var witness = result.EffectWitness == null
             ? string.Empty
@@ -80,49 +96,77 @@ internal static class SarifProjection {
                 result.ClaimId + " for " + claim.CallableId + reason + witness,
             result.EffectWitness?.Location ?? claim.Location,
             result.ClaimId,
-            new { claim, result });
+            new
+            {
+                claim,
+                result
+            });
     }
 
     private static object IncompleteResult(
         WorkerVerifyRequest request, WorkerCallableResult result,
-        WorkerCallableManifestEntry callable) =>
-        Result(
+        WorkerCallableManifestEntry callable)
+    {
+        return Result(
             "SP0047", "review",
             LauncherPresentation.Level(request.VerifyPolicy, "note"),
             "Selected analysis is incomplete for " + result.CallableId +
                 " (" + result.Reason + ").",
             callable.Location, result.CallableId,
-            new { callable, result });
+            new
+            {
+                callable,
+                result
+            });
+    }
 
     private static object Result(
         string ruleId, string kind, string level, string message,
-        WorkerSourceLocation location, string semanticId, object properties) =>
-        new {
+        WorkerSourceLocation location, string semanticId, object properties)
+    {
+        return new
+        {
             ruleId,
             kind,
             level,
-            message = new { text = message },
+            message = new
+            {
+                text = message
+            },
             locations = new[] { new { physicalLocation = new {
                 artifactLocation = new { uri = LocationUri(location.Path) },
                 region = new {
                     startLine = location.Line, startColumn = location.Column
                 }
             }}},
-            partialFingerprints = new Dictionary<string, string> {
+            partialFingerprints = new Dictionary<string, string>
+            {
                 ["sharpProofSemanticId/v1"] = semanticId
             },
             properties
         };
+    }
 
     private static object Notification(
-        string id, string message, string level = "error") =>
-        new {
-            descriptor = new { id },
+        string id, string message, string level = "error")
+    {
+        return new
+        {
+            descriptor = new
+            {
+                id
+            },
             level,
-            message = new { text = message }
+            message = new
+            {
+                text = message
+            }
         };
+    }
 
-    private static string LocationUri(string path) =>
-        Uri.TryCreate(path, UriKind.Absolute, out var uri)
+    private static string LocationUri(string path)
+    {
+        return Uri.TryCreate(path, UriKind.Absolute, out var uri)
             ? uri.AbsoluteUri : path.Replace('\\', '/');
+    }
 }

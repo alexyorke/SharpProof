@@ -10,7 +10,8 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class ProtocolJsonTests {
+public sealed class ProtocolJsonTests
+{
     private const string InputHash =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private static readonly string[] s_requestProperties = [
@@ -22,13 +23,15 @@ public sealed class ProtocolJsonTests {
     ];
 
     [Test]
-    public void VersionEightRequestCarriesOnlyArtifactAndRuntimeControls() {
+    public void VersionEightRequestCarriesOnlyArtifactAndRuntimeControls()
+    {
         var request = CreateRequest();
         var json = WorkerProtocolJson.SerializeRequest(request);
         var roundTrip = WorkerProtocolJson.DeserializeRequest(json)!;
         using var document = JsonDocument.Parse(json);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("8"));
             Assert.That(WorkerCacheVersions.Current, Is.EqualTo(9));
             Assert.That(WorkerManifestVersions.Current, Is.EqualTo(4));
@@ -67,7 +70,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void DeserializationRejectsDuplicatePropertiesAtEveryDepth() {
+    public void DeserializationRejectsDuplicatePropertiesAtEveryDepth()
+    {
         var requestJson = WorkerProtocolJson.SerializeRequest(CreateRequest());
         var nestedRequestDuplicate = requestJson.Replace(
             "\"path\":\"compiler.manifest.json\"",
@@ -82,7 +86,8 @@ public sealed class ProtocolJsonTests {
             "\"path\":\"Subject.cs\",\"path\":\"Subject.cs\"",
             StringComparison.Ordinal);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.Throws<JsonException>((Action)(() =>
                 WorkerProtocolJson.DeserializeRequest(
                     nestedRequestDuplicate)));
@@ -93,7 +98,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void CompilerManifestArtifactIsCanonicalAndCarriesAssumptions() {
+    public void CompilerManifestArtifactIsCanonicalAndCarriesAssumptions()
+    {
         var compilation = CreateCompilation();
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var manifest = discovery.Manifest;
@@ -108,7 +114,8 @@ public sealed class ProtocolJsonTests {
         var json = CompilerManifestArtifactJson.Serialize(artifact);
         var roundTrip = CompilerManifestArtifactJson.Deserialize(json);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(roundTrip.SchemaVersion, Is.EqualTo(5));
             Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("8"));
             Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(manifest.Hash));
@@ -145,7 +152,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void ManifestHashIsCanonicalAndCoversEveryField() {
+    public void ManifestHashIsCanonicalAndCoversEveryField()
+    {
         var manifest = CreateManifest();
         var hash = manifest.Hash;
 
@@ -167,7 +175,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void ManifestHashUsesStableNamedEnumIdentities() {
+    public void ManifestHashUsesStableNamedEnumIdentities()
+    {
         var forward = CreateManifest();
         forward.Callables[0].SelectedFeatures = [
             WorkerSelectedFeature.Effects,
@@ -192,7 +201,8 @@ public sealed class ProtocolJsonTests {
             [.. reverse.Callables[0].Assumptions.Reverse()];
         WorkerProtocolJson.SealManifest(reverse);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(reverse.Hash, Is.EqualTo(forward.Hash));
             Assert.That(
                 forward.Hash,
@@ -203,7 +213,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void ManifestHashIsSensitiveToEveryManifestEnum() {
+    public void ManifestHashIsSensitiveToEveryManifestEnum()
+    {
         var hashes = new HashSet<string>(StringComparer.Ordinal) {
             CreateManifest().Hash,
             ManifestHashAfter(static manifest =>
@@ -229,12 +240,14 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void ManifestHashSeparatesFormerlyAmbiguousCollectionBoundaries() {
+    public void ManifestHashSeparatesFormerlyAmbiguousCollectionBoundaries()
+    {
         var responseManifest = CreateBoundaryManifest(expandedFirst: false);
         var expectedManifest = CreateBoundaryManifest(expandedFirst: true);
         var response = CreateResponse(responseManifest);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
             Assert.That(
                 WorkerProtocolJson.Validate(CreateResponse(expectedManifest))
@@ -252,7 +265,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void EffectClaimShapeIsClosedAndPartOfManifestIdentity() {
+    public void EffectClaimShapeIsClosedAndPartOfManifestIdentity()
+    {
         var manifest = CreateManifest();
         var postconditionHash = manifest.Hash;
         manifest.Callables[0].SelectedFeatures = [WorkerSelectedFeature.Effects];
@@ -265,7 +279,8 @@ public sealed class ProtocolJsonTests {
             WorkerEffectContractKind.DoesNotThrow;
         WorkerProtocolJson.SealManifest(manifest);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(WorkerProtocolJson.ValidateManifest(manifest).IsValid,
                 Is.True);
             Assert.That(manifest.Hash, Is.Not.EqualTo(postconditionHash));
@@ -287,7 +302,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void EffectCertaintyMustAgreeWithOutcomeAndUnknownReason() {
+    public void EffectCertaintyMustAgreeWithOutcomeAndUnknownReason()
+    {
         var manifest = CreateManifest();
         manifest.Callables[0].SelectedFeatures = [WorkerSelectedFeature.Effects];
         manifest.Callables[0].SelectionReasons = [
@@ -361,7 +377,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void VacuityEvidenceIsLimitedToProvenPostconditions() {
+    public void VacuityEvidenceIsLimitedToProvenPostconditions()
+    {
         var response = CreateResponse(CreateManifest());
         response.ClaimResults[0].Vacuity =
             WorkerVacuityKind.ContradictoryPreconditions;
@@ -380,7 +397,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void StrictResponseValidationRequiresExactManifestAndResultSets() {
+    public void StrictResponseValidationRequiresExactManifestAndResultSets()
+    {
         var expected = CreateManifest();
         var response = CreateResponse(expected);
         var request = CreateRequest();
@@ -439,7 +457,8 @@ public sealed class ProtocolJsonTests {
     [TestCase(nameof(WorkerBudgets.MaximumExpressionDepth))]
     [TestCase(nameof(WorkerBudgets.ProcessMemoryLimitBytes))]
     [TestCase(nameof(WorkerBudgets.MaxWorkerProcesses))]
-    public void RequestValidationBindsEverySummaryBudget(string propertyName) {
+    public void RequestValidationBindsEverySummaryBudget(string propertyName)
+    {
         var request = CreateRequest();
         var response = CreateResponse(CreateManifest());
         response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
@@ -462,7 +481,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void OmittedOrNumericClaimOutcomeCannotBecomeProven() {
+    public void OmittedOrNumericClaimOutcomeCannotBecomeProven()
+    {
         var json = WorkerProtocolJson.SerializeResponse(
             CreateResponse(CreateManifest()));
         var omitted = WorkerProtocolJson.DeserializeResponse(
@@ -484,7 +504,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void UnknownClaimsRequireIncompleteCallableCoverage() {
+    public void UnknownClaimsRequireIncompleteCallableCoverage()
+    {
         var response = CreateResponse(CreateManifest());
         SetUnknown(response, WorkerClaimReason.UnsupportedBody);
         response.Summary = CreateSummary(response);
@@ -501,7 +522,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void FatalClaimReasonsRequireFailedRun() {
+    public void FatalClaimReasonsRequireFailedRun()
+    {
         var response = CreateResponse(CreateManifest());
         SetUnknown(response, WorkerClaimReason.BackendUnavailable);
         response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
@@ -520,7 +542,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void CallableFailureAndTimeoutReasonsConstrainRunStatus() {
+    public void CallableFailureAndTimeoutReasonsConstrainRunStatus()
+    {
         var response = CreateResponse(CreateManifest());
         response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
         response.CallableResults[0].Reason =
@@ -558,7 +581,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void AssumptionSummaryUnionsDeclarationsAndUsageById() {
+    public void AssumptionSummaryUnionsDeclarationsAndUsageById()
+    {
         var response = CreateResponse(CreateManifest());
         var used = response.ClaimResults[0].Assumptions.Single(
             static assumption =>
@@ -575,7 +599,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void ClaimResultsRequireOwningCallableAssumptionDeclarations() {
+    public void ClaimResultsRequireOwningCallableAssumptionDeclarations()
+    {
         var response = CreateResponse(CreateManifest());
         response.ClaimResults[0].Assumptions =
             [.. response.ClaimResults[0].Assumptions.Skip(1)];
@@ -588,7 +613,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void NullPayloadElementsAreRejectedWithoutCanonicalizationCrashes() {
+    public void NullPayloadElementsAreRejectedWithoutCanonicalizationCrashes()
+    {
         var response = CreateResponse(CreateManifest());
         response.ClaimResults = [null!];
         response.CallableResults = [null!];
@@ -598,7 +624,8 @@ public sealed class ProtocolJsonTests {
             (Action)(() => WorkerProtocolJson.Canonicalize(response)));
         var codes = WorkerProtocolJson.Validate(response).Errors
             .Select(static error => error.Code).ToArray();
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(codes, Does.Contain("response.claim_results"));
             Assert.That(codes, Does.Contain("response.callable_results"));
             Assert.That(codes, Does.Contain("response.errors"));
@@ -606,7 +633,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void SummaryAndOutcomePayloadMustMatchClaimResults() {
+    public void SummaryAndOutcomePayloadMustMatchClaimResults()
+    {
         var response = CreateResponse(CreateManifest());
         response.Summary.ClaimCount = 0;
         response.ClaimResults[0].Model = [
@@ -625,7 +653,8 @@ public sealed class ProtocolJsonTests {
     }
 
     [Test]
-    public void ManifestRequiresDenseOrdinalsAndExactCallableMembership() {
+    public void ManifestRequiresDenseOrdinalsAndExactCallableMembership()
+    {
         var manifest = CreateManifest();
         manifest.Claims[0].Ordinal = 2;
         manifest.Callables[0].ClaimIds = [];
@@ -639,15 +668,20 @@ public sealed class ProtocolJsonTests {
                 .And.Contain("manifest.claim_membership"));
     }
 
-    private static WorkerVerifyRequest CreateRequest() =>
-        new() {
-            CompilerManifest = new WorkerFileReference {
+    private static WorkerVerifyRequest CreateRequest()
+    {
+        return new()
+        {
+            CompilerManifest = new WorkerFileReference
+            {
                 Path = "compiler.manifest.json",
                 Sha256 = InputHash
             }
         };
+    }
 
-    private static CSharpCompilation CreateCompilation() {
+    private static CSharpCompilation CreateCompilation()
+    {
         var path = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
             "ProtocolSubject.cs");
@@ -694,15 +728,18 @@ public sealed class ProtocolJsonTests {
                 concurrentBuild: false));
     }
 
-    private static WorkerClaimManifest CreateManifest() {
-        var location = new WorkerSourceLocation {
+    private static WorkerClaimManifest CreateManifest()
+    {
+        var location = new WorkerSourceLocation
+        {
             Path = "Subject.cs",
             Start = 10,
             Length = 20,
             Line = 2,
             Column = 5
         };
-        var manifest = new WorkerClaimManifest {
+        var manifest = new WorkerClaimManifest
+        {
             Callables = [
                 new WorkerCallableManifestEntry {
                     CallableId = "M:Subject.Identity(System.Int64)",
@@ -746,7 +783,8 @@ public sealed class ProtocolJsonTests {
     }
 
     private static string ManifestHashAfter(
-        Action<WorkerClaimManifest> mutation) {
+        Action<WorkerClaimManifest> mutation)
+    {
         var manifest = CreateManifest();
         mutation(manifest);
         WorkerProtocolJson.SealManifest(manifest);
@@ -754,8 +792,10 @@ public sealed class ProtocolJsonTests {
     }
 
     private static WorkerClaimManifest CreateBoundaryManifest(
-        bool expandedFirst) {
-        var manifest = new WorkerClaimManifest {
+        bool expandedFirst)
+    {
+        var manifest = new WorkerClaimManifest
+        {
             Callables = [
                 new WorkerCallableManifestEntry {
                     CallableId = "0",
@@ -823,8 +863,10 @@ public sealed class ProtocolJsonTests {
     }
 
     private static WorkerVerifyResponse CreateResponse(
-        WorkerClaimManifest manifest) {
-        var response = new WorkerVerifyResponse {
+        WorkerClaimManifest manifest)
+    {
+        var response = new WorkerVerifyResponse
+        {
             InputHash = InputHash,
             Manifest = manifest,
             RunStatus = WorkerRunStatus.Complete,
@@ -855,16 +897,19 @@ public sealed class ProtocolJsonTests {
     }
 
     private static WorkerAssumptionEvidence[] CopyAssumptions(
-        IEnumerable<WorkerAssumptionEvidence> assumptions) =>
-        [.. assumptions.Select(static assumption =>
+        IEnumerable<WorkerAssumptionEvidence> assumptions)
+    {
+        return [.. assumptions.Select(static assumption =>
             new WorkerAssumptionEvidence {
                 Id = assumption.Id,
                 Kind = assumption.Kind,
                 Used = assumption.Used
             })];
+    }
 
     private static WorkerVerificationSummary CreateSummary(
-        WorkerVerifyResponse response) {
+        WorkerVerifyResponse response)
+    {
         var assumptions = response.ClaimResults
             .Where(static claim => claim != null)
             .SelectMany(static claim => claim.Assumptions ?? [])
@@ -874,7 +919,8 @@ public sealed class ProtocolJsonTests {
             .Where(static assumption => assumption != null)
             .GroupBy(static assumption => assumption.Id, StringComparer.Ordinal)
             .ToArray();
-        return new WorkerVerificationSummary {
+        return new WorkerVerificationSummary
+        {
             CallableCount = response.CallableResults.Count(
                 static callable => callable != null),
             ClaimCount = response.ClaimResults.Count(
@@ -895,7 +941,8 @@ public sealed class ProtocolJsonTests {
                     Reason = group.Key,
                     Count = group.Count()
                 })],
-            Assumptions = new WorkerAssumptionSummary {
+            Assumptions = new WorkerAssumptionSummary
+            {
                 Total = assumptions.Length,
                 Used = assumptions.Count(static group =>
                     group.Any(static value => value.Used)),
@@ -905,7 +952,8 @@ public sealed class ProtocolJsonTests {
                     group.First().Kind == WorkerAssumptionKind.TrustedBoundary)
             },
             CacheStatus = WorkerCacheStatus.Disabled,
-            Versions = new WorkerVersionSummary {
+            Versions = new WorkerVersionSummary
+            {
                 WorkerVersion = "test",
                 ApiSpecVersion = "test"
             }
@@ -914,14 +962,17 @@ public sealed class ProtocolJsonTests {
 
     private static void SetUnknown(
         WorkerVerifyResponse response,
-        WorkerClaimReason reason) {
+        WorkerClaimReason reason)
+    {
         response.ClaimResults[0].Outcome = WorkerClaimOutcome.Unknown;
         response.ClaimResults[0].Reason = reason;
     }
 
     private static WorkerEffectViolationWitness CreateEffectWitness(
-        WorkerSourceLocation location) =>
-        new() {
+        WorkerSourceLocation location)
+    {
+        return new()
+        {
             Kind = "explicit-throw",
             Detail = "T:System.InvalidOperationException",
             Effects = WorkerEffectSet.Throws,
@@ -929,7 +980,8 @@ public sealed class ProtocolJsonTests {
                 "System.Private.CoreLib:T:System.InvalidOperationException",
                 "System.Private.CoreLib:T:System.Exception"
             ],
-            Location = new WorkerSourceLocation {
+            Location = new WorkerSourceLocation
+            {
                 Path = location.Path,
                 Start = location.Start,
                 Length = location.Length,
@@ -937,4 +989,5 @@ public sealed class ProtocolJsonTests {
                 Column = location.Column
             }
         };
+    }
 }

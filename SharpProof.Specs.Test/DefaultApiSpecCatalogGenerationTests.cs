@@ -6,12 +6,14 @@ using NUnit.Framework;
 namespace SharpProof.Specs.Test;
 
 [TestFixture]
-public sealed class DefaultApiSpecCatalogGenerationTests {
+public sealed class DefaultApiSpecCatalogGenerationTests
+{
     private const string ExpectedContentSha256 =
         "1fda63085937a8298c8df635b55c02a0d9074ba35100bc552b8070494b520246";
 
     [Test]
-    public void GeneratedCatalogPreservesEveryReviewedWitness() {
+    public void GeneratedCatalogPreservesEveryReviewedWitness()
+    {
         using var document = JsonDocument.Parse(
             File.ReadAllText(CatalogPath()));
         var root = document.RootElement;
@@ -45,7 +47,8 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
                 declaration.GetProperty("target")
                     .GetProperty("witnessIdentifier").GetString())));
 
-        for (var index = 0; index < reviewed.Length; index++) {
+        for (var index = 0; index < reviewed.Length; index++)
+        {
             AssertDeclaration(
                 reviewed[index],
                 templates[index],
@@ -58,7 +61,8 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
     }
 
     [Test]
-    public async Task CheckedInGeneratedOutputsAreCurrent() {
+    public async Task CheckedInGeneratedOutputsAreCurrent()
+    {
         var result = await RunGeneratorAsync("-Verify");
 
         Assert.That(result.ExitCode, Is.Zero, result.Output);
@@ -69,7 +73,8 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
     }
 
     [Test]
-    public async Task GeneratorIsDeterministicLfAndBomFree() {
+    public async Task GeneratorIsDeterministicLfAndBomFree()
+    {
         using var workspace = GenerationWorkspace.Create();
         var first = await RunGeneratorAsync(
             "-SourceOutputPath",
@@ -107,7 +112,8 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
     }
 
     [Test]
-    public async Task VerificationRejectsStaleGeneratedOutput() {
+    public async Task VerificationRejectsStaleGeneratedOutput()
+    {
         using var workspace = GenerationWorkspace.Create();
         var generated = await RunGeneratorAsync(
             "-SourceOutputPath",
@@ -138,11 +144,13 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
         JsonElement declaration,
         ApiSpecTemplate template,
         Dictionary<string, ApiSpecAssemblyIdentity[]> assemblies,
-        Dictionary<string, SpecEvidence> evidence) {
+        Dictionary<string, SpecEvidence> evidence)
+    {
         var expected = declaration.GetProperty("target");
         var actual = template.Target;
         var witness = actual.WitnessIdentifier;
-        Assert.Multiple(() => {
+        Assert.Multiple(() =>
+        {
             Assert.That(
                 actual.WitnessIdentifier,
                 Is.EqualTo(
@@ -222,7 +230,8 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
             witness);
         for (var index = 0;
              index < postconditions.Length;
-             index++) {
+             index++)
+        {
             var expectedPostcondition = postconditions[index];
             var actualPostcondition = template.Postconditions[index];
             Assert.That(
@@ -245,7 +254,8 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
         JsonElement expected,
         ApiSpecFacets actual,
         Dictionary<string, SpecEvidence> evidence,
-        string witness) {
+        string witness)
+    {
         var effects = expected.GetProperty("effects");
         var expectedEffects = effects.GetProperty("values")
             .EnumerateArray()
@@ -258,7 +268,8 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
         var nullness = expected.GetProperty("nullness");
         var cardinality = expected.GetProperty("cardinality");
         var exactCount = cardinality.GetProperty("exactCount");
-        Assert.Multiple(() => {
+        Assert.Multiple(() =>
+        {
             Assert.That(
                 actual.Effects.Effects,
                 Is.EqualTo(expectedEffects),
@@ -337,12 +348,14 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
     }
 
     private static Dictionary<string, ApiSpecAssemblyIdentity[]>
-        ReadAssemblySets(JsonElement root) {
+        ReadAssemblySets(JsonElement root)
+    {
         var result =
             new Dictionary<string, ApiSpecAssemblyIdentity[]>(
                 StringComparer.Ordinal);
         foreach (var set in root.GetProperty("assemblySets")
-                     .EnumerateArray()) {
+                     .EnumerateArray())
+        {
             var id = set.GetProperty("id").GetString() ??
                 throw new InvalidDataException(
                     "An assembly set id is null.");
@@ -365,8 +378,9 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
     }
 
     private static Dictionary<string, SpecEvidence> ReadEvidence(
-        JsonElement root) =>
-        root.GetProperty("evidence")
+        JsonElement root)
+    {
+        return root.GetProperty("evidence")
             .EnumerateArray()
             .ToDictionary(
                 static item => item.GetProperty("id").GetString() ??
@@ -379,20 +393,24 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
                     throw new InvalidDataException(
                         "An evidence source is null.")),
                 StringComparer.Ordinal);
+    }
 
     private static SpecEvidence Evidence(
         JsonElement reference,
-        Dictionary<string, SpecEvidence> evidence) {
+        Dictionary<string, SpecEvidence> evidence)
+    {
         var id = reference.GetString() ??
             throw new InvalidDataException(
                 "An evidence reference is null.");
         return evidence[id];
     }
 
-    private static string Describe(JsonElement term) {
+    private static string Describe(JsonElement term)
+    {
         var kind = term.GetProperty("kind").GetString();
         var type = term.GetProperty("type").GetString();
-        return kind switch {
+        return kind switch
+        {
             "variable" =>
                 "variable:" +
                 term.GetProperty("role").GetString() + ":" +
@@ -430,8 +448,10 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
         };
     }
 
-    private static string Describe(SpecTermDeclaration term) =>
-        term switch {
+    private static string Describe(SpecTermDeclaration term)
+    {
+        return term switch
+        {
             SpecVariableDeclaration variable =>
                 "variable:" + variable.Role + ":" + variable.Ordinal + ":" + variable.Type,
             SpecBooleanDeclaration boolean =>
@@ -460,24 +480,30 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
                 "(" + Describe(length.Value) + ")",
             _ => throw new ArgumentOutOfRangeException(nameof(term))
         };
+    }
 
     private static T EnumValue<T>(JsonElement value)
-        where T : struct, Enum =>
-        Enum.Parse<T>(
+        where T : struct, Enum
+    {
+        return Enum.Parse<T>(
             value.GetString() ??
             throw new InvalidDataException(
                 "An enum value is null."),
             ignoreCase: false);
+    }
 
     private static T? NullableEnumValue<T>(JsonElement value)
-        where T : struct, Enum =>
-        value.ValueKind == JsonValueKind.Null
+        where T : struct, Enum
+    {
+        return value.ValueKind == JsonValueKind.Null
             ? null
             : EnumValue<T>(value);
+    }
 
     private static void AssertGeneratedEncoding(
         byte[] bytes,
-        string expectedHeader) {
+        string expectedHeader)
+    {
         Assert.That(bytes, Is.Not.Empty);
         Assert.That(
             bytes.Length >= 3 &&
@@ -492,8 +518,10 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
     }
 
     private static async Task<GeneratorResult> RunGeneratorAsync(
-        params string[] arguments) {
-        var startInfo = new ProcessStartInfo {
+        params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo
+        {
             FileName = "pwsh",
             WorkingDirectory = RepositoryRoot(),
             UseShellExecute = false,
@@ -506,7 +534,10 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
         startInfo.ArgumentList.Add("-File");
         startInfo.ArgumentList.Add(GeneratorPath());
         foreach (var argument in arguments)
+        {
             startInfo.ArgumentList.Add(argument);
+        }
+
         using var process = Process.Start(startInfo) ??
             throw new InvalidOperationException(
                 "Failed to start the API-spec catalog generator.");
@@ -518,27 +549,36 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
             (await output) + Environment.NewLine + (await error));
     }
 
-    private static string CatalogPath() =>
-        Path.Combine(
+    private static string CatalogPath()
+    {
+        return Path.Combine(
             RepositoryRoot(),
             "SharpProof.Specs",
             "DefaultApiSpecCatalog.json");
+    }
 
-    private static string GeneratorPath() =>
-        Path.Combine(
+    private static string GeneratorPath()
+    {
+        return Path.Combine(
             RepositoryRoot(),
             "scripts",
             "Generate-ApiSpecCatalog.ps1");
+    }
 
-    private static string RepositoryRoot() {
+    private static string RepositoryRoot()
+    {
         var directory = new DirectoryInfo(
             TestContext.CurrentContext.TestDirectory);
-        while (directory != null) {
+        while (directory != null)
+        {
             if (File.Exists(
                     Path.Combine(
                         directory.FullName,
                         "SharpProof.Release.props")))
+            {
                 return directory.FullName;
+            }
+
             directory = directory.Parent;
         }
         throw new InvalidOperationException(
@@ -549,10 +589,12 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
         int ExitCode,
         string Output);
 
-    private sealed class GenerationWorkspace : IDisposable {
+    private sealed class GenerationWorkspace : IDisposable
+    {
         private readonly string _root;
 
-        private GenerationWorkspace(string root) {
+        private GenerationWorkspace(string root)
+        {
             _root = root;
             FirstSourcePath = Path.Combine(root, "first.generated.cs");
             FirstDocumentationPath =
@@ -563,12 +605,25 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
                 Path.Combine(root, "second.generated.md");
         }
 
-        internal string FirstSourcePath { get; }
-        internal string FirstDocumentationPath { get; }
-        internal string SecondSourcePath { get; }
-        internal string SecondDocumentationPath { get; }
+        internal string FirstSourcePath
+        {
+            get;
+        }
+        internal string FirstDocumentationPath
+        {
+            get;
+        }
+        internal string SecondSourcePath
+        {
+            get;
+        }
+        internal string SecondDocumentationPath
+        {
+            get;
+        }
 
-        internal static GenerationWorkspace Create() {
+        internal static GenerationWorkspace Create()
+        {
             var root = Path.Combine(
                 Path.GetTempPath(),
                 "SharpProof.ApiSpecCatalog.Test",
@@ -577,7 +632,8 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
             return new GenerationWorkspace(root);
         }
 
-        public void Dispose() {
+        public void Dispose()
+        {
             var parent = Path.GetFullPath(
                 Path.Combine(
                     Path.GetTempPath(),
@@ -586,10 +642,15 @@ public sealed class DefaultApiSpecCatalogGenerationTests {
             if (!resolved.StartsWith(
                     parent + Path.DirectorySeparatorChar,
                     StringComparison.Ordinal))
+            {
                 throw new InvalidOperationException(
                     "Refusing to remove an unexpected generator directory.");
+            }
+
             if (Directory.Exists(resolved))
+            {
                 Directory.Delete(resolved, recursive: true);
+            }
         }
     }
 }

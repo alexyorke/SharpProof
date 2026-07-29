@@ -1,6 +1,7 @@
 namespace SharpProof.Effects;
 [Flags]
-public enum EffectContractKind : long {
+public enum EffectContractKind : long
+{
     None = 0,
     ReadsReceiverState = 1L << 0, ReadsArgumentState = 1L << 1,
     ReadsCapturedState = 1L << 2, ReadsStaticState = 1L << 3,
@@ -12,7 +13,8 @@ public enum EffectContractKind : long {
     UsesNativeCode = 1L << 14, UsesReflection = 1L << 15
 }
 [Flags]
-public enum EffectContractCapabilityKind {
+public enum EffectContractCapabilityKind
+{
     None = 0,
     IO = 1 << 0, FileRead = 1 << 1, FileWrite = 1 << 2,
     Network = 1 << 3, Console = 1 << 4, Process = 1 << 5,
@@ -21,7 +23,8 @@ public enum EffectContractCapabilityKind {
     Synchronization = 1 << 11,
     NativeInterop = 1 << 12
 }
-internal static class EffectContractMetadata {
+internal static class EffectContractMetadata
+{
     internal const string AttributeMetadataName =
         "SharpProof.Attributes.EffectContractAttribute";
     internal const string TrustedAttributeMetadataName =
@@ -36,8 +39,10 @@ internal static class EffectContractMetadata {
     internal const EffectContractCapabilityKind AllCapabilities =
         (EffectContractCapabilityKind)((1 << 13) - 1);
 
-    internal static bool TryConvertInt64(object? value, out long result) {
-        try {
+    internal static bool TryConvertInt64(object? value, out long result)
+    {
+        try
+        {
             result = Convert.ToInt64(
                 value,
                 System.Globalization.CultureInfo.InvariantCulture);
@@ -46,7 +51,8 @@ internal static class EffectContractMetadata {
         catch (Exception exception) when (
             exception is InvalidCastException or
             FormatException or
-            OverflowException) {
+            OverflowException)
+        {
             result = 0;
             return false;
         }

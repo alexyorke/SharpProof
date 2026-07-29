@@ -15,7 +15,8 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class WorkerTcbEdgeCaseTests {
+public sealed class WorkerTcbEdgeCaseTests
+{
     [TestCase(
         BackendFailureReason.Timeout,
         WorkerClaimReason.MethodTimeout)]
@@ -24,7 +25,8 @@ public sealed class WorkerTcbEdgeCaseTests {
         WorkerClaimReason.UnsupportedExpression)]
     public async Task BackendAbstentionsMapToAccountableClaimReasons(
         BackendFailureReason backendReason,
-        WorkerClaimReason expectedReason) {
+        WorkerClaimReason expectedReason)
+    {
         var verifier = new CallableVerifier(
             new FixedBackend(BackendCheckResult.Unknown(backendReason)),
             WorkerBudgets.DefaultMaximumExpressionDepth);
@@ -34,7 +36,8 @@ public sealed class WorkerTcbEdgeCaseTests {
             CreateResourceBudget(),
             CancellationToken.None);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(results, Has.Length.EqualTo(1));
             Assert.That(
                 results[0].Outcome,
@@ -49,7 +52,8 @@ public sealed class WorkerTcbEdgeCaseTests {
     [TestCase(MalformedBodyKind.MissingReturnValue)]
     [TestCase(MalformedBodyKind.UnsupportedInstruction)]
     public async Task MalformedProgramBodiesFailClosedBeforeBackendInvocation(
-        MalformedBodyKind kind) {
+        MalformedBodyKind kind)
+    {
         var backend = new UnexpectedBackend();
         var verifier = new CallableVerifier(
             backend,
@@ -60,7 +64,8 @@ public sealed class WorkerTcbEdgeCaseTests {
             CreateResourceBudget(),
             CancellationToken.None);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(backend.CallCount, Is.Zero);
             Assert.That(results, Has.Length.EqualTo(1));
             Assert.That(
@@ -73,11 +78,13 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     [Test]
-    public async Task ContractClaimOrderMismatchFailsClosedBeforeBackendInvocation() {
+    public async Task ContractClaimOrderMismatchFailsClosedBeforeBackendInvocation()
+    {
         var factory = new IrFactory();
         var target = new CompilerCallablePreparation(
             factory,
-            new WorkerCallableManifestEntry {
+            new WorkerCallableManifestEntry
+            {
                 CallableId = "M:Test.Subject.Verify",
                 ClaimIds = ["manifest-claim"]
             },
@@ -99,7 +106,8 @@ public sealed class WorkerTcbEdgeCaseTests {
                 CreateResourceBudget(),
                 CancellationToken.None);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(backend.CallCount, Is.Zero);
             Assert.That(results, Has.Length.EqualTo(1));
             Assert.That(
@@ -112,7 +120,8 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     [Test]
-    public async Task MissingPreparedBodyFailsClosedBeforeBackendInvocation() {
+    public async Task MissingPreparedBodyFailsClosedBeforeBackendInvocation()
+    {
         var factory = new IrFactory();
         var target = CreateTarget(
             factory,
@@ -128,7 +137,8 @@ public sealed class WorkerTcbEdgeCaseTests {
                 CreateResourceBudget(),
                 CancellationToken.None);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(backend.CallCount, Is.Zero);
             Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
@@ -136,7 +146,8 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     [Test]
-    public async Task DeepPreconditionFailsClosedBeforeBackendInvocation() {
+    public async Task DeepPreconditionFailsClosedBeforeBackendInvocation()
+    {
         var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var target = CreateTarget(
@@ -175,7 +186,8 @@ public sealed class WorkerTcbEdgeCaseTests {
                 CreateResourceBudget(),
                 CancellationToken.None);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(backend.CallCount, Is.Zero);
             Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
@@ -183,7 +195,8 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     [Test]
-    public async Task EmptySourceIntervalFailsClosedBeforeBackendInvocation() {
+    public async Task EmptySourceIntervalFailsClosedBeforeBackendInvocation()
+    {
         var factory = new IrFactory();
         var parameter = factory.CreateVariable("value", factory.IntegerType);
         var target = CreateTarget(
@@ -206,7 +219,8 @@ public sealed class WorkerTcbEdgeCaseTests {
                 CreateResourceBudget(),
                 CancellationToken.None);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(backend.CallCount, Is.Zero);
             Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
@@ -214,7 +228,8 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     [Test]
-    public async Task ResourceCounterCrossingMethodLimitDiscardsBackendOutcome() {
+    public async Task ResourceCounterCrossingMethodLimitDiscardsBackendOutcome()
+    {
         long consumed = 0;
         var backend = new ResourceConsumingBackend(
             () => consumed = 11,
@@ -232,7 +247,8 @@ public sealed class WorkerTcbEdgeCaseTests {
             budget,
             CancellationToken.None);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(backend.CallCount, Is.EqualTo(1));
             Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
@@ -240,7 +256,8 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     [Test]
-    public async Task SemanticPreconditionContradictionIsExplicitVacuityEvidence() {
+    public async Task SemanticPreconditionContradictionIsExplicitVacuityEvidence()
+    {
         var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var variable = factory.Variable(value);
@@ -262,7 +279,8 @@ public sealed class WorkerTcbEdgeCaseTests {
 
         var result = await VerifyWithSmtAsync(target);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 result.Vacuity,
@@ -272,7 +290,8 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     [Test]
-    public async Task SatisfiablePreconditionProducesOrdinaryProof() {
+    public async Task SatisfiablePreconditionProducesOrdinaryProof()
+    {
         var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var target = CreateTarget(
@@ -289,14 +308,16 @@ public sealed class WorkerTcbEdgeCaseTests {
 
         var result = await VerifyWithSmtAsync(target);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.None));
         }
     }
 
     [Test]
-    public async Task SatisfiablePreconditionDoesNotHideFalsePostcondition() {
+    public async Task SatisfiablePreconditionDoesNotHideFalsePostcondition()
+    {
         var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var target = CreateTarget(
@@ -313,14 +334,16 @@ public sealed class WorkerTcbEdgeCaseTests {
 
         var result = await VerifyWithSmtAsync(target);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.None));
         }
     }
 
     [Test]
-    public async Task UnknownPreconditionSatisfiabilityCannotBecomeVacuousProof() {
+    public async Task UnknownPreconditionSatisfiabilityCannotBecomeVacuousProof()
+    {
         var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var target = CreateTarget(
@@ -346,7 +369,8 @@ public sealed class WorkerTcbEdgeCaseTests {
                 CreateResourceBudget(),
                 CancellationToken.None);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(backend.CallCount, Is.EqualTo(2));
             Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
@@ -357,13 +381,15 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     [Test]
-    public async Task NonliteralUnreachableNormalCompletionIsExplicitVacuityEvidence() {
+    public async Task NonliteralUnreachableNormalCompletionIsExplicitVacuityEvidence()
+    {
         var result = await VerifyWithSmtAsync(
             CreateDivisionTarget(
                 IrBinaryOperator.Equal,
                 postcondition: false));
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 result.Vacuity,
@@ -372,20 +398,23 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     [Test]
-    public async Task NonliteralReachableNormalCompletionIsNotVacuous() {
+    public async Task NonliteralReachableNormalCompletionIsNotVacuous()
+    {
         var result = await VerifyWithSmtAsync(
             CreateDivisionTarget(
                 IrBinaryOperator.NotEqual,
                 postcondition: true));
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.None));
         }
     }
 
     [Test]
-    public async Task UnknownNormalCompletionSatisfiabilityCannotBecomeProof() {
+    public async Task UnknownNormalCompletionSatisfiabilityCannotBecomeProof()
+    {
         var backend = new SatisfiableUnknownProofBackend();
 
         var results = await new CallableVerifier(
@@ -397,7 +426,8 @@ public sealed class WorkerTcbEdgeCaseTests {
                 CreateResourceBudget(),
                 CancellationToken.None);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(backend.CallCount, Is.EqualTo(3));
             Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
@@ -408,14 +438,16 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     [Test]
-    public async Task UserAssumeCannotSupplyNormalCompletionEvidence() {
+    public async Task UserAssumeCannotSupplyNormalCompletionEvidence()
+    {
         var result = await VerifyWithSmtAsync(
             CreateDivisionTarget(
                 IrBinaryOperator.Equal,
                 postcondition: false,
                 assumeCompletion: true));
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 result.Vacuity,
@@ -424,7 +456,8 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     [Test]
-    public void UnknownCompilerClauseKindIsRejectedExhaustively() {
+    public void UnknownCompilerClauseKindIsRejectedExhaustively()
+    {
         var factory = new IrFactory();
         var target = CreateTarget(
             factory,
@@ -456,7 +489,8 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     [Test]
-    public void MalformedBackendOutcomeBecomesTypedUnknown() {
+    public void MalformedBackendOutcomeBecomesTypedUnknown()
+    {
         var result = CallableClaimResultAssembler.FromOutcome(
             CreateTrivialTarget(),
             0,
@@ -467,14 +501,16 @@ public sealed class WorkerTcbEdgeCaseTests {
             WorkerClaimReason.None,
             WorkerVacuityKind.None);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.MalformedBackendResult));
         }
     }
 
     [Test]
-    public void CounterexampleModelFormattingCoversEveryIrValueKind() {
+    public void CounterexampleModelFormattingCoversEveryIrValueKind()
+    {
         var factory = new IrFactory();
         var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
         var values = new[] {
@@ -542,7 +578,8 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     [Test]
-    public void TrivialReplayRejectsAResultVariableWithoutAProgram() {
+    public void TrivialReplayRejectsAResultVariableWithoutAProgram()
+    {
         var factory = new IrFactory();
         var result = factory.CreateVariable(
             "result",
@@ -570,7 +607,8 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     [Test]
-    public void NullResultFacetProjectsToNegativeNonNullEvidence() {
+    public void NullResultFacetProjectsToNegativeNonNullEvidence()
+    {
         var factory = new IrFactory();
         var result = factory.CreateVariable(
             "result",
@@ -586,7 +624,8 @@ public sealed class WorkerTcbEdgeCaseTests {
             out var projection,
             out var evidence);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(succeeded, Is.True);
             Assert.That(projection.NonNullVariable, Is.Not.Null);
             Assert.That(projection.LengthVariable, Is.Null);
@@ -596,7 +635,8 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     [Test]
-    public void NonEmptySequenceFacetProjectsToPositiveLengthEvidence() {
+    public void NonEmptySequenceFacetProjectsToPositiveLengthEvidence()
+    {
         var factory = new IrFactory();
         var result = factory.CreateVariable(
             "result",
@@ -612,7 +652,8 @@ public sealed class WorkerTcbEdgeCaseTests {
             out var projection,
             out var evidence);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(succeeded, Is.True);
             Assert.That(projection.NonNullVariable, Is.Not.Null);
             Assert.That(projection.LengthVariable, Is.Not.Null);
@@ -622,12 +663,14 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     [Test]
-    public async Task CacheRejectsAHashedPayloadWithNullCallableResults() {
+    public async Task CacheRejectsAHashedPayloadWithNullCallableResults()
+    {
         var directory = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
             "worker-cache-edge-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
-        try {
+        try
+        {
             var manifest = new WorkerClaimManifest();
             WorkerProtocolJson.SealManifest(manifest);
             var inputHash = new string('a', 64);
@@ -647,18 +690,21 @@ public sealed class WorkerTcbEdgeCaseTests {
 
             Assert.That(response, Is.Null);
         }
-        finally {
+        finally
+        {
             Directory.Delete(directory, recursive: true);
         }
     }
 
     [Test]
-    public async Task CacheRejectsPayloadSealedForADifferentManifest() {
+    public async Task CacheRejectsPayloadSealedForADifferentManifest()
+    {
         var directory = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
             "worker-cache-manifest-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
-        try {
+        try
+        {
             var manifest = new WorkerClaimManifest();
             WorkerProtocolJson.SealManifest(manifest);
             var inputHash = new string('b', 64);
@@ -678,7 +724,8 @@ public sealed class WorkerTcbEdgeCaseTests {
 
             Assert.That(response, Is.Null);
         }
-        finally {
+        finally
+        {
             Directory.Delete(directory, recursive: true);
         }
     }
@@ -688,9 +735,11 @@ public sealed class WorkerTcbEdgeCaseTests {
         string inputHash,
         string manifestHash,
         WorkerCallableResult[]? callableResults,
-        WorkerClaimResult[] claimResults) {
+        WorkerClaimResult[] claimResults)
+    {
         var payload = JsonSerializer.Serialize(
-            new {
+            new
+            {
                 ManifestHash = manifestHash,
                 CallableResults = callableResults,
                 ClaimResults = claimResults
@@ -702,7 +751,8 @@ public sealed class WorkerTcbEdgeCaseTests {
                     "x2",
                     CultureInfo.InvariantCulture)));
         var envelope = JsonSerializer.Serialize(
-            new {
+            new
+            {
                 SchemaVersion = WorkerCacheVersions.Current,
                 InputHash = inputHash,
                 PayloadHash = payloadHash,
@@ -714,7 +764,8 @@ public sealed class WorkerTcbEdgeCaseTests {
             envelope);
     }
 
-    private static CompilerCallablePreparation CreateTrivialTarget() {
+    private static CompilerCallablePreparation CreateTrivialTarget()
+    {
         var factory = new IrFactory();
         return CreateTarget(
             factory,
@@ -724,11 +775,13 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     private static CompilerCallablePreparation CreateMalformedProgramTarget(
-        MalformedBodyKind kind) {
+        MalformedBodyKind kind)
+    {
         var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
-        switch (kind) {
+        switch (kind)
+        {
             case MalformedBodyKind.MissingAssignmentSource:
                 var source = factory.CreateVariable(
                     "unbound-source",
@@ -819,7 +872,8 @@ public sealed class WorkerTcbEdgeCaseTests {
     private static CompilerCallablePreparation CreateDivisionTarget(
         IrBinaryOperator preconditionOperator,
         bool postcondition,
-        bool assumeCompletion = false) {
+        bool assumeCompletion = false)
+    {
         var factory = new IrFactory();
         var parameter = factory.CreateVariable(
             "parameter",
@@ -841,6 +895,7 @@ public sealed class WorkerTcbEdgeCaseTests {
                 factory.Variable(parameter),
                 factory.Integer(0))));
         if (assumeCompletion)
+        {
             clauses.Add(
                 new CompilerPreparedClause(
                     CompilerContractKind.Assume,
@@ -851,6 +906,8 @@ public sealed class WorkerTcbEdgeCaseTests {
                     CompilerContractEvidence.CompilerBoundInvocation,
                     null,
                     "assume-completion"));
+        }
+
         clauses.Add(Ensures(factory.Boolean(postcondition)));
         return CreateTarget(
             factory,
@@ -870,8 +927,9 @@ public sealed class WorkerTcbEdgeCaseTests {
         IrFactory factory,
         IrTerm postcondition,
         ImmutableArray<CompilerCanonicalVariable> variables,
-        CompilerPreparedBody? body) =>
-        CreateTarget(
+        CompilerPreparedBody? body)
+    {
+        return CreateTarget(
             factory,
             [new CompilerPreparedClause(
                 CompilerContractKind.Ensures,
@@ -881,15 +939,18 @@ public sealed class WorkerTcbEdgeCaseTests {
                 null)],
             variables,
             body);
+    }
 
     private static CompilerCallablePreparation CreateTarget(
         IrFactory factory,
         ImmutableArray<CompilerPreparedClause> clauses,
         ImmutableArray<CompilerCanonicalVariable> variables,
-        CompilerPreparedBody? body) =>
-        new(
+        CompilerPreparedBody? body)
+    {
+        return new(
             factory,
-            new WorkerCallableManifestEntry {
+            new WorkerCallableManifestEntry
+            {
                 CallableId = "M:Test.Subject.Verify",
                 ClaimIds = ["claim"]
             },
@@ -897,34 +958,42 @@ public sealed class WorkerTcbEdgeCaseTests {
             variables,
             WorkerClaimReason.None,
             body);
+    }
 
-    private static CompilerPreparedClause Requires(IrTerm condition) =>
-        new(
+    private static CompilerPreparedClause Requires(IrTerm condition)
+    {
+        return new(
             CompilerContractKind.Requires,
             condition,
             CompilerContractEvidence.CompilerBoundInvocation,
             null,
             null);
+    }
 
-    private static CompilerPreparedClause Ensures(IrTerm condition) =>
-        new(
+    private static CompilerPreparedClause Ensures(IrTerm condition)
+    {
+        return new(
             CompilerContractKind.Ensures,
             condition,
             CompilerContractEvidence.CompilerBoundInvocation,
             "claim",
             null);
+    }
 
-    private static CompilerCanonicalVariable Parameter(IrVarId variable) =>
-        new(
+    private static CompilerCanonicalVariable Parameter(IrVarId variable)
+    {
+        return new(
             CompilerVariableRole.Parameter,
             0,
             variable,
             null,
             null,
             "value");
+    }
 
     private static async Task<WorkerClaimResult> VerifyWithSmtAsync(
-        CompilerCallablePreparation target) {
+        CompilerCallablePreparation target)
+    {
         using var backend = new SharpProof.Smt.IrSmtBackend(
             new SharpProof.Smt.IrSmtBackendOptions(
                 WorkerBudgets.DefaultQueryRlimit));
@@ -936,16 +1005,19 @@ public sealed class WorkerTcbEdgeCaseTests {
                 CancellationToken.None)).Single();
     }
 
-    private static MethodResourceBudget CreateResourceBudget() =>
-        new(
+    private static MethodResourceBudget CreateResourceBudget()
+    {
+        return new(
             null,
             WorkerBudgets.DefaultQueryRlimit,
             WorkerBudgets.DefaultMethodRlimit);
+    }
 
     private static ApiSpecTemplate CreateTemplate(
         SpecValueType resultType,
         SpecNullness nullness,
-        SpecCardinality cardinality) {
+        SpecCardinality cardinality)
+    {
         var evidence = new SpecEvidence(
             SpecEvidenceKind.Documented,
             "worker-tcb-edge-test");
@@ -982,25 +1054,29 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     private sealed class FixedBackend(BackendCheckResult result)
-        : ISmtBackend {
+        : ISmtBackend
+    {
         private readonly BackendCheckResult _result = result;
 
         public Task<BackendCheckResult> CheckAsync(
             VerificationQuery query,
-            CancellationToken cancellationToken) {
+            CancellationToken cancellationToken)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(_result);
         }
     }
 
-    private sealed class UnexpectedBackend : ISmtBackend {
+    private sealed class UnexpectedBackend : ISmtBackend
+    {
         private int _callCount;
 
         internal int CallCount => Volatile.Read(ref _callCount);
 
         public Task<BackendCheckResult> CheckAsync(
             VerificationQuery query,
-            CancellationToken cancellationToken) {
+            CancellationToken cancellationToken)
+        {
             Interlocked.Increment(ref _callCount);
             throw new AssertionException(
                 "Malformed input reached the backend.");
@@ -1009,7 +1085,8 @@ public sealed class WorkerTcbEdgeCaseTests {
 
     private sealed class ResourceConsumingBackend(
         Action consume,
-        BackendCheckResult result) : ISmtBackend {
+        BackendCheckResult result) : ISmtBackend
+    {
         private readonly Action _consume = consume;
         private readonly BackendCheckResult _result = result;
         private int _callCount;
@@ -1018,7 +1095,8 @@ public sealed class WorkerTcbEdgeCaseTests {
 
         public Task<BackendCheckResult> CheckAsync(
             VerificationQuery query,
-            CancellationToken cancellationToken) {
+            CancellationToken cancellationToken)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             Interlocked.Increment(ref _callCount);
             _consume();
@@ -1027,7 +1105,8 @@ public sealed class WorkerTcbEdgeCaseTests {
     }
 
     private sealed class ScriptedBackend(
-        params BackendCheckResult[] results) : ISmtBackend {
+        params BackendCheckResult[] results) : ISmtBackend
+    {
         private readonly Queue<BackendCheckResult> _results = new(results);
         private int _callCount;
 
@@ -1035,24 +1114,28 @@ public sealed class WorkerTcbEdgeCaseTests {
 
         public Task<BackendCheckResult> CheckAsync(
             VerificationQuery query,
-            CancellationToken cancellationToken) {
+            CancellationToken cancellationToken)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             Interlocked.Increment(ref _callCount);
             return Task.FromResult(_results.Dequeue());
         }
     }
 
-    private sealed class SatisfiableUnknownProofBackend : ISmtBackend {
+    private sealed class SatisfiableUnknownProofBackend : ISmtBackend
+    {
         private int _callCount;
 
         internal int CallCount => Volatile.Read(ref _callCount);
 
         public Task<BackendCheckResult> CheckAsync(
             VerificationQuery query,
-            CancellationToken cancellationToken) {
+            CancellationToken cancellationToken)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(
-                Interlocked.Increment(ref _callCount) switch {
+                Interlocked.Increment(ref _callCount) switch
+                {
                     1 => BackendCheckResult.Satisfiable(
                         new BackendModel(
                             query.ModelVariables.Select(variable =>
@@ -1068,7 +1151,8 @@ public sealed class WorkerTcbEdgeCaseTests {
         }
     }
 
-    public enum MalformedBodyKind {
+    public enum MalformedBodyKind
+    {
         MissingAssignmentSource,
         UnboundCall,
         MissingBranchCondition,

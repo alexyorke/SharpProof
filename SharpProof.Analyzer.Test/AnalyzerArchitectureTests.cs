@@ -7,7 +7,8 @@ using SharpProof.Analyzer;
 namespace SharpProof.Analyzer.Test;
 
 [TestFixture]
-public sealed class AnalyzerArchitectureTests {
+public sealed class AnalyzerArchitectureTests
+{
     private static readonly string[] ExpectedAnalyzerReferences = [
         "SharpProof.CompilerArtifact",
         "SharpProof.Contracts",
@@ -33,7 +34,8 @@ public sealed class AnalyzerArchitectureTests {
     ];
 
     [Test]
-    public async Task ConcurrentRunsProduceTheSameDiagnostics() {
+    public async Task ConcurrentRunsProduceTheSameDiagnostics()
+    {
         const string source = """
             using SharpProof.Attributes;
 
@@ -64,7 +66,8 @@ public sealed class AnalyzerArchitectureTests {
     }
 
     [Test]
-    public void AnalyzerAssemblyReferencesOnlyCurrentFrontendLayers() {
+    public void AnalyzerAssemblyReferencesOnlyCurrentFrontendLayers()
+    {
         var references = typeof(SharpProofAnalyzer).Assembly
             .GetReferencedAssemblies()
             .Select(static name => name.Name)
@@ -80,22 +83,26 @@ public sealed class AnalyzerArchitectureTests {
     }
 
     [Test]
-    public void PortableAnalysisAssembliesDoNotReferenceRuntimeAttributes() {
+    public void PortableAnalysisAssembliesDoNotReferenceRuntimeAttributes()
+    {
         var assemblies = new[] {
             typeof(SharpProofAnalyzer).Assembly,
             typeof(SharpProof.Effects.EffectSummaryProjector).Assembly
         };
 
         foreach (var assembly in assemblies)
+        {
             Assert.That(
                 assembly.GetReferencedAssemblies()
                     .Select(static reference => reference.Name),
                 Does.Not.Contain("SharpProof.Attributes"),
                 assembly.GetName().Name);
+        }
     }
 
     [Test]
-    public void AnalyzerOutputContainsOnlyCurrentFrontendLayersAndNoSolver() {
+    public void AnalyzerOutputContainsOnlyCurrentFrontendLayersAndNoSolver()
+    {
         var output = Path.GetDirectoryName(
             typeof(SharpProofAnalyzer).Assembly.Location) ??
             throw new InvalidOperationException("Analyzer output path is unavailable.");
@@ -114,7 +121,8 @@ public sealed class AnalyzerArchitectureTests {
                 StringComparison.Ordinal))
             .ToArray();
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 sharpProofNames,
                 Is.SubsetOf(ExpectedAnalyzerOutputAssemblies));
@@ -123,7 +131,8 @@ public sealed class AnalyzerArchitectureTests {
     }
 
     [Test]
-    public void AnalyzerProjectKeepsTheSolverOutOfProcess() {
+    public void AnalyzerProjectKeepsTheSolverOutOfProcess()
+    {
         var root = AnalyzerTestHost.FindRepositoryRoot();
         var project = File.ReadAllText(
             Path.Combine(
@@ -138,7 +147,8 @@ public sealed class AnalyzerArchitectureTests {
     }
 
     [Test]
-    public void OperationKindGateIsExhaustiveAndFutureKindsFailClosed() {
+    public void OperationKindGateIsExhaustiveAndFutureKindsFailClosed()
+    {
         var runtimeKinds = Enum.GetValues<OperationKind>().Distinct().ToArray();
 
         Assert.That(
@@ -152,7 +162,8 @@ public sealed class AnalyzerArchitectureTests {
     }
 
     [Test]
-    public void SubsetAbstentionsUseAClosedTypedReason() {
+    public void SubsetAbstentionsUseAClosedTypedReason()
+    {
         Assert.That(
             Enum.GetValues<LanguageSubsetAbstentionReason>(),
             Is.EquivalentTo(new[] {
@@ -167,7 +178,8 @@ public sealed class AnalyzerArchitectureTests {
             LanguageSubsetAbstentionReason.UnsupportedOperationKind,
             OperationKind.DynamicInvocation);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(abstention.IsSupported, Is.False);
             Assert.That(
                 abstention.Reason,
@@ -180,7 +192,8 @@ public sealed class AnalyzerArchitectureTests {
     }
 
     [Test]
-    public void ReleaseTrackingMatchesCurrentSupportedDescriptors() {
+    public void ReleaseTrackingMatchesCurrentSupportedDescriptors()
+    {
         var root = AnalyzerTestHost.FindRepositoryRoot();
         var analyzerDirectory = Path.Combine(
             root,
@@ -201,7 +214,8 @@ public sealed class AnalyzerArchitectureTests {
                 static descriptor => descriptor.Id,
                 StringComparer.Ordinal);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 shipped,
                 Is.Empty,
@@ -211,9 +225,11 @@ public sealed class AnalyzerArchitectureTests {
                 Is.EquivalentTo(descriptors.Keys));
             Assert.That(unshipped, Has.Count.EqualTo(12));
         }
-        foreach (var descriptor in descriptors.Values) {
+        foreach (var descriptor in descriptors.Values)
+        {
             var rule = unshipped[descriptor.Id];
-            using (Assert.EnterMultipleScope()) {
+            using (Assert.EnterMultipleScope())
+            {
                 Assert.That(
                     rule.Category,
                     Is.EqualTo(descriptor.Category),
@@ -229,19 +245,26 @@ public sealed class AnalyzerArchitectureTests {
     private static Dictionary<string, ReleaseRule>
         ReadReleaseSection(
             string path,
-            string section) {
+            string section)
+    {
         var result = new Dictionary<string, ReleaseRule>(
             StringComparer.Ordinal);
         var inSection = false;
-        foreach (var line in File.ReadLines(path)) {
-            if (line.StartsWith("### ", StringComparison.Ordinal)) {
+        foreach (var line in File.ReadLines(path))
+        {
+            if (line.StartsWith("### ", StringComparison.Ordinal))
+            {
                 inSection = string.Equals(
                     line.Substring("### ".Length).Trim(),
                     section,
                     StringComparison.Ordinal);
                 continue;
             }
-            if (!inSection) continue;
+            if (!inSection)
+            {
+                continue;
+            }
+
             var columns = line
                 .Split('|')
                 .Select(static column => column.Trim())
@@ -250,7 +273,10 @@ public sealed class AnalyzerArchitectureTests {
                 columns[0].Length != 6 ||
                 !columns[0].StartsWith("SP", StringComparison.Ordinal) ||
                 !int.TryParse(columns[0].AsSpan(2), out _))
+            {
                 continue;
+            }
+
             var rule = new ReleaseRule(
                 columns[0],
                 columns[1],
@@ -264,18 +290,22 @@ public sealed class AnalyzerArchitectureTests {
     }
 
     private static string ReleaseSeverity(
-        DiagnosticDescriptor descriptor) =>
-        descriptor.IsEnabledByDefault
+        DiagnosticDescriptor descriptor)
+    {
+        return descriptor.IsEnabledByDefault
             ? descriptor.DefaultSeverity.ToString()
             : "Disabled";
+    }
 
-    private static string Snapshot(IEnumerable<Microsoft.CodeAnalysis.Diagnostic> diagnostics) =>
-        string.Join(
+    private static string Snapshot(IEnumerable<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
+    {
+        return string.Join(
             "\n",
             diagnostics.Select(diagnostic =>
                 diagnostic.Id + "|" +
                 diagnostic.Location.SourceSpan.Start + "|" +
                 diagnostic.GetMessage(CultureInfo.InvariantCulture)));
+    }
 
     private sealed record ReleaseRule(
         string Id,

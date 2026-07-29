@@ -1,14 +1,28 @@
 namespace SharpProof.Ir;
 
-public static class IrSubstitution {
+public static class IrSubstitution
+{
     public static IrTerm Substitute(
         IrFactory factory,
         IrTerm root,
         IrVarId variable,
-        IrTerm replacement) {
-        if (factory == null) throw new ArgumentNullException(nameof(factory));
-        if (root == null) throw new ArgumentNullException(nameof(root));
-        if (replacement == null) throw new ArgumentNullException(nameof(replacement));
+        IrTerm replacement)
+    {
+        if (factory == null)
+        {
+            throw new ArgumentNullException(nameof(factory));
+        }
+
+        if (root == null)
+        {
+            throw new ArgumentNullException(nameof(root));
+        }
+
+        if (replacement == null)
+        {
+            throw new ArgumentNullException(nameof(replacement));
+        }
+
         return Substitute(
             factory,
             root,
@@ -18,20 +32,40 @@ public static class IrSubstitution {
     public static IrTerm Substitute(
         IrFactory factory,
         IrTerm root,
-        IReadOnlyDictionary<IrVarId, IrTerm> replacements) {
-        if (factory == null) throw new ArgumentNullException(nameof(factory));
-        if (root == null) throw new ArgumentNullException(nameof(root));
-        if (replacements == null) throw new ArgumentNullException(nameof(replacements));
+        IReadOnlyDictionary<IrVarId, IrTerm> replacements)
+    {
+        if (factory == null)
+        {
+            throw new ArgumentNullException(nameof(factory));
+        }
+
+        if (root == null)
+        {
+            throw new ArgumentNullException(nameof(root));
+        }
+
+        if (replacements == null)
+        {
+            throw new ArgumentNullException(nameof(replacements));
+        }
+
         factory.EnsureTerm(root, nameof(root));
-        foreach (var replacement in replacements) {
+        foreach (var replacement in replacements)
+        {
             var variable = factory.GetVariableInfo(replacement.Key);
             factory.EnsureTerm(replacement.Value, nameof(replacements));
             if (variable.Type != replacement.Value.Type)
+            {
                 throw new ArgumentException(
                     "A replacement term must have the same type as its variable.",
                     nameof(replacements));
+            }
         }
-        if (replacements.Count == 0) return root;
+        if (replacements.Count == 0)
+        {
+            return root;
+        }
+
         var memo = new Dictionary<IrId, IrTerm>();
         return Rewrite(factory, root, replacements, memo);
     }
@@ -40,17 +74,36 @@ public static class IrSubstitution {
         IrFactory factory,
         IrTerm term,
         IReadOnlyDictionary<IrVarId, IrTerm> replacements,
-        IDictionary<IrId, IrTerm> memo) {
+        IDictionary<IrId, IrTerm> memo)
+    {
         if (term is IrVariableTerm variable &&
             replacements.TryGetValue(variable.Variable, out var replacement))
+        {
             return replacement;
-        if (memo.TryGetValue(term.Id, out var existing)) return existing;
-        IrTerm Visit(IrTerm child) => Rewrite(factory, child, replacements, memo);
-        IrTerm? VisitNullable(IrTerm? child) =>
-            child == null ? null : Visit(child);
-        IrTerm[] VisitAll(ImmutableArray<IrTerm> children) =>
-            [.. children.Select(Visit)];
-        var rewritten = term switch {
+        }
+
+        if (memo.TryGetValue(term.Id, out var existing))
+        {
+            return existing;
+        }
+
+        IrTerm Visit(IrTerm child)
+        {
+            return Rewrite(factory, child, replacements, memo);
+        }
+
+        IrTerm? VisitNullable(IrTerm? child)
+        {
+            return child == null ? null : Visit(child);
+        }
+
+        IrTerm[] VisitAll(ImmutableArray<IrTerm> children)
+        {
+            return [.. children.Select(Visit)];
+        }
+
+        var rewritten = term switch
+        {
             IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrNullTerm or IrVariableTerm => term,
             IrOpaqueTerm { Purity: IrOpaquePurity.Pure } opaque =>
                 factory.PureOpaque(

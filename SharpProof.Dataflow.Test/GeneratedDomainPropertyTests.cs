@@ -1,17 +1,20 @@
 namespace SharpProof.Dataflow.Test;
 
-internal static class GeneratedDomainLawAssertions {
+internal static class GeneratedDomainLawAssertions
+{
     private const int PropertyIterations = 512;
 
     public static void AssertLatticeAndBottomLaws<T>(
         IAbstractDomain<T> domain,
         IReadOnlyList<T> values,
-        int seed) {
+        int seed)
+    {
         Assert.That(values, Is.Not.Empty);
         var random = new Random(seed);
         var comparer = EqualityComparer<T>.Default;
 
-        foreach (var value in values) {
+        foreach (var value in values)
+        {
             Assert.That(
                 domain.LessThanOrEqual(value, value),
                 Is.True,
@@ -30,18 +33,21 @@ internal static class GeneratedDomainLawAssertions {
                 $"Right bottom join law failed for {value}.");
         }
 
-        for (var iteration = 0; iteration < PropertyIterations; iteration++) {
+        for (var iteration = 0; iteration < PropertyIterations; iteration++)
+        {
             var first = Pick(values, random);
             var second = Pick(values, random);
             var third = Pick(values, random);
 
             if (domain.LessThanOrEqual(first, second) &&
                 domain.LessThanOrEqual(second, first))
+            {
                 Assert.That(
                     comparer.Equals(first, second),
                     Is.True,
                     $"Antisymmetry failed at seed {seed}, iteration {iteration}: " +
                     $"{first} and {second}.");
+            }
 
             var middle = domain.Join(first, second);
             var upper = domain.Join(middle, third);
@@ -78,11 +84,14 @@ internal static class GeneratedDomainLawAssertions {
                 $"Join is not below a generated upper bound at seed {seed}, " +
                 $"iteration {iteration}.");
 
-            for (var upperBoundAttempt = 0; upperBoundAttempt < 8; upperBoundAttempt++) {
+            for (var upperBoundAttempt = 0; upperBoundAttempt < 8; upperBoundAttempt++)
+            {
                 var sampledUpperBound = Pick(values, random);
                 if (!domain.LessThanOrEqual(first, sampledUpperBound) ||
                     !domain.LessThanOrEqual(second, sampledUpperBound))
+                {
                     continue;
+                }
 
                 Assert.That(
                     domain.LessThanOrEqual(join, sampledUpperBound),
@@ -98,21 +107,25 @@ internal static class GeneratedDomainLawAssertions {
         IReadOnlyList<T> values,
         int seed,
         IReadOnlyList<(string Name, Func<T, T> Transfer)> unaryTransfers,
-        IReadOnlyList<(string Name, Func<T, T, T> Transfer)> binaryTransfers) {
+        IReadOnlyList<(string Name, Func<T, T, T> Transfer)> binaryTransfers)
+    {
         Assert.That(values, Is.Not.Empty);
         var random = new Random(seed);
 
-        for (var iteration = 0; iteration < PropertyIterations; iteration++) {
+        for (var iteration = 0; iteration < PropertyIterations; iteration++)
+        {
             var lower = Pick(values, random);
             var upper = domain.Join(lower, Pick(values, random));
             Assert.That(domain.LessThanOrEqual(lower, upper), Is.True);
 
             foreach (var (name, transfer) in unaryTransfers)
+            {
                 Assert.That(
                     domain.LessThanOrEqual(transfer(lower), transfer(upper)),
                     Is.True,
                     $"{name} is not monotone at seed {seed}, iteration {iteration}: " +
                     $"{lower} <= {upper}.");
+            }
 
             var leftLower = Pick(values, random);
             var leftUpper = domain.Join(leftLower, Pick(values, random));
@@ -120,6 +133,7 @@ internal static class GeneratedDomainLawAssertions {
             var rightUpper = domain.Join(rightLower, Pick(values, random));
 
             foreach (var (name, transfer) in binaryTransfers)
+            {
                 Assert.That(
                     domain.LessThanOrEqual(
                         transfer(leftLower, rightLower),
@@ -127,19 +141,22 @@ internal static class GeneratedDomainLawAssertions {
                     Is.True,
                     $"{name} is not monotone at seed {seed}, iteration {iteration}: " +
                     $"({leftLower}, {rightLower}) <= ({leftUpper}, {rightUpper}).");
+            }
         }
     }
 
     public static void AssertWideningTerminates<T>(
         IAbstractDomain<T> domain,
         IReadOnlyList<T> ascendingChain,
-        int maximumChanges) {
+        int maximumChanges)
+    {
         Assert.That(ascendingChain, Is.Not.Empty);
         var previousChainValue = domain.Bottom;
         var widened = domain.Bottom;
         var changes = 0;
 
-        foreach (var next in ascendingChain) {
+        foreach (var next in ascendingChain)
+        {
             Assert.That(
                 domain.LessThanOrEqual(previousChainValue, next),
                 Is.True,
@@ -156,7 +173,10 @@ internal static class GeneratedDomainLawAssertions {
                 Is.True,
                 $"Widening does not cover the next state {next}: {widened}.");
             if (!domain.AreEquivalent(previousWidened, widened))
+            {
                 changes++;
+            }
+
             previousChainValue = next;
         }
 
@@ -167,16 +187,20 @@ internal static class GeneratedDomainLawAssertions {
 
         var terminal = ascendingChain[^1];
         for (var repetition = 0; repetition < 32; repetition++)
+        {
             Assert.That(
                 domain.AreEquivalent(domain.Widen(widened, terminal), widened),
                 Is.True,
                 $"Widening did not remain stable at repetition {repetition}.");
+        }
     }
 
     public static void AssertHavocIsConservative<T>(
         IAbstractDomain<T> domain,
-        IReadOnlyList<T> values) {
-        foreach (var value in values) {
+        IReadOnlyList<T> values)
+    {
+        foreach (var value in values)
+        {
             var havoced = domain.Havoc(value);
             Assert.That(
                 domain.LessThanOrEqual(value, havoced),
@@ -197,14 +221,18 @@ internal static class GeneratedDomainLawAssertions {
         }
     }
 
-    private static T Pick<T>(IReadOnlyList<T> values, Random random) =>
-        values[random.Next(values.Count)];
+    private static T Pick<T>(IReadOnlyList<T> values, Random random)
+    {
+        return values[random.Next(values.Count)];
+    }
 }
 
-internal static class GeneratedDomainSamples {
+internal static class GeneratedDomainSamples
+{
     private static readonly int[] Moduli = [1, 2, 3, 4, 5, 8, 16];
 
-    public static IReadOnlyList<IntervalValue> Intervals(int seed, int count) {
+    public static IReadOnlyList<IntervalValue> Intervals(int seed, int count)
+    {
         var domain = IntervalDomain.Instance;
         var random = new Random(seed);
         var values = new List<IntervalValue> {
@@ -215,12 +243,14 @@ internal static class GeneratedDomainSamples {
             domain.Range(long.MinValue, long.MaxValue)
         };
 
-        for (var index = 0; index < count; index++) {
+        for (var index = 0; index < count; index++)
+        {
             var first = NextSignedValue(random);
             var second = NextSignedValue(random);
             var lower = Math.Min(first, second);
             var upper = Math.Max(first, second);
-            values.Add(random.Next(6) switch {
+            values.Add(random.Next(6) switch
+            {
                 0 => domain.Constant(first),
                 1 => domain.Range(lower, upper),
                 2 => domain.Range(random.Next(4) == 0 ? null : lower, upper),
@@ -239,7 +269,8 @@ internal static class GeneratedDomainSamples {
         return values;
     }
 
-    public static IReadOnlyList<SequenceCardinalityValue> Sequences(int seed, int count) {
+    public static IReadOnlyList<SequenceCardinalityValue> Sequences(int seed, int count)
+    {
         var domain = SequenceCardinalityDomain.Instance;
         var random = new Random(seed);
         var values = new List<SequenceCardinalityValue> {
@@ -250,12 +281,14 @@ internal static class GeneratedDomainSamples {
             domain.KnownLength(long.MaxValue)
         };
 
-        for (var index = 0; index < count; index++) {
+        for (var index = 0; index < count; index++)
+        {
             var first = NextLength(random);
             var second = NextLength(random);
             var lower = Math.Min(first, second);
             var upper = Math.Max(first, second);
-            var length = random.Next(4) switch {
+            var length = random.Next(4) switch
+            {
                 0 => IntervalValue.Constant(first),
                 1 => IntervalValue.Range(lower, upper),
                 2 => IntervalValue.Range(lower, null),
@@ -265,7 +298,8 @@ internal static class GeneratedDomainSamples {
                     NextModulus(random),
                     random.NextInt64(0, 17))
             };
-            values.Add(random.Next(5) switch {
+            values.Add(random.Next(5) switch
+            {
                 0 => domain.KnownLength(first),
                 1 => domain.Create(SequenceCardinalityKind.Empty, length),
                 2 => domain.Create(SequenceCardinalityKind.NonEmpty, length),
@@ -279,38 +313,49 @@ internal static class GeneratedDomainSamples {
         return values;
     }
 
-    private static long NextSignedValue(Random random) =>
-        random.Next(24) switch {
+    private static long NextSignedValue(Random random)
+    {
+        return random.Next(24) switch
+        {
             0 => long.MinValue,
             1 => long.MaxValue,
             _ => random.NextInt64(-512, 513)
         };
+    }
 
-    private static long NextLength(Random random) =>
-        random.Next(24) == 0
+    private static long NextLength(Random random)
+    {
+        return random.Next(24) == 0
             ? long.MaxValue
             : random.NextInt64(0, 513);
+    }
 
-    private static BigInteger NextModulus(Random random) =>
-        new(Moduli[random.Next(Moduli.Length)]);
+    private static BigInteger NextModulus(Random random)
+    {
+        return new(Moduli[random.Next(Moduli.Length)]);
+    }
 }
 
 [TestFixture]
-public sealed class GeneratedIntervalDomainPropertyTests {
+public sealed class GeneratedIntervalDomainPropertyTests
+{
     private const int Seed = 0x51A2;
     private readonly IntervalDomain _domain = IntervalDomain.Instance;
     private static IReadOnlyList<IntervalValue> Values =>
         GeneratedDomainSamples.Intervals(Seed, 256);
 
     [Test]
-    public void GeneratedValuesSatisfyLatticeAndBottomLaws() =>
+    public void GeneratedValuesSatisfyLatticeAndBottomLaws()
+    {
         GeneratedDomainLawAssertions.AssertLatticeAndBottomLaws(
             _domain,
             Values,
             Seed);
+    }
 
     [Test]
-    public void GeneratedTransfersAreMonotone() =>
+    public void GeneratedTransfersAreMonotone()
+    {
         GeneratedDomainLawAssertions.AssertTransfersAreMonotone(
             _domain,
             Values,
@@ -321,12 +366,15 @@ public sealed class GeneratedIntervalDomainPropertyTests {
                 ("AssumeAtMost", value => _domain.AssumeAtMost(value, 23))
             ],
             [("Add", _domain.Add)]);
+    }
 
     [Test]
-    public void WideningTerminatesOnGeneratedAscendingChains() {
+    public void WideningTerminatesOnGeneratedAscendingChains()
+    {
         var oneSided = new List<IntervalValue> { _domain.Bottom, _domain.Constant(11) };
         var congruent = new List<IntervalValue> { _domain.Bottom, _domain.Constant(0) };
-        for (var step = 1; step <= 128; step++) {
+        for (var step = 1; step <= 128; step++)
+        {
             oneSided.Add(_domain.Range(11, 11 + step));
             congruent.Add(_domain.Create(0, step * 2L, 2, 0));
         }
@@ -343,12 +391,15 @@ public sealed class GeneratedIntervalDomainPropertyTests {
     }
 
     [Test]
-    public void GeneratedHavocIsConservative() =>
+    public void GeneratedHavocIsConservative()
+    {
         GeneratedDomainLawAssertions.AssertHavocIsConservative(_domain, Values);
+    }
 }
 
 [TestFixture]
-public sealed class GeneratedSequenceCardinalityDomainPropertyTests {
+public sealed class GeneratedSequenceCardinalityDomainPropertyTests
+{
     private const int Seed = 0x7E91;
     private readonly SequenceCardinalityDomain _domain =
         SequenceCardinalityDomain.Instance;
@@ -356,14 +407,17 @@ public sealed class GeneratedSequenceCardinalityDomainPropertyTests {
         GeneratedDomainSamples.Sequences(Seed, 256);
 
     [Test]
-    public void GeneratedValuesSatisfyLatticeAndBottomLaws() =>
+    public void GeneratedValuesSatisfyLatticeAndBottomLaws()
+    {
         GeneratedDomainLawAssertions.AssertLatticeAndBottomLaws(
             _domain,
             Values,
             Seed);
+    }
 
     [Test]
-    public void GeneratedTransfersAreMonotone() =>
+    public void GeneratedTransfersAreMonotone()
+    {
         GeneratedDomainLawAssertions.AssertTransfersAreMonotone(
             _domain,
             Values,
@@ -374,17 +428,21 @@ public sealed class GeneratedSequenceCardinalityDomainPropertyTests {
                 ("AssumeNonEmpty", _domain.AssumeNonEmpty)
             ],
             [("Concat", _domain.Concat)]);
+    }
 
     [Test]
-    public void WideningTerminatesOnGeneratedAscendingChains() {
+    public void WideningTerminatesOnGeneratedAscendingChains()
+    {
         var chain = new List<SequenceCardinalityValue> {
             _domain.Bottom,
             _domain.Empty
         };
         for (var step = 1; step <= 128; step++)
+        {
             chain.Add(_domain.Create(
                 SequenceCardinalityKind.Top,
                 IntervalValue.Range(0, step)));
+        }
 
         GeneratedDomainLawAssertions.AssertWideningTerminates(
             _domain,
@@ -393,16 +451,21 @@ public sealed class GeneratedSequenceCardinalityDomainPropertyTests {
     }
 
     [Test]
-    public void GeneratedHavocIsConservative() =>
+    public void GeneratedHavocIsConservative()
+    {
         GeneratedDomainLawAssertions.AssertHavocIsConservative(_domain, Values);
+    }
 }
 
 [TestFixture]
-public sealed class GeneratedNullnessDomainPropertyTests {
+public sealed class GeneratedNullnessDomainPropertyTests
+{
     private const int Seed = 0x19F3;
     private readonly NullnessDomain _domain = NullnessDomain.Instance;
-    private static IReadOnlyList<NullnessValue> Values {
-        get {
+    private static IReadOnlyList<NullnessValue> Values
+    {
+        get
+        {
             var random = new Random(Seed);
             return Enumerable.Range(0, 256)
                 .Select(_ => (NullnessValue)random.Next(4))
@@ -413,14 +476,17 @@ public sealed class GeneratedNullnessDomainPropertyTests {
     }
 
     [Test]
-    public void GeneratedValuesSatisfyLatticeAndBottomLaws() =>
+    public void GeneratedValuesSatisfyLatticeAndBottomLaws()
+    {
         GeneratedDomainLawAssertions.AssertLatticeAndBottomLaws(
             _domain,
             Values,
             Seed);
+    }
 
     [Test]
-    public void GeneratedTransfersAreMonotone() =>
+    public void GeneratedTransfersAreMonotone()
+    {
         GeneratedDomainLawAssertions.AssertTransfersAreMonotone(
             _domain,
             Values,
@@ -430,9 +496,11 @@ public sealed class GeneratedNullnessDomainPropertyTests {
                 ("AssumeNonNull", _domain.AssumeNonNull)
             ],
             []);
+    }
 
     [Test]
-    public void WideningTerminatesOnGeneratedAscendingChains() =>
+    public void WideningTerminatesOnGeneratedAscendingChains()
+    {
         GeneratedDomainLawAssertions.AssertWideningTerminates(
             _domain,
             [
@@ -441,8 +509,11 @@ public sealed class GeneratedNullnessDomainPropertyTests {
                 NullnessValue.MaybeNull
             ],
             maximumChanges: 2);
+    }
 
     [Test]
-    public void GeneratedHavocIsConservative() =>
+    public void GeneratedHavocIsConservative()
+    {
         GeneratedDomainLawAssertions.AssertHavocIsConservative(_domain, Values);
+    }
 }

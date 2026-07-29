@@ -1,7 +1,8 @@
 namespace SharpProof.CompilerProbe.TestAsset;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public sealed class CompilerProbeAnalyzer : DiagnosticAnalyzer {
+public sealed class CompilerProbeAnalyzer : DiagnosticAnalyzer
+{
     private static readonly DiagnosticDescriptor s_failureRule = new(
         CompilerProbeContract.FailureDiagnosticId,
         "Final compilation probe failed",
@@ -14,8 +15,13 @@ public sealed class CompilerProbeAnalyzer : DiagnosticAnalyzer {
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         [s_failureRule];
 
-    public override void Initialize(AnalysisContext context) {
-        if (context == null) throw new ArgumentNullException(nameof(context));
+    public override void Initialize(AnalysisContext context)
+    {
+        if (context == null)
+        {
+            throw new ArgumentNullException(nameof(context));
+        }
+
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(
             GeneratedCodeAnalysisFlags.Analyze |
@@ -23,27 +29,33 @@ public sealed class CompilerProbeAnalyzer : DiagnosticAnalyzer {
         context.RegisterCompilationAction(WriteSnapshot);
     }
 
-    private static void WriteSnapshot(CompilationAnalysisContext context) {
+    private static void WriteSnapshot(CompilationAnalysisContext context)
+    {
         var globalOptions =
             context.Options.AnalyzerConfigOptionsProvider.GlobalOptions;
         if (!globalOptions.TryGetValue(
                 CompilerProbeContract.OutputPathOptionKey,
                 out var outputPath) ||
             string.IsNullOrWhiteSpace(outputPath))
+        {
             return;
+        }
 
-        try {
+        try
+        {
             context.CancellationToken.ThrowIfCancellationRequested();
             WriteAtomically(
                 outputPath,
                 CompilerProbeSnapshot.Create(context));
         }
         catch (OperationCanceledException)
-            when (context.CancellationToken.IsCancellationRequested) {
+            when (context.CancellationToken.IsCancellationRequested)
+        {
             throw;
 #pragma warning disable CA1031
         }
-        catch (Exception exception) {
+        catch (Exception exception)
+        {
 #pragma warning restore CA1031
             context.ReportDiagnostic(
                 Diagnostic.Create(
@@ -53,7 +65,8 @@ public sealed class CompilerProbeAnalyzer : DiagnosticAnalyzer {
         }
     }
 
-    private static void WriteAtomically(string path, string content) {
+    private static void WriteAtomically(string path, string content)
+    {
         var destination = Path.GetFullPath(path);
         var directory = Path.GetDirectoryName(destination) ??
             throw new InvalidOperationException(
@@ -64,12 +77,14 @@ public sealed class CompilerProbeAnalyzer : DiagnosticAnalyzer {
             "." + Path.GetFileName(destination) + "." +
             Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture) +
             ".tmp");
-        try {
+        try
+        {
             using (var stream = new FileStream(
                        temporaryPath,
                        FileMode.CreateNew,
                        FileAccess.Write,
-                       FileShare.None)) {
+                       FileShare.None))
+            {
                 using var writer = new StreamWriter(
                     stream,
                     new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
@@ -79,22 +94,34 @@ public sealed class CompilerProbeAnalyzer : DiagnosticAnalyzer {
             }
 
             if (File.Exists(destination))
+            {
                 File.Replace(temporaryPath, destination, null);
+            }
             else
+            {
                 File.Move(temporaryPath, destination);
+            }
         }
-        finally {
+        finally
+        {
             TryDelete(temporaryPath);
         }
     }
 
-    private static void TryDelete(string path) {
-        try {
-            if (File.Exists(path)) File.Delete(path);
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
         }
-        catch (IOException) {
+        catch (IOException)
+        {
         }
-        catch (UnauthorizedAccessException) {
+        catch (UnauthorizedAccessException)
+        {
         }
     }
 }

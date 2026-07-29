@@ -4,10 +4,13 @@ using SharpProof.TestSupport;
 namespace SharpProof.Analyzer.Test;
 
 [TestFixture]
-public sealed class DiagnosticDescriptorCatalogTests {
+public sealed class DiagnosticDescriptorCatalogTests
+{
     [Test]
-    public void RuntimeDescriptorsMatchTheAuthoritativeCatalog() =>
+    public void RuntimeDescriptorsMatchTheAuthoritativeCatalog()
+    {
         DiagnosticDescriptorCatalogAssertions.AssertOutput(
             "analyzer",
             typeof(SharpProofAnalyzer).Assembly);
+    }
 }

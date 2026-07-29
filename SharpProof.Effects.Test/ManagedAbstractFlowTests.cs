@@ -5,9 +5,11 @@ using SharpProof.Dataflow;
 namespace SharpProof.Effects.Test;
 
 [TestFixture]
-public sealed class ManagedAbstractFlowTests {
+public sealed class ManagedAbstractFlowTests
+{
     [Test]
-    public void OperationBudgetExhaustionFailsClosed() {
+    public void OperationBudgetExhaustionFailsClosed()
+    {
         var statements = string.Concat(
             Enumerable.Repeat("value++;", ManagedAbstractFlow.MaxAnalyzedOperations + 1));
         var compilation = EffectTestHost.CreateCompilation(
@@ -25,7 +27,8 @@ public sealed class ManagedAbstractFlowTests {
             .Analyze(method, graph, null, default);
 
         Assert.That(graph.Blocks.Length, Is.LessThanOrEqualTo(ManagedAbstractFlow.MaxAnalyzedBlocks));
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.BudgetExceeded));
             Assert.That(
                 analysis.IncompleteReason,
@@ -35,7 +38,8 @@ public sealed class ManagedAbstractFlowTests {
     }
 
     [Test]
-    public void BlockBudgetExhaustionHasASeparateDeterministicReason() {
+    public void BlockBudgetExhaustionHasASeparateDeterministicReason()
+    {
         var branches = string.Concat(
             Enumerable.Repeat(
                 "if (condition) { value++; }",
@@ -56,7 +60,8 @@ public sealed class ManagedAbstractFlowTests {
             .Analyze(method, graph, null, default);
 
         Assert.That(graph.Blocks.Length, Is.GreaterThan(ManagedAbstractFlow.MaxAnalyzedBlocks));
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.BudgetExceeded));
             Assert.That(
                 analysis.IncompleteReason,
@@ -66,7 +71,8 @@ public sealed class ManagedAbstractFlowTests {
     }
 
     [Test]
-    public void CyclicControlFlowIsTypedAndHasNoScalarResult() {
+    public void CyclicControlFlowIsTypedAndHasNoScalarResult()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class Sample {
@@ -85,7 +91,8 @@ public sealed class ManagedAbstractFlowTests {
         var analysis = ManagedAbstractFlow.ForCompilation(compilation)
             .Analyze(method, ControlFlowGraph.Create(root), null, default);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Cyclic));
             Assert.That(
                 analysis.IncompleteReason,
@@ -95,7 +102,8 @@ public sealed class ManagedAbstractFlowTests {
     }
 
     [Test]
-    public void IncrementAndDecrementUpdateSubsequentIntervals() {
+    public void IncrementAndDecrementUpdateSubsequentIntervals()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class Sample {
@@ -137,7 +145,8 @@ public sealed class ManagedAbstractFlowTests {
     }
 
     [Test]
-    public void SharedEdgeRefinementPreservesBooleanFactsAcrossOperationIdentity() {
+    public void SharedEdgeRefinementPreservesBooleanFactsAcrossOperationIdentity()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class Sample {
@@ -170,7 +179,8 @@ public sealed class ManagedAbstractFlowTests {
     }
 
     [Test]
-    public void ApprovedApiSpecificationRefinesReturnNullnessAndCardinality() {
+    public void ApprovedApiSpecificationRefinesReturnNullnessAndCardinality()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class Sample {
@@ -185,7 +195,8 @@ public sealed class ManagedAbstractFlowTests {
         var value = ManagedAbstractFlow.ForCompilation(compilation)
             .Evaluate(operation, ManagedFlowState.Empty);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(value.IsDefinitelyNonNull, Is.True);
             Assert.That(value.TryGetCardinality(out var cardinality), Is.True);
             Assert.That(cardinality, Is.EqualTo(IntervalValue.Constant(0)));

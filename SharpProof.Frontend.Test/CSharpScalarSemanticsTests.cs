@@ -6,11 +6,13 @@ using SharpProof.Ir;
 namespace SharpProof.Frontend.Test;
 
 [TestFixture]
-public sealed class CSharpScalarSemanticsTests {
+public sealed class CSharpScalarSemanticsTests
+{
     private static readonly Dictionary<
         SpecialType,
         (bool IsSigned, int BitWidth, long Minimum, long Maximum)> Expected =
-        new() {
+        new()
+        {
             [SpecialType.System_SByte] =
                 (true, 8, sbyte.MinValue, sbyte.MaxValue),
             [SpecialType.System_Byte] =
@@ -30,12 +32,14 @@ public sealed class CSharpScalarSemanticsTests {
         };
 
     [Test]
-    public void SupportedIntegerCatalogIsExactAndExhaustive() {
+    public void SupportedIntegerCatalogIsExactAndExhaustive()
+    {
         Assert.That(
             CSharpScalarSemantics.SupportedIntegers.Select(
                 static semantics => semantics.SpecialType),
             Is.Unique);
-        foreach (var type in Enum.GetValues<SpecialType>()) {
+        foreach (var type in Enum.GetValues<SpecialType>())
+        {
             var expected = Expected.TryGetValue(type, out var values);
             var actual = CSharpScalarSemantics.TryGetInteger(
                 type,
@@ -45,8 +49,13 @@ public sealed class CSharpScalarSemanticsTests {
                 CSharpScalarSemantics.IsSupportedInteger(type),
                 Is.EqualTo(expected),
                 type.ToString());
-            if (!expected) continue;
-            using (Assert.EnterMultipleScope()) {
+            if (!expected)
+            {
+                continue;
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
                 Assert.That(
                     semantics.SpecialType,
                     Is.EqualTo(type),
@@ -76,7 +85,8 @@ public sealed class CSharpScalarSemanticsTests {
     }
 
     [Test]
-    public void RoslynTypeLoweringUsesExactlyTheCatalogIntegerSet() {
+    public void RoslynTypeLoweringUsesExactlyTheCatalogIntegerSet()
+    {
         var compilation = CSharpCompilation.Create(
             "ScalarCatalog",
             references: [
@@ -87,18 +97,23 @@ public sealed class CSharpScalarSemanticsTests {
         var lowerer = new RoslynOperationLowerer(factory);
 
         foreach (var type in Expected.Keys)
+        {
             Assert.That(
                 lowerer.GetTypeId(compilation.GetSpecialType(type)),
                 Is.EqualTo(factory.IntegerType),
                 type.ToString());
+        }
+
         foreach (var type in new[] {
                      SpecialType.System_UInt64,
                      SpecialType.System_IntPtr,
                      SpecialType.System_UIntPtr
                  })
+        {
             Assert.That(
                 lowerer.GetTypeId(compilation.GetSpecialType(type)),
                 Is.Not.EqualTo(factory.IntegerType),
                 type.ToString());
+        }
     }
 }

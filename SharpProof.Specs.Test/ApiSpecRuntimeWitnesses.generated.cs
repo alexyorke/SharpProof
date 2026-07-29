@@ -7,7 +7,8 @@ using System.Collections.Immutable;
 
 namespace SharpProof.Specs.Test;
 
-public sealed partial class ApiSpecRuntimeOracleTests {
+public sealed partial class ApiSpecRuntimeOracleTests
+{
     private static ImmutableArray<RuntimeWitnessDescriptor> GeneratedRuntimeWitnesses =>
     [
         new("bcl.array.empty", CreateBclArrayEmptyWitness),

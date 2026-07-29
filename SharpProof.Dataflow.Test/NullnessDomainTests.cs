@@ -1,37 +1,46 @@
 namespace SharpProof.Dataflow.Test;
 
 [TestFixture]
-public sealed class NullnessDomainTests {
+public sealed class NullnessDomainTests
+{
     private static readonly NullnessValue[] Samples = Enum.GetValues<NullnessValue>();
     private readonly NullnessDomain _domain = NullnessDomain.Instance;
 
     [Test]
-    public void OrderAndJoinSatisfyFiniteLatticeLaws() =>
+    public void OrderAndJoinSatisfyFiniteLatticeLaws()
+    {
         DomainLawAssertions.AssertOrderAndJoinLaws(_domain, Samples);
+    }
 
     [Test]
-    public void RefinementTransfersAreMonotone() {
+    public void RefinementTransfersAreMonotone()
+    {
         DomainLawAssertions.AssertMonotone(_domain, Samples, _domain.AssumeNull);
         DomainLawAssertions.AssertMonotone(_domain, Samples, _domain.AssumeNonNull);
     }
 
     [Test]
-    public void NullAndNonNullJoinToMaybeNull() =>
+    public void NullAndNonNullJoinToMaybeNull()
+    {
         Assert.That(
             _domain.Join(NullnessValue.Null, NullnessValue.NonNull),
             Is.EqualTo(NullnessValue.MaybeNull));
+    }
 
     [Test]
-    public void ContradictoryAssumptionsReachBottom() =>
+    public void ContradictoryAssumptionsReachBottom()
+    {
         Assert.That(
             (
                 _domain.AssumeNull(NullnessValue.NonNull),
                 _domain.AssumeNonNull(NullnessValue.Null)
             ),
             Is.EqualTo((NullnessValue.Bottom, NullnessValue.Bottom)));
+    }
 
     [Test]
-    public void WideningTerminatesImmediately() {
+    public void WideningTerminatesImmediately()
+    {
         var value = NullnessValue.Bottom;
         value = _domain.Widen(value, NullnessValue.Null);
         value = _domain.Widen(value, NullnessValue.NonNull);
@@ -42,6 +51,8 @@ public sealed class NullnessDomainTests {
     }
 
     [Test]
-    public void HavocIsConservative() =>
+    public void HavocIsConservative()
+    {
         DomainLawAssertions.AssertConservativeHavoc(_domain, Samples);
+    }
 }

@@ -12,7 +12,8 @@ using SharpProof.Ir;
 
 namespace SharpProof.Fuzz;
 
-public enum GeneratedExpressionType {
+public enum GeneratedExpressionType
+{
     Boolean,
     Integer,
     String,
@@ -20,7 +21,8 @@ public enum GeneratedExpressionType {
     Reference
 }
 
-public enum GeneratedExpressionKind {
+public enum GeneratedExpressionKind
+{
     BooleanLiteral,
     IntegerLiteral,
     LeftParameter,
@@ -54,14 +56,16 @@ public enum GeneratedExpressionKind {
     Conditional
 }
 
-public sealed class GeneratedCSharpExpression {
+public sealed class GeneratedCSharpExpression
+{
     private GeneratedCSharpExpression(
         GeneratedExpressionKind kind,
         GeneratedExpressionType type,
         long integerValue,
         bool booleanValue,
         ImmutableArray<GeneratedCSharpExpression> children,
-        string? stringValue = null) {
+        string? stringValue = null)
+    {
         Kind = kind;
         Type = type;
         IntegerValue = integerValue;
@@ -71,88 +75,132 @@ public sealed class GeneratedCSharpExpression {
         NodeCount = 1 + children.Sum(static child => child.NodeCount);
     }
 
-    public GeneratedExpressionKind Kind { get; }
-    public GeneratedExpressionType Type { get; }
-    public long IntegerValue { get; }
-    public bool BooleanValue { get; }
-    public string? StringValue { get; }
-    public ImmutableArray<GeneratedCSharpExpression> Children { get; }
-    public int NodeCount { get; }
+    public GeneratedExpressionKind Kind
+    {
+        get;
+    }
+    public GeneratedExpressionType Type
+    {
+        get;
+    }
+    public long IntegerValue
+    {
+        get;
+    }
+    public bool BooleanValue
+    {
+        get;
+    }
+    public string? StringValue
+    {
+        get;
+    }
+    public ImmutableArray<GeneratedCSharpExpression> Children
+    {
+        get;
+    }
+    public int NodeCount
+    {
+        get;
+    }
 
-    public static GeneratedCSharpExpression Boolean(bool value) =>
-        new(
+    public static GeneratedCSharpExpression Boolean(bool value)
+    {
+        return new(
             GeneratedExpressionKind.BooleanLiteral,
             GeneratedExpressionType.Boolean,
             0,
             value,
             []);
+    }
 
-    public static GeneratedCSharpExpression Integer(long value) =>
-        new(
+    public static GeneratedCSharpExpression Integer(long value)
+    {
+        return new(
             GeneratedExpressionKind.IntegerLiteral,
             GeneratedExpressionType.Integer,
             value,
             false,
             []);
+    }
 
-    public static GeneratedCSharpExpression Left() =>
-        new(
+    public static GeneratedCSharpExpression Left()
+    {
+        return new(
             GeneratedExpressionKind.LeftParameter,
             GeneratedExpressionType.Integer,
             0,
             false,
             []);
+    }
 
-    public static GeneratedCSharpExpression Right() =>
-        new(
+    public static GeneratedCSharpExpression Right()
+    {
+        return new(
             GeneratedExpressionKind.RightParameter,
             GeneratedExpressionType.Integer,
             0,
             false,
             []);
+    }
 
-    public static GeneratedCSharpExpression Condition() =>
-        new(
+    public static GeneratedCSharpExpression Condition()
+    {
+        return new(
             GeneratedExpressionKind.ConditionParameter,
             GeneratedExpressionType.Boolean,
             0,
             false,
             []);
+    }
 
-    public static GeneratedCSharpExpression Text() =>
-        new(
+    public static GeneratedCSharpExpression Text()
+    {
+        return new(
             GeneratedExpressionKind.TextParameter,
             GeneratedExpressionType.String,
             0,
             false,
             []);
+    }
 
-    public static GeneratedCSharpExpression Values() =>
-        new(
+    public static GeneratedCSharpExpression Values()
+    {
+        return new(
             GeneratedExpressionKind.ValuesParameter,
             GeneratedExpressionType.Sequence,
             0,
             false,
             []);
+    }
 
-    public static GeneratedCSharpExpression Reference() =>
-        new(
+    public static GeneratedCSharpExpression Reference()
+    {
+        return new(
             GeneratedExpressionKind.ReferenceParameter,
             GeneratedExpressionType.Reference,
             0,
             false,
             []);
+    }
 
-    public static GeneratedCSharpExpression NullReference() =>
-        new(
+    public static GeneratedCSharpExpression NullReference()
+    {
+        return new(
             GeneratedExpressionKind.NullReference,
             GeneratedExpressionType.Reference,
             0,
             false,
             []);
+    }
 
-    public static GeneratedCSharpExpression String(string value) {
-        if (value == null) throw new ArgumentNullException(nameof(value));
+    public static GeneratedCSharpExpression String(string value)
+    {
+        if (value == null)
+        {
+            throw new ArgumentNullException(nameof(value));
+        }
+
         return new GeneratedCSharpExpression(
             GeneratedExpressionKind.StringLiteral,
             GeneratedExpressionType.String,
@@ -162,22 +210,32 @@ public sealed class GeneratedCSharpExpression {
             value);
     }
 
-    public static GeneratedCSharpExpression NullString() =>
-        new(
+    public static GeneratedCSharpExpression NullString()
+    {
+        return new(
             GeneratedExpressionKind.NullString,
             GeneratedExpressionType.String,
             0,
             false,
             []);
+    }
 
     public static GeneratedCSharpExpression Length(
-        GeneratedCSharpExpression value) {
-        if (value == null) throw new ArgumentNullException(nameof(value));
+        GeneratedCSharpExpression value)
+    {
+        if (value == null)
+        {
+            throw new ArgumentNullException(nameof(value));
+        }
+
         if (value.Type is not (
             GeneratedExpressionType.String or GeneratedExpressionType.Sequence))
+        {
             throw new ArgumentException(
                 "Length requires a generated string or sequence.",
                 nameof(value));
+        }
+
         return new GeneratedCSharpExpression(
             GeneratedExpressionKind.Length,
             GeneratedExpressionType.Integer,
@@ -188,13 +246,25 @@ public sealed class GeneratedCSharpExpression {
 
     public static GeneratedCSharpExpression ArrayIndex(
         GeneratedCSharpExpression sequence,
-        GeneratedCSharpExpression index) {
-        if (sequence == null) throw new ArgumentNullException(nameof(sequence));
-        if (index == null) throw new ArgumentNullException(nameof(index));
+        GeneratedCSharpExpression index)
+    {
+        if (sequence == null)
+        {
+            throw new ArgumentNullException(nameof(sequence));
+        }
+
+        if (index == null)
+        {
+            throw new ArgumentNullException(nameof(index));
+        }
+
         if (sequence.Type != GeneratedExpressionType.Sequence ||
             index.Type != GeneratedExpressionType.Integer)
+        {
             throw new ArgumentException(
                 "Array access requires a generated sequence and integer.");
+        }
+
         return new GeneratedCSharpExpression(
             GeneratedExpressionKind.ArrayIndex,
             GeneratedExpressionType.Integer,
@@ -204,12 +274,20 @@ public sealed class GeneratedCSharpExpression {
     }
 
     public static GeneratedCSharpExpression CastToString(
-        GeneratedCSharpExpression value) {
-        if (value == null) throw new ArgumentNullException(nameof(value));
+        GeneratedCSharpExpression value)
+    {
+        if (value == null)
+        {
+            throw new ArgumentNullException(nameof(value));
+        }
+
         if (value.Type != GeneratedExpressionType.Reference)
+        {
             throw new ArgumentException(
                 "The generated cast requires a reference operand.",
                 nameof(value));
+        }
+
         return new GeneratedCSharpExpression(
             GeneratedExpressionKind.CastToString,
             GeneratedExpressionType.String,
@@ -220,17 +298,26 @@ public sealed class GeneratedCSharpExpression {
 
     public static GeneratedCSharpExpression Unary(
         GeneratedExpressionKind kind,
-        GeneratedCSharpExpression operand) {
-        if (operand == null) throw new ArgumentNullException(nameof(operand));
-        var expected = kind switch {
+        GeneratedCSharpExpression operand)
+    {
+        if (operand == null)
+        {
+            throw new ArgumentNullException(nameof(operand));
+        }
+
+        var expected = kind switch
+        {
             GeneratedExpressionKind.Not => GeneratedExpressionType.Boolean,
             GeneratedExpressionKind.Negate => GeneratedExpressionType.Integer,
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
         if (operand.Type != expected)
+        {
             throw new ArgumentException(
                 "The unary operand has the wrong generated type.",
                 nameof(operand));
+        }
+
         return new GeneratedCSharpExpression(
             kind,
             expected,
@@ -242,18 +329,31 @@ public sealed class GeneratedCSharpExpression {
     public static GeneratedCSharpExpression Binary(
         GeneratedExpressionKind kind,
         GeneratedCSharpExpression left,
-        GeneratedCSharpExpression right) {
-        if (left == null) throw new ArgumentNullException(nameof(left));
-        if (right == null) throw new ArgumentNullException(nameof(right));
-        if (kind is GeneratedExpressionKind.Equal or GeneratedExpressionKind.NotEqual) {
+        GeneratedCSharpExpression right)
+    {
+        if (left == null)
+        {
+            throw new ArgumentNullException(nameof(left));
+        }
+
+        if (right == null)
+        {
+            throw new ArgumentNullException(nameof(right));
+        }
+
+        if (kind is GeneratedExpressionKind.Equal or GeneratedExpressionKind.NotEqual)
+        {
             if (left.Type != right.Type ||
                 left.Type is not (
                     GeneratedExpressionType.Integer or
                     GeneratedExpressionType.String or
                     GeneratedExpressionType.Sequence or
                     GeneratedExpressionType.Reference))
+            {
                 throw new ArgumentException(
                     "Equality operands have incompatible generated types.");
+            }
+
             return new GeneratedCSharpExpression(
                 kind,
                 GeneratedExpressionType.Boolean,
@@ -261,11 +361,15 @@ public sealed class GeneratedCSharpExpression {
                 false,
                 [left, right]);
         }
-        if (kind == GeneratedExpressionKind.StringConcat) {
+        if (kind == GeneratedExpressionKind.StringConcat)
+        {
             if (left.Type != GeneratedExpressionType.String ||
                 right.Type != GeneratedExpressionType.String)
+            {
                 throw new ArgumentException(
                     "String concatenation requires generated strings.");
+            }
+
             return new GeneratedCSharpExpression(
                 kind,
                 GeneratedExpressionType.String,
@@ -273,7 +377,8 @@ public sealed class GeneratedCSharpExpression {
                 false,
                 [left, right]);
         }
-        var (operandType, resultType) = kind switch {
+        var (operandType, resultType) = kind switch
+        {
             GeneratedExpressionKind.Add or
             GeneratedExpressionKind.Subtract or
             GeneratedExpressionKind.Multiply or
@@ -291,7 +396,10 @@ public sealed class GeneratedCSharpExpression {
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
         if (left.Type != operandType || right.Type != operandType)
+        {
             throw new ArgumentException("The binary operands have the wrong generated type.");
+        }
+
         return new GeneratedCSharpExpression(
             kind,
             resultType,
@@ -303,18 +411,37 @@ public sealed class GeneratedCSharpExpression {
     public static GeneratedCSharpExpression Conditional(
         GeneratedCSharpExpression condition,
         GeneratedCSharpExpression whenTrue,
-        GeneratedCSharpExpression whenFalse) {
-        if (condition == null) throw new ArgumentNullException(nameof(condition));
-        if (whenTrue == null) throw new ArgumentNullException(nameof(whenTrue));
-        if (whenFalse == null) throw new ArgumentNullException(nameof(whenFalse));
+        GeneratedCSharpExpression whenFalse)
+    {
+        if (condition == null)
+        {
+            throw new ArgumentNullException(nameof(condition));
+        }
+
+        if (whenTrue == null)
+        {
+            throw new ArgumentNullException(nameof(whenTrue));
+        }
+
+        if (whenFalse == null)
+        {
+            throw new ArgumentNullException(nameof(whenFalse));
+        }
+
         if (condition.Type != GeneratedExpressionType.Boolean)
+        {
             throw new ArgumentException(
                 "The conditional guard must be Boolean.",
                 nameof(condition));
+        }
+
         if (whenTrue.Type != whenFalse.Type)
+        {
             throw new ArgumentException(
                 "The conditional branches must have the same type.",
                 nameof(whenFalse));
+        }
+
         return new GeneratedCSharpExpression(
             GeneratedExpressionKind.Conditional,
             whenTrue.Type,
@@ -323,19 +450,24 @@ public sealed class GeneratedCSharpExpression {
             [condition, whenTrue, whenFalse]);
     }
 
-    public string Render() {
+    public string Render()
+    {
         var builder = new StringBuilder();
         AppendTo(builder);
         return builder.ToString();
     }
 
-    internal bool TryEvaluateIntegerConstant(out long value) {
-        if (Type != GeneratedExpressionType.Integer) {
+    internal bool TryEvaluateIntegerConstant(out long value)
+    {
+        if (Type != GeneratedExpressionType.Integer)
+        {
             value = 0;
             return false;
         }
-        try {
-            switch (Kind) {
+        try
+        {
+            switch (Kind)
+            {
                 case GeneratedExpressionKind.IntegerLiteral:
                     value = IntegerValue;
                     return true;
@@ -350,8 +482,12 @@ public sealed class GeneratedCSharpExpression {
                 case GeneratedExpressionKind.Remainder:
                     if (!Children[0].TryEvaluateIntegerConstant(out var left) ||
                         !Children[1].TryEvaluateIntegerConstant(out var right))
+                    {
                         break;
-                    value = Kind switch {
+                    }
+
+                    value = Kind switch
+                    {
                         GeneratedExpressionKind.Add => checked(left + right),
                         GeneratedExpressionKind.Subtract => checked(left - right),
                         GeneratedExpressionKind.Multiply => checked(left * right),
@@ -366,7 +502,8 @@ public sealed class GeneratedCSharpExpression {
                         .TryEvaluateIntegerConstant(out value);
             }
         }
-        catch (ArithmeticException) {
+        catch (ArithmeticException)
+        {
         }
         value = 0;
         return false;
@@ -374,8 +511,10 @@ public sealed class GeneratedCSharpExpression {
 
     private static bool TryEvaluateBooleanConstant(
         GeneratedCSharpExpression expression,
-        out bool value) {
-        switch (expression.Kind) {
+        out bool value)
+    {
+        switch (expression.Kind)
+        {
             case GeneratedExpressionKind.BooleanLiteral:
                 value = expression.BooleanValue;
                 return true;
@@ -386,7 +525,8 @@ public sealed class GeneratedCSharpExpression {
             case GeneratedExpressionKind.AndAlso:
             case GeneratedExpressionKind.OrElse:
                 if (TryEvaluateBooleanConstant(expression.Children[0], out var left) &&
-                    TryEvaluateBooleanConstant(expression.Children[1], out var right)) {
+                    TryEvaluateBooleanConstant(expression.Children[1], out var right))
+                {
                     value = expression.Kind == GeneratedExpressionKind.AndAlso
                         ? left && right
                         : left || right;
@@ -403,8 +543,10 @@ public sealed class GeneratedCSharpExpression {
         return false;
     }
 
-    private void AppendTo(StringBuilder builder) {
-        switch (Kind) {
+    private void AppendTo(StringBuilder builder)
+    {
+        switch (Kind)
+        {
             case GeneratedExpressionKind.BooleanLiteral:
                 builder.Append(BooleanValue ? "true" : "false");
                 return;
@@ -485,37 +627,51 @@ public sealed class GeneratedCSharpExpression {
         }
     }
 
-    private static string BinaryToken(GeneratedExpressionKind kind) => kind switch {
-        GeneratedExpressionKind.Add => "+",
-        GeneratedExpressionKind.Subtract => "-",
-        GeneratedExpressionKind.Multiply => "*",
-        GeneratedExpressionKind.Divide => "/",
-        GeneratedExpressionKind.Remainder => "%",
-        GeneratedExpressionKind.AndAlso => "&&",
-        GeneratedExpressionKind.OrElse => "||",
-        GeneratedExpressionKind.Equal => "==",
-        GeneratedExpressionKind.NotEqual => "!=",
-        GeneratedExpressionKind.LessThan => "<",
-        GeneratedExpressionKind.LessThanOrEqual => "<=",
-        GeneratedExpressionKind.GreaterThan => ">",
-        GeneratedExpressionKind.GreaterThanOrEqual => ">=",
-        GeneratedExpressionKind.StringConcat => "+",
-        _ => throw new ArgumentOutOfRangeException(nameof(kind))
-    };
+    private static string BinaryToken(GeneratedExpressionKind kind)
+    {
+        return kind switch
+        {
+            GeneratedExpressionKind.Add => "+",
+            GeneratedExpressionKind.Subtract => "-",
+            GeneratedExpressionKind.Multiply => "*",
+            GeneratedExpressionKind.Divide => "/",
+            GeneratedExpressionKind.Remainder => "%",
+            GeneratedExpressionKind.AndAlso => "&&",
+            GeneratedExpressionKind.OrElse => "||",
+            GeneratedExpressionKind.Equal => "==",
+            GeneratedExpressionKind.NotEqual => "!=",
+            GeneratedExpressionKind.LessThan => "<",
+            GeneratedExpressionKind.LessThanOrEqual => "<=",
+            GeneratedExpressionKind.GreaterThan => ">",
+            GeneratedExpressionKind.GreaterThanOrEqual => ">=",
+            GeneratedExpressionKind.StringConcat => "+",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
+    }
 }
 
 public sealed record GeneratedCSharpCase(
     GeneratedCSharpExpression Expression,
     long Left,
     long Right,
-    bool Condition) {
-    public string? Text { get; init; }
+    bool Condition)
+{
+    public string? Text
+    {
+        get; init;
+    }
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Performance",
         "CA1819:Properties should not return arrays",
         Justification = "The value is passed to compiled code as a long[] argument.")]
-    public long[]? Values { get; init; }
-    public object? Reference { get; init; }
+    public long[]? Values
+    {
+        get; init;
+    }
+    public object? Reference
+    {
+        get; init;
+    }
 
     public string Source =>
         "#nullable enable\n" +
@@ -527,15 +683,20 @@ public sealed record GeneratedCSharpCase(
         ";\n" +
         "}\n";
 
-    private static string ReturnType(GeneratedExpressionType type) => type switch {
-        GeneratedExpressionType.Boolean => "bool",
-        GeneratedExpressionType.Integer => "long",
-        GeneratedExpressionType.String => "string?",
-        _ => throw new ArgumentOutOfRangeException(nameof(type))
-    };
+    private static string ReturnType(GeneratedExpressionType type)
+    {
+        return type switch
+        {
+            GeneratedExpressionType.Boolean => "bool",
+            GeneratedExpressionType.Integer => "long",
+            GeneratedExpressionType.String => "string?",
+            _ => throw new ArgumentOutOfRangeException(nameof(type))
+        };
+    }
 }
 
-public sealed class SmallCSharpCaseGenerator(int seed) {
+public sealed class SmallCSharpCaseGenerator(int seed)
+{
     private static readonly long[] InterestingIntegers = [
         long.MinValue,
         -3,
@@ -550,8 +711,13 @@ public sealed class SmallCSharpCaseGenerator(int seed) {
     private static readonly long[] LiteralIntegers = [-3, -1, 0, 1, 2, 3];
     private readonly Random _random = new(seed);
 
-    public GeneratedCSharpCase Next(int maximumDepth = 4) {
-        if (maximumDepth < 0) throw new ArgumentOutOfRangeException(nameof(maximumDepth));
+    public GeneratedCSharpCase Next(int maximumDepth = 4)
+    {
+        if (maximumDepth < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumDepth));
+        }
+
         var values = _random.Next(4) == 0
             ? null
             : Enumerable.Range(0, _random.Next(4))
@@ -559,8 +725,12 @@ public sealed class SmallCSharpCaseGenerator(int seed) {
                 .ToArray();
         var index = InterestingIntegers[_random.Next(InterestingIntegers.Length)];
         if (_random.Next(3) == 0 && values != null)
+        {
             index = _random.Next(2) == 0 ? -1 : values.Length;
-        var expression = _random.Next(10) switch {
+        }
+
+        var expression = _random.Next(10) switch
+        {
             0 => String(maximumDepth),
             1 => GeneratedCSharpExpression.Length(String(maximumDepth)),
             2 => GeneratedCSharpExpression.Binary(
@@ -588,15 +758,18 @@ public sealed class SmallCSharpCaseGenerator(int seed) {
                 ? index
                 : InterestingIntegers[_random.Next(InterestingIntegers.Length)],
             InterestingIntegers[_random.Next(InterestingIntegers.Length)],
-            _random.Next(2) == 0) {
-            Text = _random.Next(4) switch {
+            _random.Next(2) == 0)
+        {
+            Text = _random.Next(4) switch
+            {
                 0 => null,
                 1 => "",
                 2 => "sharp",
                 _ => "proof"
             },
             Values = values,
-            Reference = _random.Next(3) switch {
+            Reference = _random.Next(3) switch
+            {
                 0 => null,
                 1 => "sharp",
                 _ => new object()
@@ -604,9 +777,15 @@ public sealed class SmallCSharpCaseGenerator(int seed) {
         };
     }
 
-    private GeneratedCSharpExpression String(int depth) {
-        if (depth == 0) return StringLeaf();
-        return _random.Next(4) switch {
+    private GeneratedCSharpExpression String(int depth)
+    {
+        if (depth == 0)
+        {
+            return StringLeaf();
+        }
+
+        return _random.Next(4) switch
+        {
             0 => GeneratedCSharpExpression.Conditional(
                 Boolean(depth - 1),
                 String(depth - 1),
@@ -619,17 +798,27 @@ public sealed class SmallCSharpCaseGenerator(int seed) {
         };
     }
 
-    private GeneratedCSharpExpression StringLeaf() => _random.Next(5) switch {
-        0 => GeneratedCSharpExpression.Text(),
-        1 => GeneratedCSharpExpression.NullString(),
-        2 => GeneratedCSharpExpression.String(""),
-        3 => GeneratedCSharpExpression.String("sharp"),
-        _ => GeneratedCSharpExpression.String("proof")
-    };
+    private GeneratedCSharpExpression StringLeaf()
+    {
+        return _random.Next(5) switch
+        {
+            0 => GeneratedCSharpExpression.Text(),
+            1 => GeneratedCSharpExpression.NullString(),
+            2 => GeneratedCSharpExpression.String(""),
+            3 => GeneratedCSharpExpression.String("sharp"),
+            _ => GeneratedCSharpExpression.String("proof")
+        };
+    }
 
-    private GeneratedCSharpExpression Integer(int depth) {
-        if (depth == 0) return IntegerLeaf();
-        return _random.Next(6) switch {
+    private GeneratedCSharpExpression Integer(int depth)
+    {
+        if (depth == 0)
+        {
+            return IntegerLeaf();
+        }
+
+        return _random.Next(6) switch
+        {
             0 => GeneratedCSharpExpression.Unary(
                 GeneratedExpressionKind.Negate,
                 Integer(depth - 1)),
@@ -641,8 +830,10 @@ public sealed class SmallCSharpCaseGenerator(int seed) {
         };
     }
 
-    private GeneratedCSharpExpression IntegerBinary(int depth) {
-        var kind = _random.Next(5) switch {
+    private GeneratedCSharpExpression IntegerBinary(int depth)
+    {
+        var kind = _random.Next(5) switch
+        {
             0 => GeneratedExpressionKind.Add,
             1 => GeneratedExpressionKind.Subtract,
             2 => GeneratedExpressionKind.Multiply,
@@ -653,24 +844,40 @@ public sealed class SmallCSharpCaseGenerator(int seed) {
         var right = Integer(depth);
         if (left.TryEvaluateIntegerConstant(out _) &&
             right.TryEvaluateIntegerConstant(out _))
+        {
             left = GeneratedCSharpExpression.Left();
+        }
+
         if (kind is GeneratedExpressionKind.Divide or GeneratedExpressionKind.Remainder &&
             right.TryEvaluateIntegerConstant(out var divisor) &&
             divisor == 0)
+        {
             right = GeneratedCSharpExpression.Right();
+        }
+
         return GeneratedCSharpExpression.Binary(kind, left, right);
     }
 
-    private GeneratedCSharpExpression IntegerLeaf() => _random.Next(4) switch {
-        0 => GeneratedCSharpExpression.Left(),
-        1 => GeneratedCSharpExpression.Right(),
-        _ => GeneratedCSharpExpression.Integer(
-            LiteralIntegers[_random.Next(LiteralIntegers.Length)])
-    };
+    private GeneratedCSharpExpression IntegerLeaf()
+    {
+        return _random.Next(4) switch
+        {
+            0 => GeneratedCSharpExpression.Left(),
+            1 => GeneratedCSharpExpression.Right(),
+            _ => GeneratedCSharpExpression.Integer(
+                LiteralIntegers[_random.Next(LiteralIntegers.Length)])
+        };
+    }
 
-    private GeneratedCSharpExpression Boolean(int depth) {
-        if (depth == 0) return BooleanLeaf();
-        return _random.Next(6) switch {
+    private GeneratedCSharpExpression Boolean(int depth)
+    {
+        if (depth == 0)
+        {
+            return BooleanLeaf();
+        }
+
+        return _random.Next(6) switch
+        {
             0 => GeneratedCSharpExpression.Unary(
                 GeneratedExpressionKind.Not,
                 Boolean(depth - 1)),
@@ -691,20 +898,28 @@ public sealed class SmallCSharpCaseGenerator(int seed) {
         };
     }
 
-    private GeneratedCSharpExpression BooleanLeaf() => _random.Next(3) switch {
-        0 => GeneratedCSharpExpression.Condition(),
-        1 => GeneratedCSharpExpression.Boolean(false),
-        _ => GeneratedCSharpExpression.Boolean(true)
-    };
+    private GeneratedCSharpExpression BooleanLeaf()
+    {
+        return _random.Next(3) switch
+        {
+            0 => GeneratedCSharpExpression.Condition(),
+            1 => GeneratedCSharpExpression.Boolean(false),
+            _ => GeneratedCSharpExpression.Boolean(true)
+        };
+    }
 
-    private GeneratedExpressionKind RandomComparison() => _random.Next(6) switch {
-        0 => GeneratedExpressionKind.Equal,
-        1 => GeneratedExpressionKind.NotEqual,
-        2 => GeneratedExpressionKind.LessThan,
-        3 => GeneratedExpressionKind.LessThanOrEqual,
-        4 => GeneratedExpressionKind.GreaterThan,
-        _ => GeneratedExpressionKind.GreaterThanOrEqual
-    };
+    private GeneratedExpressionKind RandomComparison()
+    {
+        return _random.Next(6) switch
+        {
+            0 => GeneratedExpressionKind.Equal,
+            1 => GeneratedExpressionKind.NotEqual,
+            2 => GeneratedExpressionKind.LessThan,
+            3 => GeneratedExpressionKind.LessThanOrEqual,
+            4 => GeneratedExpressionKind.GreaterThan,
+            _ => GeneratedExpressionKind.GreaterThanOrEqual
+        };
+    }
 }
 
 public sealed record FrontendDifferentialResult(
@@ -727,15 +942,21 @@ public sealed record FrontendSemanticEdgeResult(
     string Detail,
     IrExceptionKind? ExceptionKind = null);
 
-public sealed class FrontendDifferentialOracle {
+public sealed class FrontendDifferentialOracle
+{
     private const string SemanticEdgeMethodPrefix = "EdgeTarget";
     private static readonly Lazy<ImmutableArray<MetadataReference>> References =
         new(CreateReferences, LazyThreadSafetyMode.ExecutionAndPublication);
 
     public FrontendDifferentialResult Compare(
         GeneratedCSharpCase generated,
-        CancellationToken cancellationToken = default) {
-        if (generated == null) throw new ArgumentNullException(nameof(generated));
+        CancellationToken cancellationToken = default)
+    {
+        if (generated == null)
+        {
+            throw new ArgumentNullException(nameof(generated));
+        }
+
         return CompareBatch([generated], cancellationToken)[0];
     }
 
@@ -745,14 +966,25 @@ public sealed class FrontendDifferentialOracle {
         Justification = "Oracle methods intentionally share an instance-shaped test API.")]
     public ImmutableArray<FrontendDifferentialResult> CompareBatch(
         IReadOnlyList<GeneratedCSharpCase> generatedCases,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default)
+    {
         if (generatedCases == null)
+        {
             throw new ArgumentNullException(nameof(generatedCases));
-        if (generatedCases.Count == 0) return [];
+        }
+
+        if (generatedCases.Count == 0)
+        {
+            return [];
+        }
+
         if (generatedCases.Any(static generated => generated == null))
+        {
             throw new ArgumentException(
                 "Generated cases cannot contain null.",
                 nameof(generatedCases));
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
 
         var source = CreateBatchSource(generatedCases);
@@ -771,7 +1003,8 @@ public sealed class FrontendDifferentialOracle {
                 nullableContextOptions: NullableContextOptions.Enable));
         using var image = new MemoryStream();
         var emit = compilation.Emit(image, cancellationToken: cancellationToken);
-        if (!emit.Success) {
+        if (!emit.Success)
+        {
             var failure = Mismatch(
                 "Generated C# did not compile: " +
                 FormatErrors(emit.Diagnostics));
@@ -787,7 +1020,8 @@ public sealed class FrontendDifferentialOracle {
                 static method => ParseMethodIndex(
                     method.Identifier.ValueText))
             .ToArray();
-        if (methodSyntaxes.Length != generatedCases.Count) {
+        if (methodSyntaxes.Length != generatedCases.Count)
+        {
             var failure = Mismatch(
                 "Roslyn exposed an unexpected generated method count.");
             return [.. Enumerable.Repeat(failure, generatedCases.Count)];
@@ -797,13 +1031,15 @@ public sealed class FrontendDifferentialOracle {
         var loadContext = new AssemblyLoadContext(
             "SharpProofFrontendFuzz",
             isCollectible: true);
-        try {
+        try
+        {
             var assembly = loadContext.LoadFromStream(image);
             var runtimeType = assembly.GetType(
                 "SharpProofGeneratedFrontend")!;
             var results = ImmutableArray.CreateBuilder<FrontendDifferentialResult>(
                 generatedCases.Count);
-            for (var index = 0; index < generatedCases.Count; index++) {
+            for (var index = 0; index < generatedCases.Count; index++)
+            {
                 cancellationToken.ThrowIfCancellationRequested();
                 var methodSyntax = methodSyntaxes[index];
                 var methodSymbol = (IMethodSymbol?)model.GetDeclaredSymbol(
@@ -813,7 +1049,8 @@ public sealed class FrontendDifferentialOracle {
                     model,
                     methodSyntax.ExpressionBody!.Expression,
                     cancellationToken);
-                if (methodSymbol == null || operation == null) {
+                if (methodSymbol == null || operation == null)
+                {
                     results.Add(
                         Mismatch(
                             "Roslyn did not expose the generated method operation."));
@@ -822,7 +1059,8 @@ public sealed class FrontendDifferentialOracle {
 
                 var factory = new IrFactory();
                 var lowering = new RoslynOperationLowerer(factory).Lower(operation);
-                if (!lowering.IsExact) {
+                if (!lowering.IsExact)
+                {
                     results.Add(
                         Mismatch(
                             "Generated supported C# closed the frontend subset: " +
@@ -852,7 +1090,8 @@ public sealed class FrontendDifferentialOracle {
             }
             return results.ToImmutable();
         }
-        finally {
+        finally
+        {
             loadContext.Unload();
         }
     }
@@ -863,10 +1102,20 @@ public sealed class FrontendDifferentialOracle {
         Justification = "Oracle methods intentionally share an instance-shaped test API.")]
     public ImmutableArray<FrontendSemanticEdgeResult> CompareSemanticEdges(
         IReadOnlyList<FrontendSemanticEdgeCase> cases,
-        CancellationToken cancellationToken = default) {
-        if (cases == null) throw new ArgumentNullException(nameof(cases));
-        if (cases.Count == 0) return [];
-        for (var index = 0; index < cases.Count; index++) {
+        CancellationToken cancellationToken = default)
+    {
+        if (cases == null)
+        {
+            throw new ArgumentNullException(nameof(cases));
+        }
+
+        if (cases.Count == 0)
+        {
+            return [];
+        }
+
+        for (var index = 0; index < cases.Count; index++)
+        {
             var generated = cases[index] ??
                 throw new ArgumentException(
                     "Semantic edge cases cannot contain null.",
@@ -878,9 +1127,11 @@ public sealed class FrontendDifferentialOracle {
                 generated.Parameters == null ||
                 string.IsNullOrWhiteSpace(generated.Expression) ||
                 generated.Arguments == null)
+            {
                 throw new ArgumentException(
                     $"Semantic edge case {index} is incomplete.",
                     nameof(cases));
+            }
         }
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -901,10 +1152,12 @@ public sealed class FrontendDifferentialOracle {
         using var image = new MemoryStream();
         var emit = compilation.Emit(image, cancellationToken: cancellationToken);
         if (!emit.Success)
+        {
             return RepeatSemanticFailure(
                 cases.Count,
                 "Generated semantic-edge C# did not compile: " +
                 FormatErrors(emit.Diagnostics));
+        }
 
         var model = compilation.GetSemanticModel(syntaxTree);
         var methods = syntaxTree.GetRoot(cancellationToken)
@@ -917,22 +1170,26 @@ public sealed class FrontendDifferentialOracle {
                 method.Identifier.ValueText))
             .ToArray();
         if (methods.Length != cases.Count)
+        {
             return RepeatSemanticFailure(
                 cases.Count,
                 "Roslyn exposed an unexpected semantic-edge method count.");
+        }
 
         image.Position = 0;
         var loadContext = new AssemblyLoadContext(
             "SharpProofFrontendSemanticEdges",
             isCollectible: true);
-        try {
+        try
+        {
             var assembly = loadContext.LoadFromStream(image);
             var runtimeType = assembly.GetType(
                 "SharpProofGeneratedFrontendEdges")!;
             var results =
                 ImmutableArray.CreateBuilder<FrontendSemanticEdgeResult>(
                     cases.Count);
-            for (var index = 0; index < cases.Count; index++) {
+            for (var index = 0; index < cases.Count; index++)
+            {
                 cancellationToken.ThrowIfCancellationRequested();
                 results.Add(CompareSemanticEdge(
                     cases[index],
@@ -944,7 +1201,8 @@ public sealed class FrontendDifferentialOracle {
             }
             return results.ToImmutable();
         }
-        finally {
+        finally
+        {
             loadContext.Unload();
         }
     }
@@ -953,15 +1211,21 @@ public sealed class FrontendDifferentialOracle {
         IrFactory factory,
         IMethodSymbol method,
         FrontendLoweringResult lowering,
-        GeneratedCSharpCase generated) {
+        GeneratedCSharpCase generated)
+    {
         var environment = new Dictionary<IrVarId, IrValue>();
-        foreach (var binding in lowering.Variables) {
+        foreach (var binding in lowering.Variables)
+        {
             if (binding.Symbol is not IParameterSymbol parameter ||
                 !SymbolEqualityComparer.Default.Equals(
                     parameter.ContainingSymbol,
                     method))
+            {
                 continue;
-            var value = parameter.Ordinal switch {
+            }
+
+            var value = parameter.Ordinal switch
+            {
                 0 => factory.CreateIntegerValue(generated.Left),
                 1 => factory.CreateIntegerValue(generated.Right),
                 2 => factory.CreateBooleanValue(generated.Condition),
@@ -993,7 +1257,8 @@ public sealed class FrontendDifferentialOracle {
         SemanticModel model,
         Type runtimeType,
         int index,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var method = (IMethodSymbol?)model.GetDeclaredSymbol(
             methodSyntax,
             cancellationToken);
@@ -1002,21 +1267,27 @@ public sealed class FrontendDifferentialOracle {
             methodSyntax.ExpressionBody!.Expression,
             cancellationToken);
         if (method == null || operation == null)
+        {
             return SemanticFailure(
                 null,
                 null,
                 "Roslyn did not expose the semantic-edge method operation.");
+        }
+
         if (generated.Arguments.Count != method.Parameters.Length)
+        {
             return SemanticFailure(
                 null,
                 null,
                 "The semantic-edge runtime argument count is incorrect.");
+        }
 
         var factory = new IrFactory();
         var lowering = new RoslynOperationLowerer(factory).Lower(operation);
         var actual = lowering.Classification;
         if (actual.Decision != generated.ExpectedDecision ||
             actual.Abstention != generated.ExpectedAbstention)
+        {
             return SemanticFailure(
                 actual.Decision,
                 actual.Abstention,
@@ -1029,12 +1300,18 @@ public sealed class FrontendDifferentialOracle {
                 "/" +
                 actual.Abstention +
                 ".");
-        if (!actual.IsExact) {
+        }
+
+        if (!actual.IsExact)
+        {
             if (lowering.Term is not IrOpaqueTerm)
+            {
                 return SemanticFailure(
                     actual.Decision,
                     actual.Abstention,
                     "A closed abstention did not produce an opaque root term.");
+            }
+
             return SemanticAgreement(actual);
         }
 
@@ -1069,14 +1346,19 @@ public sealed class FrontendDifferentialOracle {
             IrFactory factory,
             IMethodSymbol method,
             FrontendLoweringResult lowering,
-            IReadOnlyList<object?> arguments) {
+            IReadOnlyList<object?> arguments)
+    {
         var environment = new Dictionary<IrVarId, IrValue>();
-        foreach (var binding in lowering.Variables) {
+        foreach (var binding in lowering.Variables)
+        {
             if (binding.Symbol is not IParameterSymbol parameter ||
                 !SymbolEqualityComparer.Default.Equals(
                     parameter.ContainingSymbol,
                     method))
+            {
                 continue;
+            }
+
             var type = factory.GetVariableInfo(binding.Variable).Type;
             environment.Add(
                 binding.Variable,
@@ -1091,17 +1373,23 @@ public sealed class FrontendDifferentialOracle {
     private static IrValue CreateSemanticEdgeValue(
         IrFactory factory,
         IrTypeId type,
-        object? value) {
+        object? value)
+    {
         var kind = factory.GetTypeInfo(type).Kind;
-        if (value == null) {
+        if (value == null)
+        {
             if (kind is IrTypeKind.String or
                 IrTypeKind.Reference or
                 IrTypeKind.Sequence)
+            {
                 return factory.CreateNullValue(type);
+            }
+
             throw new InvalidOperationException(
                 "A non-nullable semantic-edge variable received null.");
         }
-        return kind switch {
+        return kind switch
+        {
             IrTypeKind.Boolean when value is bool boolean =>
                 factory.CreateBooleanValue(boolean),
             IrTypeKind.Integer when value is sbyte or byte or short or ushort or
@@ -1121,10 +1409,16 @@ public sealed class FrontendDifferentialOracle {
     private static IOperation? GetExpressionOperation(
         SemanticModel model,
         ExpressionSyntax expression,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var operation = model.GetOperation(expression, cancellationToken);
-        if (operation != null) return operation;
-        return expression switch {
+        if (operation != null)
+        {
+            return operation;
+        }
+
+        return expression switch
+        {
             CheckedExpressionSyntax checkedExpression =>
                 GetExpressionOperation(
                     model,
@@ -1142,8 +1436,9 @@ public sealed class FrontendDifferentialOracle {
     private static RuntimeOutcome InvokeMethod(
         MethodInfo method,
         GeneratedCSharpCase generated,
-        CancellationToken cancellationToken) =>
-        InvokeMethod(
+        CancellationToken cancellationToken)
+    {
+        return InvokeMethod(
             method,
             [
                 generated.Left,
@@ -1154,28 +1449,34 @@ public sealed class FrontendDifferentialOracle {
                 generated.Reference
             ],
             cancellationToken);
+    }
 
     private static RuntimeOutcome InvokeMethod(
         MethodInfo method,
         IReadOnlyList<object?> arguments,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
-        try {
+        try
+        {
             return RuntimeOutcome.Returned(
                 method.Invoke(null, [.. arguments]));
         }
         catch (TargetInvocationException exception)
-            when (exception.InnerException != null) {
+            when (exception.InnerException != null)
+        {
             return RuntimeOutcome.Threw(exception.InnerException);
         }
     }
 
     private static string CreateBatchSource(
-        IReadOnlyList<GeneratedCSharpCase> generatedCases) {
+        IReadOnlyList<GeneratedCSharpCase> generatedCases)
+    {
         var builder = new StringBuilder();
         builder.AppendLine("#nullable enable");
         builder.AppendLine("public static class SharpProofGeneratedFrontend {");
-        for (var index = 0; index < generatedCases.Count; index++) {
+        for (var index = 0; index < generatedCases.Count; index++)
+        {
             var generated = generatedCases[index];
             builder.Append("    public static ");
             builder.Append(ReturnType(generated.Expression.Type));
@@ -1191,7 +1492,8 @@ public sealed class FrontendDifferentialOracle {
     }
 
     private static string CreateSemanticEdgeSource(
-        IReadOnlyList<FrontendSemanticEdgeCase> cases) {
+        IReadOnlyList<FrontendSemanticEdgeCase> cases)
+    {
         var builder = new StringBuilder();
         builder.AppendLine("#nullable enable");
         builder.AppendLine(
@@ -1206,7 +1508,8 @@ public sealed class FrontendDifferentialOracle {
         builder.AppendLine("}");
         builder.AppendLine(
             "public static class SharpProofGeneratedFrontendEdges {");
-        for (var index = 0; index < cases.Count; index++) {
+        for (var index = 0; index < cases.Count; index++)
+        {
             var generated = cases[index];
             builder.Append("    public static ");
             builder.Append(generated.ReturnType);
@@ -1222,37 +1525,52 @@ public sealed class FrontendDifferentialOracle {
         return builder.ToString();
     }
 
-    private static string MethodName(int index) =>
-        "Target" + index.ToString(CultureInfo.InvariantCulture);
+    private static string MethodName(int index)
+    {
+        return "Target" + index.ToString(CultureInfo.InvariantCulture);
+    }
 
-    private static string SemanticEdgeMethodName(int index) =>
-        SemanticEdgeMethodPrefix +
+    private static string SemanticEdgeMethodName(int index)
+    {
+        return SemanticEdgeMethodPrefix +
         index.ToString(CultureInfo.InvariantCulture);
+    }
 
-    private static int ParseMethodIndex(string name) =>
-        int.Parse(
+    private static int ParseMethodIndex(string name)
+    {
+        return int.Parse(
             name.AsSpan("Target".Length),
             NumberStyles.None,
             CultureInfo.InvariantCulture);
+    }
 
-    private static int ParseSemanticEdgeMethodIndex(string name) =>
-        int.Parse(
+    private static int ParseSemanticEdgeMethodIndex(string name)
+    {
+        return int.Parse(
             name.AsSpan(SemanticEdgeMethodPrefix.Length),
             NumberStyles.None,
             CultureInfo.InvariantCulture);
+    }
 
-    private static string ReturnType(GeneratedExpressionType type) => type switch {
-        GeneratedExpressionType.Boolean => "bool",
-        GeneratedExpressionType.Integer => "long",
-        GeneratedExpressionType.String => "string?",
-        _ => throw new ArgumentOutOfRangeException(nameof(type))
-    };
+    private static string ReturnType(GeneratedExpressionType type)
+    {
+        return type switch
+        {
+            GeneratedExpressionType.Boolean => "bool",
+            GeneratedExpressionType.Integer => "long",
+            GeneratedExpressionType.String => "string?",
+            _ => throw new ArgumentOutOfRangeException(nameof(type))
+        };
+    }
 
     private static FrontendDifferentialResult CompareOutcomes(
         IrEvaluationResult interpreted,
-        RuntimeOutcome actual) {
-        if (actual.Exception != null) {
-            var kind = actual.Exception switch {
+        RuntimeOutcome actual)
+    {
+        if (actual.Exception != null)
+        {
+            var kind = actual.Exception switch
+            {
                 DivideByZeroException => IrExceptionKind.DivideByZero,
                 OverflowException => IrExceptionKind.Overflow,
                 NullReferenceException => IrExceptionKind.NullReference,
@@ -1263,7 +1581,10 @@ public sealed class FrontendDifferentialOracle {
             if (interpreted.Status == IrEvaluationStatus.Exception &&
                 kind != null &&
                 interpreted.Exception!.Kind == kind)
+            {
                 return Agreement(kind);
+            }
+
             return Mismatch(
                 "Compiled C# threw " +
                 actual.Exception.GetType().Name +
@@ -1273,11 +1594,15 @@ public sealed class FrontendDifferentialOracle {
         }
 
         if (interpreted.Status != IrEvaluationStatus.Value)
+        {
             return Mismatch(
                 "Compiled C# returned normally while the lowered IR reported " +
                 Describe(interpreted) +
                 ".");
-        var agrees = interpreted.Value!.Kind switch {
+        }
+
+        var agrees = interpreted.Value!.Kind switch
+        {
             IrValueKind.Boolean =>
                 actual.Value is bool value &&
                 value == interpreted.Value.Boolean,
@@ -1299,17 +1624,22 @@ public sealed class FrontendDifferentialOracle {
                 "Compiled C# and the lowered IR produced different values.");
     }
 
-    private static string Describe(IrEvaluationResult result) => result.Status switch {
-        IrEvaluationStatus.Value => "a value",
-        IrEvaluationStatus.Exception =>
-            "exception " + result.Exception!.Kind,
-        IrEvaluationStatus.Unsupported =>
-            "unsupported " + result.Unsupported!.Reason,
-        _ => result.Status.ToString()
-    };
+    private static string Describe(IrEvaluationResult result)
+    {
+        return result.Status switch
+        {
+            IrEvaluationStatus.Value => "a value",
+            IrEvaluationStatus.Exception =>
+                "exception " + result.Exception!.Kind,
+            IrEvaluationStatus.Unsupported =>
+                "unsupported " + result.Unsupported!.Reason,
+            _ => result.Status.ToString()
+        };
+    }
 
-    private static string FormatErrors(IEnumerable<Diagnostic> diagnostics) =>
-        string.Join(
+    private static string FormatErrors(IEnumerable<Diagnostic> diagnostics)
+    {
+        return string.Join(
             " | ",
             diagnostics
                 .Where(static diagnostic =>
@@ -1321,8 +1651,10 @@ public sealed class FrontendDifferentialOracle {
                     diagnostic.Id +
                     ": " +
                     diagnostic.GetMessage(CultureInfo.InvariantCulture)));
+    }
 
-    private static ImmutableArray<MetadataReference> CreateReferences() {
+    private static ImmutableArray<MetadataReference> CreateReferences()
+    {
         var trustedAssemblies =
             (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
             throw new InvalidOperationException(
@@ -1335,90 +1667,146 @@ public sealed class FrontendDifferentialOracle {
     }
 
     private static FrontendDifferentialResult Agreement(
-        IrExceptionKind? exceptionKind = null) =>
-        new(FuzzOracleStatus.Agreement, "", exceptionKind);
+        IrExceptionKind? exceptionKind = null)
+    {
+        return new(FuzzOracleStatus.Agreement, "", exceptionKind);
+    }
 
-    private static FrontendDifferentialResult Mismatch(string detail) =>
-        new(FuzzOracleStatus.Mismatch, detail);
+    private static FrontendDifferentialResult Mismatch(string detail)
+    {
+        return new(FuzzOracleStatus.Mismatch, detail);
+    }
 
     private static ImmutableArray<FrontendSemanticEdgeResult>
         RepeatSemanticFailure(
             int count,
-            string detail) =>
-        [.. Enumerable.Repeat(
+            string detail)
+    {
+        return [.. Enumerable.Repeat(
             SemanticFailure(null, null, detail),
             count)];
+    }
 
     private static FrontendSemanticEdgeResult SemanticAgreement(
-        FrontendSubsetClassification classification) =>
-        new(
+        FrontendSubsetClassification classification)
+    {
+        return new(
             FuzzOracleStatus.Agreement,
             classification.Decision,
             classification.Abstention,
             "");
+    }
 
     private static FrontendSemanticEdgeResult SemanticFailure(
         FrontendSubsetDecision? decision,
         FrontendAbstention? abstention,
-        string detail) =>
-        new(
+        string detail)
+    {
+        return new(
             FuzzOracleStatus.Mismatch,
             decision,
             abstention,
             detail);
+    }
 
-    private sealed record RuntimeOutcome(object? Value, Exception? Exception) {
-        internal static RuntimeOutcome Returned(object? value) =>
-            new(value, null);
+    private sealed record RuntimeOutcome(object? Value, Exception? Exception)
+    {
+        internal static RuntimeOutcome Returned(object? value)
+        {
+            return new(value, null);
+        }
 
-        internal static RuntimeOutcome Threw(Exception exception) =>
-            new(null, exception);
+        internal static RuntimeOutcome Threw(Exception exception)
+        {
+            return new(null, exception);
+        }
     }
 }
 
-public static class CSharpStructuralShrinker {
+public static class CSharpStructuralShrinker
+{
     public static GeneratedCSharpCase Minimize(
         GeneratedCSharpCase generated,
         Func<GeneratedCSharpCase, bool> preservesMismatch,
-        CancellationToken cancellationToken = default) {
-        if (generated == null) throw new ArgumentNullException(nameof(generated));
+        CancellationToken cancellationToken = default)
+    {
+        if (generated == null)
+        {
+            throw new ArgumentNullException(nameof(generated));
+        }
+
         if (preservesMismatch == null)
+        {
             throw new ArgumentNullException(nameof(preservesMismatch));
+        }
 
         var current = generated;
-        while (true) {
+        while (true)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             var changed = false;
-            foreach (var candidateExpression in GetCandidates(current.Expression)) {
+            foreach (var candidateExpression in GetCandidates(current.Expression))
+            {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (candidateExpression.NodeCount >= current.Expression.NodeCount)
+                {
                     continue;
-                var candidate = current with { Expression = candidateExpression };
-                if (!preservesMismatch(candidate)) continue;
+                }
+
+                var candidate = current with
+                {
+                    Expression = candidateExpression
+                };
+                if (!preservesMismatch(candidate))
+                {
+                    continue;
+                }
+
                 current = candidate;
                 changed = true;
                 break;
             }
-            if (!changed) return current;
+            if (!changed)
+            {
+                return current;
+            }
         }
     }
 
     public static ImmutableArray<GeneratedCSharpExpression> GetCandidates(
-        GeneratedCSharpExpression expression) {
-        if (expression == null) throw new ArgumentNullException(nameof(expression));
+        GeneratedCSharpExpression expression)
+    {
+        if (expression == null)
+        {
+            throw new ArgumentNullException(nameof(expression));
+        }
+
         var candidates = new List<GeneratedCSharpExpression>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        void Add(GeneratedCSharpExpression candidate) {
-            if (candidate.NodeCount >= expression.NodeCount) return;
-            if (seen.Add(candidate.Render())) candidates.Add(candidate);
+        void Add(GeneratedCSharpExpression candidate)
+        {
+            if (candidate.NodeCount >= expression.NodeCount)
+            {
+                return;
+            }
+
+            if (seen.Add(candidate.Render()))
+            {
+                candidates.Add(candidate);
+            }
         }
 
         foreach (var child in expression.Children)
+        {
             if (child.Type == expression.Type)
+            {
                 Add(child);
+            }
+        }
 
-        switch (expression.Type) {
+        switch (expression.Type)
+        {
             case GeneratedExpressionType.Integer:
                 Add(GeneratedCSharpExpression.Integer(0));
                 Add(GeneratedCSharpExpression.Integer(1));
@@ -1446,14 +1834,19 @@ public static class CSharpStructuralShrinker {
 
         for (var childIndex = 0;
              childIndex < expression.Children.Length;
-             childIndex++) {
+             childIndex++)
+        {
             foreach (var childCandidate in GetCandidates(
-                         expression.Children[childIndex])) {
+                         expression.Children[childIndex]))
+            {
                 var rebuilt = TryReplaceChild(
                     expression,
                     childIndex,
                     childCandidate);
-                if (rebuilt != null) Add(rebuilt);
+                if (rebuilt != null)
+                {
+                    Add(rebuilt);
+                }
             }
         }
         return [.. candidates];
@@ -1462,9 +1855,12 @@ public static class CSharpStructuralShrinker {
     private static GeneratedCSharpExpression? TryReplaceChild(
         GeneratedCSharpExpression expression,
         int childIndex,
-        GeneratedCSharpExpression child) {
-        try {
-            return expression.Kind switch {
+        GeneratedCSharpExpression child)
+    {
+        try
+        {
+            return expression.Kind switch
+            {
                 GeneratedExpressionKind.Not or
                 GeneratedExpressionKind.Negate =>
                     childIndex == 0
@@ -1508,7 +1904,8 @@ public static class CSharpStructuralShrinker {
                 _ => null
             };
         }
-        catch (ArgumentException) {
+        catch (ArgumentException)
+        {
             return null;
         }
     }

@@ -1,12 +1,14 @@
 namespace SharpProof.Specs;
 
-public enum SpecEvidenceKind {
+public enum SpecEvidenceKind
+{
     Documented,
     Observed
 }
 
 [Flags]
-public enum SpecEffect {
+public enum SpecEffect
+{
     None = 0,
     Unknown = 1 << 0,
     ReadsReceiverState = 1 << 1,
@@ -22,19 +24,22 @@ public enum SpecEffect {
     Nondeterminism = 1 << 11
 }
 
-public enum SpecAllocationBehavior {
+public enum SpecAllocationBehavior
+{
     None,
     MayAllocate,
     Unknown
 }
 
-public enum SpecThrowBehavior {
+public enum SpecThrowBehavior
+{
     DoesNotThrow,
     MayThrow,
     Unknown
 }
 
-public enum SpecNullness {
+public enum SpecNullness
+{
     NotApplicable,
     NonNull,
     MaybeNull,
@@ -42,7 +47,8 @@ public enum SpecNullness {
     Unknown
 }
 
-public enum SpecCardinality {
+public enum SpecCardinality
+{
     NotApplicable,
     Empty,
     NonEmpty,
@@ -50,13 +56,15 @@ public enum SpecCardinality {
     Unknown
 }
 
-public enum SpecTargetMemberKind {
+public enum SpecTargetMemberKind
+{
     Constructor,
     Method,
     PropertyGet
 }
 
-public enum SpecValueType {
+public enum SpecValueType
+{
     Boolean,
     Integer,
     String,
@@ -64,18 +72,21 @@ public enum SpecValueType {
     Sequence
 }
 
-public enum SpecVariableRole {
+public enum SpecVariableRole
+{
     Receiver,
     Parameter,
     Result
 }
 
-public enum SpecUnaryOperator {
+public enum SpecUnaryOperator
+{
     Not,
     Negate
 }
 
-public enum SpecBinaryOperator {
+public enum SpecBinaryOperator
+{
     Add,
     Subtract,
     Multiply,
@@ -106,7 +117,8 @@ public sealed record SpecNullnessFacet(SpecNullness Result, SpecEvidence Evidenc
 public sealed record SpecCardinalityFacet(
     SpecCardinality Result, int? ExactCount, SpecEvidence Evidence);
 
-public enum ApiSpecReferenceFamily {
+public enum ApiSpecReferenceFamily
+{
     Unspecified,
     MicrosoftNetCoreReferencePack,
     NetStandardReferencePack,
@@ -180,23 +192,49 @@ public sealed record SpecVariableInfo(
 public sealed record SpecPostcondition(
     SpecTermDeclaration Condition, SpecEvidence Evidence);
 
-public sealed class ApiSpecTemplate {
+public sealed class ApiSpecTemplate
+{
     internal ApiSpecTemplate(
         SpecId id, ApiSpecTarget target, ApiSpecFacets facets,
         ImmutableArray<SpecVariableInfo> variables, SpecVarId? receiver,
         ImmutableArray<SpecVarId> parameters, SpecVarId? result,
-        ImmutableArray<SpecPostcondition> postconditions) {
+        ImmutableArray<SpecPostcondition> postconditions)
+    {
         (Id, Target, Facets, Variables) = (id, target, facets, variables);
         (Receiver, Parameters, Result, Postconditions) =
             (receiver, parameters, result, postconditions);
     }
 
-    public SpecId Id { get; }
-    public ApiSpecTarget Target { get; }
-    public ApiSpecFacets Facets { get; }
-    public ImmutableArray<SpecVariableInfo> Variables { get; }
-    public SpecVarId? Receiver { get; }
-    public ImmutableArray<SpecVarId> Parameters { get; }
-    public SpecVarId? Result { get; }
-    public ImmutableArray<SpecPostcondition> Postconditions { get; }
+    public SpecId Id
+    {
+        get;
+    }
+    public ApiSpecTarget Target
+    {
+        get;
+    }
+    public ApiSpecFacets Facets
+    {
+        get;
+    }
+    public ImmutableArray<SpecVariableInfo> Variables
+    {
+        get;
+    }
+    public SpecVarId? Receiver
+    {
+        get;
+    }
+    public ImmutableArray<SpecVarId> Parameters
+    {
+        get;
+    }
+    public SpecVarId? Result
+    {
+        get;
+    }
+    public ImmutableArray<SpecPostcondition> Postconditions
+    {
+        get;
+    }
 }

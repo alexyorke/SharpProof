@@ -5,16 +5,19 @@ using SharpProof.Gates.Corpus;
 namespace SharpProof.Gates.Test;
 
 [TestFixture]
-public sealed class CorpusGateTests {
+public sealed class CorpusGateTests
+{
     [Test]
-    public void GeneratorHasDocumentedMetamorphicCoverage() {
+    public void GeneratorHasDocumentedMetamorphicCoverage()
+    {
         var cases = CorpusCatalog.CreateCases();
         var synthetic = cases.Where(static item =>
             item.Origin == CorpusOrigin.SyntheticMetamorphic).ToArray();
         var openSource = cases.Where(static item =>
             item.Origin == CorpusOrigin.OpenSource).ToArray();
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(synthetic, Has.Length.EqualTo(280));
             Assert.That(
                 synthetic.Select(static item => item.SeedId).Distinct().Count(),
@@ -38,7 +41,8 @@ public sealed class CorpusGateTests {
     }
 
     [Test]
-    public void OpenSourceManifestHasPinnedLicensedProvenance() {
+    public void OpenSourceManifestHasPinnedLicensedProvenance()
+    {
         var root = RepositoryLayout.FindRoot();
         var document = OpenSourceCorpusCatalog.Load(root);
         var selectedFileCount = document.Methods
@@ -46,7 +50,8 @@ public sealed class CorpusGateTests {
             .Distinct(StringComparer.Ordinal)
             .Count();
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(document.SchemaVersion, Is.EqualTo(1));
             Assert.That(document.Sources, Has.Length.EqualTo(1));
             Assert.That(document.Sources[0].Repository, Is.EqualTo(
@@ -67,7 +72,8 @@ public sealed class CorpusGateTests {
     }
 
     [Test]
-    public async Task AnalyzerMatchesCanonicalCorpusAndReplayModes() {
+    public async Task AnalyzerMatchesCanonicalCorpusAndReplayModes()
+    {
         var root = RepositoryLayout.FindRoot();
 
         var result = await CorpusGate.RunAsync(root);
@@ -76,7 +82,8 @@ public sealed class CorpusGateTests {
             result.Failures,
             Is.Empty,
             string.Join(Environment.NewLine, result.Failures));
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(result.Passed, Is.True);
             Assert.That(result.CaseCount, Is.EqualTo(480));
             Assert.That(result.BaseCaseCount, Is.EqualTo(228));
@@ -97,7 +104,8 @@ public sealed class CorpusGateTests {
                         static item => item.Reason,
                         static item => item.Count),
                 Is.EquivalentTo(
-                    new Dictionary<string, int>(StringComparer.Ordinal) {
+                    new Dictionary<string, int>(StringComparer.Ordinal)
+                    {
                         ["SP0002"] = 28,
                         ["SP0016"] = 20,
                         ["SP0045"] = 30,
@@ -123,7 +131,8 @@ public sealed class CorpusGateTests {
     }
 
     [Test]
-    public void SnapshotCapturesSemanticOutcomeAndCanonicalDiagnostics() {
+    public void SnapshotCapturesSemanticOutcomeAndCanonicalDiagnostics()
+    {
         var root = RepositoryLayout.FindRoot();
         var lines = File.ReadAllLines(
             Path.Combine(
@@ -144,7 +153,8 @@ public sealed class CorpusGateTests {
             line.StartsWith("OSS0001.baseline|", StringComparison.Ordinal))
             .Split('|');
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(refutedParts, Has.Length.EqualTo(4));
             Assert.That(refutedParts[1], Is.EqualTo("Refuted"));
             Assert.That(refutedParts[2], Is.EqualTo("Refuted"));

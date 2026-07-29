@@ -1,32 +1,43 @@
 root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
 [*.cs]
+indent_style = space
+indent_size = 4
+tab_width = 4
 max_line_length = 140
-csharp_new_line_before_open_brace = none
 dotnet_diagnostic.IDE0055.severity = warning
-csharp_style_expression_bodied_accessors = true:warning
-csharp_style_expression_bodied_constructors = true:warning
-csharp_style_expression_bodied_indexers = true:warning
-csharp_style_expression_bodied_lambdas = true:warning
-csharp_style_expression_bodied_local_functions = true:warning
-csharp_style_expression_bodied_methods = true:warning
-csharp_style_expression_bodied_operators = true:warning
-csharp_style_expression_bodied_properties = true:warning
-csharp_style_implicit_object_creation_when_type_is_apparent = true:warning
-csharp_style_prefer_primary_constructors = true:warning
-dotnet_style_prefer_collection_expression = true:warning
-[{SharpProof.Analyzer,SharpProof.Attributes,Tools}/**/*.cs]
-csharp_prefer_braces = false:warning
-csharp_style_namespace_declarations = file_scoped:warning
-csharp_style_prefer_simple_using_statement = true:warning
-csharp_style_prefer_switch_expression = true:warning
-dotnet_style_collection_initializer = true:warning
-dotnet_style_object_initializer = true:warning
-[SharpProof.Testing/*.cs]
-csharp_new_line_before_open_brace = none
-dotnet_diagnostic.IDE0055.severity = none
-[SharpProof.Testing/**/*.cs]
-csharp_new_line_before_open_brace = none
-dotnet_diagnostic.IDE0055.severity = none
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_preserve_single_line_blocks = true
+csharp_preserve_single_line_statements = false
+csharp_prefer_braces = true:warning
+
+# Keep ordinary modern C# conveniences without using style diagnostics to
+# collapse declarations solely to satisfy source-size gates.
+csharp_style_expression_bodied_accessors = true:suggestion
+csharp_style_expression_bodied_constructors = false:warning
+csharp_style_expression_bodied_indexers = when_on_single_line:suggestion
+csharp_style_expression_bodied_lambdas = true:suggestion
+csharp_style_expression_bodied_local_functions = false:warning
+csharp_style_expression_bodied_methods = false:warning
+csharp_style_expression_bodied_operators = false:warning
+csharp_style_expression_bodied_properties = when_on_single_line:suggestion
+csharp_style_implicit_object_creation_when_type_is_apparent = true:suggestion
+csharp_style_namespace_declarations = file_scoped:suggestion
+csharp_style_prefer_primary_constructors = false:suggestion
+csharp_style_prefer_simple_using_statement = true:suggestion
+csharp_style_prefer_switch_expression = true:suggestion
+dotnet_style_collection_initializer = true:suggestion
+dotnet_style_object_initializer = true:suggestion
+dotnet_style_prefer_collection_expression = true:suggestion
 
 [SharpProof.Dataflow/IntervalDomain.cs]
 dotnet_diagnostic.CA1822.severity = none

@@ -7,13 +7,15 @@ using NUnit.Framework;
 
 namespace SharpProof.TestSupport;
 
-internal static class DiagnosticDescriptorCatalogAssertions {
+internal static class DiagnosticDescriptorCatalogAssertions
+{
     private const string RepositoryHelpPrefix =
         "https://github.com/alexyorke/SharpProof/blob/master/";
 
     internal static void AssertOutput(
         string outputName,
-        Assembly assembly) {
+        Assembly assembly)
+    {
         using var catalog = ReadCatalog();
         Assert.That(
             catalog.RootElement.GetProperty("schemaVersion").GetInt32(),
@@ -36,7 +38,8 @@ internal static class DiagnosticDescriptorCatalogAssertions {
 
     private static void AssertOutput(
         JsonElement output,
-        Assembly assembly) {
+        Assembly assembly)
+    {
         var name = output.GetProperty("name").GetString()!;
         var typeName =
             output.GetProperty("namespace").GetString() + "." +
@@ -59,7 +62,8 @@ internal static class DiagnosticDescriptorCatalogAssertions {
             Is.EqualTo(specifications.Select(static specification =>
                 specification.GetProperty("symbol").GetString())),
             name);
-        for (var index = 0; index < fields.Length; index++) {
+        for (var index = 0; index < fields.Length; index++)
+        {
             Assert.That(
                 specifications[index].GetProperty("order").GetInt32(),
                 Is.EqualTo(index),
@@ -72,7 +76,10 @@ internal static class DiagnosticDescriptorCatalogAssertions {
         var supportedMember =
             output.GetProperty("supportedDiagnosticsMember");
         if (supportedMember.ValueKind == JsonValueKind.Null)
+        {
             return;
+        }
+
         var aggregate = type.GetField(
             supportedMember.GetString()!,
             BindingFlags.NonPublic |
@@ -91,9 +98,11 @@ internal static class DiagnosticDescriptorCatalogAssertions {
 
     private static void AssertDescriptor(
         DiagnosticDescriptor descriptor,
-        JsonElement specification) {
+        JsonElement specification)
+    {
         var id = specification.GetProperty("id").GetString()!;
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(descriptor.Id, Is.EqualTo(id));
             Assert.That(
                 descriptor.Title.ToString(CultureInfo.InvariantCulture),
@@ -140,10 +149,13 @@ internal static class DiagnosticDescriptorCatalogAssertions {
             : helpElement.GetString()!;
         Assert.That(descriptor.HelpLinkUri, Is.EqualTo(expectedHelp), id);
         if (expectedHelp.Length != 0)
+        {
             AssertRepositoryHelpLink(expectedHelp, id);
+        }
     }
 
-    private static void AssertRepositoryHelpLink(string link, string id) {
+    private static void AssertRepositoryHelpLink(string link, string id)
+    {
         Assert.That(
             link,
             Does.StartWith(RepositoryHelpPrefix),
@@ -163,18 +175,23 @@ internal static class DiagnosticDescriptorCatalogAssertions {
             id);
     }
 
-    private static HashSet<string> MarkdownAnchors(string text) {
+    private static HashSet<string> MarkdownAnchors(string text)
+    {
         var anchors = new HashSet<string>(
             StringComparer.OrdinalIgnoreCase);
         foreach (Match match in Regex.Matches(
                      text,
                      """<a\s+id\s*=\s*["'](?<id>[^"']+)["']""",
                      RegexOptions.IgnoreCase))
+        {
             anchors.Add(match.Groups["id"].Value);
+        }
+
         foreach (Match match in Regex.Matches(
                      text,
                      @"^(?:#{1,6})[ \t]+(?<heading>.+?)[ \t]*#*[ \t]*$",
-                     RegexOptions.Multiline)) {
+                     RegexOptions.Multiline))
+        {
             var heading = Regex.Replace(
                 match.Groups["heading"].Value,
                 "<[^>]+>|`",
@@ -188,21 +205,27 @@ internal static class DiagnosticDescriptorCatalogAssertions {
         return anchors;
     }
 
-    private static JsonDocument ReadCatalog() =>
-        JsonDocument.Parse(File.ReadAllText(Path.Combine(
+    private static JsonDocument ReadCatalog()
+    {
+        return JsonDocument.Parse(File.ReadAllText(Path.Combine(
             RepositoryRoot(),
             "eng",
             "diagnostics",
             "diagnostic-descriptors.v1.json")));
+    }
 
-    private static string RepositoryRoot() {
+    private static string RepositoryRoot()
+    {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
              directory != null;
-             directory = directory.Parent) {
+             directory = directory.Parent)
+        {
             if (File.Exists(Path.Combine(
                     directory.FullName,
                     "SharpProof.sln")))
+            {
                 return directory.FullName;
+            }
         }
         throw new InvalidOperationException(
             "Could not find the repository root.");

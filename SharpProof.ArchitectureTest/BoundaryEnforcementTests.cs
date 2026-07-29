@@ -5,7 +5,8 @@ using NUnit.Framework;
 namespace SharpProof.ArchitectureTest;
 
 [TestFixture]
-public sealed class BoundaryEnforcementTests {
+public sealed class BoundaryEnforcementTests
+{
     private static readonly string[] BannedApiProjects = [
         "SharpProof.Analyzer",
         "SharpProof.Attributes",
@@ -41,7 +42,8 @@ public sealed class BoundaryEnforcementTests {
     ];
 
     [Test]
-    public void BannedApiAnalyzerIsScopedToProductionProjects() {
+    public void BannedApiAnalyzerIsScopedToProductionProjects()
+    {
         var root = RepositoryRoot();
         var props = XDocument.Load(Path.Combine(root, "Directory.Build.props"));
         var marker = props
@@ -92,7 +94,8 @@ public sealed class BoundaryEnforcementTests {
     }
 
     [Test]
-    public void BannedSymbolInventoryCoversEverySoundnessBoundary() {
+    public void BannedSymbolInventoryCoversEverySoundnessBoundary()
+    {
         var text = File.ReadAllText(
             Path.Combine(RepositoryRoot(), "BannedSymbols.txt"));
         var required = new[] {
@@ -110,18 +113,23 @@ public sealed class BoundaryEnforcementTests {
         };
 
         foreach (var member in required)
+        {
             Assert.That(text, Does.Contain(member), member);
+        }
     }
 
     [Test]
-    public void SemanticModelsFlowThroughTheSingleAuditedHostAdapter() {
+    public void SemanticModelsFlowThroughTheSingleAuditedHostAdapter()
+    {
         const string adapterProject = "SharpProof.Frontend";
         const string adapterFile = "CompilationModelProvider.cs";
         var directCallFiles = new List<string>();
         var suppressionFiles = new List<string>();
 
-        foreach (var project in BannedApiProjects) {
-            foreach (var file in SourceFiles(project)) {
+        foreach (var project in BannedApiProjects)
+        {
+            foreach (var file in SourceFiles(project))
+            {
                 var source = File.ReadAllText(file);
                 var compact = Regex.Replace(source, @"\s+", string.Empty)
                     .Replace(
@@ -136,11 +144,16 @@ public sealed class BoundaryEnforcementTests {
                 if (compact.Contains(
                         ".GetSemanticModel(",
                         StringComparison.Ordinal))
+                {
                     directCallFiles.Add(Relative(file));
+                }
+
                 if (source.Contains(
                         "#pragma warning disable RS0030",
                         StringComparison.Ordinal))
+                {
                     suppressionFiles.Add(Relative(file));
+                }
             }
         }
 
@@ -163,7 +176,8 @@ public sealed class BoundaryEnforcementTests {
     }
 
     [Test]
-    public void ThinAnalyzerHasOnlyCurrentFrontendDependencies() {
+    public void ThinAnalyzerHasOnlyCurrentFrontendDependencies()
+    {
         var direct = ProjectReferences("SharpProof.Analyzer");
         string[] expectedDirect = [
             "SharpProof.CompilerArtifact",
@@ -191,8 +205,10 @@ public sealed class BoundaryEnforcementTests {
     }
 
     [Test]
-    public void EverySoundnessCriticalProjectRunsTheMetaAnalyzer() {
-        foreach (var project in SoundnessCriticalProjects) {
+    public void EverySoundnessCriticalProjectRunsTheMetaAnalyzer()
+    {
+        foreach (var project in SoundnessCriticalProjects)
+        {
             var reference = XDocument.Load(ProjectFile(project))
                 .Descendants("ProjectReference")
                 .SingleOrDefault(element =>
@@ -213,7 +229,8 @@ public sealed class BoundaryEnforcementTests {
     }
 
     [Test]
-    public void MetaAnalyzerSelfDogfoodsBannedApisWithoutReferencingItself() {
+    public void MetaAnalyzerSelfDogfoodsBannedApisWithoutReferencingItself()
+    {
         Assert.That(
             BannedApiProjects,
             Does.Contain("SharpProof.Meta.Analyzers"));
@@ -229,7 +246,8 @@ public sealed class BoundaryEnforcementTests {
     }
 
     [Test]
-    public void DiagnosticDescriptorsComeOnlyFromTheGeneratedCatalog() {
+    public void DiagnosticDescriptorsComeOnlyFromTheGeneratedCatalog()
+    {
         Assert.That(
             File.Exists(Path.Combine(
                 RepositoryRoot(),
@@ -242,8 +260,10 @@ public sealed class BoundaryEnforcementTests {
             "SharpProof.ContractForGenerator",
             "SharpProof.Meta.Analyzers"
         ];
-        foreach (var project in descriptorProjects) {
-            foreach (var file in SourceFiles(project)) {
+        foreach (var project in descriptorProjects)
+        {
+            foreach (var file in SourceFiles(project))
+            {
                 var source = File.ReadAllText(file);
                 Assert.That(
                     source,
@@ -252,7 +272,10 @@ public sealed class BoundaryEnforcementTests {
                 if (Path.GetFileName(file).EndsWith(
                         "DiagnosticDescriptors.generated.cs",
                         StringComparison.Ordinal))
+                {
                     continue;
+                }
+
                 Assert.That(
                     Regex.IsMatch(
                         source,
@@ -272,7 +295,8 @@ public sealed class BoundaryEnforcementTests {
     }
 
     [Test]
-    public void CurrentProductionDoesNotParseContractStrings() {
+    public void CurrentProductionDoesNotParseContractStrings()
+    {
         var parserCallers = BannedApiProjects
             .SelectMany(SourceFiles)
             .Where(file => Regex.IsMatch(
@@ -286,8 +310,10 @@ public sealed class BoundaryEnforcementTests {
     }
 
     [Test]
-    public void ProductionProjectsDoNotUseSemanticDisplayText() {
-        foreach (var project in BannedApiProjects) {
+    public void ProductionProjectsDoNotUseSemanticDisplayText()
+    {
+        foreach (var project in BannedApiProjects)
+        {
             var source = ReadProductionSources(project);
             Assert.That(
                 source,
@@ -297,7 +323,8 @@ public sealed class BoundaryEnforcementTests {
     }
 
     [Test]
-    public void ActiveSolutionContainsExactlyCurrentProjects() {
+    public void ActiveSolutionContainsExactlyCurrentProjects()
+    {
         string[] expected = [
             @"SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj",
             @"SharpProof.Analyzer\SharpProof.Analyzer.csproj",
@@ -352,14 +379,17 @@ public sealed class BoundaryEnforcementTests {
 
         Assert.That(actual, Is.EquivalentTo(expected));
         foreach (var project in actual)
+        {
             Assert.That(
                 File.Exists(Path.Combine(RepositoryRoot(), project)),
                 Is.True,
                 project);
+        }
     }
 
     [Test]
-    public void AnalyzerPackagePayloadExcludesWorkerAndSolverAssets() {
+    public void AnalyzerPackagePayloadExcludesWorkerAndSolverAssets()
+    {
         var packageFile =
             Path.Combine(
                 RepositoryRoot(),
@@ -369,7 +399,8 @@ public sealed class BoundaryEnforcementTests {
         var analyzerPayload = string.Join(
             ";",
             package.Descendants("TfmSpecificPackageFile")
-                .Where(element => {
+                .Where(element =>
+                {
                     var path = (string?)element.Attribute("PackagePath");
                     return string.IsNullOrWhiteSpace(path) ||
                            path.Contains(
@@ -389,29 +420,37 @@ public sealed class BoundaryEnforcementTests {
             "SharpProof.Worker.Launcher"
         ];
         foreach (var forbidden in forbiddenAssets)
+        {
             Assert.That(
                 analyzerPayload,
                 Does.Not.Contain(forbidden),
                 forbidden);
+        }
     }
 
     private static HashSet<string> TransitiveProjectClosure(
-        string rootProject) {
+        string rootProject)
+    {
         var result = new HashSet<string>(StringComparer.Ordinal);
         var pending = new Stack<string>();
         pending.Push(rootProject);
-        while (pending.Count != 0) {
+        while (pending.Count != 0)
+        {
             var project = pending.Pop();
-            foreach (var dependency in ProjectReferences(project)) {
+            foreach (var dependency in ProjectReferences(project))
+            {
                 if (result.Add(dependency))
+                {
                     pending.Push(dependency);
+                }
             }
         }
         return result;
     }
 
-    private static string[] ProjectReferences(string project) =>
-        [.. XDocument.Load(ProjectFile(project))
+    private static string[] ProjectReferences(string project)
+    {
+        return [.. XDocument.Load(ProjectFile(project))
             .Descendants("ProjectReference")
             .Where(static element =>
                 !string.Equals(
@@ -423,16 +462,20 @@ public sealed class BoundaryEnforcementTests {
                     ((string?)element.Attribute("Include") ?? string.Empty)
                         .Replace('\\', '/')))
             .Where(static value => !string.IsNullOrWhiteSpace(value))];
+    }
 
-    private static string[] ProjectPackages(string project) =>
-        [.. XDocument.Load(ProjectFile(project))
+    private static string[] ProjectPackages(string project)
+    {
+        return [.. XDocument.Load(ProjectFile(project))
             .Descendants("PackageReference")
             .Select(static element =>
                 (string?)element.Attribute("Include") ?? string.Empty)
             .Where(static value => !string.IsNullOrWhiteSpace(value))];
+    }
 
-    private static IEnumerable<string> SourceFiles(string project) =>
-        Directory.GetFiles(
+    private static IEnumerable<string> SourceFiles(string project)
+    {
+        return Directory.GetFiles(
                 Path.Combine(RepositoryRoot(), project),
                 "*.cs",
                 SearchOption.AllDirectories)
@@ -446,36 +489,50 @@ public sealed class BoundaryEnforcementTests {
                     Path.DirectorySeparatorChar,
                     StringComparison.Ordinal))
             .OrderBy(static path => path, StringComparer.Ordinal);
+    }
 
-    private static string ReadProductionSources(string project) =>
-        string.Join("\n", SourceFiles(project).Select(File.ReadAllText));
+    private static string ReadProductionSources(string project)
+    {
+        return string.Join("\n", SourceFiles(project).Select(File.ReadAllText));
+    }
 
-    private static string ProjectFile(string project) =>
-        Path.Combine(RepositoryRoot(), project, project + ".csproj");
+    private static string ProjectFile(string project)
+    {
+        return Path.Combine(RepositoryRoot(), project, project + ".csproj");
+    }
 
-    private static string Relative(string path) =>
-        Path.GetRelativePath(RepositoryRoot(), path).Replace('\\', '/');
+    private static string Relative(string path)
+    {
+        return Path.GetRelativePath(RepositoryRoot(), path).Replace('\\', '/');
+    }
 
-    private static int Count(string text, string value) {
+    private static int Count(string text, string value)
+    {
         var count = 0;
         var offset = 0;
         while ((offset = text.IndexOf(
                    value,
                    offset,
-                   StringComparison.Ordinal)) >= 0) {
+                   StringComparison.Ordinal)) >= 0)
+        {
             count++;
             offset += value.Length;
         }
         return count;
     }
 
-    private static string RepositoryRoot() {
+    private static string RepositoryRoot()
+    {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null) {
+        while (directory != null)
+        {
             if (File.Exists(Path.Combine(
                     directory.FullName,
                     "SharpProof.sln")))
+            {
                 return directory.FullName;
+            }
+
             directory = directory.Parent;
         }
         throw new InvalidOperationException(

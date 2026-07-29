@@ -2,7 +2,8 @@ using SharpProof.Dataflow;
 
 namespace SharpProof.Analyzer;
 
-internal static class ManagedContractFacts {
+internal static class ManagedContractFacts
+{
     private static readonly ImmutableDictionary<IrBinaryOperator, BinaryOperatorKind> Operators =
         Enum.GetValues(typeof(BinaryOperatorKind))
             .Cast<BinaryOperatorKind>()
@@ -11,8 +12,13 @@ internal static class ManagedContractFacts {
             .ToImmutableDictionary(static item => item.Ir!.Value, static item => item.Kind);
 
     internal static ManagedFlowState ApplyRequires(
-        ManagedFlowState state, BoundMethodContracts? contracts) {
-        if (contracts == null) return state;
+        ManagedFlowState state, BoundMethodContracts? contracts)
+    {
+        if (contracts == null)
+        {
+            return state;
+        }
+
         var variables = contracts.Variables
             .Where(static variable =>
                 variable.Symbol != null &&
@@ -25,8 +31,10 @@ internal static class ManagedContractFacts {
     }
 
     internal static ManagedAbstractValue Evaluate(
-        IrTerm term, IReadOnlyDictionary<IrVarId, ManagedAbstractValue> variables) =>
-        term switch {
+        IrTerm term, IReadOnlyDictionary<IrVarId, ManagedAbstractValue> variables)
+    {
+        return term switch
+        {
             IrBooleanTerm boolean => ManagedAbstractValue.Boolean(boolean.Value),
             IrIntegerTerm integer => ManagedAbstractValue.Integer(IntervalValue.Constant(integer.Value)),
             IrStringTerm => ManagedAbstractValue.Reference(NullnessValue.NonNull),
@@ -48,14 +56,20 @@ internal static class ManagedContractFacts {
             IrCastTerm cast => Evaluate(cast.Operand, variables),
             _ => ManagedAbstractValue.Unknown
         };
+    }
 
     private static ManagedFlowState Assume(
         ManagedFlowState state, IrTerm condition, bool expected,
-        IReadOnlyDictionary<IrVarId, ISymbol> variables) {
+        IReadOnlyDictionary<IrVarId, ISymbol> variables)
+    {
         var values = variables.ToDictionary(static pair => pair.Key, pair => state.Get(pair.Value));
         if (Evaluate(condition, values).TryGetBoolean(out var constant))
+        {
             return constant == expected ? state : ManagedFlowState.Bottom;
-        return condition switch {
+        }
+
+        return condition switch
+        {
             IrUnaryTerm { Operator: IrUnaryOperator.Not } unary =>
                 Assume(state, unary.Operand, !expected, variables),
             IrBinaryTerm { Operator: IrBinaryOperator.AndAlso } binary when expected =>
@@ -77,9 +91,14 @@ internal static class ManagedContractFacts {
         };
     }
 
-    private static BinaryOperatorKind Map(IrBinaryOperator @operator) =>
-        Operators.TryGetValue(@operator, out var kind) ? kind : BinaryOperatorKind.None;
+    private static BinaryOperatorKind Map(IrBinaryOperator @operator)
+    {
+        return Operators.TryGetValue(@operator, out var kind) ? kind : BinaryOperatorKind.None;
+    }
 
-    private static IReadOnlyDictionary<IrVarId, ManagedAbstractValue> EmptyValues { get; } =
+    private static IReadOnlyDictionary<IrVarId, ManagedAbstractValue> EmptyValues
+    {
+        get;
+    } =
         new Dictionary<IrVarId, ManagedAbstractValue>();
 }

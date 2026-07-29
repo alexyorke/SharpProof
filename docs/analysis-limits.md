@@ -183,8 +183,9 @@ is the observed runner total rather than the requested budget.
 
 The active contract also fixes protocol version 8, cache schema version 9,
 claim-manifest schema version 4, and compiler artifact schema version 5, along
-with the narrow proof-kernel and component TCB path/LOC ratchets and the
-reference surfaces `netstandard2.0`, `net8.0`, and `net472`.
+with exact proof-kernel and component TCB path inventories, formatting-neutral
+Roslyn complexity ratchets, and the reference surfaces `netstandard2.0`,
+`net8.0`, and `net472`.
 
 Unknown rate is reported by the corpus as explicit, silent, and total metrics;
 it is not a release threshold.

@@ -12,12 +12,14 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class CompilerManifestArtifactTests {
+public sealed class CompilerManifestArtifactTests
+{
     private const string SourceMarker =
         "sharp-proof-source-must-not-be-embedded";
 
     [Test]
-    public void ArtifactRecordsCompilerAndSyntaxEvidenceWithoutSourceText() {
+    public void ArtifactRecordsCompilerAndSyntaxEvidenceWithoutSourceText()
+    {
         var parse = new CSharpParseOptions(LanguageVersion.CSharp12)
             .WithFeatures([
                 new KeyValuePair<string, string>(
@@ -32,7 +34,8 @@ public sealed class CompilerManifestArtifactTests {
         var tree = artifact.Compilation.SyntaxTrees.Single();
         var json = CompilerManifestArtifactJson.Serialize(artifact);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 artifact.Compilation.CompilerVersion,
                 Is.EqualTo(
@@ -74,7 +77,8 @@ public sealed class CompilerManifestArtifactTests {
     }
 
     [Test]
-    public void CompilerIdentityIsProvenanceRatherThanWorkerGate() {
+    public void CompilerIdentityIsProvenanceRatherThanWorkerGate()
+    {
         var artifact = CreateArtifact();
         artifact.Compilation.CompilerMvid =
             Guid.NewGuid().ToString("D");
@@ -93,7 +97,8 @@ public sealed class CompilerManifestArtifactTests {
     }
 
     [Test]
-    public void RecomputedOuterHashCannotHideMalformedNestedEvidence() {
+    public void RecomputedOuterHashCannotHideMalformedNestedEvidence()
+    {
         Action<CompilerCompilationSnapshot>[] corruptions = [
             snapshot => snapshot.Options.OutputKind = "invalid",
             snapshot => snapshot.Options.ResolverPolicy = "ignored",
@@ -103,7 +108,8 @@ public sealed class CompilerManifestArtifactTests {
             snapshot => snapshot.References[0].Kind = "invalid"
         ];
 
-        foreach (var corrupt in corruptions) {
+        foreach (var corrupt in corruptions)
+        {
             var artifact = CreateArtifact();
             corrupt(artifact.Compilation);
             artifact.CompilationSha256 =
@@ -121,20 +127,26 @@ public sealed class CompilerManifestArtifactTests {
     }
 
     [Test]
-    public void AdditionalFilesRejectNoncanonicalOrdering() =>
+    public void AdditionalFilesRejectNoncanonicalOrdering()
+    {
         AssertMalformedAdditionalFiles(
             AdditionalFile("z.input", 'b'),
             AdditionalFile("a.input", 'a'));
+    }
 
     [Test]
-    public void AdditionalFilesRejectDuplicateNormalizedPaths() =>
+    public void AdditionalFilesRejectDuplicateNormalizedPaths()
+    {
         AssertMalformedAdditionalFiles(
             AdditionalFile("same.input", 'a'),
             AdditionalFile("same.input", 'b'));
+    }
 
     [Test]
-    public void AdditionalFilesRejectNoncanonicalPaths() =>
-        AssertMalformedAdditionalFiles(new CompilerAdditionalFileSnapshot {
+    public void AdditionalFilesRejectNoncanonicalPaths()
+    {
+        AssertMalformedAdditionalFiles(new CompilerAdditionalFileSnapshot
+        {
             Path = Path.Combine(
                     TestContext.CurrentContext.WorkDirectory,
                     "nested",
@@ -143,9 +155,11 @@ public sealed class CompilerManifestArtifactTests {
                 .Replace('\\', '/'),
             Sha256 = new string('a', 64)
         });
+    }
 
     [Test]
-    public void MalformedLoweredCallableFailsDuringHydration() {
+    public void MalformedLoweredCallableFailsDuringHydration()
+    {
         var artifact = CreateContractArtifact();
         var valid =
             CompilerManifestArtifactJson.DecodeCallables(artifact);
@@ -165,7 +179,8 @@ public sealed class CompilerManifestArtifactTests {
     }
 
     [Test]
-    public void LoweredProgramAboveTheReplayInstructionBoundFailsHydration() {
+    public void LoweredProgramAboveTheReplayInstructionBoundFailsHydration()
+    {
         var artifact = CreateContractArtifact(
             """
             using SharpProof.Attributes;
@@ -194,7 +209,8 @@ public sealed class CompilerManifestArtifactTests {
     }
 
     [Test]
-    public void EnsuresRowsExactlyMatchManifestClaimIdentityAndEvidence() {
+    public void EnsuresRowsExactlyMatchManifestClaimIdentityAndEvidence()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -209,7 +225,8 @@ public sealed class CompilerManifestArtifactTests {
         var valid = CreateContractArtifact(source);
         var rows = valid.Callables[0].Clauses.Where(
             static row => row.Kind == CompilerContractKind.Ensures).ToArray();
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(rows.Select(static row => row.ClaimId),
                 Is.EqualTo(valid.Manifest.Claims.Select(static claim => claim.ClaimId)));
             Assert.That(rows.Select(static row => row.Evidence),
@@ -222,7 +239,8 @@ public sealed class CompilerManifestArtifactTests {
             values => (values[0].ClaimId, values[1].ClaimId) = (values[1].ClaimId, values[0].ClaimId),
             values => values[0].Evidence = CompilerContractEvidence.Companion
         ];
-        foreach (var corrupt in corruptions) {
+        foreach (var corrupt in corruptions)
+        {
             var artifact = CreateContractArtifact(source);
             corrupt([.. artifact.Callables[0].Clauses.Where(
                 static row => row.Kind == CompilerContractKind.Ensures)]);
@@ -232,11 +250,13 @@ public sealed class CompilerManifestArtifactTests {
     }
 
     [Test]
-    public void EffectEvidenceExactlyMatchesManifestAndFailsClosed() {
+    public void EffectEvidenceExactlyMatchesManifestAndFailsClosed()
+    {
         var valid = CreateEffectArtifact();
         var claim = valid.Manifest.Claims.Single();
         var evidence = valid.Callables.Single().EffectClaims.Single();
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(claim.Kind, Is.EqualTo(WorkerClaimKind.Effect));
             Assert.That(claim.EffectContractKind,
                 Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
@@ -260,7 +280,8 @@ public sealed class CompilerManifestArtifactTests {
             value => value.EffectClaims[0].Certainty =
                 WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary
         ];
-        foreach (var corrupt in corruptions) {
+        foreach (var corrupt in corruptions)
+        {
             var artifact = CreateEffectArtifact();
             corrupt(artifact.Callables[0]);
             Assert.Throws<InvalidDataException>((Action)(() =>
@@ -269,7 +290,8 @@ public sealed class CompilerManifestArtifactTests {
     }
 
     [Test]
-    public void DefiniteEffectViolationCarriesSealedSourceWitness() {
+    public void DefiniteEffectViolationCarriesSealedSourceWitness()
+    {
         var artifact = CreateContractArtifact(
             """
             using System;
@@ -282,7 +304,8 @@ public sealed class CompilerManifestArtifactTests {
             """);
         var evidence = artifact.Callables.Single().EffectClaims.Single();
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 evidence.Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Refuted));
@@ -306,7 +329,8 @@ public sealed class CompilerManifestArtifactTests {
     }
 
     [Test]
-    public void ContractPredicatesAreBoundToCompilerInventory() {
+    public void ContractPredicatesAreBoundToCompilerInventory()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -330,7 +354,8 @@ public sealed class CompilerManifestArtifactTests {
     }
 
     [Test]
-    public void AddedPreconditionCannotPassHydration() {
+    public void AddedPreconditionCannotPassHydration()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -356,7 +381,8 @@ public sealed class CompilerManifestArtifactTests {
             PredicateSha256 = requires.PredicateSha256
         }];
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(artifact.Manifest.Callables[0].Assumptions.Count(
                 static item => item.Kind == WorkerAssumptionKind.Precondition), Is.EqualTo(1));
             Assert.Throws<InvalidDataException>((Action)(() =>
@@ -365,7 +391,8 @@ public sealed class CompilerManifestArtifactTests {
     }
 
     [Test]
-    public void ProgramEntryIsCanonicalAndLegacyInstructionOffsetIsRejected() {
+    public void ProgramEntryIsCanonicalAndLegacyInstructionOffsetIsRejected()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -379,7 +406,8 @@ public sealed class CompilerManifestArtifactTests {
             """;
         var artifact = CreateContractArtifact(source);
         var graph = artifact.Callables[0].Graph!;
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(graph.Entry, Is.Zero);
             Assert.That(graph.Blocks, Has.Length.GreaterThan(1));
         }
@@ -397,7 +425,8 @@ public sealed class CompilerManifestArtifactTests {
     }
 
     [Test]
-    public async Task SpecCallSetAndCompilerCallIdentityFailClosed() {
+    public async Task SpecCallSetAndCompilerCallIdentityFailClosed()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -410,14 +439,16 @@ public sealed class CompilerManifestArtifactTests {
             """;
         var valid = CreateContractArtifact(source);
         var body = valid.Callables[0].Body!;
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(body.Calls.Single().Identity, Is.EqualTo("M:System.Array.Empty``1"));
             Assert.That(body.SpecCalls.Single().WitnessIdentifier, Is.EqualTo("bcl.array.empty"));
         }
         foreach (var descriptors in new Func<CompilerSpecCallArtifact[], CompilerSpecCallArtifact[]>[] {
                      static _ => [],
                      static values => [values[0], values[0]]
-                 }) {
+                 })
+        {
             var artifact = CreateContractArtifact(source);
             artifact.Callables[0].Body!.SpecCalls = descriptors(artifact.Callables[0].Body!.SpecCalls);
             Assert.Throws<InvalidDataException>((Action)(() =>
@@ -425,7 +456,8 @@ public sealed class CompilerManifestArtifactTests {
         }
         foreach (var identities in new Func<CompilerCallIdentityArtifact[], CompilerCallIdentityArtifact[]>[] {
                      static _ => [], static values => [values[0], values[0]]
-                 }) {
+                 })
+        {
             var artifact = CreateContractArtifact(source);
             artifact.Callables[0].Body!.Calls = identities(artifact.Callables[0].Body!.Calls);
             Assert.Throws<InvalidDataException>((Action)(() =>
@@ -439,14 +471,16 @@ public sealed class CompilerManifestArtifactTests {
         var results = await verifier.VerifyAsync(target,
             new MethodResourceBudget(null, WorkerBudgets.DefaultQueryRlimit, WorkerBudgets.DefaultMethodRlimit),
             CancellationToken.None);
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
         }
     }
 
     [Test]
-    public void CanonicalVariableEvidenceFailsClosed() {
+    public void CanonicalVariableEvidenceFailsClosed()
+    {
         Action<CompilerCallableArtifact>[] corruptions = [
             value => value.Variables[1].Variable = value.Variables[0].Variable,
             value => value.Variables[0].Ordinal = 1,
@@ -456,7 +490,8 @@ public sealed class CompilerManifestArtifactTests {
             value => value.Variables[1].Role =
                 CompilerVariableRole.Receiver
         ];
-        foreach (var corrupt in corruptions) {
+        foreach (var corrupt in corruptions)
+        {
             var artifact = CreateContractArtifact();
             corrupt(artifact.Callables[0]);
             Assert.Throws<InvalidDataException>((Action)(() =>
@@ -465,7 +500,8 @@ public sealed class CompilerManifestArtifactTests {
     }
 
     [Test]
-    public void ProgramParameterBindingsFailClosed() {
+    public void ProgramParameterBindingsFailClosed()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -484,7 +520,8 @@ public sealed class CompilerManifestArtifactTests {
             value => (value.Body!.ParameterBindings[0].Target, value.Body.ParameterBindings[1].Target) =
                 (value.Body.ParameterBindings[1].Target, value.Body.ParameterBindings[0].Target)
         ];
-        foreach (var corrupt in corruptions) {
+        foreach (var corrupt in corruptions)
+        {
             var artifact = CreateContractArtifact(source);
             Assert.That(artifact.Callables[0].Body!.ParameterBindings, Has.Length.EqualTo(2));
             corrupt(artifact.Callables[0]);
@@ -494,7 +531,8 @@ public sealed class CompilerManifestArtifactTests {
     }
 
     [Test]
-    public void SameShapedMemberSubstitutionFailsClosed() {
+    public void SameShapedMemberSubstitutionFailsClosed()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -511,7 +549,8 @@ public sealed class CompilerManifestArtifactTests {
             .Single(static instruction => instruction.Kind == IrInstructionKind.Call);
         var original = graph.Members[call.B];
         graph.Identities = [.. graph.Identities, graph.Identities.Length];
-        graph.Members[call.B] = new PortableIrMember {
+        graph.Members[call.B] = new PortableIrMember
+        {
             Identity = graph.Identities.Length - 1,
             DeclaringType = original.DeclaringType,
             Name = original.Name,
@@ -526,7 +565,8 @@ public sealed class CompilerManifestArtifactTests {
     }
 
     [Test]
-    public void ResolverDependentDirectivesFailClosed() {
+    public void ResolverDependentDirectivesFailClosed()
+    {
         var parse = new CSharpParseOptions(
             LanguageVersion.CSharp12,
             kind: SourceCodeKind.Script);
@@ -549,7 +589,8 @@ public sealed class CompilerManifestArtifactTests {
 
     private static CompilerManifestArtifact CreateArtifact(
         CSharpParseOptions? parse = null,
-        string source = "internal sealed class Subject {}\n") {
+        string source = "internal sealed class Subject {}\n")
+    {
         var compilation = CreateCompilation(
             parse ?? new CSharpParseOptions(LanguageVersion.CSharp12),
             source,
@@ -564,7 +605,8 @@ public sealed class CompilerManifestArtifactTests {
             CancellationToken.None);
     }
 
-    private static CompilerManifestArtifact CreateContractArtifact(string? source = null) {
+    private static CompilerManifestArtifact CreateContractArtifact(string? source = null)
+    {
         var parse = new CSharpParseOptions(
             LanguageVersion.CSharp12,
             preprocessorSymbols: [Contract.ConditionalSymbol]);
@@ -594,8 +636,9 @@ public sealed class CompilerManifestArtifactTests {
             CancellationToken.None);
     }
 
-    private static CompilerManifestArtifact CreateEffectArtifact() =>
-        CreateContractArtifact(
+    private static CompilerManifestArtifact CreateEffectArtifact()
+    {
+        return CreateContractArtifact(
             """
             using SharpProof.Attributes;
             internal static class Subject {
@@ -603,26 +646,34 @@ public sealed class CompilerManifestArtifactTests {
                 internal static int Identity(int value) => value;
             }
             """);
+    }
 
-    private sealed class UnexpectedBackend : ISmtBackend {
+    private sealed class UnexpectedBackend : ISmtBackend
+    {
         public Task<BackendCheckResult> CheckAsync(
-            VerificationQuery query, CancellationToken cancellationToken) =>
+            VerificationQuery query, CancellationToken cancellationToken)
+        {
             throw new AssertionException("A mismatched spec witness reached the backend.");
+        }
     }
 
     private static CompilerAdditionalFileSnapshot AdditionalFile(
         string name,
-        char hash) =>
-        new() {
+        char hash)
+    {
+        return new()
+        {
             Path = Path.GetFullPath(Path.Combine(
                     TestContext.CurrentContext.WorkDirectory,
                     name))
                 .Replace('\\', '/'),
             Sha256 = new string(hash, 64)
         };
+    }
 
     private static void AssertMalformedAdditionalFiles(
-        params CompilerAdditionalFileSnapshot[] files) {
+        params CompilerAdditionalFileSnapshot[] files)
+    {
         var artifact = CreateArtifact();
         artifact.Compilation.AdditionalFiles = files;
         artifact.CompilationSha256 =
@@ -640,7 +691,8 @@ public sealed class CompilerManifestArtifactTests {
     private static CSharpCompilation CreateCompilation(
         CSharpParseOptions parse,
         string source,
-        bool includeContractReference) {
+        bool includeContractReference)
+    {
         var paths = ((string)AppContext.GetData(
                 "TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator)

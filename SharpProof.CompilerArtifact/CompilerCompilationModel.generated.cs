@@ -8,7 +8,8 @@
 
 namespace SharpProof.CompilerArtifact;
 
-internal sealed class CompilerCompilationSnapshot {
+internal sealed class CompilerCompilationSnapshot
+{
     public string ProjectDirectory { get; set; } = string.Empty;
     public string AssemblyName { get; set; } = string.Empty;
     public string AssemblyIdentity { get; set; } = string.Empty;
@@ -23,7 +24,8 @@ internal sealed class CompilerCompilationSnapshot {
     public CompilerAdditionalFileSnapshot[] AdditionalFiles { get; set; } = [];
 }
 
-internal sealed class CompilerCompilationOptionsSnapshot {
+internal sealed class CompilerCompilationOptionsSnapshot
+{
     public string OutputKind { get; set; } = string.Empty;
     public string OptimizationLevel { get; set; } = string.Empty;
     public string Platform { get; set; } = string.Empty;
@@ -38,7 +40,8 @@ internal sealed class CompilerCompilationOptionsSnapshot {
     public string ResolverPolicy { get; set; } = string.Empty;
 }
 
-internal sealed class CompilerSyntaxTreeSnapshot {
+internal sealed class CompilerSyntaxTreeSnapshot
+{
     public string Path { get; set; } = string.Empty;
     public string Sha256 { get; set; } = string.Empty;
     public string LanguageVersion { get; set; } = string.Empty;
@@ -48,7 +51,8 @@ internal sealed class CompilerSyntaxTreeSnapshot {
     public CompilerFeatureSnapshot[] Features { get; set; } = [];
 }
 
-internal sealed class CompilerReferenceSnapshot {
+internal sealed class CompilerReferenceSnapshot
+{
     public string Path { get; set; } = string.Empty;
     public string Kind { get; set; } = string.Empty;
     public bool EmbedInteropTypes { get; set; }
@@ -57,12 +61,14 @@ internal sealed class CompilerReferenceSnapshot {
     public string Sha256 { get; set; } = string.Empty;
 }
 
-internal sealed class CompilerAdditionalFileSnapshot {
+internal sealed class CompilerAdditionalFileSnapshot
+{
     public string Path { get; set; } = string.Empty;
     public string Sha256 { get; set; } = string.Empty;
 }
 
-internal sealed class CompilerFeatureSnapshot {
+internal sealed class CompilerFeatureSnapshot
+{
     public string Key { get; set; } = string.Empty;
     public string Value { get; set; } = string.Empty;
 }

@@ -8,31 +8,36 @@
 
 namespace SharpProof.CompilerArtifact;
 
-internal static class CompilerManifestArtifactVersions {
+internal static class CompilerManifestArtifactVersions
+{
     internal const string Schema = "SharpProof.CompilerManifest";
     internal const int Current = 5;
 }
 
-internal enum CompilerContractKind {
+internal enum CompilerContractKind
+{
     Requires = 0,
     Ensures = 1,
     Assume = 2
 }
 
-internal enum CompilerContractEvidence {
+internal enum CompilerContractEvidence
+{
     CompilerBoundInvocation = 0,
     ClosedAttribute = 1,
     Companion = 2
 }
 
-internal enum CompilerVariableRole {
+internal enum CompilerVariableRole
+{
     Receiver = 0,
     Parameter = 1,
     Result = 2,
     PreState = 3
 }
 
-internal enum CompilerPreparedBodyKind {
+internal enum CompilerPreparedBodyKind
+{
     Trivial = 0,
     Program = 1
 }
@@ -44,7 +49,8 @@ internal sealed record CompilerCallablePreparation(
     ImmutableArray<CompilerCanonicalVariable> Variables,
     WorkerClaimReason FailureReason,
     CompilerPreparedBody? Body
-) {
+)
+{
     internal bool IsSuccess => FailureReason == WorkerClaimReason.None;
     internal ImmutableArray<CompilerEffectClaimArtifact> EffectClaims { get; init; } = [];
 }
@@ -76,7 +82,8 @@ internal sealed record CompilerPreparedBody(
     IrProgram? Program,
     ImmutableDictionary<IrVarId, IrVarId> ParameterBindings,
     ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> SpecCalls
-) {
+)
+{
     internal const int MaximumInstructions = 4096;
 
     internal static CompilerPreparedBody Trivial() =>
@@ -104,7 +111,8 @@ internal sealed record CompilerPreparedSpecCall(
     bool ConsumesMemoryHavoc
 );
 
-internal sealed class CompilerCallableArtifact {
+internal sealed class CompilerCallableArtifact
+{
     public string CallableId { get; set; } = string.Empty;
     public WorkerClaimReason FailureReason { get; set; }
     public PortableIrGraph? Graph { get; set; }
@@ -114,7 +122,8 @@ internal sealed class CompilerCallableArtifact {
     public CompilerEffectClaimArtifact[] EffectClaims { get; set; } = [];
 }
 
-internal sealed class CompilerEffectClaimArtifact {
+internal sealed class CompilerEffectClaimArtifact
+{
     public string ClaimId { get; set; } = string.Empty;
     public WorkerEffectContractKind ContractKind { get; set; }
     public WorkerClaimOutcome Outcome { get; set; }
@@ -126,13 +135,15 @@ internal sealed class CompilerEffectClaimArtifact {
     public string EvidenceSha256 { get; set; } = string.Empty;
 }
 
-internal sealed class CompilerEffectConstraintArtifact {
+internal sealed class CompilerEffectConstraintArtifact
+{
     public WorkerEffectSet AllowedEffects { get; set; }
     public WorkerEffectCapabilitySet AllowedCapabilities { get; set; }
     public string[] AllowedExceptionTypes { get; set; } = [];
 }
 
-internal sealed class CompilerClauseArtifact {
+internal sealed class CompilerClauseArtifact
+{
     public CompilerContractKind Kind { get; set; }
     public CompilerContractEvidence Evidence { get; set; }
     public int Root { get; set; } = -1;
@@ -141,7 +152,8 @@ internal sealed class CompilerClauseArtifact {
     public string PredicateSha256 { get; set; } = string.Empty;
 }
 
-internal sealed class CompilerVariableArtifact {
+internal sealed class CompilerVariableArtifact
+{
     public CompilerVariableRole Role { get; set; }
     public int Ordinal { get; set; }
     public int Variable { get; set; } = -1;
@@ -151,36 +163,42 @@ internal sealed class CompilerVariableArtifact {
     public string ModelLabel { get; set; } = string.Empty;
 }
 
-internal sealed class CompilerBodyArtifact {
+internal sealed class CompilerBodyArtifact
+{
     public CompilerPreparedBodyKind Kind { get; set; }
     public CompilerVariableMappingArtifact[] ParameterBindings { get; set; } = [];
     public CompilerCallIdentityArtifact[] Calls { get; set; } = [];
     public CompilerSpecCallArtifact[] SpecCalls { get; set; } = [];
 }
 
-internal sealed class CompilerVariableMappingArtifact {
+internal sealed class CompilerVariableMappingArtifact
+{
     public int Source { get; set; } = -1;
     public int Target { get; set; } = -1;
 }
 
-internal sealed class CompilerCallIdentityArtifact {
+internal sealed class CompilerCallIdentityArtifact
+{
     public int Instruction { get; set; } = -1;
     public string Identity { get; set; } = string.Empty;
 }
 
-internal sealed class CompilerSpecCallArtifact {
+internal sealed class CompilerSpecCallArtifact
+{
     public int Instruction { get; set; } = -1;
     public string WitnessIdentifier { get; set; } = string.Empty;
     public bool ConsumesMemoryHavoc { get; set; }
 }
 
-internal sealed class CompilerDiagnosticArtifact {
+internal sealed class CompilerDiagnosticArtifact
+{
     public string Code { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
     public WorkerSourceLocation Location { get; set; } = new();
 }
 
-internal sealed class CompilerManifestArtifact {
+internal sealed class CompilerManifestArtifact
+{
     public string Schema { get; set; } = CompilerManifestArtifactVersions.Schema;
     public int SchemaVersion { get; set; } = CompilerManifestArtifactVersions.Current;
     public string ProtocolVersion { get; set; } = WorkerProtocolVersions.Current;
@@ -193,11 +211,13 @@ internal sealed class CompilerManifestArtifact {
     public CompilerCallableArtifact[] Callables { get; set; } = [];
 }
 
-internal static class CompilerEffectClaimArtifactCodec {
+internal static class CompilerEffectClaimArtifactCodec
+{
     internal static void Seal(CompilerEffectClaimArtifact value) =>
         value.EvidenceSha256 = ComputeSha256(value);
 
-    internal static void Validate(CompilerEffectClaimArtifact value) {
+    internal static void Validate(CompilerEffectClaimArtifact value)
+    {
         if (value == null || string.IsNullOrWhiteSpace(value.ClaimId) ||
             string.IsNullOrWhiteSpace(value.Evidence) ||
             !WorkerProtocolJson.IsDefined(value.ContractKind, WorkerEffectContractKind.Unspecified) ||
@@ -211,7 +231,8 @@ internal static class CompilerEffectClaimArtifactCodec {
 
     private static bool HasValidOutcome(CompilerEffectClaimArtifact value) =>
         WorkerProtocolJson.HasValidEffectCertainty(value.Outcome, value.Reason, value.Certainty) &&
-        (value.Outcome, value.Reason, value.Certainty, value.Witness) switch {
+        (value.Outcome, value.Reason, value.Certainty, value.Witness) switch
+        {
             (WorkerClaimOutcome.Proven, WorkerClaimReason.None, _, null) => true,
             (WorkerClaimOutcome.Refuted, WorkerClaimReason.None,
                 _, { } witness) => WorkerProtocolJson.HasValidEffectWitness(witness) &&
@@ -226,13 +247,15 @@ internal static class CompilerEffectClaimArtifactCodec {
 
     private static bool HasValidConstraint(
         WorkerEffectContractKind kind,
-        CompilerEffectConstraintArtifact? constraint) {
+        CompilerEffectConstraintArtifact? constraint)
+    {
         if (constraint == null ||
             !WorkerProtocolJson.HasKnownEffects(
                 constraint.AllowedEffects, constraint.AllowedCapabilities) ||
             !WorkerProtocolJson.AreDistinctNonblank(constraint.AllowedExceptionTypes))
             return false;
-        return kind switch {
+        return kind switch
+        {
             WorkerEffectContractKind.AllowedCapabilities =>
                 constraint.AllowedEffects == WorkerEffectSet.None &&
                 constraint.AllowedExceptionTypes.Length == 0,
@@ -246,7 +269,8 @@ internal static class CompilerEffectClaimArtifactCodec {
         };
     }
 
-    private static string ComputeSha256(CompilerEffectClaimArtifact value) {
+    private static string ComputeSha256(CompilerEffectClaimArtifact value)
+    {
         var witness = value.Witness;
         var constraint = value.Constraint;
         using var hash = new CanonicalHashWriter();

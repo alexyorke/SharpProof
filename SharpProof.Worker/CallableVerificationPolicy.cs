@@ -1,20 +1,29 @@
 namespace SharpProof.Worker;
 
-internal static class CallableVerificationPolicy {
+internal static class CallableVerificationPolicy
+{
     internal static async Task<CallableVerificationResult> VerifyTargetAsync(
         CallableVerifier verifier, CompilerCallablePreparation target, WorkerBudgets budgets,
         Func<long>? readConsumedResourceCount, int methodWallTimeMilliseconds,
-        CancellationTokenSource projectBoundary, CancellationToken callerCancellation) {
+        CancellationTokenSource projectBoundary, CancellationToken callerCancellation)
+    {
         if (callerCancellation.IsCancellationRequested)
+        {
             return Unknown(target, WorkerClaimReason.Canceled, WorkerCallableCoverageReason.Canceled);
+        }
+
         if (!target.IsSuccess)
+        {
             return Unknown(target, target.FailureReason,
                 target.FailureReason == WorkerClaimReason.UnsupportedCallable
                     ? WorkerCallableCoverageReason.UnsupportedCallable
                     : WorkerCallableCoverageReason.SemanticUnknown);
+        }
+
         using var methodBoundary = CancellationTokenSource.CreateLinkedTokenSource(projectBoundary.Token);
         methodBoundary.CancelAfter(methodWallTimeMilliseconds);
-        try {
+        try
+        {
             var postconditions = await verifier.VerifyAsync(target,
                 new MethodResourceBudget(readConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit),
                 methodBoundary.Token).ConfigureAwait(false);
@@ -31,17 +40,22 @@ internal static class CallableVerificationPolicy {
                 : WorkerCallableCoverageReason.None;
             return Result(target, reason, records);
         }
-        catch (OperationCanceledException) {
+        catch (OperationCanceledException)
+        {
             if (callerCancellation.IsCancellationRequested)
+            {
                 return Unknown(target, WorkerClaimReason.Canceled,
                     WorkerCallableCoverageReason.Canceled);
+            }
+
             var timeout = projectBoundary.IsCancellationRequested
                 ? (WorkerClaimReason.ProjectTimeout, WorkerCallableCoverageReason.ProjectTimeout)
                 : (WorkerClaimReason.MethodTimeout, WorkerCallableCoverageReason.MethodTimeout);
             return Unknown(target, timeout.Item1, timeout.Item2);
         }
         catch (Exception exception) when (
-            exception is not OutOfMemoryException and not StackOverflowException) {
+            exception is not OutOfMemoryException and not StackOverflowException)
+        {
             return Unknown(target, WorkerClaimReason.InfrastructureFailure,
                 WorkerCallableCoverageReason.InfrastructureFailure);
         }
@@ -49,14 +63,18 @@ internal static class CallableVerificationPolicy {
 
     internal static CallableVerificationResult Unknown(
         CompilerCallablePreparation target, WorkerClaimReason claimReason,
-        WorkerCallableCoverageReason callableReason) =>
-        Result(target, callableReason, CallableClaimResultAssembler.Unknowns(target, claimReason));
+        WorkerCallableCoverageReason callableReason)
+    {
+        return Result(target, callableReason, CallableClaimResultAssembler.Unknowns(target, claimReason));
+    }
 
     private static CallableVerificationResult Result(
         CompilerCallablePreparation target, WorkerCallableCoverageReason reason,
-        ImmutableArray<WorkerClaimResult> claims) =>
-        new(
-            new WorkerCallableResult {
+        ImmutableArray<WorkerClaimResult> claims)
+    {
+        return new(
+            new WorkerCallableResult
+            {
                 CallableId = target.Entry.CallableId,
                 Coverage = reason == WorkerCallableCoverageReason.None
                     ? WorkerCallableCoverage.Complete
@@ -65,6 +83,7 @@ internal static class CallableVerificationPolicy {
                 Assumptions = [.. target.Entry.Assumptions]
             },
             claims);
+    }
 }
 
 internal sealed record CallableVerificationResult(

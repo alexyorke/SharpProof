@@ -28,6 +28,10 @@ jobs:
         shell: pwsh
         run: .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
 
+      - name: Verify standard C# formatting
+        shell: pwsh
+        run: .\scripts\Format-CSharp.ps1 -Verify
+
       - name: Verify maintained documentation
         shell: pwsh
         run: .\scripts\Generate-Readme.ps1 -Verify

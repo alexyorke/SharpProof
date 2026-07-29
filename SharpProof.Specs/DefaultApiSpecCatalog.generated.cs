@@ -5,11 +5,13 @@
 // </auto-generated>
 namespace SharpProof.Specs;
 
-public sealed partial class ApiSpecTable {
+public sealed partial class ApiSpecTable
+{
     public const string DefaultTableIdentity = "SharpProof.ApiSpec.Default";
     public const string DefaultTableVersion = "3";
 
-    private static ImmutableArray<ApiSpecDeclaration> CreateDefaultDeclarations() {
+    private static ImmutableArray<ApiSpecDeclaration> CreateDefaultDeclarations()
+    {
         ImmutableArray<ApiSpecAssemblyIdentity> assemblySetFramework = [
             new("System.Private.CoreLib", "7cec85d7bea7798e", ApiSpecReferenceFamily.MicrosoftNetCoreRuntime),
             new("mscorlib", "b77a5c561934e089", ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),

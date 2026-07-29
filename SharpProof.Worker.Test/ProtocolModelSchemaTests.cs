@@ -8,7 +8,8 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class ProtocolModelSchemaTests {
+public sealed class ProtocolModelSchemaTests
+{
     private static readonly Assembly s_protocolAssembly =
         typeof(WorkerVerifyRequest).Assembly;
     private static readonly Type s_protocolMetadata = s_protocolAssembly.GetType(
@@ -17,11 +18,13 @@ public sealed class ProtocolModelSchemaTests {
     private static readonly NullabilityInfoContext s_nullability = new();
 
     [Test]
-    public void SchemaPinsTheReleasedWireVersions() {
+    public void SchemaPinsTheReleasedWireVersions()
+    {
         using var schema = ReadSchema();
         var versions = schema.RootElement.GetProperty("versionMembers");
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 ResolveMemberValue(versions.GetProperty("protocol").GetString()!),
                 Is.EqualTo("8"));
@@ -38,16 +41,19 @@ public sealed class ProtocolModelSchemaTests {
     }
 
     [Test]
-    public void GeneratedDeclarationsMatchSchemaExactly() {
+    public void GeneratedDeclarationsMatchSchemaExactly()
+    {
         using var schema = ReadSchema();
         foreach (var declaration in schema.RootElement
                      .GetProperty("declarations")
-                     .EnumerateArray()) {
+                     .EnumerateArray())
+        {
             var name = declaration.GetProperty("name").GetString()!;
             var type = s_protocolAssembly.GetType(
                 "SharpProof.Worker.Protocol." + name,
                 throwOnError: true)!;
-            switch (declaration.GetProperty("kind").GetString()) {
+            switch (declaration.GetProperty("kind").GetString())
+            {
                 case "staticClass":
                     Assert.That(type.IsAbstract && type.IsSealed, Is.True, name);
                     AssertConstants(type, declaration);
@@ -68,7 +74,8 @@ public sealed class ProtocolModelSchemaTests {
     }
 
     [Test]
-    public void GeneratedRuntimeMetadataMatchesSchemaExactly() {
+    public void GeneratedRuntimeMetadataMatchesSchemaExactly()
+    {
         using var schema = ReadSchema();
         AssertRequiredJsonRoots(schema.RootElement);
         AssertDefinedEnums(schema.RootElement);
@@ -77,17 +84,20 @@ public sealed class ProtocolModelSchemaTests {
     }
 
     [Test]
-    public void GeneratedValidationTablesMatchEveryDeclaredState() {
+    public void GeneratedValidationTablesMatchEveryDeclaredState()
+    {
         using var schema = ReadSchema();
         foreach (var table in schema.RootElement
                      .GetProperty("validationTables")
-                     .EnumerateArray()) {
+                     .EnumerateArray())
+        {
             var name = table.GetProperty("name").GetString()!;
             var method = s_protocolMetadata.GetMethod(
                 "Matches" + name,
                 BindingFlags.NonPublic | BindingFlags.Static)!;
             foreach (var arguments in ValidationTableArguments(
-                         table.GetProperty("parameters"))) {
+                         table.GetProperty("parameters")))
+            {
                 Assert.That(
                     method.Invoke(null, arguments),
                     Is.EqualTo(TableContains(table, arguments)),
@@ -96,13 +106,15 @@ public sealed class ProtocolModelSchemaTests {
         }
     }
 
-    private static void AssertRequiredJsonRoots(JsonElement schema) {
+    private static void AssertRequiredJsonRoots(JsonElement schema)
+    {
         var declarations = schema.GetProperty("declarations")
             .EnumerateArray()
             .ToDictionary(
                 static declaration => declaration.GetProperty("name").GetString()!,
                 StringComparer.Ordinal);
-        foreach (var root in schema.GetProperty("requiredJsonRoots").EnumerateArray()) {
+        foreach (var root in schema.GetProperty("requiredJsonRoots").EnumerateArray())
+        {
             var name = root.GetString()!;
             var expected = declarations[name].GetProperty("properties")
                 .EnumerateArray()
@@ -114,7 +126,8 @@ public sealed class ProtocolModelSchemaTests {
         }
     }
 
-    private static void AssertDefinedEnums(JsonElement schema) {
+    private static void AssertDefinedEnums(JsonElement schema)
+    {
         var defined = schema.GetProperty("definedEnums")
             .EnumerateArray()
             .Select(static value => value.GetString()!)
@@ -125,11 +138,13 @@ public sealed class ProtocolModelSchemaTests {
         foreach (var declaration in schema.GetProperty("declarations")
                      .EnumerateArray()
                      .Where(static value =>
-                         value.GetProperty("kind").GetString() == "enum")) {
+                         value.GetProperty("kind").GetString() == "enum"))
+        {
             var name = declaration.GetProperty("name").GetString()!;
             var type = ProtocolType(name);
             var typedDefinition = definition.MakeGenericMethod(type);
-            foreach (var member in declaration.GetProperty("members").EnumerateArray()) {
+            foreach (var member in declaration.GetProperty("members").EnumerateArray())
+            {
                 var value = Enum.Parse(type, member.GetProperty("name").GetString()!);
                 Assert.That(
                     typedDefinition.Invoke(null, [value]),
@@ -145,7 +160,8 @@ public sealed class ProtocolModelSchemaTests {
         }
     }
 
-    private static void AssertManifestNames(JsonElement schema) {
+    private static void AssertManifestNames(JsonElement schema)
+    {
         var included = schema.GetProperty("manifestNameEnums")
             .EnumerateArray()
             .Select(static value => value.GetString()!)
@@ -156,10 +172,12 @@ public sealed class ProtocolModelSchemaTests {
         foreach (var declaration in schema.GetProperty("declarations")
                      .EnumerateArray()
                      .Where(static value =>
-                         value.GetProperty("kind").GetString() == "enum")) {
+                         value.GetProperty("kind").GetString() == "enum"))
+        {
             var name = declaration.GetProperty("name").GetString()!;
             var type = ProtocolType(name);
-            foreach (var member in declaration.GetProperty("members").EnumerateArray()) {
+            foreach (var member in declaration.GetProperty("members").EnumerateArray())
+            {
                 var memberName = member.GetProperty("name").GetString()!;
                 var value = Enum.Parse(type, memberName);
                 Assert.That(
@@ -170,11 +188,14 @@ public sealed class ProtocolModelSchemaTests {
         }
     }
 
-    private static void AssertValidationPlans(JsonElement schema) {
-        foreach (var plan in schema.GetProperty("validationPlans").EnumerateArray()) {
+    private static void AssertValidationPlans(JsonElement schema)
+    {
+        foreach (var plan in schema.GetProperty("validationPlans").EnumerateArray())
+        {
             var name = plan.GetProperty("name").GetString()!;
             if (plan.TryGetProperty("mode", out var mode) &&
-                mode.GetString() == "predicate") {
+                mode.GetString() == "predicate")
+            {
                 Assert.That(
                     s_protocolMetadata.GetMethod(
                         "Is" + name + "Valid",
@@ -196,9 +217,11 @@ public sealed class ProtocolModelSchemaTests {
         }
     }
 
-    private static IEnumerable<object?[]> ValidationTableArguments(JsonElement parameters) {
+    private static IEnumerable<object?[]> ValidationTableArguments(JsonElement parameters)
+    {
         IEnumerable<object?[]> result = [[]];
-        foreach (var parameter in parameters.EnumerateArray()) {
+        foreach (var parameter in parameters.EnumerateArray())
+        {
             var typeName = parameter.GetProperty("type").GetString()!;
             object?[] values = typeName == "bool"
                 ? [false, true]
@@ -210,8 +233,9 @@ public sealed class ProtocolModelSchemaTests {
         return result;
     }
 
-    private static bool TableContains(JsonElement table, object?[] arguments) =>
-        table.GetProperty("rows").EnumerateArray().Any(row =>
+    private static bool TableContains(JsonElement table, object?[] arguments)
+    {
+        return table.GetProperty("rows").EnumerateArray().Any(row =>
             row.EnumerateArray().Select((value, index) =>
                     value.ValueKind == JsonValueKind.String && value.GetString() == "*" ||
                     value.ValueKind == JsonValueKind.String &&
@@ -219,15 +243,22 @@ public sealed class ProtocolModelSchemaTests {
                     value.ValueKind is JsonValueKind.True or JsonValueKind.False &&
                     value.GetBoolean() == (bool)arguments[index]!)
                 .All(static value => value));
+    }
 
-    private static Type ProtocolType(string name) =>
-        s_protocolAssembly.GetType(
+    private static Type ProtocolType(string name)
+    {
+        return s_protocolAssembly.GetType(
             "SharpProof.Worker.Protocol." + name,
             throwOnError: true)!;
+    }
 
-    private static void AssertConstants(Type type, JsonElement declaration) {
+    private static void AssertConstants(Type type, JsonElement declaration)
+    {
         if (!declaration.TryGetProperty("constants", out var constants))
+        {
             return;
+        }
+
         var expectedNames = constants.EnumerateArray()
             .Select(static constant =>
                 constant.GetProperty("name").GetString())
@@ -244,20 +275,26 @@ public sealed class ProtocolModelSchemaTests {
             Is.EqualTo(expectedNames),
             type.Name);
         var specifications = constants.EnumerateArray().ToArray();
-        for (var index = 0; index < fields.Length; index++) {
+        for (var index = 0; index < fields.Length; index++)
+        {
             var expected = specifications[index].GetProperty("value");
             var actual = fields[index].GetRawConstantValue();
             if (expected.ValueKind == JsonValueKind.String)
+            {
                 Assert.That(actual, Is.EqualTo(expected.GetString()), fields[index].Name);
+            }
             else
+            {
                 Assert.That(
                     Convert.ToInt64(actual, CultureInfo.InvariantCulture),
                     Is.EqualTo(expected.GetInt64()),
                     fields[index].Name);
+            }
         }
     }
 
-    private static void AssertEnum(Type type, JsonElement declaration) {
+    private static void AssertEnum(Type type, JsonElement declaration)
+    {
         Assert.That(type.IsEnum, Is.True, type.Name);
         var underlying = declaration.GetProperty("underlyingType").GetString();
         Assert.That(
@@ -282,7 +319,8 @@ public sealed class ProtocolModelSchemaTests {
             Is.EqualTo(members.Select(static member =>
                 member.GetProperty("value").GetInt64())),
             type.Name);
-        foreach (var member in members) {
+        foreach (var member in members)
+        {
             var name = member.GetProperty("name").GetString()!;
             var value = Enum.Parse(type, name);
             Assert.That(
@@ -297,7 +335,8 @@ public sealed class ProtocolModelSchemaTests {
 
     private static void AssertProperties(
         Type type,
-        JsonElement declaration) {
+        JsonElement declaration)
+    {
         var specifications = declaration.GetProperty("properties")
             .EnumerateArray()
             .ToArray();
@@ -324,7 +363,8 @@ public sealed class ProtocolModelSchemaTests {
                 specification.GetProperty("jsonName").GetString())),
             type.Name);
 
-        for (var index = 0; index < properties.Length; index++) {
+        for (var index = 0; index < properties.Length; index++)
+        {
             var property = properties[index];
             var specification = specifications[index];
             Assert.That(
@@ -343,7 +383,10 @@ public sealed class ProtocolModelSchemaTests {
             var initial = property.GetValue(instance);
             AssertDefault(type, property, initial, specification);
             if (!expectsSetter)
+            {
                 continue;
+            }
+
             var replacement = ReplacementValue(property.PropertyType, initial);
             property.SetValue(instance, replacement);
             Assert.That(
@@ -357,10 +400,12 @@ public sealed class ProtocolModelSchemaTests {
         Type declaringType,
         PropertyInfo property,
         object? actual,
-        JsonElement specification) {
+        JsonElement specification)
+    {
         var defaultValue = specification.GetProperty("default");
         var kind = defaultValue.GetProperty("kind").GetString();
-        switch (kind) {
+        switch (kind)
+        {
             case "implicit":
                 Assert.That(
                     actual,
@@ -387,7 +432,10 @@ public sealed class ProtocolModelSchemaTests {
                     defaultValue.GetProperty("value").GetString()!,
                     declaringType);
                 if (property.PropertyType.IsEnum)
+                {
                     expected = Enum.ToObject(property.PropertyType, expected!);
+                }
+
                 Assert.That(actual, Is.EqualTo(expected), property.Name);
                 break;
             case "constructorAssigned":
@@ -408,29 +456,53 @@ public sealed class ProtocolModelSchemaTests {
         }
     }
 
-    private static object CreateInstance(Type type) {
+    private static object CreateInstance(Type type)
+    {
         if (type != typeof(WorkerProtocolValidationResult))
+        {
             return Activator.CreateInstance(type)!;
+        }
+
         return type.GetConstructors(
                 BindingFlags.Instance | BindingFlags.NonPublic)
             .Single()
             .Invoke([Array.Empty<WorkerProtocolError>()]);
     }
 
-    private static object? ReplacementValue(Type type, object? current) {
+    private static object? ReplacementValue(Type type, object? current)
+    {
         if (type == typeof(string))
+        {
             return "changed";
+        }
+
         if (type == typeof(bool))
+        {
             return !(bool)current!;
+        }
+
         if (type == typeof(int))
+        {
             return 17;
+        }
+
         if (type == typeof(uint))
+        {
             return 17U;
+        }
+
         if (type == typeof(long))
+        {
             return 17L;
+        }
+
         if (type.IsEnum)
+        {
             return Enum.GetValues(type).GetValue(Enum.GetValues(type).Length - 1);
-        if (type.IsArray) {
+        }
+
+        if (type.IsArray)
+        {
             var elementType = type.GetElementType()!;
             var array = Array.CreateInstance(elementType, 1);
             array.SetValue(
@@ -447,7 +519,8 @@ public sealed class ProtocolModelSchemaTests {
 
     private static object? ResolveMemberValue(
         string member,
-        Type? declaringType = null) {
+        Type? declaringType = null)
+    {
         var separator = member.LastIndexOf('.');
         var type = separator < 0
             ? declaringType!
@@ -463,12 +536,18 @@ public sealed class ProtocolModelSchemaTests {
             .GetRawConstantValue();
     }
 
-    private static string SchemaType(PropertyInfo property) =>
-        SchemaType(property.PropertyType, s_nullability.Create(property));
+    private static string SchemaType(PropertyInfo property)
+    {
+        return SchemaType(property.PropertyType, s_nullability.Create(property));
+    }
 
-    private static string SchemaType(Type type, NullabilityInfo? nullability) {
+    private static string SchemaType(Type type, NullabilityInfo? nullability)
+    {
         if (type.IsArray)
+        {
             return SchemaType(type.GetElementType()!, nullability?.ElementType) + "[]";
+        }
+
         var name = type == typeof(string)
             ? "string"
             : type == typeof(bool)
@@ -499,18 +578,24 @@ public sealed class ProtocolModelSchemaTests {
             : name;
     }
 
-    private static JsonDocument ReadSchema() =>
-        JsonDocument.Parse(File.ReadAllText(Path.Combine(
+    private static JsonDocument ReadSchema()
+    {
+        return JsonDocument.Parse(File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
             "SharpProof.Worker.Protocol",
             "ProtocolModel.schema.json")));
+    }
 
-    private static string FindRepositoryRoot() {
+    private static string FindRepositoryRoot()
+    {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
              directory != null;
-             directory = directory.Parent) {
+             directory = directory.Parent)
+        {
             if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
+            {
                 return directory.FullName;
+            }
         }
         throw new InvalidOperationException("Could not find repository root.");
     }

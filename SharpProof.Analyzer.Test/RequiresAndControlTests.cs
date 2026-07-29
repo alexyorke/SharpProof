@@ -5,9 +5,11 @@ using NUnit.Framework;
 namespace SharpProof.Analyzer.Test;
 
 [TestFixture]
-public sealed class RequiresAndControlTests {
+public sealed class RequiresAndControlTests
+{
     [Test]
-    public async Task CompilerBoundFalseRequiresIsReportedAfterConcreteReplay() {
+    public async Task CompilerBoundFalseRequiresIsReportedAfterConcreteReplay()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -37,7 +39,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task UnsupportedEffectsSyntaxDoesNotHideConcretePreconditionViolation() {
+    public async Task UnsupportedEffectsSyntaxDoesNotHideConcretePreconditionViolation()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -64,7 +67,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task UnknownInvocationArgumentAndEnsuresAbstainSilently() {
+    public async Task UnknownInvocationArgumentAndEnsuresAbstainSilently()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -89,7 +93,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task NonCompletingCallPrefixCannotProduceARefutation() {
+    public async Task NonCompletingCallPrefixCannotProduceARefutation()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             #nullable enable
@@ -168,7 +173,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task AllNormallyEvaluatedArgumentsCanProduceARefutation() {
+    public async Task AllNormallyEvaluatedArgumentsCanProduceARefutation()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -192,7 +198,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task ArgumentFactsUseEachArgumentsOwnEvaluationPoint() {
+    public async Task ArgumentFactsUseEachArgumentsOwnEvaluationPoint()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -218,7 +225,8 @@ public sealed class RequiresAndControlTests {
             ["SP0027"]);
 
         Assert.That(diagnostics, Has.Length.EqualTo(1));
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(diagnostics[0].Id, Is.EqualTo("SP0027"));
             Assert.That(
                 diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
@@ -228,7 +236,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task DefinitelyNonThrowingSourcePrefixPreservesRefutation() {
+    public async Task DefinitelyNonThrowingSourcePrefixPreservesRefutation()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -256,7 +265,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task AcyclicIfElseJoinsRefinePreconditionArguments() {
+    public async Task AcyclicIfElseJoinsRefinePreconditionArguments()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -309,7 +319,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task CallerContractsAndClosedParameterFactsSeedFlow() {
+    public async Task CallerContractsAndClosedParameterFactsSeedFlow()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -355,7 +366,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task ApprovedApiResultFactsDischargeCallSitePreconditions() {
+    public async Task ApprovedApiResultFactsDischargeCallSitePreconditions()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System;
@@ -384,7 +396,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task NullGuardsAndUnreachableBranchesRefineFlow() {
+    public async Task NullGuardsAndUnreachableBranchesRefineFlow()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             #nullable enable
@@ -453,7 +466,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task UncheckedOverflowFailsClosedButConcreteViolationsReport() {
+    public async Task UncheckedOverflowFailsClosedButConcreteViolationsReport()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -492,7 +506,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task NarrowingConversionsFailClosedButConcreteViolationsReport() {
+    public async Task NarrowingConversionsFailClosedButConcreteViolationsReport()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -531,7 +546,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task ObjectInitializerEffectsFollowConstructorPreconditions() {
+    public async Task ObjectInitializerEffectsFollowConstructorPreconditions()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -566,7 +582,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task IncrementAndDecrementUpdateSubsequentIntervalFacts() {
+    public async Task IncrementAndDecrementUpdateSubsequentIntervalFacts()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -596,7 +613,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task DirectLocalInitializersAndAssignmentsReplayPreconditions() {
+    public async Task DirectLocalInitializersAndAssignmentsReplayPreconditions()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             #nullable enable
@@ -635,7 +653,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task ExpressionBodiedPropertiesReplayConcretePreconditions() {
+    public async Task ExpressionBodiedPropertiesReplayConcretePreconditions()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -659,7 +678,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task ConstructorInitializersReplayConcretePreconditions() {
+    public async Task ConstructorInitializersReplayConcretePreconditions()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -684,7 +704,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task ImplicitThisReceiverReplaysConcretePreconditions() {
+    public async Task ImplicitThisReceiverReplaysConcretePreconditions()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -707,7 +728,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task DirectClauseSourceDoesNotMixInCompanionPreconditions() {
+    public async Task DirectClauseSourceDoesNotMixInCompanionPreconditions()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -739,7 +761,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task UnsupportedCallableAbstainsSilently() {
+    public async Task UnsupportedCallableAbstainsSilently()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System.Threading.Tasks;
@@ -762,7 +785,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task UnsupportedCallableStillReportsMalformedAttributes() {
+    public async Task UnsupportedCallableStillReportsMalformedAttributes()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System;
@@ -788,7 +812,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task UnsupportedCallableReportsEveryMalformedClosedContract() {
+    public async Task UnsupportedCallableReportsEveryMalformedClosedContract()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System.Threading.Tasks;
@@ -822,7 +847,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task BodylessDeclarationsReportEveryMalformedAttribute() {
+    public async Task BodylessDeclarationsReportEveryMalformedAttribute()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System;
@@ -850,7 +876,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task IntrinsicMisuseIsDiagnosedWhenContractsAreNotSelected() {
+    public async Task IntrinsicMisuseIsDiagnosedWhenContractsAreNotSelected()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -895,7 +922,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task EveryMisplacedContractClauseIsDiagnosed() {
+    public async Task EveryMisplacedContractClauseIsDiagnosed()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -951,7 +979,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task InvalidTargetClauseRemainsAnErrorWithAValidCompanion() {
+    public async Task InvalidTargetClauseRemainsAnErrorWithAValidCompanion()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -991,7 +1020,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task NestedCallableClausesAreValidatedOnlyByTheirOwner() {
+    public async Task NestedCallableClausesAreValidatedOnlyByTheirOwner()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System;
@@ -1033,7 +1063,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task SuppressionOnlyChangesReportingAndTrustDoesNotSharpen() {
+    public async Task SuppressionOnlyChangesReportingAndTrustDoesNotSharpen()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -1066,7 +1097,8 @@ public sealed class RequiresAndControlTests {
     }
 
     [Test]
-    public async Task EmptyControlReasonsReportUsageAndDoNotSuppress() {
+    public async Task EmptyControlReasonsReportUsageAndDoNotSuppress()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;

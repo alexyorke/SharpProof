@@ -4,15 +4,18 @@ using SharpProof.Ir;
 namespace SharpProof.Testing.Test;
 
 [TestFixture]
-public sealed class IrCSharpDifferentialOracleTests {
+public sealed class IrCSharpDifferentialOracleTests
+{
     [Test]
-    public void GeneratedTermsAgreeWithCompiledCSharp() {
+    public void GeneratedTermsAgreeWithCompiledCSharp()
+    {
         var factory = new IrFactory();
         var generator = new WellSortedIrGenerator(factory, seed: 0x5A17);
         var oracle = new IrCSharpDifferentialOracle(factory);
         var categories = new HashSet<GeneratedIrCategory>();
 
-        for (var index = 0; index < 200; index++) {
+        for (var index = 0; index < 200; index++)
+        {
             var generated = generator.Next(maximumDepth: 4);
             categories.Add(generated.Category);
             var result = oracle.Compare(generated.Term, generated.Variables);
@@ -28,7 +31,8 @@ public sealed class IrCSharpDifferentialOracleTests {
     }
 
     [Test]
-    public void ShortCircuitSkipsDivisionByZero() {
+    public void ShortCircuitSkipsDivisionByZero()
+    {
         var factory = new IrFactory();
         var dangerous = factory.Binary(
             IrBinaryOperator.Equal,
@@ -51,7 +55,8 @@ public sealed class IrCSharpDifferentialOracleTests {
     }
 
     [Test]
-    public void OpaqueTermsAbstain() {
+    public void OpaqueTermsAbstain()
+    {
         var factory = new IrFactory();
         var member = factory.GetOrCreateMember(
             factory.CreateIdentity(),
@@ -69,7 +74,8 @@ public sealed class IrCSharpDifferentialOracleTests {
     }
 
     [Test]
-    public void RenderableSequenceAccessChecksValueAndExceptionEdges() {
+    public void RenderableSequenceAccessChecksValueAndExceptionEdges()
+    {
         var factory = new IrFactory();
         var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
         var values = factory.CreateVariable("values", sequenceType);
@@ -81,7 +87,8 @@ public sealed class IrCSharpDifferentialOracleTests {
 
         var value = oracle.Compare(
             term,
-            new Dictionary<IrVarId, IrValue> {
+            new Dictionary<IrVarId, IrValue>
+            {
                 [values] = factory.CreateSequenceValue(
                     sequenceType,
                     [factory.CreateIntegerValue(17)]),
@@ -89,18 +96,21 @@ public sealed class IrCSharpDifferentialOracleTests {
             });
         var outOfRange = oracle.Compare(
             term,
-            new Dictionary<IrVarId, IrValue> {
+            new Dictionary<IrVarId, IrValue>
+            {
                 [values] = factory.CreateSequenceValue(sequenceType, []),
                 [index] = factory.CreateIntegerValue(0)
             });
         var nullReceiver = oracle.Compare(
             term,
-            new Dictionary<IrVarId, IrValue> {
+            new Dictionary<IrVarId, IrValue>
+            {
                 [values] = factory.CreateNullValue(sequenceType),
                 [index] = factory.CreateIntegerValue(0)
             });
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(value.Status, Is.EqualTo(DifferentialStatus.Agreement));
             Assert.That(value.Interpreted.Value!.Integer, Is.EqualTo(17));
             Assert.That(

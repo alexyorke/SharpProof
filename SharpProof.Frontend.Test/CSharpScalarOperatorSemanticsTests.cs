@@ -6,10 +6,13 @@ using SharpProof.Ir;
 namespace SharpProof.Frontend.Test;
 
 [TestFixture]
-public sealed class CSharpScalarOperatorSemanticsTests {
+public sealed class CSharpScalarOperatorSemanticsTests
+{
     [Test]
-    public void BinaryMappingsAndArithmeticCategoriesAreExhaustive() {
-        var mappings = new Dictionary<BinaryOperatorKind, IrBinaryOperator> {
+    public void BinaryMappingsAndArithmeticCategoriesAreExhaustive()
+    {
+        var mappings = new Dictionary<BinaryOperatorKind, IrBinaryOperator>
+        {
             [BinaryOperatorKind.Add] = IrBinaryOperator.Add,
             [BinaryOperatorKind.Subtract] = IrBinaryOperator.Subtract,
             [BinaryOperatorKind.Multiply] = IrBinaryOperator.Multiply,
@@ -47,7 +50,8 @@ public sealed class CSharpScalarOperatorSemanticsTests {
             CSharpScalarSemantics.SupportedBinaryOperators.Select(
                 static semantics => semantics.Kind),
             Is.EquivalentTo(mappings.Keys));
-        foreach (var kind in Enum.GetValues<BinaryOperatorKind>()) {
+        foreach (var kind in Enum.GetValues<BinaryOperatorKind>())
+        {
             var expected = mappings.TryGetValue(kind, out var mapped)
                 ? mapped
                 : (IrBinaryOperator?)null;
@@ -72,7 +76,8 @@ public sealed class CSharpScalarOperatorSemanticsTests {
     }
 
     [Test]
-    public void IntegerConversionRangesAreExhaustive() {
+    public void IntegerConversionRangesAreExhaustive()
+    {
         SpecialType[] integers = [
             SpecialType.System_SByte,
             SpecialType.System_Byte,
@@ -83,7 +88,8 @@ public sealed class CSharpScalarOperatorSemanticsTests {
             SpecialType.System_UInt32,
             SpecialType.System_Int64
         ];
-        var ranges = new Dictionary<SpecialType, (long Minimum, long Maximum)> {
+        var ranges = new Dictionary<SpecialType, (long Minimum, long Maximum)>
+        {
             [SpecialType.System_SByte] = (sbyte.MinValue, sbyte.MaxValue),
             [SpecialType.System_Byte] = (byte.MinValue, byte.MaxValue),
             [SpecialType.System_Int16] = (short.MinValue, short.MaxValue),
@@ -103,8 +109,10 @@ public sealed class CSharpScalarOperatorSemanticsTests {
         Assert.That(
             CSharpScalarSemantics.SupportedIntegerConversions,
             Has.Length.EqualTo(integers.Length * integers.Length));
-        foreach (var source in integers) {
-            foreach (var target in integers) {
+        foreach (var source in integers)
+        {
+            foreach (var target in integers)
+            {
                 var sourceRange = ranges[source];
                 var targetRange = ranges[target];
                 Assert.That(
@@ -130,10 +138,12 @@ public sealed class CSharpScalarOperatorSemanticsTests {
     }
 
     [Test]
-    public void UnaryMappingsAndCheckedPoliciesAreExhaustive() {
+    public void UnaryMappingsAndCheckedPoliciesAreExhaustive()
+    {
         var expected = new Dictionary<
             UnaryOperatorKind,
-            (IrUnaryOperator? Ir, bool Identity, bool Checked, bool ExactInteger)> {
+            (IrUnaryOperator? Ir, bool Identity, bool Checked, bool ExactInteger)>
+        {
             [UnaryOperatorKind.Not] =
                     (IrUnaryOperator.Not, false, false, false),
             [UnaryOperatorKind.Plus] =
@@ -150,7 +160,8 @@ public sealed class CSharpScalarOperatorSemanticsTests {
             CSharpScalarSemantics.SupportedUnaryOperators.Select(
                 static semantics => semantics.Kind),
             Is.EquivalentTo(expected.Keys));
-        foreach (var kind in Enum.GetValues<UnaryOperatorKind>()) {
+        foreach (var kind in Enum.GetValues<UnaryOperatorKind>())
+        {
             var present = CSharpScalarSemantics.TryGetUnary(
                 kind,
                 out var semantics);
@@ -158,8 +169,13 @@ public sealed class CSharpScalarOperatorSemanticsTests {
                 present,
                 Is.EqualTo(expected.TryGetValue(kind, out var row)),
                 kind.ToString());
-            if (!present) continue;
-            using (Assert.EnterMultipleScope()) {
+            if (!present)
+            {
+                continue;
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
                 Assert.That(semantics.IrOperator, Is.EqualTo(row.Ir));
                 Assert.That(semantics.IsIdentity, Is.EqualTo(row.Identity));
                 Assert.That(

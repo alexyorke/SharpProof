@@ -5,9 +5,11 @@ using SharpProof.Fuzz;
 namespace SharpProof.Fuzz.Test;
 
 [TestFixture]
-public sealed class FuzzRunnerTests {
+public sealed class FuzzRunnerTests
+{
     [Test]
-    public async Task FixedSeedIsDeterministicAndSound() {
+    public async Task FixedSeedIsDeterministicAndSound()
+    {
         var options = new FuzzOptions(Cases: 24, Seed: 12345, MaximumParallelism: 4);
 
         var first = await FuzzRunner.RunAsync(options);
@@ -30,7 +32,8 @@ public sealed class FuzzRunnerTests {
     }
 
     [Test]
-    public async Task ParallelismDoesNotChangeDeterministicOutcomes() {
+    public async Task ParallelismDoesNotChangeDeterministicOutcomes()
+    {
         var serial = await FuzzRunner.RunAsync(
             new FuzzOptions(Cases: 16, Seed: -9876, MaximumParallelism: 1));
         var parallel = await FuzzRunner.RunAsync(
@@ -51,7 +54,8 @@ public sealed class FuzzRunnerTests {
     }
 
     [Test]
-    public void SupportedDomainAbstentionFailsTheCampaign() {
+    public void SupportedDomainAbstentionFailsTheCampaign()
+    {
         var coverage = new FrontendFuzzCoverage(
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
         var summary = new FuzzSummary(
@@ -72,21 +76,25 @@ public sealed class FuzzRunnerTests {
     }
 
     [Test]
-    public async Task CancellationPropagates() {
+    public async Task CancellationPropagates()
+    {
         var cancellation = new CancellationToken(canceled: true);
-        try {
+        try
+        {
             await FuzzRunner.RunAsync(
                 new FuzzOptions(Cases: 10, Seed: 1, MaximumParallelism: 1),
                 cancellation);
             Assert.Fail("Expected cancellation to propagate.");
         }
-        catch (OperationCanceledException) {
+        catch (OperationCanceledException)
+        {
             Assert.Pass();
         }
     }
 
     [Test]
-    public void GeneratedSourceFlowsThroughFrontendAndMatchesRuntime() {
+    public void GeneratedSourceFlowsThroughFrontendAndMatchesRuntime()
+    {
         var first = new SmallCSharpCaseGenerator(seed: 741).Next(
             maximumDepth: 4);
         var second = new SmallCSharpCaseGenerator(seed: 741).Next(
@@ -104,7 +112,8 @@ public sealed class FuzzRunnerTests {
     }
 
     [Test]
-    public void ExpandedFrontendShapesMatchRuntime() {
+    public void ExpandedFrontendShapesMatchRuntime()
+    {
         var cases = new[] {
             new GeneratedCSharpCase(
                 GeneratedCSharpExpression.Length(
@@ -146,7 +155,8 @@ public sealed class FuzzRunnerTests {
     }
 
     [Test]
-    public void ExpandedCoverageRequirementFailsClosed() {
+    public void ExpandedCoverageRequirementFailsClosed()
+    {
         var empty = new FrontendFuzzCoverage(
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
@@ -154,7 +164,8 @@ public sealed class FuzzRunnerTests {
     }
 
     [Test]
-    public async Task FiniteDomainOracleChecksSatAndUnsatWithExplicitAssumptions() {
+    public async Task FiniteDomainOracleChecksSatAndUnsatWithExplicitAssumptions()
+    {
         var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var enabled = factory.CreateVariable("enabled", factory.BooleanType);
@@ -198,14 +209,16 @@ public sealed class FuzzRunnerTests {
         int seed,
         int expectedTrue,
         int expectedFalse,
-        int expectedUndefined) {
+        int expectedUndefined)
+    {
         var factory = new IrFactory();
         var generated = PartialTermSmtCaseGenerator.Create(factory, seed);
 
         var result = await new PartialTermSmtDifferentialOracle()
             .CompareAsync(factory, generated);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 result.Status,
                 Is.EqualTo(FuzzOracleStatus.Agreement),
@@ -218,7 +231,8 @@ public sealed class FuzzRunnerTests {
     }
 
     [Test]
-    public void CSharpShrinkerIsDeterministicAndPreservesMismatch() {
+    public void CSharpShrinkerIsDeterministicAndPreservesMismatch()
+    {
         var expression = GeneratedCSharpExpression.Binary(
             GeneratedExpressionKind.Add,
             GeneratedCSharpExpression.Conditional(
@@ -231,10 +245,12 @@ public sealed class FuzzRunnerTests {
             Left: 3,
             Right: 4,
             Condition: true);
-        static bool Preserves(GeneratedCSharpCase candidate) =>
-            candidate.Expression.Render().Contains(
+        static bool Preserves(GeneratedCSharpCase candidate)
+        {
+            return candidate.Expression.Render().Contains(
                 "left",
                 StringComparison.Ordinal);
+        }
 
         var first = CSharpStructuralShrinker.Minimize(generated, Preserves);
         var second = CSharpStructuralShrinker.Minimize(generated, Preserves);
@@ -247,7 +263,8 @@ public sealed class FuzzRunnerTests {
     }
 
     [Test]
-    public async Task IrShrinkerIsDeterministicAndPreservesMismatch() {
+    public async Task IrShrinkerIsDeterministicAndPreservesMismatch()
+    {
         var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var variableTerm = factory.Variable(variable);
@@ -264,8 +281,10 @@ public sealed class FuzzRunnerTests {
                 IrBinaryOperator.LessThan,
                 variableTerm,
                 factory.Integer(2)));
-        Task<bool> Preserves(IrTerm candidate, CancellationToken _) =>
-            Task.FromResult(Contains(candidate, variable));
+        Task<bool> Preserves(IrTerm candidate, CancellationToken _)
+        {
+            return Task.FromResult(Contains(candidate, variable));
+        }
 
         var first = await IrStructuralShrinker.MinimizeAsync(
             factory,
@@ -286,35 +305,42 @@ public sealed class FuzzRunnerTests {
     [TestCase("--cases", "0")]
     [TestCase("--max-parallelism", "5")]
     [TestCase("--unknown", "1")]
-    public void InvalidOptionsFailClosed(string option, string value) {
-        try {
+    public void InvalidOptionsFailClosed(string option, string value)
+    {
+        try
+        {
             FuzzOptions.Parse([option, value]);
             Assert.Fail("Expected invalid options to fail.");
         }
-        catch (FuzzUsageException) {
+        catch (FuzzUsageException)
+        {
             Assert.Pass();
         }
     }
 
-    private static bool Contains(IrTerm term, IrVarId variable) => term switch {
-        IrVariableTerm item => item.Variable == variable,
-        IrUnaryTerm unary => Contains(unary.Operand, variable),
-        IrBinaryTerm binary =>
-            Contains(binary.Left, variable) ||
-            Contains(binary.Right, variable),
-        IrConditionalTerm conditional =>
-            Contains(conditional.Condition, variable) ||
-            Contains(conditional.WhenTrue, variable) ||
-            Contains(conditional.WhenFalse, variable),
-        IrCastTerm cast => Contains(cast.Operand, variable),
-        IrLengthTerm length => Contains(length.Value, variable),
-        IrSequenceAccessTerm access =>
-            Contains(access.Sequence, variable) ||
-            Contains(access.Index, variable),
-        IrOpaqueTerm opaque =>
-            opaque.Receiver != null &&
-            Contains(opaque.Receiver, variable) ||
-            opaque.Arguments.Any(argument => Contains(argument, variable)),
-        _ => false
-    };
+    private static bool Contains(IrTerm term, IrVarId variable)
+    {
+        return term switch
+        {
+            IrVariableTerm item => item.Variable == variable,
+            IrUnaryTerm unary => Contains(unary.Operand, variable),
+            IrBinaryTerm binary =>
+                Contains(binary.Left, variable) ||
+                Contains(binary.Right, variable),
+            IrConditionalTerm conditional =>
+                Contains(conditional.Condition, variable) ||
+                Contains(conditional.WhenTrue, variable) ||
+                Contains(conditional.WhenFalse, variable),
+            IrCastTerm cast => Contains(cast.Operand, variable),
+            IrLengthTerm length => Contains(length.Value, variable),
+            IrSequenceAccessTerm access =>
+                Contains(access.Sequence, variable) ||
+                Contains(access.Index, variable),
+            IrOpaqueTerm opaque =>
+                opaque.Receiver != null &&
+                Contains(opaque.Receiver, variable) ||
+                opaque.Arguments.Any(argument => Contains(argument, variable)),
+            _ => false
+        };
+    }
 }

@@ -3,7 +3,8 @@ using System.Globalization;
 namespace SharpProof.Dataflow.Test;
 
 [TestFixture]
-public sealed class IntervalDomainTests {
+public sealed class IntervalDomainTests
+{
     private readonly IntervalDomain _domain = IntervalDomain.Instance;
 
     private static IReadOnlyList<IntervalValue> Samples => [
@@ -22,11 +23,14 @@ public sealed class IntervalDomainTests {
     ];
 
     [Test]
-    public void OrderAndJoinSatisfySampledLatticeLaws() =>
+    public void OrderAndJoinSatisfySampledLatticeLaws()
+    {
         DomainLawAssertions.AssertOrderAndJoinLaws(_domain, Samples);
+    }
 
     [Test]
-    public void CongruentBoundsAreCanonicalized() {
+    public void CongruentBoundsAreCanonicalized()
+    {
         var even = _domain.Create(-5, 5, 2, 0);
 
         Assert.That(even.LowerBound, Is.EqualTo(-4));
@@ -37,7 +41,8 @@ public sealed class IntervalDomainTests {
     }
 
     [Test]
-    public void JoinComputesCongruenceHull() {
+    public void JoinComputesCongruenceHull()
+    {
         var joined = _domain.Join(_domain.Constant(2), _domain.Constant(6));
 
         Assert.That(joined.LowerBound, Is.EqualTo(2));
@@ -48,7 +53,8 @@ public sealed class IntervalDomainTests {
     }
 
     [Test]
-    public void EndpointJoinRemainsTheLeastCongruenceUpperBound() {
+    public void EndpointJoinRemainsTheLeastCongruenceUpperBound()
+    {
         var joined = _domain.Join(
             _domain.Constant(long.MinValue),
             _domain.Constant(long.MaxValue));
@@ -63,7 +69,8 @@ public sealed class IntervalDomainTests {
     }
 
     [Test]
-    public void ArithmeticAndRefinementTransfersAreMonotone() {
+    public void ArithmeticAndRefinementTransfersAreMonotone()
+    {
         DomainLawAssertions.AssertMonotone(
             _domain,
             Samples,
@@ -80,23 +87,29 @@ public sealed class IntervalDomainTests {
     }
 
     [Test]
-    public void ArithmeticOverflowFailsClosed() =>
+    public void ArithmeticOverflowFailsClosed()
+    {
         Assert.That(
             _domain.Add(_domain.Constant(long.MaxValue), _domain.Constant(1)),
             Is.EqualTo(_domain.Top));
+    }
 
     [Test]
-    public void PotentialEndpointOverflowFailsClosed() =>
+    public void PotentialEndpointOverflowFailsClosed()
+    {
         Assert.That(
             _domain.Add(
                 _domain.Range(-485, 292),
                 _domain.Range(null, 386)),
             Is.EqualTo(_domain.Top));
+    }
 
     [Test]
-    public void WideningTerminatesForAscendingBounds() {
+    public void WideningTerminatesForAscendingBounds()
+    {
         var previous = _domain.Constant(0);
-        for (var upper = 1; upper <= 64; upper++) {
+        for (var upper = 1; upper <= 64; upper++)
+        {
             var next = _domain.Range(0, upper);
             var widened = _domain.Widen(previous, next);
             Assert.That(_domain.LessThanOrEqual(previous, widened), Is.True);
@@ -110,11 +123,14 @@ public sealed class IntervalDomainTests {
     }
 
     [Test]
-    public void HavocIsConservative() =>
+    public void HavocIsConservative()
+    {
         DomainLawAssertions.AssertConservativeHavoc(_domain, Samples);
+    }
 
     [Test]
-    public void ClosedDomainFacadeUsesSharpProofJoinAndOrder() {
+    public void ClosedDomainFacadeUsesSharpProofJoinAndOrder()
+    {
         Assert.That(
             _domain.Merge(_domain.Constant(2), _domain.Constant(6)),
             Is.EqualTo(_domain.Join(_domain.Constant(2), _domain.Constant(6))));

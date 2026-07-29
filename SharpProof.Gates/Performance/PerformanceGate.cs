@@ -33,12 +33,14 @@ internal sealed record PerformanceGateResult(
     double ForcedTerminationMilliseconds,
     ImmutableArray<string> Failures);
 
-internal static class PerformanceGate {
+internal static class PerformanceGate
+{
     private const int RetainedCompilationCount = 40;
 
     public static async Task<PerformanceGateResult> RunAsync(
         string repositoryRoot,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default)
+    {
         var contract = AcceptancePerformanceContract.Load(repositoryRoot);
         ValidateContract(contract);
         var source = CreateDefaultOffSource(320);
@@ -108,13 +110,19 @@ internal static class PerformanceGate {
 
         var failures = ImmutableArray.CreateBuilder<string>();
         if (medianRatio > contract.MaximumMedianRatio)
+        {
             failures.Add(
                 $"Default-off median ratio {Format(medianRatio)} exceeds " +
                 $"{Format(contract.MaximumMedianRatio)}.");
+        }
+
         if (p95Ratio > contract.MaximumP95Ratio)
+        {
             failures.Add(
                 $"Default-off p95 ratio {Format(p95Ratio)} exceeds " +
                 $"{Format(contract.MaximumP95Ratio)}.");
+        }
+
         failures.AddRange(EvaluateRetainedMemoryLimits(
             retainedRatio,
             retainedIncreaseMiB,
@@ -124,22 +132,33 @@ internal static class PerformanceGate {
             enabledRetention.RetainedMemoryIncreaseMiB,
             contract));
         if (editP95 > contract.IdeEditP95Milliseconds)
+        {
             failures.Add(
                 $"IDE edit p95 {Format(editP95)} ms exceeds " +
                 $"{Format(contract.IdeEditP95Milliseconds)} ms.");
+        }
+
         if (editMaximum > contract.IdeEditMaximumMilliseconds)
+        {
             failures.Add(
                 $"IDE edit maximum {Format(editMaximum)} ms exceeds " +
                 $"{Format(contract.IdeEditMaximumMilliseconds)} ms.");
+        }
+
         failures.AddRange(editMeasurement.DiagnosticFailures);
         if (cancellationP95 > contract.CancellationP95Milliseconds)
+        {
             failures.Add(
                 $"Worker cancellation p95 {Format(cancellationP95)} ms exceeds " +
                 $"{Format(contract.CancellationP95Milliseconds)} ms.");
+        }
+
         if (forcedTermination > contract.ForcedTerminationMilliseconds)
+        {
             failures.Add(
                 $"Launcher forced termination {Format(forcedTermination)} ms " +
                 $"exceeds {Format(contract.ForcedTerminationMilliseconds)} ms.");
+        }
 
         return new PerformanceGateResult(
             failures.Count == 0,
@@ -168,13 +187,15 @@ internal static class PerformanceGate {
             string source,
             string kind,
             int iterations,
-            CancellationToken cancellationToken = default) {
+            CancellationToken cancellationToken = default)
+    {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
         var sessionFactory = new CountingSessionFactory();
         var analyzer = new SharpProofAnalyzer(sessionFactory);
         var diagnosticCount = 0;
         var stopwatch = Stopwatch.StartNew();
-        for (var index = 0; index < iterations; index++) {
+        for (var index = 0; index < iterations; index++)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             var compilation = CreateTimingCompilation(
                 source,
@@ -188,9 +209,12 @@ internal static class PerformanceGate {
         }
         stopwatch.Stop();
         if (diagnosticCount != 0 || sessionFactory.CreateCount != iterations)
+        {
             throw new InvalidOperationException(
                 "Unannotated advisory analysis must stay quiet and create " +
                 "exactly one analysis session per compilation.");
+        }
+
         return new DefaultOffBatchMeasurement(
             stopwatch.Elapsed.TotalMilliseconds / iterations,
             iterations,
@@ -201,13 +225,15 @@ internal static class PerformanceGate {
     private static CSharpCompilation CreateTimingCompilation(
         string source,
         string kind,
-        int index) =>
-        AnalyzerGateHost.CreateCompilation(
+        int index)
+    {
+        return AnalyzerGateHost.CreateCompilation(
             source,
             "SharpProof_" +
             kind +
             "_" +
             index.ToString(CultureInfo.InvariantCulture));
+    }
 
     private static async Task<PackageBuildTiming>
         MeasureDefaultOffPackageBuildsAsync(
@@ -215,7 +241,8 @@ internal static class PerformanceGate {
             string source,
             int warmups,
             int samples,
-            CancellationToken cancellationToken) {
+            CancellationToken cancellationToken)
+    {
         var probeParent = Path.Combine(
             Path.GetTempPath(),
             "SharpProof.Gates.Performance");
@@ -225,13 +252,17 @@ internal static class PerformanceGate {
         if (!resolvedRoot.StartsWith(
                 resolvedParent + Path.DirectorySeparatorChar,
                 StringComparison.Ordinal))
+        {
             throw new InvalidOperationException(
                 "Refusing to use an unexpected performance probe path.");
+        }
+
         var baselineDirectory = Path.Combine(resolvedRoot, "baseline");
         var defaultOffDirectory = Path.Combine(resolvedRoot, "default-off");
         Directory.CreateDirectory(baselineDirectory);
         Directory.CreateDirectory(defaultOffDirectory);
-        try {
+        try
+        {
             var baselineProject = CreatePerformanceProbeProject(
                 baselineDirectory,
                 source,
@@ -255,6 +286,7 @@ internal static class PerformanceGate {
                     cancellationToken)
                 .ConfigureAwait(false);
             for (var index = 0; index < warmups; index++)
+            {
                 await RunBuildPairAsync(
                         baselineProject,
                         defaultOffProject,
@@ -262,10 +294,12 @@ internal static class PerformanceGate {
                         defaultFirst: (index & 1) != 0,
                         cancellationToken)
                     .ConfigureAwait(false);
+            }
 
             var baseline = new double[samples];
             var defaultOff = new double[samples];
-            for (var index = 0; index < samples; index++) {
+            for (var index = 0; index < samples; index++)
+            {
                 var pair = await RunBuildPairAsync(
                         baselineProject,
                         defaultOffProject,
@@ -278,9 +312,12 @@ internal static class PerformanceGate {
             }
             return new PackageBuildTiming(baseline, defaultOff);
         }
-        finally {
+        finally
+        {
             if (Directory.Exists(resolvedRoot))
+            {
                 Directory.Delete(resolvedRoot, recursive: true);
+            }
         }
     }
 
@@ -288,7 +325,8 @@ internal static class PerformanceGate {
         string directory,
         string source,
         string repositoryRoot,
-        bool importSharpProof) {
+        bool importSharpProof)
+    {
         File.WriteAllText(
             Path.Combine(directory, "Subject.cs"),
             source,
@@ -330,19 +368,25 @@ internal static class PerformanceGate {
         return project;
     }
 
-    private static string? EscapeAnalyzerDirectory(string root, string configuration) =>
-        EscapePath(root, "SharpProof.Analyzer", "bin", configuration, "netstandard2.0");
+    private static string? EscapeAnalyzerDirectory(string root, string configuration)
+    {
+        return EscapePath(root, "SharpProof.Analyzer", "bin", configuration, "netstandard2.0");
+    }
 
-    private static string? EscapePath(params string[] segments) =>
-        System.Security.SecurityElement.Escape(Path.Combine(segments));
+    private static string? EscapePath(params string[] segments)
+    {
+        return System.Security.SecurityElement.Escape(Path.Combine(segments));
+    }
 
     private static async Task<PackageBuildPair> RunBuildPairAsync(
         string baselineProject,
         string defaultOffProject,
         string symbol,
         bool defaultFirst,
-        CancellationToken cancellationToken) {
-        if (defaultFirst) {
+        CancellationToken cancellationToken)
+    {
+        if (defaultFirst)
+        {
             var defaultOff = await RunDotnetAsync(
                     defaultOffProject,
                     restore: false,
@@ -357,7 +401,8 @@ internal static class PerformanceGate {
                 .ConfigureAwait(false);
             return new PackageBuildPair(baseline, defaultOff);
         }
-        else {
+        else
+        {
             var baseline = await RunDotnetAsync(
                     baselineProject,
                     restore: false,
@@ -378,8 +423,10 @@ internal static class PerformanceGate {
         string project,
         bool restore,
         string? symbol,
-        CancellationToken cancellationToken) {
-        var startInfo = new ProcessStartInfo {
+        CancellationToken cancellationToken)
+    {
+        var startInfo = new ProcessStartInfo
+        {
             FileName = "dotnet",
             WorkingDirectory = Path.GetDirectoryName(project)!,
             UseShellExecute = false,
@@ -392,7 +439,8 @@ internal static class PerformanceGate {
         startInfo.ArgumentList.Add("--nologo");
         startInfo.ArgumentList.Add("/nodeReuse:false");
         startInfo.ArgumentList.Add("-p:UseSharedCompilation=false");
-        if (!restore) {
+        if (!restore)
+        {
             startInfo.ArgumentList.Add("--no-restore");
             startInfo.ArgumentList.Add("-c");
             startInfo.ArgumentList.Add("Release");
@@ -407,13 +455,18 @@ internal static class PerformanceGate {
         var standardError = process.StandardError.ReadToEndAsync(
             cancellationToken);
         var stopwatch = Stopwatch.StartNew();
-        try {
+        try
+        {
             await process.WaitForExitAsync(cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch {
+        catch
+        {
             if (!process.HasExited)
+            {
                 process.Kill(entireProcessTree: true);
+            }
+
             throw;
         }
         stopwatch.Stop();
@@ -421,19 +474,24 @@ internal static class PerformanceGate {
                      Environment.NewLine +
                      (await standardError.ConfigureAwait(false));
         if (process.ExitCode != 0)
+        {
             throw new InvalidOperationException(
                 $"The default-off package performance probe failed:{Environment.NewLine}" +
                 output);
+        }
+
         return stopwatch.Elapsed.TotalMilliseconds;
     }
 
     private static void WarmRetentionPaths(
         string source,
         int warmups,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var sessionFactory = new CountingSessionFactory();
         var analyzer = new SharpProofAnalyzer(sessionFactory);
-        for (var index = 0; index < warmups; index++) {
+        for (var index = 0; index < warmups; index++)
+        {
             var baseline = AnalyzerGateHost.CreateCompilation(
                 source,
                 $"RetentionBaselineWarmup_{index}");
@@ -448,19 +506,24 @@ internal static class PerformanceGate {
                 cancellationToken);
         }
         if (sessionFactory.CreateCount != warmups)
+        {
             throw new InvalidOperationException(
                 "Advisory retention warmup created an unexpected number of sessions.");
+        }
+
         ForceCollection();
     }
 
     private static long MeasureCompilerOnlyRetainedBytes(
         string source,
         string kind,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         ForceCollection();
         var before = GC.GetTotalMemory(forceFullCollection: true);
         var retained = new List<Compilation>(RetainedCompilationCount);
-        for (var index = 0; index < RetainedCompilationCount; index++) {
+        for (var index = 0; index < RetainedCompilationCount; index++)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             var compilation = AnalyzerGateHost.CreateCompilation(
                 source,
@@ -477,14 +540,16 @@ internal static class PerformanceGate {
     private static long MeasureDefaultOffAnalyzerRetainedBytes(
         string source,
         string kind,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         ForceCollection();
         var before = GC.GetTotalMemory(forceFullCollection: true);
         var retained = new List<Compilation>(RetainedCompilationCount);
         var sessionFactory = new CountingSessionFactory();
         var analyzer = new SharpProofAnalyzer(sessionFactory);
         var diagnosticCount = 0;
-        for (var index = 0; index < RetainedCompilationCount; index++) {
+        for (var index = 0; index < RetainedCompilationCount; index++)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             var compilation = AnalyzerGateHost.CreateCompilation(
                 source,
@@ -498,9 +563,12 @@ internal static class PerformanceGate {
         }
         if (diagnosticCount != 0 ||
             sessionFactory.CreateCount != RetainedCompilationCount)
+        {
             throw new InvalidOperationException(
                 "Unannotated advisory retention must stay quiet and create " +
                 "exactly one analysis session per compilation.");
+        }
+
         ForceCollection();
         var after = GC.GetTotalMemory(forceFullCollection: true);
         GC.KeepAlive(retained);
@@ -511,8 +579,9 @@ internal static class PerformanceGate {
     private static int AnalyzeDefaultOff(
         Compilation compilation,
         DiagnosticAnalyzer analyzer,
-        CancellationToken cancellationToken) =>
-        AnalyzerGateHost.AnalyzeAsync(
+        CancellationToken cancellationToken)
+    {
+        return AnalyzerGateHost.AnalyzeAsync(
                 compilation,
                 analyzer,
                 mode: null,
@@ -521,11 +590,14 @@ internal static class PerformanceGate {
             .GetAwaiter()
             .GetResult()
             .Length;
+    }
 
     private static void WarmEnabledAnalyzerRetentionPaths(
         int warmups,
-        CancellationToken cancellationToken) {
-        for (var index = 0; index < warmups; index++) {
+        CancellationToken cancellationToken)
+    {
+        for (var index = 0; index < warmups; index++)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             _ = AnalyzeEnabledCompilation(
                 CreateEnabledSource(index),
@@ -537,12 +609,14 @@ internal static class PerformanceGate {
 
     private static EnabledAnalyzerRetentionMeasurement
         MeasureEnabledAnalyzerRetention(
-            CancellationToken cancellationToken) {
+            CancellationToken cancellationToken)
+    {
         ForceCollection();
         var before = GC.GetTotalMemory(forceFullCollection: true);
         var compilations =
             new List<WeakReference<Compilation>>(RetainedCompilationCount);
-        for (var index = 0; index < RetainedCompilationCount; index++) {
+        for (var index = 0; index < RetainedCompilationCount; index++)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             compilations.Add(
                 AnalyzeEnabledCompilation(
@@ -564,7 +638,8 @@ internal static class PerformanceGate {
     private static WeakReference<Compilation> AnalyzeEnabledCompilation(
         string source,
         string assemblyName,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var compilation = AnalyzerGateHost.CreateCompilation(
             source,
             assemblyName);
@@ -583,7 +658,8 @@ internal static class PerformanceGate {
 
     private static async Task<IdeEditMeasurement> MeasureIdeEditsAsync(
         AcceptancePerformanceContract contract,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         const string marker = "return null;";
         var source = """
             using SharpProof.Attributes;
@@ -601,13 +677,17 @@ internal static class PerformanceGate {
         var tree = compilation.SyntaxTrees.Single();
         var markerStart = source.LastIndexOf(marker, StringComparison.Ordinal);
         if (markerStart < 0)
+        {
             throw new InvalidOperationException("IDE edit marker is missing.");
+        }
+
         var analyzer = new SharpProofAnalyzer();
         var currentCompilation = compilation;
         var currentTree = tree;
         var currentlyAllocates = false;
 
-        for (var index = 0; index < contract.Warmups; index++) {
+        for (var index = 0; index < contract.Warmups; index++)
+        {
             var allocates = !currentlyAllocates;
             var currentMarker = currentlyAllocates
                 ? "return new object();"
@@ -638,7 +718,8 @@ internal static class PerformanceGate {
 
         var latencies = new double[contract.IdeEdits];
         var diagnosticFailures = ImmutableArray.CreateBuilder<string>();
-        for (var index = 0; index < latencies.Length; index++) {
+        for (var index = 0; index < latencies.Length; index++)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             var allocates = !currentlyAllocates;
             var replacement = allocates ? "return new object();" : marker;
@@ -665,14 +746,16 @@ internal static class PerformanceGate {
                 .ConfigureAwait(false);
             stopwatch.Stop();
             latencies[index] = stopwatch.Elapsed.TotalMilliseconds;
-            try {
+            try
+            {
                 ValidateIdeDiagnostics(
                     diagnostics,
                     allocates,
                     index,
                     "measured");
             }
-            catch (InvalidOperationException exception) {
+            catch (InvalidOperationException exception)
+            {
                 diagnosticFailures.Add(exception.Message);
             }
             currentTree = changedTree;
@@ -688,7 +771,8 @@ internal static class PerformanceGate {
         ImmutableArray<Diagnostic> diagnostics,
         bool allocates,
         int editIndex,
-        string phase) {
+        string phase)
+    {
         var canonical = diagnostics
             .Select(static diagnostic =>
                 diagnostic.Id + "|" +
@@ -708,7 +792,9 @@ internal static class PerformanceGate {
             .ToImmutableArray();
         if (duplicateCount == 0 &&
             actualIds.SequenceEqual(expectedIds, StringComparer.Ordinal))
+        {
             return;
+        }
 
         throw new InvalidOperationException(
             $"IDE {phase} edit {editIndex} produced stale or duplicate " +
@@ -717,21 +803,26 @@ internal static class PerformanceGate {
             $"{duplicateCount}.");
     }
 
-    private static string CreateDefaultOffSource(int methodCount) {
+    private static string CreateDefaultOffSource(int methodCount)
+    {
         var builder = new StringBuilder();
         builder.AppendLine("public static class DefaultOffFixture {");
         for (var index = 0; index < methodCount; index++)
+        {
             builder.Append("    public static int M")
                 .Append(index.ToString(CultureInfo.InvariantCulture))
                 .Append("(int value) => value + ")
                 .Append(index.ToString(CultureInfo.InvariantCulture))
                 .AppendLine(";");
+        }
+
         builder.AppendLine("}");
         return builder.ToString();
     }
 
-    private static string CreateEnabledSource(int index) =>
-        $$"""
+    private static string CreateEnabledSource(int index)
+    {
+        return $$"""
         using SharpProof.Attributes;
 
         public static class EnabledRetentionFixture_{{index}} {
@@ -741,11 +832,16 @@ internal static class PerformanceGate {
             }
         }
         """;
+    }
 
-    private static double Percentile(IEnumerable<double> values, double rank) {
+    private static double Percentile(IEnumerable<double> values, double rank)
+    {
         var sorted = values.OrderBy(static value => value).ToArray();
         if (sorted.Length == 0)
+        {
             throw new ArgumentException("At least one sample is required.", nameof(values));
+        }
+
         var index = Math.Clamp(
             (int)Math.Ceiling(rank * sorted.Length) - 1,
             0,
@@ -753,33 +849,45 @@ internal static class PerformanceGate {
         return sorted[index];
     }
 
-    private static double Ratio(double numerator, double denominator) =>
-        denominator <= 0 ? double.PositiveInfinity : numerator / denominator;
+    private static double Ratio(double numerator, double denominator)
+    {
+        return denominator <= 0 ? double.PositiveInfinity : numerator / denominator;
+    }
 
-    private static void ForceCollection() {
+    private static void ForceCollection()
+    {
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true);
         GC.WaitForPendingFinalizers();
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true);
     }
 
-    private static string Format(double value) =>
-        value.ToString("0.###", CultureInfo.InvariantCulture);
+    private static string Format(double value)
+    {
+        return value.ToString("0.###", CultureInfo.InvariantCulture);
+    }
 
     internal static ImmutableArray<string> EvaluateRetainedMemoryLimits(
         double retainedRatio,
         double retainedIncreaseMiB,
-        AcceptancePerformanceContract contract) {
+        AcceptancePerformanceContract contract)
+    {
         var failures = ImmutableArray.CreateBuilder<string>();
         if (retainedRatio > contract.MaximumRetainedMemoryRatio)
+        {
             failures.Add(
                 $"Default-off retained memory ratio {Format(retainedRatio)} " +
                 $"exceeds {Format(contract.MaximumRetainedMemoryRatio)}.");
+        }
+
         if (retainedIncreaseMiB >
             contract.MaximumRetainedMemoryIncreaseMiB)
+        {
             failures.Add(
                 $"Default-off retained memory increase " +
                 $"{Format(retainedIncreaseMiB)} MiB exceeds " +
                 $"{contract.MaximumRetainedMemoryIncreaseMiB} MiB.");
+        }
+
         return failures.ToImmutable();
     }
 
@@ -787,30 +895,41 @@ internal static class PerformanceGate {
         EvaluateEnabledAnalyzerRetentionLimits(
             int retainedCompilationCount,
             double retainedMemoryIncreaseMiB,
-            AcceptancePerformanceContract contract) {
+            AcceptancePerformanceContract contract)
+    {
         var failures = ImmutableArray.CreateBuilder<string>();
         if (retainedCompilationCount >
             contract.MaximumEnabledRetainedCompilations)
+        {
             failures.Add(
                 $"Enabled analyzer retained {retainedCompilationCount} " +
                 $"compilation graph(s); maximum is " +
                 $"{contract.MaximumEnabledRetainedCompilations}.");
+        }
+
         if (retainedMemoryIncreaseMiB >
             contract.MaximumEnabledRetainedMemoryIncreaseMiB)
+        {
             failures.Add(
                 $"Enabled analyzer retained memory increase " +
                 $"{Format(retainedMemoryIncreaseMiB)} MiB exceeds " +
                 $"{contract.MaximumEnabledRetainedMemoryIncreaseMiB} MiB.");
+        }
+
         return failures.ToImmutable();
     }
 
-    private static void ValidateContract(AcceptancePerformanceContract contract) {
+    private static void ValidateContract(AcceptancePerformanceContract contract)
+    {
         if (contract.Warmups != 5 ||
             contract.Samples != 30 ||
             contract.IdeEdits != 200)
+        {
             throw new InvalidDataException(
                 "The performance protocol is fixed at 5 warmups, " +
                 "30 samples, and 200 IDE edits.");
+        }
+
         if (contract.MaximumMedianRatio <= 0 ||
             contract.MaximumP95Ratio <= 0 ||
             contract.MaximumRetainedMemoryRatio <= 0 ||
@@ -821,12 +940,15 @@ internal static class PerformanceGate {
             contract.IdeEditMaximumMilliseconds <= 0 ||
             contract.CancellationP95Milliseconds <= 0 ||
             contract.ForcedTerminationMilliseconds <= 0)
+        {
             throw new InvalidDataException(
                 "The performance limits must be positive.");
+        }
     }
 
     internal static void ValidateAdvisoryPackagePolicy(
-        string repositoryRoot) {
+        string repositoryRoot)
+    {
         var portableRoot = Path.Combine(
             repositoryRoot,
             "SharpProof.Package",
@@ -858,7 +980,8 @@ internal static class PerformanceGate {
         XDocument portableProps,
         XDocument portableTargets,
         XDocument verifierProps,
-        XDocument verifierTargets) {
+        XDocument verifierTargets)
+    {
         var visibleProperties = portableProps
             .Descendants("CompilerVisibleProperty")
             .Select(static element => (string?)element.Attribute("Include"))
@@ -1001,25 +1124,30 @@ internal static class PerformanceGate {
             verifierExec.Length != 1 ||
             !ReferenceEquals(
                 verifierExec[0].Ancestors("Target").SingleOrDefault(),
-                verifierCore)) {
+                verifierCore))
+        {
             throw new InvalidDataException(
                 "The package must run advisory analysis but omit the verifier " +
                 "by default.");
         }
     }
 
-    private static string NormalizeMsBuildCondition(string? condition) =>
-        string.Concat((condition ?? string.Empty)
+    private static string NormalizeMsBuildCondition(string? condition)
+    {
+        return string.Concat((condition ?? string.Empty)
             .Where(static character => !char.IsWhiteSpace(character)));
+    }
 
-    private static ImmutableArray<string> SplitTargetList(string? value) =>
-        string.IsNullOrWhiteSpace(value)
+    private static ImmutableArray<string> SplitTargetList(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
             ? []
             : [.. value.Split(
                     [';'],
                     StringSplitOptions.RemoveEmptyEntries)
                 .Select(static target => target.Trim())
                 .Where(static target => target.Length != 0)];
+    }
 
     private sealed record EnabledAnalyzerRetentionMeasurement(
         int RetainedCompilationCount,
@@ -1043,13 +1171,18 @@ internal static class PerformanceGate {
         double[] Latencies,
         ImmutableArray<string> DiagnosticFailures);
 
-    private sealed class CountingSessionFactory : IAnalyzerSessionFactory {
-        internal int CreateCount { get; private set; }
+    private sealed class CountingSessionFactory : IAnalyzerSessionFactory
+    {
+        internal int CreateCount
+        {
+            get; private set;
+        }
 
         public AnalyzerSession Create(
             Compilation compilation,
             SharpProof.Analyzer.Configuration.AnalyzerConfiguration configuration,
-            CancellationToken cancellationToken) {
+            CancellationToken cancellationToken)
+        {
             CreateCount++;
             return new AnalyzerSession(
                 compilation,

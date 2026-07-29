@@ -6,9 +6,11 @@ using SharpProof.Ir;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class PortableIrGraphCodecTests {
+public sealed class PortableIrGraphCodecTests
+{
     [Test]
-    public void RoundTripPreservesEveryTermInstructionAndLocationShape() {
+    public void RoundTripPreservesEveryTermInstructionAndLocationShape()
+    {
         var fixture = CreateFixture();
 
         var encoded = PortableIrGraphCodec.Encode(
@@ -21,7 +23,8 @@ public sealed class PortableIrGraphCodecTests {
             decoded.Program,
             decoded.Roots);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 encoded.Graph.Terms.Select(static row => row.Kind).Distinct(),
                 Is.EquivalentTo(Enum.GetValues<IrTermKind>()));
@@ -77,7 +80,8 @@ public sealed class PortableIrGraphCodecTests {
     }
 
     [Test]
-    public void EncoderReturnsStableDenseMappingsForPreparationMetadata() {
+    public void EncoderReturnsStableDenseMappingsForPreparationMetadata()
+    {
         var fixture = CreateFixture();
 
         var encoded = PortableIrGraphCodec.Encode(
@@ -89,7 +93,8 @@ public sealed class PortableIrGraphCodecTests {
             .SelectMany(static block => block.Instructions)
             .ToArray();
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 encoded.VariableIndices.Values,
                 Is.EquivalentTo(Enumerable.Range(0, encoded.Graph.Variables.Length)));
@@ -101,18 +106,22 @@ public sealed class PortableIrGraphCodecTests {
     }
 
     [Test]
-    public void WireEnumCatalogsAreExhaustive() =>
+    public void WireEnumCatalogsAreExhaustive()
+    {
         Assert.That(PortableIrGraphCodec.HasCompleteWireEnumCatalogs, Is.True);
+    }
 
     [TestCase(WireEnumMutation.OpaquePurity)]
     [TestCase(WireEnumMutation.UnaryOperator)]
     [TestCase(WireEnumMutation.BinaryOperator)]
     [TestCase(WireEnumMutation.HavocKind)]
-    public void DecoderRejectsUnknownWireEnumCodes(WireEnumMutation mutation) {
+    public void DecoderRejectsUnknownWireEnumCodes(WireEnumMutation mutation)
+    {
         var fixture = CreateFixture();
         var graph = PortableIrGraphCodec.Encode(fixture.Program, fixture.Roots).Graph;
 
-        switch (mutation) {
+        switch (mutation)
+        {
             case WireEnumMutation.OpaquePurity:
                 graph.Terms.First(static row => row.Kind == IrTermKind.Opaque).C = 999;
                 break;
@@ -135,14 +144,16 @@ public sealed class PortableIrGraphCodecTests {
     }
 
     [Test]
-    public void RootsOnlyGraphDoesNotFabricateAProgram() {
+    public void RootsOnlyGraphDoesNotFabricateAProgram()
+    {
         var factory = new IrFactory();
         IrTerm[] roots = [factory.Integer(42)];
 
         var encoded = PortableIrGraphCodec.Encode(factory, null, roots);
         var decoded = PortableIrGraphCodec.Decode(encoded.Graph);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(encoded.Graph.HasProgram, Is.False);
             Assert.That(encoded.Graph.Entry, Is.EqualTo(-1));
             Assert.That(encoded.Graph.Blocks, Is.Empty);
@@ -165,13 +176,15 @@ public sealed class PortableIrGraphCodecTests {
     [TestCase(MalformedMutation.NullInstructionItems)]
     [TestCase(MalformedMutation.LocationKind)]
     [TestCase(MalformedMutation.ProgramShape)]
-    public void DecoderRejectsMalformedGraphs(MalformedMutation mutation) {
+    public void DecoderRejectsMalformedGraphs(MalformedMutation mutation)
+    {
         var fixture = CreateFixture();
         var graph = PortableIrGraphCodec.Encode(
             fixture.Program,
             fixture.Roots).Graph;
 
-        switch (mutation) {
+        switch (mutation)
+        {
             case MalformedMutation.TermIndex:
                 graph.Roots[0] = graph.Terms.Length;
                 break;
@@ -239,7 +252,8 @@ public sealed class PortableIrGraphCodecTests {
     [TestCase(DeepGraphKind.Types, true)]
     public void DecoderRejectsVeryDeepAcyclicAndCyclicGraphs(
         DeepGraphKind kind,
-        bool cyclic) {
+        bool cyclic)
+    {
         var graph = DeepGraph(kind, cyclic, 4096);
 
         Assert.Throws<InvalidDataException>(
@@ -249,8 +263,10 @@ public sealed class PortableIrGraphCodecTests {
     private static PortableIrGraph DeepGraph(
         DeepGraphKind kind,
         bool cyclic,
-        int depth) {
-        var graph = new PortableIrGraph {
+        int depth)
+    {
+        var graph = new PortableIrGraph
+        {
             Types = [
                 new() { Kind = IrTypeKind.Boolean, Name = "bool" },
                 new() { Kind = IrTypeKind.Integer, Name = "int" },
@@ -258,41 +274,52 @@ public sealed class PortableIrGraphCodecTests {
                 new() { Kind = IrTypeKind.Reference, Name = "object" }
             ]
         };
-        if (kind == DeepGraphKind.Types) {
+        if (kind == DeepGraphKind.Types)
+        {
             var types = graph.Types;
             Array.Resize(ref types, types.Length + depth);
             graph.Types = types;
             for (var index = 4; index < graph.Types.Length; index++)
-                graph.Types[index] = new PortableIrType {
+            {
+                graph.Types[index] = new PortableIrType
+                {
                     Kind = IrTypeKind.Sequence,
                     Name = $"sequence-{index}",
                     Element = index == graph.Types.Length - 1
                         ? cyclic ? 4 : 0
                         : index + 1
                 };
+            }
         }
-        else {
+        else
+        {
             graph.Terms = new PortableIrTerm[depth];
             for (var index = 0; index < graph.Terms.Length; index++)
+            {
                 graph.Terms[index] = index == graph.Terms.Length - 1 &&
                     !cyclic
-                    ? new PortableIrTerm {
+                    ? new PortableIrTerm
+                    {
                         Kind = IrTermKind.Boolean,
                         Type = 0,
                         A = 1
                     }
-                    : new PortableIrTerm {
+                    : new PortableIrTerm
+                    {
                         Kind = IrTermKind.Unary,
                         Type = 0,
                         A = (int)IrUnaryOperator.Not,
                         B = index == graph.Terms.Length - 1 ? 0 : index + 1
                     };
+            }
+
             graph.Roots = [0];
         }
         return graph;
     }
 
-    private static CodecFixture CreateFixture() {
+    private static CodecFixture CreateFixture()
+    {
         var factory = new IrFactory();
         var boxType = factory.GetOrCreateReferenceType(
             factory.CreateIdentity(),
@@ -393,7 +420,8 @@ public sealed class PortableIrGraphCodecTests {
             Array.IndexOf(roots, flagTerm));
     }
 
-    public enum MalformedMutation {
+    public enum MalformedMutation
+    {
         TermIndex,
         TermCycle,
         TypeCycle,
@@ -410,12 +438,14 @@ public sealed class PortableIrGraphCodecTests {
         ProgramShape
     }
 
-    public enum DeepGraphKind {
+    public enum DeepGraphKind
+    {
         Terms,
         Types
     }
 
-    public enum WireEnumMutation {
+    public enum WireEnumMutation
+    {
         OpaquePurity,
         UnaryOperator,
         BinaryOperator,

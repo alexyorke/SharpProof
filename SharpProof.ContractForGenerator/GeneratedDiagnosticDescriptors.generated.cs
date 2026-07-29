@@ -7,7 +7,8 @@
 
 namespace SharpProof.ContractForGenerator;
 
-internal static class GeneratedDiagnosticDescriptors {
+internal static class GeneratedDiagnosticDescriptors
+{
 
     internal static readonly DiagnosticDescriptor InvalidTarget = new(
         id: "SPCF0001",

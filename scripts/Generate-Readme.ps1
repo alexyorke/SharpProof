@@ -28,6 +28,7 @@ $currentMaintainedDocuments = @(
 $datedEvidenceDocuments = @(
     'docs\soundness-notes\2026-07-25-api-spec-result-domains.md',
     'docs\soundness-notes\2026-07-25-hardening.md',
+    'docs\soundness-notes\2026-07-29-formatting-neutral-source-metrics.md',
     'docs\soundness-notes\2026-07-29-semantic-precondition-vacuity.md'
 )
 $maintainedDocuments = @(

@@ -4,10 +4,13 @@ using SharpProof.TestSupport;
 namespace SharpProof.Meta.Analyzers.Test;
 
 [TestFixture]
-public sealed class DiagnosticDescriptorCatalogTests {
+public sealed class DiagnosticDescriptorCatalogTests
+{
     [Test]
-    public void RuntimeDescriptorsMatchTheAuthoritativeCatalog() =>
+    public void RuntimeDescriptorsMatchTheAuthoritativeCatalog()
+    {
         DiagnosticDescriptorCatalogAssertions.AssertOutput(
             "metaAnalyzer",
             typeof(SharpProofSoundnessAnalyzer).Assembly);
+    }
 }

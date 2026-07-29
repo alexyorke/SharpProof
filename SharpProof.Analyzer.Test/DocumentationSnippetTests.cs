@@ -10,7 +10,8 @@ namespace SharpProof.Analyzer.Test;
     "Performance",
     "CA1812:Avoid uninstantiated internal classes",
     Justification = "NUnit instantiates test fixtures through reflection.")]
-internal sealed class DocumentationSnippetTests {
+internal sealed class DocumentationSnippetTests
+{
     private static readonly Regex CSharpFence = new(
         "^```csharp[ \t]*\n(?<code>.*?)^```[ \t]*$",
         RegexOptions.CultureInvariant |
@@ -21,7 +22,8 @@ internal sealed class DocumentationSnippetTests {
     public void MaintainedCSharpFenceCompiles(
         string relativePath,
         int ordinal,
-        string source) {
+        string source)
+    {
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>
@@ -37,7 +39,8 @@ internal sealed class DocumentationSnippetTests {
                 static diagnostic => diagnostic.ToString())));
     }
 
-    private static IEnumerable<TestCaseData> GetCSharpSnippets() {
+    private static IEnumerable<TestCaseData> GetCSharpSnippets()
+    {
         var root = AnalyzerTestHost.FindRepositoryRoot();
         var paths = new[] { Path.Combine(root, "README.md") }
             .Concat(Directory.EnumerateFiles(
@@ -48,7 +51,8 @@ internal sealed class DocumentationSnippetTests {
                 Path.Combine(root, "samples", "README.md")
             ])
             .OrderBy(static path => path, StringComparer.Ordinal);
-        foreach (var path in paths) {
+        foreach (var path in paths)
+        {
             var content = File.ReadAllText(path).Replace(
                 "\r\n",
                 "\n",
@@ -56,7 +60,8 @@ internal sealed class DocumentationSnippetTests {
             var relativePath = Path.GetRelativePath(root, path)
                 .Replace('\\', '/');
             var ordinal = 0;
-            foreach (Match match in CSharpFence.Matches(content)) {
+            foreach (Match match in CSharpFence.Matches(content))
+            {
                 ordinal++;
                 yield return new TestCaseData(
                         relativePath,

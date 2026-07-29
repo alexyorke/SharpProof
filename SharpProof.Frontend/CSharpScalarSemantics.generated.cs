@@ -11,7 +11,8 @@ internal readonly struct CSharpIntegerSemantics(
     int bitWidth,
     long minimum,
     long maximum,
-    bool supportsExactIrArithmetic = false) {
+    bool supportsExactIrArithmetic = false)
+{
     internal SpecialType SpecialType { get; } = specialType;
     internal bool IsSigned { get; } = isSigned;
     internal int BitWidth { get; } = bitWidth;
@@ -24,7 +25,8 @@ internal readonly struct CSharpIntegerSemantics(
 internal readonly struct CSharpIntegerConversionSemantics(
     SpecialType source,
     SpecialType target,
-    bool isValuePreserving) {
+    bool isValuePreserving)
+{
     internal SpecialType Source { get; } = source;
     internal SpecialType Target { get; } = target;
     internal bool IsValuePreserving { get; } = isValuePreserving;
@@ -34,7 +36,8 @@ internal readonly struct CSharpBinarySemantics(
     BinaryOperatorKind kind,
     IrBinaryOperator irOperator,
     bool isIntegerArithmetic = false,
-    bool requiresCheckedArithmetic = false) {
+    bool requiresCheckedArithmetic = false)
+{
     internal BinaryOperatorKind Kind { get; } = kind;
     internal IrBinaryOperator IrOperator { get; } = irOperator;
     internal bool IsIntegerArithmetic { get; } = isIntegerArithmetic;
@@ -47,7 +50,8 @@ internal readonly struct CSharpUnarySemantics(
     IrUnaryOperator? irOperator,
     bool isIdentity = false,
     bool requiresCheckedArithmetic = false,
-    bool requiresExactIntegerDomain = false) {
+    bool requiresExactIntegerDomain = false)
+{
     internal UnaryOperatorKind Kind { get; } = kind;
     internal IrUnaryOperator? IrOperator { get; } = irOperator;
     internal bool IsIdentity { get; } = isIdentity;
@@ -57,7 +61,8 @@ internal readonly struct CSharpUnarySemantics(
         requiresExactIntegerDomain;
 }
 
-internal static class CSharpScalarSemantics {
+internal static class CSharpScalarSemantics
+{
     private static readonly ImmutableArray<CSharpIntegerSemantics> Integers = [
         new(SpecialType.System_SByte, true, 8, -128L, 127L),
         new(SpecialType.System_Byte, false, 8, 0L, 255L),
@@ -121,9 +126,11 @@ internal static class CSharpScalarSemantics {
 
     internal static bool TryGetInteger(
         SpecialType type,
-        out CSharpIntegerSemantics semantics) {
+        out CSharpIntegerSemantics semantics)
+    {
         foreach (var candidate in Integers)
-            if (candidate.SpecialType == type) {
+            if (candidate.SpecialType == type)
+            {
                 semantics = candidate;
                 return true;
             }
@@ -133,7 +140,8 @@ internal static class CSharpScalarSemantics {
 
     internal static IrBinaryOperator? MapBinary(
         BinaryOperatorKind kind,
-        SpecialType resultType) {
+        SpecialType resultType)
+    {
         if (kind == BinaryOperatorKind.Add &&
             resultType == SpecialType.System_String)
             return IrBinaryOperator.StringConcat;
@@ -152,7 +160,8 @@ internal static class CSharpScalarSemantics {
 
     internal static bool IsValuePreservingIntegerConversion(
         SpecialType source,
-        SpecialType target) {
+        SpecialType target)
+    {
         foreach (var conversion in IntegerConversions)
             if (conversion.Source == source &&
                 conversion.Target == target)
@@ -166,9 +175,11 @@ internal static class CSharpScalarSemantics {
 
     internal static bool TryGetUnary(
         UnaryOperatorKind kind,
-        out CSharpUnarySemantics semantics) {
+        out CSharpUnarySemantics semantics)
+    {
         foreach (var candidate in UnaryOperators)
-            if (candidate.Kind == kind) {
+            if (candidate.Kind == kind)
+            {
                 semantics = candidate;
                 return true;
             }
@@ -185,9 +196,11 @@ internal static class CSharpScalarSemantics {
 
     private static bool TryGetBinary(
         BinaryOperatorKind kind,
-        out CSharpBinarySemantics semantics) {
+        out CSharpBinarySemantics semantics)
+    {
         foreach (var candidate in BinaryOperators)
-            if (candidate.Kind == kind) {
+            if (candidate.Kind == kind)
+            {
                 semantics = candidate;
                 return true;
             }

@@ -14,9 +14,11 @@ using SharpProof.Verify;
 namespace SharpProof.ArchitectureTest;
 
 [TestFixture]
-public sealed class ArchitectureTests {
+public sealed class ArchitectureTests
+{
     private static readonly JsonSerializerOptions SizeRatchetJsonOptions =
-        new() {
+        new()
+        {
             PropertyNameCaseInsensitive = true
         };
 
@@ -36,9 +38,17 @@ public sealed class ArchitectureTests {
         "SharpProof.Worker.Launcher"
     ];
 
+    private static readonly string[] TrustedKernelPaths = [
+        "SharpProof.Verify/Evidence.cs",
+        "SharpProof.Verify/Outcomes.cs",
+        "SharpProof.Verify/ProofKernel.cs"
+    ];
+
     [Test]
-    public void NewLayerProjectReferencesFollowTheDependencyDag() {
-        var allowed = new Dictionary<string, string[]>(StringComparer.Ordinal) {
+    public void NewLayerProjectReferencesFollowTheDependencyDag()
+    {
+        var allowed = new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
             ["SharpProof.Ir"] = [],
             ["SharpProof.CompilerArtifact"] = [
                 "SharpProof.Ir",
@@ -78,7 +88,8 @@ public sealed class ArchitectureTests {
             ]
         };
 
-        foreach (var project in ProductionProjects) {
+        foreach (var project in ProductionProjects)
+        {
             var actual = GetProjectReferences(project)
                 .OrderBy(static value => value, StringComparer.Ordinal)
                 .ToArray();
@@ -92,20 +103,23 @@ public sealed class ArchitectureTests {
     }
 
     [Test]
-    public void WorkerAndLauncherRuntimeClosuresAreCompilerNeutral() {
+    public void WorkerAndLauncherRuntimeClosuresAreCompilerNeutral()
+    {
         var forbiddenProjects = new[] {
             "SharpProof.Analyzer", "SharpProof.Attributes", "SharpProof.Contracts",
             "SharpProof.Effects", "SharpProof.Frontend"
         };
         foreach (var root in new[] {
                      "SharpProof.Worker", "SharpProof.Worker.Launcher"
-                 }) {
+                 })
+        {
             var closure = TransitiveProjectClosure(root).ToArray();
             Assert.That(
                 closure.Intersect(forbiddenProjects, StringComparer.Ordinal),
                 Is.Empty,
                 root);
-            foreach (var project in closure) {
+            foreach (var project in closure)
+            {
                 Assert.That(
                     ProjectPackages(project),
                     Has.None.StartsWith("Microsoft.CodeAnalysis"),
@@ -123,27 +137,32 @@ public sealed class ArchitectureTests {
     }
 
     [Test]
-    public void AnalyzerUtilitiesHasNoStaleBuildOrTestResidue() {
+    public void AnalyzerUtilitiesHasNoStaleBuildOrTestResidue()
+    {
         foreach (var path in new[] {
                      "Directory.Build.targets",
                      "SharpProof.AnalyzerConsumer.props",
                      "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj"
                  })
+        {
             Assert.That(
                 File.ReadAllText(Path.Combine(
                     RepositoryRoot(), path.Replace('/', Path.DirectorySeparatorChar))),
                 Does.Not.Contain("Microsoft.CodeAnalysis.AnalyzerUtilities"),
                 path);
+        }
     }
 
     [Test]
-    public void LanguageNeutralLayersHaveNoCSharpSyntaxDependency() {
+    public void LanguageNeutralLayersHaveNoCSharpSyntaxDependency()
+    {
         foreach (var project in new[] {
                      "SharpProof.Ir",
                      "SharpProof.CompilerArtifact",
                      "SharpProof.Specs",
                      "SharpProof.Dataflow"
-                 }) {
+                 })
+        {
             var source = ReadProductionSources(project);
             Assert.That(source, Does.Not.Contain("Microsoft.CodeAnalysis.CSharp"));
             Assert.That(source, Does.Not.Contain("SyntaxNode"));
@@ -153,8 +172,10 @@ public sealed class ArchitectureTests {
     }
 
     [Test]
-    public void OnlyTheSmtLayerReferencesZ3InTheProductionGraph() {
-        foreach (var project in ProductionProjects) {
+    public void OnlyTheSmtLayerReferencesZ3InTheProductionGraph()
+    {
+        foreach (var project in ProductionProjects)
+        {
             var xml = XDocument.Load(ProjectFile(project));
             var packages = xml
                 .Descendants("PackageReference")
@@ -169,7 +190,8 @@ public sealed class ArchitectureTests {
     }
 
     [Test]
-    public void IrTermPayloadsDoNotExposeSemanticStrings() {
+    public void IrTermPayloadsDoNotExposeSemanticStrings()
+    {
         var stringPayloads = typeof(IrTerm).Assembly
             .GetTypes()
             .Where(static type =>
@@ -186,7 +208,8 @@ public sealed class ArchitectureTests {
     }
 
     [Test]
-    public void SemanticConsumersDoNotEncodeFrameworkIdentitiesAsStringLiterals() {
+    public void SemanticConsumersDoNotEncodeFrameworkIdentitiesAsStringLiterals()
+    {
         var semanticConsumers = new[] {
             "SharpProof.Analyzer",
             "SharpProof.CompilerArtifact",
@@ -215,7 +238,8 @@ public sealed class ArchitectureTests {
                     literal.Token.ValueText.StartsWith(
                         "System.",
                         StringComparison.Ordinal))
-                .Select(literal => {
+                .Select(literal =>
+                {
                     var line = literal.GetLocation()
                         .GetLineSpan()
                         .StartLinePosition.Line + 1;
@@ -232,7 +256,8 @@ public sealed class ArchitectureTests {
     }
 
     [Test]
-    public void FrontendUsesOnlyTotalCompilerBoundLowering() {
+    public void FrontendUsesOnlyTotalCompilerBoundLowering()
+    {
         var source = ReadProductionSources("SharpProof.Frontend");
         Assert.That(source, Does.Not.Contain("TryLower"));
         Assert.That(source, Does.Not.Contain("SyntaxFactory"));
@@ -244,7 +269,8 @@ public sealed class ArchitectureTests {
     }
 
     [Test]
-    public void ProofProducingOutcomeConstructorsStayInTheKernel() {
+    public void ProofProducingOutcomeConstructorsStayInTheKernel()
+    {
         var productionFiles = ProductionProjects
             .SelectMany(ProductionSourceFiles)
             .ToArray();
@@ -280,7 +306,8 @@ public sealed class ArchitectureTests {
     }
 
     [Test]
-    public void AlgorithmLayerSizeRatchetManifestIsWellFormed() {
+    public void AlgorithmLayerSizeRatchetManifestIsWellFormed()
+    {
         var manifest = ReadSizeRatchetManifest();
         var expectedPaths = new[] {
             "SharpProof.Dataflow/ForwardDataflowAnalysis.cs",
@@ -299,10 +326,12 @@ public sealed class ArchitectureTests {
             "SharpProof.Verify/ProofKernel.cs",
             "SharpProof.Worker/CallableCounterexampleReplayer.cs"
         };
-        Assert.That(manifest.SchemaVersion, Is.EqualTo(1));
+        Assert.That(manifest.SchemaVersion, Is.EqualTo(2));
         Assert.That(manifest.Rationale, Is.Not.Empty);
-        Assert.That(manifest.Measurement.PhysicalFileLines, Is.Not.Empty);
-        Assert.That(manifest.Measurement.MemberLines, Is.Not.Empty);
+        Assert.That(manifest.Measurement.FileExpressionNodes, Is.Not.Empty);
+        Assert.That(manifest.Measurement.MemberExpressionNodes, Is.Not.Empty);
+        Assert.That(manifest.Measurement.FileDecisionPoints, Is.Not.Empty);
+        Assert.That(manifest.Measurement.MemberDecisionPoints, Is.Not.Empty);
         Assert.That(
             manifest.Files
                 .Select(static entry => entry.Path)
@@ -312,15 +341,18 @@ public sealed class ArchitectureTests {
                 StringComparer.Ordinal)));
 
         var paths = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var entry in manifest.Files) {
+        foreach (var entry in manifest.Files)
+        {
             Assert.That(entry.Path, Is.EqualTo(entry.Path.Replace('\\', '/')));
             Assert.That(entry.Path, Does.EndWith(".cs"));
             Assert.That(
                 paths.Add(entry.Path),
                 Is.True,
                 $"Duplicate size-ratchet entry: {entry.Path}");
-            Assert.That(entry.MaximumPhysicalLines, Is.Positive, entry.Path);
-            Assert.That(entry.MaximumMemberLines, Is.Positive, entry.Path);
+            Assert.That(entry.MaximumFileExpressionNodes, Is.Positive, entry.Path);
+            Assert.That(entry.MaximumMemberExpressionNodes, Is.Positive, entry.Path);
+            Assert.That(entry.MaximumFileDecisionPoints, Is.Positive, entry.Path);
+            Assert.That(entry.MaximumMemberDecisionPoints, Is.Positive, entry.Path);
 
             var fullPath = Path.GetFullPath(
                 Path.Combine(RepositoryRoot(), entry.Path));
@@ -335,9 +367,11 @@ public sealed class ArchitectureTests {
     }
 
     [Test]
-    public void TrustedComputingBaseDeclarationNamesEveryRequiredPath() {
+    public void TrustedComputingBaseDeclarationNamesEveryRequiredPath()
+    {
         var expected = new Dictionary<string, string[]>(
-            StringComparer.Ordinal) {
+            StringComparer.Ordinal)
+        {
             ["discovery"] = [
                 "SharpProof.Analyzer/FinalCompilationCollector.cs",
                 "SharpProof.Analyzer/CompilerArtifact/ClaimManifestBuilder.cs",
@@ -451,9 +485,15 @@ public sealed class ArchitectureTests {
         var root = document.RootElement;
         Assert.That(
             root.GetProperty("trustedKernel")
-                .GetProperty("maximumNonblankLines")
-                .GetInt32(),
-            Is.EqualTo(275));
+                .GetProperty("paths")
+                .EnumerateArray()
+                .Select(static path => path.GetString() ?? "")
+                .OrderBy(static path => path, StringComparer.Ordinal),
+            Is.EqualTo(TrustedKernelPaths));
+        Assert.That(
+            root.GetProperty("trustedKernel")
+                .TryGetProperty("maximumNonblankLines", out _),
+            Is.False);
         var declaration = root.GetProperty("trustedComputingBase");
         Assert.That(
             declaration.GetProperty("measurement").GetString(),
@@ -473,7 +513,8 @@ public sealed class ArchitectureTests {
             Is.EqualTo(expected.Keys.OrderBy(
                 static name => name,
                 StringComparer.Ordinal)));
-        foreach (var component in expected) {
+        foreach (var component in expected)
+        {
             Assert.That(
                 actual[component.Key].OrderBy(
                     static path => path,
@@ -486,7 +527,8 @@ public sealed class ArchitectureTests {
     }
 
     [Test]
-    public void WorkflowCommandsUsePowerShellSafeMsBuildSwitches() {
+    public void WorkflowCommandsUsePowerShellSafeMsBuildSwitches()
+    {
         var workflowRoot = Path.Combine(RepositoryRoot(), ".github", "workflows");
         var violations = Directory
             .EnumerateFiles(workflowRoot, "*.yml", SearchOption.TopDirectoryOnly)
@@ -495,7 +537,8 @@ public sealed class ArchitectureTests {
                 "*.yaml",
                 SearchOption.TopDirectoryOnly))
             .SelectMany(path => File.ReadLines(path)
-                .Select((line, index) => new {
+                .Select((line, index) => new
+                {
                     Path = path,
                     Line = line,
                     Number = index + 1
@@ -520,7 +563,8 @@ public sealed class ArchitectureTests {
     }
 
     [Test]
-    public void PackageTestsDeclareReleaseEvidenceAssetDependencies() {
+    public void PackageTestsDeclareReleaseEvidenceAssetDependencies()
+    {
         var references = GetProjectReferences("SharpProof.Package.Test").ToArray();
 
         Assert.That(references, Does.Contain("SharpProof.Package"));
@@ -528,9 +572,11 @@ public sealed class ArchitectureTests {
     }
 
     [Test]
-    public void ReplacedAlgorithmLayersStayWithinSizeCaps() {
+    public void AlgorithmLayersStayWithinStructuralComplexityCaps()
+    {
         var violations = new List<string>();
-        foreach (var entry in ReadSizeRatchetManifest().Files) {
+        foreach (var entry in ReadSizeRatchetManifest().Files)
+        {
             var fullPath = Path.Combine(RepositoryRoot(), entry.Path);
             var source = File.ReadAllText(fullPath);
             var tree = CSharpSyntaxTree.ParseText(
@@ -542,7 +588,8 @@ public sealed class ArchitectureTests {
                 .Where(static diagnostic =>
                     diagnostic.Severity == DiagnosticSeverity.Error)
                 .ToArray();
-            if (parseErrors.Length != 0) {
+            if (parseErrors.Length != 0)
+            {
                 violations.Add(
                     $"{entry.Path}: Roslyn parse errors: " +
                     string.Join("; ", parseErrors.Select(
@@ -550,32 +597,58 @@ public sealed class ArchitectureTests {
                 continue;
             }
 
-            var physicalLines = File.ReadLines(fullPath).Count();
-            if (physicalLines > entry.MaximumPhysicalLines) {
+            var root = tree.GetRoot();
+            var fileExpressionNodes = root.DescendantNodes()
+                .Count(static node => node is ExpressionSyntax);
+            var fileDecisionPoints = root.DescendantNodes()
+                .Count(IsDecisionPoint);
+            if (fileExpressionNodes > entry.MaximumFileExpressionNodes)
+            {
                 violations.Add(
-                    $"{entry.Path}: {physicalLines} physical lines exceeds " +
-                    $"cap {entry.MaximumPhysicalLines}");
+                    $"{entry.Path}: {fileExpressionNodes} expression nodes exceeds " +
+                    $"cap {entry.MaximumFileExpressionNodes}");
+            }
+            if (fileDecisionPoints > entry.MaximumFileDecisionPoints)
+            {
+                violations.Add(
+                    $"{entry.Path}: {fileDecisionPoints} decision points " +
+                    $"exceeds cap {entry.MaximumFileDecisionPoints}");
             }
 
-            var largestMember = tree.GetRoot()
+            var members = root
                 .DescendantNodes()
                 .Where(IsMeasuredMember)
-                .Select(node => new {
+                .Select(static node => new
+                {
                     Node = node,
-                    Lines = SourceLineCount(node)
+                    ExpressionNodes = node.DescendantNodesAndSelf()
+                        .Count(static candidate => candidate is ExpressionSyntax),
+                    DecisionPoints = node.DescendantNodesAndSelf()
+                        .Count(IsDecisionPoint)
                 })
-                .OrderByDescending(static member => member.Lines)
-                .FirstOrDefault();
-            if (largestMember != null &&
-                largestMember.Lines > entry.MaximumMemberLines) {
-                var line = largestMember.Node.GetLocation()
+                .ToArray();
+            foreach (var member in members)
+            {
+                if (member.ExpressionNodes <= entry.MaximumMemberExpressionNodes &&
+                    member.DecisionPoints <= entry.MaximumMemberDecisionPoints)
+                {
+                    continue;
+                }
+
+                var line = member.Node.GetLocation()
                     .GetLineSpan()
                     .StartLinePosition.Line + 1;
                 violations.Add(
-                    $"{entry.Path}:{line}: {MemberName(largestMember.Node)} " +
-                    $"spans {largestMember.Lines} lines; cap " +
-                    $"{entry.MaximumMemberLines}");
+                    $"{entry.Path}:{line}: {MemberName(member.Node)} has " +
+                    $"{member.ExpressionNodes} expression nodes and " +
+                    $"{member.DecisionPoints} decision points; caps " +
+                    $"{entry.MaximumMemberExpressionNodes} and " +
+                    $"{entry.MaximumMemberDecisionPoints}");
             }
+            TestContext.WriteLine(
+                $"{entry.Path}|{fileExpressionNodes}|{fileDecisionPoints}|" +
+                $"{members.Max(static member => member.ExpressionNodes)}|" +
+                $"{members.Max(static member => member.DecisionPoints)}");
         }
 
         Assert.That(
@@ -584,21 +657,38 @@ public sealed class ArchitectureTests {
             Environment.NewLine + string.Join(Environment.NewLine, violations));
     }
 
-    private static bool IsMeasuredMember(SyntaxNode node) =>
-        node is BaseMethodDeclarationSyntax or
+    private static bool IsMeasuredMember(SyntaxNode node)
+    {
+        return node is BaseMethodDeclarationSyntax or
         LocalFunctionStatementSyntax or
         AccessorDeclarationSyntax or
         ParameterListSyntax { Parent: TypeDeclarationSyntax } or
         PropertyDeclarationSyntax { ExpressionBody: not null } or
         IndexerDeclarationSyntax { ExpressionBody: not null };
-
-    private static int SourceLineCount(SyntaxNode node) {
-        var span = node.GetLocation().GetLineSpan();
-        return span.EndLinePosition.Line - span.StartLinePosition.Line + 1;
     }
 
-    private static string MemberName(SyntaxNode node) =>
-        node switch {
+    private static bool IsDecisionPoint(SyntaxNode node)
+    {
+        return node is IfStatementSyntax or
+            ForStatementSyntax or
+            ForEachStatementSyntax or
+            ForEachVariableStatementSyntax or
+            WhileStatementSyntax or
+            DoStatementSyntax or
+            CaseSwitchLabelSyntax or
+            CasePatternSwitchLabelSyntax or
+            CatchClauseSyntax or
+            ConditionalExpressionSyntax or
+            SwitchExpressionArmSyntax ||
+        node.IsKind(SyntaxKind.LogicalAndExpression) ||
+        node.IsKind(SyntaxKind.LogicalOrExpression) ||
+        node.IsKind(SyntaxKind.CoalesceExpression);
+    }
+
+    private static string MemberName(SyntaxNode node)
+    {
+        return node switch
+        {
             MethodDeclarationSyntax method => method.Identifier.ValueText,
             ConstructorDeclarationSyntax constructor =>
                 constructor.Identifier.ValueText,
@@ -611,7 +701,8 @@ public sealed class ArchitectureTests {
             LocalFunctionStatementSyntax local => local.Identifier.ValueText,
             AccessorDeclarationSyntax accessor =>
                 accessor.Keyword.ValueText + " accessor",
-            ParameterListSyntax {
+            ParameterListSyntax
+            {
                 Parent: TypeDeclarationSyntax type
             } => type.Identifier.ValueText + " primary constructor",
             PropertyDeclarationSyntax property =>
@@ -619,8 +710,10 @@ public sealed class ArchitectureTests {
             IndexerDeclarationSyntax => "this getter",
             _ => node.Kind().ToString()
         };
+    }
 
-    private static SizeRatchetManifest ReadSizeRatchetManifest() {
+    private static SizeRatchetManifest ReadSizeRatchetManifest()
+    {
         var path = Path.Combine(
             RepositoryRoot(),
             "eng",
@@ -634,7 +727,8 @@ public sealed class ArchitectureTests {
                 "Could not deserialize the algorithm size-ratchet manifest.");
     }
 
-    private static IEnumerable<string> GetProjectReferences(string project) {
+    private static IEnumerable<string> GetProjectReferences(string project)
+    {
         var xml = XDocument.Load(ProjectFile(project));
         return xml
             .Descendants("ProjectReference")
@@ -649,36 +743,53 @@ public sealed class ArchitectureTests {
                 Path.GetFileNameWithoutExtension(value!.Replace('\\', '/')));
     }
 
-    private static IEnumerable<string> TransitiveProjectClosure(string root) {
-        var pending = new Stack<string>(); var visited = new HashSet<string>(StringComparer.Ordinal);
+    private static IEnumerable<string> TransitiveProjectClosure(string root)
+    {
+        var pending = new Stack<string>();
+        var visited = new HashSet<string>(StringComparer.Ordinal);
         pending.Push(root);
-        while (pending.Count != 0) {
+        while (pending.Count != 0)
+        {
             var project = pending.Pop();
-            if (!visited.Add(project)) continue;
+            if (!visited.Add(project))
+            {
+                continue;
+            }
+
             yield return project;
             foreach (var dependency in GetProjectReferences(project))
+            {
                 pending.Push(dependency);
+            }
         }
     }
 
-    private static string[] ProjectPackages(string project) => [..
+    private static string[] ProjectPackages(string project)
+    {
+        return [..
         XDocument.Load(ProjectFile(project))
             .Descendants("PackageReference")
             .Select(static element => (string?)element.Attribute("Include"))
             .Where(static value => !string.IsNullOrWhiteSpace(value))
             .Select(static value => value!)];
+    }
 
-    private static string ProjectFile(string project) =>
-        Path.Combine(RepositoryRoot(), project, project + ".csproj");
+    private static string ProjectFile(string project)
+    {
+        return Path.Combine(RepositoryRoot(), project, project + ".csproj");
+    }
 
-    private static string ReadProductionSources(string project) =>
-        string.Join(
+    private static string ReadProductionSources(string project)
+    {
+        return string.Join(
             "\n",
             ProductionSourceFiles(project)
                 .Select(File.ReadAllText));
+    }
 
-    private static IEnumerable<string> ProductionSourceFiles(string project) =>
-        Directory.GetFiles(
+    private static IEnumerable<string> ProductionSourceFiles(string project)
+    {
+        return Directory.GetFiles(
                 Path.Combine(RepositoryRoot(), project),
                 "*.cs",
                 SearchOption.AllDirectories)
@@ -692,26 +803,36 @@ public sealed class ArchitectureTests {
                     Path.DirectorySeparatorChar,
                     StringComparison.Ordinal))
             .OrderBy(static path => path, StringComparer.Ordinal);
+    }
 
     private static string[] FindRelativeCallers(
         IEnumerable<string> files,
-        string pattern) =>
-        [.. files
+        string pattern)
+    {
+        return [.. files
             .Where(file => File.ReadAllText(file).Contains(
                 pattern,
                 StringComparison.Ordinal))
             .Select(Relative)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static value => value, StringComparer.Ordinal)];
+    }
 
-    private static string Relative(string path) =>
-        Path.GetRelativePath(RepositoryRoot(), path).Replace('\\', '/');
+    private static string Relative(string path)
+    {
+        return Path.GetRelativePath(RepositoryRoot(), path).Replace('\\', '/');
+    }
 
-    private static string RepositoryRoot() {
+    private static string RepositoryRoot()
+    {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null) {
+        while (directory != null)
+        {
             if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
+            {
                 return directory.FullName;
+            }
+
             directory = directory.Parent;
         }
         throw new InvalidOperationException("Could not find the repository root.");
@@ -721,8 +842,12 @@ public sealed class ArchitectureTests {
         "Performance",
         "CA1812:Avoid uninstantiated internal classes",
         Justification = "System.Text.Json instantiates this model through reflection.")]
-    private sealed class SizeRatchetManifest {
-        public int SchemaVersion { get; init; }
+    private sealed class SizeRatchetManifest
+    {
+        public int SchemaVersion
+        {
+            get; init;
+        }
 
         public string Rationale { get; init; } = "";
 
@@ -731,21 +856,43 @@ public sealed class ArchitectureTests {
         public SizeRatchetEntry[] Files { get; init; } = [];
     }
 
-    private sealed class SizeRatchetMeasurement {
-        public string PhysicalFileLines { get; init; } = "";
+    private sealed class SizeRatchetMeasurement
+    {
+        public string FileExpressionNodes { get; init; } = "";
 
-        public string MemberLines { get; init; } = "";
+        public string MemberExpressionNodes { get; init; } = "";
+
+        public string FileDecisionPoints { get; init; } = "";
+
+        public string MemberDecisionPoints { get; init; } = "";
     }
 
     [SuppressMessage(
         "Performance",
         "CA1812:Avoid uninstantiated internal classes",
         Justification = "System.Text.Json instantiates this model through reflection.")]
-    private sealed class SizeRatchetEntry {
+    private sealed class SizeRatchetEntry
+    {
         public string Path { get; init; } = "";
 
-        public int MaximumPhysicalLines { get; init; }
+        public int MaximumFileExpressionNodes
+        {
+            get; init;
+        }
 
-        public int MaximumMemberLines { get; init; }
+        public int MaximumMemberExpressionNodes
+        {
+            get; init;
+        }
+
+        public int MaximumFileDecisionPoints
+        {
+            get; init;
+        }
+
+        public int MaximumMemberDecisionPoints
+        {
+            get; init;
+        }
     }
 }

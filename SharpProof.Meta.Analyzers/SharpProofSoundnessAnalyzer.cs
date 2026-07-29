@@ -8,7 +8,8 @@ using Microsoft.CodeAnalysis.Operations;
 namespace SharpProof.Meta.Analyzers;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
+public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
+{
     private static readonly ImmutableArray<string> KnownTypeNames = [
         "Microsoft.CodeAnalysis.Compilation", "Microsoft.CodeAnalysis.SemanticModel",
         "Microsoft.CodeAnalysis.CSharp.SyntaxFactory", "Microsoft.CodeAnalysis.ISymbol",
@@ -29,7 +30,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
     ];
 
     private static readonly ImmutableDictionary<KnownType, ImmutableHashSet<string>> ForbiddenMethods =
-        new Dictionary<KnownType, ImmutableHashSet<string>> {
+        new Dictionary<KnownType, ImmutableHashSet<string>>
+        {
             [KnownType.Compilation] = Names("ReplaceSyntaxTree", "AddSyntaxTrees", "GetSymbolsWithName"),
             [KnownType.SemanticModel] = Names("TryGetSpeculativeSemanticModel", "GetSpeculativeTypeInfo", "GetDiagnostics"),
             [KnownType.SyntaxFactory] = Names("ParseStatement", "ParseExpression", "ParseTypeName")
@@ -43,11 +45,17 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => MetaDiagnosticDescriptors.All;
 
-    public override void Initialize(AnalysisContext context) {
-        if (context == null) throw new ArgumentNullException(nameof(context));
+    public override void Initialize(AnalysisContext context)
+    {
+        if (context == null)
+        {
+            throw new ArgumentNullException(nameof(context));
+        }
+
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-        context.RegisterCompilationStartAction(startContext => {
+        context.RegisterCompilationStartAction(startContext =>
+        {
             var symbols = new KnownSymbols(startContext.Compilation);
             startContext.RegisterOperationAction(c => AnalyzeInvocation(c, symbols), OperationKind.Invocation);
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, symbols), OperationKind.ObjectCreation);
@@ -57,14 +65,20 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
         });
     }
 
-    private static ImmutableHashSet<string> Names(params string[] values) =>
-        values.ToImmutableHashSet(StringComparer.Ordinal);
+    private static ImmutableHashSet<string> Names(params string[] values)
+    {
+        return values.ToImmutableHashSet(StringComparer.Ordinal);
+    }
 
-    private static void AnalyzeInvocation(OperationAnalysisContext context, KnownSymbols symbols) {
+    private static void AnalyzeInvocation(OperationAnalysisContext context, KnownSymbols symbols)
+    {
         var invocation = (IInvocationOperation)context.Operation;
         var method = invocation.TargetMethod.OriginalDefinition;
         if (IsForbidden(method, invocation, context.ContainingSymbol, symbols))
+        {
             Report(context, MetaDiagnosticDescriptors.ForbiddenRoslynApi, invocation.Syntax.GetLocation(), method.Name);
+        }
+
         AnalyzeSemanticEquals(context, invocation, symbols);
         AnalyzeCacheWrite(context, invocation);
     }
@@ -73,26 +87,46 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
         IMethodSymbol method,
         IInvocationOperation invocation,
         ISymbol containingSymbol,
-        KnownSymbols symbols) {
-        if (!IsSemanticNamespace(containingSymbol)) return false;
+        KnownSymbols symbols)
+    {
+        if (!IsSemanticNamespace(containingSymbol))
+        {
+            return false;
+        }
+
         foreach (var entry in ForbiddenMethods)
+        {
             if (IsSameType(method.ContainingType, symbols[entry.Key]) && entry.Value.Contains(method.Name))
+            {
                 return true;
+            }
+        }
+
         if (method.Name == "GetSemanticModel" && IsSameType(method.ContainingType, symbols[KnownType.Compilation]))
+        {
             return !IsSameType(containingSymbol.ContainingType, symbols[KnownType.CompilationModelProvider]);
-        if (method.Name != "ToDisplayString") return false;
+        }
+
+        if (method.Name != "ToDisplayString")
+        {
+            return false;
+        }
+
         var receiverType = invocation.Instance?.Type ?? method.ContainingType;
         return IsSameType(receiverType, symbols[KnownType.Symbol]) ||
                receiverType?.AllInterfaces.Any(value => IsSameType(value, symbols[KnownType.Symbol])) == true;
     }
 
-    private static void AnalyzeObjectCreation(OperationAnalysisContext context, KnownSymbols symbols) {
+    private static void AnalyzeObjectCreation(OperationAnalysisContext context, KnownSymbols symbols)
+    {
         var creation = (IObjectCreationOperation)context.Operation;
         var containingType = context.ContainingSymbol.ContainingType;
         if (IsSameType(creation.Type, symbols[KnownType.DiagnosticDescriptor]) &&
             !IsExactNamespace(context.ContainingSymbol.ContainingNamespace, "SharpProof", "Meta", "Analyzers") &&
             !IsAnyType(containingType, symbols, KnownType.AnalyzerDiagnosticDescriptors, KnownType.ContractForDiagnosticDescriptors))
+        {
             Report(context, MetaDiagnosticDescriptors.DescriptorConstruction, creation.Syntax.GetLocation());
+        }
 
         if (IsSameType(creation.Type, symbols[KnownType.Assumption]) &&
             !IsAnyType(
@@ -101,7 +135,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
                 KnownType.ProofKernel,
                 KnownType.CallableVerifier,
                 KnownType.PostconditionObligationBuilder))
+        {
             Report(context, MetaDiagnosticDescriptors.AssumptionConstruction, creation.Syntax.GetLocation());
+        }
 
         if (IsSameType(creation.Type, symbols[KnownType.EffectSummary]) &&
             !IsAnyType(
@@ -111,79 +147,119 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
                 KnownType.EffectSummaryDomain,
                 KnownType.EffectSummaryOperations,
                 KnownType.ExternalEffectResolver))
+        {
             Report(context, MetaDiagnosticDescriptors.EffectSummaryConstruction, creation.Syntax.GetLocation());
+        }
 
         if (IsAnyType(creation.Type, symbols, KnownType.ProvenOutcome, KnownType.RefutedOutcome, KnownType.ValidatedModel) &&
             !IsSameType(containingType, symbols[KnownType.ProofKernel]))
+        {
             Report(
                 context,
                 MetaDiagnosticDescriptors.ProofOutcomeConstruction,
                 creation.Syntax.GetLocation(),
                 creation.Type?.Name ?? string.Empty);
+        }
     }
 
-    private static bool IsAnyType(ITypeSymbol? actual, KnownSymbols symbols, params KnownType[] expected) =>
-        expected.Any(type => IsSameType(actual, symbols[type]));
+    private static bool IsAnyType(ITypeSymbol? actual, KnownSymbols symbols, params KnownType[] expected)
+    {
+        return expected.Any(type => IsSameType(actual, symbols[type]));
+    }
 
-    private static void AnalyzeBinaryOperation(OperationAnalysisContext context) {
+    private static void AnalyzeBinaryOperation(OperationAnalysisContext context)
+    {
         AnalyzeSemanticString(context);
         AnalyzeCSharpExpressionText(context);
     }
 
-    private static void AnalyzeSemanticString(OperationAnalysisContext context) {
-        if (context.Operation is not IBinaryOperation {
-            OperatorKind: BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals
-        } binary ||
+    private static void AnalyzeSemanticString(OperationAnalysisContext context)
+    {
+        if (context.Operation is not IBinaryOperation
+            {
+                OperatorKind: BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals
+            } binary ||
             !IsSemanticNamespace(context.ContainingSymbol) ||
             !IsInsideCondition(binary.Syntax))
+        {
             return;
+        }
+
         var literal = GetSemanticLiteral(binary.LeftOperand) ?? GetSemanticLiteral(binary.RightOperand);
         if (literal != null)
+        {
             Report(context, MetaDiagnosticDescriptors.SemanticStringControlFlow, binary.Syntax.GetLocation(), literal);
+        }
     }
 
     private static void AnalyzeSemanticEquals(
         OperationAnalysisContext context,
         IInvocationOperation invocation,
-        KnownSymbols symbols) {
+        KnownSymbols symbols)
+    {
         if (!IsSameType(invocation.TargetMethod.ContainingType, symbols[KnownType.String]) ||
             invocation.TargetMethod.Name != "Equals" ||
             !IsSemanticNamespace(context.ContainingSymbol) ||
             !IsInsideCondition(invocation.Syntax))
+        {
             return;
+        }
+
         var literal = invocation.Instance == null ? null : GetSemanticLiteral(invocation.Instance);
         literal ??= invocation.Arguments.Select(static a => GetSemanticLiteral(a.Value)).FirstOrDefault(value => value != null);
         if (literal != null)
+        {
             Report(context, MetaDiagnosticDescriptors.SemanticStringControlFlow, invocation.Syntax.GetLocation(), literal);
+        }
     }
 
-    private static void AnalyzeCSharpExpressionText(OperationAnalysisContext context) {
+    private static void AnalyzeCSharpExpressionText(OperationAnalysisContext context)
+    {
         if (context.Operation is not IBinaryOperation { OperatorKind: BinaryOperatorKind.Add } binary ||
             binary.Type?.SpecialType != SpecialType.System_String ||
             !IsSemanticNamespace(context.ContainingSymbol))
+        {
             return;
+        }
+
         var fragment = GetCSharpExpressionFragment(binary.LeftOperand) ?? GetCSharpExpressionFragment(binary.RightOperand);
         if (fragment != null)
+        {
             Report(context, MetaDiagnosticDescriptors.CSharpExpressionText, binary.Syntax.GetLocation(), fragment);
+        }
     }
 
-    private static string? GetCSharpExpressionFragment(IOperation operation) {
-        if (!operation.ConstantValue.HasValue || operation.ConstantValue.Value is not string value) return null;
+    private static string? GetCSharpExpressionFragment(IOperation operation)
+    {
+        if (!operation.ConstantValue.HasValue || operation.ConstantValue.Value is not string value)
+        {
+            return null;
+        }
+
         return CSharpExpressionFragments.FirstOrDefault(fragment => value.IndexOf(fragment, StringComparison.Ordinal) >= 0);
     }
 
-    private static void AnalyzeCacheWrite(OperationAnalysisContext context, IInvocationOperation invocation) {
+    private static void AnalyzeCacheWrite(OperationAnalysisContext context, IInvocationOperation invocation)
+    {
         if (!CacheWriteMethods.Contains(invocation.TargetMethod.Name) ||
             !IsCacheType(invocation.Instance?.Type ?? invocation.TargetMethod.ContainingType) ||
             !invocation.Arguments.Any(static argument => ContainsNonCacheableSemanticAnswer(argument.Value)))
+        {
             return;
+        }
+
         Report(context, MetaDiagnosticDescriptors.NonCacheableSemanticAnswer, invocation.Syntax.GetLocation());
     }
 
-    private static bool IsCacheType(ITypeSymbol? type) => type?.Name.IndexOf("Cache", StringComparison.Ordinal) >= 0;
+    private static bool IsCacheType(ITypeSymbol? type)
+    {
+        return type?.Name.IndexOf("Cache", StringComparison.Ordinal) >= 0;
+    }
 
-    private static bool ContainsNonCacheableSemanticAnswer(IOperation operation) =>
-        operation.DescendantsAndSelf().Any(static descendant => descendant switch {
+    private static bool ContainsNonCacheableSemanticAnswer(IOperation operation)
+    {
+        return operation.DescendantsAndSelf().Any(static descendant => descendant switch
+        {
             IFieldReferenceOperation field => IsNonCacheableName(field.Field.Name),
             IPropertyReferenceOperation property => IsNonCacheableName(property.Property.Name),
             IInvocationOperation invocation => IsNonCacheableName(invocation.TargetMethod.Name),
@@ -191,21 +267,31 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
             ILocalReferenceOperation local => IsNonCacheableName(local.Local.Name),
             _ => false
         });
+    }
 
-    private static bool IsNonCacheableName(string? name) =>
-        name != null &&
+    private static bool IsNonCacheableName(string? name)
+    {
+        return name != null &&
         (string.Equals(name, "Unknown", StringComparison.Ordinal) ||
          name.IndexOf("Timeout", StringComparison.Ordinal) >= 0 ||
          name.IndexOf("Error", StringComparison.Ordinal) >= 0 ||
          name.IndexOf("Failure", StringComparison.Ordinal) >= 0);
+    }
 
-    private static string? GetSemanticLiteral(IOperation operation) {
-        if (!operation.ConstantValue.HasValue || operation.ConstantValue.Value is not string value) return null;
+    private static string? GetSemanticLiteral(IOperation operation)
+    {
+        if (!operation.ConstantValue.HasValue || operation.ConstantValue.Value is not string value)
+        {
+            return null;
+        }
+
         return value.StartsWith("ir.", StringComparison.Ordinal) || value.StartsWith("ir_", StringComparison.Ordinal) ? value : null;
     }
 
-    private static bool IsInsideCondition(SyntaxNode syntax) =>
-        syntax.AncestorsAndSelf().Any(node => node switch {
+    private static bool IsInsideCondition(SyntaxNode syntax)
+    {
+        return syntax.AncestorsAndSelf().Any(node => node switch
+        {
             IfStatementSyntax statement => statement.Condition.Span.Contains(syntax.Span),
             WhileStatementSyntax statement => statement.Condition.Span.Contains(syntax.Span),
             DoStatementSyntax statement => statement.Condition.Span.Contains(syntax.Span),
@@ -213,47 +299,79 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
             ConditionalExpressionSyntax conditional => conditional.Condition.Span.Contains(syntax.Span),
             _ => false
         });
-
-    private static void AnalyzeField(SymbolAnalysisContext context) {
-        var field = (IFieldSymbol)context.Symbol;
-        if (field.IsConst || field.ContainingType?.TypeKind == TypeKind.Enum) return;
-        if (field.IsStatic && !field.IsReadOnly && IsCriticalStateNamespace(field.ContainingNamespace))
-            Report(context, MetaDiagnosticDescriptors.MutableStaticState, field.Locations.FirstOrDefault(), field.Name);
-        if (field.Type.SpecialType == SpecialType.System_String &&
-            IsNamespaceOrNested(field.ContainingNamespace, "SharpProof", "Ir"))
-            Report(context, MetaDiagnosticDescriptors.StringFieldInIr, field.Locations.FirstOrDefault(), field.Name);
     }
 
-    private static void AnalyzeCatchClause(SyntaxNodeAnalysisContext context, KnownSymbols symbols) {
+    private static void AnalyzeField(SymbolAnalysisContext context)
+    {
+        var field = (IFieldSymbol)context.Symbol;
+        if (field.IsConst || field.ContainingType?.TypeKind == TypeKind.Enum)
+        {
+            return;
+        }
+
+        if (field.IsStatic && !field.IsReadOnly && IsCriticalStateNamespace(field.ContainingNamespace))
+        {
+            Report(context, MetaDiagnosticDescriptors.MutableStaticState, field.Locations.FirstOrDefault(), field.Name);
+        }
+
+        if (field.Type.SpecialType == SpecialType.System_String &&
+            IsNamespaceOrNested(field.ContainingNamespace, "SharpProof", "Ir"))
+        {
+            Report(context, MetaDiagnosticDescriptors.StringFieldInIr, field.Locations.FirstOrDefault(), field.Name);
+        }
+    }
+
+    private static void AnalyzeCatchClause(SyntaxNodeAnalysisContext context, KnownSymbols symbols)
+    {
         var clause = (CatchClauseSyntax)context.Node;
-        if (clause.Declaration?.Type == null) return;
+        if (clause.Declaration?.Type == null)
+        {
+            return;
+        }
+
         var caughtType = context.SemanticModel.GetTypeInfo(clause.Declaration.Type, context.CancellationToken).Type;
         if (!IsSameType(caughtType, symbols[KnownType.OperationCanceledException]) ||
             RethrowsCancellationImmediately(clause) ||
             IsAuditedCancellationBoundary(clause, context, context.ContainingSymbol, symbols))
+        {
             return;
+        }
+
         Report(context, MetaDiagnosticDescriptors.SwallowedCancellation, clause.CatchKeyword.GetLocation());
     }
 
-    private static bool RethrowsCancellationImmediately(CatchClauseSyntax clause) =>
-        clause.Block.Statements.FirstOrDefault() is ThrowStatementSyntax { Expression: null };
+    private static bool RethrowsCancellationImmediately(CatchClauseSyntax clause)
+    {
+        return clause.Block.Statements.FirstOrDefault() is ThrowStatementSyntax { Expression: null };
+    }
 
     private static bool IsAuditedCancellationBoundary(
         CatchClauseSyntax clause,
         SyntaxNodeAnalysisContext context,
         ISymbol? containingSymbol,
-        KnownSymbols symbols) {
-        if (containingSymbol is not IMethodSymbol method) return false;
+        KnownSymbols symbols)
+    {
+        if (containingSymbol is not IMethodSymbol method)
+        {
+            return false;
+        }
+
         if (IsAuditedWorkerMain(method, symbols[KnownType.WorkerProgram], symbols.TaskOfInt32) ||
             IsAuditedWorkerMain(method, symbols[KnownType.WorkerLauncherProgram], symbols.TaskOfInt32) ||
             SymbolEqualityComparer.Default.Equals(method, symbols.WorkerVerifyAsync))
+        {
             return true;
+        }
+
         if (method is not { Name: "VerifyTargetAsync", IsStatic: true, Parameters.Length: 7 } ||
             !IsSameType(method.ContainingType, symbols[KnownType.CallableVerificationPolicy]) ||
             !SymbolEqualityComparer.Default.Equals(method.ReturnType, symbols.VerifyTargetTask) ||
             method.Parameters[6].Name != "callerCancellation" ||
             !IsSameType(method.Parameters[6].Type, symbols[KnownType.CancellationToken]))
+        {
             return false;
+        }
+
         return ThrowsIfCallerCancellationRequested(clause, context, method, symbols) ||
                ReifiesCallerCancellation(clause, context, method, symbols);
     }
@@ -262,12 +380,16 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
         CatchClauseSyntax clause,
         SyntaxNodeAnalysisContext context,
         IMethodSymbol method,
-        KnownSymbols symbols) {
+        KnownSymbols symbols)
+    {
         if (clause.Block.Statements.FirstOrDefault() is not ExpressionStatementSyntax expression ||
             context.SemanticModel.GetOperation(expression.Expression, context.CancellationToken) is not IInvocationOperation invocation ||
             invocation.TargetMethod.Name != "ThrowIfCancellationRequested" ||
             !IsSameType(invocation.TargetMethod.ContainingType, symbols[KnownType.CancellationToken]))
+        {
             return false;
+        }
+
         return ReferencesParameter(invocation.Instance, method.Parameters[6]);
     }
 
@@ -275,7 +397,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
         CatchClauseSyntax clause,
         SyntaxNodeAnalysisContext context,
         IMethodSymbol method,
-        KnownSymbols symbols) {
+        KnownSymbols symbols)
+    {
         if (clause.Block.Statements.FirstOrDefault() is not IfStatementSyntax { Else: null } cancellationIf ||
             context.SemanticModel.GetOperation(cancellationIf.Condition, context.CancellationToken) is not
                 IPropertyReferenceOperation cancellationRequested ||
@@ -287,37 +410,56 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
             invocation.TargetMethod is not { Name: "Unknown", IsStatic: true, Parameters.Length: 3 } ||
             !IsSameType(invocation.TargetMethod.ContainingType, symbols[KnownType.CallableVerificationPolicy]) ||
             !IsSameType(invocation.TargetMethod.ReturnType, symbols[KnownType.CallableVerificationResult]))
+        {
             return false;
+        }
+
         var target = invocation.Arguments.FirstOrDefault(candidate => candidate.Parameter?.Ordinal == 0);
         return ReferencesParameter(target?.Value, method.Parameters[1]) &&
                IsCanceledReasonArgument(invocation, 1, symbols[KnownType.WorkerClaimReason]) &&
                IsCanceledReasonArgument(invocation, 2, symbols[KnownType.WorkerCallableCoverageReason]);
     }
 
-    private static ReturnStatementSyntax? SoleReturn(StatementSyntax statement) =>
-        statement switch {
+    private static ReturnStatementSyntax? SoleReturn(StatementSyntax statement)
+    {
+        return statement switch
+        {
             ReturnStatementSyntax direct => direct,
             BlockSyntax { Statements.Count: 1 } block => block.Statements[0] as ReturnStatementSyntax,
             _ => null
         };
+    }
 
     private static bool IsCanceledReasonArgument(
         IInvocationOperation invocation,
         int parameterOrdinal,
-        INamedTypeSymbol? expectedType) {
+        INamedTypeSymbol? expectedType)
+    {
         if (expectedType == null ||
             !IsSameType(invocation.TargetMethod.Parameters[parameterOrdinal].Type, expectedType))
+        {
             return false;
+        }
+
         var argument = invocation.Arguments.FirstOrDefault(candidate => candidate.Parameter?.Ordinal == parameterOrdinal);
         IOperation? value = argument?.Value;
-        while (value is IConversionOperation conversion) value = conversion.Operand;
+        while (value is IConversionOperation conversion)
+        {
+            value = conversion.Operand;
+        }
+
         return value is IFieldReferenceOperation field &&
                field.Field is { Name: "Canceled", IsStatic: true } &&
                IsSameType(field.Field.ContainingType, expectedType);
     }
 
-    private static bool ReferencesParameter(IOperation? receiver, IParameterSymbol parameter) {
-        while (receiver is IConversionOperation conversion) receiver = conversion.Operand;
+    private static bool ReferencesParameter(IOperation? receiver, IParameterSymbol parameter)
+    {
+        while (receiver is IConversionOperation conversion)
+        {
+            receiver = conversion.Operand;
+        }
+
         return receiver is IParameterReferenceOperation reference &&
                SymbolEqualityComparer.Default.Equals(reference.Parameter, parameter);
     }
@@ -325,56 +467,83 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
     private static bool IsAuditedWorkerMain(
         IMethodSymbol method,
         INamedTypeSymbol? program,
-        INamedTypeSymbol? taskOfInt32) =>
-        method is { Name: "Main", IsStatic: true, Parameters.Length: 1 } &&
+        INamedTypeSymbol? taskOfInt32)
+    {
+        return method is { Name: "Main", IsStatic: true, Parameters.Length: 1 } &&
         IsSameType(method.ContainingType, program) &&
         SymbolEqualityComparer.Default.Equals(method.ReturnType, taskOfInt32) &&
         method.Parameters[0].Type is IArrayTypeSymbol { Rank: 1 } arguments &&
         arguments.ElementType.SpecialType == SpecialType.System_String;
+    }
 
-    private static bool IsSemanticNamespace(ISymbol symbol) =>
-        IsCriticalStateNamespace(symbol.ContainingNamespace) ||
+    private static bool IsSemanticNamespace(ISymbol symbol)
+    {
+        return IsCriticalStateNamespace(symbol.ContainingNamespace) ||
         IsNamespaceOrNested(symbol.ContainingNamespace, "SharpProof", "Dataflow") ||
         IsNamespaceOrNested(symbol.ContainingNamespace, "SharpProof", "Specs");
+    }
 
-    private static bool IsCriticalStateNamespace(INamespaceSymbol? value) =>
-        IsNamespaceOrNested(value, "SharpProof", "Analyzer") ||
+    private static bool IsCriticalStateNamespace(INamespaceSymbol? value)
+    {
+        return IsNamespaceOrNested(value, "SharpProof", "Analyzer") ||
         IsNamespaceOrNested(value, "SharpProof", "Frontend") ||
         IsNamespaceOrNested(value, "SharpProof", "Verify");
+    }
 
-    private static bool IsNamespaceOrNested(INamespaceSymbol? value, params string[] expectedPrefix) {
+    private static bool IsNamespaceOrNested(INamespaceSymbol? value, params string[] expectedPrefix)
+    {
         for (var current = value; current != null && !current.IsGlobalNamespace; current = current.ContainingNamespace)
-            if (IsExactNamespace(current, expectedPrefix)) return true;
+        {
+            if (IsExactNamespace(current, expectedPrefix))
+            {
+                return true;
+            }
+        }
+
         return false;
     }
 
-    private static bool IsExactNamespace(INamespaceSymbol? value, params string[] expected) {
+    private static bool IsExactNamespace(INamespaceSymbol? value, params string[] expected)
+    {
         var current = value;
-        for (var index = expected.Length - 1; index >= 0; index--) {
+        for (var index = expected.Length - 1; index >= 0; index--)
+        {
             if (current == null ||
                 current.IsGlobalNamespace ||
                 !string.Equals(current.Name, expected[index], StringComparison.Ordinal))
+            {
                 return false;
+            }
+
             current = current.ContainingNamespace;
         }
         return current?.IsGlobalNamespace == true;
     }
 
-    private static bool IsSameType(ITypeSymbol? actual, INamedTypeSymbol? expected) =>
-        actual != null &&
+    private static bool IsSameType(ITypeSymbol? actual, INamedTypeSymbol? expected)
+    {
+        return actual != null &&
         expected != null &&
         SymbolEqualityComparer.Default.Equals(actual.OriginalDefinition, expected.OriginalDefinition);
+    }
 
-    private static void Report(OperationAnalysisContext context, DiagnosticDescriptor rule, Location? at, params object?[] args) =>
+    private static void Report(OperationAnalysisContext context, DiagnosticDescriptor rule, Location? at, params object?[] args)
+    {
         context.ReportDiagnostic(Diagnostic.Create(rule, at, args));
+    }
 
-    private static void Report(SymbolAnalysisContext context, DiagnosticDescriptor rule, Location? at, params object?[] args) =>
+    private static void Report(SymbolAnalysisContext context, DiagnosticDescriptor rule, Location? at, params object?[] args)
+    {
         context.ReportDiagnostic(Diagnostic.Create(rule, at, args));
+    }
 
-    private static void Report(SyntaxNodeAnalysisContext context, DiagnosticDescriptor rule, Location? at, params object?[] args) =>
+    private static void Report(SyntaxNodeAnalysisContext context, DiagnosticDescriptor rule, Location? at, params object?[] args)
+    {
         context.ReportDiagnostic(Diagnostic.Create(rule, at, args));
+    }
 
-    private enum KnownType {
+    private enum KnownType
+    {
         Compilation, SemanticModel, SyntaxFactory, Symbol, DiagnosticDescriptor,
         OperationCanceledException, CancellationToken, CompilationModelProvider,
         AnalyzerDiagnosticDescriptors, ContractForDiagnosticDescriptors, String,
@@ -387,13 +556,18 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
         WorkerVerifyResponse
     }
 
-    private sealed class KnownSymbols {
+    private sealed class KnownSymbols
+    {
         private readonly ImmutableArray<INamedTypeSymbol?> _types;
 
-        internal KnownSymbols(Compilation compilation) {
+        internal KnownSymbols(Compilation compilation)
+        {
             var types = new INamedTypeSymbol?[KnownTypeNames.Length];
             for (var index = 0; index < KnownTypeNames.Length; index++)
+            {
                 types[index] = compilation.GetTypeByMetadataName(KnownTypeNames[index]);
+            }
+
             types[(int)KnownType.String] = compilation.GetSpecialType(SpecialType.System_String);
             _types = [.. types];
 
@@ -416,8 +590,17 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer {
         }
 
         internal INamedTypeSymbol? this[KnownType type] => _types[(int)type];
-        internal INamedTypeSymbol? TaskOfInt32 { get; }
-        internal INamedTypeSymbol? VerifyTargetTask { get; }
-        internal IMethodSymbol? WorkerVerifyAsync { get; }
+        internal INamedTypeSymbol? TaskOfInt32
+        {
+            get;
+        }
+        internal INamedTypeSymbol? VerifyTargetTask
+        {
+            get;
+        }
+        internal IMethodSymbol? WorkerVerifyAsync
+        {
+            get;
+        }
     }
 }

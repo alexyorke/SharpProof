@@ -8,24 +8,29 @@ using System.Collections.Immutable;
 
 namespace SharpProof.Worker.Protocol;
 
-public static class WorkerProtocolVersions {
+public static class WorkerProtocolVersions
+{
     public const string Current = "8";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
-public static class WorkerCacheVersions {
+public static class WorkerCacheVersions
+{
     public const int Current = 9;
 }
 
-public static class WorkerManifestVersions {
+public static class WorkerManifestVersions
+{
     public const int Current = 4;
 }
 
-public static class WorkerLauncherDefaults {
+public static class WorkerLauncherDefaults
+{
     public const int TerminationGraceMilliseconds = 1000;
 }
 
-public sealed class WorkerVerifyRequest {
+public sealed class WorkerVerifyRequest
+{
     public string ProtocolVersion { get; set; } = WorkerProtocolVersions.Current;
     public WorkerFileReference CompilerManifest { get; set; } = new();
     public WorkerBudgets Budgets { get; set; } = new();
@@ -34,33 +39,38 @@ public sealed class WorkerVerifyRequest {
     public WorkerAssumptionPolicy AssumptionPolicy { get; set; } = WorkerAssumptionPolicy.Allow;
 }
 
-public sealed class WorkerFileReference {
+public sealed class WorkerFileReference
+{
     public string Path { get; set; } = string.Empty;
     public string Sha256 { get; set; } = string.Empty;
 }
 
-public enum WorkerFeatureSet {
+public enum WorkerFeatureSet
+{
     Unspecified = 0,
     Effects = 1,
     Contracts = 2,
     All = 3
 }
 
-public enum WorkerVerifyPolicy {
+public enum WorkerVerifyPolicy
+{
     Unspecified = 0,
     Advisory = 1,
     WarnOnUnknown = 2,
     RequireProven = 3
 }
 
-public enum WorkerAssumptionPolicy {
+public enum WorkerAssumptionPolicy
+{
     Unspecified = 0,
     Allow = 1,
     Warn = 2,
     Error = 3
 }
 
-public sealed class WorkerBudgets {
+public sealed class WorkerBudgets
+{
     public const int MaximumParallelism = 4;
     public const uint DefaultQueryRlimit = 3000000U;
     public const uint DefaultMethodRlimit = 20000000U;
@@ -78,32 +88,37 @@ public sealed class WorkerBudgets {
     public int MaxWorkerProcesses { get; set; } = MaximumParallelism;
 }
 
-public sealed class WorkerCacheOptions {
+public sealed class WorkerCacheOptions
+{
     public const long DefaultMaximumBytes = 536870912L;
     public bool Enabled { get; set; } = true;
     public string? Directory { get; set; }
     public long MaximumBytes { get; set; } = DefaultMaximumBytes;
 }
 
-public enum WorkerSelectedFeature {
+public enum WorkerSelectedFeature
+{
     Unspecified = 0,
     Effects = 1,
     Contracts = 2
 }
 
-public enum WorkerSelectionReason {
+public enum WorkerSelectionReason
+{
     Unspecified = 0,
     ExplicitAnnotation = 1,
     DiscoveredPostcondition = 2
 }
 
-public enum WorkerClaimKind {
+public enum WorkerClaimKind
+{
     Unspecified = 0,
     Postcondition = 1,
     Effect = 2
 }
 
-public enum WorkerClaimEvidence {
+public enum WorkerClaimEvidence
+{
     Unspecified = 0,
     DirectClause = 1,
     CompanionClause = 2,
@@ -111,7 +126,8 @@ public enum WorkerClaimEvidence {
     Attribute = 4
 }
 
-public enum WorkerEffectContractKind {
+public enum WorkerEffectContractKind
+{
     Unspecified = 0,
     EnforcePure = 1,
     ZeroAllocations = 2,
@@ -121,7 +137,8 @@ public enum WorkerEffectContractKind {
     EffectContract = 6
 }
 
-public sealed class WorkerSourceLocation {
+public sealed class WorkerSourceLocation
+{
     public string Path { get; set; } = string.Empty;
     public int Start { get; set; }
     public int Length { get; set; }
@@ -129,7 +146,8 @@ public sealed class WorkerSourceLocation {
     public int Column { get; set; }
 }
 
-public sealed class WorkerCallableManifestEntry {
+public sealed class WorkerCallableManifestEntry
+{
     public string CallableId { get; set; } = string.Empty;
     public WorkerSelectedFeature[] SelectedFeatures { get; set; } = [];
     public WorkerSelectionReason[] SelectionReasons { get; set; } = [];
@@ -138,7 +156,8 @@ public sealed class WorkerCallableManifestEntry {
     public WorkerAssumptionEvidence[] Assumptions { get; set; } = [];
 }
 
-public sealed class WorkerClaimManifestEntry {
+public sealed class WorkerClaimManifestEntry
+{
     public string ClaimId { get; set; } = string.Empty;
     public string CallableId { get; set; } = string.Empty;
     public int Ordinal { get; set; }
@@ -148,14 +167,16 @@ public sealed class WorkerClaimManifestEntry {
     public WorkerSourceLocation Location { get; set; } = new();
 }
 
-public sealed class WorkerClaimManifest {
+public sealed class WorkerClaimManifest
+{
     public int SchemaVersion { get; set; } = WorkerManifestVersions.Current;
     public string Hash { get; set; } = string.Empty;
     public WorkerCallableManifestEntry[] Callables { get; set; } = [];
     public WorkerClaimManifestEntry[] Claims { get; set; } = [];
 }
 
-public enum WorkerRunStatus {
+public enum WorkerRunStatus
+{
     Unspecified = 0,
     Complete = 1,
     TimedOut = 2,
@@ -163,7 +184,8 @@ public enum WorkerRunStatus {
     Failed = 4
 }
 
-public enum WorkerRunFailureReason {
+public enum WorkerRunFailureReason
+{
     Unspecified = 0,
     None = 1,
     InvalidRequest = 2,
@@ -177,13 +199,15 @@ public enum WorkerRunFailureReason {
     ContainmentFailure = 10
 }
 
-public enum WorkerCallableCoverage {
+public enum WorkerCallableCoverage
+{
     Unspecified = 0,
     Complete = 1,
     Incomplete = 2
 }
 
-public enum WorkerCallableCoverageReason {
+public enum WorkerCallableCoverageReason
+{
     Unspecified = 0,
     None = 1,
     UnsupportedCallable = 2,
@@ -196,14 +220,16 @@ public enum WorkerCallableCoverageReason {
     InfrastructureFailure = 9
 }
 
-public enum WorkerClaimOutcome {
+public enum WorkerClaimOutcome
+{
     Unspecified = 0,
     Proven = 1,
     Refuted = 2,
     Unknown = 3
 }
 
-public enum WorkerEffectEvidenceCertainty {
+public enum WorkerEffectEvidenceCertainty
+{
     Unspecified = 0,
     IncompleteMayEffectSummary = 1,
     CompleteMayEffectSummary = 2,
@@ -213,7 +239,8 @@ public enum WorkerEffectEvidenceCertainty {
 }
 
 [Flags]
-public enum WorkerEffectSet : long {
+public enum WorkerEffectSet : long
+{
     None = 0L,
     ReadsReceiverState = 1L,
     ReadsArgumentState = 2L,
@@ -235,7 +262,8 @@ public enum WorkerEffectSet : long {
 }
 
 [Flags]
-public enum WorkerEffectCapabilitySet {
+public enum WorkerEffectCapabilitySet
+{
     None = 0,
     IO = 1,
     FileRead = 2,
@@ -253,13 +281,15 @@ public enum WorkerEffectCapabilitySet {
     AllKnown = 8191
 }
 
-public enum WorkerVacuityKind {
+public enum WorkerVacuityKind
+{
     None = 0,
     ContradictoryPreconditions = 1,
     NoModeledNormalReturn = 2
 }
 
-public enum WorkerClaimReason {
+public enum WorkerClaimReason
+{
     Unspecified = 0,
     None = 1,
     UnsupportedCallable = 2,
@@ -282,7 +312,8 @@ public enum WorkerClaimReason {
     EffectContractNotEstablished = 19
 }
 
-public enum WorkerAssumptionKind {
+public enum WorkerAssumptionKind
+{
     Unspecified = 0,
     Precondition = 1,
     UserAssume = 2,
@@ -292,20 +323,23 @@ public enum WorkerAssumptionKind {
     NormalCompletion = 6
 }
 
-public sealed class WorkerAssumptionEvidence {
+public sealed class WorkerAssumptionEvidence
+{
     public string Id { get; set; } = string.Empty;
     public WorkerAssumptionKind Kind { get; set; }
     public bool Used { get; set; }
 }
 
-public sealed class WorkerCallableResult {
+public sealed class WorkerCallableResult
+{
     public string CallableId { get; set; } = string.Empty;
     public WorkerCallableCoverage Coverage { get; set; }
     public WorkerCallableCoverageReason Reason { get; set; }
     public WorkerAssumptionEvidence[] Assumptions { get; set; } = [];
 }
 
-public sealed class WorkerClaimResult {
+public sealed class WorkerClaimResult
+{
     public string ClaimId { get; set; } = string.Empty;
     public WorkerClaimOutcome Outcome { get; set; }
     public WorkerClaimReason Reason { get; set; }
@@ -317,7 +351,8 @@ public sealed class WorkerClaimResult {
     public WorkerAssumptionEvidence[] Assumptions { get; set; } = [];
 }
 
-public sealed class WorkerEffectViolationWitness {
+public sealed class WorkerEffectViolationWitness
+{
     public string Kind { get; set; } = string.Empty;
     public string Detail { get; set; } = string.Empty;
     public WorkerEffectSet Effects { get; set; }
@@ -326,30 +361,35 @@ public sealed class WorkerEffectViolationWitness {
     public WorkerSourceLocation Location { get; set; } = new();
 }
 
-public sealed class WorkerModelValue {
+public sealed class WorkerModelValue
+{
     public string Variable { get; set; } = string.Empty;
     public string Kind { get; set; } = string.Empty;
     public string Value { get; set; } = string.Empty;
 }
 
-public sealed class WorkerClaimOutcomeCount {
+public sealed class WorkerClaimOutcomeCount
+{
     public WorkerClaimOutcome Outcome { get; set; }
     public int Count { get; set; }
 }
 
-public sealed class WorkerClaimReasonCount {
+public sealed class WorkerClaimReasonCount
+{
     public WorkerClaimReason Reason { get; set; }
     public int Count { get; set; }
 }
 
-public sealed class WorkerAssumptionSummary {
+public sealed class WorkerAssumptionSummary
+{
     public int Total { get; set; }
     public int Used { get; set; }
     public int User { get; set; }
     public int Trusted { get; set; }
 }
 
-public enum WorkerCacheStatus {
+public enum WorkerCacheStatus
+{
     Unspecified = 0,
     Disabled = 1,
     Miss = 2,
@@ -359,7 +399,8 @@ public enum WorkerCacheStatus {
     Unavailable = 6
 }
 
-public sealed class WorkerVersionSummary {
+public sealed class WorkerVersionSummary
+{
     public string ProtocolVersion { get; set; } = WorkerProtocolVersions.Current;
     public int ManifestSchemaVersion { get; set; } = WorkerManifestVersions.Current;
     public int CacheSchemaVersion { get; set; } = WorkerCacheVersions.Current;
@@ -369,7 +410,8 @@ public sealed class WorkerVersionSummary {
     public string ApiSpecContentSha256 { get; set; } = WorkerProtocolVersions.EmptySha256;
 }
 
-public sealed class WorkerVerificationSummary {
+public sealed class WorkerVerificationSummary
+{
     public int CallableCount { get; set; }
     public int ClaimCount { get; set; }
     public WorkerClaimOutcomeCount[] OutcomeCounts { get; set; } = [];
@@ -382,12 +424,14 @@ public sealed class WorkerVerificationSummary {
     public long ElapsedMilliseconds { get; set; }
 }
 
-public sealed class WorkerProtocolError {
+public sealed class WorkerProtocolError
+{
     public string Code { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
 }
 
-public sealed class WorkerVerifyResponse {
+public sealed class WorkerVerifyResponse
+{
     public string ProtocolVersion { get; set; } = WorkerProtocolVersions.Current;
     public string RequestHash { get; set; } = WorkerProtocolVersions.EmptySha256;
     public string InputHash { get; set; } = string.Empty;
@@ -400,19 +444,22 @@ public sealed class WorkerVerifyResponse {
     public WorkerProtocolError[] Errors { get; set; } = [];
 }
 
-public sealed class WorkerProtocolValidationResult {
+public sealed class WorkerProtocolValidationResult
+{
     internal WorkerProtocolValidationResult(IEnumerable<WorkerProtocolError> errors) =>
         Errors = [.. errors];
     public ImmutableArray<WorkerProtocolError> Errors { get; }
     public bool IsValid => Errors.IsDefaultOrEmpty;
 }
 
-internal readonly struct WorkerProtocolRule<T>(string code, Func<T, bool> isValid) {
+internal readonly struct WorkerProtocolRule<T>(string code, Func<T, bool> isValid)
+{
     internal readonly string Code = code;
     internal readonly Func<T, bool> IsValid = isValid;
 }
 
-internal static class WorkerProtocolMetadata {
+internal static class WorkerProtocolMetadata
+{
     internal static readonly string[] WorkerVerifyRequestJsonProperties = [
         "protocolVersion", "compilerManifest", "budgets", "cache", "verifyPolicy", "assumptionPolicy",
     ];
@@ -453,7 +500,8 @@ internal static class WorkerProtocolMetadata {
     ];
     internal static bool IsKnown<T>(T value) where T : struct, Enum =>
         s_knownValues.Contains((Enum)(object)value);
-    internal static string? GetManifestName(Enum value) => value switch {
+    internal static string? GetManifestName(Enum value) => value switch
+    {
         WorkerSelectedFeature.Unspecified => nameof(WorkerSelectedFeature.Unspecified),
         WorkerSelectedFeature.Effects => nameof(WorkerSelectedFeature.Effects),
         WorkerSelectedFeature.Contracts => nameof(WorkerSelectedFeature.Contracts),
@@ -484,7 +532,8 @@ internal static class WorkerProtocolMetadata {
         WorkerEffectContractKind.EffectContract => nameof(WorkerEffectContractKind.EffectContract),
         _ => null
     };
-    internal static int GetAssumptionOrder(WorkerAssumptionKind value) => value switch {
+    internal static int GetAssumptionOrder(WorkerAssumptionKind value) => value switch
+    {
         WorkerAssumptionKind.Unspecified => 0,
         WorkerAssumptionKind.Precondition => 1,
         WorkerAssumptionKind.UserAssume => 2,
@@ -509,7 +558,8 @@ internal static class WorkerProtocolMetadata {
             or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.AllowedExceptions)
             or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.EffectContract);
     internal static bool MatchesCallableCoverage(WorkerCallableCoverage coverage, WorkerCallableCoverageReason reason) =>
-        coverage switch {
+        coverage switch
+        {
             WorkerCallableCoverage.Complete => reason is WorkerCallableCoverageReason.None,
             WorkerCallableCoverage.Incomplete => reason is WorkerCallableCoverageReason.UnsupportedCallable
                 or WorkerCallableCoverageReason.UnsupportedContract or WorkerCallableCoverageReason.SemanticUnknown
@@ -519,7 +569,8 @@ internal static class WorkerProtocolMetadata {
             _ => false
         };
     internal static bool MatchesClaimOutcome(WorkerClaimOutcome outcome, WorkerClaimReason reason) =>
-        outcome switch {
+        outcome switch
+        {
             WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted => reason is WorkerClaimReason.None,
             WorkerClaimOutcome.Unknown => reason is WorkerClaimReason.UnsupportedCallable or WorkerClaimReason.UnsupportedContract
                 or WorkerClaimReason.UnsupportedBody or WorkerClaimReason.UnsupportedExpression or WorkerClaimReason.DeepPostcondition
@@ -545,7 +596,8 @@ internal static class WorkerProtocolMetadata {
             or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Proven, WorkerVacuityKind.ContradictoryPreconditions)
             or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Proven, WorkerVacuityKind.NoModeledNormalReturn);
     internal static bool MatchesRunFailure(WorkerRunStatus status, WorkerRunFailureReason reason) =>
-        status switch {
+        status switch
+        {
             WorkerRunStatus.Complete or WorkerRunStatus.TimedOut or WorkerRunStatus.Canceled => reason is WorkerRunFailureReason.None,
             WorkerRunStatus.Failed => reason is WorkerRunFailureReason.InvalidRequest or WorkerRunFailureReason.InputUnavailable
                 or WorkerRunFailureReason.CompilationFailure or WorkerRunFailureReason.CompilerManifestMismatch
@@ -655,14 +707,17 @@ internal static class WorkerProtocolMetadata {
         && !string.IsNullOrWhiteSpace(value.Message));
 }
 
-public static partial class WorkerProtocolJson {
-    private static string CreateManifestPayload(WorkerClaimManifest manifest) {
+public static partial class WorkerProtocolJson
+{
+    private static string CreateManifestPayload(WorkerClaimManifest manifest)
+    {
         var writer = new ManifestWriter().Add("SharpProof.Worker.ManifestHash")
             .Add(WorkerManifestVersions.Current);
         writer.Add("manifest.schemaVersion").Add(manifest.SchemaVersion);
         writer.Add("manifest.callables").Add(manifest.Callables?.Length ?? -1);
         foreach (var entry in (manifest.Callables ?? [])
-            .OrderBy(static value => value?.CallableId, StringComparer.Ordinal)) {
+            .OrderBy(static value => value?.CallableId, StringComparer.Ordinal))
+        {
             writer.Add("callable");
             writer.Add("callable.id").Add(entry?.CallableId);
             writer.AddItems("callable.selectedFeatures", entry?.SelectedFeatures,
@@ -683,7 +738,8 @@ public static partial class WorkerProtocolJson {
         foreach (var entry in (manifest.Claims ?? [])
             .OrderBy(static value => value?.CallableId, StringComparer.Ordinal)
             .ThenBy(static value => value?.Ordinal ?? int.MinValue)
-            .ThenBy(static value => value?.ClaimId, StringComparer.Ordinal)) {
+            .ThenBy(static value => value?.ClaimId, StringComparer.Ordinal))
+        {
             writer.Add("claim");
             writer.Add("claim.id").Add(entry?.ClaimId);
             writer.Add("claim.callableId").Add(entry?.CallableId);

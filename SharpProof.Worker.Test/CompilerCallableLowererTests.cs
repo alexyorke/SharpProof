@@ -10,7 +10,8 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class CompilerCallableLowererTests {
+public sealed class CompilerCallableLowererTests
+{
     private static readonly CompilerContractKind[] ExpectedClauseKinds = [
         CompilerContractKind.Requires,
         CompilerContractKind.Assume,
@@ -18,7 +19,8 @@ public sealed class CompilerCallableLowererTests {
     ];
 
     [Test]
-    public void BoundContractsAndExecutableBodyRetainVerifierInputs() {
+    public void BoundContractsAndExecutableBodyRetainVerifierInputs()
+    {
         var preparation = Prepare(
             """
             using SharpProof.Attributes;
@@ -47,7 +49,8 @@ public sealed class CompilerCallableLowererTests {
             Is.EqualTo(1));
         var parameter = preparation.Variables.Single(static variable =>
             variable.Role == CompilerVariableRole.Parameter);
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(parameter.ModelLabel, Is.EqualTo("parameter:0"));
             Assert.That(
                 parameter.SourceIntegerInterval,
@@ -67,7 +70,8 @@ public sealed class CompilerCallableLowererTests {
     }
 
     [Test]
-    public void ResolvedSpecCallIsBoundToExactLoweredInstruction() {
+    public void ResolvedSpecCallIsBoundToExactLoweredInstruction()
+    {
         var preparation = Prepare(
             """
             using SharpProof.Attributes;
@@ -90,7 +94,8 @@ public sealed class CompilerCallableLowererTests {
             .SelectMany(static block => block.Instructions)
             .OfType<IrCallInstruction>()
             .Single(instruction => instruction.Id == descriptor.Instruction);
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 descriptor.WitnessIdentifier,
                 Is.EqualTo("bcl.math.abs.int32"));
@@ -101,7 +106,8 @@ public sealed class CompilerCallableLowererTests {
     }
 
     [Test]
-    public void ConstructorAndRefBodyAreTypedUnsupported() {
+    public void ConstructorAndRefBodyAreTypedUnsupported()
+    {
         var constructor = Prepare(
             """
             using SharpProof.Attributes;
@@ -124,7 +130,8 @@ public sealed class CompilerCallableLowererTests {
             """,
             "Read");
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(constructor.IsSuccess, Is.False);
             Assert.That(
                 constructor.FailureReason,
@@ -137,7 +144,8 @@ public sealed class CompilerCallableLowererTests {
     }
 
     [Test]
-    public void BodyAboveTheReplayInstructionBoundIsTypedUnsupported() {
+    public void BodyAboveTheReplayInstructionBoundIsTypedUnsupported()
+    {
         var statements = string.Concat(Enumerable.Repeat(
             "value = value;\n",
             CompilerPreparedBody.MaximumInstructions));
@@ -162,7 +170,8 @@ public sealed class CompilerCallableLowererTests {
     }
 
     [Test]
-    public void ManifestClaimAndAssumptionDriftFailsClosed() {
+    public void ManifestClaimAndAssumptionDriftFailsClosed()
+    {
         var (compilation, target, factory) = CreateTarget(
             """
             using SharpProof.Attributes;
@@ -179,9 +188,13 @@ public sealed class CompilerCallableLowererTests {
         var lowerer = new CompilerCallableLowerer(compilation, factory);
 
         var valid = lowerer.Prepare(target);
-        var missingClaim = lowerer.Prepare(target with { Claims = [] });
+        var missingClaim = lowerer.Prepare(target with
+        {
+            Claims = []
+        });
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(valid.IsSuccess, Is.True);
             Assert.That(
                 missingClaim.FailureReason,
@@ -190,7 +203,8 @@ public sealed class CompilerCallableLowererTests {
     }
 
     [Test]
-    public void CancellationStopsPreparationBeforeBinding() {
+    public void CancellationStopsPreparationBeforeBinding()
+    {
         var (compilation, target, factory) = CreateTarget(
             """
             using SharpProof.Attributes;
@@ -213,7 +227,8 @@ public sealed class CompilerCallableLowererTests {
 
     private static CompilerCallablePreparation Prepare(
         string source,
-        string methodName) {
+        string methodName)
+    {
         var (compilation, target, factory) = CreateTarget(source, methodName);
         return new CompilerCallableLowerer(compilation, factory).Prepare(target);
     }
@@ -223,7 +238,8 @@ public sealed class CompilerCallableLowererTests {
         ManifestCallableTarget Target,
         IrFactory Factory) CreateTarget(
         string source,
-        string methodName) {
+        string methodName)
+    {
         var compilation = CreateCompilation(source);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var target = discovery.Targets.Values.Single(candidate =>
@@ -231,7 +247,8 @@ public sealed class CompilerCallableLowererTests {
         return (compilation, target, new IrFactory());
     }
 
-    private static CSharpCompilation CreateCompilation(string source) {
+    private static CSharpCompilation CreateCompilation(string source)
+    {
         var parse = new CSharpParseOptions(
             LanguageVersion.CSharp12,
             preprocessorSymbols: [Contract.ConditionalSymbol]);

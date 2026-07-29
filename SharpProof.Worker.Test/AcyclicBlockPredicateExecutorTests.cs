@@ -9,9 +9,11 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class AcyclicBlockPredicateExecutorTests {
+public sealed class AcyclicBlockPredicateExecutorTests
+{
     [Test]
-    public void DiamondProducesOneJoinedReturnInsteadOfTwoPaths() {
+    public void DiamondProducesOneJoinedReturnInsteadOfTwoPaths()
+    {
         var factory = new IrFactory();
         var condition = factory.CreateVariable("condition", factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
@@ -26,7 +28,8 @@ public sealed class AcyclicBlockPredicateExecutorTests {
 
         var execution = Execute(factory, builder.Build(), [condition]);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(execution.IsSuccess, Is.True);
             Assert.That(execution.Returns, Has.Length.EqualTo(1));
             Assert.That(execution.Returns[0].ReturnTerm, Is.SameAs(factory.Integer(7)));
@@ -34,7 +37,8 @@ public sealed class AcyclicBlockPredicateExecutorTests {
     }
 
     [Test]
-    public async Task SequentialDiamondsRepresentMoreThanSixtyFourPathsWithoutEnumeration() {
+    public async Task SequentialDiamondsRepresentMoreThanSixtyFourPathsWithoutEnumeration()
+    {
         const int diamondCount = 7;
         var factory = new IrFactory();
         var conditions = Enumerable.Range(0, diamondCount)
@@ -42,7 +46,8 @@ public sealed class AcyclicBlockPredicateExecutorTests {
             .ToArray();
         var builder = new IrProgramBuilder(factory);
         var current = builder.CreateBlock("entry");
-        for (var index = 0; index < diamondCount; index++) {
+        for (var index = 0; index < diamondCount; index++)
+        {
             var whenTrue = builder.CreateBlock("true-" + index);
             var whenFalse = builder.CreateBlock("false-" + index);
             var join = builder.CreateBlock("join-" + index);
@@ -74,7 +79,8 @@ public sealed class AcyclicBlockPredicateExecutorTests {
                 WorkerBudgets.DefaultMethodRlimit),
             CancellationToken.None);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(1 << diamondCount, Is.GreaterThan(64));
             Assert.That(execution.IsSuccess, Is.True);
             Assert.That(execution.Returns, Has.Length.EqualTo(1));
@@ -86,7 +92,8 @@ public sealed class AcyclicBlockPredicateExecutorTests {
     }
 
     [Test]
-    public void ReassignmentUsesGuardedPhiValuesAtNestedJoins() {
+    public void ReassignmentUsesGuardedPhiValuesAtNestedJoins()
+    {
         var factory = new IrFactory();
         var firstCondition = factory.CreateVariable("first", factory.BooleanType);
         var secondCondition = factory.CreateVariable("second", factory.BooleanType);
@@ -118,7 +125,8 @@ public sealed class AcyclicBlockPredicateExecutorTests {
         var execution = Execute(factory, builder.Build(), [firstCondition, secondCondition]);
         var returned = execution.Returns.Single().ReturnTerm!;
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(execution.IsSuccess, Is.True);
             Assert.That(returned, Is.TypeOf<IrConditionalTerm>());
             Assert.That(Evaluate(factory, returned, firstCondition, true, secondCondition, false), Is.EqualTo(1));
@@ -129,7 +137,8 @@ public sealed class AcyclicBlockPredicateExecutorTests {
     }
 
     [Test]
-    public void MultipleReturnsRetainSeparateBlockPredicates() {
+    public void MultipleReturnsRetainSeparateBlockPredicates()
+    {
         var factory = new IrFactory();
         var condition = factory.CreateVariable("condition", factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
@@ -142,7 +151,8 @@ public sealed class AcyclicBlockPredicateExecutorTests {
 
         var execution = Execute(factory, builder.Build(), [condition]);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(execution.IsSuccess, Is.True);
             Assert.That(execution.Returns, Has.Length.EqualTo(2));
             Assert.That(execution.Returns.Select(static value => ((IrIntegerTerm)value.ReturnTerm!).Value),
@@ -152,7 +162,8 @@ public sealed class AcyclicBlockPredicateExecutorTests {
     }
 
     [Test]
-    public async Task CycleProducesTypedUnknownWithoutInvokingTheBackend() {
+    public async Task CycleProducesTypedUnknownWithoutInvokingTheBackend()
+    {
         var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("cycle");
@@ -174,7 +185,8 @@ public sealed class AcyclicBlockPredicateExecutorTests {
                 WorkerBudgets.DefaultMethodRlimit),
             CancellationToken.None);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(execution.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
             Assert.That(backend.CallCount, Is.Zero);
             Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
@@ -183,7 +195,8 @@ public sealed class AcyclicBlockPredicateExecutorTests {
     }
 
     [Test]
-    public void SymbolicOperationBudgetExhaustionIsTypedResourceLimit() {
+    public void SymbolicOperationBudgetExhaustionIsTypedResourceLimit()
+    {
         var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
@@ -206,7 +219,8 @@ public sealed class AcyclicBlockPredicateExecutorTests {
     private static SymbolicBodyExecution Execute(
         IrFactory factory,
         IrProgram program,
-        IReadOnlyCollection<IrVarId> inputs) {
+        IReadOnlyCollection<IrVarId> inputs)
+    {
         var environment = inputs.ToImmutableDictionary(
             static variable => variable,
             variable => (IrTerm)factory.Variable(variable));
@@ -225,7 +239,8 @@ public sealed class AcyclicBlockPredicateExecutorTests {
         IrVarId first,
         bool firstValue,
         IrVarId second,
-        bool secondValue) {
+        bool secondValue)
+    {
         var result = new IrInterpreter(factory).Evaluate(
             term,
             ImmutableDictionary<IrVarId, IrValue>.Empty
@@ -239,10 +254,12 @@ public sealed class AcyclicBlockPredicateExecutorTests {
         IrFactory factory,
         IrProgram program,
         ImmutableArray<CompilerCanonicalVariable> variables,
-        ImmutableDictionary<IrVarId, IrVarId> parameterBindings) =>
-        new(
+        ImmutableDictionary<IrVarId, IrVarId> parameterBindings)
+    {
+        return new(
             factory,
-            new WorkerCallableManifestEntry {
+            new WorkerCallableManifestEntry
+            {
                 CallableId = "M:Test.Subject.Cycle",
                 ClaimIds = ["claim"]
             },
@@ -258,17 +275,23 @@ public sealed class AcyclicBlockPredicateExecutorTests {
                 program,
                 parameterBindings,
                 ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty));
+    }
 
-    private sealed class CompletionThenProofBackend : ISmtBackend {
+    private sealed class CompletionThenProofBackend : ISmtBackend
+    {
         private int _callCount;
         internal int CallCount => Volatile.Read(ref _callCount);
         public Task<BackendCheckResult> CheckAsync(
             VerificationQuery query,
-            CancellationToken cancellationToken) {
+            CancellationToken cancellationToken)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             if (Interlocked.Increment(ref _callCount) != 1)
+            {
                 return Task.FromResult(
                     BackendCheckResult.Unsatisfiable([]));
+            }
+
             var assignments = query.ModelVariables.Select(variable =>
                 KeyValuePair.Create(
                     variable,
@@ -279,12 +302,14 @@ public sealed class AcyclicBlockPredicateExecutorTests {
         }
     }
 
-    private sealed class UnexpectedBackend : ISmtBackend {
+    private sealed class UnexpectedBackend : ISmtBackend
+    {
         private int _callCount;
         internal int CallCount => Volatile.Read(ref _callCount);
         public Task<BackendCheckResult> CheckAsync(
             VerificationQuery query,
-            CancellationToken cancellationToken) {
+            CancellationToken cancellationToken)
+        {
             Interlocked.Increment(ref _callCount);
             throw new AssertionException("A cyclic body reached the backend.");
         }

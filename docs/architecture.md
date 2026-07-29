@@ -46,27 +46,28 @@ rules with exact project-reference and payload checks. These checks define
 mechanical enforcement boundaries; they do not expand the admitted language or
 turn an unsupported result into proof.
 
-The path/LOC ratchets in `eng/acceptance/contract.json` cover proof-outcome
-construction and each declared trusted boundary: discovery, lowering,
-execution, obligation construction, SMT encoding, API specification code and
-catalog generation, effect analysis, replay, policy, result assembly, and
-cache validation. Compiler-input identity, typed canonical hash encoding, and
-protocol validation have their own non-overlapping ratchets rather than being
-hidden inside the older cache component. API-spec content identity is likewise
+The exact path inventories in `eng/acceptance/contract.json` cover
+proof-outcome construction and each declared trusted boundary: discovery,
+lowering, execution, obligation construction, SMT encoding, API specification
+code and catalog generation, effect analysis, replay, policy, result assembly,
+and cache validation. Compiler-input identity, typed canonical hash encoding,
+and protocol validation have their own non-overlapping inventories rather than
+being hidden inside the cache component. API-spec content identity is likewise
 separate from resolution and instantiation. The declarative API catalog, its
 generator, and the generated matcher/instantiator source are one audited
 `apiSpecificationCatalog` component. The C# scalar type, conversion, checked
 arithmetic, and IR-operator rules likewise come from the versioned
 `SharpProof.Frontend/CSharpScalarSemantics.json` catalog and its verified
-generated source, with an independent `scalarSemanticsCatalog` ratchet.
-Launcher containment and publication remain separately checked by architecture,
-package, and integration tests.
+generated source. Launcher containment and publication remain separately
+checked by architecture, package, and integration tests.
 
-The same acceptance contract pins the pre-decomposition commit and measured
-nonblank baseline for each replaced production coordinator. Acceptance
-recomputes those historical counts from Git and requires every listed layer to
-remain at least 10% smaller. Extracted components remain covered by their own
-TCB caps, and the repository-wide production cap is unchanged.
+Source complexity is measured independently of formatting. Repository,
+coordinator, algorithm-file, and member ratchets count Roslyn expression nodes,
+decision points, and declarations while excluding whitespace, comments, line
+wrapping, and optional block braces. Physical and nonblank line totals are
+reported only as information. This replaced the historical physical/nonblank
+LOC and "10% smaller" gates, which rewarded brace removal and line collapsing
+rather than architectural decomposition.
 
 ## Semantic core
 

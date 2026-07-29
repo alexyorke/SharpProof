@@ -5,35 +5,50 @@ const string usage =
     "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1..4]";
 
 FuzzOptions options;
-try {
+try
+{
     options = FuzzOptions.Parse(args);
 }
-catch (FuzzUsageException exception) {
+catch (FuzzUsageException exception)
+{
     if (!string.IsNullOrEmpty(exception.Message))
+    {
         Console.Error.WriteLine(exception.Message);
+    }
+
     Console.Error.WriteLine(usage);
     return string.IsNullOrEmpty(exception.Message) ? 0 : 2;
 }
 
 using var cancellation = new CancellationTokenSource();
-Console.CancelKeyPress += (_, eventArgs) => {
+Console.CancelKeyPress += (_, eventArgs) =>
+{
     eventArgs.Cancel = true;
     cancellation.Cancel();
 };
 
-try {
+try
+{
     var summary = await FuzzRunner.RunAsync(options, cancellation.Token);
     Console.WriteLine(JsonSerializer.Serialize(
         summary,
         FuzzJson.Indented));
     return summary.Passed ? 0 : 1;
 }
-catch (OperationCanceledException) when (cancellation.IsCancellationRequested) {
+catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+{
     Console.Error.WriteLine("SharpProof fuzz run cancelled.");
     return 130;
 }
 
-file static class FuzzJson {
-    internal static JsonSerializerOptions Indented { get; } =
-        new() { WriteIndented = true };
+file static class FuzzJson
+{
+    internal static JsonSerializerOptions Indented
+    {
+        get;
+    } =
+        new()
+        {
+            WriteIndented = true
+        };
 }

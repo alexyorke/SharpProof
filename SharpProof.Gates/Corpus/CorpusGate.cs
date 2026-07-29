@@ -32,10 +32,12 @@ internal sealed record CorpusGateResult(
     ImmutableArray<string> AllowedDegradations,
     ImmutableArray<string> Failures);
 
-internal static class CorpusGate {
+internal static class CorpusGate
+{
     public static async Task<CorpusGateResult> RunAsync(
         string repositoryRoot,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default)
+    {
         var openSourceDocument = OpenSourceCorpusCatalog.Load(repositoryRoot);
         var cases = CorpusCatalog.CreateCases(repositoryRoot);
         var openSourceCases = cases
@@ -62,7 +64,8 @@ internal static class CorpusGate {
             unknownReasonRatchetPath);
         var observations = ImmutableArray.CreateBuilder<CorpusObservation>();
         foreach (var item in cases.Where(static item =>
-                     item.Origin == CorpusOrigin.SyntheticMetamorphic)) {
+                     item.Origin == CorpusOrigin.SyntheticMetamorphic))
+        {
             cancellationToken.ThrowIfCancellationRequested();
             observations.Add(
                 await ObserveCaseAsync(item, cancellationToken)
@@ -80,37 +83,54 @@ internal static class CorpusGate {
         if (openSourceCases.Length is
             < OpenSourceCorpusCatalog.MinimumMethodCount or
             > OpenSourceCorpusCatalog.MaximumMethodCount)
+        {
             failures.Add(
                 $"Corpus has {openSourceCases.Length} OSS base methods; " +
                 $"{OpenSourceCorpusCatalog.MinimumMethodCount}-" +
                 $"{OpenSourceCorpusCatalog.MaximumMethodCount} are required.");
+        }
+
         if (cases.Select(static item => item.Id).Distinct(StringComparer.Ordinal)
                 .Count() != cases.Length)
+        {
             failures.Add("Corpus case IDs are not unique.");
+        }
+
         if (expected.Count != cases.Length)
+        {
             failures.Add(
                 $"Snapshot has {expected.Count} cases but generator produced {cases.Length}.");
+        }
 
-        foreach (var item in cases) {
+        foreach (var item in cases)
+        {
             if (expected.TryGetValue(item.Id, out var baseline) &&
                 baseline.Verdict != item.SemanticExpectation)
+            {
                 failures.Add(
                     $"Snapshot verdict for {item.Id} is {baseline.Verdict}, " +
                     $"but its reviewed semantic expectation is " +
                     $"{item.SemanticExpectation}. Do not bless a precision " +
                     $"regression by rewriting the snapshot.");
+            }
         }
 
-        foreach (var observation in observations) {
-            if (!expected.TryGetValue(observation.CaseId, out var baseline)) {
+        foreach (var observation in observations)
+        {
+            if (!expected.TryGetValue(observation.CaseId, out var baseline))
+            {
                 failures.Add($"Missing snapshot entry: {observation.CaseId}.");
                 continue;
             }
             if (Matches(baseline, observation))
+            {
                 continue;
+            }
+
             if (baseline.Verdict == CorpusVerdict.Proven &&
                 observation.Verdict == CorpusVerdict.Unknown &&
-                allowances.TryGetValue(observation.CaseId, out var allowance)) {
+                allowances.TryGetValue(observation.CaseId, out var allowance))
+            {
                 usedAllowances.Add(observation.CaseId);
                 allowedDegradations.Add(
                     $"{observation.CaseId}: {allowance.Reason}");
@@ -124,11 +144,18 @@ internal static class CorpusGate {
         foreach (var caseId in expected.Keys.Except(
                      cases.Select(static item => item.Id),
                      StringComparer.Ordinal))
+        {
             failures.Add($"Stale snapshot entry: {caseId}.");
+        }
+
         foreach (var allowance in allowances.Values)
+        {
             if (!usedAllowances.Contains(allowance.CaseId))
+            {
                 failures.Add(
                     $"Stale or unnecessary Proven->Unknown allowance: {allowance.CaseId}.");
+            }
+        }
 
         var immutableObservations = observations.ToImmutable();
         var cacheFailures = await VerifyCacheReplayAsync(
@@ -160,9 +187,12 @@ internal static class CorpusGate {
             observation.Verdict is
                 CorpusVerdict.Unknown or CorpusVerdict.SilentUnknown);
         if (supportedUnknownCount != 0)
+        {
             failures.Add(
                 $"{supportedUnknownCount} supported corpus cases produced Unknown; " +
                 "supported cases must have an accountable Proven or Refuted result.");
+        }
+
         var unknownReasons = CountUnknownReasons(immutableObservations);
         ValidateUnknownReasonRatchet(
             unknownReasonRatchet,
@@ -207,7 +237,8 @@ internal static class CorpusGate {
 
     public static async Task<string> RenderActualSnapshotAsync(
         string? repositoryRoot = null,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default)
+    {
         repositoryRoot ??= RepositoryLayout.FindRoot();
         var openSourceDocument = OpenSourceCorpusCatalog.Load(repositoryRoot);
         var lines = new List<string> {
@@ -218,7 +249,8 @@ internal static class CorpusGate {
         foreach (var item in CorpusCatalog.CreateCases(repositoryRoot)
                      .Where(static item =>
                          item.Origin ==
-                         CorpusOrigin.SyntheticMetamorphic)) {
+                         CorpusOrigin.SyntheticMetamorphic))
+        {
             cancellationToken.ThrowIfCancellationRequested();
             lines.Add(
                 (await ObserveCaseAsync(item, cancellationToken).ConfigureAwait(false))
@@ -235,7 +267,8 @@ internal static class CorpusGate {
 
     public static async Task WriteActualSnapshotAsync(
         string repositoryRoot,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default)
+    {
         await OpenSourceCorpusImporter.ImportIfRequestedAsync(
                 repositoryRoot,
                 cancellationToken)
@@ -259,7 +292,8 @@ internal static class CorpusGate {
 
     internal static async Task<CorpusObservation> ObserveCaseAsync(
         CorpusCase item,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var analysis = await AnalyzerGateHost.AnalyzeWithSemanticOutcomesAsync(
                 item.Source,
                 item.Mode,
@@ -270,15 +304,19 @@ internal static class CorpusGate {
 
     private static CorpusObservation Observe(
         CorpusCase item,
-        AnalyzerGateAnalysis analysis) {
+        AnalyzerGateAnalysis analysis)
+    {
         var targets = analysis.SemanticOutcomes
             .Where(static outcome =>
                 outcome.Accessibility == Accessibility.Public)
             .ToImmutableArray();
         if (targets.Length != 1)
+        {
             throw new InvalidOperationException(
                 $"Corpus case {item.Id} produced {targets.Length} public-method " +
                 "semantic outcomes; exactly one is required.");
+        }
+
         var diagnostics = analysis.Diagnostics
             .Select(diagnostic => CanonicalizeDiagnostic(
                 diagnostic,
@@ -298,33 +336,39 @@ internal static class CorpusGate {
 
     private static bool Matches(
         SnapshotExpectation expected,
-        CorpusObservation actual) =>
-        expected.Verdict == actual.Verdict &&
+        CorpusObservation actual)
+    {
+        return expected.Verdict == actual.Verdict &&
         expected.SemanticOutcome == actual.SemanticOutcome &&
         expected.Diagnostics.SequenceEqual(
             actual.Diagnostics,
             StringComparer.Ordinal);
+    }
 
     private static bool Matches(
         CorpusObservation expected,
-        CorpusObservation actual) =>
-        expected.Verdict == actual.Verdict &&
+        CorpusObservation actual)
+    {
+        return expected.Verdict == actual.Verdict &&
         expected.SemanticOutcome == actual.SemanticOutcome &&
         expected.Diagnostics.SequenceEqual(
             actual.Diagnostics,
             StringComparer.Ordinal);
+    }
 
     private static async Task<ImmutableArray<string>> VerifyCacheReplayAsync(
         ImmutableArray<CorpusCase> cases,
         ImmutableArray<CorpusObservation> firstPass,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var failures = ImmutableArray.CreateBuilder<string>();
         var byId = firstPass.ToImmutableDictionary(
             static observation => observation.CaseId,
             StringComparer.Ordinal);
         foreach (var item in cases.Where(static item =>
                      item.Origin == CorpusOrigin.SyntheticMetamorphic &&
-                     item.Variant == CorpusVariant.Baseline)) {
+                     item.Variant == CorpusVariant.Baseline))
+        {
             cancellationToken.ThrowIfCancellationRequested();
             var compilation = AnalyzerGateHost.CreateCompilation(
                 item.Source,
@@ -347,7 +391,9 @@ internal static class CorpusGate {
                     .ConfigureAwait(false));
             if (!Matches(byId[item.Id], first) ||
                 !Matches(byId[item.Id], second))
+            {
                 failures.Add($"Cache replay changed {item.Id}.");
+            }
         }
         return failures.ToImmutable();
     }
@@ -355,7 +401,8 @@ internal static class CorpusGate {
     private static async Task<ImmutableArray<string>> VerifyConcurrentReplayAsync(
         ImmutableArray<CorpusCase> cases,
         ImmutableArray<CorpusObservation> firstPass,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var selected = CorpusCatalog.Variants
             .Select(variant => cases.First(item =>
                 item.Origin == CorpusOrigin.SyntheticMetamorphic &&
@@ -365,7 +412,8 @@ internal static class CorpusGate {
             static observation => observation.CaseId,
             StringComparer.Ordinal);
         var bag = new ConcurrentBag<CorpusObservation>();
-        await Task.WhenAll(selected.Select(async item => {
+        await Task.WhenAll(selected.Select(async item =>
+        {
             var observation = await ObserveCaseAsync(item, cancellationToken)
                 .ConfigureAwait(false);
             bag.Add(observation);
@@ -378,14 +426,19 @@ internal static class CorpusGate {
     }
 
     private static ImmutableDictionary<string, SnapshotExpectation> LoadSnapshot(
-        string path) {
+        string path)
+    {
         var result = ImmutableDictionary.CreateBuilder<
             string,
             SnapshotExpectation>(StringComparer.Ordinal);
-        foreach (var rawLine in File.ReadAllLines(path)) {
+        foreach (var rawLine in File.ReadAllLines(path))
+        {
             var line = rawLine.Trim();
             if (line.Length == 0 || line.StartsWith('#'))
+            {
                 continue;
+            }
+
             var parts = line.Split('|');
             if (parts.Length != 4 ||
                 !Enum.TryParse<CorpusVerdict>(
@@ -396,8 +449,11 @@ internal static class CorpusGate {
                     parts[2],
                     ignoreCase: false,
                     out var semanticOutcome))
+            {
                 throw new InvalidDataException(
                     $"Invalid corpus snapshot line: {rawLine}");
+            }
+
             ImmutableArray<string> diagnostics = parts[3].Length == 0
                 ? []
                 : [.. parts[3].Split(',')
@@ -412,25 +468,31 @@ internal static class CorpusGate {
                         verdict,
                         semanticOutcome,
                         diagnostics)))
+            {
                 throw new InvalidDataException(
                     $"Duplicate corpus snapshot case: {parts[0]}");
+            }
         }
         return result.ToImmutable();
     }
 
     internal static CorpusVerdict ToVerdict(
         AnalyzerSemanticOutcome semanticOutcome,
-        bool hasNoDiagnostics) =>
-        semanticOutcome switch {
+        bool hasNoDiagnostics)
+    {
+        return semanticOutcome switch
+        {
             AnalyzerSemanticOutcome.Proven => CorpusVerdict.Proven,
             AnalyzerSemanticOutcome.Refuted => CorpusVerdict.Refuted,
             _ when hasNoDiagnostics => CorpusVerdict.SilentUnknown,
             _ => CorpusVerdict.Unknown
         };
+    }
 
     internal static string CanonicalizeDiagnostic(
         Diagnostic diagnostic,
-        CompilationOptions compilationOptions) {
+        CompilationOptions compilationOptions)
+    {
         var severity = GetEffectiveSeverity(diagnostic, compilationOptions);
         var location = NormalizeLocation(diagnostic.Location);
         var message = diagnostic.GetMessage(CultureInfo.InvariantCulture)
@@ -443,13 +505,18 @@ internal static class CorpusGate {
 
     private static DiagnosticSeverity GetEffectiveSeverity(
         Diagnostic diagnostic,
-        CompilationOptions compilationOptions) {
+        CompilationOptions compilationOptions)
+    {
         if (!compilationOptions.SpecificDiagnosticOptions.TryGetValue(
                 diagnostic.Id,
                 out var action) ||
             action == ReportDiagnostic.Default)
+        {
             return diagnostic.Severity;
-        return action switch {
+        }
+
+        return action switch
+        {
             ReportDiagnostic.Error => DiagnosticSeverity.Error,
             ReportDiagnostic.Warn => DiagnosticSeverity.Warning,
             ReportDiagnostic.Info => DiagnosticSeverity.Info,
@@ -460,9 +527,13 @@ internal static class CorpusGate {
         };
     }
 
-    private static string NormalizeLocation(Location location) {
+    private static string NormalizeLocation(Location location)
+    {
         if (location == Location.None || !location.IsInSource)
+        {
             return "none";
+        }
+
         var lineSpan = location.GetMappedLineSpan();
         var path = Path.GetFileName(lineSpan.Path)
             .Replace('\\', '/');
@@ -475,24 +546,31 @@ internal static class CorpusGate {
     }
 
     private static ImmutableArray<CorpusUnknownReasonCount> CountUnknownReasons(
-        ImmutableArray<CorpusObservation> observations) =>
-        [.. observations
+        ImmutableArray<CorpusObservation> observations)
+    {
+        return [.. observations
             .Where(static observation => observation.Verdict is
                 CorpusVerdict.Unknown or CorpusVerdict.SilentUnknown)
             .GroupBy(GetUnknownReason, StringComparer.Ordinal)
             .OrderBy(static group => group.Key, StringComparer.Ordinal)
             .Select(static group =>
                 new CorpusUnknownReasonCount(group.Key, group.Count()))];
+    }
 
-    private static string GetUnknownReason(CorpusObservation observation) {
+    private static string GetUnknownReason(CorpusObservation observation)
+    {
         if (observation.Diagnostics.IsDefaultOrEmpty)
+        {
             return observation.Verdict == CorpusVerdict.SilentUnknown
                 ? "silent-unclassified"
                 : "unknown-unclassified";
+        }
+
         return string.Join(
             "+",
             observation.Diagnostics
-                .Select(static diagnostic => {
+                .Select(static diagnostic =>
+                {
                     var separator = diagnostic.IndexOf(
                         '@',
                         StringComparison.Ordinal);
@@ -508,52 +586,73 @@ internal static class CorpusGate {
         CorpusUnknownReasonRatchet ratchet,
         ImmutableArray<CorpusUnknownReasonCount> actual,
         int totalUnknownCount,
-        ImmutableArray<string>.Builder failures) {
+        ImmutableArray<string>.Builder failures)
+    {
         if (totalUnknownCount > ratchet.MaximumTotalUnknown)
+        {
             failures.Add(
                 $"Corpus Unknown count regressed from the ratcheted maximum " +
                 $"{ratchet.MaximumTotalUnknown} to {totalUnknownCount}.");
-        foreach (var item in actual) {
+        }
+
+        foreach (var item in actual)
+        {
             if (!ratchet.MaximumByReason.TryGetValue(
                     item.Reason,
-                    out var maximum)) {
+                    out var maximum))
+            {
                 failures.Add(
                     $"Corpus produced a new unreviewed Unknown reason " +
                     $"'{item.Reason}' ({item.Count} cases).");
                 continue;
             }
             if (item.Count > maximum)
+            {
                 failures.Add(
                     $"Corpus Unknown reason '{item.Reason}' regressed from " +
                     $"the ratcheted maximum {maximum} to {item.Count}.");
+            }
         }
     }
 
     private static CorpusUnknownReasonRatchet LoadUnknownReasonRatchet(
-        string path) {
+        string path)
+    {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
         var root = document.RootElement;
         if (root.GetProperty("schemaVersion").GetInt32() != 1)
+        {
             throw new InvalidDataException(
                 "Unsupported corpus Unknown-reason ratchet schema.");
+        }
+
         var maximumTotalUnknown =
             root.GetProperty("maximumTotalUnknown").GetInt32();
         if (maximumTotalUnknown < 0)
+        {
             throw new InvalidDataException(
                 "The corpus Unknown maximum cannot be negative.");
+        }
+
         var maximumByReason =
             ImmutableDictionary.CreateBuilder<string, int>(
                 StringComparer.Ordinal);
         foreach (var property in root.GetProperty("maximumByReason")
-                     .EnumerateObject()) {
+                     .EnumerateObject())
+        {
             var maximum = property.Value.GetInt32();
             if (string.IsNullOrWhiteSpace(property.Name) || maximum < 0)
+            {
                 throw new InvalidDataException(
                     "Corpus Unknown-reason maxima need a name and " +
                     "a non-negative count.");
+            }
+
             if (!maximumByReason.TryAdd(property.Name, maximum))
+            {
                 throw new InvalidDataException(
                     $"Duplicate corpus Unknown reason: {property.Name}.");
+            }
         }
         return new CorpusUnknownReasonRatchet(
             maximumTotalUnknown,
@@ -561,28 +660,38 @@ internal static class CorpusGate {
     }
 
     private static ImmutableDictionary<string, ProvenToUnknownAllowance>
-        LoadAllowances(string path) {
+        LoadAllowances(string path)
+    {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
         if (document.RootElement.GetProperty("schemaVersion").GetInt32() != 1)
+        {
             throw new InvalidDataException(
                 "Unsupported Proven->Unknown allowance schema.");
+        }
+
         var result = ImmutableDictionary.CreateBuilder<
             string,
             ProvenToUnknownAllowance>(StringComparer.Ordinal);
         foreach (var element in document.RootElement
                      .GetProperty("allowances")
-                     .EnumerateArray()) {
+                     .EnumerateArray())
+        {
             var caseId = element.GetProperty("caseId").GetString();
             var reason = element.GetProperty("reason").GetString();
             if (string.IsNullOrWhiteSpace(caseId) ||
                 string.IsNullOrWhiteSpace(reason))
+            {
                 throw new InvalidDataException(
                     "Every Proven->Unknown allowance needs a caseId and explanation.");
+            }
+
             if (!result.TryAdd(
                     caseId,
                     new ProvenToUnknownAllowance(caseId, reason)))
+            {
                 throw new InvalidDataException(
                     $"Duplicate Proven->Unknown allowance: {caseId}");
+            }
         }
         return result.ToImmutable();
     }

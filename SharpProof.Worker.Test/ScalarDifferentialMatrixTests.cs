@@ -12,7 +12,8 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class ScalarDifferentialMatrixTests {
+public sealed class ScalarDifferentialMatrixTests
+{
     private static readonly ScalarCase[] SupportedCases = [
         new(
             "SByte",
@@ -56,7 +57,8 @@ public sealed class ScalarDifferentialMatrixTests {
     ];
 
     [Test]
-    public async Task SupportedScalarMatrixAgreesAcrossRuntimeIrAndSmt() {
+    public async Task SupportedScalarMatrixAgreesAcrossRuntimeIrAndSmt()
+    {
         using var project = DifferentialProject.Create(CreateSource());
         var request = project.CreateRequest();
         using var worker = SharpProofWorker.Create(request.Budgets);
@@ -75,7 +77,8 @@ public sealed class ScalarDifferentialMatrixTests {
             result.Outcome == WorkerClaimOutcome.Proven).ToArray();
         var refuted = supportedResults.Where(static result =>
             result.Outcome == WorkerClaimOutcome.Refuted).ToArray();
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(supportedResults, Has.Length.EqualTo(24));
             Assert.That(
                 proven,
@@ -93,7 +96,8 @@ public sealed class ScalarDifferentialMatrixTests {
                 supportedResults.Select(static result => result.Reason),
                 Is.All.EqualTo(WorkerClaimReason.None));
         }
-        foreach (var item in SupportedCases) {
+        foreach (var item in SupportedCases)
+        {
             var counterexample = refuted.Single(result =>
                 CallableId(response, result).Contains(
                     "." + item.MethodName + "(",
@@ -109,13 +113,15 @@ public sealed class ScalarDifferentialMatrixTests {
         var subject = runtime.Assembly.GetType(
             "ScalarDifferentialSubject",
             throwOnError: true)!;
-        foreach (var item in SupportedCases) {
+        foreach (var item in SupportedCases)
+        {
             var method = subject.GetMethod(
                 item.MethodName,
                 BindingFlags.Public | BindingFlags.Static) ??
                 throw new InvalidOperationException(
                     $"Runtime method '{item.MethodName}' is missing.");
-            foreach (var input in item.BoundaryValues) {
+            foreach (var input in item.BoundaryValues)
+            {
                 Assert.That(
                     method.Invoke(null, [input, true]),
                     Is.EqualTo(input),
@@ -129,7 +135,8 @@ public sealed class ScalarDifferentialMatrixTests {
     }
 
     [Test]
-    public async Task WidthSensitiveConversionsRemainTypedUnknown() {
+    public async Task WidthSensitiveConversionsRemainTypedUnknown()
+    {
         using var project = DifferentialProject.Create(CreateSource());
         var request = project.CreateRequest();
         using var worker = SharpProofWorker.Create(request.Budgets);
@@ -141,7 +148,8 @@ public sealed class ScalarDifferentialMatrixTests {
                 "Conversion(",
                 StringComparison.Ordinal))
             .ToArray();
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(response.Errors, Is.Empty);
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(conversions, Has.Length.EqualTo(2));
@@ -154,7 +162,8 @@ public sealed class ScalarDifferentialMatrixTests {
         }
     }
 
-    private static string CreateSource() {
+    private static string CreateSource()
+    {
         var methods = SupportedCases.Select(static item =>
             $$"""
                 public static {{item.TypeName}} {{item.MethodName}}(
@@ -207,35 +216,45 @@ public sealed class ScalarDifferentialMatrixTests {
 
     private static string CallableId(
         WorkerVerifyResponse response,
-        WorkerClaimResult result) =>
-        response.Manifest.Claims.Single(claim =>
+        WorkerClaimResult result)
+    {
+        return response.Manifest.Claims.Single(claim =>
             string.Equals(
                 claim.ClaimId,
                 result.ClaimId,
                 StringComparison.Ordinal)).CallableId;
+    }
 
-    private static string Format(object value) =>
-        value is char character
+    private static string Format(object value)
+    {
+        return value is char character
             ? ((int)character).ToString(CultureInfo.InvariantCulture)
             : Convert.ToString(value, CultureInfo.InvariantCulture) ??
               string.Empty;
+    }
 
     private sealed record ScalarCase(
         string MethodName,
         string TypeName,
         object[] BoundaryValues);
 
-    private sealed class DifferentialProject : IDisposable {
+    private sealed class DifferentialProject : IDisposable
+    {
         private readonly string _sourcePath;
 
-        private DifferentialProject(string directory, string sourcePath) {
+        private DifferentialProject(string directory, string sourcePath)
+        {
             DirectoryPath = directory;
             _sourcePath = sourcePath;
         }
 
-        internal string DirectoryPath { get; }
+        internal string DirectoryPath
+        {
+            get;
+        }
 
-        internal static DifferentialProject Create(string source) {
+        internal static DifferentialProject Create(string source)
+        {
             var directory = Path.Combine(
                 Path.GetTempPath(),
                 "SharpProof.ScalarDifferential",
@@ -249,7 +268,8 @@ public sealed class ScalarDifferentialMatrixTests {
             return new DifferentialProject(directory, sourcePath);
         }
 
-        internal WorkerVerifyRequest CreateRequest() {
+        internal WorkerVerifyRequest CreateRequest()
+        {
             var compilation = CreateCompilation(includeContracts: true);
             var discovery = new ClaimManifestBuilder(compilation).Build();
             var artifact = CompilerManifestArtifactProducer.Create(
@@ -266,8 +286,10 @@ public sealed class ScalarDifferentialMatrixTests {
                 DirectoryPath,
                 "compiler-manifest.json");
             File.WriteAllBytes(artifactPath, bytes);
-            return new WorkerVerifyRequest {
-                CompilerManifest = new WorkerFileReference {
+            return new WorkerVerifyRequest
+            {
+                CompilerManifest = new WorkerFileReference
+                {
                     Path = artifactPath,
                     Sha256 = string.Concat(
                         System.Security.Cryptography.SHA256.HashData(bytes)
@@ -275,14 +297,16 @@ public sealed class ScalarDifferentialMatrixTests {
                                 "x2",
                                 CultureInfo.InvariantCulture)))
                 },
-                Cache = new WorkerCacheOptions {
+                Cache = new WorkerCacheOptions
+                {
                     Enabled = false,
                     Directory = Path.Combine(DirectoryPath, "cache")
                 }
             };
         }
 
-        internal RuntimeAssembly EmitRuntimeAssembly() {
+        internal RuntimeAssembly EmitRuntimeAssembly()
+        {
             var compilation = CreateCompilation(includeContracts: false);
             using var image = new MemoryStream();
             var emit = compilation.Emit(image);
@@ -304,7 +328,8 @@ public sealed class ScalarDifferentialMatrixTests {
                 context.LoadFromStream(image));
         }
 
-        public void Dispose() {
+        public void Dispose()
+        {
             var resolved = Path.GetFullPath(DirectoryPath);
             var expectedRoot = Path.GetFullPath(
                 Path.Combine(
@@ -313,13 +338,19 @@ public sealed class ScalarDifferentialMatrixTests {
             if (!resolved.StartsWith(
                     expectedRoot + Path.DirectorySeparatorChar,
                     StringComparison.Ordinal))
+            {
                 throw new InvalidOperationException(
                     "Refusing to remove an unexpected test directory.");
+            }
+
             if (Directory.Exists(resolved))
+            {
                 Directory.Delete(resolved, recursive: true);
+            }
         }
 
-        private CSharpCompilation CreateCompilation(bool includeContracts) {
+        private CSharpCompilation CreateCompilation(bool includeContracts)
+        {
             var parseOptions = new CSharpParseOptions(
                 LanguageVersion.CSharp12,
                 preprocessorSymbols: includeContracts
@@ -346,7 +377,8 @@ public sealed class ScalarDifferentialMatrixTests {
                     concurrentBuild: false));
         }
 
-        private static string[] GetReferences() {
+        private static string[] GetReferences()
+        {
             var trusted = ((string)AppContext.GetData(
                     "TRUSTED_PLATFORM_ASSEMBLIES")!)
                 .Split(Path.PathSeparator);
@@ -362,21 +394,25 @@ public sealed class ScalarDifferentialMatrixTests {
 
         internal static Assembly? ResolveContractAssembly(
             AssemblyLoadContext context,
-            AssemblyName name) =>
-            string.Equals(
+            AssemblyName name)
+        {
+            return string.Equals(
                 name.Name,
                 typeof(Contract).Assembly.GetName().Name,
                 StringComparison.Ordinal)
                 ? context.LoadFromAssemblyPath(typeof(Contract).Assembly.Location)
                 : null;
+        }
     }
 
     private sealed class RuntimeAssembly(
         AssemblyLoadContext context,
-        Assembly assembly) : IDisposable {
+        Assembly assembly) : IDisposable
+    {
         internal Assembly Assembly { get; } = assembly;
 
-        public void Dispose() {
+        public void Dispose()
+        {
             context.Resolving -= DifferentialProject.ResolveContractAssembly;
             context.Unload();
         }

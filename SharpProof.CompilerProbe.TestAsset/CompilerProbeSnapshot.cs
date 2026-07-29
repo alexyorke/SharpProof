@@ -2,8 +2,10 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SharpProof.CompilerProbe.TestAsset;
 
-internal static class CompilerProbeSnapshot {
-    internal static string Create(CompilationAnalysisContext context) {
+internal static class CompilerProbeSnapshot
+{
+    internal static string Create(CompilationAnalysisContext context)
+    {
         var compilation = (CSharpCompilation)context.Compilation;
         var builder = new StringBuilder();
         var first = true;
@@ -48,7 +50,8 @@ internal static class CompilerProbeSnapshot {
 
     private static void AppendAssembly(
         StringBuilder builder,
-        CSharpCompilation compilation) {
+        CSharpCompilation compilation)
+    {
         var first = true;
         builder.Append('{');
         ProbeJson.StringProperty(
@@ -66,7 +69,8 @@ internal static class CompilerProbeSnapshot {
 
     private static void AppendOptions(
         StringBuilder builder,
-        CSharpCompilation compilation) {
+        CSharpCompilation compilation)
+    {
         var options = compilation.Options;
         var parseOptions = compilation.SyntaxTrees
             .Select(static tree => tree.Options)
@@ -145,7 +149,8 @@ internal static class CompilerProbeSnapshot {
     }
 
     private static IEnumerable<string> CreateConsumedOptionRows(
-        CompilationAnalysisContext context) {
+        CompilationAnalysisContext context)
+    {
         var provider = context.Options.AnalyzerConfigOptionsProvider;
         var rows = new List<string> {
             CreateOptionRow(
@@ -174,7 +179,8 @@ internal static class CompilerProbeSnapshot {
     private static string CreateOptionRow(
         string key,
         string path,
-        string value) {
+        string value)
+    {
         var builder = new StringBuilder();
         var first = true;
         builder.Append('{');
@@ -187,7 +193,8 @@ internal static class CompilerProbeSnapshot {
 
     private static IEnumerable<string> CreateSyntaxTreeRows(
         CSharpCompilation compilation,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var indexedTrees = compilation.SyntaxTrees
             .Select(static (tree, ordinal) => (Tree: tree, Ordinal: ordinal))
             .OrderBy(
@@ -206,7 +213,8 @@ internal static class CompilerProbeSnapshot {
         CSharpCompilation compilation,
         SyntaxTree tree,
         int ordinal,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var text = tree.GetText(cancellationToken).ToString();
         var builder = new StringBuilder();
         var first = true;
@@ -247,7 +255,8 @@ internal static class CompilerProbeSnapshot {
     private static IEnumerable<string> GetDeclaredSymbols(
         CSharpCompilation compilation,
         SyntaxTree tree,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var model = compilation.GetSemanticModel(tree);
         return tree.GetRoot(cancellationToken)
             .DescendantNodesAndSelf()
@@ -267,7 +276,8 @@ internal static class CompilerProbeSnapshot {
 
     private static void AppendParseOptions(
         StringBuilder builder,
-        CSharpParseOptions options) {
+        CSharpParseOptions options)
+    {
         var first = true;
         builder.Append('{');
         ProbeJson.StringProperty(
@@ -309,7 +319,8 @@ internal static class CompilerProbeSnapshot {
         builder.Append('}');
     }
 
-    private static string CreateFeatureRow(string key, string value) {
+    private static string CreateFeatureRow(string key, string value)
+    {
         var builder = new StringBuilder();
         var first = true;
         builder.Append('{');
@@ -320,16 +331,19 @@ internal static class CompilerProbeSnapshot {
     }
 
     private static IEnumerable<string> CreateReferenceRows(
-        CSharpCompilation compilation) =>
-        compilation.References
+        CSharpCompilation compilation)
+    {
+        return compilation.References
             .OfType<PortableExecutableReference>()
             .Select(reference =>
                 CreateReferenceRow(compilation, reference))
             .OrderBy(static row => row, StringComparer.Ordinal);
+    }
 
     private static string CreateReferenceRow(
         CSharpCompilation compilation,
-        PortableExecutableReference reference) {
+        PortableExecutableReference reference)
+    {
         var path = reference.FilePath ?? string.Empty;
         var builder = new StringBuilder();
         var first = true;
@@ -377,18 +391,23 @@ internal static class CompilerProbeSnapshot {
 
     private static string GetReferenceIdentity(
         CSharpCompilation compilation,
-        PortableExecutableReference reference) =>
-        compilation.GetAssemblyOrModuleSymbol(reference) switch {
+        PortableExecutableReference reference)
+    {
+        return compilation.GetAssemblyOrModuleSymbol(reference) switch
+        {
             IAssemblySymbol assembly => assembly.Identity.ToString(),
             IModuleSymbol module => module.Name,
             _ => string.Empty
         };
+    }
 
     private static IEnumerable<string> CreateAdditionalFileRows(
-        CompilationAnalysisContext context) {
+        CompilationAnalysisContext context)
+    {
         var provider = context.Options.AnalyzerConfigOptionsProvider;
         return context.Options.AdditionalFiles
-            .Select(file => {
+            .Select(file =>
+            {
                 var text = file.GetText(context.CancellationToken)?
                     .ToString() ?? string.Empty;
                 var builder = new StringBuilder();
@@ -420,18 +439,24 @@ internal static class CompilerProbeSnapshot {
 
     private static string GetOption(
         AnalyzerConfigOptions options,
-        string key) =>
-        options.TryGetValue(key, out var value) ? value : string.Empty;
+        string key)
+    {
+        return options.TryGetValue(key, out var value) ? value : string.Empty;
+    }
 
-    private static bool IsGenerated(string path, string text) =>
-        path.EndsWith(".g.cs", StringComparison.OrdinalIgnoreCase) ||
+    private static bool IsGenerated(string path, string text)
+    {
+        return path.EndsWith(".g.cs", StringComparison.OrdinalIgnoreCase) ||
         path.EndsWith(
             ".generated.cs",
             StringComparison.OrdinalIgnoreCase) ||
         text.TrimStart().StartsWith(
             "// <auto-generated",
             StringComparison.Ordinal);
+    }
 
-    private static string NormalizePath(string path) =>
-        path.Replace('\\', '/');
+    private static string NormalizePath(string path)
+    {
+        return path.Replace('\\', '/');
+    }
 }

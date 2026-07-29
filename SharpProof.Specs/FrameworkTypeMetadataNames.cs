@@ -4,7 +4,8 @@ namespace SharpProof.Specs;
 /// Keep framework type-name declarations in the spec layer so consumers do
 /// not grow independent string-based BCL authorities.
 /// </summary>
-public static class FrameworkTypeMetadataNames {
+public static class FrameworkTypeMetadataNames
+{
     public const string ArgumentNullException = "System.ArgumentNullException";
     public const string ArrayTypeMismatchException =
         "System.ArrayTypeMismatchException";

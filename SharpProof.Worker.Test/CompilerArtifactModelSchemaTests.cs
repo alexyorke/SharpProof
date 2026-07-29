@@ -8,23 +8,27 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class CompilerArtifactModelSchemaTests {
+public sealed class CompilerArtifactModelSchemaTests
+{
     private static readonly Assembly s_artifactAssembly =
         typeof(CompilerManifestArtifact).Assembly;
     private static readonly NullabilityInfoContext s_nullability = new();
 
     [Test]
-    public void GeneratedDeclarationsMatchTheAuthoritativeSchema() {
+    public void GeneratedDeclarationsMatchTheAuthoritativeSchema()
+    {
         using var schema = ReadSchema();
 
         foreach (var declaration in schema.RootElement
                      .GetProperty("declarations")
-                     .EnumerateArray()) {
+                     .EnumerateArray())
+        {
             var name = declaration.GetProperty("name").GetString()!;
             var type = s_artifactAssembly.GetType(
                 "SharpProof.CompilerArtifact." + name,
                 throwOnError: true)!;
-            switch (declaration.GetProperty("kind").GetString()) {
+            switch (declaration.GetProperty("kind").GetString())
+            {
                 case "staticClass":
                     Assert.That(type.IsAbstract && type.IsSealed, Is.True, name);
                     AssertConstants(type, declaration);
@@ -53,12 +57,14 @@ public sealed class CompilerArtifactModelSchemaTests {
     }
 
     [Test]
-    public void SchemaPinsEnvelopeWireCatalogsAndEffectEvidenceDomain() {
+    public void SchemaPinsEnvelopeWireCatalogsAndEffectEvidenceDomain()
+    {
         using var schema = ReadSchema();
         var envelope = schema.RootElement.GetProperty("artifactEnvelope");
         var evidence = schema.RootElement.GetProperty("effectEvidence");
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 envelope.GetProperty("schema").GetString(),
                 Is.EqualTo(CompilerManifestArtifactVersions.Schema));
@@ -74,7 +80,8 @@ public sealed class CompilerArtifactModelSchemaTests {
         var codec = typeof(PortableIrGraphCodec);
         foreach (var catalog in schema.RootElement
                      .GetProperty("wireEnumCatalogs")
-                     .EnumerateArray()) {
+                     .EnumerateArray())
+        {
             var field = codec.GetField(
                 catalog.GetProperty("field").GetString()!,
                 BindingFlags.NonPublic |
@@ -93,7 +100,8 @@ public sealed class CompilerArtifactModelSchemaTests {
         Assert.That(PortableIrGraphCodec.HasCompleteWireEnumCatalogs, Is.True);
     }
 
-    private static void AssertConstants(Type type, JsonElement declaration) {
+    private static void AssertConstants(Type type, JsonElement declaration)
+    {
         JsonElement[] specifications = [
             .. declaration.GetProperty("constants").EnumerateArray()
         ];
@@ -110,7 +118,8 @@ public sealed class CompilerArtifactModelSchemaTests {
             Is.EqualTo(specifications.Select(static specification =>
                 specification.GetProperty("name").GetString())),
             type.Name);
-        for (var index = 0; index < fields.Length; index++) {
+        for (var index = 0; index < fields.Length; index++)
+        {
             var expected = specifications[index].GetProperty("value");
             Assert.That(
                 fields[index].GetRawConstantValue(),
@@ -121,7 +130,8 @@ public sealed class CompilerArtifactModelSchemaTests {
         }
     }
 
-    private static void AssertEnum(Type type, JsonElement declaration) {
+    private static void AssertEnum(Type type, JsonElement declaration)
+    {
         JsonElement[] members = [
             .. declaration.GetProperty("members").EnumerateArray()
         ];
@@ -139,7 +149,8 @@ public sealed class CompilerArtifactModelSchemaTests {
             type.Name);
     }
 
-    private static void AssertRecord(Type type, JsonElement declaration) {
+    private static void AssertRecord(Type type, JsonElement declaration)
+    {
         JsonElement[] parameters = [
             .. declaration.GetProperty("parameters").EnumerateArray()
         ];
@@ -170,7 +181,8 @@ public sealed class CompilerArtifactModelSchemaTests {
             properties.Select(static property => property.Name),
             Is.EqualTo(expectedNames),
             type.Name);
-        for (var index = 0; index < parameters.Length; index++) {
+        for (var index = 0; index < parameters.Length; index++)
+        {
             Assert.That(
                 SchemaType(properties[index]),
                 Is.EqualTo(parameters[index].GetProperty("type").GetString()),
@@ -179,7 +191,8 @@ public sealed class CompilerArtifactModelSchemaTests {
 
     }
 
-    private static void AssertClass(Type type, JsonElement declaration) {
+    private static void AssertClass(Type type, JsonElement declaration)
+    {
         JsonElement[] specifications = [
             .. declaration.GetProperty("properties").EnumerateArray()
         ];
@@ -196,7 +209,8 @@ public sealed class CompilerArtifactModelSchemaTests {
             Is.EqualTo(specifications.Select(static specification =>
                 specification.GetProperty("name").GetString())),
             type.Name);
-        for (var index = 0; index < properties.Length; index++) {
+        for (var index = 0; index < properties.Length; index++)
+        {
             var property = properties[index];
             var specification = specifications[index];
             Assert.That(
@@ -214,7 +228,10 @@ public sealed class CompilerArtifactModelSchemaTests {
 
         if (specifications.Any(static specification =>
                 !specification.TryGetProperty("jsonName", out _)))
+        {
             return;
+        }
+
         var instance = CreateDefaultInstance(type);
         using var wire = JsonDocument.Parse(JsonSerializer.Serialize(
             instance,
@@ -226,7 +243,8 @@ public sealed class CompilerArtifactModelSchemaTests {
             Is.EqualTo(specifications.Select(static specification =>
                 specification.GetProperty("jsonName").GetString())),
             type.Name);
-        for (var index = 0; index < properties.Length; index++) {
+        for (var index = 0; index < properties.Length; index++)
+        {
             AssertDefault(
                 type,
                 properties[index],
@@ -235,7 +253,10 @@ public sealed class CompilerArtifactModelSchemaTests {
                 declaration);
             var property = properties[index];
             if (property.SetMethod == null)
+            {
                 continue;
+            }
+
             var replacement = ReplacementValue(
                 property.PropertyType,
                 property.GetValue(instance));
@@ -249,14 +270,17 @@ public sealed class CompilerArtifactModelSchemaTests {
 
     private static void AssertSetter(
         PropertyInfo property,
-        JsonElement specification) {
+        JsonElement specification)
+    {
         var expected = specification.GetProperty("set").GetString();
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 property.SetMethod == null,
                 Is.EqualTo(expected == "none"),
                 property.Name);
-            if (expected != "none") {
+            if (expected != "none")
+            {
                 Assert.That(
                     property.SetMethod!.IsPublic,
                     Is.EqualTo(
@@ -272,10 +296,12 @@ public sealed class CompilerArtifactModelSchemaTests {
         PropertyInfo property,
         object? actual,
         JsonElement specification,
-        JsonElement declaration) {
+        JsonElement declaration)
+    {
         var defaultValue = specification.GetProperty("default");
         var kind = defaultValue.GetProperty("kind").GetString();
-        switch (kind) {
+        switch (kind)
+        {
             case "implicit":
                 Assert.That(
                     actual,
@@ -331,13 +357,15 @@ public sealed class CompilerArtifactModelSchemaTests {
     private static object? ParameterDefault(
         Type type,
         string name,
-        JsonElement declaration) {
+        JsonElement declaration)
+    {
         var parameter = declaration.GetProperty("constructor")
             .EnumerateArray()
             .Single(candidate =>
                 candidate.GetProperty("name").GetString() == name);
         var value = parameter.GetProperty("default").GetString()!;
-        return value switch {
+        return value switch
+        {
             "default" => type.IsValueType ? Activator.CreateInstance(type) : null,
             "null" => null,
             "false" => false,
@@ -353,22 +381,42 @@ public sealed class CompilerArtifactModelSchemaTests {
         };
     }
 
-    private static object? ReplacementValue(Type type, object? current) {
+    private static object? ReplacementValue(Type type, object? current)
+    {
         if (type == typeof(string))
+        {
             return "changed";
+        }
+
         if (type == typeof(bool))
+        {
             return !(bool)current!;
+        }
+
         if (type == typeof(int))
+        {
             return 17;
+        }
+
         if (type == typeof(long))
+        {
             return 17L;
+        }
+
         if (Nullable.GetUnderlyingType(type) is { } nullable)
+        {
             return nullable == typeof(long)
                 ? 17L
                 : Activator.CreateInstance(nullable);
+        }
+
         if (type.IsEnum)
+        {
             return Enum.GetValues(type).GetValue(Enum.GetValues(type).Length - 1);
-        if (type.IsArray) {
+        }
+
+        if (type.IsArray)
+        {
             var elementType = type.GetElementType()!;
             var value = elementType == typeof(string)
                 ? "item"
@@ -382,7 +430,8 @@ public sealed class CompilerArtifactModelSchemaTests {
         return CreateObject(type);
     }
 
-    private static object CreateObject(Type type) {
+    private static object CreateObject(Type type)
+    {
         var constructor = type.GetConstructors(
                 BindingFlags.Public |
                 BindingFlags.NonPublic |
@@ -391,9 +440,12 @@ public sealed class CompilerArtifactModelSchemaTests {
             .First();
         var parameters = constructor.GetParameters();
         if (parameters.All(static parameter => parameter.HasDefaultValue))
+        {
             return constructor.Invoke([
                 .. parameters.Select(static parameter => parameter.DefaultValue)
             ]);
+        }
+
         return constructor.Invoke([
             .. parameters.Select(parameter => parameter.ParameterType.IsValueType
                 ? Activator.CreateInstance(parameter.ParameterType)
@@ -401,7 +453,8 @@ public sealed class CompilerArtifactModelSchemaTests {
         ]);
     }
 
-    private static object CreateDefaultInstance(Type type) {
+    private static object CreateDefaultInstance(Type type)
+    {
         var constructor = type.GetConstructors(
                 BindingFlags.Public |
                 BindingFlags.NonPublic |
@@ -417,7 +470,8 @@ public sealed class CompilerArtifactModelSchemaTests {
         ]);
     }
 
-    private static object? ResolveMember(string member) {
+    private static object? ResolveMember(string member)
+    {
         var separator = member.LastIndexOf('.');
         var typeName = member[..separator];
         var memberName = member[(separator + 1)..];
@@ -435,14 +489,23 @@ public sealed class CompilerArtifactModelSchemaTests {
             .GetRawConstantValue();
     }
 
-    private static string SchemaType(PropertyInfo property) =>
-        SchemaType(property.PropertyType, s_nullability.Create(property));
+    private static string SchemaType(PropertyInfo property)
+    {
+        return SchemaType(property.PropertyType, s_nullability.Create(property));
+    }
 
-    private static string SchemaType(Type type, NullabilityInfo? nullability) {
+    private static string SchemaType(Type type, NullabilityInfo? nullability)
+    {
         if (Nullable.GetUnderlyingType(type) is { } underlying)
+        {
             return SchemaType(underlying, null) + "?";
+        }
+
         if (type.IsArray)
+        {
             return SchemaType(type.GetElementType()!, nullability?.ElementType) + "[]";
+        }
+
         var name = type == typeof(string)
             ? "string"
             : type == typeof(bool)
@@ -471,18 +534,24 @@ public sealed class CompilerArtifactModelSchemaTests {
             : name;
     }
 
-    private static JsonDocument ReadSchema() =>
-        JsonDocument.Parse(File.ReadAllText(Path.Combine(
+    private static JsonDocument ReadSchema()
+    {
+        return JsonDocument.Parse(File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
             "SharpProof.CompilerArtifact",
             "CompilerArtifactModel.schema.json")));
+    }
 
-    private static string FindRepositoryRoot() {
+    private static string FindRepositoryRoot()
+    {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
              directory != null;
-             directory = directory.Parent) {
+             directory = directory.Parent)
+        {
             if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
+            {
                 return directory.FullName;
+            }
         }
         throw new InvalidOperationException("Could not find repository root.");
     }

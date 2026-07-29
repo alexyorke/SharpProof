@@ -8,7 +8,8 @@ using SharpProof.Ir;
 
 namespace SharpProof.Testing;
 
-public enum DifferentialStatus {
+public enum DifferentialStatus
+{
     Agreement,
     Abstained,
     Mismatch
@@ -19,7 +20,8 @@ public sealed record DifferentialResult(
     IrEvaluationResult Interpreted,
     string Detail);
 
-public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
+public sealed class IrCSharpDifferentialOracle(IrFactory factory)
+{
     private static readonly Lazy<ImmutableArray<MetadataReference>> References =
         new(CreateReferences, LazyThreadSafetyMode.ExecutionAndPublication);
     private readonly IrFactory _factory =
@@ -27,13 +29,16 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
 
     public DifferentialResult Compare(
         IrTerm term,
-        IReadOnlyDictionary<IrVarId, IrValue> variables) {
+        IReadOnlyDictionary<IrVarId, IrValue> variables)
+    {
         ArgumentNullException.ThrowIfNull(term);
         ArgumentNullException.ThrowIfNull(variables);
 
         var interpreted = new IrInterpreter(_factory).Evaluate(term, variables);
         if (!TryCreateProgram(term, variables, out var program, out var orderedVariables, out var reason))
+        {
             return new DifferentialResult(DifferentialStatus.Abstained, interpreted, reason);
+        }
 
         var tree = CSharpSyntaxTree.ParseText(
             program,
@@ -48,7 +53,8 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
                 checkOverflow: true));
         using var image = new MemoryStream();
         var emit = compilation.Emit(image);
-        if (!emit.Success) {
+        if (!emit.Success)
+        {
             var errors = string.Join(
                 " | ",
                 emit.Diagnostics
@@ -66,7 +72,8 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
         var method = assembly.GetType("SharpProofGeneratedOracle")!.GetMethod(
             "Evaluate",
             BindingFlags.Public | BindingFlags.Static)!;
-        try {
+        try
+        {
             var runtimeValues = new Dictionary<IrValue, object?>(
                 ReferenceEqualityComparer.Instance);
             var actual = method.Invoke(
@@ -75,7 +82,8 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
                     binding => ToRuntimeValue(variables[binding], runtimeValues))]);
             return CompareValue(interpreted, actual);
         }
-        catch (TargetInvocationException exception) when (exception.InnerException != null) {
+        catch (TargetInvocationException exception) when (exception.InnerException != null)
+        {
             return CompareException(interpreted, exception.InnerException);
         }
     }
@@ -85,17 +93,21 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
         IReadOnlyDictionary<IrVarId, IrValue> values,
         out string program,
         out ImmutableArray<IrVarId> orderedVariables,
-        out string reason) {
+        out string reason)
+    {
         var variables = new SortedDictionary<int, IrVarId>();
-        if (!TryAppendExpression(new StringBuilder(), term, variables, out _, out reason)) {
+        if (!TryAppendExpression(new StringBuilder(), term, variables, out _, out reason))
+        {
             program = "";
             orderedVariables = [];
             return false;
         }
 
         orderedVariables = [.. variables.Values];
-        foreach (var variable in orderedVariables) {
-            if (!values.ContainsKey(variable)) {
+        foreach (var variable in orderedVariables)
+        {
+            if (!values.ContainsKey(variable))
+            {
                 program = "";
                 reason = "A referenced variable has no concrete value.";
                 return false;
@@ -103,7 +115,8 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
         }
 
         var expression = new StringBuilder();
-        if (!TryAppendExpression(expression, term, variables, out var returnType, out reason)) {
+        if (!TryAppendExpression(expression, term, variables, out var returnType, out reason))
+        {
             program = "";
             return false;
         }
@@ -115,12 +128,18 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
         source.Append("    public static ");
         source.Append(returnType);
         source.Append(" Evaluate(");
-        for (var index = 0; index < orderedVariables.Length; index++) {
-            if (index != 0) source.Append(", ");
+        for (var index = 0; index < orderedVariables.Length; index++)
+        {
+            if (index != 0)
+            {
+                source.Append(", ");
+            }
+
             var variable = orderedVariables[index];
             if (!TryGetCSharpType(
                     _factory.GetVariableInfo(variable).Type,
-                    out var parameterType)) {
+                    out var parameterType))
+            {
                 program = "";
                 reason = "A variable type is outside the executable oracle subset.";
                 return false;
@@ -145,13 +164,16 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
         IrTerm term,
         IDictionary<int, IrVarId> variables,
         out string type,
-        out string reason) {
-        if (!TryGetCSharpType(term.Type, out type)) {
+        out string reason)
+    {
+        if (!TryGetCSharpType(term.Type, out type))
+        {
             reason = "The result type is outside the executable oracle subset.";
             return false;
         }
 
-        switch (term) {
+        switch (term)
+        {
             case IrBooleanTerm boolean:
                 builder.Append(boolean.Value ? "true" : "false");
                 break;
@@ -177,30 +199,48 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
                 builder.Append('(');
                 builder.Append(unary.Operator == IrUnaryOperator.Not ? '!' : '-');
                 if (!TryAppendExpression(builder, unary.Operand, variables, out _, out reason))
+                {
                     return false;
+                }
+
                 builder.Append(')');
                 break;
             case IrBinaryTerm binary:
                 builder.Append('(');
                 if (!TryAppendExpression(builder, binary.Left, variables, out _, out reason))
+                {
                     return false;
+                }
+
                 builder.Append(' ');
                 builder.Append(BinaryToken(binary.Operator));
                 builder.Append(' ');
                 if (!TryAppendExpression(builder, binary.Right, variables, out _, out reason))
+                {
                     return false;
+                }
+
                 builder.Append(')');
                 break;
             case IrConditionalTerm conditional:
                 builder.Append('(');
                 if (!TryAppendExpression(builder, conditional.Condition, variables, out _, out reason))
+                {
                     return false;
+                }
+
                 builder.Append(" ? ");
                 if (!TryAppendExpression(builder, conditional.WhenTrue, variables, out _, out reason))
+                {
                     return false;
+                }
+
                 builder.Append(" : ");
                 if (!TryAppendExpression(builder, conditional.WhenFalse, variables, out _, out reason))
+                {
                     return false;
+                }
+
                 builder.Append(')');
                 break;
             case IrCastTerm cast:
@@ -208,22 +248,34 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
                 builder.Append(type);
                 builder.Append(')');
                 if (!TryAppendExpression(builder, cast.Operand, variables, out _, out reason))
+                {
                     return false;
+                }
+
                 builder.Append(')');
                 break;
             case IrLengthTerm length:
                 builder.Append('(');
                 if (!TryAppendExpression(builder, length.Value, variables, out _, out reason))
+                {
                     return false;
+                }
+
                 builder.Append(").Length");
                 break;
             case IrSequenceAccessTerm access:
                 builder.Append('(');
                 if (!TryAppendExpression(builder, access.Sequence, variables, out _, out reason))
+                {
                     return false;
+                }
+
                 builder.Append(")[");
                 if (!TryAppendExpression(builder, access.Index, variables, out _, out reason))
+                {
                     return false;
+                }
+
                 builder.Append(']');
                 break;
             case IrOpaqueTerm:
@@ -238,9 +290,11 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
         return true;
     }
 
-    private bool TryGetCSharpType(IrTypeId type, out string name) {
+    private bool TryGetCSharpType(IrTypeId type, out string name)
+    {
         var info = _factory.GetTypeInfo(type);
-        name = info.Kind switch {
+        name = info.Kind switch
+        {
             IrTypeKind.Boolean => "bool",
             IrTypeKind.Integer => "long",
             IrTypeKind.String => "string",
@@ -254,27 +308,33 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
         return name.Length != 0;
     }
 
-    private static string BinaryToken(IrBinaryOperator @operator) => @operator switch {
-        IrBinaryOperator.Add => "+",
-        IrBinaryOperator.Subtract => "-",
-        IrBinaryOperator.Multiply => "*",
-        IrBinaryOperator.Divide => "/",
-        IrBinaryOperator.Remainder => "%",
-        IrBinaryOperator.AndAlso => "&&",
-        IrBinaryOperator.OrElse => "||",
-        IrBinaryOperator.Equal => "==",
-        IrBinaryOperator.NotEqual => "!=",
-        IrBinaryOperator.LessThan => "<",
-        IrBinaryOperator.LessThanOrEqual => "<=",
-        IrBinaryOperator.GreaterThan => ">",
-        IrBinaryOperator.GreaterThanOrEqual => ">=",
-        IrBinaryOperator.StringConcat => "+",
-        _ => throw new ArgumentOutOfRangeException(nameof(@operator))
-    };
+    private static string BinaryToken(IrBinaryOperator @operator)
+    {
+        return @operator switch
+        {
+            IrBinaryOperator.Add => "+",
+            IrBinaryOperator.Subtract => "-",
+            IrBinaryOperator.Multiply => "*",
+            IrBinaryOperator.Divide => "/",
+            IrBinaryOperator.Remainder => "%",
+            IrBinaryOperator.AndAlso => "&&",
+            IrBinaryOperator.OrElse => "||",
+            IrBinaryOperator.Equal => "==",
+            IrBinaryOperator.NotEqual => "!=",
+            IrBinaryOperator.LessThan => "<",
+            IrBinaryOperator.LessThanOrEqual => "<=",
+            IrBinaryOperator.GreaterThan => ">",
+            IrBinaryOperator.GreaterThanOrEqual => ">=",
+            IrBinaryOperator.StringConcat => "+",
+            _ => throw new ArgumentOutOfRangeException(nameof(@operator))
+        };
+    }
 
-    private static void AppendInteger(StringBuilder builder, long value) {
+    private static void AppendInteger(StringBuilder builder, long value)
+    {
         builder.Append("Value(");
-        if (value == long.MinValue) {
+        if (value == long.MinValue)
+        {
             builder.Append("long.MinValue");
             builder.Append(')');
             return;
@@ -286,9 +346,15 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
 
     private object? ToRuntimeValue(
         IrValue value,
-        IDictionary<IrValue, object?> converted) {
-        if (converted.TryGetValue(value, out var existing)) return existing;
-        var runtimeValue = value.Kind switch {
+        IDictionary<IrValue, object?> converted)
+    {
+        if (converted.TryGetValue(value, out var existing))
+        {
+            return existing;
+        }
+
+        var runtimeValue = value.Kind switch
+        {
             IrValueKind.Boolean => value.Boolean,
             IrValueKind.Integer => value.Integer,
             IrValueKind.String => value.String,
@@ -304,30 +370,40 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
 
     private Array ToRuntimeArray(
         IrValue value,
-        IDictionary<IrValue, object?> converted) {
+        IDictionary<IrValue, object?> converted)
+    {
         var info = _factory.GetTypeInfo(value.Type);
         if (info.ElementType == null ||
             !TryGetRuntimeType(info.ElementType.Value, out var elementType))
+        {
             throw new InvalidOperationException(
                 "The sequence element type is outside the executable oracle subset.");
+        }
+
         var result = Array.CreateInstance(elementType, value.Elements.Length);
         converted[value] = result;
         for (var index = 0; index < value.Elements.Length; index++)
+        {
             result.SetValue(
                 ToRuntimeValue(value.Elements[index], converted),
                 index);
+        }
+
         return result;
     }
 
-    private bool TryGetRuntimeType(IrTypeId type, out Type runtimeType) {
+    private bool TryGetRuntimeType(IrTypeId type, out Type runtimeType)
+    {
         var info = _factory.GetTypeInfo(type);
         if (info.Kind == IrTypeKind.Sequence &&
             info.ElementType != null &&
-            TryGetRuntimeType(info.ElementType.Value, out var elementType)) {
+            TryGetRuntimeType(info.ElementType.Value, out var elementType))
+        {
             runtimeType = elementType.MakeArrayType();
             return true;
         }
-        runtimeType = info.Kind switch {
+        runtimeType = info.Kind switch
+        {
             IrTypeKind.Boolean => typeof(bool),
             IrTypeKind.Integer => typeof(long),
             IrTypeKind.String => typeof(string),
@@ -339,14 +415,18 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
 
     private static DifferentialResult CompareValue(
         IrEvaluationResult interpreted,
-        object? actual) {
+        object? actual)
+    {
         if (interpreted.Status != IrEvaluationStatus.Value)
+        {
             return new DifferentialResult(
                 DifferentialStatus.Mismatch,
                 interpreted,
                 "Compiled C# returned normally while the IR did not.");
+        }
 
-        var agrees = interpreted.Value!.Kind switch {
+        var agrees = interpreted.Value!.Kind switch
+        {
             IrValueKind.Boolean => actual is bool value && value == interpreted.Value.Boolean,
             IrValueKind.Integer => actual is long value && value == interpreted.Value.Integer,
             IrValueKind.String => actual is string value &&
@@ -362,8 +442,10 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
 
     private static DifferentialResult CompareException(
         IrEvaluationResult interpreted,
-        Exception actual) {
-        var kind = actual switch {
+        Exception actual)
+    {
+        var kind = actual switch
+        {
             DivideByZeroException => IrExceptionKind.DivideByZero,
             OverflowException => IrExceptionKind.Overflow,
             NullReferenceException => IrExceptionKind.NullReference,
@@ -383,7 +465,8 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory) {
                   " while the IR reported " + interpreted.Status + ".");
     }
 
-    private static ImmutableArray<MetadataReference> CreateReferences() {
+    private static ImmutableArray<MetadataReference> CreateReferences()
+    {
         var trustedAssemblies =
             (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
             throw new InvalidOperationException("Trusted platform assemblies are unavailable.");

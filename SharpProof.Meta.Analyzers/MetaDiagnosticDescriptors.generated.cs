@@ -9,7 +9,8 @@ using Microsoft.CodeAnalysis;
 
 namespace SharpProof.Meta.Analyzers;
 
-internal static class MetaDiagnosticDescriptors {
+internal static class MetaDiagnosticDescriptors
+{
 
     internal static readonly DiagnosticDescriptor ForbiddenRoslynApi = new(
         id: "SPMETA001",

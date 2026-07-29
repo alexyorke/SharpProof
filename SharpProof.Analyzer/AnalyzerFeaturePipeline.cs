@@ -1,25 +1,36 @@
 namespace SharpProof.Analyzer;
 
-internal static class AnalyzerFeaturePipeline {
+internal static class AnalyzerFeaturePipeline
+{
     internal static void ValidateMethodAttributes(
         SymbolAnalysisContext context,
-        AnalyzerSession session) {
+        AnalyzerSession session)
+    {
         context.CancellationToken.ThrowIfCancellationRequested();
         if (context.Symbol is not IMethodSymbol method ||
             method.DeclaringSyntaxReferences.IsDefaultOrEmpty)
+        {
             return;
+        }
+
         EffectContractDiagnostics.ValidateArguments(method, session, context.ReportDiagnostic);
         ClosedContractDiagnostics.Validate(method, session, context.ReportDiagnostic);
         var selection = GetSelection(
             method, session, context.ReportDiagnostic, context.CancellationToken);
-        if ((!method.IsAbstract && !method.IsExtern) || !selection.Any) return;
-        if (selection.IsSuppressed) {
+        if ((!method.IsAbstract && !method.IsExtern) || !selection.Any)
+        {
+            return;
+        }
+
+        if (selection.IsSuppressed)
+        {
             session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Suppressed);
             return;
         }
         if (!selection.Contracts &&
             selection.Effects &&
-            session.ResolveEffectContract(method).Kind == EffectContractResolutionKind.Valid) {
+            session.ResolveEffectContract(method).Kind == EffectContractResolutionKind.Valid)
+        {
             var outcome = EffectContractDiagnostics.Analyze(
                 method,
                 method.DeclaringSyntaxReferences[0].GetSyntax(context.CancellationToken),
@@ -43,24 +54,32 @@ internal static class AnalyzerFeaturePipeline {
 
     internal static void AnalyzeOperationBlock(
         OperationBlockAnalysisContext context,
-        AnalyzerSession session) {
+        AnalyzerSession session)
+    {
         context.CancellationToken.ThrowIfCancellationRequested();
-        if (context.OwningSymbol is not IMethodSymbol method) return;
-        if (method.DeclaringSyntaxReferences.IsDefaultOrEmpty) {
+        if (context.OwningSymbol is not IMethodSymbol method)
+        {
+            return;
+        }
+
+        if (method.DeclaringSyntaxReferences.IsDefaultOrEmpty)
+        {
             session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Abstained);
             return;
         }
 
         var declaration = FindDeclaration(
             method, context.OperationBlocks, context.CancellationToken);
-        if (declaration == null) {
+        if (declaration == null)
+        {
             session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Abstained);
             return;
         }
         ValidateContractClauses(method, session, context.ReportDiagnostic);
         var selection = GetSelection(
             method, session, context.ReportDiagnostic, context.CancellationToken);
-        if (selection.IsSuppressed) {
+        if (selection.IsSuppressed)
+        {
             session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Suppressed);
             return;
         }
@@ -78,8 +97,10 @@ internal static class AnalyzerFeaturePipeline {
                 session.HasResolvedApiSpec,
                 context.CancellationToken)
             : LanguageSubsetDecision.Supported;
-        if (!subset.IsSupported) {
+        if (!subset.IsSupported)
+        {
             if (selection.Any)
+            {
                 context.ReportDiagnostic(Diagnostic.Create(
                     GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
                     AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(declaration),
@@ -87,10 +108,13 @@ internal static class AnalyzerFeaturePipeline {
                     subset.OperationKind is { } operation
                         ? subset.Reason + " (" + operation + ")"
                         : subset.Reason.ToString()));
+            }
+
             outcome = AnalyzerSemanticOutcomes.Combine(
                 outcome, AnalyzerSemanticOutcome.Abstained);
         }
         else if (session.Configuration.EffectsEnabled)
+        {
             outcome = AnalyzerSemanticOutcomes.Combine(
                 outcome,
                 EffectContractDiagnostics.Analyze(
@@ -99,8 +123,10 @@ internal static class AnalyzerFeaturePipeline {
                     session,
                     context.ReportDiagnostic,
                     context.CancellationToken));
+        }
 
         if (session.Configuration.ContractsEnabled)
+        {
             outcome = AnalyzerSemanticOutcomes.Combine(
                 outcome,
                 RequiresCallSiteAnalyzer.Analyze(
@@ -110,38 +136,51 @@ internal static class AnalyzerFeaturePipeline {
                     session,
                     context.ReportDiagnostic,
                     context.CancellationToken));
+        }
+
         session.RecordSemanticOutcome(method, outcome);
     }
 
     private static void ValidateContractClauses(
         IMethodSymbol method,
         AnalyzerSession session,
-        Action<Diagnostic> reportDiagnostic) {
+        Action<Diagnostic> reportDiagnostic)
+    {
         var inventory = session.GetContractClauses(method);
         ReportInvalidIntrinsics(
             session.GetContractIntrinsicViolations(inventory), session, reportDiagnostic);
         ReportInvalidClauses(inventory.Clauses, reportDiagnostic);
         foreach (var owner in GetNestedOwners(inventory, session.Compilation))
+        {
             ReportInvalidClauses(session.GetContractClauses(owner).Clauses, reportDiagnostic);
+        }
     }
 
     private static IEnumerable<IMethodSymbol> GetNestedOwners(
         ContractClauseInventory inventory,
-        Compilation compilation) =>
-        inventory.Clauses
+        Compilation compilation)
+    {
+        return inventory.Clauses
             .Where(static clause => clause.Placement == ContractClausePlacement.NestedCallable)
             .Select(clause => SharpProof.Frontend.Host.CompilationModelProvider
                 .GetSemanticModel(compilation, clause.Invocation.Syntax.SyntaxTree)
                 .GetEnclosingSymbol(clause.Invocation.Syntax.SpanStart))
             .OfType<IMethodSymbol>()
             .Distinct<IMethodSymbol>(SymbolEqualityComparer.Default);
+    }
 
     private static void ReportInvalidIntrinsics(
         ImmutableArray<ContractIntrinsicViolation> violations,
         AnalyzerSession session,
-        Action<Diagnostic> reportDiagnostic) {
-        foreach (var violation in violations) {
-            if (!session.TryMarkContractIntrinsicValidated(violation)) continue;
+        Action<Diagnostic> reportDiagnostic)
+    {
+        foreach (var violation in violations)
+        {
+            if (!session.TryMarkContractIntrinsicValidated(violation))
+            {
+                continue;
+            }
+
             var isOld = violation.Failure is
                 ContractBindingFailure.OldOutsideEnsures or ContractBindingFailure.NestedOld;
             var (argument, reason) = DescribeIntrinsicViolation(violation.Failure, isOld);
@@ -155,8 +194,10 @@ internal static class AnalyzerFeaturePipeline {
 
     private static (string Argument, string Reason) DescribeIntrinsicViolation(
         ContractBindingFailure failure,
-        bool isOld) =>
-        failure switch {
+        bool isOld)
+    {
+        return failure switch
+        {
             ContractBindingFailure.NestedOld => (
                 "<nesting>", "Contract.Old cannot be nested inside Contract.Old"),
             ContractBindingFailure.InvalidIntrinsicSignature => (
@@ -166,14 +207,20 @@ internal static class AnalyzerFeaturePipeline {
                     : "expected a result type matching the callable return type"),
             _ => ("<placement>", "expected use inside Contract.Ensures")
         };
+    }
 
     private static void ReportInvalidClauses(
         ImmutableArray<ContractClauseOccurrence> clauses,
-        Action<Diagnostic> reportDiagnostic) {
-        foreach (var clause in clauses) {
+        Action<Diagnostic> reportDiagnostic)
+    {
+        foreach (var clause in clauses)
+        {
             if (clause.IsValid ||
                 clause.Placement == ContractClausePlacement.NestedCallable)
+            {
                 continue;
+            }
+
             reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
                 "Contract." + clause.Kind,
                 "<placement>",
@@ -182,8 +229,10 @@ internal static class AnalyzerFeaturePipeline {
         }
     }
 
-    private static string DescribePlacement(ContractClausePlacement placement) =>
-        placement switch {
+    private static string DescribePlacement(ContractClausePlacement placement)
+    {
+        return placement switch
+        {
             ContractClausePlacement.Conditional =>
                 "expected an unconditional prologue statement",
             ContractClausePlacement.Unreachable =>
@@ -192,12 +241,14 @@ internal static class AnalyzerFeaturePipeline {
                 "expected the clause before every non-contract statement",
             _ => "expected a direct prologue statement"
         };
+    }
 
     private static MethodSelection GetSelection(
         IMethodSymbol method,
         AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var features = session.Attributes.Select(
             method,
             session.Configuration.ContractsEnabled &&
@@ -216,29 +267,37 @@ internal static class AnalyzerFeaturePipeline {
     private static SyntaxNode? FindDeclaration(
         IMethodSymbol method,
         ImmutableArray<IOperation> operationBlocks,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var operationSyntax = operationBlocks
             .OrderByDescending(static operation => operation.Syntax.Span.Length)
             .FirstOrDefault()?.Syntax;
-        foreach (var reference in method.DeclaringSyntaxReferences) {
+        foreach (var reference in method.DeclaringSyntaxReferences)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             if (operationSyntax == null ||
                 reference.SyntaxTree == operationSyntax.SyntaxTree &&
                 reference.Span.Contains(operationSyntax.Span))
+            {
                 return NormalizeDeclaration(reference.GetSyntax(cancellationToken));
+            }
         }
         return null;
     }
 
-    private static SyntaxNode NormalizeDeclaration(SyntaxNode declaration) =>
-        declaration switch {
+    private static SyntaxNode NormalizeDeclaration(SyntaxNode declaration)
+    {
+        return declaration switch
+        {
             ArrowExpressionClauseSyntax { Parent: { } parent } => parent,
             _ => declaration
         };
+    }
 
     private readonly record struct MethodSelection(
         ContractSelectionFeatures Features,
-        bool IsSuppressed) {
+        bool IsSuppressed)
+    {
         internal bool Contracts => (Features & ContractSelectionFeatures.Contracts) != 0;
         internal bool Effects => (Features & ContractSelectionFeatures.Effects) != 0;
         internal bool Any => Contracts || Effects;

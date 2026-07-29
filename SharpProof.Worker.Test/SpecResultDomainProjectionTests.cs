@@ -7,9 +7,11 @@ using SharpProof.Specs;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class SpecResultDomainProjectionTests {
+public sealed class SpecResultDomainProjectionTests
+{
     [Test]
-    public void NonNullEmptySequenceProjectsToBooleanAndIntegerFacts() {
+    public void NonNullEmptySequenceProjectsToBooleanAndIntegerFacts()
+    {
         var factory = new IrFactory();
         var sequenceType = factory.GetOrCreateSequenceType(
             factory.IntegerType);
@@ -42,7 +44,8 @@ public sealed class SpecResultDomainProjectionTests {
                 result,
                 projection));
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(succeeded, Is.True);
             Assert.That(projection, Is.Not.EqualTo(default(SpecResultProjection)));
             Assert.That(projection.NonNullVariable, Is.Not.Null);
@@ -51,7 +54,8 @@ public sealed class SpecResultDomainProjectionTests {
             Assert.That(rewritten, Is.TypeOf<IrBinaryTerm>());
         }
         var conjunction = (IrBinaryTerm)rewritten;
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 conjunction.Left,
                 Is.TypeOf<IrVariableTerm>());
@@ -62,7 +66,8 @@ public sealed class SpecResultDomainProjectionTests {
     }
 
     [Test]
-    public void UnknownNullnessCreatesNoProxyOrEvidence() {
+    public void UnknownNullnessCreatesNoProxyOrEvidence()
+    {
         var factory = new IrFactory();
         var result = factory.CreateVariable(
             "result",
@@ -79,7 +84,8 @@ public sealed class SpecResultDomainProjectionTests {
             out var projection,
             out var evidence);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(succeeded, Is.True);
             Assert.That(projection, Is.EqualTo(default(SpecResultProjection)));
             Assert.That(evidence, Is.Empty);
@@ -87,7 +93,8 @@ public sealed class SpecResultDomainProjectionTests {
     }
 
     [Test]
-    public void CardinalityWithoutNonNullOrSequenceTypeFailsClosed() {
+    public void CardinalityWithoutNonNullOrSequenceTypeFailsClosed()
+    {
         var factory = new IrFactory();
         var sequence = factory.CreateVariable(
             "sequence",
@@ -104,7 +111,8 @@ public sealed class SpecResultDomainProjectionTests {
             SpecNullness.NonNull,
             SpecCardinality.Empty);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 SpecResultDomainProjection.TryCreate(
                     factory,
@@ -125,7 +133,8 @@ public sealed class SpecResultDomainProjectionTests {
     }
 
     [Test]
-    public void IntervalProjectionPreservesFiniteBoundsAndTop() {
+    public void IntervalProjectionPreservesFiniteBoundsAndTop()
+    {
         var factory = new IrFactory();
         var value = factory.Variable(
             factory.CreateVariable("value", factory.IntegerType));
@@ -141,7 +150,8 @@ public sealed class SpecResultDomainProjectionTests {
             IntervalDomain.Instance.Top,
             out var topPredicate);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(finite, Is.True);
             Assert.That(finitePredicate, Is.TypeOf<IrBinaryTerm>());
             Assert.That(
@@ -162,7 +172,8 @@ public sealed class SpecResultDomainProjectionTests {
     private static ApiSpecTemplate CreateTemplate(
         SpecValueType resultType,
         SpecNullness nullness,
-        SpecCardinality cardinality) {
+        SpecCardinality cardinality)
+    {
         var evidence = new SpecEvidence(
             SpecEvidenceKind.Documented,
             "worker-domain-projection-test");

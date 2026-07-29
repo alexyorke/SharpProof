@@ -481,7 +481,17 @@ function Assert-ExactGeneratedFile {
         [string]$DisplayPath
     )
 
-    $normalized = ConvertTo-SharpProofGeneratedText -Text $Content
+    $candidate = if ($Path.EndsWith(
+            '.cs',
+            [StringComparison]::OrdinalIgnoreCase)) {
+        Format-SharpProofGeneratedCSharp `
+            -Content $Content `
+            -DisplayPath $DisplayPath
+    }
+    else {
+        $Content
+    }
+    $normalized = ConvertTo-SharpProofGeneratedText -Text $candidate
     $encoding = [Text.UTF8Encoding]::new($false)
     $expected = $encoding.GetBytes($normalized)
     $actual = [IO.File]::ReadAllBytes($Path)

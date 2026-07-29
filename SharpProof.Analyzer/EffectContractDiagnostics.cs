@@ -1,8 +1,10 @@
 namespace SharpProof.Analyzer;
 
-internal static class EffectContractDiagnostics {
+internal static class EffectContractDiagnostics
+{
     internal static void ValidateArguments(
-        IMethodSymbol method, AnalyzerSession session, Action<Diagnostic> reportDiagnostic) {
+        IMethodSymbol method, AnalyzerSession session, Action<Diagnostic> reportDiagnostic)
+    {
         var attributes = ContractSelectionInventory.GetCallableAttributes(method).ToImmutableArray();
         var location = method.Locations.FirstOrDefault() ?? Location.None;
         _ = DecodeCapabilities(
@@ -11,30 +13,48 @@ internal static class EffectContractDiagnostics {
             Select(attributes, session.Attributes.AllowedExceptions), session.Compilation, location, session, reportDiagnostic);
         if (!attributes.Any(attribute =>
                 ContractSelectionInventory.Is(attribute, session.Attributes.EffectContract)))
+        {
             return;
+        }
+
         var contract = session.ResolveEffectContract(method);
         var invalid = contract.InvalidAttribute;
         if (contract.Kind == EffectContractResolutionKind.Invalid &&
             invalid != null)
+        {
             ReportInvalidOnce(
                 invalid, "[EffectContract]", contract.InvalidReason, location, session, reportDiagnostic);
+        }
     }
 
     internal static AnalyzerSemanticOutcome Analyze(
         IMethodSymbol method, SyntaxNode declaration, AnalyzerSession session,
-        Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken) {
+        Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken)
+    {
         var evaluations = Evaluate(
             method, AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(declaration),
             session, reportDiagnostic, cancellationToken);
         foreach (var evaluation in evaluations)
+        {
             if (evaluation.Diagnostic != null)
+            {
                 reportDiagnostic(Diagnostic.Create(
                     evaluation.Diagnostic,
                     evaluation.DiagnosticLocation,
                     evaluation.DiagnosticArguments));
-        if (evaluations.IsDefaultOrEmpty) return AnalyzerSemanticOutcome.NotApplicable;
+            }
+        }
+
+        if (evaluations.IsDefaultOrEmpty)
+        {
+            return AnalyzerSemanticOutcome.NotApplicable;
+        }
+
         if (evaluations.Any(static item => item.Outcome == WorkerClaimOutcome.Refuted))
+        {
             return AnalyzerSemanticOutcome.Refuted;
+        }
+
         return evaluations.All(static item => item.Outcome == WorkerClaimOutcome.Proven)
             ? AnalyzerSemanticOutcome.Proven
             : AnalyzerSemanticOutcome.Unknown;
@@ -42,7 +62,8 @@ internal static class EffectContractDiagnostics {
 
     internal static ImmutableArray<EffectClaimEvaluation> Evaluate(
         IMethodSymbol method, Location location, AnalyzerSession session,
-        Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken) {
+        Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken)
+    {
         var attributes = ContractSelectionInventory.GetCallableAttributes(method).ToImmutableArray();
         var pure = Select(attributes, session.Attributes.EnforcePure);
         var zeroAllocations = Select(attributes, session.Attributes.ZeroAllocations);
@@ -56,7 +77,9 @@ internal static class EffectContractDiagnostics {
             noThrow.IsDefaultOrEmpty &&
             allowedExceptions.IsDefaultOrEmpty &&
             summaryContracts.IsDefaultOrEmpty)
+        {
             return [];
+        }
 
         var capabilities = DecodeCapabilities(allowedCapabilities, location, session, reportDiagnostic);
         var exceptions = DecodeAllowedExceptions(
@@ -72,12 +95,15 @@ internal static class EffectContractDiagnostics {
         var projection = result.Projection;
         if (summary.AnalysisIncompleteReason != EffectAnalysisIncompleteReason.None &&
             summaryContracts.IsDefaultOrEmpty)
+        {
             reportDiagnostic(Diagnostic.Create(
                 GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
                 location,
                 method.Name,
                 "ManagedAbstractFlow:" +
                 EffectContractMappings.EvidenceName(summary.AnalysisIncompleteReason)));
+        }
+
         var requires = session.BindRequires(method);
         var direct = requires.IsSuccess && requires.Contracts!.Clauses.IsDefaultOrEmpty
             ? result.DirectWitnesses
@@ -180,10 +206,18 @@ internal static class EffectContractDiagnostics {
             ImmutableArray<AttributeData> selected, WorkerEffectContractKind kind,
             bool complete, bool isEstablished, DiagnosticDescriptor? diagnostic,
             object[] arguments, string evidence, EffectDirectWitness? candidateViolation,
-            EffectClaimConstraint constraint, bool valid = true, bool trusted = false) {
-            if (selected.IsDefaultOrEmpty) return;
+            EffectClaimConstraint constraint, bool valid = true, bool trusted = false)
+        {
+            if (selected.IsDefaultOrEmpty)
+            {
+                return;
+            }
+
             if (kind != WorkerEffectContractKind.EffectContract)
+            {
                 evidence = SummaryFacetEvidence(summaryEvidence, complete, evidence);
+            }
+
             var established = valid && complete && isEstablished;
             var violation = valid && !established ? candidateViolation : null;
             var (outcome, reason, certainty) = Classify(
@@ -206,8 +240,10 @@ internal static class EffectContractDiagnostics {
         WorkerClaimReason Reason,
         WorkerEffectEvidenceCertainty Certainty) Classify(
         bool established, bool violated, bool valid, bool complete, bool trusted,
-        WorkerClaimReason incompleteReason) =>
-        (established, violated, valid, complete, trusted) switch {
+        WorkerClaimReason incompleteReason)
+    {
+        return (established, violated, valid, complete, trusted) switch
+        {
             (true, _, _, _, true) => (WorkerClaimOutcome.Proven, WorkerClaimReason.None,
                 WorkerEffectEvidenceCertainty.TrustedCompleteBoundary),
             (true, _, _, _, _) => (WorkerClaimOutcome.Proven, WorkerClaimReason.None,
@@ -226,12 +262,17 @@ internal static class EffectContractDiagnostics {
             _ => (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished,
                 WorkerEffectEvidenceCertainty.CompleteMayEffectSummary)
         };
+    }
 
-    private static WorkerClaimReason MapIncompleteReason(EffectSummary summary) {
+    private static WorkerClaimReason MapIncompleteReason(EffectSummary summary)
+    {
         var reason = summary.AnalysisIncompleteReason;
         if ((reason & (EffectAnalysisIncompleteReason.BlockBudgetExceeded |
                        EffectAnalysisIncompleteReason.OperationBudgetExceeded)) != 0)
+        {
             return WorkerClaimReason.ResourceLimit;
+        }
+
         return (reason & EffectAnalysisIncompleteReason.CyclicControlFlow) != 0
             ? WorkerClaimReason.UnsupportedBody
             : WorkerClaimReason.EffectSummaryIncomplete;
@@ -239,14 +280,17 @@ internal static class EffectContractDiagnostics {
 
     private static (EffectContractCapabilityKind Value, bool IsValid) DecodeCapabilities(
         ImmutableArray<AttributeData> attributes, Location fallbackLocation,
-        AnalyzerSession session, Action<Diagnostic> reportDiagnostic) {
+        AnalyzerSession session, Action<Diagnostic> reportDiagnostic)
+    {
         var value = EffectContractCapabilityKind.None;
-        foreach (var attribute in attributes) {
+        foreach (var attribute in attributes)
+        {
             if (attribute.ConstructorArguments.Length == 1 &&
                 EffectContractMetadata.TryConvertInt64(
                     attribute.ConstructorArguments[0].Value, out var raw) &&
                 raw >= 0 &&
-                ((EffectContractCapabilityKind)raw & ~EffectContractMetadata.AllCapabilities) == 0) {
+                ((EffectContractCapabilityKind)raw & ~EffectContractMetadata.AllCapabilities) == 0)
+            {
                 value |= (EffectContractCapabilityKind)raw;
                 continue;
             }
@@ -261,11 +305,13 @@ internal static class EffectContractDiagnostics {
 
     private static (ImmutableArray<INamedTypeSymbol> Types, bool IsValid) DecodeAllowedExceptions(
         ImmutableArray<AttributeData> attributes, Compilation compilation, Location fallbackLocation,
-        AnalyzerSession session, Action<Diagnostic> reportDiagnostic) {
+        AnalyzerSession session, Action<Diagnostic> reportDiagnostic)
+    {
         var exceptionType = compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
         var types = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
         var valid = true;
-        foreach (var attribute in attributes) {
+        foreach (var attribute in attributes)
+        {
             var arguments = attribute.ConstructorArguments;
             var values = arguments.Length == 1 && arguments[0].Kind == TypedConstantKind.Array
                 ? arguments[0].Values
@@ -273,7 +319,8 @@ internal static class EffectContractDiagnostics {
             if (exceptionType != null &&
                 !values.IsDefault &&
                 values.All(argument => argument.Value is INamedTypeSymbol type &&
-                    EffectTypeFacts.IsDerivedFrom(type, exceptionType))) {
+                    EffectTypeFacts.IsDerivedFrom(type, exceptionType)))
+            {
                 types.AddRange(values.Select(static argument => (INamedTypeSymbol)argument.Value!));
                 continue;
             }
@@ -287,26 +334,34 @@ internal static class EffectContractDiagnostics {
 
     private static void ReportInvalidOnce(
         AttributeData attribute, string contract, string reason, Location fallbackLocation,
-        AnalyzerSession session, Action<Diagnostic> reportDiagnostic) {
+        AnalyzerSession session, Action<Diagnostic> reportDiagnostic)
+    {
         if (session.TryMarkAttributeValidated(attribute))
+        {
             reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
                 contract, "<invalid>", reason, GetLocation(attribute, fallbackLocation)));
+        }
     }
 
-    private static string SummaryFacetEvidence(string summary, bool complete, string constraint) =>
-        summary + ";facet.complete=" +
+    private static string SummaryFacetEvidence(string summary, bool complete, string constraint)
+    {
+        return summary + ";facet.complete=" +
         complete.ToString(CultureInfo.InvariantCulture) + ";" + constraint;
+    }
 
-    private static string AddWitnessEvidence(string evidence, EffectDirectWitness? witness) =>
-        witness == null
+    private static string AddWitnessEvidence(string evidence, EffectDirectWitness? witness)
+    {
+        return witness == null
             ? evidence
             : evidence + ";witness.kind=" + witness.Kind +
               ";witness.detail=" + witness.Detail +
               ";witness.start=" + witness.Location.SourceSpan.Start.ToString(CultureInfo.InvariantCulture) +
               ";witness.length=" + witness.Location.SourceSpan.Length.ToString(CultureInfo.InvariantCulture);
+    }
 
-    private static string FormatUnknown(EffectSummary summary, string facet) =>
-        facet + ": " +
+    private static string FormatUnknown(EffectSummary summary, string facet)
+    {
+        return facet + ": " +
         (summary.AnalysisIncompleteReason != EffectAnalysisIncompleteReason.None
             ? EffectContractMappings.EvidenceName(summary.AnalysisIncompleteReason)
             : summary.Uncertainty != EffectUncertainty.None
@@ -314,12 +369,16 @@ internal static class EffectContractDiagnostics {
             : summary.Completeness != EffectCompleteness.Complete
                 ? "IncompleteSummary"
                 : "UnknownFacet");
+    }
 
     private static bool IsAllowed(
-        INamedTypeSymbol thrown, ImmutableArray<INamedTypeSymbol> allowed) =>
-        allowed.Any(candidate => EffectTypeFacts.IsDerivedFrom(thrown, candidate));
+        INamedTypeSymbol thrown, ImmutableArray<INamedTypeSymbol> allowed)
+    {
+        return allowed.Any(candidate => EffectTypeFacts.IsDerivedFrom(thrown, candidate));
+    }
 
-    private static string CreateSummaryEvidence(EffectSummary summary) {
+    private static string CreateSummaryEvidence(EffectSummary summary)
+    {
         var projection = EffectSummaryProjector.Project(summary);
         return string.Join(";", [
             "actual.effects=" + EffectContractMappings.EvidenceName(projection.Effects),
@@ -335,28 +394,35 @@ internal static class EffectContractDiagnostics {
         ]);
     }
 
-    private static string FormatTypes(IEnumerable<INamedTypeSymbol> types) =>
-        string.Join(",", types
+    private static string FormatTypes(IEnumerable<INamedTypeSymbol> types)
+    {
+        return string.Join(",", types
             .Select(static type =>
                 (type.ContainingAssembly?.Identity.Name ?? string.Empty) + ":" +
                 (DocumentationCommentId.CreateDeclarationId(type) ?? type.MetadataName))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static value => value, StringComparer.Ordinal));
+    }
 
     private static string FormatDiagnosticTypes(
-        IEnumerable<INamedTypeSymbol> types) =>
-        string.Join(", ", types.Select(static type => type.Name)
+        IEnumerable<INamedTypeSymbol> types)
+    {
+        return string.Join(", ", types.Select(static type => type.Name)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static value => value, StringComparer.Ordinal));
+    }
 
-    private static Location GetLocation(AttributeData attribute, Location fallback) =>
-        attribute.ApplicationSyntaxReference?.SyntaxTree.GetLocation(
+    private static Location GetLocation(AttributeData attribute, Location fallback)
+    {
+        return attribute.ApplicationSyntaxReference?.SyntaxTree.GetLocation(
             attribute.ApplicationSyntaxReference.Span) ?? fallback;
+    }
 
     private static ImmutableArray<AttributeData> Select(
-        ImmutableArray<AttributeData> attributes, INamedTypeSymbol? expected) =>
-        [.. attributes.Where(attribute => ContractSelectionInventory.Is(attribute, expected))];
-
+        ImmutableArray<AttributeData> attributes, INamedTypeSymbol? expected)
+    {
+        return [.. attributes.Where(attribute => ContractSelectionInventory.Is(attribute, expected))];
+    }
 }
 
 internal sealed record EffectClaimEvaluation(
@@ -368,7 +434,11 @@ internal sealed record EffectClaimEvaluation(
 internal sealed record EffectClaimConstraint(
     EffectContractKind Effects,
     EffectContractCapabilityKind Capabilities,
-    ImmutableArray<INamedTypeSymbol> ExceptionTypes) {
-    internal static EffectClaimConstraint Empty { get; } =
+    ImmutableArray<INamedTypeSymbol> ExceptionTypes)
+{
+    internal static EffectClaimConstraint Empty
+    {
+        get;
+    } =
         new(EffectContractKind.None, EffectContractCapabilityKind.None, []);
 }

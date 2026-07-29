@@ -10,7 +10,8 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Analyzer.Test;
 
 [TestFixture]
-public sealed class AnalyzerModeAndEffectTests {
+public sealed class AnalyzerModeAndEffectTests
+{
     private const int ManagedFlowOperationBudget = 4096;
     private const string ModeFixture = """
         using SharpProof.Attributes;
@@ -30,7 +31,8 @@ public sealed class AnalyzerModeAndEffectTests {
         """;
 
     [Test]
-    public async Task ProfileOffCreatesNoAnalysisSession() {
+    public async Task ProfileOffCreatesNoAnalysisSession()
+    {
         var factory = new ThrowingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             ModeFixture,
@@ -44,7 +46,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task DefaultAdvisoryAllKeepsUnannotatedCodeQuiet() {
+    public async Task DefaultAdvisoryAllKeepsUnannotatedCodeQuiet()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             "public static class Fixture { public static int Add(int x) => x + 1; }",
             mode: null,
@@ -54,7 +57,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task EffectModeReusesAnalyzerResolvedApiSpecs() {
+    public async Task EffectModeReusesAnalyzerResolvedApiSpecs()
+    {
         var factory = new SpecReuseSessionFactory();
         _ = await AnalyzerTestHost.AnalyzeAsync(
             ModeFixture,
@@ -75,7 +79,8 @@ public sealed class AnalyzerModeAndEffectTests {
         string? mode,
         string? profile,
         string? features,
-        string allowedValues) {
+        string allowedValues)
+    {
         var factory = new ThrowingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             ModeFixture,
@@ -99,7 +104,8 @@ public sealed class AnalyzerModeAndEffectTests {
     [TestCase("strict", "all")]
     public async Task ConflictingLegacyAndReplacementOptionsFailClosed(
         string? profile,
-        string? features) {
+        string? features)
+    {
         var factory = new ThrowingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             ModeFixture,
@@ -125,7 +131,8 @@ public sealed class AnalyzerModeAndEffectTests {
     public async Task EquivalentLegacyAndReplacementOptionsRemainCompatible(
         string mode,
         string profile,
-        string features) {
+        string features)
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             ModeFixture,
             mode,
@@ -148,7 +155,8 @@ public sealed class AnalyzerModeAndEffectTests {
         string mode,
         string? profile,
         string? features,
-        string[] expected) {
+        string[] expected)
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             ModeFixture,
             mode,
@@ -168,7 +176,8 @@ public sealed class AnalyzerModeAndEffectTests {
     public async Task ProfileAndFeaturesSelectOnlyTheirPipeline(
         string profile,
         string features,
-        string[] expected) {
+        string[] expected)
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             ModeFixture,
             mode: null,
@@ -182,7 +191,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task MayEffectSummaryReportsEachContractAsNotVerified() {
+    public async Task MayEffectSummaryReportsEachContractAsNotVerified()
+    {
         var external = AnalyzerTestHost.EmitReference(
             """
             using SharpProof.Attributes;
@@ -237,7 +247,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task UnknownEffectFacetsNeverCountAsSuccess() {
+    public async Task UnknownEffectFacetsNeverCountAsSuccess()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System;
@@ -271,7 +282,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task IncompleteUnrelatedFacetsDoNotBlockIndependentContracts() {
+    public async Task IncompleteUnrelatedFacetsDoNotBlockIndependentContracts()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System.Collections.Generic;
@@ -292,7 +304,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task VolatileFieldReadCannotProvePurityOrNoSynchronization() {
+    public async Task VolatileFieldReadCannotProvePurityOrNoSynchronization()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -314,7 +327,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task ExactConstantAndPropertyIncrementEffectsSatisfyContracts() {
+    public async Task ExactConstantAndPropertyIncrementEffectsSatisfyContracts()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -344,7 +358,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task SemanticOutcomeDoesNotTreatSilentCallSiteAsProven() {
+    public async Task SemanticOutcomeDoesNotTreatSilentCallSiteAsProven()
+    {
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
@@ -369,7 +384,8 @@ public sealed class AnalyzerModeAndEffectTests {
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(["SP0027"]));
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 factory.Outcomes["Proven"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Proven));
@@ -383,7 +399,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task ConstructorRequiresProduceAccountableCallSiteOutcomes() {
+    public async Task ConstructorRequiresProduceAccountableCallSiteOutcomes()
+    {
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
@@ -434,7 +451,8 @@ public sealed class AnalyzerModeAndEffectTests {
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(["SP0027", "SP0027"]));
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 factory.Outcomes["ProvenConstructor"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Proven));
@@ -457,7 +475,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task ExhaustedManagedFlowCannotProduceAPositiveCallSiteOutcome() {
+    public async Task ExhaustedManagedFlowCannotProduceAPositiveCallSiteOutcome()
+    {
         var padding = string.Concat(
             Enumerable.Repeat(
                 "value++;",
@@ -496,7 +515,8 @@ public sealed class AnalyzerModeAndEffectTests {
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(["SP0027"]));
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 factory.Outcomes["IncompleteProven"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
@@ -507,7 +527,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task RequiresChecksOnlyCompilerReachableInvocations() {
+    public async Task RequiresChecksOnlyCompilerReachableInvocations()
+    {
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
@@ -565,7 +586,8 @@ public sealed class AnalyzerModeAndEffectTests {
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(["SP0027"]));
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 factory.Outcomes["IfFalse"],
                 Is.EqualTo(AnalyzerSemanticOutcome.NotApplicable));
@@ -594,7 +616,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task EffectSemanticOutcomeNeverRefutesFromAMaySummary() {
+    public async Task EffectSemanticOutcomeNeverRefutesFromAMaySummary()
+    {
         var factory = new RecordingSessionFactory();
         _ = await AnalyzerTestHost.AnalyzeAsync(
             """
@@ -618,7 +641,8 @@ public sealed class AnalyzerModeAndEffectTests {
             ["SP0002", "SP0045"],
             new SharpProofAnalyzer(factory));
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 factory.Outcomes["Proven"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Proven));
@@ -632,7 +656,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task CompilerBoundGhostContractsHaveNoRuntimeEffects() {
+    public async Task CompilerBoundGhostContractsHaveNoRuntimeEffects()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -656,7 +681,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task UnsupportedSelectedMethodIsVisibleButUnannotatedPeerIsQuiet() {
+    public async Task UnsupportedSelectedMethodIsVisibleButUnannotatedPeerIsQuiet()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System;
@@ -687,7 +713,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task UnsupportedContractSelectedBodiesAreVisibleButUnannotatedPeersAreQuiet() {
+    public async Task UnsupportedContractSelectedBodiesAreVisibleButUnannotatedPeersAreQuiet()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System;
@@ -726,7 +753,8 @@ public sealed class AnalyzerModeAndEffectTests {
             Is.EqualTo(["SP0047", "SP0047", "SP0047"]));
         var messages = diagnostics.Select(diagnostic =>
             diagnostic.GetMessage(CultureInfo.InvariantCulture)).ToArray();
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 messages.Count(static message =>
                     message.Contains(
@@ -755,7 +783,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task AbstractAndExternSelectionsCannotDisappearWithoutAnOutcome() {
+    public async Task AbstractAndExternSelectionsCannotDisappearWithoutAnOutcome()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -797,7 +826,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task OnlyValidTrustedCompleteBodylessEffectContractsAreAccepted() {
+    public async Task OnlyValidTrustedCompleteBodylessEffectContractsAreAccepted()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System;
@@ -866,7 +896,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task NullableAndNativeDivisionCannotSatisfyDoesNotThrow() {
+    public async Task NullableAndNativeDivisionCannotSatisfyDoesNotThrow()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -918,7 +949,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task EffectContractSelectsUnsupportedMethod() {
+    public async Task EffectContractSelectsUnsupportedMethod()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System;
@@ -941,7 +973,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task CompleteSourceEffectContractCanBeProvenFromAnEmptyBody() {
+    public async Task CompleteSourceEffectContractCanBeProvenFromAnEmptyBody()
+    {
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
@@ -965,7 +998,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task BudgetIncompleteManagedFlowCannotProveSelectedEffectContracts() {
+    public async Task BudgetIncompleteManagedFlowCannotProveSelectedEffectContracts()
+    {
         var padding = string.Concat(
             Enumerable.Repeat(
                 "value++;",
@@ -1020,7 +1054,8 @@ public sealed class AnalyzerModeAndEffectTests {
                 "SharpProof could not completely analyze selected method " +
                 "'BudgetRefuted': ManagedAbstractFlow:OperationBudgetExceeded"
             ]));
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 factory.Outcomes["BudgetExceeded"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
@@ -1043,7 +1078,8 @@ public sealed class AnalyzerModeAndEffectTests {
         var cyclicEvaluation = EffectContractDiagnostics.Evaluate(
             fixture.GetMembers("Cyclic").OfType<IMethodSymbol>().Single(),
             Location.None, session, static _ => { }, default).Single();
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(budgetEvaluation.Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
             Assert.That(budgetEvaluation.Evidence, Does.Contain("OperationBudgetExceeded"));
             Assert.That(refutedEvaluation.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
@@ -1055,7 +1091,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task CompleteSourceEffectContractReportsAnUncoveredStateWrite() {
+    public async Task CompleteSourceEffectContractReportsAnUncoveredStateWrite()
+    {
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
@@ -1085,7 +1122,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task BaseExceptionEffectContractCoversDerivedBodyException() {
+    public async Task BaseExceptionEffectContractCoversDerivedBodyException()
+    {
         var factory = new RecordingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
@@ -1113,7 +1151,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public async Task ContractsOnlyStillRejectsInvalidEffectContractBits() {
+    public async Task ContractsOnlyStillRejectsInvalidEffectContractBits()
+    {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
@@ -1139,7 +1178,8 @@ public sealed class AnalyzerModeAndEffectTests {
     }
 
     [Test]
-    public void AdvisoryDescriptorsUseProductionDefaults() {
+    public void AdvisoryDescriptorsUseProductionDefaults()
+    {
         var descriptors = new SharpProofAnalyzer().SupportedDiagnostics;
         var informational = descriptors.Where(static descriptor =>
             descriptor.Id is not ("SP0024" or "SP0025" or "SP0027" or "SP0049"));
@@ -1160,7 +1200,8 @@ public sealed class AnalyzerModeAndEffectTests {
             Is.EqualTo(DiagnosticSeverity.Error));
     }
 
-    private sealed class ThrowingSessionFactory : IAnalyzerSessionFactory {
+    private sealed class ThrowingSessionFactory : IAnalyzerSessionFactory
+    {
         private int _createCount;
 
         internal int CreateCount => Volatile.Read(ref _createCount);
@@ -1168,14 +1209,16 @@ public sealed class AnalyzerModeAndEffectTests {
         public AnalyzerSession Create(
             Compilation compilation,
             AnalyzerConfiguration configuration,
-            CancellationToken cancellationToken) {
+            CancellationToken cancellationToken)
+        {
             Interlocked.Increment(ref _createCount);
             throw new InvalidOperationException(
                 "The profile-off analyzer must not construct a session.");
         }
     }
 
-    private sealed class RecordingSessionFactory : IAnalyzerSessionFactory {
+    private sealed class RecordingSessionFactory : IAnalyzerSessionFactory
+    {
         private readonly ConcurrentDictionary<
             string,
             AnalyzerSemanticOutcome> _outcomes =
@@ -1183,12 +1226,16 @@ public sealed class AnalyzerModeAndEffectTests {
 
         internal ConcurrentDictionary<string, AnalyzerSemanticOutcome> Outcomes =>
             _outcomes;
-        internal AnalyzerSession? Session { get; private set; }
+        internal AnalyzerSession? Session
+        {
+            get; private set;
+        }
 
         public AnalyzerSession Create(
             Compilation compilation,
             AnalyzerConfiguration configuration,
-            CancellationToken cancellationToken) {
+            CancellationToken cancellationToken)
+        {
             Session = new AnalyzerSession(
                 compilation,
                 configuration,
@@ -1202,13 +1249,18 @@ public sealed class AnalyzerModeAndEffectTests {
         }
     }
 
-    private sealed class SpecReuseSessionFactory : IAnalyzerSessionFactory {
-        internal AnalyzerSession? Session { get; private set; }
+    private sealed class SpecReuseSessionFactory : IAnalyzerSessionFactory
+    {
+        internal AnalyzerSession? Session
+        {
+            get; private set;
+        }
 
         public AnalyzerSession Create(
             Compilation compilation,
             AnalyzerConfiguration configuration,
-            CancellationToken cancellationToken) {
+            CancellationToken cancellationToken)
+        {
             Session = new AnalyzerSession(
                 compilation,
                 configuration,

@@ -11,7 +11,8 @@ public sealed record FuzzFailure(
     string Oracle,
     string Original,
     string Minimized,
-    string Detail) {
+    string Detail)
+{
     public string Term => Minimized;
 }
 
@@ -28,7 +29,8 @@ public sealed record FrontendFuzzCoverage(
     int OverflowExceptions,
     int NullReferenceExceptions,
     int IndexOutOfRangeExceptions,
-    int InvalidCastExceptions) {
+    int InvalidCastExceptions)
+{
     public bool HasExpandedCategories =>
         TextParameters > 0 &&
         StringLiterals > 0 &&
@@ -57,7 +59,8 @@ public sealed record FuzzSummary(
     int PartialSmtAgreements,
     FrontendFuzzCoverage FrontendCoverage,
     bool CoverageSatisfied,
-    ImmutableArray<FuzzFailure> Failures) {
+    ImmutableArray<FuzzFailure> Failures)
+{
     public bool Passed =>
         Failures.IsDefaultOrEmpty &&
         CoverageSatisfied &&
@@ -68,14 +71,20 @@ public sealed record FuzzSummary(
         PartialSmtAgreements == Cases;
 }
 
-public static class FuzzRunner {
+public static class FuzzRunner
+{
     private const int FrontendCompilationBatchSize = 256;
     private const int PullRequestCoverageBudget = FuzzOptions.DefaultCases;
 
     public static async Task<FuzzSummary> RunAsync(
         FuzzOptions options,
-        CancellationToken cancellationToken = default) {
-        if (options == null) throw new ArgumentNullException(nameof(options));
+        CancellationToken cancellationToken = default)
+    {
+        if (options == null)
+        {
+            throw new ArgumentNullException(nameof(options));
+        }
+
         var failures = new ConcurrentQueue<FuzzFailure>();
         var agreements = 0;
         var abstentions = 0;
@@ -83,7 +92,8 @@ public static class FuzzRunner {
         var smtAgreements = 0;
         var partialSmtAgreements = 0;
         var frontendCases = new GeneratedCSharpCase[options.Cases];
-        for (var index = 0; index < frontendCases.Length; index++) {
+        for (var index = 0; index < frontendCases.Length; index++)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             var caseSeed = CreateCaseSeed(options.Seed, index);
             frontendCases[index] = new SmallCSharpCaseGenerator(
@@ -95,7 +105,8 @@ public static class FuzzRunner {
         var frontendOracle = new FrontendDifferentialOracle();
         for (var offset = 0;
              offset < frontendCases.Length;
-             offset += FrontendCompilationBatchSize) {
+             offset += FrontendCompilationBatchSize)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             var count = Math.Min(
                 FrontendCompilationBatchSize,
@@ -114,7 +125,8 @@ public static class FuzzRunner {
         var coverageSatisfied =
             options.Cases < PullRequestCoverageBudget ||
             HasRequiredFrontendCoverage(frontendCoverage);
-        var parallelOptions = new ParallelOptions {
+        var parallelOptions = new ParallelOptions
+        {
             MaxDegreeOfParallelism = options.MaximumParallelism,
             CancellationToken = cancellationToken
         };
@@ -122,13 +134,16 @@ public static class FuzzRunner {
         await Parallel.ForEachAsync(
             Enumerable.Range(0, options.Cases),
             parallelOptions,
-            async (index, token) => {
+            async (index, token) =>
+            {
                 token.ThrowIfCancellationRequested();
                 var caseSeed = CreateCaseSeed(options.Seed, index);
                 var frontendCase = frontendCases[index];
                 var frontend = frontendResults[index];
                 if (frontend.Status == FuzzOracleStatus.Agreement)
+                {
                     Interlocked.Increment(ref frontendAgreements);
+                }
 
                 var factory = new IrFactory();
                 var formula = CreateTotalFiniteDomainFormula(
@@ -142,7 +157,9 @@ public static class FuzzRunner {
                         token)
                     .ConfigureAwait(false);
                 if (smt.Status == FuzzOracleStatus.Agreement)
+                {
                     Interlocked.Increment(ref smtAgreements);
+                }
 
                 var partialCase = PartialTermSmtCaseGenerator.Create(
                     factory,
@@ -155,9 +172,12 @@ public static class FuzzRunner {
                         token)
                     .ConfigureAwait(false);
                 if (partial.Status == FuzzOracleStatus.Agreement)
+                {
                     Interlocked.Increment(ref partialSmtAgreements);
+                }
 
-                if (frontend.Status == FuzzOracleStatus.Mismatch) {
+                if (frontend.Status == FuzzOracleStatus.Mismatch)
+                {
                     var minimized = CSharpStructuralShrinker.Minimize(
                         frontendCase,
                         candidate =>
@@ -176,7 +196,8 @@ public static class FuzzRunner {
                             minimized.Source,
                             minimizedResult.Detail));
                 }
-                if (smt.Status == FuzzOracleStatus.Mismatch) {
+                if (smt.Status == FuzzOracleStatus.Mismatch)
+                {
                     var minimized = await IrStructuralShrinker.MinimizeAsync(
                             factory,
                             formula,
@@ -204,7 +225,8 @@ public static class FuzzRunner {
                             printer.Print(minimized),
                             minimizedResult.Detail));
                 }
-                if (partial.Status != FuzzOracleStatus.Agreement) {
+                if (partial.Status != FuzzOracleStatus.Agreement)
+                {
                     var printer = new IrPrinter(factory);
                     failures.Enqueue(
                         new FuzzFailure(
@@ -225,9 +247,13 @@ public static class FuzzRunner {
                     smt.Status == FuzzOracleStatus.Abstained ||
                     partial.Status == FuzzOracleStatus.Abstained;
                 if (!hasMismatch && !hasAbstention)
+                {
                     Interlocked.Increment(ref agreements);
+                }
                 else if (!hasMismatch)
+                {
                     Interlocked.Increment(ref abstentions);
+                }
             });
 
         return new FuzzSummary(
@@ -249,7 +275,8 @@ public static class FuzzRunner {
 
     private static FrontendFuzzCoverage CreateFrontendCoverage(
         IReadOnlyList<GeneratedCSharpCase> cases,
-        IReadOnlyList<FrontendDifferentialResult> results) {
+        IReadOnlyList<FrontendDifferentialResult> results)
+    {
         var textParameters = 0;
         var stringLiterals = 0;
         var nullStrings = 0;
@@ -259,15 +286,19 @@ public static class FuzzRunner {
         var arrayLengths = 0;
         var arrayIndexes = 0;
         foreach (var generated in cases)
+        {
             Count(generated.Expression);
+        }
 
         var divideByZero = 0;
         var overflow = 0;
         var nullReference = 0;
         var indexOutOfRange = 0;
         var invalidCast = 0;
-        foreach (var result in results) {
-            switch (result.ExceptionKind) {
+        foreach (var result in results)
+        {
+            switch (result.ExceptionKind)
+            {
                 case IrExceptionKind.DivideByZero:
                     divideByZero++;
                     break;
@@ -300,8 +331,10 @@ public static class FuzzRunner {
             indexOutOfRange,
             invalidCast);
 
-        void Count(GeneratedCSharpExpression expression) {
-            switch (expression.Kind) {
+        void Count(GeneratedCSharpExpression expression)
+        {
+            switch (expression.Kind)
+            {
                 case GeneratedExpressionKind.TextParameter:
                     textParameters++;
                     break;
@@ -329,22 +362,29 @@ public static class FuzzRunner {
                     arrayIndexes++;
                     break;
             }
-            foreach (var child in expression.Children) Count(child);
+            foreach (var child in expression.Children)
+            {
+                Count(child);
+            }
         }
     }
 
     private static bool HasRequiredFrontendCoverage(
-        FrontendFuzzCoverage coverage) =>
-        coverage.HasExpandedCategories;
+        FrontendFuzzCoverage coverage)
+    {
+        return coverage.HasExpandedCategories;
+    }
 
     private static IrTerm CreateTotalFiniteDomainFormula(
         IrFactory factory,
         int caseSeed,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var generator = new WellSortedIrGenerator(
             factory,
             unchecked(caseSeed ^ 0x6C8E9CF5));
-        for (var attempt = 0; attempt < 64; attempt++) {
+        for (var attempt = 0; attempt < 64; attempt++)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             var generated = generator.NextArithmeticOrBoolean(maximumDepth: 3);
             var formula = generated.Term.Type == factory.BooleanType
@@ -364,15 +404,20 @@ public static class FuzzRunner {
                     factory,
                     formula,
                     cancellationToken))
+            {
                 return formula;
+            }
         }
         return factory.Boolean((caseSeed & 1) == 0);
     }
 
-    private static int CreateCaseSeed(int seed, int index) =>
-        unchecked(seed + index * 397);
+    private static int CreateCaseSeed(int seed, int index)
+    {
+        return unchecked(seed + index * 397);
+    }
 
-    private static int PositiveModulo(int value, int divisor) {
+    private static int PositiveModulo(int value, int divisor)
+    {
         var remainder = value % divisor;
         return remainder < 0 ? remainder + divisor : remainder;
     }

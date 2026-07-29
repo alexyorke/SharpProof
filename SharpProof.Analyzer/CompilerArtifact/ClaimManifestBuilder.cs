@@ -5,7 +5,8 @@ namespace SharpProof.CompilerArtifact;
 internal sealed class ClaimManifestBuilder(
     CSharpCompilation compilation,
     WorkerFeatureSet enabledFeatures = WorkerFeatureSet.All,
-    CancellationToken cancellationToken = default) {
+    CancellationToken cancellationToken = default)
+{
     private readonly CSharpCompilation _compilation =
         compilation ?? throw new ArgumentNullException(nameof(compilation));
     private readonly ContractClauseInventoryBuilder _clauses =
@@ -17,19 +18,24 @@ internal sealed class ClaimManifestBuilder(
     private readonly ImmutableArray<ContractForSymbolMatcher.CompanionDescriptor> _companions =
         ContractForSymbolMatcher.DiscoverCompanions(compilation, cancellationToken);
 
-    internal ClaimManifestBuildResult Build() {
+    internal ClaimManifestBuildResult Build()
+    {
         cancellationToken.ThrowIfCancellationRequested();
         var discovered = DiscoverMethods().Select(CreateSeed).ToImmutableArray();
         var ids = CreateCallableIds(discovered);
         var targets = ImmutableDictionary.CreateBuilder<IMethodSymbol, ManifestCallableTarget>(
             SymbolEqualityComparer.Default);
-        foreach (var seed in discovered.OrderBy(seed => ids[seed.Method], StringComparer.Ordinal)) {
+        foreach (var seed in discovered.OrderBy(seed => ids[seed.Method], StringComparer.Ordinal))
+        {
             cancellationToken.ThrowIfCancellationRequested();
             if (BuildTarget(seed, ids[seed.Method]) is { } target)
+            {
                 targets.Add(seed.Method, target);
+            }
         }
         var ordered = targets.Values.OrderBy(static target => target.Entry.CallableId, StringComparer.Ordinal);
-        var manifest = new WorkerClaimManifest {
+        var manifest = new WorkerClaimManifest
+        {
             Callables = [.. ordered.Select(static target => target.Entry)],
             Claims = [.. ordered.SelectMany(static target =>
                 target.Claims.Select(static claim => claim.Entry)
@@ -39,13 +45,15 @@ internal sealed class ClaimManifestBuilder(
         return new ClaimManifestBuildResult(manifest, targets.ToImmutable());
     }
 
-    private ManifestCallableTarget? BuildTarget(CallableSeed seed, string callableId) {
+    private ManifestCallableTarget? BuildTarget(CallableSeed seed, string callableId)
+    {
         var target = seed.Method;
         var inventory = _clauses.Create(target);
         var source = target;
         var usesCompanion = false;
         if (!inventory.Clauses.Any(static clause => clause.IsValid) &&
-            ContractForSymbolMatcher.ResolveCompanion(_companions, target).Method is { } companion) {
+            ContractForSymbolMatcher.ResolveCompanion(_companions, target).Method is { } companion)
+        {
             source = companion;
             inventory = _clauses.Create(source);
             usesCompanion = true;
@@ -56,7 +64,10 @@ internal sealed class ClaimManifestBuilder(
         var assumptions = CreateAssumptions(
             target, source, inventory, usesCompanion, callableId);
         if (postconditions.IsDefaultOrEmpty && selected.IsDefaultOrEmpty && assumptions.IsDefaultOrEmpty)
+        {
             return null;
+        }
+
         var location = CallableLocation(target, seed.Declaration);
         var effects = EffectsEnabled
             ? CreateEffectClaims(
@@ -67,14 +78,28 @@ internal sealed class ClaimManifestBuilder(
         var features = new HashSet<WorkerSelectedFeature>(selected);
         if (!postconditions.IsDefaultOrEmpty ||
             assumptions.Any(static evidence => evidence.Kind == WorkerAssumptionKind.UserAssume))
+        {
             features.Add(WorkerSelectedFeature.Contracts);
-        if (!effects.IsDefaultOrEmpty) features.Add(WorkerSelectedFeature.Effects);
+        }
+
+        if (!effects.IsDefaultOrEmpty)
+        {
+            features.Add(WorkerSelectedFeature.Effects);
+        }
+
         var reasons = ImmutableArray.CreateBuilder<WorkerSelectionReason>(2);
         if (!selected.IsDefaultOrEmpty || !assumptions.IsDefaultOrEmpty)
+        {
             reasons.Add(WorkerSelectionReason.ExplicitAnnotation);
+        }
+
         if (!postconditions.IsDefaultOrEmpty)
+        {
             reasons.Add(WorkerSelectionReason.DiscoveredPostcondition);
-        var entry = new WorkerCallableManifestEntry {
+        }
+
+        var entry = new WorkerCallableManifestEntry
+        {
             CallableId = callableId,
             SelectedFeatures = [.. features.OrderBy(static feature => feature)],
             SelectionReasons = reasons.ToArray(),
@@ -96,10 +121,16 @@ internal sealed class ClaimManifestBuilder(
         IMethodSymbol source,
         ContractClauseInventory inventory,
         bool usesCompanion,
-        string callableId) {
-        if (!ContractsEnabled) return [];
+        string callableId)
+    {
+        if (!ContractsEnabled)
+        {
+            return [];
+        }
+
         var candidates = inventory.Clauses
-            .Where(static clause => clause is {
+            .Where(static clause => clause is
+            {
                 Kind: BoundContractKind.Ensures,
                 Placement: not ContractClausePlacement.NestedCallable
             })
@@ -122,11 +153,13 @@ internal sealed class ClaimManifestBuilder(
             .ToImmutableArray();
         var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
         var claims = ImmutableArray.CreateBuilder<ManifestClaim>(candidates.Length);
-        for (var ordinal = 0; ordinal < candidates.Length; ordinal++) {
+        for (var ordinal = 0; ordinal < candidates.Length; ordinal++)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             var candidate = candidates[ordinal];
             var rank = NextRank(ranks, candidate.Fingerprint);
-            claims.Add(new ManifestClaim(new WorkerClaimManifestEntry {
+            claims.Add(new ManifestClaim(new WorkerClaimManifestEntry
+            {
                 ClaimId = SemanticClaimIdentity.Create(
                     AssemblyName, callableId, candidate.Fingerprint, rank),
                 CallableId = callableId,
@@ -141,7 +174,8 @@ internal sealed class ClaimManifestBuilder(
 
     private ImmutableArray<WorkerSelectedFeature> SelectFeatures(
         IMethodSymbol method,
-        ContractClauseInventory inventory) {
+        ContractClauseInventory inventory)
+    {
         var selected = _attributes.Select(
             method,
             inventory.Clauses.Any(static clause =>
@@ -149,9 +183,15 @@ internal sealed class ClaimManifestBuilder(
             TrustedAttributes(method).Any());
         var result = ImmutableArray.CreateBuilder<WorkerSelectedFeature>(2);
         if (EffectsEnabled && (selected & ContractSelectionFeatures.Effects) != 0)
+        {
             result.Add(WorkerSelectedFeature.Effects);
+        }
+
         if (ContractsEnabled && (selected & ContractSelectionFeatures.Contracts) != 0)
+        {
             result.Add(WorkerSelectedFeature.Contracts);
+        }
+
         return result.ToImmutable();
     }
 
@@ -160,14 +200,20 @@ internal sealed class ClaimManifestBuilder(
         IMethodSymbol source,
         ContractClauseInventory inventory,
         bool usesCompanion,
-        string callableId) {
+        string callableId)
+    {
         var candidates = ImmutableArray.CreateBuilder<AssumptionCandidate>();
-        if (ContractsEnabled) {
-            foreach (var clause in inventory.Clauses) {
+        if (ContractsEnabled)
+        {
+            foreach (var clause in inventory.Clauses)
+            {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (clause.Kind is not (BoundContractKind.Requires or BoundContractKind.Assume) ||
                     clause.Placement == ContractClausePlacement.NestedCallable)
+                {
                     continue;
+                }
+
                 candidates.Add(new AssumptionCandidate(
                     clause.Kind == BoundContractKind.Requires
                         ? WorkerAssumptionKind.Precondition
@@ -176,15 +222,22 @@ internal sealed class ClaimManifestBuilder(
                         clause.Invocation, target, source, usesCompanion)));
             }
             foreach (var parameter in target.Parameters)
+            {
                 foreach (var attribute in parameter.GetAttributes().Where(_attributes.IsClosedContract))
+                {
                     candidates.Add(new AssumptionCandidate(
                         WorkerAssumptionKind.Precondition,
                         SemanticClaimIdentity.CreateAttributeFingerprint(attribute, target, parameter)));
+                }
+            }
         }
         foreach (var (scope, attribute) in TrustedAttributes(target))
+        {
             candidates.Add(new AssumptionCandidate(
                 WorkerAssumptionKind.TrustedBoundary,
                 SemanticClaimIdentity.CreateTrustedFingerprint(attribute, scope, target)));
+        }
+
         var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
         return [.. candidates.Select(candidate => {
             cancellationToken.ThrowIfCancellationRequested();
@@ -202,17 +255,21 @@ internal sealed class ClaimManifestBuilder(
         ImmutableArray<EffectClaimEvaluation> evaluations,
         IMethodSymbol method,
         string callableId,
-        int ordinalOffset) {
+        int ordinalOffset)
+    {
         var claims = ImmutableArray.CreateBuilder<ManifestEffectClaim>();
         var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var evaluation in evaluations.OrderBy(static evaluation => evaluation.Kind))
-            foreach (var attribute in evaluation.Attributes.OrderBy(AttributeOrder)) {
+        {
+            foreach (var attribute in evaluation.Attributes.OrderBy(AttributeOrder))
+            {
                 cancellationToken.ThrowIfCancellationRequested();
                 var fingerprint = "effect:" + evaluation.Kind + ":" +
                     SemanticClaimIdentity.CreateAttributeFingerprint(attribute, method);
                 var claimId = SemanticClaimIdentity.Create(
                     AssemblyName, callableId, fingerprint, NextRank(ranks, fingerprint));
-                var entry = new WorkerClaimManifestEntry {
+                var entry = new WorkerClaimManifestEntry
+                {
                     ClaimId = claimId,
                     CallableId = callableId,
                     Ordinal = ordinalOffset + claims.Count,
@@ -225,19 +282,24 @@ internal sealed class ClaimManifestBuilder(
                 CompilerEffectClaimArtifactCodec.Seal(evidence);
                 claims.Add(new ManifestEffectClaim(entry, evidence));
             }
+        }
+
         return claims.ToImmutable();
     }
 
     private static CompilerEffectClaimArtifact CreateEffectEvidence(
         string claimId,
-        EffectClaimEvaluation evaluation) =>
-        new() {
+        EffectClaimEvaluation evaluation)
+    {
+        return new()
+        {
             ClaimId = claimId,
             ContractKind = evaluation.Kind,
             Outcome = evaluation.Outcome,
             Reason = evaluation.Reason,
             Certainty = evaluation.Certainty,
-            Constraint = new CompilerEffectConstraintArtifact {
+            Constraint = new CompilerEffectConstraintArtifact
+            {
                 AllowedEffects = ToWorkerEffects(evaluation.Constraint.Effects),
                 AllowedCapabilities = ToWorkerCapabilities(evaluation.Constraint.Capabilities),
                 AllowedExceptionTypes = [.. evaluation.Constraint.ExceptionTypes
@@ -247,7 +309,8 @@ internal sealed class ClaimManifestBuilder(
             },
             Witness = evaluation.Witness is not { } witness
                 ? null
-                : new WorkerEffectViolationWitness {
+                : new WorkerEffectViolationWitness
+                {
                     Kind = witness.Kind,
                     Detail = witness.Detail,
                     Effects = ToWorkerEffects(witness.Effects),
@@ -257,46 +320,54 @@ internal sealed class ClaimManifestBuilder(
                 },
             Evidence = evaluation.Evidence
         };
+    }
 
-    internal static WorkerEffectSet ToWorkerEffects(EffectContractKind source) => source switch {
-        EffectContractKind.None => WorkerEffectSet.None,
-        _ when (source & EffectContractKind.ReadsReceiverState) != 0 =>
-            WorkerEffectSet.ReadsReceiverState | ToWorkerEffects(source & ~EffectContractKind.ReadsReceiverState),
-        _ when (source & EffectContractKind.ReadsArgumentState) != 0 =>
-            WorkerEffectSet.ReadsArgumentState | ToWorkerEffects(source & ~EffectContractKind.ReadsArgumentState),
-        _ when (source & EffectContractKind.ReadsCapturedState) != 0 =>
-            WorkerEffectSet.ReadsCapturedState | ToWorkerEffects(source & ~EffectContractKind.ReadsCapturedState),
-        _ when (source & EffectContractKind.ReadsStaticState) != 0 =>
-            WorkerEffectSet.ReadsStaticState | ToWorkerEffects(source & ~EffectContractKind.ReadsStaticState),
-        _ when (source & EffectContractKind.ReadsAmbientState) != 0 =>
-            WorkerEffectSet.ReadsAmbientState | ToWorkerEffects(source & ~EffectContractKind.ReadsAmbientState),
-        _ when (source & EffectContractKind.WritesReceiverState) != 0 =>
-            WorkerEffectSet.WritesReceiverState | ToWorkerEffects(source & ~EffectContractKind.WritesReceiverState),
-        _ when (source & EffectContractKind.WritesArgumentState) != 0 =>
-            WorkerEffectSet.WritesArgumentState | ToWorkerEffects(source & ~EffectContractKind.WritesArgumentState),
-        _ when (source & EffectContractKind.WritesCapturedState) != 0 =>
-            WorkerEffectSet.WritesCapturedState | ToWorkerEffects(source & ~EffectContractKind.WritesCapturedState),
-        _ when (source & EffectContractKind.WritesStaticState) != 0 =>
-            WorkerEffectSet.WritesStaticState | ToWorkerEffects(source & ~EffectContractKind.WritesStaticState),
-        _ when (source & EffectContractKind.WritesAmbientState) != 0 =>
-            WorkerEffectSet.WritesAmbientState | ToWorkerEffects(source & ~EffectContractKind.WritesAmbientState),
-        _ when (source & EffectContractKind.Allocates) != 0 =>
-            WorkerEffectSet.Allocates | ToWorkerEffects(source & ~EffectContractKind.Allocates),
-        _ when (source & EffectContractKind.Throws) != 0 =>
-            WorkerEffectSet.Throws | ToWorkerEffects(source & ~EffectContractKind.Throws),
-        _ when (source & EffectContractKind.Synchronizes) != 0 =>
-            WorkerEffectSet.Synchronizes | ToWorkerEffects(source & ~EffectContractKind.Synchronizes),
-        _ when (source & EffectContractKind.UsesNondeterminism) != 0 =>
-            WorkerEffectSet.UsesNondeterminism | ToWorkerEffects(source & ~EffectContractKind.UsesNondeterminism),
-        _ when (source & EffectContractKind.UsesNativeCode) != 0 =>
-            WorkerEffectSet.UsesNativeCode | ToWorkerEffects(source & ~EffectContractKind.UsesNativeCode),
-        _ when (source & EffectContractKind.UsesReflection) != 0 =>
-            WorkerEffectSet.UsesReflection | ToWorkerEffects(source & ~EffectContractKind.UsesReflection),
-        _ => throw new ArgumentOutOfRangeException(nameof(source))
-    };
+    internal static WorkerEffectSet ToWorkerEffects(EffectContractKind source)
+    {
+        return source switch
+        {
+            EffectContractKind.None => WorkerEffectSet.None,
+            _ when (source & EffectContractKind.ReadsReceiverState) != 0 =>
+                WorkerEffectSet.ReadsReceiverState | ToWorkerEffects(source & ~EffectContractKind.ReadsReceiverState),
+            _ when (source & EffectContractKind.ReadsArgumentState) != 0 =>
+                WorkerEffectSet.ReadsArgumentState | ToWorkerEffects(source & ~EffectContractKind.ReadsArgumentState),
+            _ when (source & EffectContractKind.ReadsCapturedState) != 0 =>
+                WorkerEffectSet.ReadsCapturedState | ToWorkerEffects(source & ~EffectContractKind.ReadsCapturedState),
+            _ when (source & EffectContractKind.ReadsStaticState) != 0 =>
+                WorkerEffectSet.ReadsStaticState | ToWorkerEffects(source & ~EffectContractKind.ReadsStaticState),
+            _ when (source & EffectContractKind.ReadsAmbientState) != 0 =>
+                WorkerEffectSet.ReadsAmbientState | ToWorkerEffects(source & ~EffectContractKind.ReadsAmbientState),
+            _ when (source & EffectContractKind.WritesReceiverState) != 0 =>
+                WorkerEffectSet.WritesReceiverState | ToWorkerEffects(source & ~EffectContractKind.WritesReceiverState),
+            _ when (source & EffectContractKind.WritesArgumentState) != 0 =>
+                WorkerEffectSet.WritesArgumentState | ToWorkerEffects(source & ~EffectContractKind.WritesArgumentState),
+            _ when (source & EffectContractKind.WritesCapturedState) != 0 =>
+                WorkerEffectSet.WritesCapturedState | ToWorkerEffects(source & ~EffectContractKind.WritesCapturedState),
+            _ when (source & EffectContractKind.WritesStaticState) != 0 =>
+                WorkerEffectSet.WritesStaticState | ToWorkerEffects(source & ~EffectContractKind.WritesStaticState),
+            _ when (source & EffectContractKind.WritesAmbientState) != 0 =>
+                WorkerEffectSet.WritesAmbientState | ToWorkerEffects(source & ~EffectContractKind.WritesAmbientState),
+            _ when (source & EffectContractKind.Allocates) != 0 =>
+                WorkerEffectSet.Allocates | ToWorkerEffects(source & ~EffectContractKind.Allocates),
+            _ when (source & EffectContractKind.Throws) != 0 =>
+                WorkerEffectSet.Throws | ToWorkerEffects(source & ~EffectContractKind.Throws),
+            _ when (source & EffectContractKind.Synchronizes) != 0 =>
+                WorkerEffectSet.Synchronizes | ToWorkerEffects(source & ~EffectContractKind.Synchronizes),
+            _ when (source & EffectContractKind.UsesNondeterminism) != 0 =>
+                WorkerEffectSet.UsesNondeterminism | ToWorkerEffects(source & ~EffectContractKind.UsesNondeterminism),
+            _ when (source & EffectContractKind.UsesNativeCode) != 0 =>
+                WorkerEffectSet.UsesNativeCode | ToWorkerEffects(source & ~EffectContractKind.UsesNativeCode),
+            _ when (source & EffectContractKind.UsesReflection) != 0 =>
+                WorkerEffectSet.UsesReflection | ToWorkerEffects(source & ~EffectContractKind.UsesReflection),
+            _ => throw new ArgumentOutOfRangeException(nameof(source))
+        };
+    }
 
     internal static WorkerEffectCapabilitySet ToWorkerCapabilities(
-        EffectContractCapabilityKind source) => source switch {
+        EffectContractCapabilityKind source)
+    {
+        return source switch
+        {
             EffectContractCapabilityKind.None => WorkerEffectCapabilitySet.None,
             _ when (source & EffectContractCapabilityKind.IO) != 0 =>
                 WorkerEffectCapabilitySet.IO | ToWorkerCapabilities(source & ~EffectContractCapabilityKind.IO),
@@ -326,22 +397,34 @@ internal sealed class ClaimManifestBuilder(
                 WorkerEffectCapabilitySet.NativeInterop | ToWorkerCapabilities(source & ~EffectContractCapabilityKind.NativeInterop),
             _ => throw new ArgumentOutOfRangeException(nameof(source))
         };
-
-    private IEnumerable<(ISymbol Scope, AttributeData Attribute)> TrustedAttributes(
-        IMethodSymbol method) {
-        foreach (var scope in SharpProofControlAttributePolicy.EnumerateScopes(method))
-            foreach (var attribute in scope.GetAttributes())
-                if (ContractSelectionInventory.Is(attribute, _attributes.Trusted))
-                    yield return (scope, attribute);
     }
 
-    private ImmutableArray<IMethodSymbol> DiscoverMethods() {
+    private IEnumerable<(ISymbol Scope, AttributeData Attribute)> TrustedAttributes(
+        IMethodSymbol method)
+    {
+        foreach (var scope in SharpProofControlAttributePolicy.EnumerateScopes(method))
+        {
+            foreach (var attribute in scope.GetAttributes())
+            {
+                if (ContractSelectionInventory.Is(attribute, _attributes.Trusted))
+                {
+                    yield return (scope, attribute);
+                }
+            }
+        }
+    }
+
+    private ImmutableArray<IMethodSymbol> DiscoverMethods()
+    {
         var methods = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
-        foreach (var tree in _compilation.SyntaxTrees) {
+        foreach (var tree in _compilation.SyntaxTrees)
+        {
             var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(_compilation, tree);
-            foreach (var node in tree.GetRoot(cancellationToken).DescendantNodesAndSelf()) {
+            foreach (var node in tree.GetRoot(cancellationToken).DescendantNodesAndSelf())
+            {
                 cancellationToken.ThrowIfCancellationRequested();
-                switch (node) {
+                switch (node)
+                {
                     case BaseMethodDeclarationSyntax:
                     case AccessorDeclarationSyntax:
                     case LocalFunctionStatementSyntax:
@@ -360,23 +443,33 @@ internal sealed class ClaimManifestBuilder(
             }
         }
         foreach (var companion in _companions)
-            foreach (var method in ContractForSymbolMatcher.GetOrdinaryMethods(companion.Target)) {
+        {
+            foreach (var method in ContractForSymbolMatcher.GetOrdinaryMethods(companion.Target))
+            {
                 cancellationToken.ThrowIfCancellationRequested();
                 methods.Add(ContractClauseInventoryBuilder.NormalizeCallable(method));
             }
+        }
+
         return methods.ToImmutableArray();
 
-        void Add(IMethodSymbol? method) {
+        void Add(IMethodSymbol? method)
+        {
             if (method != null &&
                 !ContractForSymbolMatcher.IsCompanionType(_companions, method.ContainingType))
+            {
                 methods.Add(ContractClauseInventoryBuilder.NormalizeCallable(method));
+            }
         }
-        void AddAccessors(ISymbol? symbol) {
-            if (symbol is IPropertySymbol property) {
+        void AddAccessors(ISymbol? symbol)
+        {
+            if (symbol is IPropertySymbol property)
+            {
                 Add(property.GetMethod);
                 Add(property.SetMethod);
             }
-            else if (symbol is IEventSymbol @event) {
+            else if (symbol is IEventSymbol @event)
+            {
                 Add(@event.AddMethod);
                 Add(@event.RemoveMethod);
                 Add(@event.RaiseMethod);
@@ -384,7 +477,8 @@ internal sealed class ClaimManifestBuilder(
         }
     }
 
-    private CallableSeed CreateSeed(IMethodSymbol method) {
+    private CallableSeed CreateSeed(IMethodSymbol method)
+    {
         cancellationToken.ThrowIfCancellationRequested();
         var declaration = method.DeclaringSyntaxReferences
             .Select(reference => reference.GetSyntax(cancellationToken))
@@ -397,36 +491,53 @@ internal sealed class ClaimManifestBuilder(
     }
 
     private ImmutableDictionary<IMethodSymbol, string> CreateCallableIds(
-        ImmutableArray<CallableSeed> callables) {
+        ImmutableArray<CallableSeed> callables)
+    {
         var ordinals = new Dictionary<IMethodSymbol, int>(SymbolEqualityComparer.Default);
         foreach (var group in callables
                      .Where(static seed => seed.Method.MethodKind is
                          MethodKind.AnonymousFunction or MethodKind.LocalFunction)
                      .GroupBy(static seed => seed.Method.ContainingSymbol!,
                          SymbolEqualityComparer.Default))
+        {
             foreach (var item in group
                          .OrderBy(seed => seed.Declaration == null
                              ? int.MaxValue
                               : _clauses.GetTreeOrdinal(seed.Declaration.SyntaxTree))
                          .ThenBy(static seed => seed.Declaration?.SpanStart ?? int.MaxValue)
                          .Select(static (seed, ordinal) => (seed, ordinal)))
+            {
                 ordinals.Add(item.seed.Method, item.ordinal);
+            }
+        }
+
         var ids = new Dictionary<IMethodSymbol, string>(SymbolEqualityComparer.Default);
-        foreach (var seed in callables) Resolve(seed.Method);
+        foreach (var seed in callables)
+        {
+            Resolve(seed.Method);
+        }
+
         return ids.ToImmutableDictionary(SymbolEqualityComparer.Default);
 
-        string Resolve(IMethodSymbol method) {
+        string Resolve(IMethodSymbol method)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             method = ContractClauseInventoryBuilder.NormalizeCallable(method);
-            if (ids.TryGetValue(method, out var id)) return id;
-            if (method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction) {
+            if (ids.TryGetValue(method, out var id))
+            {
+                return id;
+            }
+
+            if (method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction)
+            {
                 var parent = method.ContainingSymbol;
                 var parentId = parent is IMethodSymbol parentMethod
                     ? Resolve(parentMethod)
                     : SemanticClaimIdentity.CreateContainerId(parent);
                 id = SemanticClaimIdentity.CreateNestedCallableId(parentId, method, ordinals[method]);
             }
-            else {
+            else
+            {
                 id = SemanticClaimIdentity.CreateCallableId(method);
             }
             ids.Add(method, id);
@@ -438,28 +549,43 @@ internal sealed class ClaimManifestBuilder(
     private bool EffectsEnabled => enabledFeatures is WorkerFeatureSet.Effects or WorkerFeatureSet.All;
     private string AssemblyName => _compilation.Assembly.Identity.Name;
 
-    private static int NextRank(Dictionary<string, int> ranks, string key) {
+    private static int NextRank(Dictionary<string, int> ranks, string key)
+    {
         ranks.TryGetValue(key, out var rank);
         ranks[key] = rank + 1;
         return rank;
     }
 
-    private Location AttributeLocation(AttributeData attribute, IMethodSymbol target) =>
-        attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation() ??
+    private Location AttributeLocation(AttributeData attribute, IMethodSymbol target)
+    {
+        return attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation() ??
         target.Locations.FirstOrDefault(static location => location.IsInSource) ?? Location.None;
-    private static (string Path, int Start) AttributeOrder(AttributeData attribute) =>
-        (attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath ?? string.Empty,
-            attribute.ApplicationSyntaxReference?.Span.Start ?? int.MaxValue);
-    private static Location CallableLocation(IMethodSymbol method, SyntaxNode? declaration) =>
-        declaration?.GetLocation() ?? method.Locations.FirstOrDefault(static location => location.IsInSource) ?? Location.None;
+    }
 
-    private static WorkerSourceLocation ToSourceLocation(Location location) {
-        if (!location.IsInSource) return new WorkerSourceLocation();
+    private static (string Path, int Start) AttributeOrder(AttributeData attribute)
+    {
+        return (attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath ?? string.Empty,
+                attribute.ApplicationSyntaxReference?.Span.Start ?? int.MaxValue);
+    }
+
+    private static Location CallableLocation(IMethodSymbol method, SyntaxNode? declaration)
+    {
+        return declaration?.GetLocation() ?? method.Locations.FirstOrDefault(static location => location.IsInSource) ?? Location.None;
+    }
+
+    private static WorkerSourceLocation ToSourceLocation(Location location)
+    {
+        if (!location.IsInSource)
+        {
+            return new WorkerSourceLocation();
+        }
+
         var mapped = location.GetMappedLineSpan();
         var path = string.IsNullOrEmpty(mapped.Path)
             ? location.SourceTree?.FilePath ?? string.Empty
             : mapped.Path;
-        return new WorkerSourceLocation {
+        return new WorkerSourceLocation
+        {
             Path = string.IsNullOrEmpty(path) ? "<compiler-generated>" : path,
             Start = location.SourceSpan.Start,
             Length = location.SourceSpan.Length,
@@ -468,15 +594,22 @@ internal sealed class ClaimManifestBuilder(
         };
     }
 
-    private static string[] CreateExceptionHierarchy(INamedTypeSymbol? type) {
+    private static string[] CreateExceptionHierarchy(INamedTypeSymbol? type)
+    {
         var identities = new List<string>();
         for (var current = type; current != null; current = current.BaseType)
+        {
             identities.Add(EffectTypeIdentity(current));
+        }
+
         return [.. identities.OrderBy(static value => value, StringComparer.Ordinal)];
     }
-    private static string EffectTypeIdentity(INamedTypeSymbol type) =>
-        (type.ContainingAssembly?.Identity.Name ?? string.Empty) + ":" +
+    private static string EffectTypeIdentity(INamedTypeSymbol type)
+    {
+        return (type.ContainingAssembly?.Identity.Name ?? string.Empty) + ":" +
         (DocumentationCommentId.CreateDeclarationId(type) ?? type.MetadataName);
+    }
+
     private readonly record struct ClaimCandidate(
         string Fingerprint, Location Location, WorkerClaimEvidence Evidence,
         IInvocationOperation? Operation, AttributeData? Attribute,
@@ -491,7 +624,8 @@ internal sealed record ClaimManifestBuildResult(WorkerClaimManifest Manifest,
 
 internal sealed record ManifestCallableTarget(IMethodSymbol Method, SyntaxNode? Declaration,
     SemanticModel? SemanticModel, WorkerCallableManifestEntry Entry, ImmutableArray<ManifestClaim> Claims,
-    ImmutableArray<ManifestEffectClaim> EffectClaims, bool IsVerifierSupported) {
+    ImmutableArray<ManifestEffectClaim> EffectClaims, bool IsVerifierSupported)
+{
     internal BaseMethodDeclarationSyntax VerifierDeclaration => (BaseMethodDeclarationSyntax)Declaration!;
     internal SemanticModel VerifierSemanticModel => SemanticModel!;
 }

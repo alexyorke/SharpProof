@@ -1,7 +1,8 @@
 namespace SharpProof.Effects.Test;
 
 [TestFixture]
-public sealed class EffectContractWireParityTests {
+public sealed class EffectContractWireParityTests
+{
     [TestCase(
         typeof(SharpProof.Attributes.SharpProofEffect),
         typeof(EffectContractKind))]
@@ -10,10 +11,12 @@ public sealed class EffectContractWireParityTests {
         typeof(EffectContractCapabilityKind))]
     public void NeutralFlagsMatchThePublicAttributeWireVocabulary(
         Type attributeFlags,
-        Type neutralFlags) {
+        Type neutralFlags)
+    {
         ArgumentNullException.ThrowIfNull(attributeFlags);
         ArgumentNullException.ThrowIfNull(neutralFlags);
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 neutralFlags.GetEnumUnderlyingType(),
                 Is.EqualTo(attributeFlags.GetEnumUnderlyingType()));
@@ -29,7 +32,8 @@ public sealed class EffectContractWireParityTests {
     }
 
     [Test]
-    public void DecoderMasksCoverExactlyTheNeutralVocabulary() {
+    public void DecoderMasksCoverExactlyTheNeutralVocabulary()
+    {
         Assert.That(
             EffectContractMetadata.AllEffects,
             Is.EqualTo(Enum.GetValues<EffectContractKind>().Aggregate(
@@ -43,8 +47,10 @@ public sealed class EffectContractWireParityTests {
     }
 
     [Test]
-    public void MetadataConstantsMatchThePublicAttributeShape() {
-        using (Assert.EnterMultipleScope()) {
+    public void MetadataConstantsMatchThePublicAttributeShape()
+    {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 EffectContractMetadata.AttributeMetadataName,
                 Is.EqualTo(typeof(EffectContractAttribute).FullName));
@@ -67,8 +73,10 @@ public sealed class EffectContractWireParityTests {
     }
 
     [Test]
-    public void CapabilityConversionsExhaustivelyRoundTripNamedFlags() {
-        foreach (var contract in Enum.GetValues<EffectContractCapabilityKind>()) {
+    public void CapabilityConversionsExhaustivelyRoundTripNamedFlags()
+    {
+        foreach (var contract in Enum.GetValues<EffectContractCapabilityKind>())
+        {
             var analysis =
                 EffectContractMappings.ToAnalysisCapabilities(contract);
             Assert.That(
@@ -79,8 +87,10 @@ public sealed class EffectContractWireParityTests {
     }
 
     [Test]
-    public void CapabilityConversionsRejectValuesOutsideTheirNamedDomain() {
-        using (Assert.EnterMultipleScope()) {
+    public void CapabilityConversionsRejectValuesOutsideTheirNamedDomain()
+    {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 (Action)(() => _ =
                     EffectContractMappings.ToAnalysisCapabilities(
@@ -118,8 +128,10 @@ public sealed class EffectContractWireParityTests {
     public void RegionProjectionUsesAnExplicitNamedMapping(
         EffectRegionKind region,
         EffectContractKind expectedRead,
-        EffectContractKind expectedWrite) {
-        using (Assert.EnterMultipleScope()) {
+        EffectContractKind expectedWrite)
+    {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 EffectContractMappings.ToContractRegion(
                     region,
@@ -134,8 +146,10 @@ public sealed class EffectContractWireParityTests {
     }
 
     [Test]
-    public void EvidenceUsesOnlyValidatedNamedEnumValues() {
-        using (Assert.EnterMultipleScope()) {
+    public void EvidenceUsesOnlyValidatedNamedEnumValues()
+    {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 EffectContractMappings.EvidenceName(EffectContractMetadata.AllEffects),
                 Does.Not.Match(@"^-?\d"));
@@ -152,11 +166,13 @@ public sealed class EffectContractWireParityTests {
         }
     }
 
-    private static Dictionary<string, long> GetNamedValues(Type enumType) =>
-        Enum.GetNames(enumType).ToDictionary(
+    private static Dictionary<string, long> GetNamedValues(Type enumType)
+    {
+        return Enum.GetNames(enumType).ToDictionary(
             static name => name,
             name => Convert.ToInt64(
                 Enum.Parse(enumType, name),
                 System.Globalization.CultureInfo.InvariantCulture),
             StringComparer.Ordinal);
+    }
 }

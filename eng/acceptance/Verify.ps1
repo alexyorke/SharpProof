@@ -15,6 +15,7 @@ $acceptanceRoot = $PSScriptRoot
 $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
+. (Join-Path $repositoryRoot 'scripts\CSharpSourceMetrics.ps1')
 & (Join-Path $repositoryRoot 'scripts\Generate-DiagnosticDescriptors.ps1') -Verify
 & (Join-Path $repositoryRoot 'scripts\Generate-CSharpScalarSemantics.ps1') -Verify
 & (Join-Path $repositoryRoot 'scripts\Generate-ApiSpecCatalog.ps1') -Verify
@@ -133,7 +134,7 @@ function Invoke-SharpProofDotnet {
     }
 }
 
-function Measure-RepositoryNonblankLines {
+function Assert-RepositoryPaths {
     param(
         [Parameter(Mandatory = $true)]
         [object[]]$Paths,
@@ -147,7 +148,6 @@ function Measure-RepositoryNonblankLines {
     }
     $seenPaths = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::Ordinal)
-    $nonblankLines = 0
     foreach ($untypedRelativePath in $Paths) {
         $relativePath = [string]$untypedRelativePath
         if ([string]::IsNullOrWhiteSpace($relativePath) -or
@@ -162,15 +162,51 @@ function Measure-RepositoryNonblankLines {
             -not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
             throw "Invalid $Scope path: $relativePath"
         }
-        $nonblankLines += @(
-            Get-Content -LiteralPath $fullPath |
-                Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-        ).Count
     }
-    return $nonblankLines
 }
 
-Assert-Equal $contract.schemaVersion 3 'schemaVersion'
+function Measure-RepositoryCSharpSyntax {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Paths,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Scope
+    )
+
+    Assert-RepositoryPaths -Paths $Paths -Scope $Scope
+    $syntaxTokens = 0
+    $syntaxNodes = 0
+    $expressionNodes = 0
+    $decisionPoints = 0
+    $members = 0
+    foreach ($untypedRelativePath in $Paths) {
+        $relativePath = [string]$untypedRelativePath
+        if (-not $relativePath.EndsWith(
+                '.cs',
+                [StringComparison]::OrdinalIgnoreCase)) {
+            throw "$Scope contains a non-C# source path: $relativePath"
+        }
+        $fullPath = Join-Path $repositoryRoot $relativePath
+        $metrics = Measure-CSharpSourceText `
+            -Source (Get-Content -LiteralPath $fullPath -Raw) `
+            -Path $relativePath
+        $syntaxTokens += $metrics.syntaxTokens
+        $syntaxNodes += $metrics.syntaxNodes
+        $expressionNodes += $metrics.expressionNodes
+        $decisionPoints += $metrics.decisionPoints
+        $members += $metrics.members
+    }
+    return [pscustomobject]@{
+        syntaxTokens = $syntaxTokens
+        syntaxNodes = $syntaxNodes
+        expressionNodes = $expressionNodes
+        decisionPoints = $decisionPoints
+        members = $members
+    }
+}
+
+Assert-Equal $contract.schemaVersion 4 'schemaVersion'
 Assert-Equal $contract.releaseLine '1.0.0-preview' 'releaseLine'
 Assert-Equal $contract.flagship 'effects' 'flagship'
 Assert-Equal $contract.analyzer.defaultProfile 'advisory' 'analyzer.defaultProfile'
@@ -303,20 +339,13 @@ Assert-Equal `
 Push-Location $repositoryRoot
 try {
     $kernelPaths = @($contract.trustedKernel.paths)
-    $kernelMaximum = [int]$contract.trustedKernel.maximumNonblankLines
-    if ($kernelPaths.Count -eq 0 -or $kernelMaximum -le 0) {
-        throw 'The trusted-kernel LOC contract must declare paths and a positive limit.'
+    if ($kernelPaths.Count -eq 0) {
+        throw 'The trusted-kernel contract must declare paths.'
     }
-    $kernelNonblankLines = Measure-RepositoryNonblankLines `
+    Assert-RepositoryPaths `
         -Paths $kernelPaths `
         -Scope 'trusted-kernel'
-    if ($kernelNonblankLines -gt $kernelMaximum) {
-        throw "Trusted-kernel nonblank LOC $kernelNonblankLines exceeds " +
-            "the contract limit $kernelMaximum."
-    }
-    Write-Host (
-        "Trusted-kernel nonblank lines: $kernelNonblankLines " +
-        "(maximum $kernelMaximum)")
+    Write-Host "Trusted-kernel paths: $($kernelPaths.Count)"
 
     $requiredTcbComponents = @(
         'discovery',
@@ -355,35 +384,21 @@ try {
     foreach ($component in $tcbComponents) {
         $name = [string]$component.name
         $paths = @($component.paths)
-        $maximum = [int]$component.maximumNonblankLines
-        if ($maximum -le 0) {
-            throw "Trusted-computing-base component '$name' must have a positive limit."
-        }
+        Assert-RepositoryPaths `
+            -Paths $paths `
+            -Scope "trusted-computing-base component '$name'"
         foreach ($path in $paths) {
             if (-not $allTcbPaths.Add([string]$path)) {
                 throw "Trusted-computing-base path belongs to multiple components: $path"
             }
         }
-        $nonblankLines = Measure-RepositoryNonblankLines `
-            -Paths $paths `
-            -Scope "trusted-computing-base component '$name'"
-        if ($nonblankLines -gt $maximum) {
-            throw "Trusted-computing-base component '$name' nonblank LOC " +
-                "$nonblankLines exceeds the contract limit $maximum."
-        }
-        Write-Host (
-            "Trusted-computing-base $name nonblank lines: " +
-            "$nonblankLines (maximum $maximum)")
+        Write-Host "Trusted-computing-base $name paths: $($paths.Count)"
     }
 
-    $reduction = $contract.productionLayerReduction
-    $minimumReduction = [double]$reduction.minimumPercent
-    $baselineCommit = [string]$reduction.baselineCommit
-    $layers = @($reduction.layers)
-    if ($minimumReduction -lt 10 -or $minimumReduction -ge 100 -or
-        $baselineCommit -notmatch '^[0-9a-f]{40}$' -or
-        $layers.Count -eq 0) {
-        throw 'The production-layer reduction contract is invalid.'
+    $coordinatorComplexity = $contract.productionCoordinatorComplexity
+    $layers = @($coordinatorComplexity.layers)
+    if ($layers.Count -eq 0) {
+        throw 'The production-coordinator complexity contract is invalid.'
     }
     $layerNames = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::Ordinal)
@@ -395,38 +410,36 @@ try {
         if ([string]::IsNullOrWhiteSpace($name) -or
             -not $layerNames.Add($name) -or
             -not $layerPaths.Add($path)) {
-            throw "Invalid or duplicate production-layer reduction: '$name'."
+            throw "Invalid or duplicate production coordinator: '$name'."
         }
-        $object = $baselineCommit + ':' + $path
-        $baselineSource = @(& git show $object)
-        if ($LASTEXITCODE -ne 0) {
-            throw "Production-layer baseline is unavailable: $object"
+        $maximumExpressionNodes = [int]$layer.maximumExpressionNodes
+        $maximumDecisionPoints = [int]$layer.maximumDecisionPoints
+        if ($maximumExpressionNodes -le 0 -or
+            $maximumDecisionPoints -le 0) {
+            throw "Production coordinator '$name' must have positive limits."
         }
-        $baselineLines = @(
-            $baselineSource |
-                Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-        ).Count
-        Assert-Equal `
-            $baselineLines `
-            ([int]$layer.baselineNonblankLines) `
-            "productionLayerReduction.$name baseline"
-        $maximum = [int][Math]::Floor(
-            $baselineLines * (1 - ($minimumReduction / 100)))
-        $current = Measure-RepositoryNonblankLines `
+        $currentMetrics = Measure-RepositoryCSharpSyntax `
             -Paths @($path) `
-            -Scope "production-layer reduction '$name'"
-        if ($current -gt $maximum) {
-            throw "Production layer '$name' has $current nonblank lines; " +
-                "the $minimumReduction% reduction requires at most $maximum."
+            -Scope "production coordinator '$name'"
+        $currentExpressionNodes = [int]$currentMetrics.expressionNodes
+        $currentDecisionPoints = [int]$currentMetrics.decisionPoints
+        if ($currentExpressionNodes -gt $maximumExpressionNodes -or
+            $currentDecisionPoints -gt $maximumDecisionPoints) {
+            throw "Production layer '$name' has $currentExpressionNodes " +
+                "expression nodes; " +
+                "$currentDecisionPoints decision points. Limits are " +
+                "$maximumExpressionNodes and $maximumDecisionPoints."
         }
         Write-Host (
-            "Production-layer $name nonblank lines: $current " +
-            "(baseline $baselineLines; maximum $maximum)")
+            "Production-layer $name expression nodes: " +
+            "$currentExpressionNodes (maximum $maximumExpressionNodes); " +
+            "decision points: " +
+            "$currentDecisionPoints (maximum $maximumDecisionPoints)")
     }
 
-    & (Join-Path $repositoryRoot 'scripts\Test-ProductionCSharpSize.ps1')
+    & (Join-Path $repositoryRoot 'scripts\Test-ProductionCSharpComplexity.ps1')
     if ($LASTEXITCODE -ne 0) {
-        throw 'The production C# size ratchet failed.'
+        throw 'The production C# structural-complexity ratchet failed.'
     }
 
     if (-not $SkipBuild) {

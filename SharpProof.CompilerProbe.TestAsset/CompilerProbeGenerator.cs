@@ -1,8 +1,10 @@
 namespace SharpProof.CompilerProbe.TestAsset;
 
 [Generator(LanguageNames.CSharp)]
-public sealed class CompilerProbeGenerator : IIncrementalGenerator {
-    public void Initialize(IncrementalGeneratorInitializationContext context) {
+public sealed class CompilerProbeGenerator : IIncrementalGenerator
+{
+    public void Initialize(IncrementalGeneratorInitializationContext context)
+    {
         var globalValue = context.AnalyzerConfigOptionsProvider.Select(
             static (provider, _) => GetOption(
                 provider.GlobalOptions,
@@ -14,7 +16,8 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator {
                     CompilerProbeContract.AdditionalFileName,
                     StringComparison.OrdinalIgnoreCase))
             .Combine(context.AnalyzerConfigOptionsProvider)
-            .Select(static (pair, cancellationToken) => {
+            .Select(static (pair, cancellationToken) =>
+            {
                 var text = pair.Left.GetText(cancellationToken)?.ToString() ??
                     string.Empty;
                 var metadata = GetOption(
@@ -35,8 +38,13 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator {
     private static void Generate(
         SourceProductionContext context,
         string globalValue,
-        ImmutableArray<(string Path, string Text, string Metadata)> inputs) {
-        if (inputs.IsDefaultOrEmpty) return;
+        ImmutableArray<(string Path, string Text, string Metadata)> inputs)
+    {
+        if (inputs.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
         var input = inputs
             .OrderBy(static value => value.Path, StringComparer.Ordinal)
             .First();
@@ -67,7 +75,8 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator {
         string text,
         string metadata,
         string globalValue,
-        string fingerprint) {
+        string fingerprint)
+    {
         var postconditionOperator = text.StartsWith(
             "refute:",
             StringComparison.Ordinal)
@@ -95,16 +104,22 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator {
         """;
     }
 
-    private static string Literal(string value) =>
-        Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(
+    private static string Literal(string value)
+    {
+        return Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(
             value,
             quote: true);
+    }
 
     private static string GetOption(
         AnalyzerConfigOptions options,
-        string key) =>
-        options.TryGetValue(key, out var value) ? value : string.Empty;
+        string key)
+    {
+        return options.TryGetValue(key, out var value) ? value : string.Empty;
+    }
 
-    private static string NormalizePath(string path) =>
-        path.Replace('\\', '/');
+    private static string NormalizePath(string path)
+    {
+        return path.Replace('\\', '/');
+    }
 }

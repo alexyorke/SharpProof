@@ -2,9 +2,11 @@ namespace SharpProof.Effects.Test;
 
 [TestFixture]
 [NonParallelizable]
-public sealed class RuntimeEffectOracleTests {
+public sealed class RuntimeEffectOracleTests
+{
     [Test]
-    public void ManagedAllocationMatchesRuntimeAllocationDelta() {
+    public void ManagedAllocationMatchesRuntimeAllocationDelta()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class RuntimeFixture {
@@ -18,7 +20,8 @@ public sealed class RuntimeEffectOracleTests {
                 "Allocate"));
         var image = EffectTestHost.EmitImage(compilation);
 
-        WithRuntimeAssembly(image, assembly => {
+        WithRuntimeAssembly(image, assembly =>
+        {
             var allocate = RequireMethod(
                     assembly,
                     "RuntimeFixture",
@@ -28,7 +31,10 @@ public sealed class RuntimeEffectOracleTests {
             var before = GC.GetAllocatedBytesForCurrentThread();
             var observedLength = 0;
             for (var iteration = 0; iteration < 64; iteration++)
+            {
                 observedLength += allocate().Length;
+            }
+
             var allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - before;
 
             Assert.That(observedLength, Is.EqualTo(64 * 64));
@@ -43,7 +49,8 @@ public sealed class RuntimeEffectOracleTests {
     }
 
     [Test]
-    public void ResolvedThrowSetContainsRuntimeException() {
+    public void ResolvedThrowSetContainsRuntimeException()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class RuntimeFixture {
@@ -58,16 +65,19 @@ public sealed class RuntimeEffectOracleTests {
         var image = EffectTestHost.EmitImage(compilation);
         string? observedException = null;
 
-        WithRuntimeAssembly(image, assembly => {
+        WithRuntimeAssembly(image, assembly =>
+        {
             var divide = RequireMethod(
                     assembly,
                     "RuntimeFixture",
                     "Divide")
                 .CreateDelegate<Func<int, int>>();
-            try {
+            try
+            {
                 _ = divide(0);
             }
-            catch (DivideByZeroException exception) {
+            catch (DivideByZeroException exception)
+            {
                 observedException = exception.GetType().FullName;
             }
         });
@@ -79,7 +89,8 @@ public sealed class RuntimeEffectOracleTests {
     }
 
     [Test]
-    public void StaticWriteMatchesObservableRuntimeStateChange() {
+    public void StaticWriteMatchesObservableRuntimeStateChange()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class RuntimeFixture {
@@ -96,7 +107,8 @@ public sealed class RuntimeEffectOracleTests {
                 "Write"));
         var image = EffectTestHost.EmitImage(compilation);
 
-        WithRuntimeAssembly(image, assembly => {
+        WithRuntimeAssembly(image, assembly =>
+        {
             var write = RequireMethod(
                     assembly,
                     "RuntimeFixture",
@@ -123,7 +135,8 @@ public sealed class RuntimeEffectOracleTests {
     }
 
     [Test]
-    public void DeclaredConsoleCapabilityMatchesObservableOutput() {
+    public void DeclaredConsoleCapabilityMatchesObservableOutput()
+    {
         var fixture = EffectTestHost.EmitImage(
             """
             using System;
@@ -152,9 +165,11 @@ public sealed class RuntimeEffectOracleTests {
         var originalOutput = Console.Out;
         using var observedOutput = new StringWriter();
 
-        try {
+        try
+        {
             Console.SetOut(observedOutput);
-            WithRuntimeAssembly(fixture, assembly => {
+            WithRuntimeAssembly(fixture, assembly =>
+            {
                 var touch = RequireMethod(
                         assembly,
                         "RuntimeCapabilityFixture",
@@ -163,7 +178,8 @@ public sealed class RuntimeEffectOracleTests {
                 touch();
             });
         }
-        finally {
+        finally
+        {
             Console.SetOut(originalOutput);
         }
 
@@ -180,7 +196,8 @@ public sealed class RuntimeEffectOracleTests {
     }
 
     [Test]
-    public void LocalAliasWriteMatchesCallerOwnedRuntimeStateChange() {
+    public void LocalAliasWriteMatchesCallerOwnedRuntimeStateChange()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public sealed class Box {
@@ -201,7 +218,8 @@ public sealed class RuntimeEffectOracleTests {
                 "Mutate"));
         var image = EffectTestHost.EmitImage(compilation);
 
-        WithRuntimeAssembly(image, assembly => {
+        WithRuntimeAssembly(image, assembly =>
+        {
             var boxType = assembly.GetType("Box", throwOnError: true)!;
             var box = Activator.CreateInstance(boxType) ??
                       throw new AssertionException(
@@ -222,7 +240,8 @@ public sealed class RuntimeEffectOracleTests {
     }
 
     [Test]
-    public void ImplicitExceptionSummariesContainRuntimeEdgeCases() {
+    public void ImplicitExceptionSummariesContainRuntimeEdgeCases()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class RuntimeFixture {
@@ -328,17 +347,21 @@ public sealed class RuntimeEffectOracleTests {
                 "System.ArgumentNullException")
         };
 
-        WithRuntimeAssembly(image, assembly => {
-            foreach (var edge in cases) {
+        WithRuntimeAssembly(image, assembly =>
+        {
+            foreach (var edge in cases)
+            {
                 var method = RequireMethod(
                     assembly,
                     "RuntimeFixture",
                     edge.MethodName);
                 string? observed = null;
-                try {
+                try
+                {
                     _ = method.Invoke(null, edge.Arguments);
                 }
-                catch (TargetInvocationException exception) {
+                catch (TargetInvocationException exception)
+                {
                     observed = exception.InnerException?.GetType().FullName;
                 }
 
@@ -361,16 +384,19 @@ public sealed class RuntimeEffectOracleTests {
 
     private static void WithRuntimeAssembly(
         EmittedAssemblyImage image,
-        Action<Assembly> action) {
+        Action<Assembly> action)
+    {
         var context = new AssemblyLoadContext(
             "SharpProof.Effects.Test.RuntimeOracle",
             isCollectible: true);
         context.Resolving += ResolveFromDefaultContext;
-        try {
+        try
+        {
             using var stream = new MemoryStream(image.Image, writable: false);
             action(context.LoadFromStream(stream));
         }
-        finally {
+        finally
+        {
             context.Resolving -= ResolveFromDefaultContext;
             context.Unload();
         }
@@ -378,28 +404,34 @@ public sealed class RuntimeEffectOracleTests {
 
     private static Assembly? ResolveFromDefaultContext(
         AssemblyLoadContext context,
-        AssemblyName requestedName) =>
-        AppDomain.CurrentDomain.GetAssemblies()
+        AssemblyName requestedName)
+    {
+        return AppDomain.CurrentDomain.GetAssemblies()
             .FirstOrDefault(candidate =>
                 AssemblyName.ReferenceMatchesDefinition(
                     candidate.GetName(),
                     requestedName));
+    }
 
     private static MethodInfo RequireMethod(
         Assembly assembly,
         string typeName,
-        string methodName) =>
-        assembly.GetType(typeName, throwOnError: true)!
+        string methodName)
+    {
+        return assembly.GetType(typeName, throwOnError: true)!
             .GetMethod(
                 methodName,
                 BindingFlags.Public | BindingFlags.Static) ??
         throw new InvalidOperationException(
             $"Runtime method '{typeName}.{methodName}' was not found.");
+    }
 
     private static ImmutableArray<string> ResolvedThrowMetadataNames(
-        EffectSummary summary) =>
-        [.. summary.Throws.Types.Select(static type =>
+        EffectSummary summary)
+    {
+        return [.. summary.Throws.Types.Select(static type =>
             type.ContainingNamespace.MetadataName + "." + type.MetadataName)];
+    }
 
     private sealed record RuntimeExceptionCase(
         string MethodName,

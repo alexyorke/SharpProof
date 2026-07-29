@@ -1,9 +1,11 @@
 namespace SharpProof.Smt.Test;
 
 [TestFixture]
-public sealed class IrSmtBackendTests {
+public sealed class IrSmtBackendTests
+{
     [Test]
-    public async Task UnsatProofReturnsAHygienicCore() {
+    public async Task UnsatProofReturnsAHygienicCore()
+    {
         var factory = new IrFactory();
         var variable = factory.CreateVariable("source name is irrelevant", factory.IntegerType);
         var operation = factory.CreateOperation("lowered");
@@ -35,7 +37,8 @@ public sealed class IrSmtBackendTests {
     }
 
     [Test]
-    public async Task SatModelMustReplayBeforeRefutation() {
+    public async Task SatModelMustReplayBeforeRefutation()
+    {
         var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var goal = factory.Binary(
@@ -60,7 +63,8 @@ public sealed class IrSmtBackendTests {
     }
 
     [Test]
-    public async Task StrictComparisonDoesNotAcceptEqualityBoundary() {
+    public async Task StrictComparisonDoesNotAcceptEqualityBoundary()
+    {
         var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var operation = factory.CreateOperation("equal to zero");
@@ -94,7 +98,8 @@ public sealed class IrSmtBackendTests {
     }
 
     [Test]
-    public async Task FormulaAndExplicitVariablesProduceOneExactModelSet() {
+    public async Task FormulaAndExplicitVariablesProduceOneExactModelSet()
+    {
         var factory = new IrFactory();
         var integer = factory.CreateVariable("integer", factory.IntegerType);
         var boolean = factory.CreateVariable("boolean", factory.BooleanType);
@@ -125,7 +130,8 @@ public sealed class IrSmtBackendTests {
     }
 
     [Test]
-    public async Task NormalCompletionGuardsCheckedDivision() {
+    public async Task NormalCompletionGuardsCheckedDivision()
+    {
         var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var operation = factory.CreateOperation("nonzero");
@@ -157,7 +163,8 @@ public sealed class IrSmtBackendTests {
     }
 
     [Test]
-    public async Task SignedRemainderOverflowProducesTypedUnknown() {
+    public async Task SignedRemainderOverflowProducesTypedUnknown()
+    {
         var factory = new IrFactory();
         var dividend = factory.CreateVariable("dividend", factory.IntegerType);
         var divisor = factory.CreateVariable("divisor", factory.IntegerType);
@@ -210,7 +217,8 @@ public sealed class IrSmtBackendTests {
         long dividendValue,
         long divisorValue,
         long expectedQuotient,
-        long expectedRemainder) {
+        long expectedRemainder)
+    {
         var factory = new IrFactory();
         var dividend = factory.CreateVariable("dividend", factory.IntegerType);
         var divisor = factory.CreateVariable("divisor", factory.IntegerType);
@@ -263,7 +271,8 @@ public sealed class IrSmtBackendTests {
     }
 
     [Test]
-    public async Task UndefinedGoalStateProducesTypedUnknown() {
+    public async Task UndefinedGoalStateProducesTypedUnknown()
+    {
         var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var quotient = factory.Binary(
@@ -293,7 +302,8 @@ public sealed class IrSmtBackendTests {
     }
 
     [Test]
-    public async Task StringVariablesFailClosedWithoutNullTagEncoding() {
+    public async Task StringVariablesFailClosedWithoutNullTagEncoding()
+    {
         var factory = new IrFactory();
         var variable = factory.CreateVariable("text", factory.StringType);
         var goal = factory.Binary(
@@ -318,7 +328,8 @@ public sealed class IrSmtBackendTests {
     }
 
     [Test]
-    public async Task NullableStringConcatCannotProduceAFalseProof() {
+    public async Task NullableStringConcatCannotProduceAFalseProof()
+    {
         var factory = new IrFactory();
         var variable = factory.CreateVariable("text", factory.StringType);
         var concatenated = factory.Binary(
@@ -347,7 +358,8 @@ public sealed class IrSmtBackendTests {
     }
 
     [Test]
-    public async Task OpaqueTermsFailClosed() {
+    public async Task OpaqueTermsFailClosed()
+    {
         var factory = new IrFactory();
         var member = factory.GetOrCreateMember(
             factory.CreateIdentity(),
@@ -373,7 +385,8 @@ public sealed class IrSmtBackendTests {
     }
 
     [Test]
-    public void PreCancelledChecksDoNotBecomeUnknown() {
+    public void PreCancelledChecksDoNotBecomeUnknown()
+    {
         var factory = new IrFactory();
         var query = new VerificationQuery(
             factory,
@@ -392,7 +405,8 @@ public sealed class IrSmtBackendTests {
     }
 
     [Test]
-    public void NativeUnknownReasonsAreClassifiedPrecisely() {
+    public void NativeUnknownReasonsAreClassifiedPrecisely()
+    {
         var classify = typeof(IrSmtBackend).GetMethod(
             "ClassifyUnknown",
             System.Reflection.BindingFlags.Static |
@@ -411,7 +425,8 @@ public sealed class IrSmtBackendTests {
     }
 
     [Test]
-    public void ActiveCancellationInterruptsTheNativeContext() {
+    public void ActiveCancellationInterruptsTheNativeContext()
+    {
         var factory = new IrFactory();
         var operation = factory.CreateOperation("repeated");
         var assumption = new Assumption(
@@ -450,8 +465,13 @@ public sealed class IrSmtBackendTests {
         Assert.That(retired.FailureReason, Is.EqualTo(BackendFailureReason.Unavailable));
     }
 
-    private static bool IsMonitorHeld(object gate) {
-        if (!Monitor.TryEnter(gate)) return true;
+    private static bool IsMonitorHeld(object gate)
+    {
+        if (!Monitor.TryEnter(gate))
+        {
+            return true;
+        }
+
         Monitor.Exit(gate);
         return false;
     }

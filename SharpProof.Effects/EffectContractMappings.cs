@@ -1,6 +1,7 @@
 namespace SharpProof.Effects;
 
-internal static class EffectContractMappings {
+internal static class EffectContractMappings
+{
     private static readonly ImmutableArray<(
         EffectContractCapabilityKind Contract, EffectCapabilityKind Analysis,
         EffectContractKind Effect)> Capabilities = [
@@ -19,37 +20,62 @@ internal static class EffectContractMappings {
         (EffectContractCapabilityKind.NativeInterop, EffectCapabilityKind.NativeInterop, EffectContractKind.UsesNativeCode)
     ];
 
-    internal static EffectCapabilityKind ToAnalysisCapabilities(EffectContractCapabilityKind source) {
+    internal static EffectCapabilityKind ToAnalysisCapabilities(EffectContractCapabilityKind source)
+    {
         if ((source & ~EffectContractMetadata.AllCapabilities) != 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(source));
+        }
+
         var result = EffectCapabilityKind.None;
         foreach (var pair in Capabilities)
-            if ((source & pair.Contract) != 0) result |= pair.Analysis;
+        {
+            if ((source & pair.Contract) != 0)
+            {
+                result |= pair.Analysis;
+            }
+        }
+
         return result;
     }
 
-    internal static EffectContractCapabilityKind ToContractCapabilities(EffectCapabilityKind source) =>
-        ProjectCapabilities(source).Capabilities;
+    internal static EffectContractCapabilityKind ToContractCapabilities(EffectCapabilityKind source)
+    {
+        return ProjectCapabilities(source).Capabilities;
+    }
 
-    internal static EffectContractKind ToContractEffects(EffectCapabilityKind source) =>
-        ProjectCapabilities(source).Effects;
+    internal static EffectContractKind ToContractEffects(EffectCapabilityKind source)
+    {
+        return ProjectCapabilities(source).Effects;
+    }
 
     private static (EffectContractCapabilityKind Capabilities, EffectContractKind Effects)
-        ProjectCapabilities(EffectCapabilityKind source) {
+        ProjectCapabilities(EffectCapabilityKind source)
+    {
         if ((source & ~EffectCapabilityKind.AllKnown) != 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(source));
+        }
+
         var capabilities = EffectContractCapabilityKind.None;
         var effects = EffectContractKind.None;
-        foreach (var pair in Capabilities) {
-            if ((source & pair.Analysis) == 0) continue;
+        foreach (var pair in Capabilities)
+        {
+            if ((source & pair.Analysis) == 0)
+            {
+                continue;
+            }
+
             capabilities |= pair.Contract;
             effects |= pair.Effect;
         }
         return (capabilities, effects);
     }
 
-    internal static EffectContractKind ToContractRegion(EffectRegionKind region, bool isWrite) =>
-        (region, isWrite) switch {
+    internal static EffectContractKind ToContractRegion(EffectRegionKind region, bool isWrite)
+    {
+        return (region, isWrite) switch
+        {
             (EffectRegionKind.Receiver, false) => EffectContractKind.ReadsReceiverState,
             (EffectRegionKind.Parameter, false) => EffectContractKind.ReadsArgumentState,
             (EffectRegionKind.Captured, false) => EffectContractKind.ReadsCapturedState,
@@ -63,30 +89,54 @@ internal static class EffectContractMappings {
             (EffectRegionKind.Fresh or EffectRegionKind.Unknown, _) => EffectContractKind.None,
             _ => throw new ArgumentOutOfRangeException(nameof(region))
         };
+    }
 
     internal static EffectRegionSet ToAnalysisRegions(
-        EffectContractKind effects, bool isWrite, int parameterCount) {
+        EffectContractKind effects, bool isWrite, int parameterCount)
+    {
         var result = EffectRegionSet.Empty;
-        bool Has(EffectContractKind read, EffectContractKind write) =>
-            (effects & (isWrite ? write : read)) != 0;
+        bool Has(EffectContractKind read, EffectContractKind write)
+        {
+            return (effects & (isWrite ? write : read)) != 0;
+        }
+
         if (Has(EffectContractKind.ReadsReceiverState, EffectContractKind.WritesReceiverState))
+        {
             result = result.Union(EffectRegionSet.Create(EffectRegionId.Receiver));
+        }
+
         if (Has(EffectContractKind.ReadsArgumentState, EffectContractKind.WritesArgumentState))
+        {
             result = result.Union(ParameterRegions(parameterCount));
+        }
+
         if (Has(EffectContractKind.ReadsCapturedState, EffectContractKind.WritesCapturedState))
+        {
             result = result.Union(EffectRegionSet.Create(EffectRegionId.Captured(0)));
+        }
+
         if (Has(EffectContractKind.ReadsStaticState, EffectContractKind.WritesStaticState))
+        {
             result = result.Union(EffectRegionSet.Create(EffectRegionId.Static()));
+        }
+
         if (Has(EffectContractKind.ReadsAmbientState, EffectContractKind.WritesAmbientState))
+        {
             result = result.Union(EffectRegionSet.Create(EffectRegionId.Ambient));
+        }
+
         return result;
     }
 
-    internal static EffectRegionSet ParameterRegions(int count) =>
-        EffectRegionSet.Create(Enumerable.Range(0, count).Select(EffectRegionId.Parameter));
+    internal static EffectRegionSet ParameterRegions(int count)
+    {
+        return EffectRegionSet.Create(Enumerable.Range(0, count).Select(EffectRegionId.Parameter));
+    }
 
-    internal static string EvidenceName(Enum value) =>
-        value switch {
+    internal static string EvidenceName(Enum value)
+    {
+        return value switch
+        {
             EffectContractKind effects when
                 (effects & ~EffectContractMetadata.AllEffects) == 0 => effects.ToString(),
             EffectContractCapabilityKind capabilities when
@@ -102,18 +152,24 @@ internal static class EffectContractMappings {
                 (uncertainty & ~EffectUncertainty.Unknown) == 0 => uncertainty.ToString(),
             _ => throw new ArgumentOutOfRangeException(nameof(value))
         };
+    }
 
-    internal static bool IsObservablePure(EffectSummary summary) =>
-        summary.Capabilities.IsEmpty &&
+    internal static bool IsObservablePure(EffectSummary summary)
+    {
+        return summary.Capabilities.IsEmpty &&
         !summary.Reads.Regions.Any(static region =>
             region.Kind is EffectRegionKind.Ambient or EffectRegionKind.Captured or EffectRegionKind.Static) &&
         summary.Writes.Regions.All(static region => region.Kind == EffectRegionKind.Fresh);
+    }
 
-    internal static bool IsPurityViolation(EffectDirectWitness witness) =>
-        witness.Capabilities != EffectContractCapabilityKind.None ||
+    internal static bool IsPurityViolation(EffectDirectWitness witness)
+    {
+        return witness.Capabilities != EffectContractCapabilityKind.None ||
         (witness.Effects & ImpureState) != 0;
+    }
 
-    internal static bool Covers(EffectSummary actual, EffectSummary declared) {
+    internal static bool Covers(EffectSummary actual, EffectSummary declared)
+    {
         var actualProjection = EffectSummaryProjector.Project(actual);
         var declaredProjection = EffectSummaryProjector.Project(declared);
         return actualProjection.IsComplete &&
@@ -122,7 +178,8 @@ internal static class EffectContractMappings {
             ExceptionsCovered(actual.Throws, declared.Throws);
     }
 
-    internal static bool Violates(EffectDirectWitness witness, EffectSummary declared) {
+    internal static bool Violates(EffectDirectWitness witness, EffectSummary declared)
+    {
         var projection = EffectSummaryProjector.Project(declared);
         return (witness.Effects & ~AllowedEffects(projection.Effects)) != 0 ||
             (witness.Capabilities & ~projection.Capabilities) != 0 ||
@@ -130,17 +187,21 @@ internal static class EffectContractMappings {
             !ExceptionsCovered(EffectThrowSet.Create([witness.ExceptionType]), declared.Throws);
     }
 
-    private static EffectContractKind AllowedEffects(EffectContractKind declared) =>
-        (declared & EffectContractKind.Throws) == 0
+    private static EffectContractKind AllowedEffects(EffectContractKind declared)
+    {
+        return (declared & EffectContractKind.Throws) == 0
             ? declared
             : declared | EffectContractKind.Allocates;
+    }
 
-    private static bool ExceptionsCovered(EffectThrowSet actual, EffectThrowSet declared) =>
-        actual.IsEmpty ||
+    private static bool ExceptionsCovered(EffectThrowSet actual, EffectThrowSet declared)
+    {
+        return actual.IsEmpty ||
         declared.IncludesUnknown ||
         !actual.IncludesUnknown &&
         actual.Types.All(thrown =>
             declared.Types.Any(allowed => EffectTypeFacts.IsDerivedFrom(thrown, allowed)));
+    }
 
     private const EffectContractKind ImpureState =
         EffectContractKind.ReadsCapturedState | EffectContractKind.ReadsStaticState |

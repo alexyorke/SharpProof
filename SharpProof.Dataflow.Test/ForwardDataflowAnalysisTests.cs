@@ -1,9 +1,11 @@
 namespace SharpProof.Dataflow.Test;
 
 [TestFixture]
-public sealed class ForwardDataflowAnalysisTests {
+public sealed class ForwardDataflowAnalysisTests
+{
     [Test]
-    public void DiamondJoinsPredecessorStates() {
+    public void DiamondJoinsPredecessorStates()
+    {
         var domain = NullnessDomain.Instance;
         var graph = new DataflowGraph<NullnessValue>(
             [
@@ -31,7 +33,8 @@ public sealed class ForwardDataflowAnalysisTests {
     }
 
     [Test]
-    public void LoopUsesWideningAndTerminates() {
+    public void LoopUsesWideningAndTerminates()
+    {
         var domain = IntervalDomain.Instance;
         var graph = CreateAscendingIntervalGraph(domain);
         var options = new ForwardDataflowAnalysisOptions(widenAfter: 1, maxIterations: 100);
@@ -48,7 +51,8 @@ public sealed class ForwardDataflowAnalysisTests {
     }
 
     [Test]
-    public void AcyclicJoinsDoNotWiden() {
+    public void AcyclicJoinsDoNotWiden()
+    {
         var domain = IntervalDomain.Instance;
         var graph = new DataflowGraph<IntervalValue>(
             [
@@ -77,7 +81,8 @@ public sealed class ForwardDataflowAnalysisTests {
     }
 
     [Test]
-    public void RandomizedBatchOrderDoesNotChangeFixpoint() {
+    public void RandomizedBatchOrderDoesNotChangeFixpoint()
+    {
         var domain = IntervalDomain.Instance;
         var graph = CreateAscendingIntervalGraph(domain);
         var options = new ForwardDataflowAnalysisOptions(widenAfter: 1, maxIterations: 100);
@@ -87,7 +92,8 @@ public sealed class ForwardDataflowAnalysisTests {
             IntervalValue.Constant(0),
             options);
 
-        for (var seed = 0; seed < 32; seed++) {
+        for (var seed = 0; seed < 32; seed++)
+        {
             var random = new Random(seed);
             var actual = ForwardDataflowAnalysis.AnalyzeWithWorklistOrderForTesting(
                 graph,
@@ -97,7 +103,8 @@ public sealed class ForwardDataflowAnalysisTests {
                 pending => [.. pending.OrderBy(_ => random.Next())]);
 
             Assert.That(actual.Iterations, Is.EqualTo(expected.Iterations));
-            for (var blockId = 0; blockId < graph.Blocks.Length; blockId++) {
+            for (var blockId = 0; blockId < graph.Blocks.Length; blockId++)
+            {
                 Assert.That(
                     domain.AreEquivalent(
                         actual.GetInputState(blockId),
@@ -115,7 +122,8 @@ public sealed class ForwardDataflowAnalysisTests {
     }
 
     [Test]
-    public void GraphCanonicalizesEdgesAndRejectsNonContiguousBlocks() {
+    public void GraphCanonicalizesEdgesAndRejectsNonContiguousBlocks()
+    {
         var graph = new DataflowGraph<NullnessValue>(
             [
                 new(0, value => value),
@@ -136,8 +144,9 @@ public sealed class ForwardDataflowAnalysisTests {
     }
 
     private static DataflowGraph<IntervalValue> CreateAscendingIntervalGraph(
-        IntervalDomain domain) =>
-        new(
+        IntervalDomain domain)
+    {
+        return new(
             [
                 new(0, value => value),
                 new(1, value => domain.AddConstant(value, 1)),
@@ -153,4 +162,5 @@ public sealed class ForwardDataflowAnalysisTests {
                 new(3, 3),
                 new(3, 4)
             ]);
+    }
 }

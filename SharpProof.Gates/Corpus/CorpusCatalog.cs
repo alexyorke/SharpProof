@@ -3,21 +3,32 @@ using System.Text;
 
 namespace SharpProof.Gates.Corpus;
 
-internal static class CorpusCatalog {
-    public static ImmutableArray<CorpusVariant> Variants { get; } =
+internal static class CorpusCatalog
+{
+    public static ImmutableArray<CorpusVariant> Variants
+    {
+        get;
+    } =
         [.. Enum.GetValues<CorpusVariant>()];
 
-    public static ImmutableArray<CorpusCase> CreateCases() =>
-        CreateCases(RepositoryLayout.FindRoot());
+    public static ImmutableArray<CorpusCase> CreateCases()
+    {
+        return CreateCases(RepositoryLayout.FindRoot());
+    }
 
     public static ImmutableArray<CorpusCase> CreateCases(
-        string repositoryRoot) =>
-        [
+        string repositoryRoot)
+    {
+        return [
             .. Seeds.SelectMany(CreateCases),
             .. OpenSourceCorpusCatalog.CreateCases(repositoryRoot)
         ];
+    }
 
-    internal static ImmutableArray<CorpusSeed> Seeds { get; } = [
+    internal static ImmutableArray<CorpusSeed> Seeds
+    {
+        get;
+    } = [
         Effect(
             "E01",
             CorpusVerdict.Proven,
@@ -175,39 +186,50 @@ internal static class CorpusCatalog {
         CorpusVerdict expected,
         string attributes,
         string body,
-        string additionalMembers = "") =>
-        new(id, "effects", expected, attributes, body, additionalMembers);
+        string additionalMembers = "")
+    {
+        return new(id, "effects", expected, attributes, body, additionalMembers);
+    }
 
     private static CorpusSeed Contract(
         string id,
         CorpusVerdict expected,
         string body,
-        string additionalMembers) =>
-        new(id, "contracts", expected, "", body, additionalMembers);
+        string additionalMembers)
+    {
+        return new(id, "contracts", expected, "", body, additionalMembers);
+    }
 
-    private static IEnumerable<CorpusCase> CreateCases(CorpusSeed seed) =>
-        Variants.Select(variant => CreateCase(seed, variant));
+    private static IEnumerable<CorpusCase> CreateCases(CorpusSeed seed)
+    {
+        return Variants.Select(variant => CreateCase(seed, variant));
+    }
 
     private static CorpusCase CreateCase(
         CorpusSeed seed,
-        CorpusVariant variant) {
+        CorpusVariant variant)
+    {
         var suffix = seed.Id;
-        var className = variant switch {
+        var className = variant switch
+        {
             CorpusVariant.Rename => $"Renamed_{suffix}",
             CorpusVariant.EscapedIdentifiers => $"@Corpus_{suffix}",
             _ => $"Corpus_{suffix}"
         };
-        var methodName = variant switch {
+        var methodName = variant switch
+        {
             CorpusVariant.Rename => $"Evaluate_{suffix}",
             CorpusVariant.EscapedIdentifiers => $"@Focus_{suffix}",
             _ => $"Focus_{suffix}"
         };
-        var helperName = variant switch {
+        var helperName = variant switch
+        {
             CorpusVariant.Rename => $"Pass_{suffix}",
             CorpusVariant.EscapedIdentifiers => $"@Identity_{suffix}",
             _ => $"Identity_{suffix}"
         };
-        var inputName = variant switch {
+        var inputName = variant switch
+        {
             CorpusVariant.Rename => "value",
             CorpusVariant.EscapedIdentifiers => "@input",
             _ => "input"
@@ -223,7 +245,8 @@ internal static class CorpusCatalog {
             methodName,
             helperName,
             inputName);
-        if (variant == CorpusVariant.AlphaRenameContractFormals) {
+        if (variant == CorpusVariant.AlphaRenameContractFormals)
+        {
             body = body.Replace(
                 "Range(value: -1, minimum: 0)",
                 "Range(contractValue: -1, contractMinimum: 0)",
@@ -239,12 +262,18 @@ internal static class CorpusCatalog {
         builder.AppendLine();
         builder.Append("public static class ").Append(className).AppendLine(" {");
         if (!string.IsNullOrWhiteSpace(members))
+        {
             builder.Append("    ").AppendLine(members);
+        }
+
         builder.Append("    private static int ")
             .Append(helperName)
             .AppendLine("(int value) => value;");
         if (!string.IsNullOrWhiteSpace(seed.Attributes))
+        {
             builder.Append("    ").AppendLine(seed.Attributes);
+        }
+
         builder.Append("    public static int ")
             .Append(methodName)
             .Append("(int ")
@@ -265,16 +294,20 @@ internal static class CorpusCatalog {
             builder.ToString());
     }
 
-    private static CorpusSupport ToSupport(CorpusVerdict verdict) =>
-        verdict is CorpusVerdict.Proven or CorpusVerdict.Refuted
+    private static CorpusSupport ToSupport(CorpusVerdict verdict)
+    {
+        return verdict is CorpusVerdict.Proven or CorpusVerdict.Refuted
             ? CorpusSupport.Supported
             : CorpusSupport.IntentionallyUnsupported;
+    }
 
     private static string CreatePrelude(
         CorpusVariant variant,
         string helper,
-        string input) =>
-        variant switch {
+        string input)
+    {
+        return variant switch
+        {
             CorpusVariant.Parentheses =>
                 $"var probe = {helper}((((({input}))))); _ = probe;",
             CorpusVariant.Temporary =>
@@ -290,9 +323,11 @@ internal static class CorpusCatalog {
             _ =>
                 $"var probe = {helper}({input}); _ = probe;"
         };
+    }
 
-    private static string AlphaRenameContractFormals(string members) =>
-        members
+    private static string AlphaRenameContractFormals(string members)
+    {
+        return members
             .Replace(
                 "Positive(int value) { Contract.Requires(value > 0); }",
                 "Positive(int contractValue) { " +
@@ -327,18 +362,23 @@ internal static class CorpusCatalog {
                 "Contract.Requires(contractValue >= 0 && " +
                 "contractValue <= 10); }",
                 StringComparison.Ordinal);
+    }
 
     private static string ReplaceTokens(
         string value,
         string method,
         string helper,
-        string input) =>
-        value.Replace("$METHOD$", method, StringComparison.Ordinal)
+        string input)
+    {
+        return value.Replace("$METHOD$", method, StringComparison.Ordinal)
             .Replace("$HELPER$", helper, StringComparison.Ordinal)
             .Replace("$INPUT$", input, StringComparison.Ordinal);
+    }
 
-    internal static string VariantKey(CorpusVariant variant) =>
-        variant switch {
+    internal static string VariantKey(CorpusVariant variant)
+    {
+        return variant switch
+        {
             CorpusVariant.Baseline => "baseline",
             CorpusVariant.Rename => "rename",
             CorpusVariant.EscapedIdentifiers => "escaped",
@@ -353,4 +393,5 @@ internal static class CorpusCatalog {
                 "reorder-independent-statements",
             _ => throw new ArgumentOutOfRangeException(nameof(variant))
         };
+    }
 }

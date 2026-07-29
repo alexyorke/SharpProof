@@ -1,6 +1,7 @@
 namespace SharpProof.Worker;
 
-internal static class EffectWitnessReplayer {
+internal static class EffectWitnessReplayer
+{
     private const WorkerEffectSet PureForbidden =
         WorkerEffectSet.ReadsCapturedState |
         WorkerEffectSet.ReadsStaticState |
@@ -13,19 +14,25 @@ internal static class EffectWitnessReplayer {
 
     internal static WorkerClaimResult Assemble(
         CompilerCallablePreparation target,
-        CompilerEffectClaimArtifact evidence) {
+        CompilerEffectClaimArtifact evidence)
+    {
         var replayed = evidence.Outcome != WorkerClaimOutcome.Refuted || Replays(evidence);
         var result = CallableClaimResultAssembler.Create(
             target, evidence.ClaimId,
             replayed ? evidence.Outcome : WorkerClaimOutcome.Unknown,
             replayed ? evidence.Reason : WorkerClaimReason.CounterexampleReplayFailed,
             replayed ? evidence.Certainty : WorkerEffectEvidenceCertainty.Unavailable);
-        if (!replayed) return result;
+        if (!replayed)
+        {
+            return result;
+        }
+
         result.EffectWitness = Copy(evidence.Witness);
         result.ProofCore = evidence.Outcome == WorkerClaimOutcome.Proven
             ? ["compiler-effect:" + evidence.EvidenceSha256]
             : [];
         if (evidence.Outcome == WorkerClaimOutcome.Refuted)
+        {
             result.Model = [
                 new WorkerModelValue {
                     Variable = "effect-witness",
@@ -33,14 +40,22 @@ internal static class EffectWitnessReplayer {
                     Value = evidence.EvidenceSha256
                 }
             ];
+        }
+
         return result;
     }
 
-    private static bool Replays(CompilerEffectClaimArtifact evidence) {
+    private static bool Replays(CompilerEffectClaimArtifact evidence)
+    {
         var witness = evidence.Witness;
         var constraint = evidence.Constraint;
-        if (witness == null || constraint == null) return false;
-        return evidence.ContractKind switch {
+        if (witness == null || constraint == null)
+        {
+            return false;
+        }
+
+        return evidence.ContractKind switch
+        {
             WorkerEffectContractKind.EnforcePure =>
                 (witness.Effects & PureForbidden) != 0 ||
                 witness.Capabilities != WorkerEffectCapabilitySet.None,
@@ -61,11 +76,15 @@ internal static class EffectWitnessReplayer {
 
     private static bool ViolatesEffectContract(
         WorkerEffectViolationWitness witness,
-        CompilerEffectConstraintArtifact constraint) {
+        CompilerEffectConstraintArtifact constraint)
+    {
         var effects = witness.Effects;
         if ((effects & WorkerEffectSet.Allocates) != 0 &&
             (constraint.AllowedEffects & WorkerEffectSet.Throws) != 0)
+        {
             effects &= ~WorkerEffectSet.Allocates;
+        }
+
         return (effects & ~constraint.AllowedEffects) != 0 ||
                (witness.Capabilities &
                 ~constraint.AllowedCapabilities) != 0 ||
@@ -74,17 +93,21 @@ internal static class EffectWitnessReplayer {
 
     private static bool HasDisallowedException(
         WorkerEffectViolationWitness witness,
-        CompilerEffectConstraintArtifact constraint) =>
-        witness.ExactExceptionTypeHierarchy.Length != 0 &&
+        CompilerEffectConstraintArtifact constraint)
+    {
+        return witness.ExactExceptionTypeHierarchy.Length != 0 &&
         !witness.ExactExceptionTypeHierarchy.Intersect(
             constraint.AllowedExceptionTypes,
             StringComparer.Ordinal).Any();
+    }
 
     private static WorkerEffectViolationWitness? Copy(
-        WorkerEffectViolationWitness? witness) =>
-        witness == null
+        WorkerEffectViolationWitness? witness)
+    {
+        return witness == null
             ? null
-            : new WorkerEffectViolationWitness {
+            : new WorkerEffectViolationWitness
+            {
                 Kind = witness.Kind,
                 Detail = witness.Detail,
                 Effects = witness.Effects,
@@ -92,7 +115,8 @@ internal static class EffectWitnessReplayer {
                 ExactExceptionTypeHierarchy = [
                     .. witness.ExactExceptionTypeHierarchy
                 ],
-                Location = new WorkerSourceLocation {
+                Location = new WorkerSourceLocation
+                {
                     Path = witness.Location.Path,
                     Start = witness.Location.Start,
                     Length = witness.Location.Length,
@@ -100,4 +124,5 @@ internal static class EffectWitnessReplayer {
                     Column = witness.Location.Column
                 }
             };
+    }
 }

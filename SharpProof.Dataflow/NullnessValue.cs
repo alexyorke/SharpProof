@@ -1,6 +1,7 @@
 namespace SharpProof.Dataflow;
 
-public enum NullnessValue {
+public enum NullnessValue
+{
     Bottom,
     Null,
     NonNull,

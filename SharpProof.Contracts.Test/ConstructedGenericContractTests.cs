@@ -9,9 +9,11 @@ using SharpProof.Ir;
 namespace SharpProof.Contracts.Test;
 
 [TestFixture]
-public sealed class ConstructedGenericContractTests {
+public sealed class ConstructedGenericContractTests
+{
     [Test]
-    public void OuterTypeParametersAreSpecializedForNestedMembers() =>
+    public void OuterTypeParametersAreSpecializedForNestedMembers()
+    {
         AssertBinds(
             """
             using SharpProof.Attributes;
@@ -33,9 +35,11 @@ public sealed class ConstructedGenericContractTests {
             }
             """,
             expectedClauses: 1);
+    }
 
     [Test]
-    public void NestedNamedTypesPreserveConstructedContainingTypes() =>
+    public void NestedNamedTypesPreserveConstructedContainingTypes()
+    {
         AssertBinds(
             """
             using SharpProof.Attributes;
@@ -61,9 +65,11 @@ public sealed class ConstructedGenericContractTests {
             }
             """,
             expectedClauses: 2);
+    }
 
     [Test]
-    public void NamedTypeArgumentsAreRecursivelySpecialized() =>
+    public void NamedTypeArgumentsAreRecursivelySpecialized()
+    {
         AssertBinds(
             """
             using System.Collections.Generic;
@@ -92,9 +98,11 @@ public sealed class ConstructedGenericContractTests {
             }
             """,
             expectedClauses: 2);
+    }
 
     [Test]
-    public void ArrayElementTypesAreRecursivelySpecialized() =>
+    public void ArrayElementTypesAreRecursivelySpecialized()
+    {
         AssertBinds(
             """
             using SharpProof.Attributes;
@@ -121,9 +129,11 @@ public sealed class ConstructedGenericContractTests {
             }
             """,
             expectedClauses: 2);
+    }
 
     [Test]
-    public void PointerTargetTypesAreRecursivelySpecialized() =>
+    public void PointerTargetTypesAreRecursivelySpecialized()
+    {
         AssertBinds(
             """
             using SharpProof.Attributes;
@@ -149,8 +159,10 @@ public sealed class ConstructedGenericContractTests {
             }
             """,
             expectedClauses: 1);
+    }
 
-    private static void AssertBinds(string source, int expectedClauses) {
+    private static void AssertBinds(string source, int expectedClauses)
+    {
         var compilation = CreateCompilation(source);
         var tree = compilation.SyntaxTrees.Single();
         var invocation = tree.GetRoot()
@@ -171,7 +183,8 @@ public sealed class ConstructedGenericContractTests {
             Has.Length.EqualTo(expectedClauses));
     }
 
-    private static CSharpCompilation CreateCompilation(string source) {
+    private static CSharpCompilation CreateCompilation(string source)
+    {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,
             new CSharpParseOptions(
@@ -199,7 +212,8 @@ public sealed class ConstructedGenericContractTests {
         return compilation;
     }
 
-    private static ImmutableArray<MetadataReference> GetReferences() {
+    private static ImmutableArray<MetadataReference> GetReferences()
+    {
         var paths = ((string)AppContext.GetData(
                 "TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator)

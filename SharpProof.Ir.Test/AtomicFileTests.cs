@@ -5,24 +5,30 @@ using SharpProof.Ir;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class AtomicFileTests {
+public sealed class AtomicFileTests
+{
     private string _root = null!;
 
     [SetUp]
-    public void SetUp() {
+    public void SetUp()
+    {
         _root = Path.Combine(
             Path.GetTempPath(), "SharpProof.AtomicFile." + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_root);
     }
 
     [TearDown]
-    public void TearDown() {
+    public void TearDown()
+    {
         if (Directory.Exists(_root))
+        {
             Directory.Delete(_root, recursive: true);
+        }
     }
 
     [Test]
-    public void WriteUtf8CreatesParentsWithoutPreambleAndReplacesDestination() {
+    public void WriteUtf8CreatesParentsWithoutPreambleAndReplacesDestination()
+    {
         var path = Path.Combine(_root, "nested", "result.txt");
         AtomicFile.WriteUtf8(path, "first\n");
         AtomicFile.WriteUtf8(path, "second\n");
@@ -32,7 +38,8 @@ public sealed class AtomicFileTests {
     }
 
     [Test]
-    public async Task WriteUtf8AsyncCreatesParentsWithoutPreambleAndReplacesDestination() {
+    public async Task WriteUtf8AsyncCreatesParentsWithoutPreambleAndReplacesDestination()
+    {
         var path = Path.Combine(_root, "nested", "result.txt");
         await AtomicFile.WriteUtf8Async(path, "first\n");
         await AtomicFile.WriteUtf8Async(path, "second\n");
@@ -44,7 +51,8 @@ public sealed class AtomicFileTests {
     }
 
     [Test]
-    public void CanceledWritePreservesDestinationAndCleansTemporaryFile() {
+    public void CanceledWritePreservesDestinationAndCleansTemporaryFile()
+    {
         var path = Path.Combine(_root, "result.txt");
         File.WriteAllText(path, "original");
 
@@ -56,7 +64,8 @@ public sealed class AtomicFileTests {
     }
 
     [Test]
-    public void FailedPublicationCleansTemporaryFile() {
+    public void FailedPublicationCleansTemporaryFile()
+    {
         var path = Path.Combine(_root, "destination");
         Directory.CreateDirectory(path);
 
@@ -65,6 +74,8 @@ public sealed class AtomicFileTests {
         Assert.That(TemporaryFiles(path), Is.Empty);
     }
 
-    private static string[] TemporaryFiles(string path) =>
-        Directory.GetFiles(Path.GetDirectoryName(path)!, Path.GetFileName(path) + ".*.tmp");
+    private static string[] TemporaryFiles(string path)
+    {
+        return Directory.GetFiles(Path.GetDirectoryName(path)!, Path.GetFileName(path) + ".*.tmp");
+    }
 }

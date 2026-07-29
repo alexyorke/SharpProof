@@ -1,9 +1,11 @@
 namespace SharpProof.Effects.Test;
 
 [TestFixture]
-public sealed class EffectAnalysisTests {
+public sealed class EffectAnalysisTests
+{
     [Test]
-    public void PureArithmeticHasNoMayEffects() {
+    public void PureArithmeticHasNoMayEffects()
+    {
         var result = Analyze(
             """
             public static class Sample {
@@ -24,7 +26,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void NameOfIsAnExactEffectFreeCompileTimeOperation() {
+    public void NameOfIsAnExactEffectFreeCompileTimeOperation()
+    {
         var result = Analyze(
             """
             public static class Sample {
@@ -41,7 +44,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void StringConstructionDistinguishesKnownAndUnknownAllocation() {
+    public void StringConstructionDistinguishesKnownAndUnknownAllocation()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class Sample {
@@ -81,7 +85,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ConversionEffectsPreventFalseZeroAllocationAndDoesNotThrowProofs() {
+    public void ConversionEffectsPreventFalseZeroAllocationAndDoesNotThrowProofs()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class Sample {
@@ -133,7 +138,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ManagedAllocationUsesModeledObjectConstructor() {
+    public void ManagedAllocationUsesModeledObjectConstructor()
+    {
         var result = Analyze(
             """
             public static class Sample {
@@ -153,7 +159,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void VolatileFieldAccessRequiresSynchronizationCapability() {
+    public void VolatileFieldAccessRequiresSynchronizationCapability()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public sealed class Sample {
@@ -168,7 +175,8 @@ public sealed class EffectAnalysisTests {
         var volatileRead = session.Analyze(Method(compilation, "ReadVolatile"));
         var ordinaryRead = session.Analyze(Method(compilation, "ReadOrdinary"));
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 volatileRead.Summary.Capabilities.Contains(
                     EffectCapabilityKind.Synchronization),
@@ -186,7 +194,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void CompileTimeConstantsDoNotReadStaticState() {
+    public void CompileTimeConstantsDoNotReadStaticState()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class Sample {
@@ -198,7 +207,8 @@ public sealed class EffectAnalysisTests {
             }
             """);
         var session = new EffectAnalysisSession(compilation);
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 session.Analyze(Method(compilation, "ReadConstant"))
                     .Summary.Reads.IsEmpty,
@@ -211,7 +221,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void PropertyIncrementUsesBothAccessorsWithoutBecomingIncomplete() {
+    public void PropertyIncrementUsesBothAccessorsWithoutBecomingIncomplete()
+    {
         var result = Analyze(
             """
             public sealed class Sample {
@@ -228,7 +239,8 @@ public sealed class EffectAnalysisTests {
             "Sample",
             "Increment");
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(result.Summary.Reads.Regions, Does.Contain(
                 EffectRegionId.Receiver));
             Assert.That(result.Summary.Writes.Regions, Does.Contain(
@@ -241,7 +253,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ValueTypeConstructionDoesNotReportManagedAllocation() {
+    public void ValueTypeConstructionDoesNotReportManagedAllocation()
+    {
         var result = Analyze(
             """
             public readonly struct Token {
@@ -263,7 +276,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ObjectAndCollectionInitializersContributeTheirEffects() {
+    public void ObjectAndCollectionInitializersContributeTheirEffects()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             using System.Collections;
@@ -313,7 +327,8 @@ public sealed class EffectAnalysisTests {
         var arrayInitializer = session.Analyze(
             Method(compilation, "ArrayInitializer"));
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 objectInitializer.Summary.Writes.IsUnknown,
                 Is.True);
@@ -336,7 +351,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ConstructorMemberInitializersContributeTheirEffects() {
+    public void ConstructorMemberInitializersContributeTheirEffects()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public sealed class Sample {
@@ -360,7 +376,8 @@ public sealed class EffectAnalysisTests {
 
         var result = new EffectAnalysisSession(compilation).Analyze(constructor);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 result.Summary.Writes.Contains(EffectRegionId.Receiver),
                 Is.True);
@@ -381,7 +398,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void PossibleTypeInitializationFailsClosed() {
+    public void PossibleTypeInitializationFailsClosed()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public sealed class Sample {
@@ -405,7 +423,8 @@ public sealed class EffectAnalysisTests {
         foreach (var method in new[] {
                      constructor,
                      Method(compilation, "Read")
-                 }) {
+                 })
+        {
             var result = session.Analyze(method);
             Assert.That(
                 result.Summary.Completeness,
@@ -423,7 +442,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void CrossTypeStaticFieldAccessAccountsForTypeInitialization() {
+    public void CrossTypeStaticFieldAccessAccountsForTypeInitialization()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class Global {
@@ -447,7 +467,8 @@ public sealed class EffectAnalysisTests {
         var result = new EffectAnalysisSession(compilation).Analyze(
             Method(compilation, "Read"));
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 result.Summary.Completeness,
                 Is.EqualTo(EffectCompleteness.Incomplete));
@@ -461,7 +482,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void MetadataStaticFieldAccessFailsClosedAtTypeInitializationBoundary() {
+    public void MetadataStaticFieldAccessFailsClosedAtTypeInitializationBoundary()
+    {
         var externalReference = EffectTestHost.EmitReference(
             """
             public static class ExternalInitialized {
@@ -480,7 +502,8 @@ public sealed class EffectAnalysisTests {
         var result = new EffectAnalysisSession(compilation).Analyze(
             Method(compilation, "Read"));
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 result.Summary.Completeness,
                 Is.EqualTo(EffectCompleteness.Incomplete));
@@ -492,7 +515,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void FieldWritesRetainReceiverAndStaticRegions() {
+    public void FieldWritesRetainReceiverAndStaticRegions()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public sealed class Sample {
@@ -525,7 +549,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void LocalAliasesRetainCallerOwnedAndFreshRegions() {
+    public void LocalAliasesRetainCallerOwnedAndFreshRegions()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public sealed class Box {
@@ -577,7 +602,8 @@ public sealed class EffectAnalysisTests {
                 "Box",
                 "FreshAlias"));
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 receiver.Summary.Writes.Contains(EffectRegionId.Receiver),
                 Is.True);
@@ -605,7 +631,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void TrustedCompleteExternalContractIsTheCapabilityOverride() {
+    public void TrustedCompleteExternalContractIsTheCapabilityOverride()
+    {
         var externalReference = EffectTestHost.EmitReference(
             """
             using SharpProof.Attributes;
@@ -650,7 +677,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void TrustedCompleteBodylessSourceContractIsResolved() {
+    public void TrustedCompleteBodylessSourceContractIsResolved()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             using SharpProof.Attributes;
@@ -674,7 +702,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ExternalSummaryRequiresBothTrustAndCompleteContract() {
+    public void ExternalSummaryRequiresBothTrustAndCompleteContract()
+    {
         var externalReference = EffectTestHost.EmitReference(
             """
             using SharpProof.Attributes;
@@ -725,7 +754,8 @@ public sealed class EffectAnalysisTests {
                      "Incomplete",
                      "ImplicitDefaults",
                      "InvalidReason"
-                 }) {
+                 })
+        {
             var result = session.Analyze(
                 EffectTestHost.RequireMethod(
                     compilation,
@@ -756,7 +786,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void VirtualPropertyAndInterfaceIndexerDispatchFailClosed() {
+    public void VirtualPropertyAndInterfaceIndexerDispatchFailClosed()
+    {
         var externalReference = EffectTestHost.EmitReference(
             """
             using SharpProof.Attributes;
@@ -784,7 +815,8 @@ public sealed class EffectAnalysisTests {
             externalReference);
         var session = new EffectAnalysisSession(compilation);
 
-        foreach (var methodName in new[] { "Read", "Write" }) {
+        foreach (var methodName in new[] { "Read", "Write" })
+        {
             var result = session.Analyze(Method(compilation, methodName));
             Assert.That(
                 result.Summary.Completeness,
@@ -799,7 +831,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ExplicitAndImplicitExceptionsRemainResolved() {
+    public void ExplicitAndImplicitExceptionsRemainResolved()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             using System;
@@ -941,7 +974,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ApiSpecMakesModeledExternalCallComplete() {
+    public void ApiSpecMakesModeledExternalCallComplete()
+    {
         var result = Analyze(
             """
             public static class Sample {
@@ -962,7 +996,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void CompilerElisionSkipsGhostArgumentsButDirectIntrinsicsThrow() {
+    public void CompilerElisionSkipsGhostArgumentsButDirectIntrinsicsThrow()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -985,7 +1020,8 @@ public sealed class EffectAnalysisTests {
         var directOld = session.Analyze(
             Method(compilation, "DirectOld")).Summary;
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 session.Analyze(Method(compilation, "Elided"))
                     .Summary.Throws.IsEmpty,
@@ -1038,7 +1074,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void UnmodeledMetadataCallFailsClosed() {
+    public void UnmodeledMetadataCallFailsClosed()
+    {
         var result = Analyze(
             """
             public static class Sample {
@@ -1059,7 +1096,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void SourceSummaryRemapsParameterWritesAtDepthZero() {
+    public void SourceSummaryRemapsParameterWritesAtDepthZero()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public sealed class Box {
@@ -1089,7 +1127,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ReducedSourceExtensionRemapsItsReceiverArgument() {
+    public void ReducedSourceExtensionRemapsItsReceiverArgument()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public sealed class Box {
@@ -1115,7 +1154,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void RefParameterWritesRemapToTheCaller() {
+    public void RefParameterWritesRemapToTheCaller()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class Sample {
@@ -1134,7 +1174,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void RecursiveSccStartsConservative() {
+    public void RecursiveSccStartsConservative()
+    {
         var result = Analyze(
             """
             public static class Sample {
@@ -1154,7 +1195,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ReachableControlFlowCycleMayDiverge() {
+    public void ReachableControlFlowCycleMayDiverge()
+    {
         var result = Analyze(
             """
             public static class Sample {
@@ -1178,7 +1220,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ScalarImpossibleBranchDoesNotContributeEffects() {
+    public void ScalarImpossibleBranchDoesNotContributeEffects()
+    {
         var result = Analyze(
             """
             public static class Sample {
@@ -1193,7 +1236,8 @@ public sealed class EffectAnalysisTests {
             "Sample",
             "Allocate");
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 result.Projection.Effects & SharpProofEffect.Allocates,
                 Is.EqualTo(SharpProofEffect.None));
@@ -1205,7 +1249,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ReferenceArrayStoreRetainsAllImplicitExceptions() {
+    public void ReferenceArrayStoreRetainsAllImplicitExceptions()
+    {
         var result = Analyze(
             """
             public static class Sample {
@@ -1227,7 +1272,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ResolvedNullReceiverThrowSurvivesUnknownDispatch() {
+    public void ResolvedNullReceiverThrowSurvivesUnknownDispatch()
+    {
         var result = Analyze(
             """
             public static class Sample {
@@ -1246,7 +1292,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void DefinitelyNonNullReceiverDoesNotAddNullReferenceException() {
+    public void DefinitelyNonNullReceiverDoesNotAddNullReferenceException()
+    {
         var result = Analyze(
             """
             public static class Sample {
@@ -1262,7 +1309,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void TryCastReceiverCanStillThrowNullReferenceException() {
+    public void TryCastReceiverCanStillThrowNullReferenceException()
+    {
         var result = Analyze(
             """
             public static class Sample {
@@ -1279,7 +1327,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void SourceEffectContractCannotOverrideTheBody() {
+    public void SourceEffectContractCannotOverrideTheBody()
+    {
         var result = Analyze(
             """
             using SharpProof.Attributes;
@@ -1303,7 +1352,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void UntrustedSourceContractRetainsItsDecodedSummaryForChecking() {
+    public void UntrustedSourceContractRetainsItsDecodedSummaryForChecking()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             using SharpProof.Attributes;
@@ -1333,7 +1383,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void AnalyzeBuildsOnlyTheRequestedReachableCallGraph() {
+    public void AnalyzeBuildsOnlyTheRequestedReachableCallGraph()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class Sample {
@@ -1358,7 +1409,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void AnalyzeAllOrderAndSummariesAreDeterministic() {
+    public void AnalyzeAllOrderAndSummariesAreDeterministic()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class Zeta {
@@ -1386,7 +1438,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ColdConcurrentAnalysisPublishesOneDeterministicCache() {
+    public void ColdConcurrentAnalysisPublishesOneDeterministicCache()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class Sample {
@@ -1408,7 +1461,8 @@ public sealed class EffectAnalysisTests {
         var expected = results[0] ??
                        throw new InvalidOperationException(
                            "Concurrent analysis produced no result.");
-        foreach (var result in results) {
+        foreach (var result in results)
+        {
             Assert.That(result, Is.Not.Null);
             Assert.That(
                 ReferenceEquals(result!.Summary, expected.Summary),
@@ -1421,7 +1475,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void UnsupportedDynamicInvocationFailsClosed() {
+    public void UnsupportedDynamicInvocationFailsClosed()
+    {
         var result = Analyze(
             """
             public static class Sample {
@@ -1439,7 +1494,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ConditionalAccessDoesNotInventNullReceiverExceptions() {
+    public void ConditionalAccessDoesNotInventNullReceiverExceptions()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public sealed class Receiver {
@@ -1465,7 +1521,8 @@ public sealed class EffectAnalysisTests {
             """);
         var session = new EffectAnalysisSession(compilation);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 session.Analyze(Method(compilation, "Read"))
                     .Summary.Throws.IsEmpty,
@@ -1481,7 +1538,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ExceptionFlowReportsOnlyExceptionsThatEscape() {
+    public void ExceptionFlowReportsOnlyExceptionsThatEscape()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             using System;
@@ -1615,7 +1673,8 @@ public sealed class EffectAnalysisTests {
             """);
         var session = new EffectAnalysisSession(compilation);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 session.Analyze(Method(compilation, "ExactCatch"))
                     .Summary.Throws.IsEmpty,
@@ -1658,7 +1717,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void CatchAllConsumesUnknownManagedThrowsOnlyWhenUnfiltered() {
+    public void CatchAllConsumesUnknownManagedThrowsOnlyWhenUnfiltered()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             using System;
@@ -1712,7 +1772,8 @@ public sealed class EffectAnalysisTests {
             """);
         var session = new EffectAnalysisSession(compilation);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 session.Analyze(Method(compilation, "CatchAll"))
                     .Summary.Throws.IsEmpty,
@@ -1737,7 +1798,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void AcyclicFlowDischargesOnlyProvenImplicitExceptions() {
+    public void AcyclicFlowDischargesOnlyProvenImplicitExceptions()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             #nullable enable
@@ -1794,7 +1856,8 @@ public sealed class EffectAnalysisTests {
                      "PositiveSize",
                      "GuardedIndex",
                      "NonNullReceiver"
-                 }) {
+                 })
+        {
             var throws = session.Analyze(Method(compilation, method))
                 .Summary.Throws;
             Assert.That(
@@ -1810,7 +1873,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ReassignmentsWrapAndBadIndexesRetainImplicitExceptions() {
+    public void ReassignmentsWrapAndBadIndexesRetainImplicitExceptions()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             #nullable enable
@@ -1893,7 +1957,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void ReturnAnnotationsRefineReceiversDivisorsAndIndexes() {
+    public void ReturnAnnotationsRefineReceiversDivisorsAndIndexes()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             #nullable enable
@@ -1942,7 +2007,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void CallsThatCanMutateLocalsInvalidateFlowFacts() {
+    public void CallsThatCanMutateLocalsInvalidateFlowFacts()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             public static class Sample {
@@ -1990,7 +2056,8 @@ public sealed class EffectAnalysisTests {
                      "OutConstructor",
                      "LocalFunctionCall",
                      "DelegateCall"
-                 }) {
+                 })
+        {
             AssertContainsThrows(
                 session.Analyze(Method(compilation, method)).Summary,
                 "System.DivideByZeroException");
@@ -1998,7 +2065,8 @@ public sealed class EffectAnalysisTests {
     }
 
     [Test]
-    public void DirectWitnessesAreNarrowDeterministicAndOrdered() {
+    public void DirectWitnessesAreNarrowDeterministicAndOrdered()
+    {
         var compilation = EffectTestHost.CreateCompilation(
             """
             using System;
@@ -2056,7 +2124,8 @@ public sealed class EffectAnalysisTests {
 
         var frameworkThrow = Witnesses("Throw");
         var userThrow = Witnesses("ThrowUser");
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(frameworkThrow[1].ExceptionType?.MetadataName,
                 Is.EqualTo(nameof(InvalidOperationException)));
             Assert.That(userThrow[1].ExceptionType, Is.Null);
@@ -2067,18 +2136,23 @@ public sealed class EffectAnalysisTests {
         }
         return;
 
-        ImmutableArray<EffectDirectWitness> Witnesses(string name) =>
-            session.Analyze(Method(compilation, name)).DirectWitnesses;
+        ImmutableArray<EffectDirectWitness> Witnesses(string name)
+        {
+            return session.Analyze(Method(compilation, name)).DirectWitnesses;
+        }
 
-        void AssertKinds(string name, params string[] expected) =>
+        void AssertKinds(string name, params string[] expected)
+        {
             Assert.That(Witnesses(name).Select(static witness => witness.Kind),
                 Is.EqualTo(expected), name);
+        }
     }
 
     private static EffectMethodResult Analyze(
         string source,
         string typeMetadataName,
-        string methodName) {
+        string methodName)
+    {
         var compilation = EffectTestHost.CreateCompilation(source);
         return new EffectAnalysisSession(compilation).Analyze(
             EffectTestHost.RequireMethod(
@@ -2089,31 +2163,39 @@ public sealed class EffectAnalysisTests {
 
     private static IMethodSymbol Method(
         Compilation compilation,
-        string methodName) =>
-        EffectTestHost.RequireMethod(compilation, "Sample", methodName);
+        string methodName)
+    {
+        return EffectTestHost.RequireMethod(compilation, "Sample", methodName);
+    }
 
     private static void AssertThrows(
         EffectSummary summary,
-        params string[] metadataNames) {
+        params string[] metadataNames)
+    {
         Assert.That(summary.Throws.IncludesUnknown, Is.False);
         AssertContainsThrows(summary, metadataNames);
     }
 
     private static void AssertContainsThrows(
         EffectSummary summary,
-        params string[] metadataNames) {
+        params string[] metadataNames)
+    {
         var actual = summary.Throws.Types
             .Select(static type =>
                 type.ContainingNamespace.MetadataName + "." + type.MetadataName)
             .ToImmutableArray();
         foreach (var metadataName in metadataNames)
+        {
             Assert.That(
                 actual,
                 Does.Contain(metadataName));
+        }
     }
 
-    private static string ResultKey(EffectMethodResult result) =>
-        result.Method.ContainingType.MetadataName + "." +
+    private static string ResultKey(EffectMethodResult result)
+    {
+        return result.Method.ContainingType.MetadataName + "." +
         result.Method.MetadataName + "/" +
         result.Method.Parameters.Length;
+    }
 }

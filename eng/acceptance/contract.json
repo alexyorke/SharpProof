@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "flagship": "effects",
   "releaseLine": "1.0.0-preview",
   "supportedTargetFrameworks": [
@@ -43,11 +43,10 @@
       "SharpProof.Verify/ProofKernel.cs",
       "SharpProof.Verify/Evidence.cs",
       "SharpProof.Verify/Outcomes.cs"
-    ],
-    "maximumNonblankLines": 275
+    ]
   },
   "trustedComputingBase": {
-    "measurement": "Aggregate nonblank physical lines across the component's repository-relative paths.",
+    "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
     "components": [
       {
         "name": "discovery",
@@ -56,8 +55,7 @@
           "SharpProof.Analyzer/CompilerArtifact/ClaimManifestBuilder.cs",
           "SharpProof.Analyzer/CompilerArtifact/SemanticClaimIdentity.cs",
           "SharpProof.Contracts/ContractClauseInventoryBuilder.cs"
-        ],
-        "maximumNonblankLines": 1025
+        ]
       },
       {
         "name": "lowering",
@@ -72,8 +70,7 @@
           "SharpProof.Contracts/ContractIntrinsicValidator.cs",
           "SharpProof.Frontend/RoslynOperationLowerer.cs",
           "SharpProof.Frontend/RoslynProgramLowerer.cs"
-        ],
-        "maximumNonblankLines": 2970
+        ]
       },
       {
         "name": "execution",
@@ -82,22 +79,19 @@
           "SharpProof.Worker/AcyclicBlockPredicateExecutor.cs",
           "SharpProof.Worker/SpecResultDomainProjection.cs",
           "SharpProof.Worker/SharpProofWorker.cs"
-        ],
-        "maximumNonblankLines": 930
+        ]
       },
       {
         "name": "obligationGeneration",
         "paths": [
           "SharpProof.Worker/PostconditionObligationBuilder.cs"
-        ],
-        "maximumNonblankLines": 130
+        ]
       },
       {
         "name": "encoding",
         "paths": [
           "SharpProof.Smt/IrSmtBackend.cs"
-        ],
-        "maximumNonblankLines": 410
+        ]
       },
       {
         "name": "apiSpecifications",
@@ -105,15 +99,13 @@
           "SharpProof.Specs/ApiSpecTable.cs",
           "SharpProof.Effects/ApiSpecResolution.cs",
           "SharpProof.Specs/ApiSpecInstantiation.cs"
-        ],
-        "maximumNonblankLines": 844
+        ]
       },
       {
         "name": "apiSpecificationIdentity",
         "paths": [
           "SharpProof.Specs/ApiSpecContentDigest.cs"
-        ],
-        "maximumNonblankLines": 64
+        ]
       },
       {
         "name": "apiSpecificationCatalog",
@@ -121,8 +113,7 @@
           "SharpProof.Specs/DefaultApiSpecCatalog.json",
           "scripts/Generate-ApiSpecCatalog.ps1",
           "SharpProof.Specs/DefaultApiSpecCatalog.generated.cs"
-        ],
-        "maximumNonblankLines": 1761
+        ]
       },
       {
         "name": "scalarSemanticsCatalog",
@@ -130,8 +121,7 @@
           "SharpProof.Frontend/CSharpScalarSemantics.json",
           "scripts/Generate-CSharpScalarSemantics.ps1",
           "SharpProof.Frontend/CSharpScalarSemantics.generated.cs"
-        ],
-        "maximumNonblankLines": 948
+        ]
       },
       {
         "name": "effectAnalysis",
@@ -160,8 +150,7 @@
           "SharpProof.Dataflow/NullnessDomain.cs",
           "SharpProof.Dataflow/NullnessValue.cs",
           "SharpProof.Specs/FrameworkTypeMetadataNames.cs"
-        ],
-        "maximumNonblankLines": 5072
+        ]
       },
       {
         "name": "replay",
@@ -170,31 +159,27 @@
           "SharpProof.Ir/IrInterpreter.cs",
           "SharpProof.Ir/IrProgramInterpreter.cs",
           "SharpProof.Worker/CallableCounterexampleReplayer.cs"
-        ],
-        "maximumNonblankLines": 711
+        ]
       },
       {
         "name": "effectReplay",
         "paths": [
           "SharpProof.Worker/EffectWitnessReplayer.cs"
-        ],
-        "maximumNonblankLines": 110
+        ]
       },
       {
         "name": "policy",
         "paths": [
           "SharpProof.Worker.Launcher/Program.cs",
           "SharpProof.Worker/CallableVerificationPolicy.cs"
-        ],
-        "maximumNonblankLines": 590
+        ]
       },
       {
         "name": "resultAssembly",
         "paths": [
           "SharpProof.Worker/CallableClaimResultAssembler.cs",
           "SharpProof.Worker.Protocol/WorkerResultAssembler.cs"
-        ],
-        "maximumNonblankLines": 220
+        ]
       },
       {
         "name": "compilerInputIdentity",
@@ -202,15 +187,13 @@
           "SharpProof.Analyzer/CompilerArtifact/CompilerCompilationCapture.cs",
           "SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs",
           "SharpProof.CompilerArtifact/CompilationFingerprint.cs"
-        ],
-        "maximumNonblankLines": 300
+        ]
       },
       {
         "name": "canonicalIdentityEncoding",
         "paths": [
           "SharpProof.Ir/CanonicalHashWriter.cs"
-        ],
-        "maximumNonblankLines": 100
+        ]
       },
       {
         "name": "protocolValidation",
@@ -218,8 +201,7 @@
           "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
           "SharpProof.Worker.Protocol/ProtocolJson.cs"
         ],
-        "rationale": "The checked-in generated model and runtime validator are the reviewed, coverlet-visible runtime protocol boundary; CI separately verifies the schema projection is current.",
-        "maximumNonblankLines": 1150
+        "rationale": "The checked-in generated model and runtime validator are the reviewed, coverlet-visible runtime protocol boundary; CI separately verifies the schema projection is current."
       },
       {
         "name": "cacheValidation",
@@ -228,63 +210,72 @@
           "SharpProof.CompilerArtifact/CompilerManifestArtifact.cs",
           "SharpProof.Worker/WorkerInputSnapshot.cs",
           "SharpProof.Worker/VerificationCache.cs"
-        ],
-        "maximumNonblankLines": 910
+        ]
       }
     ]
   },
-  "productionSize": {
-    "maximumPhysicalLines": 19916,
-    "maximumNonblankLines": 18376
+  "productionComplexity": {
+    "measurement": "Aggregate Roslyn expression nodes, decision points, and members across handwritten production C#; whitespace, comments, line wrapping, and optional braces are excluded.",
+    "maximumExpressionNodes": 94400,
+    "maximumDecisionPoints": 5200,
+    "maximumMembers": 3900
   },
-  "productionLayerReduction": {
-    "baselineCommit": "9d9ae94714c8fd3d0631f07b150e81d50a7be093",
-    "minimumPercent": 10,
+  "productionCoordinatorComplexity": {
+    "measurement": "Roslyn expression nodes and decision points in coordination layers; whitespace, comments, line wrapping, and optional braces are excluded.",
     "layers": [
       {
         "name": "callable-verification-coordinator",
         "path": "SharpProof.Worker/CallableVerifier.cs",
-        "baselineNonblankLines": 467
+        "maximumExpressionNodes": 1140,
+        "maximumDecisionPoints": 55
       },
       {
         "name": "contract-binder",
         "path": "SharpProof.Contracts/ContractBinder.cs",
-        "baselineNonblankLines": 655
+        "maximumExpressionNodes": 1890,
+        "maximumDecisionPoints": 115
       },
       {
         "name": "soundness-meta-analyzer",
         "path": "SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs",
-        "baselineNonblankLines": 675
+        "maximumExpressionNodes": 2370,
+        "maximumDecisionPoints": 145
       },
       {
         "name": "ir-factory",
         "path": "SharpProof.Ir/IrFactory.cs",
-        "baselineNonblankLines": 690
+        "maximumExpressionNodes": 2730,
+        "maximumDecisionPoints": 140
       },
       {
         "name": "api-spec-table",
         "path": "SharpProof.Specs/ApiSpecTable.cs",
-        "baselineNonblankLines": 479
+        "maximumExpressionNodes": 1920,
+        "maximumDecisionPoints": 115
       },
       {
         "name": "requires-call-site-analyzer",
         "path": "SharpProof.Analyzer/RequiresCallSiteAnalyzer.cs",
-        "baselineNonblankLines": 456
+        "maximumExpressionNodes": 1450,
+        "maximumDecisionPoints": 105
       },
       {
         "name": "effect-analysis-coordinator",
         "path": "SharpProof.Effects/EffectAnalysisSession.cs",
-        "baselineNonblankLines": 554
+        "maximumExpressionNodes": 2030,
+        "maximumDecisionPoints": 110
       },
       {
         "name": "contract-for-generator",
         "path": "SharpProof.ContractForGenerator/ContractForValidatorGenerator.cs",
-        "baselineNonblankLines": 298
+        "maximumExpressionNodes": 910,
+        "maximumDecisionPoints": 35
       },
       {
         "name": "protocol-validator",
         "path": "SharpProof.Worker.Protocol/ProtocolJson.cs",
-        "baselineNonblankLines": 559
+        "maximumExpressionNodes": 3450,
+        "maximumDecisionPoints": 135
       }
     ]
   },

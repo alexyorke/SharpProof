@@ -8,7 +8,8 @@
 
 namespace SharpProof.CompilerArtifact;
 
-internal sealed class PortableIrGraph {
+internal sealed class PortableIrGraph
+{
     public bool HasProgram { get; set; }
     public PortableIrType[] Types { get; set; } = [];
     public int[] Identities { get; set; } = [];
@@ -25,7 +26,8 @@ internal sealed class PortableIrType(
     IrTypeKind kind = default,
     string? name = null,
     int element = -1
-) {
+)
+{
     public IrTypeKind Kind { get; set; } = kind;
     public string Name { get; set; } = name ?? string.Empty;
     public int Element { get; set; } = element;
@@ -34,7 +36,8 @@ internal sealed class PortableIrType(
 internal sealed class PortableIrVariable(
     string? name = null,
     int type = -1
-) {
+)
+{
     public string Name { get; set; } = name ?? string.Empty;
     public int Type { get; set; } = type;
 }
@@ -46,7 +49,8 @@ internal sealed class PortableIrMember(
     int returnType = -1,
     bool isStatic = false,
     int[]? parameterTypes = null
-) {
+)
+{
     public int Identity { get; set; } = identity;
     public int DeclaringType { get; set; } = declaringType;
     public string Name { get; set; } = name ?? string.Empty;
@@ -58,7 +62,8 @@ internal sealed class PortableIrMember(
 
 internal sealed class PortableIrOperation(
     string? description = null
-) {
+)
+{
     public string? Description { get; set; } = description;
 }
 
@@ -72,7 +77,8 @@ internal sealed class PortableIrTerm(
     long number = 0,
     string? text = null,
     int[]? items = null
-) {
+)
+{
     public IrTermKind Kind { get; set; } = kind;
     public int Type { get; set; } = type;
     public int A { get; set; } = a;
@@ -90,7 +96,8 @@ internal sealed class PortableIrLocation(
     int a = -1,
     int b = -1,
     int[]? items = null
-) {
+)
+{
     public IrLocationKind Kind { get; set; } = kind;
     public int Type { get; set; } = type;
     public int A { get; set; } = a;
@@ -106,7 +113,8 @@ internal sealed class PortableIrInstruction(
     int c = -1,
     int[]? items = null,
     PortableIrLocation? location = null
-) {
+)
+{
     public IrInstructionKind Kind { get; set; } = kind;
     public int Operation { get; set; } = operation;
     public int A { get; set; } = a;
@@ -119,7 +127,8 @@ internal sealed class PortableIrInstruction(
 internal sealed class PortableIrBlock(
     string? name = null,
     PortableIrInstruction[]? instructions = null
-) {
+)
+{
     public string? Name { get; set; } = name;
     public PortableIrInstruction[] Instructions { get; set; } = instructions ?? [];
 }
@@ -131,7 +140,8 @@ internal sealed class DecodedPortableIrGraph(
     IrVarId[] variables,
     IrBlockId[] blocks,
     IrInstruction[] instructions
-) {
+)
+{
     internal IrFactory Factory { get; } = factory;
     internal IrProgram? Program { get; } = program;
     internal IReadOnlyList<IrTerm> Roots { get; } = roots;
@@ -144,13 +154,15 @@ internal sealed class EncodedPortableIrGraph(
     PortableIrGraph graph,
     IReadOnlyDictionary<IrVarId, int> variableIndices,
     IReadOnlyDictionary<IrInstructionId, int> instructionIndices
-) {
+)
+{
     internal PortableIrGraph Graph { get; } = graph;
     internal IReadOnlyDictionary<IrVarId, int> VariableIndices { get; } = variableIndices;
     internal IReadOnlyDictionary<IrInstructionId, int> InstructionIndices { get; } = instructionIndices;
 }
 
-internal static partial class PortableIrGraphCodec {
+internal static partial class PortableIrGraphCodec
+{
     private static readonly IrOpaquePurity[] OpaquePurities = [
         IrOpaquePurity.Pure,
         IrOpaquePurity.Impure

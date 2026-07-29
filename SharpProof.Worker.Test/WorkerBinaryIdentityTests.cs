@@ -4,9 +4,11 @@ using SharpProof.CompilerArtifact;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class WorkerBinaryIdentityTests {
+public sealed class WorkerBinaryIdentityTests
+{
     [Test]
-    public void IdentityCoversTheCompleteTrustedRuntimeClosure() {
+    public void IdentityCoversTheCompleteTrustedRuntimeClosure()
+    {
         Assert.That(
             WorkerBinaryIdentity.ComputeSha256(
                 typeof(SharpProofWorker).Assembly.Location),
@@ -18,16 +20,19 @@ public sealed class WorkerBinaryIdentityTests {
             Path.GetTempPath(),
             "SharpProof.WorkerBinaryIdentity." + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(temporaryDirectory);
-        try {
+        try
+        {
             foreach (var source in Directory.GetFiles(
                          sourceDirectory,
                          "*",
-                         SearchOption.AllDirectories)) {
+                         SearchOption.AllDirectories))
+            {
                 var name = Path.GetRelativePath(sourceDirectory, source);
                 if (name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) ||
                     name is
                         "SharpProof.Worker.deps.json" or
-                        "SharpProof.Worker.runtimeconfig.json") {
+                        "SharpProof.Worker.runtimeconfig.json")
+                {
                     var destination = Path.Combine(temporaryDirectory, name);
                     Directory.CreateDirectory(
                         Path.GetDirectoryName(destination)!);
@@ -72,7 +77,8 @@ public sealed class WorkerBinaryIdentityTests {
                 () => _ = WorkerBinaryIdentity.ComputeSha256(worker);
             Assert.Throws<FileNotFoundException>(missingDependency);
         }
-        finally {
+        finally
+        {
             Directory.Delete(temporaryDirectory, recursive: true);
         }
     }

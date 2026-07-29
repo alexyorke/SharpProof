@@ -5,6 +5,8 @@
 > used accountable worker protocol version 3. See
 > [Coverage and limits](../coverage-and-limits.md) and
 > [Typed abstention reasons](../unknown-reasons.md) for current behavior.
+> The physical/nonblank source limits recorded below were superseded by
+> [formatting-neutral source metrics](2026-07-29-formatting-neutral-source-metrics.md).
 
 This note records the soundness-focused follow-up to commit
 `d2cd1dc03ce64eb01556075985b9c3d998e988bd`. It does not claim that elapsed-time,

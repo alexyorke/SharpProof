@@ -619,12 +619,13 @@ Run long-lived .NET commands through the repository wrapper:
 
 ```powershell
 .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
+.\scripts\Format-CSharp.ps1 -Verify
 .\scripts\Generate-Readme.ps1 -Verify
 .\eng\acceptance\Verify.ps1 -Configuration Release
 ```
 
-The acceptance gate enforces the dependency graph and proof-kernel-only size
-ratchet,
+The acceptance gate enforces the dependency graph, exact trusted-boundary path
+inventories, and formatting-neutral Roslyn complexity ratchets,
 builds the solution, runs architecture and banned-API checks, lattice and
 finite-CFG laws, runtime and differential oracles, worker/package integration,
 cache/concurrency/cancellation tests, the pinned corpus, a fixed-seed
@@ -666,6 +667,8 @@ the commit-bound JSON evidence.
   records validation evidence and outstanding checkpoints.
 - [Product bug sweep](https://github.com/alexyorke/SharpProof/blob/master/docs/soundness-notes/2026-07-27-product-sweep.md)
   records the latest analyzer, contract, effect, and worker adversarial review.
+- [Formatting-neutral source metrics](https://github.com/alexyorke/SharpProof/blob/master/docs/soundness-notes/2026-07-29-formatting-neutral-source-metrics.md)
+  records the readable formatting policy and structural complexity gates.
 - [Acceptance contract](https://github.com/alexyorke/SharpProof/blob/master/eng/acceptance/README.md)
   describes the active release gate.
 

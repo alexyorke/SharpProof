@@ -4,9 +4,11 @@ using SharpProof.Ir;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class IrProgramTests {
+public sealed class IrProgramTests
+{
     [Test]
-    public void AssignmentsReadTheCurrentVariableValue() {
+    public void AssignmentsReadTheCurrentVariableValue()
+    {
         var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
@@ -40,7 +42,8 @@ public sealed class IrProgramTests {
     [TestCase(false, 20L)]
     public void BranchesSelectOneDeterministicSuccessor(
         bool condition,
-        long expected) {
+        long expected)
+    {
         var factory = new IrFactory();
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var resultVariable =
@@ -81,7 +84,8 @@ public sealed class IrProgramTests {
 
         var execution = new IrProgramInterpreter(factory).Execute(
             builder.Build(),
-            new Dictionary<IrVarId, IrValue> {
+            new Dictionary<IrVarId, IrValue>
+            {
                 [flag] = factory.CreateBooleanValue(condition)
             });
 
@@ -92,7 +96,8 @@ public sealed class IrProgramTests {
     }
 
     [Test]
-    public void BuilderCreatesClosedTypedMemoryAndCallInstructions() {
+    public void BuilderCreatesClosedTypedMemoryAndCallInstructions()
+    {
         var factory = new IrFactory();
         var receiverType = factory.GetOrCreateReferenceType(
             factory.CreateIdentity(),
@@ -165,7 +170,8 @@ public sealed class IrProgramTests {
     }
 
     [Test]
-    public void SequenceLocationsRejectNullTermsWithThePublicParameterName() {
+    public void SequenceLocationsRejectNullTermsWithThePublicParameterName()
+    {
         var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
@@ -182,7 +188,8 @@ public sealed class IrProgramTests {
     }
 
     [Test]
-    public void ProgramIdentifiersAreScopedAndValuesAreDeterministic() {
+    public void ProgramIdentifiersAreScopedAndValuesAreDeterministic()
+    {
         var first = CreateShape();
         var second = CreateShape();
 
@@ -206,7 +213,8 @@ public sealed class IrProgramTests {
     }
 
     [Test]
-    public void BuilderRequiresClosedBlocksAndRejectsPostTerminatorInstructions() {
+    public void BuilderRequiresClosedBlocksAndRejectsPostTerminatorInstructions()
+    {
         var factory = new IrFactory();
         var empty = new IrProgramBuilder(factory);
         var open = new IrProgramBuilder(factory);
@@ -228,7 +236,8 @@ public sealed class IrProgramTests {
     }
 
     [Test]
-    public void BuilderEnforcesHavocKindVariableConsistency() {
+    public void BuilderEnforcesHavocKindVariableConsistency()
+    {
         var factory = new IrFactory();
         var value =
             factory.CreateVariable("value", factory.IntegerType);
@@ -254,7 +263,8 @@ public sealed class IrProgramTests {
     }
 
     [Test]
-    public void InterpreterDistinguishesAssumptionAndAssertionFailures() {
+    public void InterpreterDistinguishesAssumptionAndAssertionFailures()
+    {
         var factory = new IrFactory();
         var assumptionBuilder = new IrProgramBuilder(factory);
         var assumptionEntry = assumptionBuilder.CreateBlock("entry");
@@ -298,7 +308,8 @@ public sealed class IrProgramTests {
     }
 
     [Test]
-    public void InterpreterStopsLoopsAtTheStepBudget() {
+    public void InterpreterStopsLoopsAtTheStepBudget()
+    {
         var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
@@ -320,7 +331,8 @@ public sealed class IrProgramTests {
     [TestCase(IrHavocKind.Variables)]
     [TestCase(IrHavocKind.VariablesAndMemory)]
     public void InterpreterFailsClosedAtVariableHavocAfterInvalidatingValues(
-        IrHavocKind havocKind) {
+        IrHavocKind havocKind)
+    {
         var factory = new IrFactory();
         var value =
             factory.CreateVariable("value", factory.IntegerType);
@@ -338,7 +350,8 @@ public sealed class IrProgramTests {
 
         var result = new IrProgramInterpreter(factory).Execute(
             builder.Build(),
-            new Dictionary<IrVarId, IrValue> {
+            new Dictionary<IrVarId, IrValue>
+            {
                 [value] = factory.CreateIntegerValue(7)
             });
 
@@ -353,7 +366,8 @@ public sealed class IrProgramTests {
     }
 
     [Test]
-    public void InterpreterPreservesVariablesAtMemoryOnlyHavoc() {
+    public void InterpreterPreservesVariablesAtMemoryOnlyHavoc()
+    {
         var factory = new IrFactory();
         var value =
             factory.CreateVariable("value", factory.IntegerType);
@@ -370,7 +384,8 @@ public sealed class IrProgramTests {
 
         var result = new IrProgramInterpreter(factory).Execute(
             builder.Build(),
-            new Dictionary<IrVarId, IrValue> {
+            new Dictionary<IrVarId, IrValue>
+            {
                 [value] = factory.CreateIntegerValue(7)
             });
 
@@ -382,7 +397,8 @@ public sealed class IrProgramTests {
     }
 
     [Test]
-    public void InterpreterEvaluatesCallArgumentsBeforeNullReceiverFailure() {
+    public void InterpreterEvaluatesCallArgumentsBeforeNullReceiverFailure()
+    {
         var factory = new IrFactory();
         var receiverType = factory.GetOrCreateReferenceType(
             factory.CreateIdentity(),
@@ -420,7 +436,8 @@ public sealed class IrProgramTests {
     }
 
     [Test]
-    public void InterpreterEvaluatesLoadIndexBeforeNullReceiverFailure() {
+    public void InterpreterEvaluatesLoadIndexBeforeNullReceiverFailure()
+    {
         var factory = new IrFactory();
         var sequenceType =
             factory.GetOrCreateSequenceType(factory.IntegerType);
@@ -450,7 +467,8 @@ public sealed class IrProgramTests {
     }
 
     [Test]
-    public void InterpreterEvaluatesStoreValueBeforeDeferredBoundsCheck() {
+    public void InterpreterEvaluatesStoreValueBeforeDeferredBoundsCheck()
+    {
         var factory = new IrFactory();
         var sequenceType =
             factory.GetOrCreateSequenceType(factory.IntegerType);
@@ -480,7 +498,8 @@ public sealed class IrProgramTests {
         boundsBuilder.Return(
             boundsEntry,
             factory.CreateOperation("bounds-return"));
-        var values = new Dictionary<IrVarId, IrValue> {
+        var values = new Dictionary<IrVarId, IrValue>
+        {
             [sequence] = factory.CreateSequenceValue(sequenceType, [])
         };
         var interpreter = new IrProgramInterpreter(factory);
@@ -507,7 +526,8 @@ public sealed class IrProgramTests {
     }
 
     [Test]
-    public void InterpreterObservesPreCanceledExecution() {
+    public void InterpreterObservesPreCanceledExecution()
+    {
         var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
@@ -520,7 +540,8 @@ public sealed class IrProgramTests {
                 cancellationToken: cancellationToken)));
     }
 
-    private static IrProgram CreateShape() {
+    private static IrProgram CreateShape()
+    {
         var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
@@ -535,9 +556,11 @@ public sealed class IrProgramTests {
         return builder.Build();
     }
 
-    private static IrTerm DivisionByZero(IrFactory factory) =>
-        factory.Binary(
+    private static IrTerm DivisionByZero(IrFactory factory)
+    {
+        return factory.Binary(
             IrBinaryOperator.Divide,
             factory.Integer(1),
             factory.Integer(0));
+    }
 }

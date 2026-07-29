@@ -7,7 +7,8 @@
 
 namespace SharpProof.Analyzer;
 
-internal static class GeneratedDiagnosticDescriptors {
+internal static class GeneratedDiagnosticDescriptors
+{
 
     internal static readonly DiagnosticDescriptor PurityNotVerifiedRule = new(
         id: "SP0002",

@@ -5,12 +5,14 @@ using SharpProof.Ir;
 namespace SharpProof.Specs.Test;
 
 [TestFixture]
-public sealed class ApiSpecInstantiationCoverageTests {
+public sealed class ApiSpecInstantiationCoverageTests
+{
     private static readonly SpecEvidence Evidence =
         new(SpecEvidenceKind.Observed, "instantiation-coverage");
 
     [Test]
-    public void EveryTotalExpressionShapeInstantiatesIntoDestinationIr() {
+    public void EveryTotalExpressionShapeInstantiatesIntoDestinationIr()
+    {
         var receiver = Variable(
             SpecVariableRole.Receiver,
             -1,
@@ -135,7 +137,8 @@ public sealed class ApiSpecInstantiationCoverageTests {
         var factory = new IrFactory();
         var sequenceType =
             factory.GetOrCreateSequenceType(factory.IntegerType);
-        var substitutions = new Dictionary<SpecVarId, IrTerm> {
+        var substitutions = new Dictionary<SpecVarId, IrTerm>
+        {
             [template.Receiver!.Value] = factory.String("abc"),
             [template.Parameters[0]] = factory.Boolean(true),
             [template.Parameters[1]] = factory.Integer(42),
@@ -157,7 +160,8 @@ public sealed class ApiSpecInstantiationCoverageTests {
                 factory,
                 substitutions);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 instantiated.Status,
                 Is.EqualTo(SpecInstantiationStatus.Succeeded));
@@ -173,7 +177,8 @@ public sealed class ApiSpecInstantiationCoverageTests {
     }
 
     [Test]
-    public void SubstitutionOwnershipAndTypesFailClosedWithTypedReasons() {
+    public void SubstitutionOwnershipAndTypesFailClosedWithTypedReasons()
+    {
         var template = CreateTemplate(
             isStatic: true,
             receiverType: null,
@@ -198,7 +203,8 @@ public sealed class ApiSpecInstantiationCoverageTests {
             ApiSpecInstantiator.InstantiatePostconditions(
                 template,
                 factory,
-                new Dictionary<SpecVarId, IrTerm> {
+                new Dictionary<SpecVarId, IrTerm>
+                {
                     [otherTemplate.Parameters.Single()] =
                         factory.Integer(0)
                 });
@@ -206,7 +212,8 @@ public sealed class ApiSpecInstantiationCoverageTests {
             ApiSpecInstantiator.InstantiatePostconditions(
                 template,
                 factory,
-                new Dictionary<SpecVarId, IrTerm> {
+                new Dictionary<SpecVarId, IrTerm>
+                {
                     [template.Parameters.Single()] =
                         foreignFactory.Integer(0)
                 });
@@ -214,12 +221,14 @@ public sealed class ApiSpecInstantiationCoverageTests {
             ApiSpecInstantiator.InstantiatePostconditions(
                 template,
                 factory,
-                new Dictionary<SpecVarId, IrTerm> {
+                new Dictionary<SpecVarId, IrTerm>
+                {
                     [template.Parameters.Single()] =
                         factory.Boolean(false)
                 });
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             AssertFailure(
                 foreignVariable,
                 SpecInstantiationFailureKind.ForeignVariable);
@@ -233,7 +242,8 @@ public sealed class ApiSpecInstantiationCoverageTests {
     }
 
     [Test]
-    public void SequenceNullProducesAnExplicitUnsupportedValueFailure() {
+    public void SequenceNullProducesAnExplicitUnsupportedValueFailure()
+    {
         var nullSequence =
             new SpecNullDeclaration(SpecValueType.Sequence);
         var template = CreateTemplate(
@@ -256,7 +266,8 @@ public sealed class ApiSpecInstantiationCoverageTests {
 
     private static void AssertFailure(
         SpecInstantiationResult result,
-        SpecInstantiationFailureKind kind) {
+        SpecInstantiationFailureKind kind)
+    {
         Assert.That(
             result.Status,
             Is.EqualTo(SpecInstantiationStatus.Failed));
@@ -271,7 +282,8 @@ public sealed class ApiSpecInstantiationCoverageTests {
         SpecValueType? receiverType,
         ImmutableArray<SpecValueType> parameterTypes,
         SpecValueType? resultType,
-        IEnumerable<SpecTermDeclaration> postconditions) {
+        IEnumerable<SpecTermDeclaration> postconditions)
+    {
         var declaration = new ApiSpecDeclaration(
             new ApiSpecTarget(
                 "instantiation-" + Guid.NewGuid().ToString("N"),
@@ -312,35 +324,45 @@ public sealed class ApiSpecInstantiationCoverageTests {
     private static SpecVariableDeclaration Variable(
         SpecVariableRole role,
         int ordinal,
-        SpecValueType type) =>
-        new(role, ordinal, type);
+        SpecValueType type)
+    {
+        return new(role, ordinal, type);
+    }
 
-    private static SpecIntegerDeclaration Integer(long value) =>
-        new(value);
+    private static SpecIntegerDeclaration Integer(long value)
+    {
+        return new(value);
+    }
 
     private static SpecBinaryDeclaration Binary(
         SpecBinaryOperator @operator,
         SpecTermDeclaration left,
         SpecTermDeclaration right,
-        SpecValueType type) =>
-        new(@operator, left, right, type);
+        SpecValueType type)
+    {
+        return new(@operator, left, right, type);
+    }
 
     private static SpecBinaryDeclaration Equal(
         SpecTermDeclaration left,
-        SpecTermDeclaration right) =>
-        Binary(
+        SpecTermDeclaration right)
+    {
+        return Binary(
             SpecBinaryOperator.Equal,
             left,
             right,
             SpecValueType.Boolean);
+    }
 
     private static SpecBinaryDeclaration Compare(
         SpecBinaryOperator @operator,
         long left,
-        long right) =>
-        Binary(
+        long right)
+    {
+        return Binary(
             @operator,
             Integer(left),
             Integer(right),
             SpecValueType.Boolean);
+    }
 }

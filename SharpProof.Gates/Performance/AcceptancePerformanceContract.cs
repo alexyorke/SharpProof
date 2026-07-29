@@ -15,8 +15,10 @@ internal sealed record AcceptancePerformanceContract(
     double IdeEditP95Milliseconds,
     double IdeEditMaximumMilliseconds,
     double CancellationP95Milliseconds,
-    double ForcedTerminationMilliseconds) {
-    public static AcceptancePerformanceContract Load(string repositoryRoot) {
+    double ForcedTerminationMilliseconds)
+{
+    public static AcceptancePerformanceContract Load(string repositoryRoot)
+    {
         var path = Path.Combine(
             repositoryRoot,
             "eng",

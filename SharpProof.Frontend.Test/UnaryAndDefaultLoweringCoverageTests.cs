@@ -8,15 +8,18 @@ using SharpProof.Ir;
 namespace SharpProof.Frontend.Test;
 
 [TestFixture]
-public sealed class UnaryAndDefaultLoweringCoverageTests {
+public sealed class UnaryAndDefaultLoweringCoverageTests
+{
     [Test]
-    public void BooleanAndIntegerDefaultsLowerToExactScalarConstants() {
+    public void BooleanAndIntegerDefaultsLowerToExactScalarConstants()
+    {
         var boolean = Lower(
             "private static bool Target() => default(bool);");
         var integer = Lower(
             "private static long Target() => default(long);");
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(boolean.IsExact, Is.True);
             Assert.That(
                 ((IrBooleanTerm)boolean.Term).Value,
@@ -29,7 +32,8 @@ public sealed class UnaryAndDefaultLoweringCoverageTests {
     }
 
     [Test]
-    public void UnaryScalarPoliciesDistinguishExactAndFailClosedCases() {
+    public void UnaryScalarPoliciesDistinguishExactAndFailClosedCases()
+    {
         var identity = Lower(
             "private static long Target(long value) => +value;");
         var checkedNegation = Lower(
@@ -41,7 +45,8 @@ public sealed class UnaryAndDefaultLoweringCoverageTests {
         var unsupportedOperator = Lower(
             "private static long Target(long value) => ~value;");
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(identity.IsExact, Is.True);
             Assert.That(identity.Term, Is.TypeOf<IrVariableTerm>());
             Assert.That(checkedNegation.IsExact, Is.True);
@@ -59,7 +64,8 @@ public sealed class UnaryAndDefaultLoweringCoverageTests {
     }
 
     [Test]
-    public void UserDefinedAndNestedOpaqueOperatorsPreserveTypedReasons() {
+    public void UserDefinedAndNestedOpaqueOperatorsPreserveTypedReasons()
+    {
         var userDefinedUnary = Lower(
             """
             private sealed class Box {
@@ -86,7 +92,8 @@ public sealed class UnaryAndDefaultLoweringCoverageTests {
                 condition ? Read() : 0;
             """);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             AssertAbstention(
                 userDefinedUnary,
                 FrontendAbstention.UserDefinedOperator);
@@ -104,14 +111,16 @@ public sealed class UnaryAndDefaultLoweringCoverageTests {
 
     private static void AssertAbstention(
         FrontendLoweringResult result,
-        FrontendAbstention abstention) {
+        FrontendAbstention abstention)
+    {
         Assert.That(result.IsExact, Is.False);
         Assert.That(
             result.Classification.Abstention,
             Is.EqualTo(abstention));
     }
 
-    private static FrontendLoweringResult Lower(string members) {
+    private static FrontendLoweringResult Lower(string members)
+    {
         var tree = CSharpSyntaxTree.ParseText(
             "public static class Subject {" +
             Environment.NewLine +
@@ -154,10 +163,16 @@ public sealed class UnaryAndDefaultLoweringCoverageTests {
 
     private static IOperation GetExpressionOperation(
         SemanticModel model,
-        ExpressionSyntax expression) {
+        ExpressionSyntax expression)
+    {
         var operation = model.GetOperation(expression);
-        if (operation != null) return operation;
-        return expression switch {
+        if (operation != null)
+        {
+            return operation;
+        }
+
+        return expression switch
+        {
             CheckedExpressionSyntax checkedExpression =>
                 GetExpressionOperation(
                     model,
@@ -172,7 +187,10 @@ public sealed class UnaryAndDefaultLoweringCoverageTests {
     }
 
     private static ImmutableArray<MetadataReference>
-        PlatformReferences { get; } =
+        PlatformReferences
+    {
+        get;
+    } =
         [.. ((string)AppContext.GetData(
                 "TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator)

@@ -2,7 +2,8 @@ using System.Text.Json;
 
 namespace SharpProof.CompilerArtifact;
 
-internal static class CompilerArtifactInputHash {
+internal static class CompilerArtifactInputHash
+{
     internal static string Compute(
         WorkerVerifyRequest request,
         byte[] artifactBytes,
@@ -11,11 +12,17 @@ internal static class CompilerArtifactInputHash {
         string workerBinarySha256,
         string apiSpecIdentity,
         string apiSpecVersion,
-        string apiSpecContentSha256) {
+        string apiSpecContentSha256)
+    {
         if (request == null)
+        {
             throw new ArgumentNullException(nameof(request));
+        }
+
         if (artifactBytes == null)
+        {
             throw new ArgumentNullException(nameof(artifactBytes));
+        }
 
         using var hash = new CanonicalHashWriter();
         hash.Add(
@@ -35,27 +42,37 @@ internal static class CompilerArtifactInputHash {
     }
 }
 
-internal static class WorkerBinaryIdentity {
-    internal static string ComputeSha256(string workerPath) {
+internal static class WorkerBinaryIdentity
+{
+    internal static string ComputeSha256(string workerPath)
+    {
         var path = Path.GetFullPath(workerPath);
-        if (!path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)) {
+        if (!path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+        {
             path = Path.ChangeExtension(path, ".dll");
             if (!File.Exists(path))
+            {
                 throw new FileNotFoundException("The managed worker binary is unavailable.", path);
+            }
         }
 
         using var hash = new CanonicalHashWriter();
         hash.Add("SharpProof.WorkerBinarySet", 1);
         foreach (var component in RuntimeComponents(path))
+        {
             hash.Add(component.Key).Add(File.ReadAllBytes(component.Value));
+        }
+
         return hash.Finish();
     }
 
-    private static SortedDictionary<string, string> RuntimeComponents(string workerPath) {
+    private static SortedDictionary<string, string> RuntimeComponents(string workerPath)
+    {
         var directory = Path.GetDirectoryName(workerPath) ??
             throw new InvalidDataException("The managed worker directory is unavailable.");
         var dependencies = Path.ChangeExtension(workerPath, ".deps.json");
-        var result = new SortedDictionary<string, string>(StringComparer.Ordinal) {
+        var result = new SortedDictionary<string, string>(StringComparer.Ordinal)
+        {
             ["worker"] = workerPath,
             ["dependencies"] = dependencies,
             ["runtimeConfig"] = Path.ChangeExtension(workerPath, ".runtimeconfig.json")
@@ -66,32 +83,50 @@ internal static class WorkerBinaryIdentity {
             throw new InvalidDataException("The worker runtime target is unavailable.");
         var target = root.GetProperty("targets").GetProperty(targetName);
         foreach (var library in target.EnumerateObject())
+        {
             AddLibraryAssets(result, directory, library.Value);
+        }
+
         return result;
     }
 
     private static void AddLibraryAssets(
-        SortedDictionary<string, string> result, string directory, JsonElement library) {
-        foreach (var group in new[] { "runtime", "native", "runtimeTargets" }) {
+        SortedDictionary<string, string> result, string directory, JsonElement library)
+    {
+        foreach (var group in new[] { "runtime", "native", "runtimeTargets" })
+        {
             if (!library.TryGetProperty(group, out var assets))
+            {
                 continue;
-            foreach (var asset in assets.EnumerateObject()) {
+            }
+
+            foreach (var asset in assets.EnumerateObject())
+            {
                 if (group == "runtimeTargets" &&
                     asset.Value.GetProperty("rid").GetString() is not ("win" or "win-x64"))
+                {
                     continue;
+                }
+
                 result.Add(group + "/" + asset.Name, ResolveAsset(directory, asset.Name));
             }
         }
     }
 
-    private static string ResolveAsset(string directory, string relativePath) {
+    private static string ResolveAsset(string directory, string relativePath)
+    {
         var nested = Path.GetFullPath(Path.Combine(
             directory, relativePath.Replace('/', Path.DirectorySeparatorChar)));
         var root = Path.GetFullPath(directory) + Path.DirectorySeparatorChar;
         if (!nested.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        {
             throw new InvalidDataException("A worker runtime asset escapes its package.");
+        }
+
         if (File.Exists(nested))
+        {
             return nested;
+        }
 
         var flattened = Path.Combine(directory, Path.GetFileName(relativePath));
         return File.Exists(flattened)
@@ -100,10 +135,15 @@ internal static class WorkerBinaryIdentity {
     }
 }
 
-internal static class CompilerManifestArtifactJson {
-    internal static string Serialize(CompilerManifestArtifact artifact) {
+internal static class CompilerManifestArtifactJson
+{
+    internal static string Serialize(CompilerManifestArtifact artifact)
+    {
         if (artifact == null)
+        {
             throw new ArgumentNullException(nameof(artifact));
+        }
+
         WorkerProtocolJson.Canonicalize(artifact.Manifest);
         artifact.CompilerDiagnostics = [
             .. artifact.CompilerDiagnostics
@@ -118,34 +158,48 @@ internal static class CompilerManifestArtifactJson {
         return JsonSerializer.Serialize(artifact, WorkerProtocolJson.Options) + "\n";
     }
 
-    internal static CompilerManifestArtifact Deserialize(string json) {
+    internal static CompilerManifestArtifact Deserialize(string json)
+    {
         if (json == null)
+        {
             throw new ArgumentNullException(nameof(json));
+        }
+
         var artifact = JsonSerializer.Deserialize<CompilerManifestArtifact>(
             json, WorkerProtocolJson.Options) ??
             throw new JsonException("A compiler manifest artifact is required.");
         Validate(artifact);
         if (Serialize(artifact) != json)
+        {
             throw new JsonException("The compiler manifest artifact is not canonical.");
+        }
+
         return artifact;
     }
 
     internal static ImmutableArray<CompilerCallablePreparation> DecodeCallables(
-        CompilerManifestArtifact artifact) {
+        CompilerManifestArtifact artifact)
+    {
         Validate(artifact);
         return CompilerLoweredArtifact.Decode(artifact.Callables, artifact.Manifest);
     }
 
-    internal static void Validate(CompilerManifestArtifact value) {
+    internal static void Validate(CompilerManifestArtifact value)
+    {
         if (!HasValidEnvelope(value) ||
             !HasValidDiagnostics(value.CompilerDiagnostics) ||
             !HasMatchingCallables(value.Callables, value.Manifest))
+        {
             throw new JsonException("The compiler manifest artifact is invalid.");
+        }
+
         CompilationFingerprint.ValidateShape(value.Compilation);
     }
 
-    private static bool HasValidEnvelope(CompilerManifestArtifact? value) =>
-        value is {
+    private static bool HasValidEnvelope(CompilerManifestArtifact? value)
+    {
+        return value is
+        {
             Schema: CompilerManifestArtifactVersions.Schema,
             SchemaVersion: CompilerManifestArtifactVersions.Current,
             ProtocolVersion: WorkerProtocolVersions.Current,
@@ -156,21 +210,26 @@ internal static class CompilerManifestArtifactJson {
         WorkerProtocolJson.IsSha256(value.CompilationSha256) &&
         value.CompilationSha256 == CompilationFingerprint.ComputeSha256(value.Compilation) &&
         WorkerProtocolJson.ValidateManifest(value.Manifest).IsValid;
+    }
 
-    private static bool HasValidDiagnostics(CompilerDiagnosticArtifact[]? diagnostics) =>
-        diagnostics != null &&
+    private static bool HasValidDiagnostics(CompilerDiagnosticArtifact[]? diagnostics)
+    {
+        return diagnostics != null &&
         diagnostics.All(static item =>
             item != null &&
             !string.IsNullOrWhiteSpace(item.Code) &&
             !string.IsNullOrWhiteSpace(item.Message) &&
             item.Location is { Start: >= 0, Length: >= 0, Line: >= 0, Column: >= 0 });
+    }
 
     private static bool HasMatchingCallables(
         CompilerCallableArtifact[]? callables,
-        WorkerClaimManifest manifest) =>
-        callables != null &&
+        WorkerClaimManifest manifest)
+    {
+        return callables != null &&
         callables.Length == manifest.Callables.Length &&
         callables.Select(static item => item?.CallableId).SequenceEqual(
             manifest.Callables.Select(static item => item.CallableId),
             StringComparer.Ordinal);
+    }
 }
