@@ -5,6 +5,9 @@ on:
     - cron: "17 8 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   fuzz:
     runs-on: windows-latest
@@ -42,6 +45,13 @@ jobs:
           --no-build
           --filter
           "FullyQualifiedName~Cache|FullyQualifiedName~Cancel|FullyQualifiedName~Timeout"
+
+      - name: Kill trusted-boundary mutations
+        shell: pwsh
+        run: >-
+          .\scripts\Test-SharpProofTrustedMutations.ps1
+          -Configuration Release
+          -OutputPath artifacts/nightly/mutations.json
 
       - name: Retain performance outcome
         shell: pwsh

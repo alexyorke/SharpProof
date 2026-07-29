@@ -38,19 +38,28 @@ contain documented breaking changes.
   generator hosts, with a clear older-host rejection.
 - Opt-in deterministic SARIF 2.1.0 projection of validated claim, incomplete
   callable, assumption, and run-failure results.
+- Source-located structured effect-violation witnesses for the narrow
+  unconditional direct-operation subset, with independent worker validation
+  and SARIF/cache preservation.
 
 ### Changed
 
 - The verifier consumes the final compiler compilation artifact instead of
   reconstructing a compilation from source files.
-- Protocol version 6 and cache schema 7 distinguish undefined
-  postconditions, non-replayable modeled calls, and genuine replay failures.
+- Protocol version 8 and cache schema 9 distinguish undefined
+  postconditions, non-replayable modeled calls, genuine replay failures,
+  effect-evidence certainty, and explicit vacuity evidence.
 - `require-proven` runs bypass the local semantic cache.
 - Effect contracts consume independent read/write, allocation, capability,
   and escaping-exception evidence facets; an unrelated unknown facet no
   longer blocks a result.
 - Effect analysis builds and caches only the requested reachable source-call
   graph while retaining deterministic exhaustive analysis.
+- Every repeatable effect-attribute occurrence has its own stable manifest
+  claim and dense ordinal while sharing the effective combined constraint.
+- Cache identity now binds the canonical packaged worker runtime closure,
+  including proof/runtime assemblies, JSON runtime assets, and managed/native
+  Z3 payloads.
 - Constructor postconditions report `UnsupportedBody` until constructor
   initialization semantics are represented.
 - Package-consumer CI restores the exact same packed bytes across Windows x64,
@@ -62,6 +71,11 @@ contain documented breaking changes.
 
 - SAT models must exactly match the requested scalar model closure and pass
   independent replay before SharpProof emits `Refuted`.
+- Built-in API specifications approve only exact assembly-name,
+  public-key-token, and reference-family triples observed across supported
+  framework surfaces; unobserved identities or origins are not trusted.
+- Canonical cache and evidence hashes encode nullability and value types, so
+  text, numeric, enum, byte, null, and empty values cannot alias one another.
 - Each verification lane owns its Z3 session and resource accounting;
   timeouts begin after lane acquisition and result ordering remains
   deterministic.

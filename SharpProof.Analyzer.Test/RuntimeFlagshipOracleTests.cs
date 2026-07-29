@@ -8,7 +8,8 @@ namespace SharpProof.Analyzer.Test;
 
 [TestFixture]
 [NonParallelizable]
-public sealed class RuntimeFlagshipOracleTests {
+public sealed class RuntimeFlagshipOracleTests
+{
     private const string Source =
         """
         #nullable disable
@@ -68,7 +69,8 @@ public sealed class RuntimeFlagshipOracleTests {
         """;
 
     [Test]
-    public async Task AnalyzerVerdictsMatchConcreteFlagshipEffects() {
+    public async Task AnalyzerVerdictsMatchConcreteFlagshipEffects()
+    {
         string[] enabledIds = ["SP0002", "SP0016", "SP0045", "SP0046"];
         var compilation = AnalyzerTestHost.CreateCompilation(
             Source,
@@ -88,7 +90,8 @@ public sealed class RuntimeFlagshipOracleTests {
             ("SP0046", "DisallowedException"));
 
         var image = AnalyzerTestHost.EmitImage(compilation);
-        WithRuntimeAssembly(image, assembly => {
+        WithRuntimeAssembly(image, assembly =>
+        {
             var fixture = assembly.GetType(
                     "RuntimeFlagshipFixture",
                     throwOnError: true)!;
@@ -107,7 +110,8 @@ public sealed class RuntimeFlagshipOracleTests {
                 throw new InvalidOperationException("State field is missing.");
             const int unchangedState = 23063;
             state.SetValue(null, unchangedState);
-            for (var index = 0; index < 128; index++) {
+            for (var index = 0; index < 128; index++)
+            {
                 var value = random.Next(-1_000_000, 1_000_000);
                 Assert.That(pure(value), Is.EqualTo(value + 1));
                 Assert.That(noAllocation(value), Is.EqualTo(value + 1));
@@ -119,7 +123,10 @@ public sealed class RuntimeFlagshipOracleTests {
             var noAllocationChecksum = 0;
             var noAllocationBefore = GC.GetAllocatedBytesForCurrentThread();
             for (var index = 0; index < 128; index++)
+            {
                 noAllocationChecksum ^= noAllocation(index);
+            }
+
             var noAllocationBytes =
                 GC.GetAllocatedBytesForCurrentThread() - noAllocationBefore;
             Assert.That(noAllocationChecksum, Is.EqualTo(128));
@@ -135,7 +142,10 @@ public sealed class RuntimeFlagshipOracleTests {
             var before = GC.GetAllocatedBytesForCurrentThread();
             var observedLength = 0;
             for (var index = 0; index < 64; index++)
+            {
                 observedLength += allocate().Length;
+            }
+
             var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
             Assert.That(observedLength, Is.EqualTo(64 * 64));
             Assert.That(allocated, Is.GreaterThanOrEqualTo(64 * 64));
@@ -147,7 +157,10 @@ public sealed class RuntimeFlagshipOracleTests {
             before = GC.GetAllocatedBytesForCurrentThread();
             observedLength = 0;
             for (var index = 0; index < 64; index++)
+            {
                 observedLength += concatenate("sharp").Length;
+            }
+
             allocated = GC.GetAllocatedBytesForCurrentThread() - before;
             Assert.That(observedLength, Is.EqualTo(64 * 10));
             Assert.That(allocated, Is.GreaterThan(0));
@@ -167,7 +180,8 @@ public sealed class RuntimeFlagshipOracleTests {
 
     private static void AssertDiagnostics(
         IEnumerable<Diagnostic> diagnostics,
-        params (string Id, string Method)[] expected) {
+        params (string Id, string Method)[] expected)
+    {
         var actual = diagnostics
             .Select(static diagnostic =>
                 (diagnostic.Id, Method: ExtractQuotedName(
@@ -182,7 +196,8 @@ public sealed class RuntimeFlagshipOracleTests {
         Assert.That(actual, Is.EqualTo(orderedExpected));
     }
 
-    private static string ExtractQuotedName(string message) {
+    private static string ExtractQuotedName(string message)
+    {
         var first = message.IndexOf('\'', StringComparison.Ordinal);
         var second = first < 0 ? -1 : message.IndexOf('\'', first + 1);
         return first >= 0 && second > first
@@ -192,7 +207,8 @@ public sealed class RuntimeFlagshipOracleTests {
     }
 
     private static void AssertThrows<TException>(Func<int, int> method)
-        where TException : Exception {
+        where TException : Exception
+    {
         Action invocation = () => method(0);
         Assert.Throws<TException>(invocation);
     }
@@ -200,26 +216,31 @@ public sealed class RuntimeFlagshipOracleTests {
     private static TDelegate Delegate<TDelegate>(
         Type fixture,
         string methodName)
-        where TDelegate : Delegate =>
-        (fixture.GetMethod(
+        where TDelegate : Delegate
+    {
+        return (fixture.GetMethod(
                 methodName,
                 BindingFlags.Public | BindingFlags.Static) ??
             throw new InvalidOperationException(
                 $"Runtime method '{methodName}' is missing."))
         .CreateDelegate<TDelegate>();
+    }
 
     private static void WithRuntimeAssembly(
         byte[] image,
-        Action<Assembly> action) {
+        Action<Assembly> action)
+    {
         var context = new AssemblyLoadContext(
             "SharpProof.Analyzer.Test.RuntimeFlagship",
             isCollectible: true);
         context.Resolving += ResolveFromDefaultContext;
-        try {
+        try
+        {
             using var stream = new MemoryStream(image, writable: false);
             action(context.LoadFromStream(stream));
         }
-        finally {
+        finally
+        {
             context.Resolving -= ResolveFromDefaultContext;
             context.Unload();
         }
@@ -227,10 +248,12 @@ public sealed class RuntimeFlagshipOracleTests {
 
     private static Assembly? ResolveFromDefaultContext(
         AssemblyLoadContext context,
-        AssemblyName requestedName) =>
-        AppDomain.CurrentDomain.GetAssemblies()
+        AssemblyName requestedName)
+    {
+        return AppDomain.CurrentDomain.GetAssemblies()
             .FirstOrDefault(candidate =>
                 AssemblyName.ReferenceMatchesDefinition(
                     candidate.GetName(),
                     requestedName));
+    }
 }

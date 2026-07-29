@@ -16,7 +16,8 @@ internal sealed record WorkerPerformanceMeasurements(
     double[] CancellationLatencies,
     double ForcedTerminationMilliseconds);
 
-internal static class WorkerPerformanceProbe {
+internal static class WorkerPerformanceProbe
+{
     private const int CooperativeProjectWallMilliseconds = 100;
     private const int CooperativeTerminationGraceMilliseconds = 10_000;
     // Shared CI can observe exit after the kernel deadline; product grace is unchanged.
@@ -26,7 +27,8 @@ internal static class WorkerPerformanceProbe {
     internal static async Task<WorkerPerformanceMeasurements> MeasureAsync(
         string repositoryRoot,
         AcceptancePerformanceContract contract,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         using var workspace = WorkerProbeWorkspace.Create();
         await VerifyCooperativeLauncherCancellationAsync(
                 repositoryRoot,
@@ -52,7 +54,8 @@ internal static class WorkerPerformanceProbe {
     internal static async Task<double> MeasureForcedTerminationAsync(
         string repositoryRoot,
         AcceptancePerformanceContract contract,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default)
+    {
         using var workspace = WorkerProbeWorkspace.Create();
         return await MeasureForcedTerminationCoreAsync(
                 repositoryRoot,
@@ -65,9 +68,11 @@ internal static class WorkerPerformanceProbe {
     private static async Task<double[]> MeasureWorkerCancellationAsync(
         WorkerProbeWorkspace workspace,
         int samples,
-        CancellationToken outerCancellationToken) {
+        CancellationToken outerCancellationToken)
+    {
         var latencies = new double[samples];
-        for (var index = 0; index < samples; index++) {
+        for (var index = 0; index < samples; index++)
+        {
             outerCancellationToken.ThrowIfCancellationRequested();
             var backend = new CancellationProbeBackend();
             using var worker = new SharpProofWorker(backend);
@@ -83,35 +88,43 @@ internal static class WorkerPerformanceProbe {
             var response = await verification.ConfigureAwait(false);
             stopwatch.Stop();
             if (!IsCompleteCancellation(response))
+            {
                 throw new InvalidOperationException(
                     "The worker did not return a complete typed cancellation.");
+            }
+
             latencies[index] = stopwatch.Elapsed.TotalMilliseconds;
         }
         return latencies;
     }
 
-    private static bool IsCompleteCancellation(WorkerVerifyResponse response) =>
-        response.RunStatus == WorkerRunStatus.Canceled &&
+    private static bool IsCompleteCancellation(WorkerVerifyResponse response)
+    {
+        return response.RunStatus == WorkerRunStatus.Canceled &&
         response.FailureReason == WorkerRunFailureReason.None &&
         response.Errors.Length == 0 &&
         response.Manifest.Callables.Length > 0 &&
         response.Manifest.Claims.Length > 0 &&
         response.CallableResults.All(static result =>
-            result is {
+            result is
+            {
                 Coverage: WorkerCallableCoverage.Incomplete,
                 Reason: WorkerCallableCoverageReason.Canceled
             }) &&
         response.ClaimResults.All(static result =>
-            result is {
+            result is
+            {
                 Outcome: WorkerClaimOutcome.Unknown,
                 Reason: WorkerClaimReason.Canceled
             }) &&
         WorkerProtocolJson.Validate(response).IsValid;
+    }
 
     private static async Task VerifyCooperativeLauncherCancellationAsync(
         string repositoryRoot,
         WorkerProbeWorkspace workspace,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var workerPath = FindBuiltAssembly(
             repositoryRoot,
             "SharpProof.Worker");
@@ -131,12 +144,14 @@ internal static class WorkerPerformanceProbe {
                 cancellationToken)
             .ConfigureAwait(false);
         if (result.ExitCode != 124)
+        {
             throw new InvalidOperationException(
                 "The real worker did not complete its project-timeout path " +
                 "through the launcher. Exit code: " +
                 result.ExitCode.ToString(CultureInfo.InvariantCulture) +
                 Environment.NewLine +
                 result.StandardError);
+        }
 
         var response = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(
@@ -152,15 +167,18 @@ internal static class WorkerPerformanceProbe {
             !response.CallableResults.Any(static result =>
                 result.Reason ==
                 WorkerCallableCoverageReason.ProjectTimeout))
+        {
             throw new InvalidOperationException(
                 "The real worker did not report a cooperative project timeout.");
+        }
     }
 
     private static async Task<double> MeasureForcedTerminationCoreAsync(
         string repositoryRoot,
         WorkerProbeWorkspace workspace,
         AcceptancePerformanceContract contract,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var probeWorker = workspace.CreateUncooperativeWorker(
             FindBuiltAssembly(
                 repositoryRoot,
@@ -188,7 +206,8 @@ internal static class WorkerPerformanceProbe {
             boundary.Token);
         var standardError = process.StandardError.ReadToEndAsync(
             boundary.Token);
-        try {
+        try
+        {
             var workerProcessId = await WaitForWorkerReadyAsync(
                     readyPath,
                     process,
@@ -200,8 +219,11 @@ internal static class WorkerPerformanceProbe {
                 (int)contract.ForcedTerminationMilliseconds + 10_000);
 #pragma warning disable CA1849 // The deadline probe intentionally uses kernel waits.
             if (!process.WaitForExit(waitLimit))
+            {
                 throw new TimeoutException(
                     "The launcher did not reach its hard deadline.");
+            }
+
             WaitForProcessExit(
                 workerProcessId,
                 Math.Max(0, waitLimit - (int)stopwatch.ElapsedMilliseconds));
@@ -210,6 +232,7 @@ internal static class WorkerPerformanceProbe {
             var output = await standardOutput.ConfigureAwait(false);
             var error = await standardError.ConfigureAwait(false);
             if (process.ExitCode != 124)
+            {
                 throw new InvalidOperationException(
                     "The launcher did not force-terminate an uncooperative " +
                     "worker. Exit code: " +
@@ -218,9 +241,12 @@ internal static class WorkerPerformanceProbe {
                     output +
                     Environment.NewLine +
                     error);
+            }
+
             return stopwatch.Elapsed.TotalMilliseconds;
         }
-        catch {
+        catch
+        {
             TryKill(process);
             throw;
         }
@@ -233,11 +259,13 @@ internal static class WorkerPerformanceProbe {
         string runName,
         int projectWallMilliseconds,
         int methodWallMilliseconds,
-        int terminationGraceMilliseconds) {
+        int terminationGraceMilliseconds)
+    {
         var launcherPath = FindBuiltAssembly(
             repositoryRoot,
             "SharpProof.Worker.Launcher");
-        var startInfo = new ProcessStartInfo {
+        var startInfo = new ProcessStartInfo
+        {
             FileName = ResolveDotNetHost(),
             UseShellExecute = false,
             CreateNoWindow = true,
@@ -296,7 +324,8 @@ internal static class WorkerPerformanceProbe {
     private static async Task<ProcessResult> WaitForExitAsync(
         Process process,
         double timeoutMilliseconds,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         using var boundary = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
         boundary.CancelAfter(TimeSpan.FromMilliseconds(timeoutMilliseconds));
@@ -304,11 +333,13 @@ internal static class WorkerPerformanceProbe {
             boundary.Token);
         var standardError = process.StandardError.ReadToEndAsync(
             boundary.Token);
-        try {
+        try
+        {
             await process.WaitForExitAsync(boundary.Token)
                 .ConfigureAwait(false);
         }
-        catch {
+        catch
+        {
             TryKill(process);
             throw;
         }
@@ -322,15 +353,22 @@ internal static class WorkerPerformanceProbe {
         string readyPath,
         Process launcher,
         Task<string> standardError,
-        CancellationToken cancellationToken) {
-        while (true) {
+        CancellationToken cancellationToken)
+    {
+        while (true)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             if (launcher.HasExited)
+            {
                 throw new InvalidOperationException(
                     "The launcher exited before the worker probe became ready." +
                     Environment.NewLine + await standardError.ConfigureAwait(false));
-            try {
-                if (File.Exists(readyPath)) {
+            }
+
+            try
+            {
+                if (File.Exists(readyPath))
+                {
                     var text = await File.ReadAllTextAsync(
                             readyPath,
                             cancellationToken)
@@ -340,10 +378,13 @@ internal static class WorkerPerformanceProbe {
                             NumberStyles.None,
                             CultureInfo.InvariantCulture,
                             out var processId))
+                    {
                         return processId;
+                    }
                 }
             }
-            catch (IOException) {
+            catch (IOException)
+            {
             }
             await Task.Delay(5, cancellationToken).ConfigureAwait(false);
         }
@@ -351,27 +392,34 @@ internal static class WorkerPerformanceProbe {
 
     private static void WaitForProcessExit(
         int processId,
-        int timeoutMilliseconds) {
+        int timeoutMilliseconds)
+    {
         Process? worker = null;
-        try {
+        try
+        {
             worker = Process.GetProcessById(processId);
 #pragma warning disable CA1849 // The deadline probe intentionally uses kernel waits.
             if (!worker.HasExited &&
                 !worker.WaitForExit(timeoutMilliseconds))
+            {
                 throw new TimeoutException(
                     "The worker process tree did not terminate.");
+            }
 #pragma warning restore CA1849
         }
-        catch (ArgumentException) {
+        catch (ArgumentException)
+        {
         }
-        finally {
+        finally
+        {
             worker?.Dispose();
         }
     }
 
     private static string FindBuiltAssembly(
         string repositoryRoot,
-        string projectName) {
+        string projectName)
+    {
         var configuration = new DirectoryInfo(
             AppContext.BaseDirectory.TrimEnd(
                 Path.DirectorySeparatorChar,
@@ -383,7 +431,8 @@ internal static class WorkerPerformanceProbe {
         };
         foreach (var candidate in candidates
                      .Where(static value => !string.IsNullOrWhiteSpace(value))
-                     .Distinct(StringComparer.OrdinalIgnoreCase)) {
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
             var path = Path.Combine(
                 repositoryRoot,
                 projectName,
@@ -392,14 +441,17 @@ internal static class WorkerPerformanceProbe {
                 "net9.0",
                 projectName + ".dll");
             if (File.Exists(path))
+            {
                 return path;
+            }
         }
         throw new FileNotFoundException(
             "The required worker executable was not built.",
             projectName + ".dll");
     }
 
-    private static string ResolveDotNetHost() {
+    private static string ResolveDotNetHost()
+    {
         var configured = Environment.GetEnvironmentVariable(
             "DOTNET_HOST_PATH");
         return string.IsNullOrWhiteSpace(configured)
@@ -410,7 +462,8 @@ internal static class WorkerPerformanceProbe {
     private static void AddOption(
         ProcessStartInfo startInfo,
         string name,
-        object value) {
+        object value)
+    {
         AddArgument(startInfo, "--" + name);
         AddArgument(
             startInfo,
@@ -420,19 +473,27 @@ internal static class WorkerPerformanceProbe {
 
     private static void AddArgument(
         ProcessStartInfo startInfo,
-        string value) =>
+        string value)
+    {
         startInfo.ArgumentList.Add(value);
+    }
 
-    private static void TryKill(Process process) {
-        try {
+    private static void TryKill(Process process)
+    {
+        try
+        {
             if (!process.HasExited)
+            {
                 process.Kill(entireProcessTree: true);
+            }
         }
-        catch (InvalidOperationException) {
+        catch (InvalidOperationException)
+        {
         }
     }
 
-    private sealed class CancellationProbeBackend : ISmtBackend {
+    private sealed class CancellationProbeBackend : ISmtBackend
+    {
         private readonly TaskCompletionSource<bool> _entered =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -440,7 +501,8 @@ internal static class WorkerPerformanceProbe {
 
         public async Task<BackendCheckResult> CheckAsync(
             VerificationQuery query,
-            CancellationToken cancellationToken) {
+            CancellationToken cancellationToken)
+        {
             _entered.TrySetResult(true);
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken)
                 .ConfigureAwait(false);
@@ -454,18 +516,25 @@ internal static class WorkerPerformanceProbe {
         string StandardOutput,
         string StandardError);
 
-    private sealed class WorkerProbeWorkspace : IDisposable {
+    private sealed class WorkerProbeWorkspace : IDisposable
+    {
         private static readonly UTF8Encoding Utf8WithoutBom =
             new(encoderShouldEmitUTF8Identifier: false);
 
-        private WorkerProbeWorkspace(string directoryPath) =>
+        private WorkerProbeWorkspace(string directoryPath)
+        {
             DirectoryPath = directoryPath;
+        }
 
-        internal string DirectoryPath { get; }
+        internal string DirectoryPath
+        {
+            get;
+        }
         internal string LauncherManifestPath =>
             Path.Combine(DirectoryPath, "launcher.compiler-manifest.json");
 
-        internal static WorkerProbeWorkspace Create() {
+        internal static WorkerProbeWorkspace Create()
+        {
             var directory = Path.Combine(
                 Path.GetTempPath(),
                 "SharpProof.Gates.Performance",
@@ -512,33 +581,42 @@ internal static class WorkerPerformanceProbe {
             return workspace;
         }
 
-        internal WorkerVerifyRequest CreateCancellationRequest() =>
-            new() {
+        internal WorkerVerifyRequest CreateCancellationRequest()
+        {
+            return new()
+            {
                 CompilerManifest = Reference(CancellationManifestPath),
-                Budgets = new WorkerBudgets {
+                Budgets = new WorkerBudgets
+                {
                     MethodWallTimeMilliseconds = 30_000,
                     ProjectWallTimeMilliseconds = 30_000,
                     MaxParallelism = 1,
                     MaxWorkerProcesses = 1
                 },
-                Cache = new WorkerCacheOptions {
+                Cache = new WorkerCacheOptions
+                {
                     Enabled = false,
                     Directory = Path.Combine(DirectoryPath, "cache")
                 }
             };
+        }
 
         private string CancellationManifestPath =>
             Path.Combine(DirectoryPath, "cancellation.compiler-manifest.json");
 
-        private static WorkerFileReference Reference(string path) =>
-            new() {
+        private static WorkerFileReference Reference(string path)
+        {
+            return new()
+            {
                 Path = path,
                 Sha256 = LowerSha(File.ReadAllBytes(path))
             };
+        }
 
         private static void WriteCompilerManifest(
             string artifactPath, string assemblyName, string sourcePath,
-            string source, IEnumerable<string> referencePaths) {
+            string source, IEnumerable<string> referencePaths)
+        {
             var tree = CSharpSyntaxTree.ParseText(
                 source,
                 new CSharpParseOptions(LanguageVersion.CSharp12,
@@ -570,17 +648,24 @@ internal static class WorkerPerformanceProbe {
                 Utf8WithoutBom);
         }
 
-        private static string LowerSha(byte[] bytes) =>
-            string.Concat(SHA256.HashData(bytes).Select(static value =>
+        private static string LowerSha(byte[] bytes)
+        {
+            return string.Concat(SHA256.HashData(bytes).Select(static value =>
                 value.ToString("x2", CultureInfo.InvariantCulture)));
+        }
 
-        internal string RequestPath(string runName) =>
-            Path.Combine(DirectoryPath, runName + ".request.json");
+        internal string RequestPath(string runName)
+        {
+            return Path.Combine(DirectoryPath, runName + ".request.json");
+        }
 
-        internal string ResultPath(string runName) =>
-            Path.Combine(DirectoryPath, runName + ".result.json");
+        internal string ResultPath(string runName)
+        {
+            return Path.Combine(DirectoryPath, runName + ".result.json");
+        }
 
-        internal string CreateUncooperativeWorker(string launcherPath) {
+        internal string CreateUncooperativeWorker(string launcherPath)
+        {
             var path = Path.Combine(
                 DirectoryPath,
                 "UncooperativeWorker.dll");
@@ -640,12 +725,15 @@ internal static class WorkerPerformanceProbe {
             using var output = File.Create(path);
             var emit = compilation.Emit(output, win32Resources: resources);
             if (!emit.Success)
+            {
                 throw new InvalidOperationException(
                     "The uncooperative worker probe could not be compiled: " +
                     string.Join(
                         Environment.NewLine,
                         emit.Diagnostics.Select(static diagnostic =>
                             diagnostic.ToString())));
+            }
+
             var launcherRuntimeConfig = Path.ChangeExtension(
                 launcherPath,
                 ".runtimeconfig.json");
@@ -653,10 +741,42 @@ internal static class WorkerPerformanceProbe {
                 launcherRuntimeConfig,
                 Path.ChangeExtension(path, ".runtimeconfig.json"),
                 overwrite: true);
+            var targetFramework = AppContext.TargetFrameworkName ??
+                throw new InvalidOperationException(
+                    "The performance probe target framework is unavailable.");
+            File.WriteAllText(
+                Path.ChangeExtension(path, ".deps.json"),
+                $$"""
+                {
+                  "runtimeTarget": {
+                    "name": "{{targetFramework}}",
+                    "signature": ""
+                  },
+                  "compilationOptions": {},
+                  "targets": {
+                    "{{targetFramework}}": {
+                      "UncooperativeWorker/1.0.0": {
+                        "runtime": {
+                          "UncooperativeWorker.dll": {}
+                        }
+                      }
+                    }
+                  },
+                  "libraries": {
+                    "UncooperativeWorker/1.0.0": {
+                      "type": "project",
+                      "serviceable": false,
+                      "sha512": ""
+                    }
+                  }
+                }
+                """,
+                Utf8WithoutBom);
             return path;
         }
 
-        public void Dispose() {
+        public void Dispose()
+        {
             var resolved = Path.GetFullPath(DirectoryPath);
             var expectedRoot = Path.GetFullPath(
                 Path.Combine(
@@ -665,19 +785,26 @@ internal static class WorkerPerformanceProbe {
             if (!resolved.StartsWith(
                     expectedRoot + Path.DirectorySeparatorChar,
                     StringComparison.Ordinal))
+            {
                 throw new InvalidOperationException(
                     "Refusing to remove an unexpected probe directory.");
+            }
+
             if (Directory.Exists(resolved))
+            {
                 Directory.Delete(resolved, recursive: true);
+            }
         }
 
-        private static string CreateLauncherSource() {
+        private static string CreateLauncherSource()
+        {
             var source = new StringBuilder();
             source.AppendLine("using SharpProof.Attributes;");
             source.AppendLine("public static class LauncherSubject {");
             for (var index = 0;
                  index < LauncherWorkloadMethods;
-                 index++) {
+                 index++)
+            {
                 source.Append("    public static long M")
                     .Append(index.ToString(CultureInfo.InvariantCulture))
                     .AppendLine("(long value) {");
@@ -690,7 +817,8 @@ internal static class WorkerPerformanceProbe {
             return source.ToString();
         }
 
-        private static string[] GetReferences() {
+        private static string[] GetReferences()
+        {
             var trustedPlatformAssemblies =
                 (string?)AppContext.GetData(
                     "TRUSTED_PLATFORM_ASSEMBLIES") ??

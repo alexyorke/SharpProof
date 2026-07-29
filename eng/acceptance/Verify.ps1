@@ -15,6 +15,12 @@ $acceptanceRoot = $PSScriptRoot
 $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
+. (Join-Path $repositoryRoot 'scripts\CSharpSourceMetrics.ps1')
+& (Join-Path $repositoryRoot 'scripts\Generate-DiagnosticDescriptors.ps1') -Verify
+& (Join-Path $repositoryRoot 'scripts\Generate-CSharpScalarSemantics.ps1') -Verify
+& (Join-Path $repositoryRoot 'scripts\Generate-ApiSpecCatalog.ps1') -Verify
+& (Join-Path $repositoryRoot 'scripts\Generate-ProtocolModel.ps1') -Verify
+& (Join-Path $repositoryRoot 'scripts\Generate-CompilerArtifactModel.ps1') -Verify
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
 $directoryBuildPropsPath = Join-Path `
     $repositoryRoot `
@@ -128,7 +134,7 @@ function Invoke-SharpProofDotnet {
     }
 }
 
-function Measure-RepositoryNonblankLines {
+function Assert-RepositoryPaths {
     param(
         [Parameter(Mandatory = $true)]
         [object[]]$Paths,
@@ -142,7 +148,6 @@ function Measure-RepositoryNonblankLines {
     }
     $seenPaths = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::Ordinal)
-    $nonblankLines = 0
     foreach ($untypedRelativePath in $Paths) {
         $relativePath = [string]$untypedRelativePath
         if ([string]::IsNullOrWhiteSpace($relativePath) -or
@@ -157,15 +162,51 @@ function Measure-RepositoryNonblankLines {
             -not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
             throw "Invalid $Scope path: $relativePath"
         }
-        $nonblankLines += @(
-            Get-Content -LiteralPath $fullPath |
-                Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-        ).Count
     }
-    return $nonblankLines
 }
 
-Assert-Equal $contract.schemaVersion 3 'schemaVersion'
+function Measure-RepositoryCSharpSyntax {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Paths,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Scope
+    )
+
+    Assert-RepositoryPaths -Paths $Paths -Scope $Scope
+    $syntaxTokens = 0
+    $syntaxNodes = 0
+    $expressionNodes = 0
+    $decisionPoints = 0
+    $members = 0
+    foreach ($untypedRelativePath in $Paths) {
+        $relativePath = [string]$untypedRelativePath
+        if (-not $relativePath.EndsWith(
+                '.cs',
+                [StringComparison]::OrdinalIgnoreCase)) {
+            throw "$Scope contains a non-C# source path: $relativePath"
+        }
+        $fullPath = Join-Path $repositoryRoot $relativePath
+        $metrics = Measure-CSharpSourceText `
+            -Source (Get-Content -LiteralPath $fullPath -Raw) `
+            -Path $relativePath
+        $syntaxTokens += $metrics.syntaxTokens
+        $syntaxNodes += $metrics.syntaxNodes
+        $expressionNodes += $metrics.expressionNodes
+        $decisionPoints += $metrics.decisionPoints
+        $members += $metrics.members
+    }
+    return [pscustomobject]@{
+        syntaxTokens = $syntaxTokens
+        syntaxNodes = $syntaxNodes
+        expressionNodes = $expressionNodes
+        decisionPoints = $decisionPoints
+        members = $members
+    }
+}
+
+Assert-Equal $contract.schemaVersion 4 'schemaVersion'
 Assert-Equal $contract.releaseLine '1.0.0-preview' 'releaseLine'
 Assert-Equal $contract.flagship 'effects' 'flagship'
 Assert-Equal $contract.analyzer.defaultProfile 'advisory' 'analyzer.defaultProfile'
@@ -193,9 +234,9 @@ Assert-Equal `
     $contract.analyzer.defaultAssumptionPolicy `
     'SharpProofAssumptionPolicy'
 Assert-Equal ($contract.supportedTargetFrameworks -join ',') 'netstandard2.0,net8.0,net472' 'supportedTargetFrameworks'
-Assert-Equal $contract.worker.protocolVersion 6 'worker.protocolVersion'
-Assert-Equal $contract.worker.manifestSchemaVersion 2 'worker.manifestSchemaVersion'
-Assert-Equal $contract.worker.compilerArtifactSchemaVersion 3 'worker.compilerArtifactSchemaVersion'
+Assert-Equal $contract.worker.protocolVersion 8 'worker.protocolVersion'
+Assert-Equal $contract.worker.manifestSchemaVersion 4 'worker.manifestSchemaVersion'
+Assert-Equal $contract.worker.compilerArtifactSchemaVersion 5 'worker.compilerArtifactSchemaVersion'
 Assert-Equal $contract.worker.maximumParallelism 4 'worker.maximumParallelism'
 Assert-Equal $contract.worker.maximumMemoryMiB 2048 'worker.maximumMemoryMiB'
 Assert-Equal $contract.worker.queryRlimit 3000000 'worker.queryRlimit'
@@ -203,7 +244,7 @@ Assert-Equal $contract.worker.methodRlimit 20000000 'worker.methodRlimit'
 Assert-Equal $contract.worker.maximumMethodWallSeconds 10 'worker.maximumMethodWallSeconds'
 Assert-Equal $contract.worker.maximumProjectWallSeconds 300 'worker.maximumProjectWallSeconds'
 Assert-Equal $contract.worker.forcedTerminationMilliseconds 1000 'worker.forcedTerminationMilliseconds'
-Assert-Equal $contract.cache.schemaVersion 7 'cache.schemaVersion'
+Assert-Equal $contract.cache.schemaVersion 9 'cache.schemaVersion'
 Assert-Equal $contract.cache.maximumMiB 512 'cache.maximumMiB'
 Assert-Equal ($contract.cache.cacheableOutcomes -join ',') 'Proven,Refuted' 'cache.cacheableOutcomes'
 Assert-Equal `
@@ -298,28 +339,32 @@ Assert-Equal `
 Push-Location $repositoryRoot
 try {
     $kernelPaths = @($contract.trustedKernel.paths)
-    $kernelMaximum = [int]$contract.trustedKernel.maximumNonblankLines
-    if ($kernelPaths.Count -eq 0 -or $kernelMaximum -le 0) {
-        throw 'The trusted-kernel LOC contract must declare paths and a positive limit.'
+    if ($kernelPaths.Count -eq 0) {
+        throw 'The trusted-kernel contract must declare paths.'
     }
-    $kernelNonblankLines = Measure-RepositoryNonblankLines `
+    Assert-RepositoryPaths `
         -Paths $kernelPaths `
         -Scope 'trusted-kernel'
-    if ($kernelNonblankLines -gt $kernelMaximum) {
-        throw "Trusted-kernel nonblank LOC $kernelNonblankLines exceeds " +
-            "the contract limit $kernelMaximum."
-    }
-    Write-Host (
-        "Trusted-kernel nonblank lines: $kernelNonblankLines " +
-        "(maximum $kernelMaximum)")
+    Write-Host "Trusted-kernel paths: $($kernelPaths.Count)"
 
     $requiredTcbComponents = @(
         'discovery',
         'lowering',
         'execution',
+        'obligationGeneration',
         'encoding',
+        'apiSpecifications',
+        'apiSpecificationIdentity',
+        'apiSpecificationCatalog',
+        'scalarSemanticsCatalog',
+        'effectAnalysis',
         'replay',
+        'effectReplay',
         'policy',
+        'resultAssembly',
+        'compilerInputIdentity',
+        'canonicalIdentityEncoding',
+        'protocolValidation',
         'cacheValidation'
     )
     $tcbComponents = @($contract.trustedComputingBase.components)
@@ -339,30 +384,62 @@ try {
     foreach ($component in $tcbComponents) {
         $name = [string]$component.name
         $paths = @($component.paths)
-        $maximum = [int]$component.maximumNonblankLines
-        if ($maximum -le 0) {
-            throw "Trusted-computing-base component '$name' must have a positive limit."
-        }
+        Assert-RepositoryPaths `
+            -Paths $paths `
+            -Scope "trusted-computing-base component '$name'"
         foreach ($path in $paths) {
             if (-not $allTcbPaths.Add([string]$path)) {
                 throw "Trusted-computing-base path belongs to multiple components: $path"
             }
         }
-        $nonblankLines = Measure-RepositoryNonblankLines `
-            -Paths $paths `
-            -Scope "trusted-computing-base component '$name'"
-        if ($nonblankLines -gt $maximum) {
-            throw "Trusted-computing-base component '$name' nonblank LOC " +
-                "$nonblankLines exceeds the contract limit $maximum."
-        }
-        Write-Host (
-            "Trusted-computing-base $name nonblank lines: " +
-            "$nonblankLines (maximum $maximum)")
+        Write-Host "Trusted-computing-base $name paths: $($paths.Count)"
     }
 
-    & (Join-Path $repositoryRoot 'scripts\Test-ProductionCSharpSize.ps1')
+    $coordinatorComplexity = $contract.productionCoordinatorComplexity
+    $layers = @($coordinatorComplexity.layers)
+    if ($layers.Count -eq 0) {
+        throw 'The production-coordinator complexity contract is invalid.'
+    }
+    $layerNames = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    $layerPaths = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($layer in $layers) {
+        $name = [string]$layer.name
+        $path = [string]$layer.path
+        if ([string]::IsNullOrWhiteSpace($name) -or
+            -not $layerNames.Add($name) -or
+            -not $layerPaths.Add($path)) {
+            throw "Invalid or duplicate production coordinator: '$name'."
+        }
+        $maximumExpressionNodes = [int]$layer.maximumExpressionNodes
+        $maximumDecisionPoints = [int]$layer.maximumDecisionPoints
+        if ($maximumExpressionNodes -le 0 -or
+            $maximumDecisionPoints -le 0) {
+            throw "Production coordinator '$name' must have positive limits."
+        }
+        $currentMetrics = Measure-RepositoryCSharpSyntax `
+            -Paths @($path) `
+            -Scope "production coordinator '$name'"
+        $currentExpressionNodes = [int]$currentMetrics.expressionNodes
+        $currentDecisionPoints = [int]$currentMetrics.decisionPoints
+        if ($currentExpressionNodes -gt $maximumExpressionNodes -or
+            $currentDecisionPoints -gt $maximumDecisionPoints) {
+            throw "Production layer '$name' has $currentExpressionNodes " +
+                "expression nodes; " +
+                "$currentDecisionPoints decision points. Limits are " +
+                "$maximumExpressionNodes and $maximumDecisionPoints."
+        }
+        Write-Host (
+            "Production-layer $name expression nodes: " +
+            "$currentExpressionNodes (maximum $maximumExpressionNodes); " +
+            "decision points: " +
+            "$currentDecisionPoints (maximum $maximumDecisionPoints)")
+    }
+
+    & (Join-Path $repositoryRoot 'scripts\Test-ProductionCSharpComplexity.ps1')
     if ($LASTEXITCODE -ne 0) {
-        throw 'The production C# size ratchet failed.'
+        throw 'The production C# structural-complexity ratchet failed.'
     }
 
     if (-not $SkipBuild) {

@@ -15,7 +15,8 @@ namespace SharpProof.Package.Test;
 
 [TestFixture]
 [NonParallelizable]
-public sealed class PackageLayoutSmokeTests {
+public sealed class PackageLayoutSmokeTests
+{
     private static readonly Guid SourceLinkKind = new(
         "CC110556-A091-4D38-9FEC-25AB9A351A6A");
 
@@ -103,7 +104,8 @@ public sealed class PackageLayoutSmokeTests {
     ];
 
     [Test]
-    public async Task PackageGraphAndLayoutsAreExact() {
+    public async Task PackageGraphAndLayoutsAreExact()
+    {
         var feed = await PackagedProductFeed.GetAsync();
 
         VerifyPackageGraph(feed);
@@ -111,7 +113,8 @@ public sealed class PackageLayoutSmokeTests {
     }
 
     [Test]
-    public async Task SymbolPackagesAreExactPortableAndSourceLinked() {
+    public async Task SymbolPackagesAreExactPortableAndSourceLinked()
+    {
         var feed = await PackagedProductFeed.GetAsync();
         var repositoryRoot = FindRepositoryRoot();
         var revision = await RunProcessAsync(
@@ -125,7 +128,8 @@ public sealed class PackageLayoutSmokeTests {
             commit,
             Does.Match("^[0-9a-f]{40}$"));
 
-        foreach (var package in feed.Packages) {
+        foreach (var package in feed.Packages)
+        {
             var symbolPackagePath =
                 feed.GetSymbolPackagePath(package.Id);
             VerifyRepositoryMetadata(package.Path, commit);
@@ -139,7 +143,8 @@ public sealed class PackageLayoutSmokeTests {
     }
 
     [Test]
-    public async Task ReleaseEvidenceIsDeterministicAndComplete() {
+    public async Task ReleaseEvidenceIsDeterministicAndComplete()
+    {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = ReleaseEvidenceWorkspace.Create(feed.Version);
         var script = Path.Combine(
@@ -224,7 +229,8 @@ public sealed class PackageLayoutSmokeTests {
                 "symbols",
                 "sbom"
             ]));
-        foreach (var artifact in artifacts) {
+        foreach (var artifact in artifacts)
+        {
             var fileName = artifact.GetProperty("fileName").GetString() ??
                 throw new InvalidDataException(
                     "Release artifact fileName is null.");
@@ -270,7 +276,8 @@ public sealed class PackageLayoutSmokeTests {
 
         foreach (var packagePath in Directory.EnumerateFiles(
             feed.Source,
-            "*.nupkg")) {
+            "*.nupkg"))
+        {
             File.Copy(
                 packagePath,
                 Path.Combine(
@@ -279,7 +286,8 @@ public sealed class PackageLayoutSmokeTests {
         }
         foreach (var symbolsPath in Directory.EnumerateFiles(
             feed.Source,
-            "*.snupkg")) {
+            "*.snupkg"))
+        {
             File.Copy(
                 symbolsPath,
                 Path.Combine(
@@ -307,7 +315,8 @@ public sealed class PackageLayoutSmokeTests {
     }
 
     [Test]
-    public async Task PortablePackageRunsAdvisoryAndRequiresVerifier() {
+    public async Task PortablePackageRunsAdvisoryAndRequiresVerifier()
+    {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
         workspace.WriteConsumer(feed.Version, PackagedProductFeed.PortablePackageId);
@@ -428,11 +437,56 @@ public sealed class PackageLayoutSmokeTests {
                 "requires the matching SharpProof.Verifier.Win-x64 package"));
     }
 
-    [Test]
-    public async Task VerifierPackageTransitivelySuppliesPortableProduct() {
+    [TestCase("netstandard2.0")]
+    [TestCase("net472")]
+    public async Task PortablePackageBuildsFrameworkConsumerFromIsolatedFeed(
+        string targetFramework)
+    {
+        if (targetFramework == "net472" && !OperatingSystem.IsWindows())
+        {
+            Assert.Ignore(
+                "The net472 package consumer is build-only and requires " +
+                "the Windows .NET Framework targeting pack.");
+        }
+
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
-        workspace.WriteConsumer(
+        workspace.WriteFrameworkConsumer(feed.Version, targetFramework);
+        var restore = await RestoreConsumerAsync(
+            workspace,
+            feed,
+            includeNetStandardFrameworkPackages:
+                targetFramework == "netstandard2.0");
+        Assert.That(restore.ExitCode, Is.Zero, restore.Output);
+
+        var enabledItems = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "msbuild",
+            workspace.ConsumerProject,
+            "-getItem:Analyzer",
+            "--nologo");
+        Assert.That(enabledItems.ExitCode, Is.Zero, enabledItems.Output);
+        var packagedAnalyzerItems =
+            GetPackagedAnalyzerItems(enabledItems.Output);
+        Assert.That(
+            packagedAnalyzerItems
+                .Where(static item => item.Role == "EntryPoint")
+                .Select(static item => item.FileName),
+            Is.EquivalentTo(ExpectedAnalyzerEntryFileNames));
+
+        // net472 qualification is intentionally build-only: the package
+        // supplies compiler analyzers, but this test never executes the
+        // resulting .NET Framework consumer assembly.
+        var build = await BuildAnalyzerConsumerAsync(workspace);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+    }
+
+    [Test]
+    public async Task VerifierPackageTransitivelySuppliesPortableProduct()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WritePassingVerifierConsumer(
             feed.Version,
             PackagedProductFeed.VerifierPackageId);
         var restore = await RestoreConsumerAsync(workspace, feed);
@@ -460,7 +514,7 @@ public sealed class PackageLayoutSmokeTests {
 
         var advisory = await BuildAnalyzerConsumerAsync(workspace);
         Assert.That(advisory.ExitCode, Is.Zero, advisory.Output);
-        Assert.That(advisory.Output, Does.Contain("SP0045"));
+        Assert.That(advisory.Output, Does.Not.Contain("SP0045"));
 
         var verification = await RunDotNetAsync(
             workspace.ConsumerDirectory,
@@ -475,7 +529,8 @@ public sealed class PackageLayoutSmokeTests {
             "-p:SharpProofVerify=true");
         if (OperatingSystem.IsWindows() &&
             RuntimeInformation.ProcessArchitecture == Architecture.X64 &&
-            RuntimeInformation.OSArchitecture == Architecture.X64) {
+            RuntimeInformation.OSArchitecture == Architecture.X64)
+        {
             Assert.That(
                 verification.ExitCode,
                 Is.Zero,
@@ -485,7 +540,8 @@ public sealed class PackageLayoutSmokeTests {
                 Does.Contain("SharpProof Proven"));
             Assert.That(File.Exists(workspace.ResultPath), Is.True);
         }
-        else {
+        else
+        {
             Assert.That(
                 verification.ExitCode,
                 Is.Not.Zero,
@@ -498,7 +554,102 @@ public sealed class PackageLayoutSmokeTests {
     }
 
     [Test]
-    public async Task VerifierPackageRejectsANonX64BuildProcess() {
+    public async Task PackagedVerifierPreservesLinkedAndMappedLocationsInSarif()
+    {
+        RequireWindowsX64Worker();
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteLinkedMappedVerifierConsumer(feed.Version);
+        var restore = await RestoreConsumerAsync(workspace, feed);
+        Assert.That(restore.ExitCode, Is.Zero, restore.Output);
+
+        var verification = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "build",
+            workspace.ConsumerProject,
+            "-c",
+            "Release",
+            "--no-restore",
+            "--nologo",
+            "/nodeReuse:false",
+            "-p:UseSharedCompilation=false",
+            "-p:SharpProofVerify=true",
+            "-p:SharpProofVerifyCacheEnabled=false",
+            "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
+        Assert.That(verification.ExitCode, Is.Not.Zero);
+        Assert.That(
+            verification.Output,
+            Does.Contain("SharpProof Refuted")
+                .And.Contain("failed with exit code 5"));
+        Assert.That(
+            File.Exists(workspace.CompilerManifestPath),
+            Is.True,
+            verification.Output);
+        Assert.That(
+            File.Exists(workspace.SarifPath),
+            Is.True,
+            verification.Output);
+
+        using (var manifest = JsonDocument.Parse(
+                   await File.ReadAllTextAsync(
+                       workspace.CompilerManifestPath)))
+        {
+            var syntaxTreePaths = manifest.RootElement
+                .GetProperty("compilation")
+                .GetProperty("syntaxTrees")
+                .EnumerateArray()
+                .Select(static tree =>
+                    tree.GetProperty("path").GetString() ?? string.Empty)
+                .ToArray();
+            Assert.That(
+                syntaxTreePaths.Any(static path =>
+                    path.Replace('\\', '/').EndsWith(
+                        "/shared source/LinkedSubject.cs",
+                        StringComparison.OrdinalIgnoreCase)),
+                Is.True,
+                "The final compiler artifact must retain the linked " +
+                "file's physical source identity.");
+
+            var claims = manifest.RootElement
+                .GetProperty("manifest")
+                .GetProperty("claims")
+                .EnumerateArray()
+                .ToArray();
+            Assert.That(claims, Has.Length.EqualTo(1));
+            var location = claims[0].GetProperty("location");
+            Assert.That(
+                location.GetProperty("path").GetString(),
+                Is.EqualTo("mapped/contracts/Identity.cs"));
+            Assert.That(
+                location.GetProperty("line").GetInt32(),
+                Is.EqualTo(73));
+        }
+
+        using var sarif = JsonDocument.Parse(
+            await File.ReadAllTextAsync(workspace.SarifPath));
+        var refuted = sarif.RootElement
+            .GetProperty("runs")[0]
+            .GetProperty("results")
+            .EnumerateArray()
+            .Single(static result =>
+                result.GetProperty("ruleId").GetString() ==
+                "SharpProof.Refuted");
+        var physicalLocation = refuted
+            .GetProperty("locations")[0]
+            .GetProperty("physicalLocation");
+        Assert.That(
+            physicalLocation.GetProperty("artifactLocation")
+                .GetProperty("uri").GetString(),
+            Is.EqualTo("mapped/contracts/Identity.cs"));
+        Assert.That(
+            physicalLocation.GetProperty("region")
+                .GetProperty("startLine").GetInt32(),
+            Is.EqualTo(73));
+    }
+
+    [Test]
+    public async Task VerifierPackageRejectsANonX64BuildProcess()
+    {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
         workspace.WriteConsumer(
@@ -530,7 +681,8 @@ public sealed class PackageLayoutSmokeTests {
     }
 
     [Test]
-    public async Task PackedAnalyzerReportsContractCorrectnessRegressions() {
+    public async Task PackedAnalyzerReportsContractCorrectnessRegressions()
+    {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
         workspace.WriteAnalyzerConsumer(
@@ -610,7 +762,8 @@ public sealed class PackageLayoutSmokeTests {
     }
 
     [Test]
-    public async Task PackedConsumerProbeCapturesFinalCompilerInputs() {
+    public async Task PackedConsumerProbeCapturesFinalCompilerInputs()
+    {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
         workspace.WriteCompilerProbeConsumer(
@@ -697,21 +850,44 @@ public sealed class PackageLayoutSmokeTests {
 
     private static Task<ProcessResult> RestoreConsumerAsync(
         PackageWorkspace workspace,
-        PackagedProductFeed feed) =>
-        RunDotNetAsync(
-            workspace.ConsumerDirectory,
+        PackagedProductFeed feed,
+        bool includeNetStandardFrameworkPackages = false)
+    {
+        var arguments = new List<string> {
             "restore",
             workspace.ConsumerProject,
             "--nologo",
             "/nodeReuse:false",
             "--source",
-            feed.Source,
-            "--packages",
-            workspace.PackageCache);
+            feed.Source
+        };
+        if (includeNetStandardFrameworkPackages)
+        {
+            arguments.Add("--source");
+            arguments.Add(workspace.PrepareNetStandardFrameworkSource());
+        }
+        arguments.Add("--packages");
+        arguments.Add(workspace.PackageCache);
+        return RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            [.. arguments]);
+    }
+
+    private static void RequireWindowsX64Worker()
+    {
+        if (!OperatingSystem.IsWindows() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64 ||
+            RuntimeInformation.OSArchitecture != Architecture.X64)
+        {
+            Assert.Ignore(
+                "The packaged worker is supported only on Windows x64.");
+        }
+    }
 
     private static Task<ProcessResult> BuildAnalyzerConsumerAsync(
-        PackageWorkspace workspace) =>
-        RunDotNetAsync(
+        PackageWorkspace workspace)
+    {
+        return RunDotNetAsync(
             workspace.ConsumerDirectory,
             "build",
             workspace.ConsumerProject,
@@ -721,10 +897,12 @@ public sealed class PackageLayoutSmokeTests {
             "--nologo",
             "/nodeReuse:false",
             "-p:UseSharedCompilation=false");
+    }
 
     private static Task<ProcessResult> RebuildCompilerProbeConsumerAsync(
         PackageWorkspace workspace,
-        params (string Name, string Value)[] properties) {
+        params (string Name, string Value)[] properties)
+    {
         var arguments = new List<string> {
             "build",
             workspace.ConsumerProject,
@@ -746,8 +924,9 @@ public sealed class PackageLayoutSmokeTests {
     private static Task<ProcessResult> RebuildProbeAsync(
         PackageWorkspace workspace,
         string globalValue,
-        string metadataValue) =>
-        RebuildCompilerProbeConsumerAsync(
+        string metadataValue)
+    {
+        return RebuildCompilerProbeConsumerAsync(
             workspace,
             ("SharpProofProfile", "advisory"),
             (
@@ -757,15 +936,19 @@ public sealed class PackageLayoutSmokeTests {
                 CompilerProbeContract.GlobalValuePropertyName,
                 globalValue),
             ("SharpProofProbeAdditionalMetadata", metadataValue));
+    }
 
-    private static string SnapshotChecksum(byte[] snapshot) =>
-        Convert.ToHexString(SHA256.HashData(snapshot));
+    private static string SnapshotChecksum(byte[] snapshot)
+    {
+        return Convert.ToHexString(SHA256.HashData(snapshot));
+    }
 
     private static void VerifyProbeSnapshot(
         byte[] snapshot,
         string input,
         string globalValue,
-        string metadataValue) {
+        string metadataValue)
+    {
         using var document = JsonDocument.Parse(snapshot);
         var root = document.RootElement;
         Assert.That(
@@ -930,21 +1113,27 @@ public sealed class PackageLayoutSmokeTests {
             Does.Contain("NUnit.Framework").IgnoreCase);
     }
 
-    private static string TextChecksum(string value) =>
-        Convert.ToHexString(
+    private static string TextChecksum(string value)
+    {
+        return Convert.ToHexString(
             SHA256.HashData(
                 System.Text.Encoding.UTF8.GetBytes(value)));
+    }
 
-    private static int CountDiagnosticLines(string output, string id) =>
-        output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+    private static int CountDiagnosticLines(string output, string id)
+    {
+        return output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
             .Count(line => line.Contains(
                 ": error " + id + ":",
                 StringComparison.Ordinal));
+    }
 
-    private static void VerifyPackageGraph(PackagedProductFeed feed) {
+    private static void VerifyPackageGraph(PackagedProductFeed feed)
+    {
         var expectedDependencies =
             new Dictionary<string, (string Id, string Version)[]>(
-                StringComparer.Ordinal) {
+                StringComparer.Ordinal)
+            {
                 [PackagedProductFeed.AttributesPackageId] = [],
                 [PackagedProductFeed.PortablePackageId] = [
                     (
@@ -957,7 +1146,8 @@ public sealed class PackageLayoutSmokeTests {
                         "[" + feed.Version + "]")
                 ]
             };
-        foreach (var package in feed.Packages) {
+        foreach (var package in feed.Packages)
+        {
             using var archive = ZipFile.OpenRead(package.Path);
             var nuspec = archive.Entries.Single(entry =>
                 entry.FullName.EndsWith(
@@ -986,6 +1176,7 @@ public sealed class PackageLayoutSmokeTests {
                 Is.EqualTo(expectedDependencies[package.Id]),
                 package.Id);
             foreach (var dependency in dependencies)
+            {
                 Assert.That(
                     dependency.Attributes()
                         .Select(static attribute =>
@@ -993,10 +1184,12 @@ public sealed class PackageLayoutSmokeTests {
                     Is.EquivalentTo(ExpectedDependencyAttributes),
                     package.Id +
                     " dependency metadata must not filter assets.");
+            }
         }
     }
 
-    private static void VerifyPackageLayouts(PackagedProductFeed feed) {
+    private static void VerifyPackageLayouts(PackagedProductFeed feed)
+    {
         var attributes = feed.GetPackage(
             PackagedProductFeed.AttributesPackageId);
         AssertArchiveLayout(
@@ -1051,7 +1244,8 @@ public sealed class PackageLayoutSmokeTests {
             ]);
         VerifyVerifierLayout(verifier.Path);
 
-        var allEntries = feed.Packages.SelectMany(package => {
+        var allEntries = feed.Packages.SelectMany(package =>
+        {
             using var archive = ZipFile.OpenRead(package.Path);
             return archive.Entries
                 .Select(entry => (package.Id, entry.FullName))
@@ -1079,7 +1273,8 @@ public sealed class PackageLayoutSmokeTests {
 
     private static void AssertArchiveLayout(
         string packagePath,
-        string[] expectedEntries) {
+        string[] expectedEntries)
+    {
         using var archive = ZipFile.OpenRead(packagePath);
         var entries = archive.Entries
             .Select(static entry =>
@@ -1095,7 +1290,8 @@ public sealed class PackageLayoutSmokeTests {
         string packagePath,
         string symbolPackagePath,
         string nuspecName,
-        string commit) {
+        string commit)
+    {
         using var package = ZipFile.OpenRead(packagePath);
         var packageEntries = package.Entries
             .Select(static entry => entry.FullName)
@@ -1129,7 +1325,8 @@ public sealed class PackageLayoutSmokeTests {
             ]);
 
         using var symbols = ZipFile.OpenRead(symbolPackagePath);
-        foreach (var pdbEntry in expectedPdbEntries) {
+        foreach (var pdbEntry in expectedPdbEntries)
+        {
             var entry = symbols.GetEntry(pdbEntry) ??
                 throw new InvalidDataException(
                     "Symbol package entry was not found: " + pdbEntry);
@@ -1139,10 +1336,14 @@ public sealed class PackageLayoutSmokeTests {
 
     private static void VerifyPortablePdbSourceLink(
         ZipArchiveEntry entry,
-        string commit) {
+        string commit)
+    {
         using var image = new MemoryStream();
         using (var stream = entry.Open())
+        {
             stream.CopyTo(image);
+        }
+
         image.Position = 0;
         using var provider =
             MetadataReaderProvider.FromPortablePdbStream(
@@ -1192,7 +1393,8 @@ public sealed class PackageLayoutSmokeTests {
 
     private static void VerifyRepositoryMetadata(
         string packagePath,
-        string commit) {
+        string commit)
+    {
         using var archive = ZipFile.OpenRead(packagePath);
         var nuspec = archive.Entries.Single(entry =>
             entry.FullName.EndsWith(
@@ -1217,16 +1419,21 @@ public sealed class PackageLayoutSmokeTests {
             Path.GetFileName(packagePath));
     }
 
-    private static string NormalizeGeneratedPackageEntry(string entry) {
+    private static string NormalizeGeneratedPackageEntry(string entry)
+    {
         const string coreProperties =
             "package/services/metadata/core-properties/";
         if (entry.StartsWith(coreProperties, StringComparison.Ordinal) &&
             entry.EndsWith(".psmdcp", StringComparison.Ordinal))
+        {
             return coreProperties + "<generated>.psmdcp";
+        }
+
         return entry;
     }
 
-    private static bool IsNativeZ3(string entry) {
+    private static bool IsNativeZ3(string entry)
+    {
         var fileName = Path.GetFileName(entry);
         return string.Equals(
                 fileName,
@@ -1242,7 +1449,8 @@ public sealed class PackageLayoutSmokeTests {
                 StringComparison.OrdinalIgnoreCase);
     }
 
-    private static void VerifyPortableLayout(string packagePath) {
+    private static void VerifyPortableLayout(string packagePath)
+    {
         using var archive = ZipFile.OpenRead(packagePath);
         var entries = archive.Entries
             .Select(static entry => entry.FullName)
@@ -1297,7 +1505,8 @@ public sealed class PackageLayoutSmokeTests {
                 .And.None.StartsWith("tools/net9/"));
     }
 
-    private static void VerifyVerifierLayout(string packagePath) {
+    private static void VerifyVerifierLayout(string packagePath)
+    {
         using var archive = ZipFile.OpenRead(packagePath);
         var entries = archive.Entries
             .Select(static entry => entry.FullName)
@@ -1328,6 +1537,7 @@ public sealed class PackageLayoutSmokeTests {
                      "tools/net9/SharpProof.Worker.deps.json",
                      "tools/net9/SharpProof.Worker.Launcher.deps.json"
                  })
+        {
             Assert.That(
                 ReadArchiveText(archive, dependencies),
                 Does.Not.Contain("\"Microsoft.CodeAnalysis/\"")
@@ -1336,6 +1546,8 @@ public sealed class PackageLayoutSmokeTests {
                     .And.Not.Contain("SharpProof.Contracts")
                     .And.Not.Contain("SharpProof.Frontend"),
                 dependencies);
+        }
+
         Assert.That(
             entries.Where(static entry =>
                 IsNativeZ3(entry)),
@@ -1344,7 +1556,8 @@ public sealed class PackageLayoutSmokeTests {
 
     private static string ReadArchiveText(
         ZipArchive archive,
-        string entryPath) {
+        string entryPath)
+    {
         var entry = archive.GetEntry(entryPath) ??
             throw new InvalidOperationException(
                 "Package entry was not found: " + entryPath);
@@ -1354,17 +1567,21 @@ public sealed class PackageLayoutSmokeTests {
 
     private static async Task<ProcessResult> RunDotNetAsync(
         string workingDirectory,
-        params string[] arguments) =>
-        await RunProcessAsync(
+        params string[] arguments)
+    {
+        return await RunProcessAsync(
             workingDirectory,
             "dotnet",
             arguments);
+    }
 
     private static async Task<ProcessResult> RunProcessAsync(
         string workingDirectory,
         string fileName,
-        params string[] arguments) {
-        var startInfo = new ProcessStartInfo {
+        params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo
+        {
             FileName = fileName,
             WorkingDirectory = workingDirectory,
             UseShellExecute = false,
@@ -1373,7 +1590,10 @@ public sealed class PackageLayoutSmokeTests {
             CreateNoWindow = true
         };
         foreach (var argument in arguments)
+        {
             startInfo.ArgumentList.Add(argument);
+        }
+
         using var process = Process.Start(startInfo)!;
         var standardOutput = process.StandardOutput.ReadToEndAsync();
         var standardError = process.StandardError.ReadToEndAsync();
@@ -1385,19 +1605,24 @@ public sealed class PackageLayoutSmokeTests {
     }
 
     private static (string FileName, string Role)[]
-        GetPackagedAnalyzerItems(string output) {
+        GetPackagedAnalyzerItems(string output)
+    {
         using var document = JsonDocument.Parse(output);
         var result = new List<(string FileName, string Role)>();
         foreach (var item in document.RootElement
             .GetProperty("Items")
             .GetProperty("Analyzer")
-            .EnumerateArray()) {
+            .EnumerateArray())
+        {
             var identity = item.GetProperty("Identity").GetString();
             if (identity == null ||
                 !identity.Replace('\\', '/').Contains(
                     "/tools/analyzers/dotnet/cs/",
                     StringComparison.Ordinal))
+            {
                 continue;
+            }
+
             result.Add((
                 Path.GetFileName(identity),
                 item.GetProperty("SharpProofAnalyzerRole").GetString() ?? ""));
@@ -1405,25 +1630,32 @@ public sealed class PackageLayoutSmokeTests {
         return [.. result];
     }
 
-    private static string FindRepositoryRoot() {
+    private static string FindRepositoryRoot()
+    {
         var directory = new DirectoryInfo(
             typeof(SharpProofWorker).Assembly.Location);
-        while (directory != null) {
+        while (directory != null)
+        {
             if (File.Exists(
                     Path.Combine(
                         directory.FullName,
                         "SharpProof.Release.props")))
+            {
                 return directory.FullName;
+            }
+
             directory = directory.Parent;
         }
         throw new InvalidOperationException(
             "Repository root was not found.");
     }
 
-    private sealed class PackageWorkspace : IDisposable {
+    private sealed class PackageWorkspace : IDisposable
+    {
         private readonly string _root;
 
-        private PackageWorkspace(string root) {
+        private PackageWorkspace(string root)
+        {
             _root = root;
             PackageCache = Path.Combine(root, "package cache");
             ConsumerDirectory = Path.Combine(root, "consumer project");
@@ -1437,6 +1669,24 @@ public sealed class PackageLayoutSmokeTests {
                 "net8.0",
                 "SharpProof",
                 "result.json");
+            CompilerManifestPath = Path.Combine(
+                ConsumerDirectory,
+                "obj",
+                "Release",
+                "net8.0",
+                "SharpProof",
+                "compiler-manifest.json");
+            SarifPath = Path.Combine(
+                ConsumerDirectory,
+                "obj",
+                "Release",
+                "net8.0",
+                "SharpProof",
+                "mapped-result.sarif");
+            LinkedSourcePath = Path.Combine(
+                root,
+                "shared source",
+                "LinkedSubject.cs");
             ProbeOutputPath = Path.Combine(
                 ConsumerDirectory,
                 "obj",
@@ -1450,14 +1700,45 @@ public sealed class PackageLayoutSmokeTests {
             Directory.CreateDirectory(ConsumerDirectory);
         }
 
-        internal string PackageCache { get; }
-        internal string ConsumerDirectory { get; }
-        internal string ConsumerProject { get; }
-        internal string ResultPath { get; }
-        internal string ProbeOutputPath { get; }
-        internal string ProbeInputPath { get; }
+        internal string PackageCache
+        {
+            get;
+        }
+        internal string ConsumerDirectory
+        {
+            get;
+        }
+        internal string ConsumerProject
+        {
+            get;
+        }
+        internal string ResultPath
+        {
+            get;
+        }
+        internal string CompilerManifestPath
+        {
+            get;
+        }
+        internal string SarifPath
+        {
+            get;
+        }
+        internal string LinkedSourcePath
+        {
+            get;
+        }
+        internal string ProbeOutputPath
+        {
+            get;
+        }
+        internal string ProbeInputPath
+        {
+            get;
+        }
 
-        internal static PackageWorkspace Create() {
+        internal static PackageWorkspace Create()
+        {
             var root = Path.Combine(
                 Path.GetTempPath(),
                 "SharpProof.Package.Layout.Test",
@@ -1469,7 +1750,8 @@ public sealed class PackageLayoutSmokeTests {
             return new PackageWorkspace(root);
         }
 
-        internal void WriteConsumer(string version, string packageId) =>
+        internal void WriteConsumer(string version, string packageId)
+        {
             WriteAnalyzerConsumer(
                 version,
                 packageId,
@@ -1487,13 +1769,181 @@ public sealed class PackageLayoutSmokeTests {
                 """,
                 "all",
                 "SP0045");
+        }
+
+        internal void WritePassingVerifierConsumer(
+            string version,
+            string packageId)
+        {
+            WriteAnalyzerConsumer(
+                version,
+                packageId,
+                """
+                using SharpProof.Attributes;
+                public static class Subject {
+                    [ZeroAllocations]
+                    public static long Identity(long value) {
+                        Contract.Ensures(
+                            Contract.Result<long>() == value);
+                        return value;
+                    }
+                }
+                """,
+                "all",
+                "SP0045");
+        }
+
+        internal string PrepareNetStandardFrameworkSource()
+        {
+            var frameworkSource = Path.Combine(
+                _root,
+                "framework package source");
+            Directory.CreateDirectory(frameworkSource);
+            CopyGlobalPackageToSource(
+                frameworkSource,
+                "netstandard.library",
+                "2.0.3");
+            CopyGlobalPackageToSource(
+                frameworkSource,
+                "microsoft.netcore.platforms",
+                "1.1.0");
+            if (Directory.EnumerateFiles(
+                    frameworkSource,
+                    "SharpProof*.nupkg").Any())
+            {
+                throw new InvalidOperationException(
+                    "The framework-only package source unexpectedly " +
+                    "contains a SharpProof package.");
+            }
+
+            return frameworkSource;
+        }
+
+        private static void CopyGlobalPackageToSource(
+            string destination,
+            string packageId,
+            string version)
+        {
+            var configuredPackages = Environment.GetEnvironmentVariable(
+                "NUGET_PACKAGES");
+            var globalPackages = string.IsNullOrWhiteSpace(configuredPackages)
+                ? Path.Combine(
+                    Environment.GetFolderPath(
+                        Environment.SpecialFolder.UserProfile),
+                    ".nuget",
+                    "packages")
+                : Path.GetFullPath(configuredPackages);
+            var fileName = packageId + "." + version + ".nupkg";
+            var source = Path.Combine(
+                globalPackages,
+                packageId,
+                version,
+                fileName);
+            if (!File.Exists(source))
+            {
+                throw new InvalidOperationException(
+                    "The offline framework package is missing from the " +
+                    "restored global package cache: " + source);
+            }
+
+            File.Copy(
+                source,
+                Path.Combine(destination, fileName),
+                overwrite: true);
+        }
+
+        internal void WriteFrameworkConsumer(
+            string version,
+            string targetFramework)
+        {
+            WriteSource(
+                """
+                using SharpProof.Attributes;
+
+                public static class Subject {
+                    [ZeroAllocations]
+                    public static int Identity(int value) => value;
+                }
+                """);
+            var escapedVersion = SecurityElement.Escape(version);
+            var escapedFramework =
+                SecurityElement.Escape(targetFramework);
+            File.WriteAllText(
+                ConsumerProject,
+                $"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>{escapedFramework}</TargetFramework>
+                    <LangVersion>12.0</LangVersion>
+                    <SharpProofProfile>advisory</SharpProofProfile>
+                    <SharpProofFeatures>all</SharpProofFeatures>
+                    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+                    <WarningsAsErrors>AD0001;CS8032;CS8034;CS8785</WarningsAsErrors>
+                    <NuGetAudit>false</NuGetAudit>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <PackageReference Include="SharpProof"
+                                      Version="{escapedVersion}" />
+                  </ItemGroup>
+                </Project>
+                """,
+                new System.Text.UTF8Encoding(false));
+        }
+
+        internal void WriteLinkedMappedVerifierConsumer(string version)
+        {
+            Directory.CreateDirectory(
+                Path.GetDirectoryName(LinkedSourcePath)!);
+            File.WriteAllText(
+                LinkedSourcePath,
+                """
+                using SharpProof.Attributes;
+
+                public static class Subject {
+                    public static long Identity(long value) {
+                #line 73 "mapped/contracts/Identity.cs"
+                        Contract.Ensures(
+                            Contract.Result<long>() > value);
+                #line default
+                        return value;
+                    }
+                }
+                """,
+                new System.Text.UTF8Encoding(false));
+            var escapedVersion = SecurityElement.Escape(version);
+            var escapedSource =
+                SecurityElement.Escape(LinkedSourcePath);
+            File.WriteAllText(
+                ConsumerProject,
+                $"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <LangVersion>12.0</LangVersion>
+                    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+                    <SharpProofProfile>advisory</SharpProofProfile>
+                    <SharpProofFeatures>contracts</SharpProofFeatures>
+                    <WarningsAsErrors>AD0001;CS8032;CS8034;CS8785</WarningsAsErrors>
+                    <NuGetAudit>false</NuGetAudit>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Compile Include="{escapedSource}"
+                             Link="Linked/Subject.cs" />
+                    <PackageReference Include="SharpProof.Verifier.Win-x64"
+                                      Version="{escapedVersion}" />
+                  </ItemGroup>
+                </Project>
+                """,
+                new System.Text.UTF8Encoding(false));
+        }
 
         internal void WriteAnalyzerConsumer(
             string version,
             string packageId,
             string source,
             string features,
-            params string[] enabledDiagnosticIds) {
+            params string[] enabledDiagnosticIds)
+        {
             WriteSource(source);
             File.WriteAllText(
                 Path.Combine(ConsumerDirectory, ".globalconfig"),
@@ -1527,13 +1977,16 @@ public sealed class PackageLayoutSmokeTests {
                 new System.Text.UTF8Encoding(false));
         }
 
-        internal void WriteSource(string source) =>
+        internal void WriteSource(string source)
+        {
             File.WriteAllText(
                 Path.Combine(ConsumerDirectory, "Subject.cs"),
                 source,
                 new System.Text.UTF8Encoding(false));
+        }
 
-        internal void WriteCompilerProbeConsumer(string version) {
+        internal void WriteCompilerProbeConsumer(string version)
+        {
             WriteSource(
                 """
                 extern alias probealias;
@@ -1595,13 +2048,16 @@ public sealed class PackageLayoutSmokeTests {
                 new System.Text.UTF8Encoding(false));
         }
 
-        internal void WriteProbeInput(string value) =>
+        internal void WriteProbeInput(string value)
+        {
             File.WriteAllText(
                 ProbeInputPath,
                 value + "\n",
                 new System.Text.UTF8Encoding(false));
+        }
 
-        public void Dispose() {
+        public void Dispose()
+        {
             var resolved = Path.GetFullPath(_root);
             var expectedRoot = Path.GetFullPath(
                 Path.Combine(
@@ -1610,17 +2066,24 @@ public sealed class PackageLayoutSmokeTests {
             if (!resolved.StartsWith(
                     expectedRoot + Path.DirectorySeparatorChar,
                     StringComparison.Ordinal))
+            {
                 throw new InvalidOperationException(
                     "Refusing to remove an unexpected test directory.");
+            }
+
             if (Directory.Exists(resolved))
+            {
                 Directory.Delete(resolved, recursive: true);
+            }
         }
     }
 
-    private sealed class ReleaseEvidenceWorkspace : IDisposable {
+    private sealed class ReleaseEvidenceWorkspace : IDisposable
+    {
         private readonly string _root;
 
-        private ReleaseEvidenceWorkspace(string root, string version) {
+        private ReleaseEvidenceWorkspace(string root, string version)
+        {
             _root = root;
             OutputDirectory = Path.Combine(root, "output");
             SbomPath = Path.Combine(
@@ -1665,13 +2128,29 @@ public sealed class PackageLayoutSmokeTests {
                 new UTF8Encoding(false));
         }
 
-        internal string OutputDirectory { get; }
-        internal string SbomPath { get; }
-        internal string InvalidSbomPath { get; }
-        internal string ManifestPath { get; }
-        internal string SumsPath { get; }
+        internal string OutputDirectory
+        {
+            get;
+        }
+        internal string SbomPath
+        {
+            get;
+        }
+        internal string InvalidSbomPath
+        {
+            get;
+        }
+        internal string ManifestPath
+        {
+            get;
+        }
+        internal string SumsPath
+        {
+            get;
+        }
 
-        internal static ReleaseEvidenceWorkspace Create(string version) {
+        internal static ReleaseEvidenceWorkspace Create(string version)
+        {
             var root = Path.Combine(
                 Path.GetTempPath(),
                 "SharpProof.ReleaseEvidence.Test",
@@ -1680,7 +2159,8 @@ public sealed class PackageLayoutSmokeTests {
             return new ReleaseEvidenceWorkspace(root, version);
         }
 
-        public void Dispose() {
+        public void Dispose()
+        {
             var resolved = Path.GetFullPath(_root);
             var expectedRoot = Path.GetFullPath(
                 Path.Combine(
@@ -1689,11 +2169,16 @@ public sealed class PackageLayoutSmokeTests {
             if (!resolved.StartsWith(
                     expectedRoot + Path.DirectorySeparatorChar,
                     StringComparison.Ordinal))
+            {
                 throw new InvalidOperationException(
                     "Refusing to remove an unexpected release-evidence " +
                     "test directory.");
+            }
+
             if (Directory.Exists(resolved))
+            {
                 Directory.Delete(resolved, recursive: true);
+            }
         }
     }
 

@@ -6,9 +6,11 @@ using SharpProof.Fuzz;
 namespace SharpProof.Fuzz.Test;
 
 [TestFixture]
-public sealed class FrontendSemanticEdgeCaseTests {
+public sealed class FrontendSemanticEdgeCaseTests
+{
     [Test]
-    public void FixedSemanticEdgesMatchRuntimeOrAbstainExactly() {
+    public void FixedSemanticEdgesMatchRuntimeOrAbstainExactly()
+    {
         var cases = new[] {
             Exact("long", "short value", "(long)value", short.MinValue),
             Exact("long", "int value", "(long)value", int.MaxValue),
@@ -91,7 +93,8 @@ public sealed class FrontendSemanticEdgeCaseTests {
         Assert.That(
             results[6].ExceptionKind,
             Is.EqualTo(IrExceptionKind.InvalidCast));
-        for (var index = 0; index < cases.Length; index++) {
+        for (var index = 0; index < cases.Length; index++)
+        {
             Assert.That(
                 results[index].ActualDecision,
                 Is.EqualTo(cases[index].ExpectedDecision));
@@ -105,26 +108,30 @@ public sealed class FrontendSemanticEdgeCaseTests {
         string returnType,
         string parameters,
         string expression,
-        params object?[] arguments) =>
-        new(
+        params object?[] arguments)
+    {
+        return new(
             returnType,
             parameters,
             expression,
             arguments,
             FrontendSubsetDecision.Exact,
             FrontendAbstention.None);
+    }
 
     private static FrontendSemanticEdgeCase Closed(
         string returnType,
         string parameters,
         string expression,
         FrontendAbstention abstention,
-        params object?[] arguments) =>
-        new(
+        params object?[] arguments)
+    {
+        return new(
             returnType,
             parameters,
             expression,
             arguments,
             FrontendSubsetDecision.ClosedAbstention,
             abstention);
+    }
 }

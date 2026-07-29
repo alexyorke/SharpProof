@@ -1,0 +1,456 @@
+{
+  "schemaVersion": 1,
+  "namespace": "SharpProof.Worker.Protocol",
+  "jsonNamingPolicy": "camelCase",
+  "usings": ["System.Collections.Immutable"],
+  "versionMembers": {
+    "protocol": "WorkerProtocolVersions.Current",
+    "manifest": "WorkerManifestVersions.Current",
+    "cache": "WorkerCacheVersions.Current"
+  },
+  "requiredJsonRoots": [
+    "WorkerVerifyRequest",
+    "WorkerVerifyResponse"
+  ],
+  "manifestNameEnums": [
+    "WorkerSelectedFeature",
+    "WorkerSelectionReason",
+    "WorkerAssumptionKind",
+    "WorkerClaimKind",
+    "WorkerClaimEvidence",
+    "WorkerEffectContractKind"
+  ],
+  "definedEnums": [
+    "WorkerFeatureSet",
+    "WorkerVerifyPolicy",
+    "WorkerAssumptionPolicy",
+    "WorkerSelectedFeature",
+    "WorkerSelectionReason",
+    "WorkerClaimKind",
+    "WorkerClaimEvidence",
+    "WorkerEffectContractKind",
+    "WorkerRunStatus",
+    "WorkerCallableCoverage",
+    "WorkerClaimOutcome",
+    "WorkerClaimReason",
+    "WorkerEffectEvidenceCertainty",
+    "WorkerAssumptionKind"
+  ],
+  "validationTables": [
+    {
+      "name": "ClaimShape",
+      "parameters": [
+        {"name":"kind","type":"WorkerClaimKind"},
+        {"name":"evidence","type":"WorkerClaimEvidence"},
+        {"name":"effectKind","type":"WorkerEffectContractKind"}
+      ],
+      "rows": [
+        ["Postcondition","DirectClause","Unspecified"],
+        ["Postcondition","CompanionClause","Unspecified"],
+        ["Postcondition","ReturnAttribute","Unspecified"],
+        ["Effect","Attribute","EnforcePure"],
+        ["Effect","Attribute","ZeroAllocations"],
+        ["Effect","Attribute","AllowedCapabilities"],
+        ["Effect","Attribute","DoesNotThrow"],
+        ["Effect","Attribute","AllowedExceptions"],
+        ["Effect","Attribute","EffectContract"]
+      ]
+    },
+    {
+      "name": "CallableCoverage",
+      "parameters": [
+        {"name":"coverage","type":"WorkerCallableCoverage"},
+        {"name":"reason","type":"WorkerCallableCoverageReason"}
+      ],
+      "rows": [
+        ["Complete","None"],
+        ["Incomplete","UnsupportedCallable"],
+        ["Incomplete","UnsupportedContract"],
+        ["Incomplete","SemanticUnknown"],
+        ["Incomplete","MissingClaimResult"],
+        ["Incomplete","MethodTimeout"],
+        ["Incomplete","ProjectTimeout"],
+        ["Incomplete","Canceled"],
+        ["Incomplete","InfrastructureFailure"]
+      ]
+    },
+    {
+      "name": "ClaimOutcome",
+      "parameters": [
+        {"name":"outcome","type":"WorkerClaimOutcome"},
+        {"name":"reason","type":"WorkerClaimReason"}
+      ],
+      "rows": [
+        ["Proven","None"],
+        ["Refuted","None"],
+        ["Unknown","UnsupportedCallable"],
+        ["Unknown","UnsupportedContract"],
+        ["Unknown","UnsupportedBody"],
+        ["Unknown","UnsupportedExpression"],
+        ["Unknown","DeepPostcondition"],
+        ["Unknown","MissingReturnValue"],
+        ["Unknown","ResourceLimit"],
+        ["Unknown","MethodTimeout"],
+        ["Unknown","ProjectTimeout"],
+        ["Unknown","Canceled"],
+        ["Unknown","BackendUnavailable"],
+        ["Unknown","InfrastructureFailure"],
+        ["Unknown","MalformedBackendResult"],
+        ["Unknown","CounterexampleReplayFailed"],
+        ["Unknown","PostconditionMayBeUndefined"],
+        ["Unknown","CounterexampleNotReplayable"],
+        ["Unknown","EffectSummaryIncomplete"],
+        ["Unknown","EffectContractNotEstablished"]
+      ]
+    },
+    {
+      "name": "EffectCertainty",
+      "parameters": [
+        {"name":"outcome","type":"WorkerClaimOutcome"},
+        {"name":"reason","type":"WorkerClaimReason"},
+        {"name":"certainty","type":"WorkerEffectEvidenceCertainty"}
+      ],
+      "rows": [
+        ["Proven","None","CompleteMayEffectSummary"],
+        ["Proven","None","TrustedCompleteBoundary"],
+        ["Refuted","None","DefiniteViolation"],
+        ["Unknown","EffectSummaryIncomplete","IncompleteMayEffectSummary"],
+        ["Unknown","EffectContractNotEstablished","CompleteMayEffectSummary"],
+        ["Unknown","*","Unavailable"]
+      ]
+    },
+    {
+      "name": "Vacuity",
+      "parameters": [
+        {"name":"kind","type":"WorkerClaimKind"},
+        {"name":"outcome","type":"WorkerClaimOutcome"},
+        {"name":"vacuity","type":"WorkerVacuityKind"}
+      ],
+      "rows": [
+        ["*","*","None"],
+        ["Postcondition","Proven","ContradictoryPreconditions"],
+        ["Postcondition","Proven","NoModeledNormalReturn"]
+      ]
+    },
+    {
+      "name": "RunFailure",
+      "parameters": [
+        {"name":"status","type":"WorkerRunStatus"},
+        {"name":"reason","type":"WorkerRunFailureReason"}
+      ],
+      "rows": [
+        ["Complete","None"],
+        ["TimedOut","None"],
+        ["Canceled","None"],
+        ["Failed","InvalidRequest"],
+        ["Failed","InputUnavailable"],
+        ["Failed","CompilationFailure"],
+        ["Failed","CompilerManifestMismatch"],
+        ["Failed","BackendUnavailable"],
+        ["Failed","InfrastructureFailure"],
+        ["Failed","MalformedResult"],
+        ["Failed","CounterexampleReplayFailed"],
+        ["Failed","ContainmentFailure"]
+      ]
+    },
+    {
+      "name": "CacheState",
+      "parameters": [
+        {"name":"status","type":"WorkerCacheStatus"},
+        {"name":"hit","type":"bool"}
+      ],
+      "rows": [
+        ["Disabled",false],
+        ["Miss",false],
+        ["Hit",true],
+        ["Written",false],
+        ["Rejected",false],
+        ["Unavailable",false]
+      ]
+    },
+    {
+      "name": "ClaimPayload",
+      "parameters": [
+        {"name":"outcome","type":"WorkerClaimOutcome"},
+        {"name":"hasProofCore","type":"bool"},
+        {"name":"hasModel","type":"bool"}
+      ],
+      "rows": [
+        ["Proven","*",false],
+        ["Refuted",false,"*"],
+        ["Unknown",false,false]
+      ]
+    }
+  ],
+  "validationPlans": [
+    {
+      "name": "Request",
+      "type": "WorkerVerifyRequest",
+      "rules": [
+        {"code":"protocol.unsupported","condition":{"op":"equalsMember","property":"ProtocolVersion","member":"WorkerProtocolVersions.Current"}},
+        {"code":"project.compiler_manifest","condition":{"op":"all","conditions":[
+          {"op":"notNull","property":"CompilerManifest"},
+          {"op":"nonBlank","property":"CompilerManifest.Path"},
+          {"op":"sha256","property":"CompilerManifest.Sha256"}
+        ]}},
+        {"code":"cache.null","condition":{"op":"notNull","property":"Cache"}},
+        {"code":"cache.maximum_bytes","condition":{"op":"implies",
+          "if":{"op":"notNull","property":"Cache"},
+          "then":{"op":"between","property":"Cache.MaximumBytes","minimum":1,"maximumMember":"WorkerCacheOptions.DefaultMaximumBytes"}}},
+        {"code":"policy.verify","condition":{"op":"defined","property":"VerifyPolicy","unspecified":"WorkerVerifyPolicy.Unspecified"}},
+        {"code":"policy.assumption","condition":{"op":"defined","property":"AssumptionPolicy","unspecified":"WorkerAssumptionPolicy.Unspecified"}}
+      ]
+    },
+    {
+      "name": "Budgets",
+      "type": "WorkerBudgets",
+      "rules": [
+        {"code":"rlimit","condition":{"op":"positive","property":"QueryRlimit"}},
+        {"code":"method_rlimit","condition":{"op":"positive","property":"MethodRlimit"}},
+        {"code":"rlimit_order","condition":{"op":"lessOrEqualProperty","property":"QueryRlimit","other":"MethodRlimit"}},
+        {"code":"method_wall","condition":{"op":"positive","property":"MethodWallTimeMilliseconds"}},
+        {"code":"project_wall","condition":{"op":"positive","property":"ProjectWallTimeMilliseconds"}},
+        {"code":"parallelism","condition":{"op":"between","property":"MaxParallelism","minimum":1,"maximumMember":"WorkerBudgets.MaximumParallelism"}},
+        {"code":"expression_depth","condition":{"op":"between","property":"MaximumExpressionDepth","minimum":1,"maximum":256}},
+        {"code":"process_memory","condition":{"op":"positive","property":"ProcessMemoryLimitBytes"}},
+        {"code":"worker_processes","condition":{"op":"between","property":"MaxWorkerProcesses","minimum":1,"maximumMember":"WorkerBudgets.MaximumParallelism"}},
+        {"code":"wall_order","condition":{"op":"lessOrEqualProperty","property":"MethodWallTimeMilliseconds","other":"ProjectWallTimeMilliseconds"}}
+      ]
+    },
+    {
+      "name": "SourceLocation",
+      "type": "WorkerSourceLocation",
+      "mode": "predicate",
+      "rules": [
+        {"code":"valid","condition":{"op":"all","conditions":[
+          {"op":"nonBlank","property":"Path"},
+          {"op":"nonNegative","property":"Start"},
+          {"op":"nonNegative","property":"Length"},
+          {"op":"positive","property":"Line"},
+          {"op":"positive","property":"Column"}
+        ]}}
+      ]
+    },
+    {
+      "name": "ManifestCallable",
+      "type": "WorkerCallableManifestEntry",
+      "rules": [
+        {"code":"selected_features","condition":{"op":"uniqueEnums","property":"SelectedFeatures","unspecified":"WorkerSelectedFeature.Unspecified","nonEmpty":true}},
+        {"code":"selection_reasons","condition":{"op":"uniqueEnums","property":"SelectionReasons","unspecified":"WorkerSelectionReason.Unspecified","nonEmpty":true}},
+        {"code":"callable_claim_ids","condition":{"op":"distinctNonblank","property":"ClaimIds"}},
+        {"code":"callable_assumptions","condition":{"op":"validAssumptions","property":"Assumptions"}},
+        {"code":"callable_assumption_usage","condition":{"op":"assumptionsUnused","property":"Assumptions"}}
+      ]
+    },
+    {
+      "name": "ManifestClaim",
+      "type": "WorkerClaimManifestEntry",
+      "rules": [
+        {"code":"claim_ordinal","condition":{"op":"nonNegative","property":"Ordinal"}},
+        {"code":"claim_kind","condition":{"op":"defined","property":"Kind","unspecified":"WorkerClaimKind.Unspecified"}},
+        {"code":"claim_evidence","condition":{"op":"defined","property":"Evidence","unspecified":"WorkerClaimEvidence.Unspecified"}},
+        {"code":"claim_shape","condition":{"op":"stateTable","table":"ClaimShape","arguments":[
+          {"op":"property","property":"Kind"},
+          {"op":"property","property":"Evidence"},
+          {"op":"property","property":"EffectContractKind"}
+        ]}}
+      ]
+    },
+    {
+      "name": "Assumption",
+      "type": "WorkerAssumptionEvidence",
+      "mode": "predicate",
+      "rules": [
+        {"code":"valid","condition":{"op":"all","conditions":[
+          {"op":"nonBlank","property":"Id"},
+          {"op":"defined","property":"Kind","unspecified":"WorkerAssumptionKind.Unspecified"}
+        ]}}
+      ]
+    },
+    {
+      "name": "CallableResult",
+      "type": "WorkerCallableResult",
+      "rules": [
+        {"code":"response.callable_coverage","condition":{"op":"defined","property":"Coverage","unspecified":"WorkerCallableCoverage.Unspecified"}},
+        {"code":"response.callable_reason","condition":{"op":"stateTable","table":"CallableCoverage","arguments":[
+          {"op":"property","property":"Coverage"},
+          {"op":"property","property":"Reason"}
+        ]}},
+        {"code":"response.callable_assumptions","condition":{"op":"validAssumptions","property":"Assumptions"}}
+      ]
+    },
+    {
+      "name": "ClaimResult",
+      "type": "WorkerClaimResult",
+      "rules": [
+        {"code":"response.claim_outcome","condition":{"op":"defined","property":"Outcome","unspecified":"WorkerClaimOutcome.Unspecified"}},
+        {"code":"response.claim_reason","condition":{"op":"stateTable","table":"ClaimOutcome","arguments":[
+          {"op":"property","property":"Outcome"},
+          {"op":"property","property":"Reason"}
+        ]}},
+        {"code":"response.proof_core","condition":{"op":"distinctNonblank","property":"ProofCore"}},
+        {"code":"response.model","condition":{"op":"validModel","property":"Model"}},
+        {"code":"response.assumptions","condition":{"op":"validAssumptions","property":"Assumptions"}},
+        {"code":"response.claim_payload","condition":{"op":"stateTable","table":"ClaimPayload","arguments":[
+          {"op":"property","property":"Outcome"},
+          {"op":"hasItems","property":"ProofCore"},
+          {"op":"hasItems","property":"Model"}
+        ]}}
+      ]
+    },
+    {
+      "name": "EffectWitness",
+      "type": "WorkerEffectViolationWitness",
+      "mode": "predicate",
+      "rules": [
+        {"code":"valid","condition":{"op":"all","conditions":[
+          {"op":"nonBlank","property":"Kind"},
+          {"op":"nonBlank","property":"Detail"},
+          {"op":"knownFlags","property":"Effects"},
+          {"op":"knownFlags","property":"Capabilities"},
+          {"op":"any","conditions":[
+            {"op":"notEqualsMember","property":"Effects","member":"WorkerEffectSet.None"},
+            {"op":"notEqualsMember","property":"Capabilities","member":"WorkerEffectCapabilitySet.None"}
+          ]},
+          {"op":"implies",
+            "if":{"op":"hasItems","property":"ExactExceptionTypeHierarchy"},
+            "then":{"op":"flagContains","property":"Effects","member":"WorkerEffectSet.Throws"}},
+          {"op":"distinctNonblank","property":"ExactExceptionTypeHierarchy"}
+        ]}}
+      ]
+    },
+    {
+      "name": "Versions",
+      "type": "WorkerVersionSummary",
+      "mode": "predicate",
+      "rules": [
+        {"code":"valid","condition":{"op":"all","conditions":[
+          {"op":"equalsMember","property":"ProtocolVersion","member":"WorkerProtocolVersions.Current"},
+          {"op":"equalsMember","property":"ManifestSchemaVersion","member":"WorkerManifestVersions.Current"},
+          {"op":"equalsMember","property":"CacheSchemaVersion","member":"WorkerCacheVersions.Current"},
+          {"op":"nonBlank","property":"WorkerVersion"},
+          {"op":"nonBlank","property":"ApiSpecVersion"},
+          {"op":"sha256","property":"WorkerBinarySha256"},
+          {"op":"sha256","property":"ApiSpecContentSha256"}
+        ]}}
+      ]
+    },
+    {
+      "name": "Summary",
+      "type": "WorkerVerificationSummary",
+      "rules": [
+        {"code":"summary.cache","condition":{"op":"stateTable","table":"CacheState","arguments":[
+          {"op":"property","property":"CacheStatus"},
+          {"op":"property","property":"CacheHit"}
+        ]}},
+        {"code":"summary.versions","condition":{"op":"all","conditions":[
+          {"op":"notNull","property":"Versions"},
+          {"op":"validPlan","property":"Versions","plan":"Versions"}
+        ]}},
+        {"code":"summary.elapsed","condition":{"op":"nonNegative","property":"ElapsedMilliseconds"}}
+      ]
+    },
+    {
+      "name": "ProtocolError",
+      "type": "WorkerProtocolError",
+      "mode": "predicate",
+      "rules": [
+        {"code":"valid","condition":{"op":"all","conditions":[
+          {"op":"nonBlank","property":"Code"},
+          {"op":"nonBlank","property":"Message"}
+        ]}}
+      ]
+    }
+  ],
+  "manifestIdentity": {
+    "domain": "SharpProof.Worker.ManifestHash",
+    "versionMember": "WorkerManifestVersions.Current",
+    "rootFields": [
+      {"label":"manifest.schemaVersion","property":"SchemaVersion","kind":"int"}
+    ],
+    "collections": [
+      {
+        "property": "Callables",
+        "lengthLabel": "manifest.callables",
+        "entryLabel": "callable",
+        "order": [
+          {"property":"CallableId","kind":"ordinalString"}
+        ],
+        "fields": [
+          {"label":"callable.id","property":"CallableId","kind":"string"},
+          {"label":"callable.selectedFeatures","property":"SelectedFeatures","kind":"enumArray"},
+          {"label":"callable.selectionReasons","property":"SelectionReasons","kind":"enumArray"},
+          {"label":"callable.location","property":"Location","kind":"location"},
+          {"label":"callable.claimIds","property":"ClaimIds","kind":"ordinalStringArray"},
+          {"label":"callable.assumptions","property":"Assumptions","kind":"assumptionArray"}
+        ]
+      },
+      {
+        "property": "Claims",
+        "lengthLabel": "manifest.claims",
+        "entryLabel": "claim",
+        "order": [
+          {"property":"CallableId","kind":"ordinalString"},
+          {"property":"Ordinal","kind":"integer"},
+          {"property":"ClaimId","kind":"ordinalString"}
+        ],
+        "fields": [
+          {"label":"claim.id","property":"ClaimId","kind":"string"},
+          {"label":"claim.callableId","property":"CallableId","kind":"string"},
+          {"label":"claim.ordinal","property":"Ordinal","kind":"int"},
+          {"label":"claim.kind","property":"Kind","kind":"enum","defaultMember":"WorkerClaimKind.Unspecified"},
+          {"label":"claim.evidence","property":"Evidence","kind":"enum","defaultMember":"WorkerClaimEvidence.Unspecified"},
+          {"label":"claim.effectContractKind","property":"EffectContractKind","kind":"enum","defaultMember":"WorkerEffectContractKind.Unspecified"},
+          {"label":"claim.location","property":"Location","kind":"location"}
+        ]
+      }
+    ]
+  },
+  "declarations": [
+    {"kind":"staticClass","name":"WorkerProtocolVersions","constants":[{"name":"Current","type":"string","value":"8"},{"name":"EmptySha256","type":"string","value":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}]},
+    {"kind":"staticClass","name":"WorkerCacheVersions","constants":[{"name":"Current","type":"int","value":9}]},
+    {"kind":"staticClass","name":"WorkerManifestVersions","constants":[{"name":"Current","type":"int","value":4}]},
+    {"kind":"staticClass","name":"WorkerLauncherDefaults","constants":[{"name":"TerminationGraceMilliseconds","type":"int","value":1000}]},
+    {"kind":"class","name":"WorkerVerifyRequest","properties":[{"name":"ProtocolVersion","jsonName":"protocolVersion","order":0,"type":"string","set":true,"default":{"kind":"member","value":"WorkerProtocolVersions.Current"}},{"name":"CompilerManifest","jsonName":"compilerManifest","order":1,"type":"WorkerFileReference","set":true,"default":{"kind":"new"}},{"name":"Budgets","jsonName":"budgets","order":2,"type":"WorkerBudgets","set":true,"default":{"kind":"new"}},{"name":"Cache","jsonName":"cache","order":3,"type":"WorkerCacheOptions","set":true,"default":{"kind":"new"}},{"name":"VerifyPolicy","jsonName":"verifyPolicy","order":4,"type":"WorkerVerifyPolicy","set":true,"default":{"kind":"member","value":"WorkerVerifyPolicy.Advisory"}},{"name":"AssumptionPolicy","jsonName":"assumptionPolicy","order":5,"type":"WorkerAssumptionPolicy","set":true,"default":{"kind":"member","value":"WorkerAssumptionPolicy.Allow"}}]},
+    {"kind":"class","name":"WorkerFileReference","properties":[{"name":"Path","jsonName":"path","order":0,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"Sha256","jsonName":"sha256","order":1,"type":"string","set":true,"default":{"kind":"stringEmpty"}}]},
+    {"kind":"enum","name":"WorkerFeatureSet","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"Effects","value":1},{"name":"Contracts","value":2},{"name":"All","value":3}]},
+    {"kind":"enum","name":"WorkerVerifyPolicy","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"Advisory","value":1},{"name":"WarnOnUnknown","value":2},{"name":"RequireProven","value":3}]},
+    {"kind":"enum","name":"WorkerAssumptionPolicy","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"Allow","value":1},{"name":"Warn","value":2},{"name":"Error","value":3}]},
+    {"kind":"class","name":"WorkerBudgets","constants":[{"name":"MaximumParallelism","type":"int","value":4},{"name":"DefaultQueryRlimit","type":"uint","value":3000000},{"name":"DefaultMethodRlimit","type":"uint","value":20000000},{"name":"DefaultMethodWallTimeMilliseconds","type":"int","value":10000},{"name":"DefaultProjectWallTimeMilliseconds","type":"int","value":300000},{"name":"DefaultMaximumExpressionDepth","type":"int","value":64},{"name":"DefaultProcessMemoryLimitBytes","type":"long","value":2147483648}],"properties":[{"name":"QueryRlimit","jsonName":"queryRlimit","order":0,"type":"uint","set":true,"default":{"kind":"member","value":"DefaultQueryRlimit"}},{"name":"MethodRlimit","jsonName":"methodRlimit","order":1,"type":"uint","set":true,"default":{"kind":"member","value":"DefaultMethodRlimit"}},{"name":"MethodWallTimeMilliseconds","jsonName":"methodWallTimeMilliseconds","order":2,"type":"int","set":true,"default":{"kind":"member","value":"DefaultMethodWallTimeMilliseconds"}},{"name":"ProjectWallTimeMilliseconds","jsonName":"projectWallTimeMilliseconds","order":3,"type":"int","set":true,"default":{"kind":"member","value":"DefaultProjectWallTimeMilliseconds"}},{"name":"MaxParallelism","jsonName":"maxParallelism","order":4,"type":"int","set":true,"default":{"kind":"member","value":"MaximumParallelism"}},{"name":"MaximumExpressionDepth","jsonName":"maximumExpressionDepth","order":5,"type":"int","set":true,"default":{"kind":"member","value":"DefaultMaximumExpressionDepth"}},{"name":"ProcessMemoryLimitBytes","jsonName":"processMemoryLimitBytes","order":6,"type":"long","set":true,"default":{"kind":"member","value":"DefaultProcessMemoryLimitBytes"}},{"name":"MaxWorkerProcesses","jsonName":"maxWorkerProcesses","order":7,"type":"int","set":true,"default":{"kind":"member","value":"MaximumParallelism"}}]},
+    {"kind":"class","name":"WorkerCacheOptions","constants":[{"name":"DefaultMaximumBytes","type":"long","value":536870912}],"properties":[{"name":"Enabled","jsonName":"enabled","order":0,"type":"bool","set":true,"default":{"kind":"true"}},{"name":"Directory","jsonName":"directory","order":1,"type":"string?","set":true,"default":{"kind":"implicit"}},{"name":"MaximumBytes","jsonName":"maximumBytes","order":2,"type":"long","set":true,"default":{"kind":"member","value":"DefaultMaximumBytes"}}]},
+    {"kind":"enum","name":"WorkerSelectedFeature","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"Effects","value":1},{"name":"Contracts","value":2}]},
+    {"kind":"enum","name":"WorkerSelectionReason","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"ExplicitAnnotation","value":1},{"name":"DiscoveredPostcondition","value":2}]},
+    {"kind":"enum","name":"WorkerClaimKind","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"Postcondition","value":1},{"name":"Effect","value":2}]},
+    {"kind":"enum","name":"WorkerClaimEvidence","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"DirectClause","value":1},{"name":"CompanionClause","value":2},{"name":"ReturnAttribute","value":3},{"name":"Attribute","value":4}]},
+    {"kind":"enum","name":"WorkerEffectContractKind","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"EnforcePure","value":1},{"name":"ZeroAllocations","value":2},{"name":"AllowedCapabilities","value":3},{"name":"DoesNotThrow","value":4},{"name":"AllowedExceptions","value":5},{"name":"EffectContract","value":6}]},
+    {"kind":"class","name":"WorkerSourceLocation","properties":[{"name":"Path","jsonName":"path","order":0,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"Start","jsonName":"start","order":1,"type":"int","set":true,"default":{"kind":"implicit"}},{"name":"Length","jsonName":"length","order":2,"type":"int","set":true,"default":{"kind":"implicit"}},{"name":"Line","jsonName":"line","order":3,"type":"int","set":true,"default":{"kind":"implicit"}},{"name":"Column","jsonName":"column","order":4,"type":"int","set":true,"default":{"kind":"implicit"}}]},
+    {"kind":"class","name":"WorkerCallableManifestEntry","properties":[{"name":"CallableId","jsonName":"callableId","order":0,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"SelectedFeatures","jsonName":"selectedFeatures","order":1,"type":"WorkerSelectedFeature[]","set":true,"default":{"kind":"emptyArray"}},{"name":"SelectionReasons","jsonName":"selectionReasons","order":2,"type":"WorkerSelectionReason[]","set":true,"default":{"kind":"emptyArray"}},{"name":"Location","jsonName":"location","order":3,"type":"WorkerSourceLocation","set":true,"default":{"kind":"new"}},{"name":"ClaimIds","jsonName":"claimIds","order":4,"type":"string[]","set":true,"default":{"kind":"emptyArray"}},{"name":"Assumptions","jsonName":"assumptions","order":5,"type":"WorkerAssumptionEvidence[]","set":true,"default":{"kind":"emptyArray"}}]},
+    {"kind":"class","name":"WorkerClaimManifestEntry","properties":[{"name":"ClaimId","jsonName":"claimId","order":0,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"CallableId","jsonName":"callableId","order":1,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"Ordinal","jsonName":"ordinal","order":2,"type":"int","set":true,"default":{"kind":"implicit"}},{"name":"Kind","jsonName":"kind","order":3,"type":"WorkerClaimKind","set":true,"default":{"kind":"implicit"}},{"name":"Evidence","jsonName":"evidence","order":4,"type":"WorkerClaimEvidence","set":true,"default":{"kind":"implicit"}},{"name":"EffectContractKind","jsonName":"effectContractKind","order":5,"type":"WorkerEffectContractKind","set":true,"default":{"kind":"implicit"}},{"name":"Location","jsonName":"location","order":6,"type":"WorkerSourceLocation","set":true,"default":{"kind":"new"}}]},
+    {"kind":"class","name":"WorkerClaimManifest","properties":[{"name":"SchemaVersion","jsonName":"schemaVersion","order":0,"type":"int","set":true,"default":{"kind":"member","value":"WorkerManifestVersions.Current"}},{"name":"Hash","jsonName":"hash","order":1,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"Callables","jsonName":"callables","order":2,"type":"WorkerCallableManifestEntry[]","set":true,"default":{"kind":"emptyArray"}},{"name":"Claims","jsonName":"claims","order":3,"type":"WorkerClaimManifestEntry[]","set":true,"default":{"kind":"emptyArray"}}]},
+    {"kind":"enum","name":"WorkerRunStatus","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"Complete","value":1},{"name":"TimedOut","value":2},{"name":"Canceled","value":3},{"name":"Failed","value":4}]},
+    {"kind":"enum","name":"WorkerRunFailureReason","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"None","value":1},{"name":"InvalidRequest","value":2},{"name":"InputUnavailable","value":3},{"name":"CompilationFailure","value":4},{"name":"CompilerManifestMismatch","value":5},{"name":"BackendUnavailable","value":6},{"name":"InfrastructureFailure","value":7},{"name":"MalformedResult","value":8},{"name":"CounterexampleReplayFailed","value":9},{"name":"ContainmentFailure","value":10}]},
+    {"kind":"enum","name":"WorkerCallableCoverage","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"Complete","value":1},{"name":"Incomplete","value":2}]},
+    {"kind":"enum","name":"WorkerCallableCoverageReason","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"None","value":1},{"name":"UnsupportedCallable","value":2},{"name":"UnsupportedContract","value":3},{"name":"SemanticUnknown","value":4},{"name":"MissingClaimResult","value":5},{"name":"MethodTimeout","value":6},{"name":"ProjectTimeout","value":7},{"name":"Canceled","value":8},{"name":"InfrastructureFailure","value":9}]},
+    {"kind":"enum","name":"WorkerClaimOutcome","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"Proven","value":1},{"name":"Refuted","value":2},{"name":"Unknown","value":3}]},
+    {"kind":"enum","name":"WorkerEffectEvidenceCertainty","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"IncompleteMayEffectSummary","value":1},{"name":"CompleteMayEffectSummary","value":2},{"name":"TrustedCompleteBoundary","value":3},{"name":"DefiniteViolation","value":4},{"name":"Unavailable","value":5}]},
+    {"kind":"enum","name":"WorkerEffectSet","underlyingType":"long","flags":true,"members":[{"name":"None","value":0},{"name":"ReadsReceiverState","value":1},{"name":"ReadsArgumentState","value":2},{"name":"ReadsCapturedState","value":4},{"name":"ReadsStaticState","value":8},{"name":"ReadsAmbientState","value":16},{"name":"WritesReceiverState","value":32},{"name":"WritesArgumentState","value":64},{"name":"WritesCapturedState","value":128},{"name":"WritesStaticState","value":256},{"name":"WritesAmbientState","value":512},{"name":"Allocates","value":1024},{"name":"Throws","value":2048},{"name":"Synchronizes","value":4096},{"name":"UsesNondeterminism","value":8192},{"name":"UsesNativeCode","value":16384},{"name":"UsesReflection","value":32768},{"name":"AllKnown","value":65535}]},
+    {"kind":"enum","name":"WorkerEffectCapabilitySet","underlyingType":"int","flags":true,"members":[{"name":"None","value":0},{"name":"IO","value":1},{"name":"FileRead","value":2},{"name":"FileWrite","value":4},{"name":"Network","value":8},{"name":"Console","value":16},{"name":"Process","value":32},{"name":"Environment","value":64},{"name":"Registry","value":128},{"name":"Clock","value":256},{"name":"Randomness","value":512},{"name":"Reflection","value":1024},{"name":"Synchronization","value":2048},{"name":"NativeInterop","value":4096},{"name":"AllKnown","value":8191}]},
+    {"kind":"enum","name":"WorkerVacuityKind","underlyingType":"int","flags":false,"members":[{"name":"None","value":0},{"name":"ContradictoryPreconditions","value":1},{"name":"NoModeledNormalReturn","value":2}]},
+    {"kind":"enum","name":"WorkerClaimReason","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"None","value":1},{"name":"UnsupportedCallable","value":2},{"name":"UnsupportedContract","value":3},{"name":"UnsupportedBody","value":4},{"name":"UnsupportedExpression","value":5},{"name":"DeepPostcondition","value":6},{"name":"MissingReturnValue","value":7},{"name":"ResourceLimit","value":8},{"name":"MethodTimeout","value":9},{"name":"ProjectTimeout","value":10},{"name":"Canceled","value":11},{"name":"BackendUnavailable","value":12},{"name":"InfrastructureFailure","value":13},{"name":"MalformedBackendResult","value":14},{"name":"CounterexampleReplayFailed","value":15},{"name":"PostconditionMayBeUndefined","value":16},{"name":"CounterexampleNotReplayable","value":17},{"name":"EffectSummaryIncomplete","value":18},{"name":"EffectContractNotEstablished","value":19}]},
+    {"kind":"enum","name":"WorkerAssumptionKind","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"Precondition","value":1},{"name":"UserAssume","value":2},{"name":"TrustedBoundary","value":3},{"name":"ApiSpecification","value":4},{"name":"SourceDomain","value":5},{"name":"NormalCompletion","value":6}]},
+    {"kind":"class","name":"WorkerAssumptionEvidence","properties":[{"name":"Id","jsonName":"id","order":0,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"Kind","jsonName":"kind","order":1,"type":"WorkerAssumptionKind","set":true,"default":{"kind":"implicit"}},{"name":"Used","jsonName":"used","order":2,"type":"bool","set":true,"default":{"kind":"implicit"}}]},
+    {"kind":"class","name":"WorkerCallableResult","properties":[{"name":"CallableId","jsonName":"callableId","order":0,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"Coverage","jsonName":"coverage","order":1,"type":"WorkerCallableCoverage","set":true,"default":{"kind":"implicit"}},{"name":"Reason","jsonName":"reason","order":2,"type":"WorkerCallableCoverageReason","set":true,"default":{"kind":"implicit"}},{"name":"Assumptions","jsonName":"assumptions","order":3,"type":"WorkerAssumptionEvidence[]","set":true,"default":{"kind":"emptyArray"}}]},
+    {"kind":"class","name":"WorkerClaimResult","properties":[{"name":"ClaimId","jsonName":"claimId","order":0,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"Outcome","jsonName":"outcome","order":1,"type":"WorkerClaimOutcome","set":true,"default":{"kind":"implicit"}},{"name":"Reason","jsonName":"reason","order":2,"type":"WorkerClaimReason","set":true,"default":{"kind":"implicit"}},{"name":"EffectCertainty","jsonName":"effectCertainty","order":3,"type":"WorkerEffectEvidenceCertainty","set":true,"default":{"kind":"implicit"}},{"name":"EffectWitness","jsonName":"effectWitness","order":4,"type":"WorkerEffectViolationWitness?","set":true,"default":{"kind":"implicit"}},{"name":"Vacuity","jsonName":"vacuity","order":5,"type":"WorkerVacuityKind","set":true,"default":{"kind":"implicit"}},{"name":"ProofCore","jsonName":"proofCore","order":6,"type":"string[]","set":true,"default":{"kind":"emptyArray"}},{"name":"Model","jsonName":"model","order":7,"type":"WorkerModelValue[]","set":true,"default":{"kind":"emptyArray"}},{"name":"Assumptions","jsonName":"assumptions","order":8,"type":"WorkerAssumptionEvidence[]","set":true,"default":{"kind":"emptyArray"}}]},
+    {"kind":"class","name":"WorkerEffectViolationWitness","properties":[{"name":"Kind","jsonName":"kind","order":0,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"Detail","jsonName":"detail","order":1,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"Effects","jsonName":"effects","order":2,"type":"WorkerEffectSet","set":true,"default":{"kind":"implicit"}},{"name":"Capabilities","jsonName":"capabilities","order":3,"type":"WorkerEffectCapabilitySet","set":true,"default":{"kind":"implicit"}},{"name":"ExactExceptionTypeHierarchy","jsonName":"exactExceptionTypeHierarchy","order":4,"type":"string[]","set":true,"default":{"kind":"emptyArray"}},{"name":"Location","jsonName":"location","order":5,"type":"WorkerSourceLocation","set":true,"default":{"kind":"new"}}]},
+    {"kind":"class","name":"WorkerModelValue","properties":[{"name":"Variable","jsonName":"variable","order":0,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"Kind","jsonName":"kind","order":1,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"Value","jsonName":"value","order":2,"type":"string","set":true,"default":{"kind":"stringEmpty"}}]},
+    {"kind":"class","name":"WorkerClaimOutcomeCount","properties":[{"name":"Outcome","jsonName":"outcome","order":0,"type":"WorkerClaimOutcome","set":true,"default":{"kind":"implicit"}},{"name":"Count","jsonName":"count","order":1,"type":"int","set":true,"default":{"kind":"implicit"}}]},
+    {"kind":"class","name":"WorkerClaimReasonCount","properties":[{"name":"Reason","jsonName":"reason","order":0,"type":"WorkerClaimReason","set":true,"default":{"kind":"implicit"}},{"name":"Count","jsonName":"count","order":1,"type":"int","set":true,"default":{"kind":"implicit"}}]},
+    {"kind":"class","name":"WorkerAssumptionSummary","properties":[{"name":"Total","jsonName":"total","order":0,"type":"int","set":true,"default":{"kind":"implicit"}},{"name":"Used","jsonName":"used","order":1,"type":"int","set":true,"default":{"kind":"implicit"}},{"name":"User","jsonName":"user","order":2,"type":"int","set":true,"default":{"kind":"implicit"}},{"name":"Trusted","jsonName":"trusted","order":3,"type":"int","set":true,"default":{"kind":"implicit"}}]},
+    {"kind":"enum","name":"WorkerCacheStatus","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"Disabled","value":1},{"name":"Miss","value":2},{"name":"Hit","value":3},{"name":"Written","value":4},{"name":"Rejected","value":5},{"name":"Unavailable","value":6}]},
+    {"kind":"class","name":"WorkerVersionSummary","properties":[{"name":"ProtocolVersion","jsonName":"protocolVersion","order":0,"type":"string","set":true,"default":{"kind":"member","value":"WorkerProtocolVersions.Current"}},{"name":"ManifestSchemaVersion","jsonName":"manifestSchemaVersion","order":1,"type":"int","set":true,"default":{"kind":"member","value":"WorkerManifestVersions.Current"}},{"name":"CacheSchemaVersion","jsonName":"cacheSchemaVersion","order":2,"type":"int","set":true,"default":{"kind":"member","value":"WorkerCacheVersions.Current"}},{"name":"WorkerVersion","jsonName":"workerVersion","order":3,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"ApiSpecVersion","jsonName":"apiSpecVersion","order":4,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"WorkerBinarySha256","jsonName":"workerBinarySha256","order":5,"type":"string","set":true,"default":{"kind":"member","value":"WorkerProtocolVersions.EmptySha256"}},{"name":"ApiSpecContentSha256","jsonName":"apiSpecContentSha256","order":6,"type":"string","set":true,"default":{"kind":"member","value":"WorkerProtocolVersions.EmptySha256"}}]},
+    {"kind":"class","name":"WorkerVerificationSummary","properties":[{"name":"CallableCount","jsonName":"callableCount","order":0,"type":"int","set":true,"default":{"kind":"implicit"}},{"name":"ClaimCount","jsonName":"claimCount","order":1,"type":"int","set":true,"default":{"kind":"implicit"}},{"name":"OutcomeCounts","jsonName":"outcomeCounts","order":2,"type":"WorkerClaimOutcomeCount[]","set":true,"default":{"kind":"emptyArray"}},{"name":"ReasonCounts","jsonName":"reasonCounts","order":3,"type":"WorkerClaimReasonCount[]","set":true,"default":{"kind":"emptyArray"}},{"name":"Assumptions","jsonName":"assumptions","order":4,"type":"WorkerAssumptionSummary","set":true,"default":{"kind":"new"}},{"name":"CacheHit","jsonName":"cacheHit","order":5,"type":"bool","set":true,"default":{"kind":"implicit"}},{"name":"CacheStatus","jsonName":"cacheStatus","order":6,"type":"WorkerCacheStatus","set":true,"default":{"kind":"implicit"}},{"name":"Versions","jsonName":"versions","order":7,"type":"WorkerVersionSummary","set":true,"default":{"kind":"new"}},{"name":"Budgets","jsonName":"budgets","order":8,"type":"WorkerBudgets","set":true,"default":{"kind":"new"}},{"name":"ElapsedMilliseconds","jsonName":"elapsedMilliseconds","order":9,"type":"long","set":true,"default":{"kind":"implicit"}}]},
+    {"kind":"class","name":"WorkerProtocolError","properties":[{"name":"Code","jsonName":"code","order":0,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"Message","jsonName":"message","order":1,"type":"string","set":true,"default":{"kind":"stringEmpty"}}]},
+    {"kind":"class","name":"WorkerVerifyResponse","properties":[{"name":"ProtocolVersion","jsonName":"protocolVersion","order":0,"type":"string","set":true,"default":{"kind":"member","value":"WorkerProtocolVersions.Current"}},{"name":"RequestHash","jsonName":"requestHash","order":1,"type":"string","set":true,"default":{"kind":"member","value":"WorkerProtocolVersions.EmptySha256"}},{"name":"InputHash","jsonName":"inputHash","order":2,"type":"string","set":true,"default":{"kind":"stringEmpty"}},{"name":"Manifest","jsonName":"manifest","order":3,"type":"WorkerClaimManifest","set":true,"default":{"kind":"new"}},{"name":"RunStatus","jsonName":"runStatus","order":4,"type":"WorkerRunStatus","set":true,"default":{"kind":"implicit"}},{"name":"FailureReason","jsonName":"failureReason","order":5,"type":"WorkerRunFailureReason","set":true,"default":{"kind":"implicit"}},{"name":"CallableResults","jsonName":"callableResults","order":6,"type":"WorkerCallableResult[]","set":true,"default":{"kind":"emptyArray"}},{"name":"ClaimResults","jsonName":"claimResults","order":7,"type":"WorkerClaimResult[]","set":true,"default":{"kind":"emptyArray"}},{"name":"Summary","jsonName":"summary","order":8,"type":"WorkerVerificationSummary","set":true,"default":{"kind":"new"}},{"name":"Errors","jsonName":"errors","order":9,"type":"WorkerProtocolError[]","set":true,"default":{"kind":"emptyArray"}}]},
+    {"kind":"class","name":"WorkerProtocolValidationResult","constructor":{"accessibility":"internal","parameters":[{"type":"IEnumerable<WorkerProtocolError>","name":"errors"}],"assignment":{"kind":"collectionCopy","target":"Errors","source":"errors"}},"properties":[{"name":"Errors","jsonName":"errors","order":0,"type":"ImmutableArray<WorkerProtocolError>","set":false,"default":{"kind":"constructorAssigned"}},{"name":"IsValid","jsonName":"isValid","order":1,"type":"bool","set":false,"default":{"kind":"computed","operation":"isDefaultOrEmpty","source":"Errors"}}]}
+  ]
+}

@@ -10,12 +10,14 @@ using SharpProof.Analyzer.Configuration;
 
 namespace SharpProof.Gates.Corpus;
 
-internal static class OpenSourceCorpusRunner {
+internal static class OpenSourceCorpusRunner
+{
     private const string AnnotationKind = "SharpProofOssCorpusMethod";
 
     internal static async Task<ImmutableArray<CorpusObservation>> ObserveAsync(
         OpenSourceCorpusDocument document,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var trees = ImmutableArray.CreateBuilder<SyntaxTree>(
             document.Files.Length + 1);
         trees.Add(CSharpSyntaxTree.ParseText(
@@ -44,7 +46,8 @@ internal static class OpenSourceCorpusRunner {
         var targets = ImmutableDictionary.CreateBuilder<
             TargetKey,
             TargetInfo>();
-        foreach (var file in document.Files) {
+        foreach (var file in document.Files)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             var root = CSharpSyntaxTree.ParseText(
                     OpenSourceCorpusCatalog.NormalizeLineEndings(file.Content),
@@ -54,7 +57,8 @@ internal static class OpenSourceCorpusRunner {
                     cancellationToken)
                 .GetCompilationUnitRoot(cancellationToken);
             var key = $"{file.SourceId}|{file.Path}";
-            if (methodsByFile.TryGetValue(key, out var methods)) {
+            if (methodsByFile.TryGetValue(key, out var methods))
+            {
                 var selected = methods.ToImmutableDictionary(
                     method => OpenSourceCorpusCatalog.FindDeclaration(root, method),
                     static method => method);
@@ -73,7 +77,8 @@ internal static class OpenSourceCorpusRunner {
             foreach (var declaration in tree.GetCompilationUnitRoot(
                          cancellationToken)
                      .GetAnnotatedNodes(AnnotationKind)
-                     .OfType<MethodDeclarationSyntax>()) {
+                     .OfType<MethodDeclarationSyntax>())
+            {
                 var annotation = declaration.GetAnnotations(AnnotationKind)
                     .Single();
                 var id = annotation.Data ??
@@ -87,9 +92,11 @@ internal static class OpenSourceCorpusRunner {
             }
         }
         if (targets.Count != document.Methods.Length)
+        {
             throw new InvalidDataException(
                 $"Instrumented {targets.Count} OSS methods, expected " +
                 $"{document.Methods.Length}.");
+        }
 
         var template = AnalyzerGateHost.CreateCompilation(
             string.Empty,
@@ -103,6 +110,7 @@ internal static class OpenSourceCorpusRunner {
             .Take(25)
             .ToImmutableArray();
         if (!compilerErrors.IsDefaultOrEmpty)
+        {
             throw new InvalidDataException(
                 "The pinned OSS corpus did not compile:" +
                 Environment.NewLine +
@@ -110,6 +118,7 @@ internal static class OpenSourceCorpusRunner {
                     Environment.NewLine,
                     compilerErrors.Select(static diagnostic =>
                         diagnostic.ToString())));
+        }
 
         var factory = new RecordingSessionFactory(targets.ToImmutable());
         var diagnostics = await AnalyzerGateHost.AnalyzeAsync(
@@ -122,10 +131,14 @@ internal static class OpenSourceCorpusRunner {
         var outcomes = factory.GetOutcomes();
         var observations = ImmutableArray.CreateBuilder<CorpusObservation>(
             document.Methods.Length);
-        foreach (var method in document.Methods) {
+        foreach (var method in document.Methods)
+        {
             if (!outcomes.TryGetValue(method.Id, out var semanticOutcome))
+            {
                 throw new InvalidDataException(
                     $"Analyzer did not record an outcome for OSS method {method.Id}.");
+            }
+
             var target = targets.Values.Single(info =>
                 string.Equals(
                     info.Method.Id,
@@ -154,8 +167,9 @@ internal static class OpenSourceCorpusRunner {
 
     private static MethodDeclarationSyntax Instrument(
         MethodDeclarationSyntax declaration,
-        string id) =>
-        declaration
+        string id)
+    {
+        return declaration
             .WithAttributeLists(
                 declaration.AttributeLists.Insert(
                     0,
@@ -166,6 +180,7 @@ internal static class OpenSourceCorpusRunner {
                                     "global::SharpProof.Attributes.EnforcePure"))))))
             .WithAdditionalAnnotations(
                 new SyntaxAnnotation(AnnotationKind, id));
+    }
 
     private readonly record struct TargetKey(
         SyntaxTree Tree,
@@ -178,7 +193,8 @@ internal static class OpenSourceCorpusRunner {
 
     private sealed class RecordingSessionFactory(
         ImmutableDictionary<TargetKey, TargetInfo> targets)
-        : IAnalyzerSessionFactory {
+        : IAnalyzerSessionFactory
+    {
         private readonly ConcurrentDictionary<
             string,
             AnalyzerSemanticOutcome> _outcomes =
@@ -187,27 +203,36 @@ internal static class OpenSourceCorpusRunner {
         public AnalyzerSession Create(
             Compilation compilation,
             AnalyzerConfiguration configuration,
-            CancellationToken cancellationToken) =>
-            new(
+            CancellationToken cancellationToken)
+        {
+            return new(
                 compilation,
                 configuration,
                 cancellationToken,
                 Record);
+        }
 
         internal ImmutableDictionary<string, AnalyzerSemanticOutcome>
-            GetOutcomes() =>
-            _outcomes.ToImmutableDictionary(StringComparer.Ordinal);
+            GetOutcomes()
+        {
+            return _outcomes.ToImmutableDictionary(StringComparer.Ordinal);
+        }
 
         private void Record(
             IMethodSymbol method,
-            AnalyzerSemanticOutcome outcome) {
-            foreach (var reference in method.DeclaringSyntaxReferences) {
+            AnalyzerSemanticOutcome outcome)
+        {
+            foreach (var reference in method.DeclaringSyntaxReferences)
+            {
                 if (!targets.TryGetValue(
                         new TargetKey(
                             reference.SyntaxTree,
                             reference.Span.Start),
                         out var target))
+                {
                     continue;
+                }
+
                 _outcomes.AddOrUpdate(
                     target.Method.Id,
                     outcome,

@@ -3,7 +3,8 @@ namespace SharpProof.CompilerProbe.TestAsset;
 /// <summary>
 /// Names shared by the package-backed final-compilation probe fixtures.
 /// </summary>
-public static class CompilerProbeContract {
+public static class CompilerProbeContract
+{
     /// <summary>The probe JSON schema name.</summary>
     public const string SchemaName = "SharpProof.CompilerProbe";
 

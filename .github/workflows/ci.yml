@@ -7,6 +7,9 @@ on:
     branches: ["**"]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: windows-latest
@@ -25,9 +28,33 @@ jobs:
         shell: pwsh
         run: .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
 
+      - name: Verify standard C# formatting
+        shell: pwsh
+        run: .\scripts\Format-CSharp.ps1 -Verify
+
       - name: Verify maintained documentation
         shell: pwsh
         run: .\scripts\Generate-Readme.ps1 -Verify
+
+      - name: Verify generated diagnostic descriptors
+        shell: pwsh
+        run: .\scripts\Generate-DiagnosticDescriptors.ps1 -Verify
+
+      - name: Verify generated C# scalar semantics
+        shell: pwsh
+        run: .\scripts\Generate-CSharpScalarSemantics.ps1 -Verify
+
+      - name: Verify generated API specification catalog
+        shell: pwsh
+        run: .\scripts\Generate-ApiSpecCatalog.ps1 -Verify
+
+      - name: Verify generated protocol model
+        shell: pwsh
+        run: .\scripts\Generate-ProtocolModel.ps1 -Verify
+
+      - name: Verify generated compiler artifact model
+        shell: pwsh
+        run: .\scripts\Generate-CompilerArtifactModel.ps1 -Verify
 
       - name: Validate architecture, metadata, and size contract
         shell: pwsh

@@ -17,6 +17,8 @@
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Analyzer" />
     <InternalsVisibleTo Include="SharpProof.CompilerArtifact" />
+    <InternalsVisibleTo Include="SharpProof.Effects" />
   </ItemGroup>
 </Project>

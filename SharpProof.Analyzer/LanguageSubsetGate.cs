@@ -1,6 +1,7 @@
 namespace SharpProof.Analyzer;
 
-internal enum LanguageSubsetAbstentionReason {
+internal enum LanguageSubsetAbstentionReason
+{
     None,
     UnsupportedCallable,
     MissingOperationRoot,
@@ -9,63 +10,105 @@ internal enum LanguageSubsetAbstentionReason {
     UnsupportedOperationShape
 }
 
-internal readonly struct LanguageSubsetDecision {
-    private LanguageSubsetDecision(
-        bool isSupported,
-        LanguageSubsetAbstentionReason reason,
-        OperationKind? operationKind) {
-        IsSupported = isSupported;
-        Reason = reason;
-        OperationKind = operationKind;
-    }
-
-    internal bool IsSupported { get; }
-    internal LanguageSubsetAbstentionReason Reason { get; }
-    internal OperationKind? OperationKind { get; }
-
-    internal static LanguageSubsetDecision Supported { get; } =
+internal readonly record struct LanguageSubsetDecision(
+    bool IsSupported,
+    LanguageSubsetAbstentionReason Reason,
+    OperationKind? OperationKind)
+{
+    internal static LanguageSubsetDecision Supported
+    {
+        get;
+    } =
         new(true, LanguageSubsetAbstentionReason.None, null);
 
     internal static LanguageSubsetDecision Abstain(
         LanguageSubsetAbstentionReason reason,
-        OperationKind? operationKind = null) {
+        OperationKind? operationKind = null)
+    {
         if (reason == LanguageSubsetAbstentionReason.None)
+        {
             throw new ArgumentOutOfRangeException(nameof(reason));
+        }
+
         return new LanguageSubsetDecision(false, reason, operationKind);
     }
 }
 
-internal static class LanguageSubsetGate {
+internal static class LanguageSubsetGate
+{
     internal static readonly ImmutableDictionary<OperationKind, bool> OperationKindDecisions =
-        Enum.GetValues(typeof(OperationKind))
-            .Cast<OperationKind>()
-            .Distinct()
-            .ToImmutableDictionary(
-                static kind => kind,
-                static kind => IsSupportedOperationKind(kind));
+        Enum.GetValues(typeof(OperationKind)).Cast<OperationKind>().Distinct()
+            .ToImmutableDictionary(static kind => kind, static kind => IsSupported(kind));
 
-    private static bool IsSupportedOperationKind(OperationKind kind) =>
-        kind is
-            >= OperationKind.Block and <= OperationKind.Return or
-            >= OperationKind.Lock and <= OperationKind.Using or
+    private static bool IsSupported(OperationKind kind)
+    {
+        return kind is
+            OperationKind.Block or
+            OperationKind.VariableDeclarationGroup or
+            OperationKind.Switch or
+            OperationKind.Loop or
+            OperationKind.Labeled or
+            OperationKind.Branch or
+            OperationKind.Empty or
+            OperationKind.Return or
+            OperationKind.Lock or
+            OperationKind.Try or
+            OperationKind.Using or
             OperationKind.ExpressionStatement or
-            >= OperationKind.Literal and <= OperationKind.FieldReference or
+            OperationKind.Literal or
+            OperationKind.Conversion or
+            OperationKind.Invocation or
+            OperationKind.ArrayElementReference or
+            OperationKind.LocalReference or
+            OperationKind.ParameterReference or
+            OperationKind.FieldReference or
             OperationKind.PropertyReference or
-            >= OperationKind.Unary and <= OperationKind.Coalesce or
+            OperationKind.Unary or
+            OperationKind.Binary or
+            OperationKind.Conditional or
+            OperationKind.Coalesce or
             OperationKind.ObjectCreation or
-            >= OperationKind.ArrayCreation and <= OperationKind.IsType or
-            >= OperationKind.SimpleAssignment and <= OperationKind.Parenthesized or
-            >= OperationKind.ConditionalAccess and <= OperationKind.InterpolatedString or
-            >= OperationKind.ObjectOrCollectionInitializer and
-                <= OperationKind.MemberInitializer or
+            OperationKind.ArrayCreation or
+            OperationKind.InstanceReference or
+            OperationKind.IsType or
+            OperationKind.SimpleAssignment or
+            OperationKind.CompoundAssignment or
+            OperationKind.Parenthesized or
+            OperationKind.ConditionalAccess or
+            OperationKind.ConditionalAccessInstance or
+            OperationKind.InterpolatedString or
+            OperationKind.ObjectOrCollectionInitializer or
+            OperationKind.MemberInitializer or
             OperationKind.NameOf or
-            >= OperationKind.DefaultValue and <= OperationKind.TypeOf or
-            >= OperationKind.Increment and <= OperationKind.Decrement or
-            >= OperationKind.FieldInitializer and <= OperationKind.Interpolation or
-            >= OperationKind.MethodBody and <= OperationKind.CaughtException or
+            OperationKind.DefaultValue or
+            OperationKind.TypeOf or
+            OperationKind.Increment or
+            OperationKind.Throw or
+            OperationKind.Decrement or
+            OperationKind.FieldInitializer or
+            OperationKind.VariableInitializer or
+            OperationKind.PropertyInitializer or
+            OperationKind.ParameterInitializer or
+            OperationKind.ArrayInitializer or
+            OperationKind.VariableDeclarator or
+            OperationKind.VariableDeclaration or
+            OperationKind.Argument or
+            OperationKind.CatchClause or
+            OperationKind.SwitchCase or
+            OperationKind.CaseClause or
+            OperationKind.InterpolatedStringText or
+            OperationKind.Interpolation or
+            OperationKind.MethodBodyOperation or
+            OperationKind.ConstructorBodyOperation or
+            OperationKind.Discard or
+            OperationKind.FlowCapture or
+            OperationKind.FlowCaptureReference or
+            OperationKind.IsNull or
+            OperationKind.CaughtException or
             OperationKind.CoalesceAssignment or
             OperationKind.UsingDeclaration or
             OperationKind.Attribute;
+    }
 
     internal static LanguageSubsetDecision ClassifyEffects(
         IMethodSymbol method,
@@ -73,64 +116,74 @@ internal static class LanguageSubsetGate {
         SemanticModel semanticModel,
         ImmutableArray<IOperation> operationBlocks,
         Func<IMethodSymbol, bool> hasResolvedGenericApiSpec,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         if (!SupportsCallable(method, declaration))
+        {
             return LanguageSubsetDecision.Abstain(
                 LanguageSubsetAbstentionReason.UnsupportedCallable);
+        }
+
         var roots = operationBlocks.IsDefaultOrEmpty
             ? GetFallbackRoots(declaration, semanticModel, cancellationToken)
             : operationBlocks;
         if (roots.IsDefaultOrEmpty)
+        {
             return LanguageSubsetDecision.Abstain(
                 LanguageSubsetAbstentionReason.MissingOperationRoot);
+        }
+
         foreach (var root in roots)
-            foreach (var operation in root.DescendantsAndSelf()) {
+        {
+            foreach (var operation in root.DescendantsAndSelf())
+            {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!OperationKindDecisions.TryGetValue(
-                        operation.Kind,
-                        out var supported) ||
-                    !supported)
+                if (!OperationKindDecisions.TryGetValue(operation.Kind, out var supported) || !supported)
+                {
                     return LanguageSubsetDecision.Abstain(
                         LanguageSubsetAbstentionReason.UnsupportedOperationKind,
                         operation.Kind);
+                }
+
                 if (IsUnsupportedType(operation.Type))
+                {
                     return LanguageSubsetDecision.Abstain(
                         LanguageSubsetAbstentionReason.UnsupportedType,
                         operation.Kind);
-                if (!SupportsOperationShape(
-                        operation,
-                        hasResolvedGenericApiSpec))
+                }
+
+                if (!SupportsOperationShape(operation, hasResolvedGenericApiSpec))
+                {
                     return LanguageSubsetDecision.Abstain(
                         LanguageSubsetAbstentionReason.UnsupportedOperationShape,
                         operation.Kind);
+                }
             }
+        }
+
         return LanguageSubsetDecision.Supported;
     }
 
     private static ImmutableArray<IOperation> GetFallbackRoots(
         SyntaxNode declaration,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var root = semanticModel.GetOperation(declaration, cancellationToken);
-        if (root != null) return [root];
-        var fallback = declaration switch {
-            BaseMethodDeclarationSyntax method =>
-                (SyntaxNode?)method.Body ?? method.ExpressionBody?.Expression,
-            AccessorDeclarationSyntax accessor =>
-                (SyntaxNode?)accessor.Body ?? accessor.ExpressionBody?.Expression,
-            PropertyDeclarationSyntax property =>
-                property.ExpressionBody?.Expression,
-            IndexerDeclarationSyntax indexer =>
-                indexer.ExpressionBody?.Expression,
-            _ => null
-        };
+        if (root != null)
+        {
+            return [root];
+        }
+
+        var fallback = ContractClauseInventoryBuilder.GetBody(declaration);
         root = fallback == null
             ? null
             : semanticModel.GetOperation(fallback, cancellationToken);
         return root == null ? [] : [root];
     }
 
-    private static bool SupportsCallable(IMethodSymbol method, SyntaxNode declaration) {
+    private static bool SupportsCallable(IMethodSymbol method, SyntaxNode declaration)
+    {
         if (method.IsAsync ||
             method.TypeParameters.Length != 0 ||
             method.ReturnsByRef ||
@@ -140,8 +193,15 @@ internal static class LanguageSubsetGate {
                 parameter.RefKind != RefKind.None ||
                 IsUnsupportedType(parameter.Type)) ||
             ContainsUnsafeSyntax(declaration))
+        {
             return false;
-        if (declaration is TypeDeclarationSyntax) return false;
+        }
+
+        if (declaration is TypeDeclarationSyntax)
+        {
+            return false;
+        }
+
         return method.MethodKind is
             MethodKind.Ordinary or
             MethodKind.Constructor or
@@ -155,8 +215,10 @@ internal static class LanguageSubsetGate {
 
     private static bool SupportsOperationShape(
         IOperation operation,
-        Func<IMethodSymbol, bool> hasResolvedGenericApiSpec) =>
-        operation switch {
+        Func<IMethodSymbol, bool> hasResolvedGenericApiSpec)
+    {
+        return operation switch
+        {
             ILoopOperation loop =>
                 loop.LoopKind is LoopKind.While or LoopKind.For,
             ISwitchOperation @switch =>
@@ -189,15 +251,23 @@ internal static class LanguageSubsetGate {
                 increment.OperatorMethod == null,
             _ => true
         };
+    }
 
-    private static bool IsConstantSwitchClause(ICaseClauseOperation clause) =>
-        clause is IDefaultCaseClauseOperation ||
+    private static bool IsConstantSwitchClause(ICaseClauseOperation clause)
+    {
+        return clause is IDefaultCaseClauseOperation ||
         clause is ISingleValueCaseClauseOperation { Value.ConstantValue.HasValue: true };
+    }
 
     private static bool SupportsProperty(
         IPropertyReferenceOperation property,
-        Func<IMethodSymbol, bool> hasResolvedGenericApiSpec) {
-        if (!RequiresResolvedGenericApiSpec(property.Property.ContainingType)) return true;
+        Func<IMethodSymbol, bool> hasResolvedGenericApiSpec)
+    {
+        if (!RequiresResolvedGenericApiSpec(property.Property.ContainingType))
+        {
+            return true;
+        }
+
         var accessors = new[] { property.Property.GetMethod, property.Property.SetMethod };
         var availableAccessors = accessors.Where(static accessor => accessor != null).ToArray();
         return availableAccessors.Length != 0 &&
@@ -206,55 +276,78 @@ internal static class LanguageSubsetGate {
 
     private static bool SupportsCall(
         IMethodSymbol method,
-        Func<IMethodSymbol, bool> hasResolvedGenericApiSpec) {
+        Func<IMethodSymbol, bool> hasResolvedGenericApiSpec)
+    {
         if (method.MethodKind is
             MethodKind.AnonymousFunction or
             MethodKind.DelegateInvoke or
             MethodKind.FunctionPointerSignature or
             MethodKind.LocalFunction)
+        {
             return false;
+        }
+
         if (method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None))
+        {
             return false;
+        }
+
         if (!RequiresResolvedGenericApiSpec(method) &&
             !RequiresResolvedGenericApiSpec(method.ContainingType))
+        {
             return true;
+        }
+
         return !ContainsOpenType(method) &&
                hasResolvedGenericApiSpec(method);
     }
 
-    private static bool RequiresResolvedGenericApiSpec(ISymbol? symbol) => symbol switch {
-        IMethodSymbol method => method.IsGenericMethod,
-        INamedTypeSymbol type => type.IsGenericType,
-        _ => false
-    };
+    private static bool RequiresResolvedGenericApiSpec(ISymbol? symbol)
+    {
+        return symbol switch
+        {
+            IMethodSymbol method => method.IsGenericMethod,
+            INamedTypeSymbol type => type.IsGenericType,
+            _ => false
+        };
+    }
 
-    private static bool ContainsOpenType(IMethodSymbol method) =>
-        method.TypeArguments.Any(IsUnsupportedType) ||
+    private static bool ContainsOpenType(IMethodSymbol method)
+    {
+        return method.TypeArguments.Any(IsUnsupportedType) ||
         method.Parameters.Any(static parameter => IsUnsupportedType(parameter.Type)) ||
         IsUnsupportedType(method.ReturnType) ||
         method.ContainingType.TypeArguments.Any(IsUnsupportedType);
+    }
 
-    private static bool IsUnsupportedType(ITypeSymbol? type) =>
-        type?.TypeKind is
+    private static bool IsUnsupportedType(ITypeSymbol? type)
+    {
+        return type?.TypeKind is
             TypeKind.Delegate or
             TypeKind.Dynamic or
             TypeKind.FunctionPointer or
             TypeKind.Pointer or
             TypeKind.TypeParameter ||
-        type switch {
+        type switch
+        {
             IArrayTypeSymbol array => IsUnsupportedType(array.ElementType),
             INamedTypeSymbol named =>
                 named.IsRefLikeType ||
                 named.TypeArguments.Any(IsUnsupportedType),
             _ => false
         };
+    }
 
-    private static bool ContainsUnsafeSyntax(SyntaxNode declaration) =>
-        declaration.DescendantNodesAndSelf().Any(static node => node is UnsafeStatementSyntax) ||
+    private static bool ContainsUnsafeSyntax(SyntaxNode declaration)
+    {
+        return declaration.DescendantNodesAndSelf().Any(static node => node is UnsafeStatementSyntax) ||
         declaration.AncestorsAndSelf().Any(HasUnsafeModifier);
+    }
 
-    private static bool HasUnsafeModifier(SyntaxNode node) {
-        var modifiers = node switch {
+    private static bool HasUnsafeModifier(SyntaxNode node)
+    {
+        var modifiers = node switch
+        {
             BaseMethodDeclarationSyntax method => method.Modifiers,
             BasePropertyDeclarationSyntax property => property.Modifiers,
             AccessorDeclarationSyntax accessor => accessor.Modifiers,

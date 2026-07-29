@@ -1,12 +1,14 @@
 namespace SharpProof.Specs;
 
-public enum SpecEvidenceKind {
+public enum SpecEvidenceKind
+{
     Documented,
     Observed
 }
 
 [Flags]
-public enum SpecEffect {
+public enum SpecEffect
+{
     None = 0,
     Unknown = 1 << 0,
     ReadsReceiverState = 1 << 1,
@@ -22,19 +24,22 @@ public enum SpecEffect {
     Nondeterminism = 1 << 11
 }
 
-public enum SpecAllocationBehavior {
+public enum SpecAllocationBehavior
+{
     None,
     MayAllocate,
     Unknown
 }
 
-public enum SpecThrowBehavior {
+public enum SpecThrowBehavior
+{
     DoesNotThrow,
     MayThrow,
     Unknown
 }
 
-public enum SpecNullness {
+public enum SpecNullness
+{
     NotApplicable,
     NonNull,
     MaybeNull,
@@ -42,7 +47,8 @@ public enum SpecNullness {
     Unknown
 }
 
-public enum SpecCardinality {
+public enum SpecCardinality
+{
     NotApplicable,
     Empty,
     NonEmpty,
@@ -50,13 +56,15 @@ public enum SpecCardinality {
     Unknown
 }
 
-public enum SpecTargetMemberKind {
+public enum SpecTargetMemberKind
+{
     Constructor,
     Method,
     PropertyGet
 }
 
-public enum SpecValueType {
+public enum SpecValueType
+{
     Boolean,
     Integer,
     String,
@@ -64,18 +72,21 @@ public enum SpecValueType {
     Sequence
 }
 
-public enum SpecVariableRole {
+public enum SpecVariableRole
+{
     Receiver,
     Parameter,
     Result
 }
 
-public enum SpecUnaryOperator {
+public enum SpecUnaryOperator
+{
     Not,
     Negate
 }
 
-public enum SpecBinaryOperator {
+public enum SpecBinaryOperator
+{
     Add,
     Subtract,
     Multiply,
@@ -106,17 +117,34 @@ public sealed record SpecNullnessFacet(SpecNullness Result, SpecEvidence Evidenc
 public sealed record SpecCardinalityFacet(
     SpecCardinality Result, int? ExactCount, SpecEvidence Evidence);
 
+public enum ApiSpecReferenceFamily
+{
+    Unspecified,
+    MicrosoftNetCoreReferencePack,
+    NetStandardReferencePack,
+    NetFrameworkReferenceAssemblies,
+    MicrosoftNetCoreRuntime,
+    SharpProofPackage
+}
+
 public sealed record ApiSpecFacets(
     SpecEffectFacet Effects, SpecAllocationFacet Allocation,
     SpecThrowFacet Throws, SpecNullnessFacet Nullness,
     SpecCardinalityFacet Cardinality);
+
+public sealed record ApiSpecAssemblyIdentity(
+    string Name,
+    string PublicKeyToken,
+    ApiSpecReferenceFamily ReferenceFamily =
+        ApiSpecReferenceFamily.Unspecified);
 
 public sealed record ApiSpecTarget(
     string WitnessIdentifier, string DocumentationCommentId,
     string ContainingTypeMetadataName, SpecTargetMemberKind MemberKind,
     string MemberName, bool IsStatic, int GenericArity,
     SpecValueType? ReceiverType, ImmutableArray<SpecValueType> ParameterTypes,
-    SpecValueType? ResultType);
+    SpecValueType? ResultType,
+    ImmutableArray<ApiSpecAssemblyIdentity> ApprovedAssemblies);
 
 public abstract record SpecTermDeclaration(SpecValueType Type);
 
@@ -161,56 +189,52 @@ public sealed record ApiSpecDeclaration(
 public sealed record SpecVariableInfo(
     SpecVarId Id, SpecVariableRole Role, int Ordinal, SpecValueType Type);
 
-public abstract record SpecTerm(SpecValueType Type);
+public sealed record SpecPostcondition(
+    SpecTermDeclaration Condition, SpecEvidence Evidence);
 
-public sealed record SpecVariableTerm(SpecVarId Variable, SpecValueType Type)
-    : SpecTerm(Type);
-
-public sealed record SpecBooleanTerm(bool Value)
-    : SpecTerm(SpecValueType.Boolean);
-
-public sealed record SpecIntegerTerm(long Value)
-    : SpecTerm(SpecValueType.Integer);
-
-public sealed record SpecStringTerm(string Value)
-    : SpecTerm(SpecValueType.String);
-
-public sealed record SpecNullTerm(SpecValueType Type)
-    : SpecTerm(Type);
-
-public sealed record SpecUnaryTerm(SpecUnaryOperator Operator, SpecTerm Operand, SpecValueType Type)
-    : SpecTerm(Type);
-
-public sealed record SpecBinaryTerm(
-    SpecBinaryOperator Operator, SpecTerm Left, SpecTerm Right, SpecValueType Type)
-    : SpecTerm(Type);
-
-public sealed record SpecConditionalTerm(
-    SpecTerm Condition, SpecTerm WhenTrue, SpecTerm WhenFalse, SpecValueType Type)
-    : SpecTerm(Type);
-
-public sealed record SpecLengthTerm(SpecTerm Value)
-    : SpecTerm(SpecValueType.Integer);
-
-public sealed record SpecPostcondition(SpecTerm Condition, SpecEvidence Evidence);
-
-public sealed class ApiSpecTemplate {
+public sealed class ApiSpecTemplate
+{
     internal ApiSpecTemplate(
         SpecId id, ApiSpecTarget target, ApiSpecFacets facets,
         ImmutableArray<SpecVariableInfo> variables, SpecVarId? receiver,
         ImmutableArray<SpecVarId> parameters, SpecVarId? result,
-        ImmutableArray<SpecPostcondition> postconditions) {
+        ImmutableArray<SpecPostcondition> postconditions)
+    {
         (Id, Target, Facets, Variables) = (id, target, facets, variables);
         (Receiver, Parameters, Result, Postconditions) =
             (receiver, parameters, result, postconditions);
     }
 
-    public SpecId Id { get; }
-    public ApiSpecTarget Target { get; }
-    public ApiSpecFacets Facets { get; }
-    public ImmutableArray<SpecVariableInfo> Variables { get; }
-    public SpecVarId? Receiver { get; }
-    public ImmutableArray<SpecVarId> Parameters { get; }
-    public SpecVarId? Result { get; }
-    public ImmutableArray<SpecPostcondition> Postconditions { get; }
+    public SpecId Id
+    {
+        get;
+    }
+    public ApiSpecTarget Target
+    {
+        get;
+    }
+    public ApiSpecFacets Facets
+    {
+        get;
+    }
+    public ImmutableArray<SpecVariableInfo> Variables
+    {
+        get;
+    }
+    public SpecVarId? Receiver
+    {
+        get;
+    }
+    public ImmutableArray<SpecVarId> Parameters
+    {
+        get;
+    }
+    public SpecVarId? Result
+    {
+        get;
+    }
+    public ImmutableArray<SpecPostcondition> Postconditions
+    {
+        get;
+    }
 }

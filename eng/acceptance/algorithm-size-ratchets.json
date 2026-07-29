@@ -1,85 +1,117 @@
 {
-  "schemaVersion": 1,
-  "rationale": "These are narrow growth ratchets for the current algorithm layers. Raise a cap only with a reviewed decomposition or a soundness note explaining why the added complexity belongs in the existing file or member.",
+  "schemaVersion": 2,
+  "rationale": "These formatting-invariant complexity ratchets keep algorithm files and members reviewable. Raise a cap only with a reviewed decomposition or a soundness note explaining why the added executable structure belongs in the existing layer.",
   "measurement": {
-    "physicalFileLines": "Count of physical lines returned by File.ReadLines.",
-    "memberLines": "Inclusive Roslyn source-span lines for methods, constructors, operators, local functions, and accessors."
+    "fileExpressionNodes": "Roslyn expression-node count for the complete file, excluding trivia and optional block syntax.",
+    "memberExpressionNodes": "Roslyn expression-node count for each measured member, excluding trivia and optional block syntax.",
+    "fileDecisionPoints": "Branching syntax constructs in the complete file.",
+    "memberDecisionPoints": "Branching syntax constructs in each measured member."
   },
   "files": [
     {
       "path": "SharpProof.Frontend/RoslynOperationLowerer.cs",
-      "maximumPhysicalLines": 680,
-      "maximumMemberLines": 60
+      "maximumFileExpressionNodes": 2730,
+      "maximumMemberExpressionNodes": 335,
+      "maximumFileDecisionPoints": 150,
+      "maximumMemberDecisionPoints": 30
     },
     {
       "path": "SharpProof.Frontend/RoslynProgramLowerer.cs",
-      "maximumPhysicalLines": 710,
-      "maximumMemberLines": 95
+      "maximumFileExpressionNodes": 1920,
+      "maximumMemberExpressionNodes": 250,
+      "maximumFileDecisionPoints": 100,
+      "maximumMemberDecisionPoints": 20
     },
     {
       "path": "SharpProof.Ir/IrInterpreter.cs",
-      "maximumPhysicalLines": 423,
-      "maximumMemberLines": 34
+      "maximumFileExpressionNodes": 1760,
+      "maximumMemberExpressionNodes": 215,
+      "maximumFileDecisionPoints": 120,
+      "maximumMemberDecisionPoints": 20
     },
     {
       "path": "SharpProof.Ir/IrProgramInterpreter.cs",
-      "maximumPhysicalLines": 185,
-      "maximumMemberLines": 96
+      "maximumFileExpressionNodes": 890,
+      "maximumMemberExpressionNodes": 485,
+      "maximumFileDecisionPoints": 60,
+      "maximumMemberDecisionPoints": 40
     },
     {
       "path": "SharpProof.Dataflow/ForwardDataflowAnalysis.cs",
-      "maximumPhysicalLines": 150,
-      "maximumMemberLines": 80
+      "maximumFileExpressionNodes": 495,
+      "maximumMemberExpressionNodes": 350,
+      "maximumFileDecisionPoints": 30,
+      "maximumMemberDecisionPoints": 25
     },
     {
       "path": "SharpProof.Dataflow/IntervalDomain.cs",
-      "maximumPhysicalLines": 225,
-      "maximumMemberLines": 45
+      "maximumFileExpressionNodes": 925,
+      "maximumMemberExpressionNodes": 150,
+      "maximumFileDecisionPoints": 85,
+      "maximumMemberDecisionPoints": 25
     },
     {
       "path": "SharpProof.Dataflow/SequenceCardinalityDomain.cs",
-      "maximumPhysicalLines": 160,
-      "maximumMemberLines": 30
+      "maximumFileExpressionNodes": 510,
+      "maximumMemberExpressionNodes": 100,
+      "maximumFileDecisionPoints": 40,
+      "maximumMemberDecisionPoints": 15
     },
     {
       "path": "SharpProof.Dataflow/NullnessDomain.cs",
-      "maximumPhysicalLines": 70,
-      "maximumMemberLines": 10
+      "maximumFileExpressionNodes": 150,
+      "maximumMemberExpressionNodes": 32,
+      "maximumFileDecisionPoints": 15,
+      "maximumMemberDecisionPoints": 6
     },
     {
       "path": "SharpProof.Effects/EffectAnalysisSession.cs",
-      "maximumPhysicalLines": 675,
-      "maximumMemberLines": 55
+      "maximumFileExpressionNodes": 2030,
+      "maximumMemberExpressionNodes": 180,
+      "maximumFileDecisionPoints": 110,
+      "maximumMemberDecisionPoints": 12
     },
     {
       "path": "SharpProof.Effects/OperationEffectScanner.cs",
-      "maximumPhysicalLines": 815,
-      "maximumMemberLines": 95
+      "maximumFileExpressionNodes": 3550,
+      "maximumMemberExpressionNodes": 330,
+      "maximumFileDecisionPoints": 250,
+      "maximumMemberDecisionPoints": 30
     },
     {
       "path": "SharpProof.Effects/ExternalEffectResolver.cs",
-      "maximumPhysicalLines": 405,
-      "maximumMemberLines": 95
+      "maximumFileExpressionNodes": 1280,
+      "maximumMemberExpressionNodes": 400,
+      "maximumFileDecisionPoints": 95,
+      "maximumMemberDecisionPoints": 40
     },
     {
       "path": "SharpProof.Verify/ProofKernel.cs",
-      "maximumPhysicalLines": 95,
-      "maximumMemberLines": 25
+      "maximumFileExpressionNodes": 475,
+      "maximumMemberExpressionNodes": 155,
+      "maximumFileDecisionPoints": 40,
+      "maximumMemberDecisionPoints": 12
     },
     {
       "path": "SharpProof.Verify/Evidence.cs",
-      "maximumPhysicalLines": 125,
-      "maximumMemberLines": 25
+      "maximumFileExpressionNodes": 150,
+      "maximumMemberExpressionNodes": 40,
+      "maximumFileDecisionPoints": 10,
+      "maximumMemberDecisionPoints": 5
     },
     {
       "path": "SharpProof.Verify/Outcomes.cs",
-      "maximumPhysicalLines": 65,
-      "maximumMemberLines": 5
+      "maximumFileExpressionNodes": 55,
+      "maximumMemberExpressionNodes": 20,
+      "maximumFileDecisionPoints": 3,
+      "maximumMemberDecisionPoints": 3
     },
     {
       "path": "SharpProof.Worker/CallableCounterexampleReplayer.cs",
-      "maximumPhysicalLines": 61,
-      "maximumMemberLines": 57
+      "maximumFileExpressionNodes": 470,
+      "maximumMemberExpressionNodes": 465,
+      "maximumFileDecisionPoints": 35,
+      "maximumMemberDecisionPoints": 35
     }
   ]
 }

@@ -46,14 +46,28 @@ rules with exact project-reference and payload checks. These checks define
 mechanical enforcement boundaries; they do not expand the admitted language or
 turn an unsupported result into proof.
 
-The `trustedKernel` path/LOC ratchet in `eng/acceptance/contract.json` covers
-only proof-outcome construction. It is not the complete trusted computing base.
-End-to-end verification also trusts compiler-side selection, contract/spec
-binding, lowering and artifact encoding; worker-side artifact decoding,
-obligation construction, SMT encoding and replay; protocol/policy/cache
-validation; and launcher containment/publication. Those boundaries require
-direct tests and review even though they are not all in the proof-kernel LOC
-ratchet.
+The exact path inventories in `eng/acceptance/contract.json` cover
+proof-outcome construction and each declared trusted boundary: discovery,
+lowering, execution, obligation construction, SMT encoding, API specification
+code and catalog generation, effect analysis, replay, policy, result assembly,
+and cache validation. Compiler-input identity, typed canonical hash encoding,
+and protocol validation have their own non-overlapping inventories rather than
+being hidden inside the cache component. API-spec content identity is likewise
+separate from resolution and instantiation. The declarative API catalog, its
+generator, and the generated matcher/instantiator source are one audited
+`apiSpecificationCatalog` component. The C# scalar type, conversion, checked
+arithmetic, and IR-operator rules likewise come from the versioned
+`SharpProof.Frontend/CSharpScalarSemantics.json` catalog and its verified
+generated source. Launcher containment and publication remain separately
+checked by architecture, package, and integration tests.
+
+Source complexity is measured independently of formatting. Repository,
+coordinator, algorithm-file, and member ratchets count Roslyn expression nodes,
+decision points, and declarations while excluding whitespace, comments, line
+wrapping, and optional block braces. Physical and nonblank line totals are
+reported only as information. This replaced the historical physical/nonblank
+LOC and "10% smaller" gates, which rewarded brace removal and line collapsing
+rather than architectural decomposition.
 
 ## Semantic core
 
@@ -97,10 +111,13 @@ return shape.
 At inlining depth zero, the current verifier consumes only facts from
 compiler-bound `ApiSpec` rows within its admitted call boundary. This is not
 general source-callee modular assume/guarantee verification. The analyzer
-performs cheap effect projections and reports a compiler-bound `Requires`
-violation only when concrete replay evaluates the precondition to false. The
-worker checks only the bounded `Ensures` subset supported by its admitted
-acyclic CFG executor; deep or otherwise unsupported postconditions abstain.
+combines exact compiler-bound replay with a managed CFG abstract interpreter
+over Boolean, nullness, integer-interval, sequence-cardinality, and effect
+facts. It reports a `Requires` violation only at a definitely executed call
+whose receiver/argument prefix completes normally and whose instantiated
+condition is definitely false. The worker checks only the bounded `Ensures`
+subset supported by its admitted acyclic CFG executor; deep or otherwise
+unsupported postconditions abstain.
 
 Proof evidence is type-safe. Approximations cannot construct an assumption.
 `Proven` is created only by the proof kernel after unsat-core hygiene checks.
@@ -121,8 +138,8 @@ indices. Formula construction, worklists, specs, proof cores, diagnostics, and
 serialized responses are stably ordered. Z3 uses resource limits; wall time is
 an outer process kill boundary.
 
-Protocol version 6 binds each request to a compiler-produced closed artifact.
-Stable semantic IDs identify selected callables, postcondition claims, and
+Protocol version 8 binds each request to a compiler-produced closed artifact.
+Stable semantic IDs identify selected callables, postcondition/effect claims, and
 user/trusted evidence independently of formatting. The protocol separates run
 status, callable coverage, and per-claim outcome. Central validation requires
 the response to match the sealed manifest exactly, including dense ordinals,
@@ -141,7 +158,9 @@ first, the manifest and request are atomically replaced, and the result is
 written last as the commit marker. A failed publication therefore cannot leave
 a stale successful result associated with a partly updated evidence set. The
 content-addressed cache includes semantic, protocol, tool, compilation,
-reference, option, target-framework, and spec identity. Cache schema version 7
+reference, option, target-framework, canonical packaged worker runtime-closure,
+and spec-content identity.
+Cache schema version 9
 stores only the validated semantic payload. A hit is accepted only when its
 manifest hash and complete result set match the current manifest. Only
 complete callables whose claims are hygienic `Proven` or replay-validated
@@ -149,12 +168,18 @@ complete callables whose claims are hygienic `Proven` or replay-validated
 
 During Windows verification, the production analyzer observes the final
 post-generator Roslyn `Compilation` and atomically emits compiler artifact
-schema version 3. The compiler owns selection, contract/spec binding, and body
+schema version 5. The compiler owns selection, contract/spec binding, effect
+evaluation, and body
 lowering. Every selected callable has either a typed failure record or a
 portable graph containing its bound clauses, canonical variables, whole-body
 CFG/IR, body start, initial environment, parameter mappings, and exact
-API-spec witness metadata. Callable IDs, claim ownership, and user-assumption
-IDs remain tied to the sealed manifest.
+API-spec witness metadata. Every selected effect-attribute occurrence also has
+one compiler-sealed `Proven`, `Refuted`, or typed `Unknown` evidence record.
+Repeated attributes retain distinct claim IDs while sharing their effective
+combined constraint/evidence. A `Refuted` effect record requires a structured
+unconditional direct witness that the worker independently validates against
+the sealed constraint. Callable IDs, claim ownership, and user-assumption IDs
+remain tied to the sealed manifest.
 
 The artifact also contains compiler error diagnostics with mapped locations,
 handwritten and generated tree hashes and parse settings, the bounded

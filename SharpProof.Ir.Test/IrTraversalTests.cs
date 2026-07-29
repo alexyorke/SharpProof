@@ -4,9 +4,11 @@ using SharpProof.Ir;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class IrTraversalTests {
+public sealed class IrTraversalTests
+{
     [Test]
-    public void ChildrenCoverEveryTermKindInSemanticOrder() {
+    public void ChildrenCoverEveryTermKindInSemanticOrder()
+    {
         var factory = new IrFactory();
         var boolean = factory.CreateVariable("boolean", factory.BooleanType);
         var integer = factory.CreateVariable("integer", factory.IntegerType);
@@ -68,7 +70,8 @@ public sealed class IrTraversalTests {
         Assert.That(
             shapes.Select(static shape => shape.Kind),
             Is.EquivalentTo(Enum.GetValues<IrTermKind>()));
-        foreach (var shape in shapes) {
+        foreach (var shape in shapes)
+        {
             Assert.That(shape.Term.Kind, Is.EqualTo(shape.Kind));
             Assert.That(
                 IrTraversal.GetChildren(shape.Term),
@@ -78,7 +81,8 @@ public sealed class IrTraversalTests {
     }
 
     [Test]
-    public void VariableCollectionDeduplicatesSharedTermsAcrossRoots() {
+    public void VariableCollectionDeduplicatesSharedTermsAcrossRoots()
+    {
         var factory = new IrFactory();
         var condition = factory.CreateVariable("condition", factory.BooleanType);
         var first = factory.CreateVariable("first", factory.IntegerType);

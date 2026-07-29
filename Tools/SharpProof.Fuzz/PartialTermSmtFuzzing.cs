@@ -5,7 +5,8 @@ using SharpProof.Verify;
 
 namespace SharpProof.Fuzz;
 
-public enum PartialTermSemanticOutcome {
+public enum PartialTermSemanticOutcome
+{
     DefinedTrue,
     DefinedFalse,
     Undefined
@@ -23,11 +24,16 @@ public sealed record PartialTermSmtCase(
     IrTerm Formula,
     ImmutableArray<ImmutableDictionary<IrVarId, IrValue>> Scenarios);
 
-public static class PartialTermSmtCaseGenerator {
+public static class PartialTermSmtCaseGenerator
+{
     public static PartialTermSmtCase Create(
         IrFactory factory,
-        int seed) {
-        if (factory == null) throw new ArgumentNullException(nameof(factory));
+        int seed)
+    {
+        if (factory == null)
+        {
+            throw new ArgumentNullException(nameof(factory));
+        }
 
         var guard = factory.CreateVariable(
             "partial-guard",
@@ -79,13 +85,16 @@ public static class PartialTermSmtCaseGenerator {
         IrVarId guard,
         bool guardValue,
         IrVarId divisor,
-        long divisorValue) =>
-        ImmutableDictionary<IrVarId, IrValue>.Empty
+        long divisorValue)
+    {
+        return ImmutableDictionary<IrVarId, IrValue>.Empty
             .Add(guard, factory.CreateBooleanValue(guardValue))
             .Add(divisor, factory.CreateIntegerValue(divisorValue));
+    }
 }
 
-public sealed class PartialTermSmtDifferentialOracle {
+public sealed class PartialTermSmtDifferentialOracle
+{
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Performance",
         "CA1822:Mark members as static",
@@ -93,18 +102,31 @@ public sealed class PartialTermSmtDifferentialOracle {
     public async Task<PartialTermSmtDifferentialResult> CompareAsync(
         IrFactory factory,
         PartialTermSmtCase generated,
-        CancellationToken cancellationToken = default) {
-        if (factory == null) throw new ArgumentNullException(nameof(factory));
+        CancellationToken cancellationToken = default)
+    {
+        if (factory == null)
+        {
+            throw new ArgumentNullException(nameof(factory));
+        }
+
         if (generated == null)
+        {
             throw new ArgumentNullException(nameof(generated));
+        }
+
         if (generated.Formula.Type != factory.BooleanType)
+        {
             throw new ArgumentException(
                 "The partial-term formula must be Boolean.",
                 nameof(generated));
+        }
+
         if (generated.Scenarios.IsDefaultOrEmpty)
+        {
             throw new ArgumentException(
                 "At least one concrete partial-term scenario is required.",
                 nameof(generated));
+        }
 
         var variables = CollectVariables(generated.Formula);
         var interpreter = new IrInterpreter(factory);
@@ -114,7 +136,8 @@ public sealed class PartialTermSmtDifferentialOracle {
         var definedFalse = 0;
         var undefined = 0;
 
-        for (var index = 0; index < generated.Scenarios.Length; index++) {
+        for (var index = 0; index < generated.Scenarios.Length; index++)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             var scenario = generated.Scenarios[index];
             ValidateScenario(factory, variables, scenario);
@@ -124,6 +147,7 @@ public sealed class PartialTermSmtDifferentialOracle {
                     scenario,
                     cancellationToken));
             if (expected == null)
+            {
                 return Result(
                     FuzzOracleStatus.Abstained,
                     index,
@@ -132,6 +156,7 @@ public sealed class PartialTermSmtDifferentialOracle {
                     undefined,
                     "The IR interpreter could not classify partial-term " +
                     $"scenario {index}.");
+            }
 
             Count(
                 expected.Value,
@@ -161,6 +186,7 @@ public sealed class PartialTermSmtDifferentialOracle {
                 .ConfigureAwait(false);
             var actual = Classify(proof);
             if (actual == null)
+            {
                 return Result(
                     FuzzOracleStatus.Abstained,
                     index + 1,
@@ -170,7 +196,10 @@ public sealed class PartialTermSmtDifferentialOracle {
                     "The backend returned " +
                     Describe(proof) +
                     $" for partial-term scenario {index}.");
+            }
+
             if (actual != expected)
+            {
                 return Result(
                     FuzzOracleStatus.Mismatch,
                     index + 1,
@@ -182,6 +211,7 @@ public sealed class PartialTermSmtDifferentialOracle {
                     " while the backend reported " +
                     actual +
                     $" for partial-term scenario {index}.");
+            }
         }
 
         return Result(
@@ -198,8 +228,9 @@ public sealed class PartialTermSmtDifferentialOracle {
         IrVarId variable,
         IrValue value,
         int scenario,
-        int ordinal) =>
-        new(
+        int ordinal)
+    {
+        return new(
             factory,
             factory.Binary(
                 IrBinaryOperator.Equal,
@@ -211,21 +242,27 @@ public sealed class PartialTermSmtDifferentialOracle {
                     scenario +
                     "-assignment-" +
                     ordinal)));
+    }
 
     private static IrTerm Literal(
         IrFactory factory,
-        IrValue value) =>
-        value.Kind switch {
+        IrValue value)
+    {
+        return value.Kind switch
+        {
             IrValueKind.Boolean => factory.Boolean(value.Boolean),
             IrValueKind.Integer => factory.Integer(value.Integer),
             _ => throw new ArgumentException(
                 "Partial-term scenarios support only Boolean and integer values.",
                 nameof(value))
         };
+    }
 
     private static PartialTermSemanticOutcome? Classify(
-        IrEvaluationResult result) =>
-        result.Status switch {
+        IrEvaluationResult result)
+    {
+        return result.Status switch
+        {
             IrEvaluationStatus.Value when
                 result.Value is { Kind: IrValueKind.Boolean } value =>
                 value.Boolean
@@ -235,33 +272,43 @@ public sealed class PartialTermSmtDifferentialOracle {
                 PartialTermSemanticOutcome.Undefined,
             _ => null
         };
+    }
 
     private static PartialTermSemanticOutcome? Classify(
-        ProofOutcome outcome) =>
-        outcome switch {
+        ProofOutcome outcome)
+    {
+        return outcome switch
+        {
             ProvenOutcome => PartialTermSemanticOutcome.DefinedTrue,
             RefutedOutcome => PartialTermSemanticOutcome.DefinedFalse,
-            UnknownOutcome {
+            UnknownOutcome
+            {
                 Reason: AbstentionReason.CounterexampleReplayFailed
             } => PartialTermSemanticOutcome.Undefined,
             _ => null
         };
+    }
 
-    private static string Describe(ProofOutcome outcome) =>
-        outcome switch {
+    private static string Describe(ProofOutcome outcome)
+    {
+        return outcome switch
+        {
             ProvenOutcome => "Proven",
             RefutedOutcome => "Refuted",
             UnknownOutcome unknown =>
                 "Unknown(" + unknown.Reason + ")",
             _ => outcome.GetType().Name
         };
+    }
 
     private static void Count(
         PartialTermSemanticOutcome outcome,
         ref int definedTrue,
         ref int definedFalse,
-        ref int undefined) {
-        switch (outcome) {
+        ref int undefined)
+    {
+        switch (outcome)
+        {
             case PartialTermSemanticOutcome.DefinedTrue:
                 definedTrue++;
                 break;
@@ -282,48 +329,71 @@ public sealed class PartialTermSmtDifferentialOracle {
         int definedTrue,
         int definedFalse,
         int undefined,
-        string detail) =>
-        new(
+        string detail)
+    {
+        return new(
             status,
             scenarioCount,
             definedTrue,
             definedFalse,
             undefined,
             detail);
+    }
 
     private static void ValidateScenario(
         IrFactory factory,
         ImmutableArray<IrVarId> variables,
-        ImmutableDictionary<IrVarId, IrValue> scenario) {
-        foreach (var variable in variables) {
+        ImmutableDictionary<IrVarId, IrValue> scenario)
+    {
+        foreach (var variable in variables)
+        {
             if (!scenario.TryGetValue(variable, out var value))
+            {
                 throw new ArgumentException(
                     "A partial-term scenario does not assign every variable.",
                     nameof(scenario));
+            }
+
             if (value == null ||
                 value.Type != factory.GetVariableInfo(variable).Type)
+            {
                 throw new ArgumentException(
                     "A partial-term scenario has a value of the wrong type.",
                     nameof(scenario));
+            }
         }
     }
 
-    private static ImmutableArray<IrVarId> CollectVariables(IrTerm root) {
+    private static ImmutableArray<IrVarId> CollectVariables(IrTerm root)
+    {
         var variables = new SortedDictionary<int, IrVarId>();
         var seen = new HashSet<IrId>();
         Visit(root);
         return [.. variables.Values];
 
-        void Visit(IrTerm term) {
-            if (!seen.Add(term.Id)) return;
-            switch (term) {
+        void Visit(IrTerm term)
+        {
+            if (!seen.Add(term.Id))
+            {
+                return;
+            }
+
+            switch (term)
+            {
                 case IrVariableTerm variable:
                     variables[variable.Variable.Value] = variable.Variable;
                     break;
                 case IrOpaqueTerm opaque:
-                    if (opaque.Receiver != null) Visit(opaque.Receiver);
+                    if (opaque.Receiver != null)
+                    {
+                        Visit(opaque.Receiver);
+                    }
+
                     foreach (var argument in opaque.Arguments)
+                    {
                         Visit(argument);
+                    }
+
                     break;
                 case IrUnaryTerm unary:
                     Visit(unary.Operand);

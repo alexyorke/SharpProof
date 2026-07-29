@@ -9,9 +9,11 @@ using SharpProof.Ir;
 namespace SharpProof.Frontend.Test;
 
 [TestFixture]
-public sealed class ProgramLoweringTests {
+public sealed class ProgramLoweringTests
+{
     [Test]
-    public void CfgLowersAssignmentsBranchesCallsAndReturns() {
+    public void CfgLowersAssignmentsBranchesCallsAndReturns()
+    {
         var lowered = Lower(
             """
             private static long Next(long value) => checked(value + 1L);
@@ -49,7 +51,8 @@ public sealed class ProgramLoweringTests {
     }
 
     [Test]
-    public void WritesAndRefCallsCarryExplicitMutationHavoc() {
+    public void WritesAndRefCallsCarryExplicitMutationHavoc()
+    {
         var lowered = Lower(
             """
             public sealed class Box {
@@ -80,14 +83,16 @@ public sealed class ProgramLoweringTests {
         Assert.That(havoc.Variables, Has.Length.EqualTo(1));
         var parameter = lowered.Result.Variables.Single(
             static binding =>
-                binding.Symbol is IParameterSymbol {
+                binding.Symbol is IParameterSymbol
+                {
                     Name: "value"
                 });
         Assert.That(havoc.Variables[0], Is.EqualTo(parameter.Variable));
     }
 
     [Test]
-    public void OnlySpecBackedPureCallsAvoidMemoryHavoc() {
+    public void OnlySpecBackedPureCallsAvoidMemoryHavoc()
+    {
         const string source =
             """
             private static long Read(long value) => value;
@@ -98,7 +103,8 @@ public sealed class ProgramLoweringTests {
             source,
             static method => method.Name == "Read");
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 unknown.Result.Program.Blocks
                     .SelectMany(static block => block.Instructions)
@@ -115,7 +121,8 @@ public sealed class ProgramLoweringTests {
     }
 
     [Test]
-    public void FlowCapturesBecomeStableVariablesAndAssignments() {
+    public void FlowCapturesBecomeStableVariablesAndAssignments()
+    {
         var lowered = Lower(
             """
             public static string Target(string? value) =>
@@ -139,7 +146,8 @@ public sealed class ProgramLoweringTests {
     }
 
     [Test]
-    public void UnsupportedMutationAbstainsAndHavocsWithoutThrowing() {
+    public void UnsupportedMutationAbstainsAndHavocsWithoutThrowing()
+    {
         FrontendProgramLoweringResult? result = null;
 
         Assert.DoesNotThrow(
@@ -165,7 +173,8 @@ public sealed class ProgramLoweringTests {
     }
 
     [Test]
-    public void InvocationLoweringPreservesReceiverAndSourceArgumentOrder() {
+    public void InvocationLoweringPreservesReceiverAndSourceArgumentOrder()
+    {
         var lowered = Lower(
             """
             private sealed class Receiver {
@@ -201,7 +210,9 @@ public sealed class ProgramLoweringTests {
             "Probe", "Ext", "Optional", "Direct"
         ];
         for (var index = 0; index < expectedNames.Length; index++)
+        {
             Assert.That(names[index], Does.Contain(expectedNames[index]));
+        }
 
         var probes = calls
             .Where((_, index) => names[index].Contains(
@@ -236,7 +247,8 @@ public sealed class ProgramLoweringTests {
     }
 
     [Test]
-    public void ProgramLoweringOrderAndIdentifiersAreDeterministic() {
+    public void ProgramLoweringOrderAndIdentifiersAreDeterministic()
+    {
         const string source =
             """
             public static long Target(bool choose, long left, long right) {
@@ -255,7 +267,8 @@ public sealed class ProgramLoweringTests {
     }
 
     [Test]
-    public void InheritedInstanceMembersRetainTypedProgramReceivers() {
+    public void InheritedInstanceMembersRetainTypedProgramReceivers()
+    {
         var lowered = Lower(
             """
             private class Base {
@@ -288,7 +301,8 @@ public sealed class ProgramLoweringTests {
 
         Assert.That(lowered.Result.IsExact, Is.True);
         Assert.That(memberReceivers, Has.Length.EqualTo(2));
-        foreach (var (member, receiver) in memberReceivers) {
+        foreach (var (member, receiver) in memberReceivers)
+        {
             Assert.That(receiver, Is.Not.Null);
             Assert.That(
                 lowered.Factory.GetMemberInfo(member).DeclaringType,
@@ -296,8 +310,9 @@ public sealed class ProgramLoweringTests {
         }
     }
 
-    private static string Shape(IrProgram program) =>
-        string.Join(
+    private static string Shape(IrProgram program)
+    {
+        return string.Join(
             "|",
             program.Blocks.Select(block =>
                 block.Id.Value +
@@ -308,10 +323,12 @@ public sealed class ProgramLoweringTests {
                         instruction.Id.Value +
                         "-" +
                         instruction.Kind))));
+    }
 
     private static LoweredProgram Lower(
         string members,
-        Func<IMethodSymbol, bool>? isKnownPure = null) {
+        Func<IMethodSymbol, bool>? isKnownPure = null)
+    {
         var source =
             """
             #nullable enable
@@ -357,12 +374,16 @@ public sealed class ProgramLoweringTests {
 
     private sealed class LoweredProgram(
         IrFactory factory,
-        FrontendProgramLoweringResult result) {
+        FrontendProgramLoweringResult result)
+    {
         internal IrFactory Factory { get; } = factory;
         internal FrontendProgramLoweringResult Result { get; } = result;
     }
 
-    private static ImmutableArray<MetadataReference> PlatformReferences { get; } =
+    private static ImmutableArray<MetadataReference> PlatformReferences
+    {
+        get;
+    } =
         [.. ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
         .Split(Path.PathSeparator)
         .Select(static path =>

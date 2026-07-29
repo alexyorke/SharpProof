@@ -5,13 +5,16 @@ using System.Xml.Linq;
 namespace SharpProof.Gates.Test;
 
 [TestFixture]
-public sealed class PerformanceGateTests {
+public sealed class PerformanceGateTests
+{
     [Test]
-    public void LoadsFixedProtocolFromAcceptanceContract() {
+    public void LoadsFixedProtocolFromAcceptanceContract()
+    {
         var contract = AcceptancePerformanceContract.Load(
             RepositoryLayout.FindRoot());
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(contract.Warmups, Is.EqualTo(5));
             Assert.That(contract.Samples, Is.EqualTo(30));
             Assert.That(contract.IdeEdits, Is.EqualTo(200));
@@ -31,7 +34,8 @@ public sealed class PerformanceGateTests {
     }
 
     [Test]
-    public void EnabledAnalyzerRetentionLimitsAreEnforcedIndependently() {
+    public void EnabledAnalyzerRetentionLimitsAreEnforcedIndependently()
+    {
         var contract = AcceptancePerformanceContract.Load(
             RepositoryLayout.FindRoot());
 
@@ -51,7 +55,8 @@ public sealed class PerformanceGateTests {
                 contract.MaximumEnabledRetainedMemoryIncreaseMiB + 1,
                 contract);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(compilationOnly.Length, Is.EqualTo(1));
             Assert.That(compilationOnly[0], Does.Contain("compilation"));
             Assert.That(memoryOnly.Length, Is.EqualTo(1));
@@ -61,7 +66,8 @@ public sealed class PerformanceGateTests {
     }
 
     [Test]
-    public void RetainedMemoryLimitsAreEnforcedIndependently() {
+    public void RetainedMemoryLimitsAreEnforcedIndependently()
+    {
         var contract = AcceptancePerformanceContract.Load(
             RepositoryLayout.FindRoot());
 
@@ -78,7 +84,8 @@ public sealed class PerformanceGateTests {
             contract.MaximumRetainedMemoryIncreaseMiB + 1,
             contract);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(ratioOnly.Length, Is.EqualTo(1));
             Assert.That(ratioOnly[0], Does.Contain("ratio"));
             Assert.That(increaseOnly.Length, Is.EqualTo(1));
@@ -88,13 +95,15 @@ public sealed class PerformanceGateTests {
     }
 
     [Test]
-    public void AdvisoryMeasurementRunsTheAnalyzerAndStaysQuiet() {
+    public void AdvisoryMeasurementRunsTheAnalyzerAndStaysQuiet()
+    {
         var measurement = PerformanceGate.MeasureDefaultOffAnalyzerBatch(
             "public static class Subject { public static int M() => 1; }",
             "DefaultOffProbe",
             iterations: 3);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(measurement.MeanMilliseconds, Is.GreaterThan(0));
             Assert.That(measurement.AnalyzerDriverRunCount, Is.EqualTo(3));
             Assert.That(measurement.DiagnosticCount, Is.Zero);
@@ -103,12 +112,15 @@ public sealed class PerformanceGateTests {
     }
 
     [Test]
-    public void AdvisoryPackagePolicyRunsAnalyzerAndOmitsVerifierWork() =>
+    public void AdvisoryPackagePolicyRunsAnalyzerAndOmitsVerifierWork()
+    {
         PerformanceGate.ValidateAdvisoryPackagePolicy(
             RepositoryLayout.FindRoot());
+    }
 
     [Test]
-    public void AdvisoryPolicyRejectsAWidenedVerifierCondition() {
+    public void AdvisoryPolicyRejectsAWidenedVerifierCondition()
+    {
         var root = RepositoryLayout.FindRoot();
         var portableProps = XDocument.Load(Path.Combine(
             root,
@@ -150,7 +162,8 @@ public sealed class PerformanceGateTests {
     }
 
     [Test]
-    public void AdvisoryPolicyRejectsVerifierConditionWithoutOptIn() {
+    public void AdvisoryPolicyRejectsVerifierConditionWithoutOptIn()
+    {
         var root = RepositoryLayout.FindRoot();
         var portableProps = XDocument.Load(Path.Combine(
             root,
@@ -194,10 +207,12 @@ public sealed class PerformanceGateTests {
     }
 
     [Test]
-    public async Task ForcedTerminationDeadlineIsStableAcrossLaunches() {
+    public async Task ForcedTerminationDeadlineIsStableAcrossLaunches()
+    {
         var root = RepositoryLayout.FindRoot();
         var contract = AcceptancePerformanceContract.Load(root);
-        for (var sample = 0; sample < 5; sample++) {
+        for (var sample = 0; sample < 5; sample++)
+        {
             var elapsed =
                 await WorkerPerformanceProbe.MeasureForcedTerminationAsync(
                     root,
@@ -211,7 +226,8 @@ public sealed class PerformanceGateTests {
     }
 
     [Test]
-    public async Task ReleasePerformanceContractPasses() {
+    public async Task ReleasePerformanceContractPasses()
+    {
         var result = await PerformanceGate.RunAsync(
             RepositoryLayout.FindRoot());
 
@@ -219,7 +235,8 @@ public sealed class PerformanceGateTests {
             result.Failures,
             Is.Empty,
             string.Join(Environment.NewLine, result.Failures));
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(result.Passed, Is.True);
             Assert.That(
                 result.DefaultOffAnalyzerDriverRunCount,

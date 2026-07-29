@@ -2,51 +2,83 @@ namespace SharpProof.Dataflow;
 
 public sealed class ForwardDataflowAnalysisOptions(
     int widenAfter = 2,
-    int maxIterations = 10_000) {
-    public int WidenAfter { get; } = widenAfter >= 0
-        ? widenAfter
-        : throw new ArgumentOutOfRangeException(nameof(widenAfter));
-    public int MaxIterations { get; } = maxIterations > 0
-        ? maxIterations
-        : throw new ArgumentOutOfRangeException(nameof(maxIterations));
+    int maxIterations = 10_000)
+{
+    public int WidenAfter
+    {
+        get;
+    } = widenAfter >= 0
+        ? widenAfter : throw new ArgumentOutOfRangeException(nameof(widenAfter));
+    public int MaxIterations
+    {
+        get;
+    } = maxIterations > 0
+        ? maxIterations : throw new ArgumentOutOfRangeException(nameof(maxIterations));
 }
 
-public sealed class DataflowAnalysisResult<T> {
+public sealed class DataflowAnalysisResult<T>
+{
     internal DataflowAnalysisResult(
         ImmutableArray<T> inputStates,
         ImmutableArray<T> outputStates,
-        int iterations) {
+        int iterations)
+    {
         InputStates = inputStates;
         OutputStates = outputStates;
         Iterations = iterations;
     }
 
-    public ImmutableArray<T> InputStates { get; }
-    public ImmutableArray<T> OutputStates { get; }
-    public int Iterations { get; }
+    public ImmutableArray<T> InputStates
+    {
+        get;
+    }
+    public ImmutableArray<T> OutputStates
+    {
+        get;
+    }
+    public int Iterations
+    {
+        get;
+    }
 
-    public T GetInputState(int blockId) => InputStates[blockId];
-    public T GetOutputState(int blockId) => OutputStates[blockId];
+    public T GetInputState(int blockId)
+    {
+        return InputStates[blockId];
+    }
+
+    public T GetOutputState(int blockId)
+    {
+        return OutputStates[blockId];
+    }
 }
 
 /// <summary>
 /// Deterministic, round-based forward worklist solver.
 /// </summary>
-public static class ForwardDataflowAnalysis {
+public static class ForwardDataflowAnalysis
+{
     public static DataflowAnalysisResult<T> Analyze<T>(
         DataflowGraph<T> graph,
         IAbstractDomain<T> domain,
         T initialState,
-        ForwardDataflowAnalysisOptions? options = null) =>
-        AnalyzeCore(graph, domain, initialState, options ?? new ForwardDataflowAnalysisOptions(), null);
+        ForwardDataflowAnalysisOptions? options = null)
+    {
+        return AnalyzeCore(graph, domain, initialState,
+            options ?? new ForwardDataflowAnalysisOptions(), null);
+    }
 
     internal static DataflowAnalysisResult<T> AnalyzeWithWorklistOrderForTesting<T>(
         DataflowGraph<T> graph,
         IAbstractDomain<T> domain,
         T initialState,
         ForwardDataflowAnalysisOptions options,
-        Func<ImmutableArray<int>, ImmutableArray<int>> worklistOrder) {
-        if (worklistOrder == null) throw new ArgumentNullException(nameof(worklistOrder));
+        Func<ImmutableArray<int>, ImmutableArray<int>> worklistOrder)
+    {
+        if (worklistOrder == null)
+        {
+            throw new ArgumentNullException(nameof(worklistOrder));
+        }
+
         return AnalyzeCore(graph, domain, initialState, options, worklistOrder);
     }
 
@@ -55,92 +87,122 @@ public static class ForwardDataflowAnalysis {
         IAbstractDomain<T> domain,
         T initialState,
         ForwardDataflowAnalysisOptions options,
-        Func<ImmutableArray<int>, ImmutableArray<int>>? worklistOrder) {
-        if (graph == null) throw new ArgumentNullException(nameof(graph));
-        if (domain == null) throw new ArgumentNullException(nameof(domain));
-        if (options == null) throw new ArgumentNullException(nameof(options));
-
-        var inputs = new T[graph.Blocks.Length];
-        var outputs = new T[graph.Blocks.Length];
-        var updateCounts = new int[graph.Blocks.Length];
-        for (var index = 0; index < graph.Blocks.Length; index++) {
-            inputs[index] = domain.Bottom;
-            outputs[index] = domain.Bottom;
+        Func<ImmutableArray<int>, ImmutableArray<int>>? worklistOrder)
+    {
+        if (graph == null)
+        {
+            throw new ArgumentNullException(nameof(graph));
         }
+
+        if (domain == null)
+        {
+            throw new ArgumentNullException(nameof(domain));
+        }
+
+        if (options == null)
+        {
+            throw new ArgumentNullException(nameof(options));
+        }
+
+        var inputs = Enumerable.Repeat(domain.Bottom, graph.Blocks.Length).ToArray();
+        var outputs = Enumerable.Repeat(domain.Bottom, graph.Blocks.Length).ToArray();
+        var updateCounts = new int[graph.Blocks.Length];
         inputs[graph.EntryBlockId] = initialState;
 
         var pending = new SortedSet<int> { graph.EntryBlockId };
         var iterations = 0;
-        while (pending.Count != 0) {
+        while (pending.Count != 0)
+        {
             if (iterations >= options.MaxIterations)
-                throw new InvalidOperationException("The dataflow analysis did not converge within its iteration limit.");
+            {
+                throw new InvalidOperationException(
+                    "The dataflow analysis did not converge within its iteration limit.");
+            }
+
             iterations++;
 
             var batch = pending.ToImmutableArray();
             pending.Clear();
-            if (worklistOrder != null) {
-                var orderedBatch = worklistOrder(batch);
-                ValidatePermutation(batch, orderedBatch);
-                batch = orderedBatch;
+            if (worklistOrder != null)
+            {
+                batch = ValidatePermutation(batch, worklistOrder(batch));
             }
 
             var changedOutputs = new Dictionary<int, T>();
-            foreach (var blockId in batch) {
+            foreach (var blockId in batch)
+            {
                 var transferred = graph.GetBlock(blockId).Transfer(inputs[blockId]);
                 var monotoneOutput = domain.Join(outputs[blockId], transferred);
                 if (!domain.AreEquivalent(outputs[blockId], monotoneOutput))
+                {
                     changedOutputs.Add(blockId, monotoneOutput);
+                }
             }
-            if (changedOutputs.Count == 0) continue;
+            if (changedOutputs.Count == 0)
+            {
+                continue;
+            }
 
             foreach (var change in changedOutputs)
+            {
                 outputs[change.Key] = change.Value;
+            }
 
             var affected = new SortedSet<int>();
             foreach (var blockId in changedOutputs.Keys)
+            {
                 foreach (var successor in graph.GetSuccessors(blockId))
+                {
                     affected.Add(successor);
+                }
+            }
 
-            foreach (var blockId in affected) {
+            foreach (var blockId in affected)
+            {
                 var incoming = blockId == graph.EntryBlockId ? initialState : domain.Bottom;
                 foreach (var predecessor in graph.GetPredecessors(blockId))
+                {
                     incoming = domain.Join(incoming, outputs[predecessor]);
+                }
 
                 var candidate = domain.Join(inputs[blockId], incoming);
-                if (domain.AreEquivalent(inputs[blockId], candidate)) continue;
+                if (domain.AreEquivalent(inputs[blockId], candidate))
+                {
+                    continue;
+                }
+
                 var updated = graph.IsCyclicBlock(blockId) &&
-                              updateCounts[blockId] >= options.WidenAfter
+                    updateCounts[blockId] >= options.WidenAfter
                     ? domain.Widen(inputs[blockId], candidate)
                     : candidate;
                 if (!domain.LessThanOrEqual(inputs[blockId], updated) ||
                     !domain.LessThanOrEqual(candidate, updated))
+                {
                     throw new InvalidOperationException("Domain widening must be an upper bound.");
+                }
 
                 updateCounts[blockId]++;
-                if (!domain.AreEquivalent(inputs[blockId], updated)) {
+                if (!domain.AreEquivalent(inputs[blockId], updated))
+                {
                     inputs[blockId] = updated;
                     pending.Add(blockId);
                 }
             }
         }
 
-        return new DataflowAnalysisResult<T>(
-            [.. inputs],
-            [.. outputs],
-            iterations);
+        return new DataflowAnalysisResult<T>([.. inputs], [.. outputs], iterations);
     }
 
-    private static void ValidatePermutation(
-        ImmutableArray<int> original,
-        ImmutableArray<int> reordered) {
+    private static ImmutableArray<int> ValidatePermutation(
+        ImmutableArray<int> original, ImmutableArray<int> reordered)
+    {
         const string message = "The worklist test hook must return a permutation.";
-        if (original.Length != reordered.Length)
+        if (original.Length != reordered.Length ||
+            !new HashSet<int>(reordered).SetEquals(original))
+        {
             throw new InvalidOperationException(message);
-        var expected = new HashSet<int>(original);
-        foreach (var blockId in reordered)
-            if (!expected.Remove(blockId))
-                throw new InvalidOperationException(message);
-        if (expected.Count != 0)
-            throw new InvalidOperationException(message);
+        }
+
+        return reordered;
     }
 }

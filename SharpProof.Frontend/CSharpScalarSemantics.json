@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "integerConversionPolicy": "range-contained",
+  "integers": [
+    {
+      "specialType": "System_SByte",
+      "signed": true,
+      "bitWidth": 8,
+      "minimum": "-128",
+      "maximum": "127",
+      "exactIrArithmetic": false
+    },
+    {
+      "specialType": "System_Byte",
+      "signed": false,
+      "bitWidth": 8,
+      "minimum": "0",
+      "maximum": "255",
+      "exactIrArithmetic": false
+    },
+    {
+      "specialType": "System_Int16",
+      "signed": true,
+      "bitWidth": 16,
+      "minimum": "-32768",
+      "maximum": "32767",
+      "exactIrArithmetic": false
+    },
+    {
+      "specialType": "System_UInt16",
+      "signed": false,
+      "bitWidth": 16,
+      "minimum": "0",
+      "maximum": "65535",
+      "exactIrArithmetic": false
+    },
+    {
+      "specialType": "System_Char",
+      "signed": false,
+      "bitWidth": 16,
+      "minimum": "0",
+      "maximum": "65535",
+      "exactIrArithmetic": false
+    },
+    {
+      "specialType": "System_Int32",
+      "signed": true,
+      "bitWidth": 32,
+      "minimum": "-2147483648",
+      "maximum": "2147483647",
+      "exactIrArithmetic": false
+    },
+    {
+      "specialType": "System_UInt32",
+      "signed": false,
+      "bitWidth": 32,
+      "minimum": "0",
+      "maximum": "4294967295",
+      "exactIrArithmetic": false
+    },
+    {
+      "specialType": "System_Int64",
+      "signed": true,
+      "bitWidth": 64,
+      "minimum": "-9223372036854775808",
+      "maximum": "9223372036854775807",
+      "exactIrArithmetic": true
+    }
+  ],
+  "binaryOperators": [
+    {
+      "kind": "Add",
+      "irOperator": "Add",
+      "integerArithmetic": true,
+      "checkedArithmetic": true
+    },
+    {
+      "kind": "Subtract",
+      "irOperator": "Subtract",
+      "integerArithmetic": true,
+      "checkedArithmetic": true
+    },
+    {
+      "kind": "Multiply",
+      "irOperator": "Multiply",
+      "integerArithmetic": true,
+      "checkedArithmetic": true
+    },
+    {
+      "kind": "Divide",
+      "irOperator": "Divide",
+      "integerArithmetic": true,
+      "checkedArithmetic": false
+    },
+    {
+      "kind": "Remainder",
+      "irOperator": "Remainder",
+      "integerArithmetic": true,
+      "checkedArithmetic": false
+    },
+    {
+      "kind": "ConditionalAnd",
+      "irOperator": "AndAlso",
+      "integerArithmetic": false,
+      "checkedArithmetic": false
+    },
+    {
+      "kind": "ConditionalOr",
+      "irOperator": "OrElse",
+      "integerArithmetic": false,
+      "checkedArithmetic": false
+    },
+    {
+      "kind": "Equals",
+      "irOperator": "Equal",
+      "integerArithmetic": false,
+      "checkedArithmetic": false
+    },
+    {
+      "kind": "NotEquals",
+      "irOperator": "NotEqual",
+      "integerArithmetic": false,
+      "checkedArithmetic": false
+    },
+    {
+      "kind": "LessThan",
+      "irOperator": "LessThan",
+      "integerArithmetic": false,
+      "checkedArithmetic": false
+    },
+    {
+      "kind": "LessThanOrEqual",
+      "irOperator": "LessThanOrEqual",
+      "integerArithmetic": false,
+      "checkedArithmetic": false
+    },
+    {
+      "kind": "GreaterThan",
+      "irOperator": "GreaterThan",
+      "integerArithmetic": false,
+      "checkedArithmetic": false
+    },
+    {
+      "kind": "GreaterThanOrEqual",
+      "irOperator": "GreaterThanOrEqual",
+      "integerArithmetic": false,
+      "checkedArithmetic": false
+    }
+  ],
+  "unaryOperators": [
+    {
+      "kind": "Not",
+      "irOperator": "Not",
+      "identity": false,
+      "checkedArithmetic": false,
+      "exactIntegerDomain": false
+    },
+    {
+      "kind": "Plus",
+      "irOperator": null,
+      "identity": true,
+      "checkedArithmetic": false,
+      "exactIntegerDomain": false
+    },
+    {
+      "kind": "Minus",
+      "irOperator": "Negate",
+      "identity": false,
+      "checkedArithmetic": true,
+      "exactIntegerDomain": true
+    }
+  ],
+  "specialBinaryOperators": [
+    {
+      "kind": "Add",
+      "resultType": "System_String",
+      "irOperator": "StringConcat"
+    }
+  ],
+  "builtInEquality": {
+    "allowReferenceTypes": true,
+    "specialTypes": [
+      "System_Boolean"
+    ]
+  }
+}

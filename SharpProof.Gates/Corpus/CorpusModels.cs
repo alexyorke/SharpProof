@@ -3,14 +3,16 @@ using SharpProof.Analyzer;
 
 namespace SharpProof.Gates.Corpus;
 
-internal enum CorpusVerdict {
+internal enum CorpusVerdict
+{
     Proven,
     Refuted,
     Unknown,
     SilentUnknown
 }
 
-internal enum CorpusVariant {
+internal enum CorpusVariant
+{
     Baseline,
     Rename,
     EscapedIdentifiers,
@@ -23,9 +25,16 @@ internal enum CorpusVariant {
     ReorderIndependentStatements
 }
 
-internal enum CorpusOrigin {
+internal enum CorpusOrigin
+{
     SyntheticMetamorphic,
     OpenSource
+}
+
+internal enum CorpusSupport
+{
+    Supported,
+    IntentionallyUnsupported
 }
 
 internal sealed record CorpusCase(
@@ -34,17 +43,29 @@ internal sealed record CorpusCase(
     CorpusVariant Variant,
     string Mode,
     CorpusVerdict SemanticExpectation,
+    CorpusSupport Support,
     string Source,
     CorpusOrigin Origin = CorpusOrigin.SyntheticMetamorphic,
     string? ProvenanceId = null);
+
+internal sealed record CorpusUnknownReasonCount(
+    string Reason,
+    int Count);
+
+internal sealed record CorpusUnknownReasonRatchet(
+    int MaximumTotalUnknown,
+    ImmutableDictionary<string, int> MaximumByReason);
 
 internal sealed record CorpusObservation(
     string CaseId,
     CorpusVerdict Verdict,
     AnalyzerSemanticOutcome SemanticOutcome,
-    ImmutableArray<string> Diagnostics) {
-    public string ToCanonicalLine() =>
-        $"{CaseId}|{Verdict}|{SemanticOutcome}|{string.Join(",", Diagnostics)}";
+    ImmutableArray<string> Diagnostics)
+{
+    public string ToCanonicalLine()
+    {
+        return $"{CaseId}|{Verdict}|{SemanticOutcome}|{string.Join(",", Diagnostics)}";
+    }
 }
 
 internal sealed record CorpusSeed(
@@ -59,9 +80,12 @@ internal sealed record SnapshotExpectation(
     string CaseId,
     CorpusVerdict Verdict,
     AnalyzerSemanticOutcome SemanticOutcome,
-    ImmutableArray<string> Diagnostics) {
-    internal string ToCanonicalLine() =>
-        $"{CaseId}|{Verdict}|{SemanticOutcome}|{string.Join(",", Diagnostics)}";
+    ImmutableArray<string> Diagnostics)
+{
+    internal string ToCanonicalLine()
+    {
+        return $"{CaseId}|{Verdict}|{SemanticOutcome}|{string.Join(",", Diagnostics)}";
+    }
 }
 
 internal sealed record ProvenToUnknownAllowance(

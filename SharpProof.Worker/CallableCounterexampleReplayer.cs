@@ -1,49 +1,97 @@
 namespace SharpProof.Worker;
-internal static class CallableCounterexampleReplayer {
+internal static class CallableCounterexampleReplayer
+{
     internal static WorkerClaimReason Replay(CompilerCallablePreparation target, int claimOrdinal,
-        ImmutableDictionary<IrVarId, IrValue> model, CancellationToken cancellationToken = default) {
-        if (target.Body is not { } body) return WorkerClaimReason.CounterexampleReplayFailed;
-        try {
+        ImmutableDictionary<IrVarId, IrValue> model, CancellationToken cancellationToken = default)
+    {
+        if (target.Body is not { } body)
+        {
+            return WorkerClaimReason.CounterexampleReplayFailed;
+        }
+
+        try
+        {
             var factory = target.Factory;
             var ensures = target.Clauses.Where(static clause =>
                 clause.Kind == CompilerContractKind.Ensures).ToArray();
-            if ((uint)claimOrdinal >= (uint)ensures.Length) return WorkerClaimReason.CounterexampleReplayFailed;
+            if ((uint)claimOrdinal >= (uint)ensures.Length)
+            {
+                return WorkerClaimReason.CounterexampleReplayFailed;
+            }
+
             var final = model.ToBuilder();
-            if (body.Kind == CompilerPreparedBodyKind.Program) {
-                if (body.Program is not { } program || !ReferenceEquals(program.Factory, factory)) return WorkerClaimReason.CounterexampleReplayFailed;
+            if (body.Kind == CompilerPreparedBodyKind.Program)
+            {
+                if (body.Program is not { } program || !ReferenceEquals(program.Factory, factory))
+                {
+                    return WorkerClaimReason.CounterexampleReplayFailed;
+                }
+
                 var initial = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
-                foreach (var binding in body.ParameterBindings) {
-                    if (!model.TryGetValue(binding.Value, out var value)) return WorkerClaimReason.CounterexampleReplayFailed;
+                foreach (var binding in body.ParameterBindings)
+                {
+                    if (!model.TryGetValue(binding.Value, out var value))
+                    {
+                        return WorkerClaimReason.CounterexampleReplayFailed;
+                    }
+
                     initial.Add(binding.Key, value);
                 }
                 var maximumSteps = program.Blocks.Sum(static block => (long)block.Instructions.Length);
-                if (maximumSteps is < 1 or > CompilerPreparedBody.MaximumInstructions) return WorkerClaimReason.CounterexampleReplayFailed;
+                if (maximumSteps is < 1 or > CompilerPreparedBody.MaximumInstructions)
+                {
+                    return WorkerClaimReason.CounterexampleReplayFailed;
+                }
+
                 var execution = new IrProgramInterpreter(factory).Execute(
                     program, initial.ToImmutable(), (int)maximumSteps, cancellationToken);
                 if (execution.Status != IrProgramExecutionStatus.Returned)
+                {
                     return execution is { Status: IrProgramExecutionStatus.Unsupported, Instruction: IrCallInstruction call } &&
                            body.SpecCalls.ContainsKey(call.Id)
                         ? WorkerClaimReason.CounterexampleNotReplayable : WorkerClaimReason.CounterexampleReplayFailed;
-                foreach (var binding in body.ParameterBindings) {
-                    if (!execution.Values.TryGetValue(binding.Key, out var value)) return WorkerClaimReason.CounterexampleReplayFailed;
+                }
+
+                foreach (var binding in body.ParameterBindings)
+                {
+                    if (!execution.Values.TryGetValue(binding.Key, out var value))
+                    {
+                        return WorkerClaimReason.CounterexampleReplayFailed;
+                    }
+
                     final[binding.Value] = value;
                 }
                 var results = target.Variables.Where(static variable =>
                     variable.Role == CompilerVariableRole.Result).ToArray();
                 if (results.Length > 1 || results.Length == 1 &&
                     (execution.ReturnValue == null || execution.ReturnValue.Type !=
-                     factory.GetVariableInfo(results[0].Variable).Type)) return WorkerClaimReason.CounterexampleReplayFailed;
-                if (results.Length == 1) final[results[0].Variable] = execution.ReturnValue!;
+                     factory.GetVariableInfo(results[0].Variable).Type))
+                {
+                    return WorkerClaimReason.CounterexampleReplayFailed;
+                }
+
+                if (results.Length == 1)
+                {
+                    final[results[0].Variable] = execution.ReturnValue!;
+                }
             }
             else if (body.Kind != CompilerPreparedBodyKind.Trivial || body.Program != null ||
                      !body.ParameterBindings.IsEmpty || !body.SpecCalls.IsEmpty ||
                      target.Variables.Any(static variable => variable.Role == CompilerVariableRole.Result))
+            {
                 return WorkerClaimReason.CounterexampleReplayFailed;
+            }
+
             foreach (var variable in target.Variables.Where(static variable =>
-                         variable.Role == CompilerVariableRole.PreState)) {
+                         variable.Role == CompilerVariableRole.PreState))
+            {
                 if (!variable.CurrentStateVariable.HasValue ||
                     !model.TryGetValue(variable.CurrentStateVariable.Value, out var value) ||
-                    value.Type != factory.GetVariableInfo(variable.Variable).Type) return WorkerClaimReason.CounterexampleReplayFailed;
+                    value.Type != factory.GetVariableInfo(variable.Variable).Type)
+                {
+                    return WorkerClaimReason.CounterexampleReplayFailed;
+                }
+
                 final[variable.Variable] = value;
             }
             var evaluated = new IrInterpreter(factory).Evaluate(

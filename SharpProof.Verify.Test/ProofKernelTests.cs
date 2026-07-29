@@ -3,9 +3,11 @@ using System.Reflection;
 namespace SharpProof.Verify.Test;
 
 [TestFixture]
-public sealed class ProofKernelTests {
+public sealed class ProofKernelTests
+{
     [Test]
-    public async Task UnsatCreatesAProvenOutcomeWithOnlyRequestedEvidence() {
+    public async Task UnsatCreatesAProvenOutcomeWithOnlyRequestedEvidence()
+    {
         var fixture = CreateFixture();
         var secondOperation = fixture.Factory.CreateOperation("second");
         var query = new VerificationQuery(
@@ -34,7 +36,8 @@ public sealed class ProofKernelTests {
     }
 
     [Test]
-    public async Task SatBecomesRefutedOnlyAfterConcreteReplay() {
+    public async Task SatBecomesRefutedOnlyAfterConcreteReplay()
+    {
         var fixture = CreateFixture();
         var model = new BackendModel([
             KeyValuePair.Create(fixture.Variable, fixture.Factory.CreateIntegerValue(0))
@@ -51,7 +54,8 @@ public sealed class ProofKernelTests {
     }
 
     [Test]
-    public async Task FormulaAndRequestedModelVariablesFormAnExactDeterministicSet() {
+    public async Task FormulaAndRequestedModelVariablesFormAnExactDeterministicSet()
+    {
         var factory = new IrFactory();
         var integer = factory.CreateVariable("integer", factory.IntegerType);
         var boolean = factory.CreateVariable("boolean", factory.BooleanType);
@@ -95,7 +99,8 @@ public sealed class ProofKernelTests {
     }
 
     [Test]
-    public async Task MissingOrMalformedRequestedModelBindingsAbstain() {
+    public async Task MissingOrMalformedRequestedModelBindingsAbstain()
+    {
         var factory = new IrFactory();
         var integer = factory.CreateVariable("integer", factory.IntegerType);
         var text = factory.CreateVariable("text", factory.StringType);
@@ -128,7 +133,8 @@ public sealed class ProofKernelTests {
     }
 
     [Test]
-    public void RequestedModelVariablesMustBeUniqueAndFactoryOwned() {
+    public void RequestedModelVariablesMustBeUniqueAndFactoryOwned()
+    {
         var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var foreignFactory = new IrFactory();
@@ -147,7 +153,8 @@ public sealed class ProofKernelTests {
     }
 
     [Test]
-    public async Task SpuriousOrIncompleteModelsAbstain() {
+    public async Task SpuriousOrIncompleteModelsAbstain()
+    {
         var fixture = CreateFixture();
         var trueModel = new BackendModel([
             KeyValuePair.Create(fixture.Variable, fixture.Factory.CreateIntegerValue(2))
@@ -170,7 +177,8 @@ public sealed class ProofKernelTests {
     }
 
     [Test]
-    public async Task UndefinedPostconditionIsTypedSeparatelyFromReplayFailure() {
+    public async Task UndefinedPostconditionIsTypedSeparatelyFromReplayFailure()
+    {
         var factory = new IrFactory();
         var divisor = factory.CreateVariable("divisor", factory.IntegerType);
         var predicate = factory.Binary(IrBinaryOperator.Equal,
@@ -194,7 +202,8 @@ public sealed class ProofKernelTests {
     }
 
     [Test]
-    public async Task OpaqueEvidenceCannotValidateARefutation() {
+    public async Task OpaqueEvidenceCannotValidateARefutation()
+    {
         var fixture = CreateFixture();
         var member = fixture.Factory.GetOrCreateMember(
             fixture.Factory.CreateIdentity(),
@@ -224,7 +233,8 @@ public sealed class ProofKernelTests {
     }
 
     [Test]
-    public async Task BackendFailuresStayTypedAndUncacheable() {
+    public async Task BackendFailuresStayTypedAndUncacheable()
+    {
         var fixture = CreateFixture();
         foreach (var pair in new[] {
                      (BackendFailureReason.UnsupportedEncoding, AbstentionReason.UnsupportedEncoding),
@@ -232,7 +242,8 @@ public sealed class ProofKernelTests {
                      (BackendFailureReason.Timeout, AbstentionReason.Timeout),
                      (BackendFailureReason.Unavailable, AbstentionReason.BackendUnavailable),
                      (BackendFailureReason.InfrastructureFailure, AbstentionReason.InfrastructureFailure)
-                 }) {
+                 })
+        {
             var outcome = await new ProofKernel(
                 new StubBackend(BackendCheckResult.Unknown(pair.Item1)))
                 .VerifyAsync(fixture.Query);
@@ -242,7 +253,8 @@ public sealed class ProofKernelTests {
     }
 
     [Test]
-    public async Task MalformedUnsatCoreCannotCreateAProof() {
+    public async Task MalformedUnsatCoreCannotCreateAProof()
+    {
         var fixture = CreateFixture();
         var outcome = await new ProofKernel(
             new StubBackend(BackendCheckResult.Unsatisfiable([4])))
@@ -254,7 +266,8 @@ public sealed class ProofKernelTests {
     }
 
     [Test]
-    public void ApproximationIsNotAProofJustification() {
+    public void ApproximationIsNotAProofJustification()
+    {
         Assert.That(
             typeof(ProofJustification).IsAssignableFrom(typeof(ApproximatedJustification)),
             Is.False);
@@ -269,7 +282,8 @@ public sealed class ProofKernelTests {
     }
 
     [Test]
-    public void CancellationPropagatesInsteadOfBecomingSemanticUnknown() {
+    public void CancellationPropagatesInsteadOfBecomingSemanticUnknown()
+    {
         var fixture = CreateFixture();
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
@@ -280,7 +294,8 @@ public sealed class ProofKernelTests {
         Assert.ThrowsAsync<OperationCanceledException>(action);
     }
 
-    private static Fixture CreateFixture() {
+    private static Fixture CreateFixture()
+    {
         var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var operation = factory.CreateOperation("comparison");
@@ -305,12 +320,14 @@ public sealed class ProofKernelTests {
             new VerificationQuery(factory, [assumption], goal));
     }
 
-    private sealed class StubBackend(BackendCheckResult result) : ISmtBackend {
+    private sealed class StubBackend(BackendCheckResult result) : ISmtBackend
+    {
         private readonly BackendCheckResult _result = result;
 
         public Task<BackendCheckResult> CheckAsync(
             VerificationQuery query,
-            CancellationToken cancellationToken) {
+            CancellationToken cancellationToken)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(_result);
         }
@@ -321,7 +338,8 @@ public sealed class ProofKernelTests {
         IrVarId variable,
         OperationId operation,
         Goal goal,
-        VerificationQuery query) {
+        VerificationQuery query)
+    {
         internal IrFactory Factory { get; } = factory;
         internal IrVarId Variable { get; } = variable;
         internal OperationId Operation { get; } = operation;

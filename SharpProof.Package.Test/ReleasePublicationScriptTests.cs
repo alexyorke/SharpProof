@@ -8,7 +8,8 @@ namespace SharpProof.Package.Test;
 
 [TestFixture]
 [NonParallelizable]
-public sealed class ReleasePublicationScriptTests {
+public sealed class ReleasePublicationScriptTests
+{
     private static readonly string[] ExpectedPackageOrder = [
         PackagedProductFeed.AttributesPackageId,
         PackagedProductFeed.PortablePackageId,
@@ -16,10 +17,12 @@ public sealed class ReleasePublicationScriptTests {
     ];
 
     [Test]
-    public async Task OfflinePlanIsOrderedAndRequiresExactRemotePayloads() {
+    public async Task OfflinePlanIsOrderedAndRequiresExactRemotePayloads()
+    {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PublicationWorkspace.Create();
-        foreach (var package in feed.Packages.Concat(feed.SymbolPackages)) {
+        foreach (var package in feed.Packages.Concat(feed.SymbolPackages))
+        {
             File.Copy(
                 package.Path,
                 Path.Combine(
@@ -41,14 +44,16 @@ public sealed class ReleasePublicationScriptTests {
             workspace.PackageSource);
         Assert.That(evidence.ExitCode, Is.Zero, evidence.Output);
 
-        using (var absentPlan = await RunPlanAsync(workspace)) {
+        using (var absentPlan = await RunPlanAsync(workspace))
+        {
             AssertPlan(
                 absentPlan.RootElement,
                 remoteState: "Absent",
                 action: "Push");
         }
 
-        foreach (var package in feed.Packages) {
+        foreach (var package in feed.Packages)
+        {
             var localPath = Path.Combine(
                 workspace.PackageSource,
                 Path.GetFileName(package.Path));
@@ -60,7 +65,8 @@ public sealed class ReleasePublicationScriptTests {
                 addUnexpectedPayload: false);
         }
 
-        using (var matchingPlan = await RunPlanAsync(workspace)) {
+        using (var matchingPlan = await RunPlanAsync(workspace))
+        {
             AssertPlan(
                 matchingPlan.RootElement,
                 remoteState: "Matching",
@@ -91,7 +97,8 @@ public sealed class ReleasePublicationScriptTests {
     private static void AssertPlan(
         JsonElement root,
         string remoteState,
-        string action) {
+        string action)
+    {
         Assert.That(
             root.GetProperty("schemaVersion").GetInt32(),
             Is.EqualTo(1));
@@ -120,7 +127,8 @@ public sealed class ReleasePublicationScriptTests {
     }
 
     private static async Task<JsonDocument> RunPlanAsync(
-        PublicationWorkspace workspace) {
+        PublicationWorkspace workspace)
+    {
         var planPath = Path.Combine(
             workspace.Root,
             "plan-" + Guid.NewGuid().ToString("N") + ".json");
@@ -132,8 +140,9 @@ public sealed class ReleasePublicationScriptTests {
 
     private static Task<ProcessResult> RunPublicationScriptAsync(
         PublicationWorkspace workspace,
-        string planPath) =>
-        RunProcessAsync(
+        string planPath)
+    {
+        return RunProcessAsync(
             FindRepositoryRoot(),
             "pwsh",
             "-NoLogo",
@@ -152,23 +161,32 @@ public sealed class ReleasePublicationScriptTests {
             planPath,
             "-DotNetPath",
             "dotnet-must-not-run-in-plan-only");
+    }
 
     private static void CreateRemotePackage(
         string sourcePath,
         string destinationPath,
-        bool addUnexpectedPayload) {
+        bool addUnexpectedPayload)
+    {
         if (File.Exists(destinationPath))
+        {
             File.Delete(destinationPath);
+        }
+
         using var source = ZipFile.OpenRead(sourcePath);
         using var destination = ZipFile.Open(
             destinationPath,
             ZipArchiveMode.Create);
-        foreach (var sourceEntry in source.Entries) {
+        foreach (var sourceEntry in source.Entries)
+        {
             if (string.Equals(
                     sourceEntry.FullName,
                     ".signature.p7s",
                     StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
+
             var destinationEntry = destination.CreateEntry(
                 sourceEntry.FullName,
                 CompressionLevel.Optimal);
@@ -179,12 +197,16 @@ public sealed class ReleasePublicationScriptTests {
         var signature = destination.CreateEntry(
             ".signature.p7s",
             CompressionLevel.NoCompression);
-        using (var signatureStream = signature.Open()) {
+        using (var signatureStream = signature.Open())
+        {
             signatureStream.Write(
                 Encoding.ASCII.GetBytes("repository signature"));
         }
         if (!addUnexpectedPayload)
+        {
             return;
+        }
+
         var unexpected = destination.CreateEntry(
             "unexpected.txt",
             CompressionLevel.NoCompression);
@@ -195,8 +217,10 @@ public sealed class ReleasePublicationScriptTests {
     private static async Task<ProcessResult> RunProcessAsync(
         string workingDirectory,
         string fileName,
-        params string[] arguments) {
-        var startInfo = new ProcessStartInfo {
+        params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo
+        {
             FileName = fileName,
             WorkingDirectory = workingDirectory,
             UseShellExecute = false,
@@ -205,7 +229,10 @@ public sealed class ReleasePublicationScriptTests {
             CreateNoWindow = true
         };
         foreach (var argument in arguments)
+        {
             startInfo.ArgumentList.Add(argument);
+        }
+
         using var process = Process.Start(startInfo)!;
         var standardOutput = process.StandardOutput.ReadToEndAsync();
         var standardError = process.StandardError.ReadToEndAsync();
@@ -216,25 +243,32 @@ public sealed class ReleasePublicationScriptTests {
             (await standardError));
     }
 
-    private static string FindRepositoryRoot() {
+    private static string FindRepositoryRoot()
+    {
         var directory = new DirectoryInfo(
             typeof(ReleasePublicationScriptTests).Assembly.Location);
-        while (directory != null) {
+        while (directory != null)
+        {
             if (File.Exists(
                     Path.Combine(
                         directory.FullName,
                         "SharpProof.Release.props")))
+            {
                 return directory.FullName;
+            }
+
             directory = directory.Parent;
         }
         throw new InvalidOperationException(
             "Repository root was not found.");
     }
 
-    private sealed class PublicationWorkspace : IDisposable {
+    private sealed class PublicationWorkspace : IDisposable
+    {
         private readonly string _expectedParent;
 
-        private PublicationWorkspace(string root, string expectedParent) {
+        private PublicationWorkspace(string root, string expectedParent)
+        {
             Root = root;
             _expectedParent = expectedParent;
             PackageSource = Path.Combine(root, "packages");
@@ -243,11 +277,21 @@ public sealed class ReleasePublicationScriptTests {
             Directory.CreateDirectory(RemoteSource);
         }
 
-        internal string Root { get; }
-        internal string PackageSource { get; }
-        internal string RemoteSource { get; }
+        internal string Root
+        {
+            get;
+        }
+        internal string PackageSource
+        {
+            get;
+        }
+        internal string RemoteSource
+        {
+            get;
+        }
 
-        internal static PublicationWorkspace Create() {
+        internal static PublicationWorkspace Create()
+        {
             var parent = Path.GetFullPath(Path.Combine(
                 Path.GetTempPath(),
                 "SharpProof.ReleasePublication"));
@@ -257,7 +301,8 @@ public sealed class ReleasePublicationScriptTests {
             return new PublicationWorkspace(root, parent);
         }
 
-        public void Dispose() {
+        public void Dispose()
+        {
             var resolved = Path.GetFullPath(Root);
             var relative = Path.GetRelativePath(_expectedParent, resolved);
             if (Path.IsPathRooted(relative) ||
@@ -266,10 +311,15 @@ public sealed class ReleasePublicationScriptTests {
                 relative.StartsWith(
                     ".." + Path.DirectorySeparatorChar,
                     StringComparison.Ordinal))
+            {
                 throw new InvalidOperationException(
                     "Refusing to remove an unexpected publication directory.");
+            }
+
             if (Directory.Exists(resolved))
+            {
                 Directory.Delete(resolved, recursive: true);
+            }
         }
     }
 

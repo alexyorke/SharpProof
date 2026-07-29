@@ -6,17 +6,20 @@ using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerProbe.TestAsset;
+using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Package.Test;
 
 [TestFixture]
 [NonParallelizable]
-public sealed class FinalCompilationProbeTests {
+public sealed class FinalCompilationProbeTests
+{
     private const string NetStandardTargetFramework = "netstandard2.0";
     private const string NetTargetFramework = "net8.0";
 
     [Test]
-    public async Task MultiTargetBuildWritesOneIsolatedFinalCompilationPerTargetFramework() {
+    public async Task MultiTargetBuildWritesOneIsolatedFinalCompilationPerTargetFramework()
+    {
         using var workspace = ProbeWorkspace.Create();
         workspace.WriteConsumer(
             targetFrameworks:
@@ -30,7 +33,8 @@ public sealed class FinalCompilationProbeTests {
         Assert.That(artifactPaths, Has.Length.EqualTo(2));
         var artifacts = new Dictionary<string, ProbeArtifact>(
             StringComparer.Ordinal);
-        foreach (var artifactPath in artifactPaths) {
+        foreach (var artifactPath in artifactPaths)
+        {
             var artifact = await ProbeArtifact.ReadAsync(artifactPath);
             artifacts.Add(artifact.TargetFramework, artifact);
         }
@@ -43,7 +47,8 @@ public sealed class FinalCompilationProbeTests {
             }));
         var netStandard = artifacts[NetStandardTargetFramework];
         var net = artifacts[NetTargetFramework];
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(netStandard.Options, Is.Not.Empty);
             Assert.That(net.Options, Is.Not.Empty);
             Assert.That(netStandard.Options, Is.Not.EqualTo(net.Options));
@@ -96,7 +101,8 @@ public sealed class FinalCompilationProbeTests {
     }
 
     [Test]
-    public async Task PackedCollectorAttestsAndVerifiesGeneratorOutput() {
+    public async Task PackedCollectorAttestsAndVerifiesGeneratorOutput()
+    {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = ProbeWorkspace.Create();
         workspace.WritePackedConsumer(feed.Version);
@@ -145,7 +151,8 @@ public sealed class FinalCompilationProbeTests {
             workspace.PackedProbeArtifactPath);
         var changedManifest = await CompilerManifestArtifact.ReadAsync(
             workspace.CompilerManifestPath);
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 await File.ReadAllBytesAsync(workspace.SubjectPath),
                 Is.EqualTo(handwrittenSource));
@@ -165,9 +172,11 @@ public sealed class FinalCompilationProbeTests {
         }
         if (OperatingSystem.IsWindows() &&
             RuntimeInformation.ProcessArchitecture == Architecture.X64 &&
-            RuntimeInformation.OSArchitecture == Architecture.X64) {
+            RuntimeInformation.OSArchitecture == Architecture.X64)
+        {
             var verification = await workspace.VerifyPackedArtifactAsync();
-            using (Assert.EnterMultipleScope()) {
+            using (Assert.EnterMultipleScope())
+            {
                 Assert.That(
                     verification.ExitCode,
                     Is.Zero,
@@ -179,11 +188,68 @@ public sealed class FinalCompilationProbeTests {
         }
     }
 
+    [Test]
+    public async Task GeneratedRefutationTraversesArtifactReplayAndCache()
+    {
+        if (!OperatingSystem.IsWindows() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64 ||
+            RuntimeInformation.OSArchitecture != Architecture.X64)
+        {
+            Assert.Ignore("The verifier is intentionally Windows x64 only.");
+        }
+
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = ProbeWorkspace.Create();
+        workspace.WritePackedConsumer(feed.Version);
+        workspace.WriteProbeInput("refute:whole-pipeline");
+
+        var restore = await workspace.RestoreAsync(feed.Source);
+        Assert.That(restore.ExitCode, Is.Zero, restore.Output);
+        var build = await workspace.RebuildAsync();
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+
+        var first = await workspace.VerifyPackedArtifactAsync();
+        Assert.That(first.ExitCode, Is.Not.Zero, first.Output);
+        var firstResponse = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(workspace.VerifyResultPath))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                firstResponse.RunStatus,
+                Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(firstResponse.ClaimResults, Has.Length.EqualTo(1));
+            Assert.That(
+                firstResponse.ClaimResults[0].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(firstResponse.ClaimResults[0].Model, Is.Not.Empty);
+            Assert.That(
+                firstResponse.Summary.CacheStatus,
+                Is.EqualTo(WorkerCacheStatus.Written));
+        }
+
+        var second = await workspace.VerifyPackedArtifactAsync();
+        Assert.That(second.ExitCode, Is.Not.Zero, second.Output);
+        var secondResponse = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(workspace.VerifyResultPath))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                secondResponse.ClaimResults.Select(static result =>
+                    (result.ClaimId, result.Outcome, result.Reason)),
+                Is.EqualTo(firstResponse.ClaimResults.Select(static result =>
+                    (result.ClaimId, result.Outcome, result.Reason))));
+            Assert.That(
+                secondResponse.Summary.CacheStatus,
+                Is.EqualTo(WorkerCacheStatus.Hit));
+        }
+    }
+
     [TestCase(ProbeSuppression.DesignTimeBuild)]
     [TestCase(ProbeSuppression.ProfileOff)]
     [TestCase(ProbeSuppression.MissingControl)]
     public async Task SuppressedCompilationDoesNotWriteAnArtifact(
-        ProbeSuppression suppression) {
+        ProbeSuppression suppression)
+    {
         using var workspace = ProbeWorkspace.Create();
         workspace.WriteConsumer(
             targetFrameworks: NetTargetFramework,
@@ -200,19 +266,22 @@ public sealed class FinalCompilationProbeTests {
         Assert.That(workspace.GetArtifactPaths(), Is.Empty);
     }
 
-    public enum ProbeSuppression {
+    public enum ProbeSuppression
+    {
         DesignTimeBuild,
         ProfileOff,
         MissingControl
     }
 
-    private sealed class ProbeArtifact {
+    private sealed class ProbeArtifact
+    {
         private ProbeArtifact(
             string targetFramework,
             string options,
             string[] syntaxTrees,
             string[] portableReferences,
-            string[] additionalFiles) {
+            string[] additionalFiles)
+        {
             TargetFramework = targetFramework;
             Options = options;
             SyntaxTrees = syntaxTrees;
@@ -220,11 +289,26 @@ public sealed class FinalCompilationProbeTests {
             AdditionalFiles = additionalFiles;
         }
 
-        internal string TargetFramework { get; }
-        internal string Options { get; }
-        internal string[] SyntaxTrees { get; }
-        internal string[] PortableReferences { get; }
-        internal string[] AdditionalFiles { get; }
+        internal string TargetFramework
+        {
+            get;
+        }
+        internal string Options
+        {
+            get;
+        }
+        internal string[] SyntaxTrees
+        {
+            get;
+        }
+        internal string[] PortableReferences
+        {
+            get;
+        }
+        internal string[] AdditionalFiles
+        {
+            get;
+        }
         internal int SyntaxTreeCount => SyntaxTrees.Length;
         internal string[] SyntaxTreePaths =>
             [.. SyntaxTrees.Select(static tree => {
@@ -238,7 +322,8 @@ public sealed class FinalCompilationProbeTests {
                         "SharpProof.Attributes.dll",
                         StringComparison.OrdinalIgnoreCase))];
 
-        internal static async Task<ProbeArtifact> ReadAsync(string path) {
+        internal static async Task<ProbeArtifact> ReadAsync(string path)
+        {
             var text = await File.ReadAllTextAsync(path);
             Assert.That(text, Does.Not.Contain('\r'), path);
             using var document = JsonDocument.Parse(text);
@@ -262,8 +347,11 @@ public sealed class FinalCompilationProbeTests {
                     "The probe artifact has no parent directory.");
             var pathTargetFramework = Path.GetFileName(artifactDirectory);
             if (string.IsNullOrEmpty(pathTargetFramework))
+            {
                 throw new InvalidDataException(
                     "The probe artifact has no target-framework directory.");
+            }
+
             _ = GetCanonicalRawRows(root, "consumedOptions", path);
             var targetFramework = root.GetProperty("consumedOptions")
                 .EnumerateArray()
@@ -287,9 +375,11 @@ public sealed class FinalCompilationProbeTests {
                 GetCanonicalRawRows(root, "additionalFiles", path));
         }
 
-        internal string GetTreeChecksum(string pathSuffix) {
+        internal string GetTreeChecksum(string pathSuffix)
+        {
             var matches = SyntaxTrees
-                .Where(tree => {
+                .Where(tree =>
+                {
                     using var document = JsonDocument.Parse(tree);
                     return document.RootElement.GetProperty("path").GetString()?
                         .EndsWith(pathSuffix, StringComparison.OrdinalIgnoreCase) ==
@@ -307,10 +397,12 @@ public sealed class FinalCompilationProbeTests {
 
         private static string[] GetCanonicalSyntaxTrees(
             JsonElement root,
-            string path) {
+            string path)
+        {
             var trees = root.GetProperty("syntaxTrees")
                 .EnumerateArray()
-                .Select(tree => new {
+                .Select(tree => new
+                {
                     Path = tree.GetProperty("path").GetString() ?? "",
                     Ordinal = tree.GetProperty("ordinal").GetInt32(),
                     Raw = tree.GetRawText()
@@ -335,7 +427,8 @@ public sealed class FinalCompilationProbeTests {
         private static string[] GetCanonicalRawRows(
             JsonElement root,
             string propertyName,
-            string path) {
+            string path)
+        {
             var rows = root.GetProperty(propertyName)
                 .EnumerateArray()
                 .Select(static row => row.GetRawText())
@@ -355,9 +448,11 @@ public sealed class FinalCompilationProbeTests {
     private sealed record CompilerManifestArtifact(
         byte[] Bytes,
         string CompilationSha256,
-        string[] ClaimPaths) {
+        string[] ClaimPaths)
+    {
         internal static async Task<CompilerManifestArtifact> ReadAsync(
-            string path) {
+            string path)
+        {
             Assert.That(File.Exists(path), Is.True, path);
             var bytes = await File.ReadAllBytesAsync(path);
             var text = Encoding.UTF8.GetString(bytes);
@@ -372,14 +467,15 @@ public sealed class FinalCompilationProbeTests {
                 .Select(static claim => claim.GetProperty("location")
                     .GetProperty("path").GetString() ?? string.Empty)
                 .ToArray();
-            using (Assert.EnterMultipleScope()) {
+            using (Assert.EnterMultipleScope())
+            {
                 Assert.That(
                     root.GetProperty("schema").GetString(),
                     Is.EqualTo("SharpProof.CompilerManifest"),
                     path);
                 Assert.That(
                     root.GetProperty("schemaVersion").GetInt32(),
-                    Is.EqualTo(3),
+                    Is.EqualTo(CurrentCompilerArtifactSchemaVersion),
                     path);
                 Assert.That(
                     compilationSha256,
@@ -391,15 +487,41 @@ public sealed class FinalCompilationProbeTests {
                 compilationSha256!,
                 claimPaths);
         }
+
+        private static int CurrentCompilerArtifactSchemaVersion
+        {
+            get
+            {
+                const string assemblyName = "SharpProof.CompilerArtifact";
+                const string typeName =
+                    assemblyName + ".CompilerManifestArtifactVersions";
+                var assembly = AppDomain.CurrentDomain.GetAssemblies()
+                    .SingleOrDefault(static candidate =>
+                        candidate.GetName().Name == assemblyName) ??
+                    System.Reflection.Assembly.Load(assemblyName);
+                var versionType = assembly.GetType(
+                    typeName,
+                    throwOnError: true)!;
+                var current = versionType.GetField(
+                    "Current",
+                    System.Reflection.BindingFlags.Static |
+                    System.Reflection.BindingFlags.NonPublic);
+                return current?.GetRawConstantValue() as int? ??
+                    throw new InvalidDataException(
+                        "The compiler-artifact schema constant was not found.");
+            }
+        }
     }
 
-    private sealed class ProbeWorkspace : IDisposable {
+    private sealed class ProbeWorkspace : IDisposable
+    {
         private static readonly string s_workspaceParent = Path.Combine(
             Path.GetTempPath(),
             "SharpProof.FinalProbe");
         private readonly string _root;
 
-        private ProbeWorkspace(string root) {
+        private ProbeWorkspace(string root)
+        {
             _root = root;
             ProjectPath = Path.Combine(root, "Consumer.csproj");
             ArtifactDirectory = Path.Combine(root, "probe");
@@ -413,17 +535,44 @@ public sealed class FinalCompilationProbeTests {
                 "probe",
                 NetTargetFramework,
                 "final-compilation.json");
+            VerifyResultPath = Path.Combine(
+                root,
+                "published",
+                "result.json");
             SubjectPath = Path.Combine(root, "Subject.cs");
         }
 
-        internal string ProjectPath { get; }
-        internal string ArtifactDirectory { get; }
-        internal string PackageCache { get; }
-        internal string CompilerManifestPath { get; }
-        internal string PackedProbeArtifactPath { get; }
-        internal string SubjectPath { get; }
+        internal string ProjectPath
+        {
+            get;
+        }
+        internal string ArtifactDirectory
+        {
+            get;
+        }
+        internal string PackageCache
+        {
+            get;
+        }
+        internal string CompilerManifestPath
+        {
+            get;
+        }
+        internal string PackedProbeArtifactPath
+        {
+            get;
+        }
+        internal string VerifyResultPath
+        {
+            get;
+        }
+        internal string SubjectPath
+        {
+            get;
+        }
 
-        internal static ProbeWorkspace Create() {
+        internal static ProbeWorkspace Create()
+        {
             var root = Path.Combine(
                 s_workspaceParent,
                 Guid.NewGuid().ToString("N"));
@@ -438,7 +587,8 @@ public sealed class FinalCompilationProbeTests {
             string targetFrameworks,
             bool enableProbe,
             string profile = "advisory",
-            bool designTimeBuild = false) {
+            bool designTimeBuild = false)
+        {
             File.WriteAllText(
                 SubjectPath,
                 """
@@ -464,7 +614,8 @@ public sealed class FinalCompilationProbeTests {
                 new System.Text.UTF8Encoding(false));
         }
 
-        internal void WritePackedConsumer(string packageVersion) {
+        internal void WritePackedConsumer(string packageVersion)
+        {
             File.WriteAllText(
                 SubjectPath,
                 """
@@ -481,16 +632,19 @@ public sealed class FinalCompilationProbeTests {
                 new UTF8Encoding(false));
         }
 
-        internal void WriteProbeInput(string value) =>
+        internal void WriteProbeInput(string value)
+        {
             File.WriteAllText(
                 Path.Combine(
                     _root,
                     CompilerProbeContract.AdditionalFileName),
                 value + "\n",
                 new UTF8Encoding(false));
+        }
 
-        internal Task<ProcessResult> BuildAsync() =>
-            RunDotNetAsync([
+        internal Task<ProcessResult> BuildAsync()
+        {
+            return RunDotNetAsync([
                 "build",
                 ProjectPath,
                 "-c",
@@ -499,9 +653,11 @@ public sealed class FinalCompilationProbeTests {
                 "/nodeReuse:false",
                 "-p:UseSharedCompilation=false"
             ]);
+        }
 
-        internal Task<ProcessResult> RebuildAsync() =>
-            RunDotNetAsync([
+        internal Task<ProcessResult> RebuildAsync()
+        {
+            return RunDotNetAsync([
                 "build",
                 ProjectPath,
                 "-t:Rebuild",
@@ -512,8 +668,10 @@ public sealed class FinalCompilationProbeTests {
                 "/nodeReuse:false",
                 "-p:UseSharedCompilation=false"
             ]);
+        }
 
-        internal Task<ProcessResult> VerifyPackedArtifactAsync() {
+        internal Task<ProcessResult> VerifyPackedArtifactAsync()
+        {
             var runDirectory = Path.Combine(_root, "verify-run");
             var publishDirectory = Path.Combine(_root, "published");
             return RunDotNetAsync([
@@ -542,8 +700,9 @@ public sealed class FinalCompilationProbeTests {
             ]);
         }
 
-        internal Task<ProcessResult> RestoreAsync(string packageSource) =>
-            RunDotNetAsync([
+        internal Task<ProcessResult> RestoreAsync(string packageSource)
+        {
+            return RunDotNetAsync([
                 "restore",
                 ProjectPath,
                 "--nologo",
@@ -553,11 +712,14 @@ public sealed class FinalCompilationProbeTests {
                 "--packages",
                 PackageCache
             ]);
+        }
 
         private async Task<ProcessResult> RunDotNetAsync(
             string[] arguments,
-            string? workingDirectory = null) {
-            var startInfo = new ProcessStartInfo {
+            string? workingDirectory = null)
+        {
+            var startInfo = new ProcessStartInfo
+            {
                 FileName = "dotnet",
                 WorkingDirectory = workingDirectory ?? _root,
                 UseShellExecute = false,
@@ -566,7 +728,10 @@ public sealed class FinalCompilationProbeTests {
                 CreateNoWindow = true
             };
             foreach (var argument in arguments)
+            {
                 startInfo.ArgumentList.Add(argument);
+            }
+
             using var process = Process.Start(startInfo) ??
                 throw new InvalidOperationException("Failed to start dotnet.");
             var standardOutput = process.StandardOutput.ReadToEndAsync();
@@ -578,15 +743,18 @@ public sealed class FinalCompilationProbeTests {
                 (await standardError));
         }
 
-        internal string[] GetArtifactPaths() =>
-            Directory.Exists(ArtifactDirectory)
+        internal string[] GetArtifactPaths()
+        {
+            return Directory.Exists(ArtifactDirectory)
                 ? Directory.GetFiles(
                     ArtifactDirectory,
                     "*.json",
                     SearchOption.AllDirectories)
                 : [];
+        }
 
-        public void Dispose() {
+        public void Dispose()
+        {
             var resolved = Path.GetFullPath(_root);
             var expectedParent = Path.GetFullPath(s_workspaceParent);
             var relative = Path.GetRelativePath(expectedParent, resolved);
@@ -596,17 +764,23 @@ public sealed class FinalCompilationProbeTests {
                 relative.StartsWith(
                     ".." + Path.DirectorySeparatorChar,
                     StringComparison.Ordinal))
+            {
                 throw new InvalidOperationException(
                     "Refusing to remove an unexpected test directory.");
+            }
+
             if (Directory.Exists(resolved))
+            {
                 Directory.Delete(resolved, recursive: true);
+            }
         }
 
         private static string CreateProjectXml(
             string targetFrameworks,
             bool enableProbe,
             string profile,
-            bool designTimeBuild) {
+            bool designTimeBuild)
+        {
             var targetFrameworkProperty =
                 targetFrameworks.Contains(';', StringComparison.Ordinal)
                     ? "TargetFrameworks"
@@ -658,7 +832,8 @@ public sealed class FinalCompilationProbeTests {
                 """;
         }
 
-        private string CreatePackedProjectXml(string packageVersion) {
+        private string CreatePackedProjectXml(string packageVersion)
+        {
             var analyzerPath = Escape(CompilerProbeContract.AssemblyPath);
             var additionalFile = Escape(
                 CompilerProbeContract.AdditionalFileName);
@@ -701,25 +876,32 @@ public sealed class FinalCompilationProbeTests {
                 """;
         }
 
-        private static string FindRepositoryRoot() {
+        private static string FindRepositoryRoot()
+        {
             var directory = new DirectoryInfo(
                 typeof(Contract).Assembly.Location);
-            while (directory != null) {
+            while (directory != null)
+            {
                 if (File.Exists(
                         Path.Combine(
                             directory.FullName,
                             "SharpProof.Release.props")))
+                {
                     return directory.FullName;
+                }
+
                 directory = directory.Parent;
             }
             throw new InvalidOperationException(
                 "Repository root was not found.");
         }
 
-        private static string Escape(string value) =>
-            SecurityElement.Escape(value) ??
+        private static string Escape(string value)
+        {
+            return SecurityElement.Escape(value) ??
             throw new InvalidOperationException(
                 "Failed to escape an MSBuild value.");
+        }
     }
 
     private sealed record ProcessResult(int ExitCode, string Output);

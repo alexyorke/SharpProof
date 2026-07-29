@@ -1,13 +1,16 @@
 namespace SharpProof.Effects.Test;
 
 [TestFixture]
-public sealed class EffectLatticeTests {
+public sealed class EffectLatticeTests
+{
     [Test]
-    public void JoinSatisfiesFiniteLatticeLaws() {
+    public void JoinSatisfiesFiniteLatticeLaws()
+    {
         var samples = CreateSamples();
         var domain = EffectSummaryDomain.Instance;
 
-        foreach (var value in samples) {
+        foreach (var value in samples)
+        {
             Assert.That(domain.LessThanOrEqual(value, value), Is.True);
             Assert.That(domain.LessThanOrEqual(domain.Bottom, value), Is.True);
             Assert.That(domain.LessThanOrEqual(value, domain.Top), Is.True);
@@ -15,16 +18,20 @@ public sealed class EffectLatticeTests {
         }
 
         foreach (var left in samples)
-            foreach (var right in samples) {
+        {
+            foreach (var right in samples)
+            {
                 var join = domain.Join(left, right);
                 Assert.That(domain.LessThanOrEqual(left, join), Is.True);
                 Assert.That(domain.LessThanOrEqual(right, join), Is.True);
                 Assert.That(join, Is.EqualTo(domain.Join(right, left)));
             }
+        }
     }
 
     [Test]
-    public void ProjectionIsMonotoneUnderPublicUnknownOrder() {
+    public void ProjectionIsMonotoneUnderPublicUnknownOrder()
+    {
         var domain = EffectSummaryDomain.Instance;
         var samples = CreateSamples();
         var closure = samples
@@ -36,17 +43,24 @@ public sealed class EffectLatticeTests {
             .ToImmutableArray();
 
         foreach (var left in closure)
+        {
             foreach (var right in closure)
+            {
                 if (domain.LessThanOrEqual(left, right))
+                {
                     Assert.That(
                         ProjectionLessThanOrEqual(
                             EffectSummaryProjector.Project(left),
                             EffectSummaryProjector.Project(right)),
                         Is.True,
                         "Projection is not monotone for a sampled ordered pair.");
+                }
+            }
+        }
     }
 
-    private static ImmutableArray<EffectSummary> CreateSamples() {
+    private static ImmutableArray<EffectSummary> CreateSamples()
+    {
         var compilation = EffectTestHost.CreateCompilation("public sealed class Sample { }");
         var exception = EffectTestHost.RequireType(
             compilation,
@@ -82,8 +96,9 @@ public sealed class EffectLatticeTests {
         EffectAllocationKind allocation = EffectAllocationKind.None,
         EffectCapabilitySet capabilities = default,
         EffectThrowSet throws = default,
-        EffectTermination termination = EffectTermination.Terminates) =>
-        new(
+        EffectTermination termination = EffectTermination.Terminates)
+    {
+        return new(
             reads,
             writes,
             allocation,
@@ -91,14 +106,22 @@ public sealed class EffectLatticeTests {
             throws,
             termination,
             EffectCompleteness.Complete);
+    }
 
     private static bool ProjectionLessThanOrEqual(
         EffectProjection left,
-        EffectProjection right) {
+        EffectProjection right)
+    {
         if (!right.IsComplete)
+        {
             return true;
+        }
+
         if (!left.IsComplete)
+        {
             return false;
+        }
+
         return (left.Effects & ~right.Effects) == 0 &&
                (left.Capabilities & ~right.Capabilities) == 0;
     }

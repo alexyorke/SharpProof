@@ -11,7 +11,8 @@ using SharpProof.Ir;
 namespace SharpProof.Frontend.Test;
 
 [TestFixture]
-public sealed class FrontendLoweringTests {
+public sealed class FrontendLoweringTests
+{
     private static readonly long[] ElementValues = [4L, 8L, 15L];
 
     [TestCase(4L, true, 2L, ExpectedResult = 18L)]
@@ -19,7 +20,8 @@ public sealed class FrontendLoweringTests {
     public object? SupportedExpressionsMatchCompiledCSharp(
         long value,
         bool enabled,
-        long divisor) {
+        long divisor)
+    {
         using var compiled = CompiledMethod.Create(
             """
             public static long Target(long value, bool enabled, long divisor) =>
@@ -29,7 +31,8 @@ public sealed class FrontendLoweringTests {
     }
 
     [Test]
-    public void BooleanNullAndStringExpressionsMatchCompiledCSharp() {
+    public void BooleanNullAndStringExpressionsMatchCompiledCSharp()
+    {
         using var boolean = CompiledMethod.Create(
             """
             public static bool Target(bool enabled, long value, string text) =>
@@ -72,7 +75,8 @@ public sealed class FrontendLoweringTests {
     }
 
     [Test]
-    public void ArrayLengthAndElementAccessMatchCompiledCSharp() {
+    public void ArrayLengthAndElementAccessMatchCompiledCSharp()
+    {
         using var element = CompiledMethod.Create(
             """
             public static long Target(long[] values, int index) =>
@@ -84,7 +88,8 @@ public sealed class FrontendLoweringTests {
     }
 
     [Test]
-    public void InterpreterPreservesLeftToRightAndShortCircuitEvaluation() {
+    public void InterpreterPreservesLeftToRightAndShortCircuitEvaluation()
+    {
         using var order = CompiledMethod.Create(
             """
             public static long Target(long left, long firstDivisor, long right, long secondDivisor) =>
@@ -115,7 +120,8 @@ public sealed class FrontendLoweringTests {
     }
 
     [Test]
-    public void OverflowAndConversionShapesAreExactOnlyWhenRepresentable() {
+    public void OverflowAndConversionShapesAreExactOnlyWhenRepresentable()
+    {
         AssertClassification(
             """
             public static long Target(long value) => checked(value + 1L);
@@ -167,7 +173,8 @@ public sealed class FrontendLoweringTests {
     }
 
     [Test]
-    public void UnsupportedIntegralDomainsCannotMasqueradeAsReferenceEquality() {
+    public void UnsupportedIntegralDomainsCannotMasqueradeAsReferenceEquality()
+    {
         AssertClassification(
             """
             public static bool Target(ulong left, ulong right) => left == right;
@@ -189,7 +196,8 @@ public sealed class FrontendLoweringTests {
     }
 
     [Test]
-    public void UnsupportedValueDomainsCannotMasqueradeAsReferenceEquality() {
+    public void UnsupportedValueDomainsCannotMasqueradeAsReferenceEquality()
+    {
         AssertClassification(
             """
             public static bool Target(double left, double right) => left == right;
@@ -209,7 +217,8 @@ public sealed class FrontendLoweringTests {
     }
 
     [Test]
-    public void SupportedUnsignedComparisonsRetainTheirNumericMeaning() {
+    public void SupportedUnsignedComparisonsRetainTheirNumericMeaning()
+    {
         using var compiled = CompiledMethod.Create(
             """
             public static bool Target(uint left, uint right) => left > right;
@@ -224,7 +233,8 @@ public sealed class FrontendLoweringTests {
     }
 
     [Test]
-    public void NullableAndEnumConstantsCannotBypassClosedTypeAbstention() {
+    public void NullableAndEnumConstantsCannotBypassClosedTypeAbstention()
+    {
         AssertClassification(
             """
             public static long? Target() => (long?)1L;
@@ -243,16 +253,19 @@ public sealed class FrontendLoweringTests {
     }
 
     [Test]
-    public void LiftedUnaryOperatorsUseTheLiftedOperatorAbstention() =>
+    public void LiftedUnaryOperatorsUseTheLiftedOperatorAbstention()
+    {
         AssertClassification(
             """
             public static long? Target(long? value) => -value;
             """,
             FrontendSubsetDecision.ClosedAbstention,
             FrontendAbstention.LiftedOperator);
+    }
 
     [Test]
-    public void NamedOptionalAndExtensionInvocationsCloseTheSubset() {
+    public void NamedOptionalAndExtensionInvocationsCloseTheSubset()
+    {
         using var named = CompiledMethod.Create(
             """
             private static long Add(long first, long second = 7L) => first + second;
@@ -285,7 +298,8 @@ public sealed class FrontendLoweringTests {
     }
 
     [Test]
-    public void PureOpaqueIdentityIsStructuralAndImpureIdentityIsPerOccurrence() {
+    public void PureOpaqueIdentityIsStructuralAndImpureIdentityIsPerOccurrence()
+    {
         using var pure = CompiledMethod.Create(
             """
             public static bool Target(long value) =>
@@ -334,7 +348,8 @@ public sealed class FrontendLoweringTests {
     }
 
     [Test]
-    public void PureOpaqueIdentitySeparatesDifferentOperatorSemantics() {
+    public void PureOpaqueIdentitySeparatesDifferentOperatorSemantics()
+    {
         using var compiled = CompiledMethod.Create(
             """
             public static bool Target(long value) =>
@@ -361,7 +376,8 @@ public sealed class FrontendLoweringTests {
     }
 
     [Test]
-    public void CompilerIdentitySeparatesSameNamedTypesFromDifferentAssemblies() {
+    public void CompilerIdentitySeparatesSameNamedTypesFromDifferentAssemblies()
+    {
         var leftReference = CreateAliasedTypeReference(
             "Collision.Left",
             "left");
@@ -422,10 +438,146 @@ public sealed class FrontendLoweringTests {
                 CompilerIdentityBridge.InternType(
                     factory,
                     references[1].Parameter.Type)));
+        Assert.That(
+            CompilerIdentityBridge.CreateTypeDisplay(
+                references[0].Parameter.Type),
+            Is.Not.EqualTo(
+                CompilerIdentityBridge.CreateTypeDisplay(
+                    references[1].Parameter.Type)));
     }
 
     [Test]
-    public void InheritedInstanceInvocationsLowerTotallyWithTypedReceivers() {
+    public void DocumentationReferenceIdsCoverCompilerIdentityCallShapes()
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            """
+            #nullable enable
+            public sealed class Subject<T> {
+                private int _value;
+                public ref int Value => ref _value;
+                public U Echo<U>(ref U value, U[] values) => value;
+                public static Subject<T> operator +(Subject<T> left, Subject<T> right) => left;
+                public void Overload(int value) { }
+                public void Overload(ref int value) { }
+                public object Anonymous() => new { Value = 1 };
+                public void Nullable(string? optional, string required) {
+                    static int Local(int[] values) => values.Length;
+                    _ = Local([]);
+                }
+            }
+            """,
+            new CSharpParseOptions(LanguageVersion.CSharp12));
+        var compilation = CSharpCompilation.Create(
+            "Identity.Shapes",
+            [tree],
+            PlatformReferences,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+        var errors = compilation.GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToArray();
+        Assert.That(
+            errors,
+            Is.Empty,
+            string.Join(
+                Environment.NewLine,
+                errors.Select(static diagnostic => diagnostic.ToString())));
+
+        var subject = compilation.GetTypeByMetadataName("Subject`1")!;
+        var echo = subject.GetMembers("Echo").OfType<IMethodSymbol>().Single();
+        var value = subject.GetMembers("Value").OfType<IPropertySymbol>().Single();
+        var addition = subject.GetMembers("op_Addition").OfType<IMethodSymbol>().Single();
+        var nullable = subject.GetMembers("Nullable").OfType<IMethodSymbol>().Single();
+        var overloads = subject.GetMembers("Overload")
+            .OfType<IMethodSymbol>()
+            .OrderBy(static method => method.Parameters[0].RefKind)
+            .ToArray();
+        var local = tree.GetRoot().DescendantNodes()
+            .OfType<LocalFunctionStatementSyntax>()
+            .Select(node => compilation.GetSemanticModel(tree).GetDeclaredSymbol(node))
+            .Single()!;
+        var anonymousType = tree.GetRoot().DescendantNodes()
+            .OfType<AnonymousObjectCreationExpressionSyntax>()
+            .Select(node => compilation.GetSemanticModel(tree).GetTypeInfo(node).Type)
+            .Single()!;
+        var constructed = subject.Construct(compilation.GetSpecialType(SpecialType.System_String));
+        ITypeSymbol[] types = [
+            subject,
+            constructed,
+            subject.TypeParameters[0],
+            compilation.CreateArrayTypeSymbol(subject.TypeParameters[0]),
+            compilation.CreateArrayTypeSymbol(
+                compilation.GetSpecialType(SpecialType.System_Int32),
+                rank: 2),
+            compilation.CreatePointerTypeSymbol(
+                compilation.GetSpecialType(SpecialType.System_Int32)),
+            nullable.Parameters[0].Type,
+            nullable.Parameters[1].Type
+        ];
+
+        foreach (var symbol in new ISymbol[] { echo, value, addition })
+        {
+            Assert.That(
+                DocumentationCommentId.CreateDeclarationId(symbol),
+                Is.Not.Null.And.Not.Empty,
+                symbol.MetadataName);
+        }
+
+        foreach (var type in types)
+        {
+            Assert.That(
+                DocumentationCommentId.CreateReferenceId(type),
+                Is.Not.Null.And.Not.Empty,
+                type.MetadataName);
+        }
+
+        Assert.That(
+            DocumentationCommentId.CreateDeclarationId(local),
+            Is.Not.Null.And.Not.Empty);
+        Assert.That(
+            DocumentationCommentId.CreateReferenceId(anonymousType),
+            Is.Null.Or.Empty,
+            "Anonymous types require an explicit stable fallback.");
+        Assert.That(
+            CompilerIdentityBridge.CreateSymbolDisplay(overloads[0]),
+            Is.Not.EqualTo(CompilerIdentityBridge.CreateSymbolDisplay(overloads[1])));
+        Assert.That(
+            CompilerIdentityBridge.CreateTypeDisplay(types[3]),
+            Is.Not.EqualTo(CompilerIdentityBridge.CreateTypeDisplay(types[4])));
+        Assert.That(
+            SymbolEqualityComparer.Default.Equals(
+                nullable.Parameters[0].Type,
+                nullable.Parameters[1].Type),
+            Is.True);
+        Assert.That(
+            CompilerIdentityBridge.CreateTypeDisplay(nullable.Parameters[0].Type),
+            Is.EqualTo(CompilerIdentityBridge.CreateTypeDisplay(nullable.Parameters[1].Type)),
+            "Display identity follows the compiler-symbol comparer used for interning.");
+        var fallback = CompilerIdentityBridge.CreateTypeDisplay(anonymousType);
+        var equivalentCompilation = CSharpCompilation.Create(
+            "Identity.Shapes",
+            [tree],
+            PlatformReferences,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+        var equivalentAnonymousType = tree.GetRoot().DescendantNodes()
+            .OfType<AnonymousObjectCreationExpressionSyntax>()
+            .Select(node => equivalentCompilation.GetSemanticModel(tree).GetTypeInfo(node).Type)
+            .Single()!;
+        Assert.That(
+            fallback,
+            Is.EqualTo(CompilerIdentityBridge.CreateTypeDisplay(
+                equivalentAnonymousType)));
+        Assert.That(
+            fallback,
+            Does.StartWith(compilation.Assembly.Identity + "::"));
+    }
+
+    [Test]
+    public void InheritedInstanceInvocationsLowerTotallyWithTypedReceivers()
+    {
         using var compiled = CompiledMethod.Create(
             """
             private class Base {
@@ -449,7 +601,8 @@ public sealed class FrontendLoweringTests {
     }
 
     [Test]
-    public void EveryOperationInUnsupportedProgramLowersWithoutThrowing() {
+    public void EveryOperationInUnsupportedProgramLowersWithoutThrowing()
+    {
         using var compiled = CompiledMethod.Create(
             """
             private sealed class Box {
@@ -466,26 +619,31 @@ public sealed class FrontendLoweringTests {
         var lowerer = new RoslynOperationLowerer(compiled.Factory);
         var operations = compiled.TargetRoot.DescendantsAndSelf().ToArray();
         Assert.That(operations.Length, Is.GreaterThan(8));
-        foreach (var operation in operations) {
+        foreach (var operation in operations)
+        {
             FrontendLoweringResult? result = null;
             Assert.DoesNotThrow(
                 (Action)(() => result = lowerer.Lower(operation)));
             Assert.That(result, Is.Not.Null);
             Assert.That(result!.Term, Is.Not.Null);
             if (!result.IsExact)
+            {
                 Assert.That(
                     result.Classification.Abstention,
                     Is.Not.EqualTo(FrontendAbstention.None));
+            }
         }
     }
 
     [Test]
-    public void OperationKindClassifierSnapshotIsClosedAndExhaustive() {
+    public void OperationKindClassifierSnapshotIsClosedAndExhaustive()
+    {
         var kinds = OperationSubsetClassifier.GetKnownOperationKinds();
         Assert.That(kinds, Is.Not.Empty);
         Assert.That(kinds, Is.Ordered);
         Assert.That(kinds.Distinct().Count(), Is.EqualTo(kinds.Length));
-        foreach (var kind in kinds) {
+        foreach (var kind in kinds)
+        {
             var classification = OperationSubsetClassifier.Classify(kind);
             Assert.That(
                 classification.Decision,
@@ -518,7 +676,8 @@ public sealed class FrontendLoweringTests {
     private static void AssertClassification(
         string members,
         FrontendSubsetDecision decision,
-        FrontendAbstention abstention) {
+        FrontendAbstention abstention)
+    {
         using var compiled = CompiledMethod.Create(members);
         var result = compiled.Lower();
         Assert.That(result.Classification.Decision, Is.EqualTo(decision));
@@ -528,7 +687,8 @@ public sealed class FrontendLoweringTests {
     private static void AssertOpaque(
         FrontendLoweringResult result,
         IrOpaquePurity purity,
-        FrontendAbstention abstention) {
+        FrontendAbstention abstention)
+    {
         Assert.That(result.Term, Is.TypeOf<IrOpaqueTerm>());
         Assert.That(((IrOpaqueTerm)result.Term).Purity, Is.EqualTo(purity));
         Assert.That(result.Classification.Decision, Is.EqualTo(
@@ -536,7 +696,8 @@ public sealed class FrontendLoweringTests {
         Assert.That(result.Classification.Abstention, Is.EqualTo(abstention));
     }
 
-    private sealed class CompiledMethod : IDisposable {
+    private sealed class CompiledMethod : IDisposable
+    {
         private readonly AssemblyLoadContextHandle _assembly;
         private readonly MethodInfo? _method;
         private readonly IMethodSymbol _methodSymbol;
@@ -546,7 +707,8 @@ public sealed class FrontendLoweringTests {
             MethodInfo? method,
             IMethodSymbol methodSymbol,
             IOperation targetRoot,
-            IOperation targetExpression) {
+            IOperation targetExpression)
+        {
             _assembly = assembly;
             _method = method;
             _methodSymbol = methodSymbol;
@@ -555,13 +717,23 @@ public sealed class FrontendLoweringTests {
             Factory = new IrFactory();
         }
 
-        internal IrFactory Factory { get; }
-        internal IOperation TargetRoot { get; }
-        internal IOperation TargetExpression { get; }
+        internal IrFactory Factory
+        {
+            get;
+        }
+        internal IOperation TargetRoot
+        {
+            get;
+        }
+        internal IOperation TargetExpression
+        {
+            get;
+        }
 
         internal static CompiledMethod Create(
             string members,
-            bool returnExpressionOnly = true) {
+            bool returnExpressionOnly = true)
+        {
             var source =
                 """
                 #nullable enable
@@ -632,17 +804,21 @@ public sealed class FrontendLoweringTests {
                 expression);
         }
 
-        internal FrontendLoweringResult Lower() =>
-            new RoslynOperationLowerer(Factory).Lower(TargetExpression);
+        internal FrontendLoweringResult Lower()
+        {
+            return new RoslynOperationLowerer(Factory).Lower(TargetExpression);
+        }
 
-        internal object? CompareWithInterpreter(params object?[] arguments) {
+        internal object? CompareWithInterpreter(params object?[] arguments)
+        {
             var actual = _method!.Invoke(null, arguments);
             var lowered = Lower();
             Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
             var environment = CreateEnvironment(lowered, arguments);
             var evaluated = new IrInterpreter(Factory).Evaluate(lowered.Term, environment);
             Assert.That(evaluated.Status, Is.EqualTo(IrEvaluationStatus.Value));
-            var interpreted = evaluated.Value!.Kind switch {
+            var interpreted = evaluated.Value!.Kind switch
+            {
                 IrValueKind.Boolean => evaluated.Value.Boolean,
                 IrValueKind.Integer => evaluated.Value.Integer,
                 IrValueKind.String => evaluated.Value.String,
@@ -655,14 +831,19 @@ public sealed class FrontendLoweringTests {
 
         internal Dictionary<IrVarId, IrValue> CreateEnvironment(
             FrontendLoweringResult lowering,
-            params object?[] arguments) {
+            params object?[] arguments)
+        {
             var values = new Dictionary<IrVarId, IrValue>();
-            foreach (var binding in lowering.Variables) {
+            foreach (var binding in lowering.Variables)
+            {
                 if (binding.Symbol is not IParameterSymbol parameter ||
                     !SymbolEqualityComparer.Default.Equals(
                         parameter.ContainingSymbol,
                         _methodSymbol))
+                {
                     continue;
+                }
+
                 values.Add(
                     binding.Variable,
                     CreateValue(
@@ -673,15 +854,22 @@ public sealed class FrontendLoweringTests {
             return values;
         }
 
-        public void Dispose() => _assembly.Dispose();
+        public void Dispose()
+        {
+            _assembly.Dispose();
+        }
 
         private static IOperation FindReturnExpression(
             SemanticModel model,
-            MethodDeclarationSyntax method) {
+            MethodDeclarationSyntax method)
+        {
             if (method.ExpressionBody != null)
+            {
                 return GetExpressionOperation(
                     model,
                     method.ExpressionBody.Expression);
+            }
+
             var returnStatement = method.Body!
                 .DescendantNodes()
                 .OfType<ReturnStatementSyntax>()
@@ -691,10 +879,16 @@ public sealed class FrontendLoweringTests {
 
         private static IOperation GetExpressionOperation(
             SemanticModel model,
-            ExpressionSyntax expression) {
+            ExpressionSyntax expression)
+        {
             var operation = model.GetOperation(expression);
-            if (operation != null) return operation;
-            return expression switch {
+            if (operation != null)
+            {
+                return operation;
+            }
+
+            return expression switch
+            {
                 CheckedExpressionSyntax checkedExpression =>
                     GetExpressionOperation(model, checkedExpression.Expression),
                 ParenthesizedExpressionSyntax parenthesized =>
@@ -708,10 +902,16 @@ public sealed class FrontendLoweringTests {
         private static IrValue CreateValue(
             IrFactory factory,
             IrTypeId type,
-            object? value) {
+            object? value)
+        {
             var info = factory.GetTypeInfo(type);
-            if (value == null) return factory.CreateNullValue(type);
-            return info.Kind switch {
+            if (value == null)
+            {
+                return factory.CreateNullValue(type);
+            }
+
+            return info.Kind switch
+            {
                 IrTypeKind.Boolean => factory.CreateBooleanValue((bool)value),
                 IrTypeKind.Integer => factory.CreateIntegerValue(
                     Convert.ToInt64(value, CultureInfo.InvariantCulture)),
@@ -731,19 +931,25 @@ public sealed class FrontendLoweringTests {
         }
     }
 
-    private sealed class AssemblyLoadContextHandle : IDisposable {
+    private sealed class AssemblyLoadContextHandle : IDisposable
+    {
         private readonly System.Runtime.Loader.AssemblyLoadContext _context;
 
         private AssemblyLoadContextHandle(
             System.Runtime.Loader.AssemblyLoadContext context,
-            Assembly assembly) {
+            Assembly assembly)
+        {
             _context = context;
             Assembly = assembly;
         }
 
-        internal Assembly Assembly { get; }
+        internal Assembly Assembly
+        {
+            get;
+        }
 
-        internal static AssemblyLoadContextHandle Load(byte[] image) {
+        internal static AssemblyLoadContextHandle Load(byte[] image)
+        {
             var context = new System.Runtime.Loader.AssemblyLoadContext(
                 "SharpProof.Frontend.Test." + Guid.NewGuid().ToString("N"),
                 isCollectible: true);
@@ -753,12 +959,16 @@ public sealed class FrontendLoweringTests {
                 context.LoadFromStream(stream));
         }
 
-        public void Dispose() => _context.Unload();
+        public void Dispose()
+        {
+            _context.Unload();
+        }
     }
 
     private static PortableExecutableReference CreateAliasedTypeReference(
         string assemblyName,
-        string alias) {
+        string alias)
+    {
         var tree = CSharpSyntaxTree.ParseText(
             """
             namespace Collision {
@@ -785,7 +995,10 @@ public sealed class FrontendLoweringTests {
                 aliases: [alias]));
     }
 
-    private static ImmutableArray<MetadataReference> PlatformReferences { get; } =
+    private static ImmutableArray<MetadataReference> PlatformReferences
+    {
+        get;
+    } =
         [.. ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
         .Split(Path.PathSeparator)
         .Select(static path => (MetadataReference)MetadataReference.CreateFromFile(path))];

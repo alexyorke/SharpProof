@@ -1,0 +1,317 @@
+using System.Collections.Immutable;
+using NUnit.Framework;
+using SharpProof.CompilerArtifact;
+using SharpProof.Ir;
+using SharpProof.Smt;
+using SharpProof.Verify;
+using SharpProof.Worker.Protocol;
+
+namespace SharpProof.Worker.Test;
+
+[TestFixture]
+public sealed class AcyclicBlockPredicateExecutorTests
+{
+    [Test]
+    public void DiamondProducesOneJoinedReturnInsteadOfTwoPaths()
+    {
+        var factory = new IrFactory();
+        var condition = factory.CreateVariable("condition", factory.BooleanType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var whenTrue = builder.CreateBlock("true");
+        var whenFalse = builder.CreateBlock("false");
+        var join = builder.CreateBlock("join");
+        builder.Branch(entry, factory.CreateOperation(), factory.Variable(condition), whenTrue, whenFalse);
+        builder.Goto(whenTrue, factory.CreateOperation(), join);
+        builder.Goto(whenFalse, factory.CreateOperation(), join);
+        builder.Return(join, factory.CreateOperation(), factory.Integer(7));
+
+        var execution = Execute(factory, builder.Build(), [condition]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(execution.IsSuccess, Is.True);
+            Assert.That(execution.Returns, Has.Length.EqualTo(1));
+            Assert.That(execution.Returns[0].ReturnTerm, Is.SameAs(factory.Integer(7)));
+        }
+    }
+
+    [Test]
+    public async Task SequentialDiamondsRepresentMoreThanSixtyFourPathsWithoutEnumeration()
+    {
+        const int diamondCount = 7;
+        var factory = new IrFactory();
+        var conditions = Enumerable.Range(0, diamondCount)
+            .Select(index => factory.CreateVariable("condition-" + index, factory.BooleanType))
+            .ToArray();
+        var builder = new IrProgramBuilder(factory);
+        var current = builder.CreateBlock("entry");
+        for (var index = 0; index < diamondCount; index++)
+        {
+            var whenTrue = builder.CreateBlock("true-" + index);
+            var whenFalse = builder.CreateBlock("false-" + index);
+            var join = builder.CreateBlock("join-" + index);
+            builder.Branch(current, factory.CreateOperation(), factory.Variable(conditions[index]), whenTrue, whenFalse);
+            builder.Goto(whenTrue, factory.CreateOperation(), join);
+            builder.Goto(whenFalse, factory.CreateOperation(), join);
+            current = join;
+        }
+        builder.Return(current, factory.CreateOperation(), factory.Integer(42));
+
+        var program = builder.Build();
+        var execution = Execute(factory, program, conditions);
+        var variables = conditions.Select((variable, ordinal) =>
+            new CompilerCanonicalVariable(
+                CompilerVariableRole.Parameter,
+                ordinal,
+                variable,
+                null,
+                null,
+                "parameter:" + ordinal)).ToImmutableArray();
+        var bindings = conditions.ToImmutableDictionary(static value => value, static value => value);
+        var backend = new CompletionThenProofBackend();
+        var verifier = new CallableVerifier(backend, WorkerBudgets.DefaultMaximumExpressionDepth);
+        var results = await verifier.VerifyAsync(
+            CreateTarget(factory, program, variables, bindings),
+            new MethodResourceBudget(
+                null,
+                WorkerBudgets.DefaultQueryRlimit,
+                WorkerBudgets.DefaultMethodRlimit),
+            CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(1 << diamondCount, Is.GreaterThan(64));
+            Assert.That(execution.IsSuccess, Is.True);
+            Assert.That(execution.Returns, Has.Length.EqualTo(1));
+            Assert.That(execution.Returns[0].ReturnTerm, Is.SameAs(factory.Integer(42)));
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.None));
+        }
+    }
+
+    [Test]
+    public void ReassignmentUsesGuardedPhiValuesAtNestedJoins()
+    {
+        var factory = new IrFactory();
+        var firstCondition = factory.CreateVariable("first", factory.BooleanType);
+        var secondCondition = factory.CreateVariable("second", factory.BooleanType);
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var firstTrue = builder.CreateBlock("first-true");
+        var firstFalse = builder.CreateBlock("first-false");
+        var firstJoin = builder.CreateBlock("first-join");
+        var secondTrue = builder.CreateBlock("second-true");
+        var secondFalse = builder.CreateBlock("second-false");
+        var secondJoin = builder.CreateBlock("second-join");
+        builder.Branch(entry, factory.CreateOperation(), factory.Variable(firstCondition), firstTrue, firstFalse);
+        builder.Assign(firstTrue, factory.CreateOperation(), value, factory.Integer(1));
+        builder.Goto(firstTrue, factory.CreateOperation(), firstJoin);
+        builder.Assign(firstFalse, factory.CreateOperation(), value, factory.Integer(2));
+        builder.Goto(firstFalse, factory.CreateOperation(), firstJoin);
+        builder.Branch(
+            firstJoin,
+            factory.CreateOperation(),
+            factory.Variable(secondCondition),
+            secondTrue,
+            secondFalse);
+        builder.Assign(secondTrue, factory.CreateOperation(), value, factory.Integer(3));
+        builder.Goto(secondTrue, factory.CreateOperation(), secondJoin);
+        builder.Goto(secondFalse, factory.CreateOperation(), secondJoin);
+        builder.Return(secondJoin, factory.CreateOperation(), factory.Variable(value));
+
+        var execution = Execute(factory, builder.Build(), [firstCondition, secondCondition]);
+        var returned = execution.Returns.Single().ReturnTerm!;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(execution.IsSuccess, Is.True);
+            Assert.That(returned, Is.TypeOf<IrConditionalTerm>());
+            Assert.That(Evaluate(factory, returned, firstCondition, true, secondCondition, false), Is.EqualTo(1));
+            Assert.That(Evaluate(factory, returned, firstCondition, false, secondCondition, false), Is.EqualTo(2));
+            Assert.That(Evaluate(factory, returned, firstCondition, true, secondCondition, true), Is.EqualTo(3));
+            Assert.That(Evaluate(factory, returned, firstCondition, false, secondCondition, true), Is.EqualTo(3));
+        }
+    }
+
+    [Test]
+    public void MultipleReturnsRetainSeparateBlockPredicates()
+    {
+        var factory = new IrFactory();
+        var condition = factory.CreateVariable("condition", factory.BooleanType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var whenTrue = builder.CreateBlock("true");
+        var whenFalse = builder.CreateBlock("false");
+        builder.Branch(entry, factory.CreateOperation(), factory.Variable(condition), whenTrue, whenFalse);
+        builder.Return(whenTrue, factory.CreateOperation(), factory.Integer(1));
+        builder.Return(whenFalse, factory.CreateOperation(), factory.Integer(2));
+
+        var execution = Execute(factory, builder.Build(), [condition]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(execution.IsSuccess, Is.True);
+            Assert.That(execution.Returns, Has.Length.EqualTo(2));
+            Assert.That(execution.Returns.Select(static value => ((IrIntegerTerm)value.ReturnTerm!).Value),
+                Is.EquivalentTo(new long[] { 1, 2 }));
+            Assert.That(execution.Returns.Select(static value => value.Predicate.Id).Distinct().Count(), Is.EqualTo(2));
+        }
+    }
+
+    [Test]
+    public async Task CycleProducesTypedUnknownWithoutInvokingTheBackend()
+    {
+        var factory = new IrFactory();
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("cycle");
+        builder.Goto(entry, factory.CreateOperation(), entry);
+        var program = builder.Build();
+        var execution = Execute(factory, program, []);
+        var backend = new UnexpectedBackend();
+        var verifier = new CallableVerifier(backend, WorkerBudgets.DefaultMaximumExpressionDepth);
+
+        var results = await verifier.VerifyAsync(
+            CreateTarget(
+                factory,
+                program,
+                [],
+                ImmutableDictionary<IrVarId, IrVarId>.Empty),
+            new MethodResourceBudget(
+                null,
+                WorkerBudgets.DefaultQueryRlimit,
+                WorkerBudgets.DefaultMethodRlimit),
+            CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(execution.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(backend.CallCount, Is.Zero);
+            Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(results.Single().Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        }
+    }
+
+    [Test]
+    public void SymbolicOperationBudgetExhaustionIsTypedResourceLimit()
+    {
+        var factory = new IrFactory();
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        builder.Return(entry, factory.CreateOperation(), factory.Integer(0));
+        var executor = new AcyclicBlockPredicateExecutor(
+            WorkerBudgets.DefaultMaximumExpressionDepth,
+            maximumSymbolicOperations: 1);
+
+        var execution = executor.Execute(
+            [],
+            factory,
+            builder.Build(),
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+            ImmutableDictionary<IrVarId, IrTerm>.Empty,
+            ImmutableDictionary<IrVarId, IrVarId>.Empty);
+
+        Assert.That(execution.Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
+    }
+
+    private static SymbolicBodyExecution Execute(
+        IrFactory factory,
+        IrProgram program,
+        IReadOnlyCollection<IrVarId> inputs)
+    {
+        var environment = inputs.ToImmutableDictionary(
+            static variable => variable,
+            variable => (IrTerm)factory.Variable(variable));
+        return new AcyclicBlockPredicateExecutor(WorkerBudgets.DefaultMaximumExpressionDepth).Execute(
+            [],
+            factory,
+            program,
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+            environment,
+            ImmutableDictionary<IrVarId, IrVarId>.Empty);
+    }
+
+    private static long Evaluate(
+        IrFactory factory,
+        IrTerm term,
+        IrVarId first,
+        bool firstValue,
+        IrVarId second,
+        bool secondValue)
+    {
+        var result = new IrInterpreter(factory).Evaluate(
+            term,
+            ImmutableDictionary<IrVarId, IrValue>.Empty
+                .Add(first, factory.CreateBooleanValue(firstValue))
+                .Add(second, factory.CreateBooleanValue(secondValue)));
+        Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        return result.Value!.Integer;
+    }
+
+    private static CompilerCallablePreparation CreateTarget(
+        IrFactory factory,
+        IrProgram program,
+        ImmutableArray<CompilerCanonicalVariable> variables,
+        ImmutableDictionary<IrVarId, IrVarId> parameterBindings)
+    {
+        return new(
+            factory,
+            new WorkerCallableManifestEntry
+            {
+                CallableId = "M:Test.Subject.Cycle",
+                ClaimIds = ["claim"]
+            },
+            [new CompilerPreparedClause(
+                CompilerContractKind.Ensures,
+                factory.Boolean(true),
+                CompilerContractEvidence.CompilerBoundInvocation,
+                "claim",
+                null)],
+            variables,
+            WorkerClaimReason.None,
+            CompilerPreparedBody.ProgramBody(
+                program,
+                parameterBindings,
+                ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty));
+    }
+
+    private sealed class CompletionThenProofBackend : ISmtBackend
+    {
+        private int _callCount;
+        internal int CallCount => Volatile.Read(ref _callCount);
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Interlocked.Increment(ref _callCount) != 1)
+            {
+                return Task.FromResult(
+                    BackendCheckResult.Unsatisfiable([]));
+            }
+
+            var assignments = query.ModelVariables.Select(variable =>
+                KeyValuePair.Create(
+                    variable,
+                    query.Factory.CreateBooleanValue(false)));
+            return Task.FromResult(
+                BackendCheckResult.Satisfiable(
+                    new BackendModel(assignments)));
+        }
+    }
+
+    private sealed class UnexpectedBackend : ISmtBackend
+    {
+        private int _callCount;
+        internal int CallCount => Volatile.Read(ref _callCount);
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _callCount);
+            throw new AssertionException("A cyclic body reached the backend.");
+        }
+    }
+}

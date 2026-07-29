@@ -7,9 +7,11 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class CallableCounterexampleReplayerTests {
+public sealed class CallableCounterexampleReplayerTests
+{
     [Test]
-    public void ReplayFollowsExactBranchAndRebuildsContractState() {
+    public void ReplayFollowsExactBranchAndRebuildsContractState()
+    {
         var fixture = CreateIncrementingBranch(static (factory, current, result, old) =>
             factory.Binary(IrBinaryOperator.OrElse,
                 factory.Binary(IrBinaryOperator.NotEqual,
@@ -22,7 +24,8 @@ public sealed class CallableCounterexampleReplayerTests {
     }
 
     [Test]
-    public void ReplayRejectsAConcreteExecutionThatSatisfiesThePostcondition() {
+    public void ReplayRejectsAConcreteExecutionThatSatisfiesThePostcondition()
+    {
         var fixture = CreateIncrementingBranch(static (factory, current, result, old) =>
             factory.Binary(IrBinaryOperator.AndAlso,
                 factory.Binary(IrBinaryOperator.Equal,
@@ -37,7 +40,8 @@ public sealed class CallableCounterexampleReplayerTests {
     }
 
     [Test]
-    public void ReplayFailsClosedWhenARequiredModelValueIsMissing() {
+    public void ReplayFailsClosedWhenARequiredModelValueIsMissing()
+    {
         var fixture = CreateIncrementingBranch(static (factory, _, _, _) =>
             factory.Boolean(false));
 
@@ -47,7 +51,8 @@ public sealed class CallableCounterexampleReplayerTests {
     }
 
     [Test]
-    public void TrivialNormalCompletionRequiresItsPostconditionToBeFalse() {
+    public void TrivialNormalCompletionRequiresItsPostconditionToBeFalse()
+    {
         Assert.That(CallableCounterexampleReplayer.Replay(
             CreateTrivial(postcondition: false), 0,
             ImmutableDictionary<IrVarId, IrValue>.Empty), Is.EqualTo(WorkerClaimReason.None));
@@ -57,9 +62,11 @@ public sealed class CallableCounterexampleReplayerTests {
     }
 
     [Test]
-    public void ReplayAllowsACallOutsideTheConcretePath() {
+    public void ReplayAllowsACallOutsideTheConcretePath()
+    {
         var fixture = Create(static (factory, _, _, _) => factory.Boolean(false),
-            static (factory, source) => {
+            static (factory, source) =>
+            {
                 var builder = new IrProgramBuilder(factory);
                 var entry = builder.CreateBlock("entry");
                 var returned = builder.CreateBlock("returned");
@@ -85,14 +92,19 @@ public sealed class CallableCounterexampleReplayerTests {
     }
 
     [Test]
-    public void ReplayRejectsAProgramAboveTheCompilerInstructionBound() {
+    public void ReplayRejectsAProgramAboveTheCompilerInstructionBound()
+    {
         var fixture = Create(static (factory, _, _, _) => factory.Boolean(false),
-            static (factory, source) => {
+            static (factory, source) =>
+            {
                 var builder = new IrProgramBuilder(factory);
                 var entry = builder.CreateBlock("entry");
                 for (var index = 0; index < CompilerPreparedBody.MaximumInstructions; index++)
+                {
                     builder.Assign(entry, factory.CreateOperation(), source,
                         factory.Variable(source));
+                }
+
                 builder.Return(entry, factory.CreateOperation(),
                     factory.Variable(source));
                 return builder.Build();
@@ -106,7 +118,8 @@ public sealed class CallableCounterexampleReplayerTests {
     [TestCase(ReplayObstacle.Havoc)]
     [TestCase(ReplayObstacle.UnsupportedTerm)]
     [TestCase(ReplayObstacle.Exception)]
-    public void ReplayFailsClosedAtNonConcreteExecution(ReplayObstacle obstacle) {
+    public void ReplayFailsClosedAtNonConcreteExecution(ReplayObstacle obstacle)
+    {
         var fixture = CreateObstacle(obstacle);
 
         Assert.That(CallableCounterexampleReplayer.Replay(
@@ -114,7 +127,8 @@ public sealed class CallableCounterexampleReplayerTests {
     }
 
     [Test]
-    public void ReplayObservesPreCanceledExecution() {
+    public void ReplayObservesPreCanceledExecution()
+    {
         var target = CreateTrivial(postcondition: false);
         var cancellationToken = new CancellationToken(canceled: true);
 
@@ -127,7 +141,8 @@ public sealed class CallableCounterexampleReplayerTests {
     }
 
     [Test]
-    public void ReplayFailsClosedForMalformedCanonicalResultIdentity() {
+    public void ReplayFailsClosedForMalformedCanonicalResultIdentity()
+    {
         var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
@@ -137,7 +152,8 @@ public sealed class CallableCounterexampleReplayerTests {
             factory.Integer(0));
         var target = new CompilerCallablePreparation(
             factory,
-            new WorkerCallableManifestEntry {
+            new WorkerCallableManifestEntry
+            {
                 CallableId = "malformed-result",
                 ClaimIds = ["claim"]
             },
@@ -171,8 +187,10 @@ public sealed class CallableCounterexampleReplayerTests {
     }
 
     private static ReplayFixture CreateIncrementingBranch(
-        Func<IrFactory, IrVarId, IrVarId, IrVarId, IrTerm> postcondition) =>
-        Create(postcondition, static (factory, source) => {
+        Func<IrFactory, IrVarId, IrVarId, IrVarId, IrTerm> postcondition)
+    {
+        return Create(postcondition, static (factory, source) =>
+        {
             var builder = new IrProgramBuilder(factory);
             var entry = builder.CreateBlock("entry");
             var increment = builder.CreateBlock("increment");
@@ -190,40 +208,55 @@ public sealed class CallableCounterexampleReplayerTests {
                 factory.Variable(source));
             return builder.Build();
         });
+    }
 
-    private static ReplayFixture CreateObstacle(ReplayObstacle obstacle) =>
-        Create(static (factory, _, _, _) => factory.Boolean(false),
-            (factory, source) => {
+    private static ReplayFixture CreateObstacle(ReplayObstacle obstacle)
+    {
+        return Create(static (factory, _, _, _) => factory.Boolean(false),
+            (factory, source) =>
+            {
                 var builder = new IrProgramBuilder(factory);
                 var entry = builder.CreateBlock("entry");
                 if (obstacle == ReplayObstacle.Havoc)
+                {
                     builder.Havoc(entry, factory.CreateOperation(),
-                        IrHavocKind.Variables, source);
+                                        IrHavocKind.Variables, source);
+                }
                 else if (obstacle == ReplayObstacle.Exception)
+                {
                     builder.Assign(entry, factory.CreateOperation(), source,
-                        factory.Binary(IrBinaryOperator.Divide,
-                            factory.Variable(source), factory.Integer(0)));
-                else {
+                                        factory.Binary(IrBinaryOperator.Divide,
+                                            factory.Variable(source), factory.Integer(0)));
+                }
+                else
+                {
                     var member = factory.GetOrCreateMember(
                         factory.CreateIdentity(), factory.ObjectType, "Opaque",
                         factory.IntegerType, true, factory.IntegerType);
                     if (obstacle == ReplayObstacle.Call)
+                    {
                         builder.Call(entry, factory.CreateOperation(), source,
-                            member, null, factory.Variable(source));
+                                                member, null, factory.Variable(source));
+                    }
                     else
+                    {
                         builder.Assign(entry, factory.CreateOperation(), source,
-                            factory.PureOpaque(member, null,
-                                factory.Variable(source)));
+                                                factory.PureOpaque(member, null,
+                                                    factory.Variable(source)));
+                    }
                 }
                 builder.Return(entry, factory.CreateOperation(),
                     factory.Variable(source));
                 return builder.Build();
             });
+    }
 
-    private static CompilerCallablePreparation CreateTrivial(bool postcondition) {
+    private static CompilerCallablePreparation CreateTrivial(bool postcondition)
+    {
         var factory = new IrFactory();
         return new CompilerCallablePreparation(factory,
-            new WorkerCallableManifestEntry {
+            new WorkerCallableManifestEntry
+            {
                 CallableId = "trivial",
                 ClaimIds = ["claim"]
             },
@@ -235,14 +268,16 @@ public sealed class CallableCounterexampleReplayerTests {
 
     private static ReplayFixture Create(
         Func<IrFactory, IrVarId, IrVarId, IrVarId, IrTerm> postcondition,
-        Func<IrFactory, IrVarId, IrProgram> program) {
+        Func<IrFactory, IrVarId, IrProgram> program)
+    {
         var factory = new IrFactory();
         var current = factory.CreateVariable("parameter:0", factory.IntegerType);
         var result = factory.CreateVariable("result", factory.IntegerType);
         var old = factory.CreateVariable("pre:0", factory.IntegerType);
         var source = factory.CreateVariable("body-parameter", factory.IntegerType);
         var target = new CompilerCallablePreparation(factory,
-            new WorkerCallableManifestEntry {
+            new WorkerCallableManifestEntry
+            {
                 CallableId = "callable",
                 ClaimIds = ["claim"]
             },
@@ -266,7 +301,10 @@ public sealed class CallableCounterexampleReplayerTests {
                 current, factory.CreateIntegerValue(5)));
     }
 
-    public enum ReplayObstacle { Call, Havoc, UnsupportedTerm, Exception }
+    public enum ReplayObstacle
+    {
+        Call, Havoc, UnsupportedTerm, Exception
+    }
     private sealed record ReplayFixture(CompilerCallablePreparation Target,
         ImmutableDictionary<IrVarId, IrValue> Model);
 }
