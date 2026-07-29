@@ -204,7 +204,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task ThrowsOnlyDoesNotCoverDirectAllocationButCoversThrowingExistingException()
+    public async Task EffectOnlyClaimRemainsAccountableWhileMixedRequiresFailsClosed()
     {
         using var project = TestProject.Create(
             """
@@ -270,20 +270,29 @@ public sealed class WorkerTests
                 Is.EqualTo("managed-allocation"));
             Assert.That(
                 throwing.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 throwing.Reason,
-                Is.EqualTo(WorkerClaimReason.None));
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
             Assert.That(
-                response.CallableResults.Select(static result => result.Coverage),
-                Is.All.EqualTo(WorkerCallableCoverage.Complete));
+                response.CallableResults.Single(result =>
+                    result.CallableId.Contains(
+                        ".AllocateOnly",
+                        StringComparison.Ordinal)).Coverage,
+                Is.EqualTo(WorkerCallableCoverage.Complete));
+            Assert.That(
+                response.CallableResults.Single(result =>
+                    result.CallableId.Contains(
+                        ".ThrowExisting(",
+                        StringComparison.Ordinal)).Coverage,
+                Is.EqualTo(WorkerCallableCoverage.Incomplete));
             Assert.That(backend.CallCount, Is.Zero);
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
 
     [Test]
-    public async Task AllowedExceptionsAccountsForPossiblyNullThrownExpressions()
+    public async Task AllowedExceptionsRemainVisibleWhenMixedRequiresBodyIsUnsupported()
     {
         using var project = TestProject.Create(
             """
@@ -337,10 +346,10 @@ public sealed class WorkerTests
             Assert.That(maybeNull.EffectWitness, Is.Null);
             Assert.That(
                 requiredNonNull.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 requiredNonNull.Reason,
-                Is.EqualTo(WorkerClaimReason.None));
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
             Assert.That(
                 response.CallableResults.Single(result =>
                     result.CallableId.Contains(
@@ -352,7 +361,7 @@ public sealed class WorkerTests
                     result.CallableId.Contains(
                         ".RequiredNonNull(",
                         StringComparison.Ordinal)).Coverage,
-                Is.EqualTo(WorkerCallableCoverage.Complete));
+                Is.EqualTo(WorkerCallableCoverage.Incomplete));
             Assert.That(backend.CallCount, Is.Zero);
             Assert.That(
                 WorkerProtocolJson.Validate(response).IsValid,
