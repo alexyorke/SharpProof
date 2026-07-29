@@ -78,6 +78,7 @@
       {
         "name": "execution",
         "paths": [
+          "SharpProof.Worker/CallableEvidenceBuilder.cs",
           "SharpProof.Worker/CallableVerifier.cs",
           "SharpProof.Worker/AcyclicBlockPredicateExecutor.cs",
           "SharpProof.Worker/SpecResultDomainProjection.cs",

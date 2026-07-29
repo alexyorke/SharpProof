@@ -17,6 +17,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         "System.Threading.CancellationToken", "SharpProof.Frontend.Host.CompilationModelProvider",
         "SharpProof.Analyzer.GeneratedDiagnosticDescriptors", "SharpProof.ContractForGenerator.GeneratedDiagnosticDescriptors",
         "System.String", "SharpProof.Verify.Assumption", "SharpProof.Verify.ProofKernel",
+        "SharpProof.Worker.CallableEvidenceBuilder",
         "SharpProof.Worker.CallableVerifier", "SharpProof.Worker.PostconditionObligationBuilder",
         "SharpProof.Effects.EffectSummary",
         "SharpProof.Effects.EffectSummaryDomain", "SharpProof.Effects.EffectSummaryOperations",
@@ -134,6 +135,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 symbols,
                 KnownType.ProofKernel,
                 KnownType.CallableVerifier,
+                KnownType.CallableEvidenceBuilder,
                 KnownType.PostconditionObligationBuilder))
         {
             Report(context, MetaDiagnosticDescriptors.AssumptionConstruction, creation.Syntax.GetLocation());
@@ -547,7 +549,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         Compilation, SemanticModel, SyntaxFactory, Symbol, DiagnosticDescriptor,
         OperationCanceledException, CancellationToken, CompilationModelProvider,
         AnalyzerDiagnosticDescriptors, ContractForDiagnosticDescriptors, String,
-        Assumption, ProofKernel, CallableVerifier, PostconditionObligationBuilder,
+        Assumption, ProofKernel, CallableEvidenceBuilder, CallableVerifier,
+        PostconditionObligationBuilder,
         EffectSummary, EffectSummaryDomain,
         EffectSummaryOperations, ExternalEffectResolver, ProvenOutcome, RefutedOutcome,
         ValidatedModel, WorkerProgram, WorkerLauncherProgram, SharpProofWorker,

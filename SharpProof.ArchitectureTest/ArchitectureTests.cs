@@ -293,7 +293,7 @@ public sealed class ArchitectureTests
         Assert.That(
             FindRelativeCallers(productionFiles, "new Assumption("),
             Is.EqualTo([
-                "SharpProof.Worker/CallableVerifier.cs",
+            "SharpProof.Worker/CallableEvidenceBuilder.cs",
                 "SharpProof.Worker/PostconditionObligationBuilder.cs"
             ]));
         Assert.That(
@@ -394,6 +394,7 @@ public sealed class ArchitectureTests
                 "SharpProof.Frontend/RoslynProgramLowerer.cs"
             ],
             ["execution"] = [
+                "SharpProof.Worker/CallableEvidenceBuilder.cs",
                 "SharpProof.Worker/CallableVerifier.cs",
                 "SharpProof.Worker/AcyclicBlockPredicateExecutor.cs",
                 "SharpProof.Worker/SpecResultDomainProjection.cs",

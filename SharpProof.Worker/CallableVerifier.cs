@@ -53,82 +53,23 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             return CallableClaimResultAssembler.PostconditionUnknowns(target, body.Reason);
         }
 
-        var assumptions = ImmutableArray.CreateBuilder<Assumption>();
-        var preconditions = ImmutableArray.CreateBuilder<Assumption>();
-        var assumptionLabels = new Dictionary<ProofJustification, string>(ReferenceEqualityComparer.Instance);
-        var userAssumptionIds = new Dictionary<ProofJustification, string>(ReferenceEqualityComparer.Instance);
-        var assumptionOrdinal = 0;
-        foreach (var clause in target.Clauses)
+        var evidenceResult = CallableEvidenceBuilder.Build(
+            target,
+            body,
+            _maximumExpressionDepth);
+        if (!evidenceResult.IsSuccess)
         {
-            if (clause.Kind == CompilerContractKind.Ensures)
-            {
-                continue;
-            }
-
-            var predicate = ApplyBodySubstitutions(factory, clause.Condition, target.Variables, null,
-                ImmutableDictionary<IrVarId, IrTerm>.Empty, allowMissingResult: true);
-            if (predicate == null || GetDepth(predicate) > _maximumExpressionDepth)
-            {
-                return CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.UnsupportedExpression);
-            }
-
-            ProofJustification justification = clause.Kind == CompilerContractKind.Assume
-                ? new UserAssumedJustification(new SourceLocationId(assumptionOrdinal))
-                : new LoweredJustification(factory.CreateOperation("contract:" + assumptionOrdinal));
-            var assumption = new Assumption(factory, predicate, justification);
-            assumptions.Add(assumption);
-            if (clause.Kind == CompilerContractKind.Requires)
-            {
-                preconditions.Add(assumption);
-            }
-
-            if (clause.Kind == CompilerContractKind.Assume)
-            {
-                userAssumptionIds.Add(justification, clause.AssumptionId!);
-            }
-
-            assumptionLabels.Add(justification,
-                ClauseLabel(clause.Kind) + ":" + assumptionOrdinal.ToString(CultureInfo.InvariantCulture));
-            assumptionOrdinal++;
+            return CallableClaimResultAssembler.PostconditionUnknowns(
+                target,
+                evidenceResult.FailureReason);
         }
-        foreach (var specAssumption in body.SpecAssumptions)
-        {
-            var guard = SpecResultDomainProjection.Rewrite(factory, specAssumption.Guard, body.SpecResultProjections);
-            var specPredicate = SpecResultDomainProjection.Rewrite(
-                factory, specAssumption.Predicate, body.SpecResultProjections);
-            var predicate = Guard(factory, guard, specPredicate);
-            if (GetDepth(predicate) > _maximumExpressionDepth)
-            {
-                return CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.UnsupportedExpression);
-            }
-
-            ProofJustification justification = new SpecJustification(specAssumption.Spec);
-            assumptions.Add(new Assumption(factory, predicate, justification));
-            assumptionLabels.Add(justification, "spec:" + specAssumption.WitnessIdentifier);
-        }
-        if (!TryAddSourceDomainAssumptions(
-                factory, target.Variables, body.Returns, body.SpecResultProjections, assumptions, assumptionLabels))
-        {
-            return CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.UnsupportedExpression);
-        }
-
-        var normalCompletion = AddNormalCompletionAssumption(
-            factory,
-            body.Returns,
-            body.SpecResultProjections,
-            assumptions,
-            assumptionLabels);
-        if (assumptions.Any(assumption => GetDepth(assumption.Predicate) > _maximumExpressionDepth))
-        {
-            return CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.UnsupportedExpression);
-        }
-
-        var assumptionsUseSupportedDomain =
-            assumptions.All(assumption => IsSupportedProofDomain(factory, assumption.Predicate));
-        ImmutableArray<IrVarId> replayVariables = [.. target.Variables.Where(variable =>
-            variable.Role is CompilerVariableRole.Receiver or CompilerVariableRole.Parameter &&
-            factory.GetTypeInfo(factory.GetVariableInfo(variable.Variable).Type).Kind is
-                IrTypeKind.Boolean or IrTypeKind.Integer).Select(static variable => variable.Variable)];
+        var evidence = evidenceResult.Evidence!;
+        var assumptions = evidence.Assumptions;
+        var preconditions = evidence.Preconditions;
+        var assumptionLabels = evidence.AssumptionLabels;
+        var userAssumptionIds = evidence.UserAssumptionIds;
+        var normalCompletion = evidence.NormalCompletion;
+        var replayVariables = evidence.ReplayVariables;
         ProofOutcome? vacuityUnknown = null;
         var contradictoryPreconditions = preconditions.Any(static assumption =>
             assumption.Predicate is IrBooleanTerm { Value: false });
@@ -208,7 +149,8 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 records.Add(CallableClaimResultAssembler.Unknown(target, index, WorkerClaimReason.DeepPostcondition));
                 continue;
             }
-            if (!assumptionsUseSupportedDomain || !IsSupportedProofDomain(factory, condition))
+            if (!evidence.UsesSupportedDomain ||
+                !IsSupportedProofDomain(factory, condition))
             {
                 records.Add(CallableClaimResultAssembler.Unknown(target, index, WorkerClaimReason.UnsupportedExpression));
                 continue;
@@ -282,14 +224,4 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             []);
     }
 
-    private static string ClauseLabel(CompilerContractKind kind)
-    {
-        return kind switch
-        {
-            CompilerContractKind.Requires => "requires",
-            CompilerContractKind.Assume => "assume",
-            CompilerContractKind.Ensures => "ensures",
-            _ => throw new ArgumentOutOfRangeException(nameof(kind))
-        };
-    }
 }
