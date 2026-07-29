@@ -406,6 +406,7 @@ public sealed class ArchitectureTests
             ["encoding"] = ["SharpProof.Smt/IrSmtBackend.cs"],
             ["apiSpecifications"] = [
                 "SharpProof.Specs/ApiSpecTable.cs",
+                "SharpProof.Specs/ApiSpecTermValidator.cs",
                 "SharpProof.Effects/ApiSpecResolution.cs",
                 "SharpProof.Specs/ApiSpecInstantiation.cs"
             ],
