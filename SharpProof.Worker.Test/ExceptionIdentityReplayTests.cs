@@ -230,6 +230,112 @@ public sealed class ExceptionIdentityReplayTests
         }
     }
 
+    [Test]
+    public void ConstructedGenericExceptionReplayUsesClosedTypeIdentity()
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            """
+            public sealed class GenericBoomException<T>
+                : System.Exception {
+            }
+
+            public static class Subject {
+                public static void Compare(
+                    GenericBoomException<int> allowed,
+                    GenericBoomException<string> thrown) {
+                }
+            }
+            """,
+            new CSharpParseOptions(LanguageVersion.CSharp12));
+        var compilation = CSharpCompilation.Create(
+            "Constructed.Exception.Consumer",
+            [tree],
+            PlatformReferences,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var method = compilation.GetTypeByMetadataName("Subject")!
+            .GetMembers("Compare")
+            .OfType<IMethodSymbol>()
+            .Single();
+        var allowed = (INamedTypeSymbol)method.Parameters[0].Type;
+        var thrown = (INamedTypeSymbol)method.Parameters[1].Type;
+        var allowedIdentity = CompilerExceptionTypeIdentity.Encode(allowed);
+        var thrownIdentity = CompilerExceptionTypeIdentity.Encode(thrown);
+
+        var mismatched = Replay(allowedIdentity);
+        var matched = Replay(thrownIdentity);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(allowedIdentity, Is.Not.EqualTo(thrownIdentity));
+            Assert.That(
+                CompilerExceptionTypeIdentity.EncodeHierarchy(thrown),
+                Does.Contain(thrownIdentity).And.Not.Contain(allowedIdentity));
+            Assert.That(
+                mismatched.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(
+                mismatched.Reason,
+                Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                matched.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                matched.Reason,
+                Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
+        }
+
+        WorkerClaimResult Replay(string allowedExceptionType)
+        {
+            const string claimId = "constructed-generic-exception";
+            var evidence = new CompilerEffectClaimArtifact
+            {
+                ClaimId = claimId,
+                ContractKind = WorkerEffectContractKind.AllowedExceptions,
+                Outcome = WorkerClaimOutcome.Refuted,
+                Reason = WorkerClaimReason.None,
+                Certainty = WorkerEffectEvidenceCertainty.DefiniteViolation,
+                Constraint = new CompilerEffectConstraintArtifact
+                {
+                    AllowedExceptionTypes = [allowedExceptionType]
+                },
+                Witness = new WorkerEffectViolationWitness
+                {
+                    Kind = "explicit-throw",
+                    Detail = thrownIdentity,
+                    Effects = WorkerEffectSet.Throws,
+                    ExactExceptionTypeHierarchy =
+                        CompilerExceptionTypeIdentity.EncodeHierarchy(thrown),
+                    Location = new WorkerSourceLocation
+                    {
+                        Path = "Subject.cs",
+                        Start = 0,
+                        Length = 1,
+                        Line = 1,
+                        Column = 1
+                    }
+                },
+                Evidence = "constructed-generic-exception"
+            };
+            CompilerEffectClaimArtifactCodec.Seal(evidence);
+            var target = new CompilerCallablePreparation(
+                new IrFactory(),
+                new WorkerCallableManifestEntry
+                {
+                    CallableId = "M:Subject.Compare",
+                    ClaimIds = [claimId]
+                },
+                [],
+                [],
+                WorkerClaimReason.None,
+                CompilerPreparedBody.Trivial())
+            {
+                EffectClaims = [evidence]
+            };
+            return EffectWitnessReplayer.Assemble(target, evidence);
+        }
+    }
+
     private static string LegacyIdentity(INamedTypeSymbol type)
     {
         return type.ContainingAssembly.Identity.Name + ":" +

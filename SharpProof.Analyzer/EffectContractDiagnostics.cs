@@ -319,13 +319,15 @@ internal static class EffectContractDiagnostics
             if (exceptionType != null &&
                 !values.IsDefault &&
                 values.All(argument => argument.Value is INamedTypeSymbol type &&
+                    !type.IsUnboundGenericType &&
                     EffectTypeFacts.IsDerivedFrom(type, exceptionType)))
             {
                 types.AddRange(values.Select(static argument => (INamedTypeSymbol)argument.Value!));
                 continue;
             }
             ReportInvalidOnce(
-                attribute, "[AllowedExceptions]", "expected only System.Exception-derived types",
+                attribute, "[AllowedExceptions]",
+                "expected only closed System.Exception-derived types",
                 fallbackLocation, session, reportDiagnostic);
             valid = false;
         }

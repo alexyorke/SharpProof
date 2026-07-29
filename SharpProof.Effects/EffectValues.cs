@@ -277,22 +277,18 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
             return 1;
         }
 
-        var result = string.Compare(left.ContainingAssembly?.Identity.Name,
-            right.ContainingAssembly?.Identity.Name, StringComparison.Ordinal);
+        var result = string.Compare(
+            CanonicalIdentity(left),
+            CanonicalIdentity(right),
+            StringComparison.Ordinal);
         if (result != 0)
         {
             return result;
         }
 
-        result = string.Compare(
-            DocumentationCommentId.CreateDeclarationId(left) ??
-            left.Kind + ":" + left.MetadataName,
-            DocumentationCommentId.CreateDeclarationId(right) ??
-            right.Kind + ":" + right.MetadataName,
-            StringComparison.Ordinal);
-        if (result != 0)
+        if (SymbolEqualityComparer.Default.Equals(left, right))
         {
-            return result;
+            return 0;
         }
 
         var leftLocation = left.Locations.FirstOrDefault(static location => location.IsInSource);
@@ -304,6 +300,13 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
             : (leftLocation?.SourceSpan.Start ?? -1)
                 .CompareTo(rightLocation?.SourceSpan.Start ?? -1);
     }
+
+    private static string CanonicalIdentity(TSymbol symbol)
+    {
+        return symbol is ITypeSymbol type
+            ? CompilerIdentityBridge.CreateTypeDisplay(type)
+            : CompilerIdentityBridge.CreateSymbolDisplay(symbol);
+    }
 }
 
 internal static class EffectTypeFacts
@@ -312,7 +315,7 @@ internal static class EffectTypeFacts
     {
         for (var current = type; current != null; current = current.BaseType)
         {
-            if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, expectedBase.OriginalDefinition))
+            if (SymbolEqualityComparer.Default.Equals(current, expectedBase))
             {
                 return true;
             }

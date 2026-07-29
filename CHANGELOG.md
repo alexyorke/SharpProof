@@ -96,6 +96,9 @@ contain documented breaking changes.
   receiver and reduced arguments to their original parameter ordinals.
 - Closed parameter contracts now use one validator in the analyzer and binder;
   `out` parameters and non-reference-capable `[NotNull]` types fail visibly.
+- Constructed generic exception types remain distinct in catch, allowed-
+  exception, effect-set, manifest, and replay evidence; unbound generic
+  exception contracts are rejected.
 - `SharpProofEffect.Throws` no longer implicitly permits managed allocation;
   every declared effect flag is enforced independently.
 - Throwing a possibly null exception expression now includes the possible

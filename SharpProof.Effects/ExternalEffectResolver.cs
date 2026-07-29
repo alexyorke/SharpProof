@@ -403,7 +403,8 @@ internal sealed class ExternalEffectResolver
 
     private bool IsException(INamedTypeSymbol type)
     {
-        return _exceptionType != null &&
+        return !type.IsUnboundGenericType &&
+        _exceptionType != null &&
         EffectTypeFacts.IsDerivedFrom(type, _exceptionType);
     }
 

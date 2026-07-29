@@ -772,6 +772,107 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void ConstructedGenericExceptionClaimsRemainExact()
+    {
+        var discovery = Build((
+            "Subject.cs",
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public class GenericException<T> : Exception {
+            }
+
+            public sealed class DerivedStringException
+                : GenericException<string> {
+            }
+
+            public static class Subject {
+                [AllowedExceptions(typeof(GenericException<int>))]
+                public static void WrongAllowed(
+                    [NotNull] GenericException<string> exception) =>
+                    throw exception;
+
+                [AllowedExceptions(typeof(GenericException<string>))]
+                public static void ExactAllowed(
+                    [NotNull] GenericException<string> exception) =>
+                    throw exception;
+
+                [AllowedExceptions(typeof(GenericException<string>))]
+                public static void DerivedAllowed(
+                    [NotNull] DerivedStringException exception) =>
+                    throw exception;
+
+                [DoesNotThrow]
+                public static void WrongCatch(
+                    [NotNull] GenericException<string> exception) {
+                    try {
+                        throw exception;
+                    }
+                    catch (GenericException<int>) {
+                    }
+                }
+
+                [DoesNotThrow]
+                public static void ExactCatch(
+                    [NotNull] GenericException<string> exception) {
+                    try {
+                        throw exception;
+                    }
+                    catch (GenericException<string>) {
+                    }
+                }
+            }
+            """));
+        var targets = discovery.Targets.Values.ToDictionary(
+            static target => target.Method.Name,
+            StringComparer.Ordinal);
+        var wrongAllowed = targets["WrongAllowed"].EffectClaims.Single().Evidence;
+        var exactAllowed = targets["ExactAllowed"].EffectClaims.Single().Evidence;
+        var derivedAllowed = targets["DerivedAllowed"].EffectClaims.Single().Evidence;
+        var wrongCatch = targets["WrongCatch"].EffectClaims.Single().Evidence;
+        var exactCatch = targets["ExactCatch"].EffectClaims.Single().Evidence;
+        var thrownStringType = (INamedTypeSymbol)targets["WrongAllowed"]
+            .Method.Parameters[0].Type;
+        var integerIdentity = wrongAllowed.Constraint
+            .AllowedExceptionTypes.Single();
+        var stringIdentity = CompilerExceptionTypeIdentity.Encode(
+            thrownStringType);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(integerIdentity, Is.Not.EqualTo(stringIdentity));
+            Assert.That(
+                wrongAllowed.Constraint.AllowedExceptionTypes,
+                Is.EqualTo([integerIdentity]));
+            Assert.That(
+                wrongAllowed.Evidence,
+                Does.Contain(integerIdentity).And.Contain(stringIdentity));
+            Assert.That(
+                wrongAllowed.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                wrongAllowed.Reason,
+                Is.EqualTo(WorkerClaimReason.EffectContractNotEstablished));
+            Assert.That(
+                exactAllowed.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                derivedAllowed.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                wrongCatch.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                wrongCatch.Reason,
+                Is.EqualTo(WorkerClaimReason.EffectContractNotEstablished));
+            Assert.That(
+                exactCatch.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+        }
+    }
+
+    [Test]
     public void RepeatableEffectAttributesEachReceiveAStableClaim()
     {
         const string source =

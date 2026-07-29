@@ -1288,6 +1288,141 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task ConstructedGenericExceptionContractsAndCatchesRemainExact()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public class GenericException<T> : Exception {
+            }
+
+            public sealed class DerivedStringException
+                : GenericException<string> {
+            }
+
+            public static class Fixture {
+                [AllowedExceptions(typeof(GenericException<int>))]
+                public static void WrongAllowed(
+                    [NotNull] GenericException<string> exception) =>
+                    throw exception;
+
+                [AllowedExceptions(typeof(GenericException<string>))]
+                public static void ExactAllowed(
+                    [NotNull] GenericException<string> exception) =>
+                    throw exception;
+
+                [AllowedExceptions(typeof(Exception))]
+                public static void BaseAllowed(
+                    [NotNull] GenericException<string> exception) =>
+                    throw exception;
+
+                [AllowedExceptions(typeof(GenericException<string>))]
+                public static void DerivedAllowed(
+                    [NotNull] DerivedStringException exception) =>
+                    throw exception;
+
+                [DoesNotThrow]
+                public static void WrongCatch(
+                    [NotNull] GenericException<string> exception) {
+                    try {
+                        throw exception;
+                    }
+                    catch (GenericException<int>) {
+                    }
+                }
+
+                [DoesNotThrow]
+                public static void ExactCatch(
+                    [NotNull] GenericException<string> exception) {
+                    try {
+                        throw exception;
+                    }
+                    catch (GenericException<string>) {
+                    }
+                }
+            }
+            """,
+            mode: null,
+            ["SP0046", "SP0047"],
+            new SharpProofAnalyzer(factory),
+            features: "effects");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0046", "SP0046"]));
+            Assert.That(
+                factory.Outcomes["WrongAllowed"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["ExactAllowed"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["BaseAllowed"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["DerivedAllowed"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["WrongCatch"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["ExactCatch"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+        }
+    }
+
+    [Test]
+    public async Task UnboundGenericExceptionContractsAreInvalid()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class GenericException<T> : Exception {
+            }
+
+            public static class Fixture {
+                [AllowedExceptions(typeof(GenericException<>))]
+                public static void InvalidAllowedExceptions() {
+                }
+
+                [EffectContract(
+                    SharpProofEffect.Throws,
+                    ThrownExceptions = new[] {
+                        typeof(GenericException<>)
+                    },
+                    Complete = true)]
+                public static void InvalidEffectContract() {
+                }
+            }
+            """,
+            mode: null,
+            ["SP0024"],
+            features: "effects");
+        var messages = diagnostics.Select(diagnostic =>
+            diagnostic.GetMessage(CultureInfo.InvariantCulture));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0024", "SP0024"]));
+            Assert.That(
+                messages,
+                Has.Some.Contain("closed System.Exception-derived types"));
+            Assert.That(
+                messages,
+                Has.Some.Contain("[EffectContract]"));
+        }
+    }
+
+    [Test]
     public async Task ContractsOnlyStillRejectsInvalidEffectContractBits()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

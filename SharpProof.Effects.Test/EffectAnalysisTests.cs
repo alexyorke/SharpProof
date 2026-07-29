@@ -1889,6 +1889,118 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ExceptionFlowDistinguishesConstructedGenericExceptionTypes()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            public class GenericException<T> : System.Exception {
+            }
+
+            public sealed class DerivedStringException
+                : GenericException<string> {
+            }
+
+            public static class Sample {
+                public static void MismatchedCatch(
+                    [NotNull] GenericException<string> exception) {
+                    try {
+                        throw exception;
+                    }
+                    catch (GenericException<int>) {
+                    }
+                }
+
+                public static void ExactCatch(
+                    [NotNull] GenericException<string> exception) {
+                    try {
+                        throw exception;
+                    }
+                    catch (GenericException<string>) {
+                    }
+                }
+
+                public static void BaseCatch(
+                    [NotNull] GenericException<string> exception) {
+                    try {
+                        throw exception;
+                    }
+                    catch (System.Exception) {
+                    }
+                }
+
+                public static void DerivedCatch(
+                    [NotNull] DerivedStringException exception) {
+                    try {
+                        throw exception;
+                    }
+                    catch (GenericException<string>) {
+                    }
+                }
+
+                public static void MismatchedDerivedCatch(
+                    [NotNull] DerivedStringException exception) {
+                    try {
+                        throw exception;
+                    }
+                    catch (GenericException<int>) {
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var genericException = EffectTestHost.RequireType(
+            compilation,
+            "GenericException`1");
+        var integerException = genericException.Construct(
+            compilation.GetSpecialType(SpecialType.System_Int32));
+        var stringException = genericException.Construct(
+            compilation.GetSpecialType(SpecialType.System_String));
+        var derivedException = EffectTestHost.RequireType(
+            compilation,
+            "DerivedStringException");
+        var mismatched = session.Analyze(
+            Method(compilation, "MismatchedCatch"));
+        var mismatchedDerived = session.Analyze(
+            Method(compilation, "MismatchedDerivedCatch"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                mismatched.Summary.Throws.Types,
+                Is.EqualTo([stringException])
+                    .Using<INamedTypeSymbol>(SymbolEqualityComparer.Default));
+            Assert.That(
+                mismatchedDerived.Summary.Throws.Types,
+                Is.EqualTo([derivedException])
+                    .Using<INamedTypeSymbol>(SymbolEqualityComparer.Default));
+            Assert.That(
+                session.Analyze(Method(compilation, "ExactCatch"))
+                    .Summary.Throws.IsEmpty,
+                Is.True);
+            Assert.That(
+                session.Analyze(Method(compilation, "BaseCatch"))
+                    .Summary.Throws.IsEmpty,
+                Is.True);
+            Assert.That(
+                session.Analyze(Method(compilation, "DerivedCatch"))
+                    .Summary.Throws.IsEmpty,
+                Is.True);
+            Assert.That(
+                EffectTypeFacts.IsDerivedFrom(
+                    derivedException,
+                    stringException),
+                Is.True);
+            Assert.That(
+                EffectTypeFacts.IsDerivedFrom(
+                    derivedException,
+                    integerException),
+                Is.False);
+        }
+    }
+
+    [Test]
     public void AcyclicFlowDischargesOnlyProvenImplicitExceptions()
     {
         var compilation = EffectTestHost.CreateCompilation(
