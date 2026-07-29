@@ -1,11 +1,17 @@
 namespace SharpProof.CompilerProbe.TestAsset;
 
-internal static class ProbeJson {
+internal static class ProbeJson
+{
     internal static void PropertyName(
         StringBuilder builder,
         ref bool first,
-        string name) {
-        if (!first) builder.Append(',');
+        string name)
+    {
+        if (!first)
+        {
+            builder.Append(',');
+        }
+
         first = false;
         String(builder, name);
         builder.Append(':');
@@ -15,7 +21,8 @@ internal static class ProbeJson {
         StringBuilder builder,
         ref bool first,
         string name,
-        string value) {
+        string value)
+    {
         PropertyName(builder, ref first, name);
         String(builder, value);
     }
@@ -24,7 +31,8 @@ internal static class ProbeJson {
         StringBuilder builder,
         ref bool first,
         string name,
-        bool value) {
+        bool value)
+    {
         PropertyName(builder, ref first, name);
         builder.Append(value ? "true" : "false");
     }
@@ -33,7 +41,8 @@ internal static class ProbeJson {
         StringBuilder builder,
         ref bool first,
         string name,
-        int value) {
+        int value)
+    {
         PropertyName(builder, ref first, name);
         builder.Append(value.ToString(CultureInfo.InvariantCulture));
     }
@@ -42,7 +51,8 @@ internal static class ProbeJson {
         StringBuilder builder,
         ref bool first,
         string name,
-        IEnumerable<string> values) {
+        IEnumerable<string> values)
+    {
         PropertyName(builder, ref first, name);
         StringArray(builder, values);
     }
@@ -51,12 +61,18 @@ internal static class ProbeJson {
         StringBuilder builder,
         ref bool first,
         string name,
-        IEnumerable<string> rows) {
+        IEnumerable<string> rows)
+    {
         PropertyName(builder, ref first, name);
         builder.Append('[');
         var firstRow = true;
-        foreach (var row in rows) {
-            if (!firstRow) builder.Append(',');
+        foreach (var row in rows)
+        {
+            if (!firstRow)
+            {
+                builder.Append(',');
+            }
+
             firstRow = false;
             builder.Append(row);
         }
@@ -65,21 +81,30 @@ internal static class ProbeJson {
 
     internal static void StringArray(
         StringBuilder builder,
-        IEnumerable<string> values) {
+        IEnumerable<string> values)
+    {
         builder.Append('[');
         var first = true;
-        foreach (var value in values) {
-            if (!first) builder.Append(',');
+        foreach (var value in values)
+        {
+            if (!first)
+            {
+                builder.Append(',');
+            }
+
             first = false;
             String(builder, value);
         }
         builder.Append(']');
     }
 
-    internal static void String(StringBuilder builder, string value) {
+    internal static void String(StringBuilder builder, string value)
+    {
         builder.Append('"');
-        foreach (var character in value) {
-            switch (character) {
+        foreach (var character in value)
+        {
+            switch (character)
+            {
                 case '"':
                     builder.Append("\\\"");
                     break;
@@ -102,14 +127,16 @@ internal static class ProbeJson {
                     builder.Append("\\t");
                     break;
                 default:
-                    if (character < ' ') {
+                    if (character < ' ')
+                    {
                         builder.Append("\\u");
                         builder.Append(
                             ((int)character).ToString(
                                 "x4",
                                 CultureInfo.InvariantCulture));
                     }
-                    else {
+                    else
+                    {
                         builder.Append(character);
                     }
                     break;

@@ -1,6 +1,7 @@
 namespace SharpProof.Attributes;
 [Flags]
-public enum SharpProofEffect : long {
+public enum SharpProofEffect : long
+{
     None = 0,
     ReadsReceiverState = 1L << 0,
     ReadsArgumentState = 1L << 1,

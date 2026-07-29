@@ -8,7 +8,8 @@ using SharpProof.Meta.Analyzers;
 namespace SharpProof.Meta.Analyzers.Test;
 
 [TestFixture]
-public sealed class SharpProofSoundnessAnalyzerTests {
+public sealed class SharpProofSoundnessAnalyzerTests
+{
     [TestCase(
         """
         using Microsoft.CodeAnalysis;
@@ -176,7 +177,39 @@ public sealed class SharpProofSoundnessAnalyzerTests {
         }
         """,
         "SPMETA010")]
-    public async Task ReportsSoundnessBoundaryViolation(string source, string expectedId) {
+    [TestCase(
+        """
+        namespace SharpProof.Verify;
+        enum Answer { Proven }
+        sealed class AnswerSource {
+            internal Answer Unknown => Answer.Proven;
+        }
+        sealed class ProofCache {
+            internal void Write(Answer answer) { }
+        }
+        sealed class C {
+            void M(ProofCache cache, AnswerSource source) =>
+                cache.Write(source.Unknown);
+        }
+        """,
+        "SPMETA010")]
+    [TestCase(
+        """
+        namespace SharpProof.Verify;
+        enum Answer { Proven }
+        sealed class ProofCache {
+            internal void Write(Answer answer) { }
+        }
+        sealed class C {
+            void M(ProofCache cache) {
+                var TimeoutAnswer = Answer.Proven;
+                cache.Write(TimeoutAnswer);
+            }
+        }
+        """,
+        "SPMETA010")]
+    public async Task ReportsSoundnessBoundaryViolation(string source, string expectedId)
+    {
         var diagnostics = await Analyze(source);
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
@@ -184,7 +217,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
     }
 
     [Test]
-    public async Task AllowsImmutableStateAndCancellationRethrow() {
+    public async Task AllowsImmutableStateAndCancellationRethrow()
+    {
         const string source =
             """
             using System;
@@ -316,7 +350,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
         }
         """)]
     public async Task RejectsDeferredOrUnrelatedCancellationPropagation(
-        string source) {
+        string source)
+    {
         var diagnostics = await Analyze(source);
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
@@ -324,7 +359,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
     }
 
     [Test]
-    public async Task AllowsImmediateRethrowAndAuditedWorkerBoundaries() {
+    public async Task AllowsImmediateRethrowAndAuditedWorkerBoundaries()
+    {
         const string source =
             """
             using System;
@@ -339,8 +375,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
                     }
                 }
 
-                sealed class SharpProofWorker {
-                    private sealed class CallableVerificationResult { }
+                sealed class CallableVerificationResult { }
+                static class CallableVerificationPolicy {
                     private static async Task<CallableVerificationResult>
                         VerifyTargetAsync(
                             object verifier,
@@ -348,7 +384,6 @@ public sealed class SharpProofSoundnessAnalyzerTests {
                             object budgets,
                             object parallelism,
                             object resourceGate,
-                            object resourceCount,
                             object projectBoundary,
                             CancellationToken callerCancellation) {
                         await Task.Yield();
@@ -367,7 +402,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
     }
 
     [Test]
-    public async Task AllowsExactWorkerVerifyAsyncCancellationBoundary() {
+    public async Task AllowsExactWorkerVerifyAsyncCancellationBoundary()
+    {
         const string source =
             """
             using System;
@@ -420,7 +456,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
         "internal async Task<WorkerVerifyResponse> VerifyAsync(WorkerVerifyRequest request, CancellationToken token)")]
     public async Task RejectsWorkerVerifyAsyncLookalikes(
         string typeName,
-        string methodSignature) {
+        string methodSignature)
+    {
         var exactTypeDeclaration =
             typeName == "SharpProofWorker"
                 ? ""
@@ -457,7 +494,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
     }
 
     [Test]
-    public async Task AllowsAuditedWorkerTypedCancellationReification() {
+    public async Task AllowsAuditedWorkerTypedCancellationReification()
+    {
         const string source =
             """
             using System;
@@ -469,8 +507,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
             }
             namespace SharpProof.Worker {
                 using SharpProof.Worker.Protocol;
-                sealed class SharpProofWorker {
-                    private sealed class CallableVerificationResult { }
+                sealed class CallableVerificationResult { }
+                static class CallableVerificationPolicy {
                     private static CallableVerificationResult Unknown(
                         object target,
                         WorkerClaimReason claimReason,
@@ -483,7 +521,6 @@ public sealed class SharpProofSoundnessAnalyzerTests {
                             object budgets,
                             object parallelism,
                             object resourceGate,
-                            object resourceCount,
                             object projectBoundary,
                             CancellationToken callerCancellation) {
                         await Task.Yield();
@@ -543,7 +580,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
         string targetArgument,
         string claimReason,
         string callableReason,
-        string unknownHelper) {
+        string unknownHelper)
+    {
         var source =
             $$"""
             using System;
@@ -555,8 +593,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
             }
             namespace SharpProof.Worker {
                 using SharpProof.Worker.Protocol;
-                sealed class SharpProofWorker {
-                    private sealed class CallableVerificationResult { }
+                sealed class CallableVerificationResult { }
+                static class CallableVerificationPolicy {
                     private static CallableVerificationResult Unknown(
                         object target,
                         WorkerClaimReason claimReason,
@@ -576,7 +614,6 @@ public sealed class SharpProofSoundnessAnalyzerTests {
                             object budgets,
                             object parallelism,
                             object resourceGate,
-                            object resourceCount,
                             CancellationToken unrelatedCancellation,
                             CancellationToken callerCancellation) {
                         await Task.Yield();
@@ -605,15 +642,16 @@ public sealed class SharpProofSoundnessAnalyzerTests {
     }
 
     [Test]
-    public async Task AuditedWorkerTimeoutBoundaryMustGuardCallerCancellation() {
+    public async Task AuditedWorkerTimeoutBoundaryMustGuardCallerCancellation()
+    {
         const string source =
             """
             using System;
             using System.Threading;
             using System.Threading.Tasks;
             namespace SharpProof.Worker {
-                sealed class SharpProofWorker {
-                    private sealed class CallableVerificationResult { }
+                sealed class CallableVerificationResult { }
+                static class CallableVerificationPolicy {
                     private static async Task<CallableVerificationResult>
                         VerifyTargetAsync(
                             object verifier,
@@ -621,7 +659,6 @@ public sealed class SharpProofSoundnessAnalyzerTests {
                             object budgets,
                             object parallelism,
                             object resourceGate,
-                            object resourceCount,
                             object projectBoundary,
                             CancellationToken callerCancellation) {
                         await Task.Yield();
@@ -641,7 +678,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
     }
 
     [Test]
-    public async Task RejectsTargetTypedProofOutcomesOutsideTheKernel() {
+    public async Task RejectsTargetTypedProofOutcomesOutsideTheKernel()
+    {
         const string source =
             """
             namespace SharpProof.Verify {
@@ -673,7 +711,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
     }
 
     [Test]
-    public async Task AllowsProofOutcomeConstructionInsideTheKernel() {
+    public async Task AllowsProofOutcomeConstructionInsideTheKernel()
+    {
         const string source =
             """
             namespace SharpProof.Verify {
@@ -699,7 +738,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
     }
 
     [Test]
-    public async Task AllowsTrustedEvidenceAndEffectConstruction() {
+    public async Task AllowsTrustedEvidenceAndEffectConstruction()
+    {
         const string source =
             """
             namespace SharpProof.Verify {
@@ -713,6 +753,9 @@ public sealed class SharpProofSoundnessAnalyzerTests {
             namespace SharpProof.Worker {
                 public sealed class CallableVerifier {
                     object M() => new SharpProof.Verify.Assumption();
+                }
+                public static class PostconditionObligationBuilder {
+                    static object M() => new SharpProof.Verify.Assumption();
                 }
             }
             namespace SharpProof.Effects {
@@ -737,7 +780,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
     }
 
     [Test]
-    public async Task AllowsDisplayStringsOutsideSoundnessCriticalLayers() {
+    public async Task AllowsDisplayStringsOutsideSoundnessCriticalLayers()
+    {
         const string source =
             """
             using Microsoft.CodeAnalysis;
@@ -752,7 +796,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
     }
 
     [Test]
-    public async Task AllowsLookalikeSymbolTypesInsideSoundnessCriticalLayers() {
+    public async Task AllowsLookalikeSymbolTypesInsideSoundnessCriticalLayers()
+    {
         const string source =
             """
             namespace Example {
@@ -773,7 +818,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
     }
 
     [Test]
-    public async Task AllowsOnlyTheResolvedGeneratedDescriptorCatalog() {
+    public async Task AllowsOnlyTheResolvedGeneratedDescriptorCatalog()
+    {
         const string source =
             """
             using Microsoft.CodeAnalysis;
@@ -807,7 +853,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
     }
 
     [Test]
-    public async Task AllowsOnlyTheNamedSemanticModelHostAdapter() {
+    public async Task AllowsOnlyTheNamedSemanticModelHostAdapter()
+    {
         const string source =
             """
             using Microsoft.CodeAnalysis;
@@ -828,7 +875,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
     [TestCase("SharpProof.Analyzer.Host", "CompilationModelProvider")]
     public async Task RejectsSemanticModelCallsOutsideTheNamedHostAdapter(
         string namespaceName,
-        string typeName) {
+        string typeName)
+    {
         var source =
             $$"""
             using Microsoft.CodeAnalysis;
@@ -847,7 +895,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
             Does.Contain("SPMETA001"));
     }
 
-    private static async Task<ImmutableArray<Diagnostic>> Analyze(string source) {
+    private static async Task<ImmutableArray<Diagnostic>> Analyze(string source)
+    {
         var compilation = CSharpCompilation.Create(
             "MetaAnalyzerTest",
             [CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12))],
@@ -863,7 +912,8 @@ public sealed class SharpProofSoundnessAnalyzerTests {
             .GetAnalyzerDiagnosticsAsync();
     }
 
-    private static IEnumerable<MetadataReference> PlatformReferences() {
+    private static IEnumerable<MetadataReference> PlatformReferences()
+    {
         var trustedAssemblies =
             (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
             throw new InvalidOperationException("Trusted platform assemblies are unavailable.");

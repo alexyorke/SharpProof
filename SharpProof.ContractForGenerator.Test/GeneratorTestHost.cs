@@ -2,23 +2,29 @@ using System.Globalization;
 
 namespace SharpProof.ContractForGenerator.Test;
 
-internal static class GeneratorTestHost {
+internal static class GeneratorTestHost
+{
     private static readonly CSharpParseOptions ParseOptions =
         CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp12);
     private static readonly ImmutableArray<MetadataReference> References =
         CreateReferences();
 
     internal static CSharpCompilation CreateCompilation(
-        params (string Path, string Source)[] sources) =>
-        CreateCompilation(References, sources);
+        params (string Path, string Source)[] sources)
+    {
+        return CreateCompilation(References, sources);
+    }
 
     internal static CSharpCompilation CreateCompilationWithoutAttributes(
-        params (string Path, string Source)[] sources) =>
-        CreateCompilation(CreateReferences(includeAttributes: false), sources);
+        params (string Path, string Source)[] sources)
+    {
+        return CreateCompilation(CreateReferences(includeAttributes: false), sources);
+    }
 
     private static CSharpCompilation CreateCompilation(
         ImmutableArray<MetadataReference> references,
-        params (string Path, string Source)[] sources) {
+        params (string Path, string Source)[] sources)
+    {
         var trees = sources.Select(source =>
             CSharpSyntaxTree.ParseText(
                 source.Source,
@@ -40,7 +46,8 @@ internal static class GeneratorTestHost {
 
     internal static GeneratorRun Run(
         CSharpCompilation compilation,
-        GeneratorDriver? previousDriver = null) {
+        GeneratorDriver? previousDriver = null)
+    {
         var driver = previousDriver ?? CreateDriver();
         driver = driver.RunGeneratorsAndUpdateCompilation(
             compilation,
@@ -70,15 +77,18 @@ internal static class GeneratorTestHost {
     }
 
     internal static ImmutableArray<string> DiagnosticKeys(
-        GeneratorRun run) =>
-        [.. run.Diagnostics.Select(static diagnostic =>
+        GeneratorRun run)
+    {
+        return [.. run.Diagnostics.Select(static diagnostic =>
             diagnostic.Id + "|" +
             diagnostic.Location.SourceTree?.FilePath + "|" +
             diagnostic.Location.SourceSpan.Start + "|" +
             diagnostic.GetMessage(CultureInfo.InvariantCulture))];
+    }
 
-    private static CSharpGeneratorDriver CreateDriver() =>
-        CSharpGeneratorDriver.Create(
+    private static CSharpGeneratorDriver CreateDriver()
+    {
+        return CSharpGeneratorDriver.Create(
             generators: [
                 new ContractForValidatorGenerator().AsSourceGenerator()
             ],
@@ -86,9 +96,11 @@ internal static class GeneratorTestHost {
             driverOptions: new GeneratorDriverOptions(
                 IncrementalGeneratorOutputKind.None,
                 trackIncrementalGeneratorSteps: true));
+    }
 
     private static ImmutableArray<MetadataReference> CreateReferences(
-        bool includeAttributes = true) {
+        bool includeAttributes = true)
+    {
         var trustedAssemblies =
             AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string ??
             throw new InvalidOperationException(
@@ -98,20 +110,26 @@ internal static class GeneratorTestHost {
             .OrderBy(static path => path, StringComparer.Ordinal)
             .Select(static path => MetadataReference.CreateFromFile(path));
         if (includeAttributes)
+        {
             references = references.Append(MetadataReference.CreateFromFile(
                 typeof(ContractForAttribute).Assembly.Location));
+        }
+
         return [.. references];
     }
 
-    private static void RequireNoErrors(Compilation compilation) {
+    private static void RequireNoErrors(Compilation compilation)
+    {
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error)
             .ToImmutableArray();
         if (!errors.IsDefaultOrEmpty)
+        {
             throw new InvalidOperationException(string.Join(
                 Environment.NewLine,
                 errors.Select(static diagnostic => diagnostic.ToString())));
+        }
     }
 }
 
@@ -120,7 +138,8 @@ internal sealed class GeneratorRun(
     CSharpCompilation outputCompilation,
     GeneratorDriver driver,
     GeneratorDriverRunResult runResult,
-    ImmutableArray<Diagnostic> diagnostics) {
+    ImmutableArray<Diagnostic> diagnostics)
+{
     internal CSharpCompilation InputCompilation { get; } = inputCompilation;
     internal CSharpCompilation OutputCompilation { get; } = outputCompilation;
     internal GeneratorDriver Driver { get; } = driver;
@@ -129,15 +148,26 @@ internal sealed class GeneratorRun(
 }
 
 internal sealed class DiagnosticIdentityComparer :
-    IEqualityComparer<Diagnostic> {
+    IEqualityComparer<Diagnostic>
+{
     internal static DiagnosticIdentityComparer Instance { get; } = new();
 
-    private DiagnosticIdentityComparer() {
+    private DiagnosticIdentityComparer()
+    {
     }
 
-    public bool Equals(Diagnostic? left, Diagnostic? right) {
-        if (ReferenceEquals(left, right)) return true;
-        if (left == null || right == null) return false;
+    public bool Equals(Diagnostic? left, Diagnostic? right)
+    {
+        if (ReferenceEquals(left, right))
+        {
+            return true;
+        }
+
+        if (left == null || right == null)
+        {
+            return false;
+        }
+
         return string.Equals(left.Id, right.Id, StringComparison.Ordinal) &&
                Equals(left.Location.SourceTree, right.Location.SourceTree) &&
                left.Location.SourceSpan == right.Location.SourceSpan &&
@@ -147,8 +177,10 @@ internal sealed class DiagnosticIdentityComparer :
                    StringComparison.Ordinal);
     }
 
-    public int GetHashCode(Diagnostic diagnostic) {
-        unchecked {
+    public int GetHashCode(Diagnostic diagnostic)
+    {
+        unchecked
+        {
             var hash = StringComparer.Ordinal.GetHashCode(diagnostic.Id);
             hash = hash * 31 + diagnostic.Location.SourceSpan.GetHashCode();
             hash = hash * 31 + StringComparer.Ordinal.GetHashCode(

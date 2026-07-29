@@ -11,11 +11,13 @@ namespace SharpProof.Attributes.Test;
     "Performance",
     "CA1812:Avoid uninstantiated internal classes",
     Justification = "NUnit instantiates test fixtures through reflection.")]
-internal sealed class ContractApiTests {
+internal sealed class ContractApiTests
+{
     [TestCase(nameof(Contract.Requires))]
     [TestCase(nameof(Contract.Ensures))]
     [TestCase(nameof(Contract.Assume))]
-    public void ContractStatementsAreNormallyElidedFromIl(string methodName) {
+    public void ContractStatementsAreNormallyElidedFromIl(string methodName)
+    {
         var method = typeof(Contract).GetMethod(methodName, [typeof(bool)]);
 
         Assert.That(method, Is.Not.Null);
@@ -30,7 +32,8 @@ internal sealed class ContractApiTests {
     }
 
     [Test]
-    public void ContractValuePlaceholdersRejectRuntimeUse() {
+    public void ContractValuePlaceholdersRejectRuntimeUse()
+    {
         var resultException = Capture<InvalidOperationException>(
             static () => _ = Contract.Result<int>());
         var oldException = Capture<InvalidOperationException>(
@@ -45,7 +48,8 @@ internal sealed class ContractApiTests {
     }
 
     [Test]
-    public void TrustAndSuppressionReasonsAreRequired() {
+    public void TrustAndSuppressionReasonsAreRequired()
+    {
         Capture<ArgumentException>(
             static () => _ = new SharpProofTrustedAttribute(" "));
         Capture<ArgumentException>(
@@ -60,7 +64,8 @@ internal sealed class ContractApiTests {
     }
 
     [Test]
-    public void ClosedRangeRejectsAnInvertedBound() {
+    public void ClosedRangeRejectsAnInvertedBound()
+    {
         Capture<ArgumentOutOfRangeException>(
             static () => _ = new InRangeAttribute(2, 1));
         var range = new InRangeAttribute(-1, 3);
@@ -69,17 +74,21 @@ internal sealed class ContractApiTests {
     }
 
     [Test]
-    public void ClosedContractsTargetOnlyParametersAndReturns() {
+    public void ClosedContractsTargetOnlyParametersAndReturns()
+    {
         foreach (var type in new[] {
                      typeof(NotNullAttribute),
                      typeof(PositiveAttribute),
                      typeof(InRangeAttribute)
                  })
+        {
             Assert.That(
                 type.GetCustomAttribute<AttributeUsageAttribute>()!.ValidOn,
                 Is.EqualTo(
                     AttributeTargets.Parameter |
                     AttributeTargets.ReturnValue));
+        }
+
         Assert.That(
             typeof(Contract).Assembly.GetType(
                 "SharpProof.Attributes.PureAttribute"),
@@ -87,7 +96,8 @@ internal sealed class ContractApiTests {
     }
 
     [Test]
-    public void PublicEffectVocabularyContainsNoAnalysisState() {
+    public void PublicEffectVocabularyContainsNoAnalysisState()
+    {
         var names = Enum.GetNames<SharpProofEffect>();
 
         Assert.That(names, Does.Not.Contain("Unknown"));
@@ -100,7 +110,8 @@ internal sealed class ContractApiTests {
     }
 
     [Test]
-    public void EffectContractsUseOnlyClosedTypedArguments() {
+    public void EffectContractsUseOnlyClosedTypedArguments()
+    {
         Assert.That(
             typeof(EffectContractAttribute).GetConstructors()
                 .SelectMany(static constructor => constructor.GetParameters()),
@@ -126,10 +137,12 @@ internal sealed class ContractApiTests {
     }
 
     [Test]
-    public void EffectContractsDefaultToPartialConservativeEvidence() {
+    public void EffectContractsDefaultToPartialConservativeEvidence()
+    {
         var contract = new EffectContractAttribute(SharpProofEffect.None);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 contract.Capabilities,
                 Is.EqualTo(SharpProofCapability.None));
@@ -140,11 +153,14 @@ internal sealed class ContractApiTests {
     }
 
     private static TException Capture<TException>(Action action)
-        where TException : Exception {
-        try {
+        where TException : Exception
+    {
+        try
+        {
             action();
         }
-        catch (TException exception) {
+        catch (TException exception)
+        {
             return exception;
         }
 

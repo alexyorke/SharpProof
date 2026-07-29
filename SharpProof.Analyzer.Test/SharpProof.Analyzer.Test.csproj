@@ -19,4 +19,8 @@
     <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" />
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\eng\testing\DiagnosticDescriptorCatalogAssertions.cs"
+             Link="DiagnosticDescriptorCatalogAssertions.cs" />
+  </ItemGroup>
 </Project>

@@ -3,39 +3,89 @@ using NUnit.Framework;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class CanonicalHashWriterTests {
+public sealed class CanonicalHashWriterTests
+{
     private const string GoldenHash =
-        "df973f08d53b8866d2da9c28359257b389f39190d7638901d424cc8ee31d2dae";
+        "f11c5f9ada1e3d32677b90b80baee7ffe826e1abb68161e4c3474fd57a103c17";
 
     [Test]
-    public void TypedAndBatchWritesPreserveTheCanonicalByteFormat() {
+    public void TypedAndBatchWritesPreserveTheCanonicalByteFormat()
+    {
         using var typed = new CanonicalHashWriter();
         typed.Add("domain")
             .Add(true)
             .Add(42)
+            .Add(uint.MaxValue)
             .Add(long.MinValue)
             .Add(new byte[] { 0, 1, 255 });
         using var batch = new CanonicalHashWriter();
-        batch.Add("domain", true, 42, long.MinValue,
+        batch.Add("domain", true, 42, uint.MaxValue, long.MinValue,
             new byte[] { 0, 1, 255 });
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(typed.Finish(), Is.EqualTo(GoldenHash));
             Assert.That(batch.Finish(), Is.EqualTo(GoldenHash));
         }
     }
 
     [Test]
-    public void FinishedWriterRejectsFurtherUse() {
+    public void TypeAndNullFramesPreventCanonicalValueCollisions()
+    {
+        static string Hash(object? value)
+        {
+            using var writer = new CanonicalHashWriter();
+            return writer.Add(value).Finish();
+        }
+
+        Assert.That(
+            new[] {
+                Hash(null),
+                Hash(string.Empty),
+                Hash("1"),
+                Hash(1),
+                Hash(1U),
+                Hash(1L),
+                Hash(true),
+                Hash(TestEnum.One),
+                Hash(new byte[] { 1 })
+            }.Distinct(StringComparer.Ordinal).Count(),
+            Is.EqualTo(9));
+    }
+
+    [Test]
+    public void UnsupportedBatchValueFailsClosed()
+    {
+        using var writer = new CanonicalHashWriter();
+        using var enumWriter = new CanonicalHashWriter();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.Throws<ArgumentException>(
+                (Action)(() => writer.Add(DateTime.UnixEpoch)));
+            Assert.Throws<ArgumentOutOfRangeException>(
+                (Action)(() => enumWriter.Add((TestEnum)2)));
+        }
+    }
+
+    [Test]
+    public void FinishedWriterRejectsFurtherUse()
+    {
         using var writer = new CanonicalHashWriter();
         writer.Add("value");
         _ = writer.Finish();
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.Throws<ObjectDisposedException>(
                 (Action)(() => _ = writer.Add("late")));
             Assert.Throws<ObjectDisposedException>(
                 (Action)(() => _ = writer.Finish()));
         }
+    }
+
+    private enum TestEnum
+    {
+        One = 1
     }
 }

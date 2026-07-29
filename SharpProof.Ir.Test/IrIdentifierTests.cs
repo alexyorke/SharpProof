@@ -4,9 +4,11 @@ using SharpProof.Ir;
 namespace SharpProof.Ir.Test;
 
 [TestFixture]
-public sealed class IrIdentifierTests {
+public sealed class IrIdentifierTests
+{
     [Test]
-    public void FactoryIdentifiersExposeStableNondefaultFormatting() {
+    public void FactoryIdentifiersExposeStableNondefaultFormatting()
+    {
         var factory = new IrFactory();
         var identity = factory.CreateIdentity();
         var stringId = factory.InternString("identifier");
@@ -24,7 +26,8 @@ public sealed class IrIdentifierTests {
         var block = builder.CreateBlock("entry");
         var instruction = builder.Return(block, operation, term);
 
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(identity.IsDefault, Is.False);
             Assert.That(
                 identity.ToString(),

@@ -1,7 +1,10 @@
 namespace SharpProof.Ir;
-internal static class IrTraversal {
-    internal static ImmutableArray<IrTerm> GetChildren(IrTerm term) =>
-        term switch {
+internal static class IrTraversal
+{
+    internal static ImmutableArray<IrTerm> GetChildren(IrTerm term)
+    {
+        return term switch
+        {
             IrOpaqueTerm opaque =>
                 [.. opaque.Receiver == null
                     ? opaque.Arguments
@@ -15,19 +18,36 @@ internal static class IrTraversal {
             IrSequenceAccessTerm access => [access.Sequence, access.Index],
             _ => []
         };
-    internal static ImmutableHashSet<IrVarId> CollectVariables(IrTerm root) =>
-        CollectVariables([root]);
+    }
+
+    internal static ImmutableHashSet<IrVarId> CollectVariables(IrTerm root)
+    {
+        return CollectVariables([root]);
+    }
+
     internal static ImmutableHashSet<IrVarId> CollectVariables(
-        IEnumerable<IrTerm> roots) {
+        IEnumerable<IrTerm> roots)
+    {
         var result = ImmutableHashSet.CreateBuilder<IrVarId>();
         var pending = new Stack<IrTerm>(roots);
         var visited = new HashSet<IrId>();
-        while (pending.Count != 0) {
+        while (pending.Count != 0)
+        {
             var term = pending.Pop();
-            if (!visited.Add(term.Id)) continue;
+            if (!visited.Add(term.Id))
+            {
+                continue;
+            }
+
             if (term is IrVariableTerm variable)
+            {
                 result.Add(variable.Variable);
-            foreach (var child in GetChildren(term)) pending.Push(child);
+            }
+
+            foreach (var child in GetChildren(term))
+            {
+                pending.Push(child);
+            }
         }
         return result.ToImmutable();
     }

@@ -1,0 +1,2297 @@
+{
+  "schemaVersion": 1,
+  "namespace": "SharpProof.CompilerArtifact",
+  "jsonNamingPolicy": "camelCase",
+  "artifactEnvelope": {
+    "schema": "SharpProof.CompilerManifest",
+    "version": 5
+  },
+  "declarations": [
+    {
+      "kind": "staticClass",
+      "name": "CompilerManifestArtifactVersions",
+      "constants": [
+        {
+          "accessibility": "internal",
+          "name": "Schema",
+          "type": "string",
+          "value": "SharpProof.CompilerManifest"
+        },
+        {
+          "accessibility": "internal",
+          "name": "Current",
+          "type": "int",
+          "value": 5
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "CompilerContractKind",
+      "members": [
+        {
+          "name": "Requires",
+          "value": 0
+        },
+        {
+          "name": "Ensures",
+          "value": 1
+        },
+        {
+          "name": "Assume",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "CompilerContractEvidence",
+      "members": [
+        {
+          "name": "CompilerBoundInvocation",
+          "value": 0
+        },
+        {
+          "name": "ClosedAttribute",
+          "value": 1
+        },
+        {
+          "name": "Companion",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "CompilerVariableRole",
+      "members": [
+        {
+          "name": "Receiver",
+          "value": 0
+        },
+        {
+          "name": "Parameter",
+          "value": 1
+        },
+        {
+          "name": "Result",
+          "value": 2
+        },
+        {
+          "name": "PreState",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "CompilerPreparedBodyKind",
+      "members": [
+        {
+          "name": "Trivial",
+          "value": 0
+        },
+        {
+          "name": "Program",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "kind": "record",
+      "name": "CompilerCallablePreparation",
+      "parameters": [
+        {
+          "name": "Factory",
+          "type": "IrFactory"
+        },
+        {
+          "name": "Entry",
+          "type": "WorkerCallableManifestEntry"
+        },
+        {
+          "name": "Clauses",
+          "type": "ImmutableArray<CompilerPreparedClause>"
+        },
+        {
+          "name": "Variables",
+          "type": "ImmutableArray<CompilerCanonicalVariable>"
+        },
+        {
+          "name": "FailureReason",
+          "type": "WorkerClaimReason"
+        },
+        {
+          "name": "Body",
+          "type": "CompilerPreparedBody?"
+        }
+      ],
+      "members": [
+        {
+          "kind": "computedProperty",
+          "accessibility": "internal",
+          "name": "IsSuccess",
+          "type": "bool",
+          "operation": "equals",
+          "source": "FailureReason",
+          "value": "WorkerClaimReason.None"
+        },
+        {
+          "kind": "property",
+          "accessibility": "internal",
+          "name": "EffectClaims",
+          "type": "ImmutableArray<CompilerEffectClaimArtifact>",
+          "set": "init",
+          "default": {
+            "kind": "emptyArray"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "record",
+      "name": "CompilerPreparedClause",
+      "parameters": [
+        {
+          "name": "Kind",
+          "type": "CompilerContractKind"
+        },
+        {
+          "name": "Condition",
+          "type": "IrTerm"
+        },
+        {
+          "name": "Evidence",
+          "type": "CompilerContractEvidence"
+        },
+        {
+          "name": "ClaimId",
+          "type": "string?"
+        },
+        {
+          "name": "AssumptionId",
+          "type": "string?"
+        }
+      ]
+    },
+    {
+      "kind": "recordStruct",
+      "name": "CompilerIntegerInterval",
+      "readonly": true,
+      "parameters": [
+        {
+          "name": "Minimum",
+          "type": "long"
+        },
+        {
+          "name": "Maximum",
+          "type": "long"
+        }
+      ]
+    },
+    {
+      "kind": "record",
+      "name": "CompilerCanonicalVariable",
+      "parameters": [
+        {
+          "name": "Role",
+          "type": "CompilerVariableRole"
+        },
+        {
+          "name": "Ordinal",
+          "type": "int"
+        },
+        {
+          "name": "Variable",
+          "type": "IrVarId"
+        },
+        {
+          "name": "CurrentStateVariable",
+          "type": "IrVarId?"
+        },
+        {
+          "name": "SourceIntegerInterval",
+          "type": "CompilerIntegerInterval?"
+        },
+        {
+          "name": "ModelLabel",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "kind": "preparedBodyRecord",
+      "name": "CompilerPreparedBody",
+      "maximumInstructions": 4096,
+      "parameters": [
+        {
+          "name": "Kind",
+          "type": "CompilerPreparedBodyKind"
+        },
+        {
+          "name": "Program",
+          "type": "IrProgram?"
+        },
+        {
+          "name": "ParameterBindings",
+          "type": "ImmutableDictionary<IrVarId, IrVarId>"
+        },
+        {
+          "name": "SpecCalls",
+          "type": "ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>"
+        }
+      ]
+    },
+    {
+      "kind": "record",
+      "name": "CompilerPreparedSpecCall",
+      "parameters": [
+        {
+          "name": "Instruction",
+          "type": "IrInstructionId"
+        },
+        {
+          "name": "CallIdentity",
+          "type": "string"
+        },
+        {
+          "name": "WitnessIdentifier",
+          "type": "string"
+        },
+        {
+          "name": "ConsumesMemoryHavoc",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "PortableIrGraph",
+      "properties": [
+        {
+          "name": "HasProgram",
+          "jsonName": "hasProgram",
+          "type": "bool",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Types",
+          "jsonName": "types",
+          "type": "PortableIrType[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "Identities",
+          "jsonName": "identities",
+          "type": "int[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "Variables",
+          "jsonName": "variables",
+          "type": "PortableIrVariable[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "Members",
+          "jsonName": "members",
+          "type": "PortableIrMember[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "Operations",
+          "jsonName": "operations",
+          "type": "PortableIrOperation[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "Terms",
+          "jsonName": "terms",
+          "type": "PortableIrTerm[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "Blocks",
+          "jsonName": "blocks",
+          "type": "PortableIrBlock[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "Entry",
+          "jsonName": "entry",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "Roots",
+          "jsonName": "roots",
+          "type": "int[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "PortableIrType",
+      "constructor": [
+        {
+          "name": "kind",
+          "type": "IrTypeKind",
+          "default": "default"
+        },
+        {
+          "name": "name",
+          "type": "string?",
+          "default": "null"
+        },
+        {
+          "name": "element",
+          "type": "int",
+          "default": "-1"
+        }
+      ],
+      "properties": [
+        {
+          "name": "Kind",
+          "jsonName": "kind",
+          "type": "IrTypeKind",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "kind"
+          }
+        },
+        {
+          "name": "Name",
+          "jsonName": "name",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameterOrStringEmpty",
+            "name": "name"
+          }
+        },
+        {
+          "name": "Element",
+          "jsonName": "element",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "element"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "PortableIrVariable",
+      "constructor": [
+        {
+          "name": "name",
+          "type": "string?",
+          "default": "null"
+        },
+        {
+          "name": "type",
+          "type": "int",
+          "default": "-1"
+        }
+      ],
+      "properties": [
+        {
+          "name": "Name",
+          "jsonName": "name",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameterOrStringEmpty",
+            "name": "name"
+          }
+        },
+        {
+          "name": "Type",
+          "jsonName": "type",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "type"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "PortableIrMember",
+      "constructor": [
+        {
+          "name": "identity",
+          "type": "int",
+          "default": "-1"
+        },
+        {
+          "name": "declaringType",
+          "type": "int",
+          "default": "-1"
+        },
+        {
+          "name": "name",
+          "type": "string?",
+          "default": "null"
+        },
+        {
+          "name": "returnType",
+          "type": "int",
+          "default": "-1"
+        },
+        {
+          "name": "isStatic",
+          "type": "bool",
+          "default": "false"
+        },
+        {
+          "name": "parameterTypes",
+          "type": "int[]?",
+          "default": "null"
+        }
+      ],
+      "properties": [
+        {
+          "name": "Identity",
+          "jsonName": "identity",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "identity"
+          }
+        },
+        {
+          "name": "DeclaringType",
+          "jsonName": "declaringType",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "declaringType"
+          }
+        },
+        {
+          "name": "Name",
+          "jsonName": "name",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameterOrStringEmpty",
+            "name": "name"
+          }
+        },
+        {
+          "name": "ReturnType",
+          "jsonName": "returnType",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "returnType"
+          }
+        },
+        {
+          "name": "IsStatic",
+          "jsonName": "isStatic",
+          "type": "bool",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "isStatic"
+          }
+        },
+        {
+          "name": "ParameterTypes",
+          "jsonName": "parameterTypes",
+          "type": "int[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameterOrEmptyArray",
+            "name": "parameterTypes"
+          }
+        },
+        {
+          "name": "DocumentationCommentId",
+          "jsonName": "documentationCommentId",
+          "type": "string?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "PortableIrOperation",
+      "constructor": [
+        {
+          "name": "description",
+          "type": "string?",
+          "default": "null"
+        }
+      ],
+      "properties": [
+        {
+          "name": "Description",
+          "jsonName": "description",
+          "type": "string?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "description"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "PortableIrTerm",
+      "constructor": [
+        {
+          "name": "kind",
+          "type": "IrTermKind",
+          "default": "default"
+        },
+        {
+          "name": "type",
+          "type": "int",
+          "default": "-1"
+        },
+        {
+          "name": "a",
+          "type": "int",
+          "default": "-1"
+        },
+        {
+          "name": "b",
+          "type": "int",
+          "default": "-1"
+        },
+        {
+          "name": "c",
+          "type": "int",
+          "default": "-1"
+        },
+        {
+          "name": "d",
+          "type": "int",
+          "default": "-1"
+        },
+        {
+          "name": "number",
+          "type": "long",
+          "default": "0"
+        },
+        {
+          "name": "text",
+          "type": "string?",
+          "default": "null"
+        },
+        {
+          "name": "items",
+          "type": "int[]?",
+          "default": "null"
+        }
+      ],
+      "properties": [
+        {
+          "name": "Kind",
+          "jsonName": "kind",
+          "type": "IrTermKind",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "kind"
+          }
+        },
+        {
+          "name": "Type",
+          "jsonName": "type",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "type"
+          }
+        },
+        {
+          "name": "A",
+          "jsonName": "a",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "a"
+          }
+        },
+        {
+          "name": "B",
+          "jsonName": "b",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "b"
+          }
+        },
+        {
+          "name": "C",
+          "jsonName": "c",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "c"
+          }
+        },
+        {
+          "name": "D",
+          "jsonName": "d",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "d"
+          }
+        },
+        {
+          "name": "Number",
+          "jsonName": "number",
+          "type": "long",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "number"
+          }
+        },
+        {
+          "name": "Text",
+          "jsonName": "text",
+          "type": "string?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "text"
+          }
+        },
+        {
+          "name": "Items",
+          "jsonName": "items",
+          "type": "int[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameterOrEmptyArray",
+            "name": "items"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "PortableIrLocation",
+      "constructor": [
+        {
+          "name": "kind",
+          "type": "IrLocationKind",
+          "default": "default"
+        },
+        {
+          "name": "type",
+          "type": "int",
+          "default": "-1"
+        },
+        {
+          "name": "a",
+          "type": "int",
+          "default": "-1"
+        },
+        {
+          "name": "b",
+          "type": "int",
+          "default": "-1"
+        },
+        {
+          "name": "items",
+          "type": "int[]?",
+          "default": "null"
+        }
+      ],
+      "properties": [
+        {
+          "name": "Kind",
+          "jsonName": "kind",
+          "type": "IrLocationKind",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "kind"
+          }
+        },
+        {
+          "name": "Type",
+          "jsonName": "type",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "type"
+          }
+        },
+        {
+          "name": "A",
+          "jsonName": "a",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "a"
+          }
+        },
+        {
+          "name": "B",
+          "jsonName": "b",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "b"
+          }
+        },
+        {
+          "name": "Items",
+          "jsonName": "items",
+          "type": "int[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameterOrEmptyArray",
+            "name": "items"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "PortableIrInstruction",
+      "constructor": [
+        {
+          "name": "kind",
+          "type": "IrInstructionKind",
+          "default": "default"
+        },
+        {
+          "name": "operation",
+          "type": "int",
+          "default": "-1"
+        },
+        {
+          "name": "a",
+          "type": "int",
+          "default": "-1"
+        },
+        {
+          "name": "b",
+          "type": "int",
+          "default": "-1"
+        },
+        {
+          "name": "c",
+          "type": "int",
+          "default": "-1"
+        },
+        {
+          "name": "items",
+          "type": "int[]?",
+          "default": "null"
+        },
+        {
+          "name": "location",
+          "type": "PortableIrLocation?",
+          "default": "null"
+        }
+      ],
+      "properties": [
+        {
+          "name": "Kind",
+          "jsonName": "kind",
+          "type": "IrInstructionKind",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "kind"
+          }
+        },
+        {
+          "name": "Operation",
+          "jsonName": "operation",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "operation"
+          }
+        },
+        {
+          "name": "A",
+          "jsonName": "a",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "a"
+          }
+        },
+        {
+          "name": "B",
+          "jsonName": "b",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "b"
+          }
+        },
+        {
+          "name": "C",
+          "jsonName": "c",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "c"
+          }
+        },
+        {
+          "name": "Items",
+          "jsonName": "items",
+          "type": "int[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameterOrEmptyArray",
+            "name": "items"
+          }
+        },
+        {
+          "name": "Location",
+          "jsonName": "location",
+          "type": "PortableIrLocation?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "location"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "PortableIrBlock",
+      "constructor": [
+        {
+          "name": "name",
+          "type": "string?",
+          "default": "null"
+        },
+        {
+          "name": "instructions",
+          "type": "PortableIrInstruction[]?",
+          "default": "null"
+        }
+      ],
+      "properties": [
+        {
+          "name": "Name",
+          "jsonName": "name",
+          "type": "string?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameter",
+            "name": "name"
+          }
+        },
+        {
+          "name": "Instructions",
+          "jsonName": "instructions",
+          "type": "PortableIrInstruction[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "parameterOrEmptyArray",
+            "name": "instructions"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "DecodedPortableIrGraph",
+      "constructor": [
+        {
+          "name": "factory",
+          "type": "IrFactory"
+        },
+        {
+          "name": "program",
+          "type": "IrProgram?"
+        },
+        {
+          "name": "roots",
+          "type": "IrTerm[]"
+        },
+        {
+          "name": "variables",
+          "type": "IrVarId[]"
+        },
+        {
+          "name": "blocks",
+          "type": "IrBlockId[]"
+        },
+        {
+          "name": "instructions",
+          "type": "IrInstruction[]"
+        }
+      ],
+      "properties": [
+        {
+          "name": "Factory",
+          "type": "IrFactory",
+          "accessibility": "internal",
+          "set": "none",
+          "default": {
+            "kind": "parameter",
+            "name": "factory"
+          }
+        },
+        {
+          "name": "Program",
+          "type": "IrProgram?",
+          "accessibility": "internal",
+          "set": "none",
+          "default": {
+            "kind": "parameter",
+            "name": "program"
+          }
+        },
+        {
+          "name": "Roots",
+          "type": "IReadOnlyList<IrTerm>",
+          "accessibility": "internal",
+          "set": "none",
+          "default": {
+            "kind": "parameter",
+            "name": "roots"
+          }
+        },
+        {
+          "name": "Variables",
+          "type": "IReadOnlyList<IrVarId>",
+          "accessibility": "internal",
+          "set": "none",
+          "default": {
+            "kind": "parameter",
+            "name": "variables"
+          }
+        },
+        {
+          "name": "Blocks",
+          "type": "IReadOnlyList<IrBlockId>",
+          "accessibility": "internal",
+          "set": "none",
+          "default": {
+            "kind": "parameter",
+            "name": "blocks"
+          }
+        },
+        {
+          "name": "Instructions",
+          "type": "IReadOnlyList<IrInstruction>",
+          "accessibility": "internal",
+          "set": "none",
+          "default": {
+            "kind": "parameter",
+            "name": "instructions"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "EncodedPortableIrGraph",
+      "constructor": [
+        {
+          "name": "graph",
+          "type": "PortableIrGraph"
+        },
+        {
+          "name": "variableIndices",
+          "type": "IReadOnlyDictionary<IrVarId, int>"
+        },
+        {
+          "name": "instructionIndices",
+          "type": "IReadOnlyDictionary<IrInstructionId, int>"
+        }
+      ],
+      "properties": [
+        {
+          "name": "Graph",
+          "type": "PortableIrGraph",
+          "accessibility": "internal",
+          "set": "none",
+          "default": {
+            "kind": "parameter",
+            "name": "graph"
+          }
+        },
+        {
+          "name": "VariableIndices",
+          "type": "IReadOnlyDictionary<IrVarId, int>",
+          "accessibility": "internal",
+          "set": "none",
+          "default": {
+            "kind": "parameter",
+            "name": "variableIndices"
+          }
+        },
+        {
+          "name": "InstructionIndices",
+          "type": "IReadOnlyDictionary<IrInstructionId, int>",
+          "accessibility": "internal",
+          "set": "none",
+          "default": {
+            "kind": "parameter",
+            "name": "instructionIndices"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerCallableArtifact",
+      "properties": [
+        {
+          "name": "CallableId",
+          "jsonName": "callableId",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "FailureReason",
+          "jsonName": "failureReason",
+          "type": "WorkerClaimReason",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Graph",
+          "jsonName": "graph",
+          "type": "PortableIrGraph?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Clauses",
+          "jsonName": "clauses",
+          "type": "CompilerClauseArtifact[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "Variables",
+          "jsonName": "variables",
+          "type": "CompilerVariableArtifact[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "Body",
+          "jsonName": "body",
+          "type": "CompilerBodyArtifact?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "EffectClaims",
+          "jsonName": "effectClaims",
+          "type": "CompilerEffectClaimArtifact[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerEffectClaimArtifact",
+      "properties": [
+        {
+          "name": "ClaimId",
+          "jsonName": "claimId",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "ContractKind",
+          "jsonName": "contractKind",
+          "type": "WorkerEffectContractKind",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Outcome",
+          "jsonName": "outcome",
+          "type": "WorkerClaimOutcome",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Reason",
+          "jsonName": "reason",
+          "type": "WorkerClaimReason",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Certainty",
+          "jsonName": "certainty",
+          "type": "WorkerEffectEvidenceCertainty",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Constraint",
+          "jsonName": "constraint",
+          "type": "CompilerEffectConstraintArtifact",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "new"
+          }
+        },
+        {
+          "name": "Witness",
+          "jsonName": "witness",
+          "type": "WorkerEffectViolationWitness?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Evidence",
+          "jsonName": "evidence",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "EvidenceSha256",
+          "jsonName": "evidenceSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerEffectConstraintArtifact",
+      "properties": [
+        {
+          "name": "AllowedEffects",
+          "jsonName": "allowedEffects",
+          "type": "WorkerEffectSet",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "AllowedCapabilities",
+          "jsonName": "allowedCapabilities",
+          "type": "WorkerEffectCapabilitySet",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "AllowedExceptionTypes",
+          "jsonName": "allowedExceptionTypes",
+          "type": "string[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerClauseArtifact",
+      "properties": [
+        {
+          "name": "Kind",
+          "jsonName": "kind",
+          "type": "CompilerContractKind",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Evidence",
+          "jsonName": "evidence",
+          "type": "CompilerContractEvidence",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Root",
+          "jsonName": "root",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "ClaimId",
+          "jsonName": "claimId",
+          "type": "string?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "AssumptionId",
+          "jsonName": "assumptionId",
+          "type": "string?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "PredicateSha256",
+          "jsonName": "predicateSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerVariableArtifact",
+      "properties": [
+        {
+          "name": "Role",
+          "jsonName": "role",
+          "type": "CompilerVariableRole",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Ordinal",
+          "jsonName": "ordinal",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Variable",
+          "jsonName": "variable",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "CurrentStateVariable",
+          "jsonName": "currentStateVariable",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "Minimum",
+          "jsonName": "minimum",
+          "type": "long?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Maximum",
+          "jsonName": "maximum",
+          "type": "long?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "ModelLabel",
+          "jsonName": "modelLabel",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerBodyArtifact",
+      "properties": [
+        {
+          "name": "Kind",
+          "jsonName": "kind",
+          "type": "CompilerPreparedBodyKind",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "ParameterBindings",
+          "jsonName": "parameterBindings",
+          "type": "CompilerVariableMappingArtifact[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "Calls",
+          "jsonName": "calls",
+          "type": "CompilerCallIdentityArtifact[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "SpecCalls",
+          "jsonName": "specCalls",
+          "type": "CompilerSpecCallArtifact[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerVariableMappingArtifact",
+      "properties": [
+        {
+          "name": "Source",
+          "jsonName": "source",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "Target",
+          "jsonName": "target",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerCallIdentityArtifact",
+      "properties": [
+        {
+          "name": "Instruction",
+          "jsonName": "instruction",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "Identity",
+          "jsonName": "identity",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerSpecCallArtifact",
+      "properties": [
+        {
+          "name": "Instruction",
+          "jsonName": "instruction",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "WitnessIdentifier",
+          "jsonName": "witnessIdentifier",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "ConsumesMemoryHavoc",
+          "jsonName": "consumesMemoryHavoc",
+          "type": "bool",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerCompilationSnapshot",
+      "properties": [
+        {
+          "name": "ProjectDirectory",
+          "jsonName": "projectDirectory",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "AssemblyName",
+          "jsonName": "assemblyName",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "AssemblyIdentity",
+          "jsonName": "assemblyIdentity",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "TargetFramework",
+          "jsonName": "targetFramework",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "CompilerVersion",
+          "jsonName": "compilerVersion",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "CompilerMvid",
+          "jsonName": "compilerMvid",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "CSharpCompilerVersion",
+          "jsonName": "cSharpCompilerVersion",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "CSharpCompilerMvid",
+          "jsonName": "cSharpCompilerMvid",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Options",
+          "jsonName": "options",
+          "type": "CompilerCompilationOptionsSnapshot",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "new"
+          }
+        },
+        {
+          "name": "SyntaxTrees",
+          "jsonName": "syntaxTrees",
+          "type": "CompilerSyntaxTreeSnapshot[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "References",
+          "jsonName": "references",
+          "type": "CompilerReferenceSnapshot[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "AdditionalFiles",
+          "jsonName": "additionalFiles",
+          "type": "CompilerAdditionalFileSnapshot[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerCompilationOptionsSnapshot",
+      "properties": [
+        {
+          "name": "OutputKind",
+          "jsonName": "outputKind",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "OptimizationLevel",
+          "jsonName": "optimizationLevel",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Platform",
+          "jsonName": "platform",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "NullableContext",
+          "jsonName": "nullableContext",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "MetadataImportOptions",
+          "jsonName": "metadataImportOptions",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "CheckOverflow",
+          "jsonName": "checkOverflow",
+          "type": "bool",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "AllowUnsafe",
+          "jsonName": "allowUnsafe",
+          "type": "bool",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Deterministic",
+          "jsonName": "deterministic",
+          "type": "bool",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "ReferencesSupersedeLowerVersions",
+          "jsonName": "referencesSupersedeLowerVersions",
+          "type": "bool",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "AssemblyIdentityComparer",
+          "jsonName": "assemblyIdentityComparer",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Usings",
+          "jsonName": "usings",
+          "type": "string[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "ResolverPolicy",
+          "jsonName": "resolverPolicy",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerSyntaxTreeSnapshot",
+      "properties": [
+        {
+          "name": "Path",
+          "jsonName": "path",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Sha256",
+          "jsonName": "sha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "LanguageVersion",
+          "jsonName": "languageVersion",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "DocumentationMode",
+          "jsonName": "documentationMode",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Kind",
+          "jsonName": "kind",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "PreprocessorSymbols",
+          "jsonName": "preprocessorSymbols",
+          "type": "string[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "Features",
+          "jsonName": "features",
+          "type": "CompilerFeatureSnapshot[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerReferenceSnapshot",
+      "properties": [
+        {
+          "name": "Path",
+          "jsonName": "path",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Kind",
+          "jsonName": "kind",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "EmbedInteropTypes",
+          "jsonName": "embedInteropTypes",
+          "type": "bool",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Aliases",
+          "jsonName": "aliases",
+          "type": "string[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "Identity",
+          "jsonName": "identity",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Sha256",
+          "jsonName": "sha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerAdditionalFileSnapshot",
+      "properties": [
+        {
+          "name": "Path",
+          "jsonName": "path",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Sha256",
+          "jsonName": "sha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerFeatureSnapshot",
+      "properties": [
+        {
+          "name": "Key",
+          "jsonName": "key",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Value",
+          "jsonName": "value",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerDiagnosticArtifact",
+      "properties": [
+        {
+          "name": "Code",
+          "jsonName": "code",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Message",
+          "jsonName": "message",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Location",
+          "jsonName": "location",
+          "type": "WorkerSourceLocation",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "new"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerManifestArtifact",
+      "properties": [
+        {
+          "name": "Schema",
+          "jsonName": "schema",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "member",
+            "value": "CompilerManifestArtifactVersions.Schema"
+          }
+        },
+        {
+          "name": "SchemaVersion",
+          "jsonName": "schemaVersion",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "member",
+            "value": "CompilerManifestArtifactVersions.Current"
+          }
+        },
+        {
+          "name": "ProtocolVersion",
+          "jsonName": "protocolVersion",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "member",
+            "value": "WorkerProtocolVersions.Current"
+          }
+        },
+        {
+          "name": "Features",
+          "jsonName": "features",
+          "type": "WorkerFeatureSet",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "CompilationSha256",
+          "jsonName": "compilationSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Compilation",
+          "jsonName": "compilation",
+          "type": "CompilerCompilationSnapshot",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "new"
+          }
+        },
+        {
+          "name": "Manifest",
+          "jsonName": "manifest",
+          "type": "WorkerClaimManifest",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "new"
+          }
+        },
+        {
+          "name": "MaximumExpressionDepth",
+          "jsonName": "maximumExpressionDepth",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "member",
+            "value": "WorkerBudgets.DefaultMaximumExpressionDepth"
+          }
+        },
+        {
+          "name": "CompilerDiagnostics",
+          "jsonName": "compilerDiagnostics",
+          "type": "CompilerDiagnosticArtifact[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "Callables",
+          "jsonName": "callables",
+          "type": "CompilerCallableArtifact[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        }
+      ]
+    }
+  ],
+  "wireEnumCatalogs": [
+    {
+      "field": "OpaquePurities",
+      "type": "IrOpaquePurity",
+      "members": [
+        "Pure",
+        "Impure"
+      ]
+    },
+    {
+      "field": "UnaryOperators",
+      "type": "IrUnaryOperator",
+      "members": [
+        "Not",
+        "Negate"
+      ]
+    },
+    {
+      "field": "BinaryOperators",
+      "type": "IrBinaryOperator",
+      "members": [
+        "Add",
+        "Subtract",
+        "Multiply",
+        "Divide",
+        "Remainder",
+        "AndAlso",
+        "OrElse",
+        "Equal",
+        "NotEqual",
+        "LessThan",
+        "LessThanOrEqual",
+        "GreaterThan",
+        "GreaterThanOrEqual",
+        "StringConcat"
+      ]
+    },
+    {
+      "field": "HavocKinds",
+      "type": "IrHavocKind",
+      "members": [
+        "Variables",
+        "Memory",
+        "VariablesAndMemory"
+      ]
+    }
+  ],
+  "effectEvidence": {
+    "domain": "SharpProof.CompilerEffectClaimEvidence",
+    "version": 6,
+    "unknownReasons": [
+      "UnsupportedContract",
+      "EffectSummaryIncomplete",
+      "EffectContractNotEstablished"
+    ],
+    "constraintKinds": {
+      "capabilities": "AllowedCapabilities",
+      "exceptions": "AllowedExceptions",
+      "combined": "EffectContract"
+    },
+    "sortAllowedExceptionTypes": true,
+    "sortWitnessExceptionHierarchy": true
+  }
+}

@@ -27,7 +27,9 @@ $currentMaintainedDocuments = @(
 )
 $datedEvidenceDocuments = @(
     'docs\soundness-notes\2026-07-25-api-spec-result-domains.md',
-    'docs\soundness-notes\2026-07-25-hardening.md'
+    'docs\soundness-notes\2026-07-25-hardening.md',
+    'docs\soundness-notes\2026-07-29-formatting-neutral-source-metrics.md',
+    'docs\soundness-notes\2026-07-29-semantic-precondition-vacuity.md'
 )
 $maintainedDocuments = @(
     $currentMaintainedDocuments + $datedEvidenceDocuments
@@ -302,8 +304,7 @@ foreach ($relativePath in $maintainedDocuments) {
     }
 }
 foreach ($relativePath in @(
-        'SharpProof.Analyzer\GeneratedDiagnosticDescriptors.cs',
-        'SharpProof.Meta.Analyzers\MetaDiagnosticDescriptors.cs')) {
+        'eng\diagnostics\diagnostic-descriptors.v1.json')) {
     Assert-RepositoryLinksInSource $relativePath
 }
 
@@ -404,59 +405,46 @@ foreach ($option in $configurationOptions) {
     }
 }
 
-$diagnosticCatalog = Get-RequiredText 'docs\diagnostic-examples.md'
-$descriptorSources = @(
-    'SharpProof.Analyzer\GeneratedDiagnosticDescriptors.cs',
-    'SharpProof.ContractForGenerator\GeneratedDiagnosticDescriptors.cs'
-)
-foreach ($descriptorSource in $descriptorSources) {
-    $content = Get-RequiredText $descriptorSource
-    $ids = [regex]::Matches(
-        $content,
-        '"(?<id>SP(?:CF)?\d{4})"') |
-        ForEach-Object { $_.Groups['id'].Value } |
-        Sort-Object -Unique
-    foreach ($id in $ids) {
+$diagnosticReference = Get-RequiredText 'docs\diagnostic-examples.md'
+$descriptorCatalogPath =
+    'eng\diagnostics\diagnostic-descriptors.v1.json'
+$descriptorCatalog = Get-RequiredText $descriptorCatalogPath |
+    ConvertFrom-Json
+if ($descriptorCatalog.schemaVersion -ne 1) {
+    throw 'Unsupported diagnostic-descriptor catalog schema.'
+}
+foreach ($output in @($descriptorCatalog.outputs)) {
+    [void](Get-RequiredText ([string]$output.outputPath))
+    foreach ($descriptor in @($output.diagnostics)) {
+        $id = [string]$descriptor.id
+        $helpLink = [string]$descriptor.helpLinkUri
+        if (-not [string]::IsNullOrWhiteSpace($helpLink)) {
+            Assert-RepositoryDocumentLink $descriptorCatalogPath $helpLink
+        }
+        if ($id -notmatch '^SP(?:CF)?\d{4}$') {
+            continue
+        }
         $anchor = '<a id="' + $id.ToLowerInvariant() + '"></a>'
-        if (-not $diagnosticCatalog.Contains(
+        if (-not $diagnosticReference.Contains(
             $anchor,
             [StringComparison]::OrdinalIgnoreCase)) {
             throw "Diagnostic catalog is missing '$id' and its help anchor."
         }
     }
 }
-$analyzerDescriptorSource = Get-RequiredText (
-    'SharpProof.Analyzer\GeneratedDiagnosticDescriptors.cs')
-$analyzerDescriptors = [regex]::Matches(
-    $analyzerDescriptorSource,
-    'internal static readonly DiagnosticDescriptor\s+\w+\s*=\s*Create\(\s*"(?<id>SP\d{4})"(?<arguments>[\s\S]*?)\);')
-if ($analyzerDescriptors.Count -eq 0) {
+$analyzerDescriptorOutput = @(
+    $descriptorCatalog.outputs |
+        Where-Object { $_.name -eq 'analyzer' }
+)
+if ($analyzerDescriptorOutput.Count -ne 1) {
     throw 'Could not derive analyzer diagnostic defaults.'
 }
-foreach ($descriptor in $analyzerDescriptors) {
-    $id = $descriptor.Groups['id'].Value
-    $arguments = $descriptor.Groups['arguments'].Value
-    $severityMatch = [regex]::Match(
-        $arguments,
-        'severity:\s*DiagnosticSeverity\.(?<value>\w+)')
-    $severity = if ($severityMatch.Success) {
-        $severityMatch.Groups['value'].Value
-    }
-    else {
-        'Info'
-    }
-    $enabledMatch = [regex]::Match(
-        $arguments,
-        'isEnabledByDefault:\s*(?<value>true|false)',
-        [Text.RegularExpressions.RegexOptions]::IgnoreCase)
-    $enabled = if ($enabledMatch.Success) {
-        [bool]::Parse($enabledMatch.Groups['value'].Value)
-    }
-    else {
-        $true
-    }
+foreach ($descriptor in @($analyzerDescriptorOutput[0].diagnostics)) {
+    $id = [string]$descriptor.id
+    $severity = [string]$descriptor.defaultSeverity
+    $enabled = [bool]$descriptor.isEnabledByDefault
     $row = [regex]::Match(
-        $diagnosticCatalog,
+        $diagnosticReference,
         '(?m)^\|\s*`' + [regex]::Escape($id) +
         '`\s*\|[^|]*\|\s*(?<severity>Info|Warning|Error),\s*' +
         '(?<state>on|off)\s*\|')
@@ -470,7 +458,7 @@ foreach ($descriptor in $analyzerDescriptors) {
 }
 foreach ($launcherDiagnostic in @('SP0047', 'SP0048')) {
     $anchor = '<a id="' + $launcherDiagnostic.ToLowerInvariant() + '"></a>'
-    if (-not $diagnosticCatalog.Contains(
+    if (-not $diagnosticReference.Contains(
             $anchor,
             [StringComparison]::OrdinalIgnoreCase)) {
         throw (
@@ -529,34 +517,44 @@ foreach ($propertyName in $workerPropertyNames) {
     }
 }
 
-$callableVerifier = Get-RequiredText 'SharpProof.Worker\CallableVerifier.cs'
 $compilerCallableLowerer = Get-RequiredText (
     'SharpProof.Analyzer\CompilerArtifact\CompilerCallableLowerer.cs')
+$compilerPreparation = Get-RequiredText (
+    'SharpProof.CompilerArtifact\CompilerArtifactModel.generated.cs')
+$bodyExecutor = Get-RequiredText (
+    'SharpProof.Worker\AcyclicBlockPredicateExecutor.cs')
 $blockBound = [regex]::Match(
     $compilerCallableLowerer,
     'const\s+int\s+MaximumBodyBlocks\s*=\s*(?<value>\d+)\s*;')
-$pathBound = [regex]::Match(
-    $callableVerifier,
-    'const\s+int\s+MaximumBodyPaths\s*=\s*(?<value>\d+)\s*;')
-$stateBound = [regex]::Match(
-    $callableVerifier,
-    'const\s+int\s+MaximumExecutionStates\s*=\s*(?<value>\d+)\s*;')
-if (-not $blockBound.Success -or -not $pathBound.Success -or
-    -not $stateBound.Success) {
+$instructionBound = [regex]::Match(
+    $compilerPreparation,
+    'const\s+int\s+MaximumInstructions\s*=\s*(?<value>\d+)\s*;')
+$operationFactor = [regex]::Match(
+    $bodyExecutor,
+    'DefaultMaximumSymbolicOperations\s*=\s*' +
+    'CompilerPreparedBody\.MaximumInstructions\s*\*\s*(?<value>\d+)\s*;')
+if (-not $blockBound.Success -or -not $instructionBound.Success -or
+    -not $operationFactor.Success) {
     throw 'Could not derive compiler/worker body execution bounds.'
 }
+$maximumInstructions = [int]::Parse(
+    $instructionBound.Groups['value'].Value,
+    [Globalization.CultureInfo]::InvariantCulture)
+$symbolicOperationFactor = [int]::Parse(
+    $operationFactor.Groups['value'].Value,
+    [Globalization.CultureInfo]::InvariantCulture)
 $fixedBodyBounds = @(
     [pscustomobject]@{
         Label = 'Reachable CFG blocks'
         Value = $blockBound.Groups['value'].Value
     },
     [pscustomobject]@{
-        Label = 'Normal-return paths'
-        Value = $pathBound.Groups['value'].Value
+        Label = 'Lowered body instructions'
+        Value = $maximumInstructions
     },
     [pscustomobject]@{
-        Label = 'Symbolic execution states'
-        Value = $stateBound.Groups['value'].Value
+        Label = 'Symbolic operations'
+        Value = $maximumInstructions * $symbolicOperationFactor
     }
 )
 foreach ($entry in $fixedBodyBounds) {
@@ -577,7 +575,7 @@ foreach ($entry in $fixedBodyBounds) {
 
 $unknownReference = Get-RequiredText 'docs\unknown-reasons.md'
 $protocolSource = Get-RequiredText (
-    'SharpProof.Worker.Protocol\ProtocolModel.cs')
+    'SharpProof.Worker.Protocol\ProtocolModel.generated.cs')
 foreach ($enumName in @(
         'WorkerFeatureSet',
         'WorkerVerifyPolicy',
@@ -610,7 +608,7 @@ $manifestVersion = [regex]::Match(
     $protocolSource,
     'WorkerManifestVersions\s*\{\s*public const int Current = (?<value>\d+)')
 $compilerArtifactSource = Get-RequiredText (
-    'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs')
+    'SharpProof.CompilerArtifact\CompilerArtifactModel.generated.cs')
 $compilerArtifactVersion = [regex]::Match(
     $compilerArtifactSource,
     'CompilerManifestArtifactVersions\s*\{[\s\S]*?\bCurrent\s*=\s*(?<value>\d+)\s*;')

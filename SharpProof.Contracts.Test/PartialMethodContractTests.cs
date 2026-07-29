@@ -8,9 +8,11 @@ using SharpProof.Ir;
 namespace SharpProof.Contracts.Test;
 
 [TestFixture]
-public sealed class PartialMethodContractTests {
+public sealed class PartialMethodContractTests
+{
     [Test]
-    public void DirectContractsBindFromTheImplementationAcrossSyntaxTrees() {
+    public void DirectContractsBindFromTheImplementationAcrossSyntaxTrees()
+    {
         var compilation = CreateCompilation(
             (
                 "Definition.cs",
@@ -44,7 +46,8 @@ public sealed class PartialMethodContractTests {
     }
 
     [Test]
-    public void ClauseInventoryNormalizesDefinitionToImplementation() {
+    public void ClauseInventoryNormalizesDefinitionToImplementation()
+    {
         var compilation = CreateCompilation(
             (
                 "Definition.cs",
@@ -75,7 +78,8 @@ public sealed class PartialMethodContractTests {
     }
 
     [Test]
-    public void CompanionContractsBindFromTheImplementationAcrossSyntaxTrees() {
+    public void CompanionContractsBindFromTheImplementationAcrossSyntaxTrees()
+    {
         var compilation = CreateCompilation(
             (
                 "Target.cs",
@@ -124,10 +128,12 @@ public sealed class PartialMethodContractTests {
     private static void AssertSuccessfulImplementationBinding(
         ContractBindingResult result,
         IMethodSymbol target,
-        bool usesCompanion) {
+        bool usesCompanion)
+    {
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         var contracts = result.Contracts!;
-        using (Assert.EnterMultipleScope()) {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(contracts.Target, Is.EqualTo(target));
             Assert.That(contracts.UsesCompanion, Is.EqualTo(usesCompanion));
             Assert.That(contracts.Source.PartialDefinitionPart, Is.Not.Null);
@@ -147,7 +153,8 @@ public sealed class PartialMethodContractTests {
     private static IMethodSymbol GetMethod(
         CSharpCompilation compilation,
         string typeName,
-        string methodName) {
+        string methodName)
+    {
         var type = compilation.GetTypeByMetadataName(typeName) ??
                    throw new InvalidOperationException(typeName);
         return type.GetMembers(methodName)
@@ -156,7 +163,8 @@ public sealed class PartialMethodContractTests {
     }
 
     private static CSharpCompilation CreateCompilation(
-        params (string FileName, string Source)[] sources) {
+        params (string FileName, string Source)[] sources)
+    {
         var parseOptions = new CSharpParseOptions(
             LanguageVersion.CSharp12,
             preprocessorSymbols: ["SHARPPROOF_CONTRACTS"]);
@@ -184,7 +192,8 @@ public sealed class PartialMethodContractTests {
         return compilation;
     }
 
-    private static ImmutableArray<MetadataReference> GetReferences() {
+    private static ImmutableArray<MetadataReference> GetReferences()
+    {
         var paths = ((string)AppContext.GetData(
                 "TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator)

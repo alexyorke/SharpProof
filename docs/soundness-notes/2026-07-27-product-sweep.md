@@ -4,6 +4,8 @@
 > reviewed on 2026-07-27. Current behavior remains defined by
 > [SEMANTICS.md](../../SEMANTICS.md) and the maintained
 > [coverage inventory](../coverage-and-limits.md).
+> The source-line gates recorded below were superseded by
+> [formatting-neutral source metrics](2026-07-29-formatting-neutral-source-metrics.md).
 
 This sweep concentrated on product semantics rather than packaging appearance:
 call-site precondition replay, clause-source consistency, effect summaries,

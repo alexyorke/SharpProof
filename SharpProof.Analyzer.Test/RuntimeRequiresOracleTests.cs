@@ -7,9 +7,11 @@ namespace SharpProof.Analyzer.Test;
 
 [TestFixture]
 [NonParallelizable]
-public sealed class RuntimeRequiresOracleTests {
+public sealed class RuntimeRequiresOracleTests
+{
     [Test]
-    public async Task RandomizedRequiresDiagnosticsMatchRuntimePredicates() {
+    public async Task RandomizedRequiresDiagnosticsMatchRuntimePredicates()
+    {
         var random = new Random(41873);
         var cases = Enumerable.Range(0, 192)
             .Select(index => new RangeCase(
@@ -29,7 +31,8 @@ public sealed class RuntimeRequiresOracleTests {
             "    private static int Throwing() =>",
             "        throw new InvalidOperationException();"
         };
-        foreach (var item in cases) {
+        foreach (var item in cases)
+        {
             lines.Add($"    public static void Case{item.Index:D3}() {{");
             lines.Add(
                 $"        Range({item.Value}, {item.Minimum}, {item.Maximum});");
@@ -56,7 +59,8 @@ public sealed class RuntimeRequiresOracleTests {
             "contracts");
         var image = AnalyzerTestHost.EmitImage(compilation);
 
-        WithRuntimeAssembly(image, assembly => {
+        WithRuntimeAssembly(image, assembly =>
+        {
             var fixture = assembly.GetType(
                     "RuntimeRequiresFixture",
                     throwOnError: true)!;
@@ -96,7 +100,8 @@ public sealed class RuntimeRequiresOracleTests {
         });
     }
 
-    private static void AssertRuntimeThrows(Type fixture, string methodName) {
+    private static void AssertRuntimeThrows(Type fixture, string methodName)
+    {
         var method = fixture.GetMethod(
                 methodName,
                 BindingFlags.Public | BindingFlags.Static) ??
@@ -110,16 +115,19 @@ public sealed class RuntimeRequiresOracleTests {
 
     private static void WithRuntimeAssembly(
         byte[] image,
-        Action<Assembly> action) {
+        Action<Assembly> action)
+    {
         var context = new AssemblyLoadContext(
             "SharpProof.Analyzer.Test.RuntimeRequires",
             isCollectible: true);
         context.Resolving += ResolveFromDefaultContext;
-        try {
+        try
+        {
             using var stream = new MemoryStream(image, writable: false);
             action(context.LoadFromStream(stream));
         }
-        finally {
+        finally
+        {
             context.Resolving -= ResolveFromDefaultContext;
             context.Unload();
         }
@@ -127,22 +135,28 @@ public sealed class RuntimeRequiresOracleTests {
 
     private static Assembly? ResolveFromDefaultContext(
         AssemblyLoadContext context,
-        AssemblyName requestedName) =>
-        AppDomain.CurrentDomain.GetAssemblies()
+        AssemblyName requestedName)
+    {
+        return AppDomain.CurrentDomain.GetAssemblies()
             .FirstOrDefault(candidate =>
                 AssemblyName.ReferenceMatchesDefinition(
                     candidate.GetName(),
                     requestedName));
+    }
 
     private sealed class RangeCase(
         int index,
         int value,
         int minimum,
-        int maximum) {
+        int maximum)
+    {
         internal int Index { get; } = index;
         internal int Value { get; } = value;
         internal int Minimum { get; } = minimum;
         internal int Maximum { get; } = maximum;
-        internal int CallLine { get; set; }
+        internal int CallLine
+        {
+            get; set;
+        }
     }
 }

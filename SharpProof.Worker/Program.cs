@@ -1,47 +1,66 @@
 namespace SharpProof.Worker;
 
-internal static class Program {
-    internal static async Task<int> Main(string[] args) {
-        if (!TryParseArguments(args, out var requestPath, out var resultPath, out var startEventName)) {
-            Console.Error.WriteLine("Usage: SharpProof.Worker verify --request <request.json> --result <result.json> --start-event <name>"); return 2;
+internal static class Program
+{
+    internal static async Task<int> Main(string[] args)
+    {
+        if (!TryParseArguments(args, out var requestPath, out var resultPath, out var startEventName))
+        {
+            Console.Error.WriteLine("Usage: SharpProof.Worker verify --request <request.json> --result <result.json> --start-event <name>");
+            return 2;
         }
         if (!OperatingSystem.IsWindows() || System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture !=
                 System.Runtime.InteropServices.Architecture.X64 || System.Runtime.InteropServices.RuntimeInformation.OSArchitecture !=
-                System.Runtime.InteropServices.Architecture.X64) {
-            Console.Error.WriteLine("The SharpProof verifier requires Windows x64."); return 125;
+                System.Runtime.InteropServices.Architecture.X64)
+        {
+            Console.Error.WriteLine("The SharpProof verifier requires Windows x64.");
+            return 125;
         }
-        if (!WaitForStart(startEventName)) return 125;
-        async Task<int> Respond(WorkerVerifyResponse response) {
-            await WriteResponseAtomicAsync(resultPath, response).ConfigureAwait(false); return 0;
+        if (!WaitForStart(startEventName))
+        {
+            return 125;
+        }
+
+        async Task<int> Respond(WorkerVerifyResponse response)
+        {
+            await WriteResponseAtomicAsync(resultPath, response).ConfigureAwait(false);
+            return 0;
         }
         WorkerVerifyRequest? request;
-        try {
+        try
+        {
             request = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(requestPath).ConfigureAwait(false));
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException) {
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        {
             return await Respond(Failure(WorkerRunFailureReason.InvalidRequest,
                 [new WorkerProtocolError {
                     Code = "request.malformed", Message = "The request file is unavailable or malformed."
                 }], new WorkerBudgets())).ConfigureAwait(false);
         }
         using var cancellation = new CancellationTokenSource();
-        ConsoleCancelEventHandler handler = (_, eventArgs) => {
-            eventArgs.Cancel = true; cancellation.Cancel();
+        ConsoleCancelEventHandler handler = (_, eventArgs) =>
+        {
+            eventArgs.Cancel = true;
+            cancellation.Cancel();
         };
         Console.CancelKeyPress += handler;
-        try {
+        try
+        {
             using var worker = SharpProofWorker.Create(request?.Budgets ?? new WorkerBudgets());
             var response = await worker.VerifyAsync(request!, cancellation.Token).ConfigureAwait(false);
             return await Respond(response).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) {
+        catch (OperationCanceledException)
+        {
             return await Respond(WorkerResultAssembler.Create(
                 WorkerResultAssembler.EmptyInputHash, WorkerResultAssembler.EmptyManifest(),
                 WorkerRunStatus.Canceled, WorkerRunFailureReason.None, [], [],
                 request?.Budgets ?? new WorkerBudgets(), WorkerCacheStatus.Disabled, 0)).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not
-            OutOfMemoryException and not StackOverflowException) {
+            OutOfMemoryException and not StackOverflowException)
+        {
             var backendUnavailable = IsBackendUnavailable(exception);
             return await Respond(Failure(backendUnavailable ? WorkerRunFailureReason.BackendUnavailable :
                 WorkerRunFailureReason.InfrastructureFailure, [new WorkerProtocolError {
@@ -53,15 +72,20 @@ internal static class Program {
         finally { Console.CancelKeyPress -= handler; }
     }
     private static WorkerVerifyResponse Failure(WorkerRunFailureReason reason,
-        IEnumerable<WorkerProtocolError> errors, WorkerBudgets budgets) =>
-        WorkerResultAssembler.Create(
+        IEnumerable<WorkerProtocolError> errors, WorkerBudgets budgets)
+    {
+        return WorkerResultAssembler.Create(
             WorkerResultAssembler.EmptyInputHash, WorkerResultAssembler.EmptyManifest(),
             WorkerRunStatus.Failed, reason, [], [], budgets, WorkerCacheStatus.Disabled, 0, errors);
+    }
+
     private static bool TryParseArguments(
-        string[] args, out string request, out string result, out string startEvent) {
+        string[] args, out string request, out string result, out string startEvent)
+    {
         if (args is not ["verify", "--request", var requestValue,
                 "--result", var resultValue, "--start-event", var eventValue] ||
-            string.IsNullOrWhiteSpace(eventValue)) {
+            string.IsNullOrWhiteSpace(eventValue))
+        {
             request = result = startEvent = string.Empty;
             return false;
         }
@@ -70,23 +94,35 @@ internal static class Program {
         startEvent = eventValue;
         return true;
     }
-    private static bool WaitForStart(string eventName) {
-        if (!OperatingSystem.IsWindows()) return false;
-        try {
+    private static bool WaitForStart(string eventName)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return false;
+        }
+
+        try
+        {
             using var startEvent = EventWaitHandle.OpenExisting(eventName);
             return startEvent.WaitOne(TimeSpan.FromSeconds(30));
         }
         catch (WaitHandleCannotBeOpenedException) { return false; }
     }
-    internal static bool IsBackendUnavailable(Exception exception) {
-        for (Exception? current = exception; current != null; current = current.InnerException) {
+    internal static bool IsBackendUnavailable(Exception exception)
+    {
+        for (Exception? current = exception; current != null; current = current.InnerException)
+        {
             if (current is DllNotFoundException or EntryPointNotFoundException or
                 BadImageFormatException or FileLoadException or FileNotFoundException ||
                 string.Equals(current.GetType().FullName, "Microsoft.Z3.Z3Exception", StringComparison.Ordinal))
+            {
                 return true;
+            }
         }
         return false;
     }
-    private static Task WriteResponseAtomicAsync(string path, WorkerVerifyResponse response) =>
-        AtomicFile.WriteUtf8Async(path, WorkerProtocolJson.SerializeResponse(response));
+    private static Task WriteResponseAtomicAsync(string path, WorkerVerifyResponse response)
+    {
+        return AtomicFile.WriteUtf8Async(path, WorkerProtocolJson.SerializeResponse(response));
+    }
 }

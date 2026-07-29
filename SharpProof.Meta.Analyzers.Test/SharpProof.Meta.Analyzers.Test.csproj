@@ -15,4 +15,8 @@
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\eng\testing\DiagnosticDescriptorCatalogAssertions.cs"
+             Link="DiagnosticDescriptorCatalogAssertions.cs" />
+  </ItemGroup>
 </Project>

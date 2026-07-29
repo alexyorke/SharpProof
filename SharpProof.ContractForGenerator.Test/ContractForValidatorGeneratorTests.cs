@@ -1,9 +1,11 @@
 namespace SharpProof.ContractForGenerator.Test;
 
 [TestFixture]
-public sealed class ContractForValidatorGeneratorTests {
+public sealed class ContractForValidatorGeneratorTests
+{
     [Test]
-    public void InterfaceCompanionWithDirectClausesIsValid() {
+    public void InterfaceCompanionWithDirectClausesIsValid()
+    {
         var run = Run(
             """
             #nullable enable
@@ -30,7 +32,8 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void AbstractMemberPreservesRefKindsAndNullability() {
+    public void AbstractMemberPreservesRefKindsAndNullability()
+    {
         var run = Run(
             """
             #nullable enable
@@ -56,7 +59,8 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void OpenGenericTargetAndMethodConstraintsMatchStructurally() {
+    public void OpenGenericTargetAndMethodConstraintsMatchStructurally()
+    {
         var run = Run(
             """
             #nullable enable
@@ -86,7 +90,8 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void OpenGenericConstraintOrderIsSemanticallyMatched() {
+    public void OpenGenericConstraintOrderIsSemanticallyMatched()
+    {
         var run = Run(
             """
             using SharpProof.Attributes;
@@ -114,7 +119,8 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void TupleElementNamesMatchExactly() {
+    public void TupleElementNamesMatchExactly()
+    {
         var run = Run(
             """
             #nullable enable
@@ -161,7 +167,8 @@ public sealed class ContractForValidatorGeneratorTests {
         }
         """)]
     public void OpenGenericCompanionTypeMustMatchArityAndConstraints(
-        string declarations) {
+        string declarations)
+    {
         var run = Run(
             """
             #nullable enable
@@ -176,7 +183,8 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void EscapedIdentifiersBindBySymbolName() {
+    public void EscapedIdentifiersBindBySymbolName()
+    {
         var run = Run(
             """
             using SharpProof.Attributes;
@@ -200,7 +208,8 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void DuplicateCompanionsAreReportedAtBothAttributes() {
+    public void DuplicateCompanionsAreReportedAtBothAttributes()
+    {
         var run = Run(
             """
             using SharpProof.Attributes;
@@ -234,7 +243,8 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void RepeatedContractForAttributesOnOneCompanionFailClosed() {
+    public void RepeatedContractForAttributesOnOneCompanionFailClosed()
+    {
         var compilation =
             GeneratorTestHost.CreateCompilationWithoutAttributes(
                 ("Subject.cs",
@@ -274,7 +284,8 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void NullContractForTargetFailsClosed() {
+    public void NullContractForTargetFailsClosed()
+    {
         var run = Run(
             """
             #nullable enable
@@ -291,8 +302,33 @@ public sealed class ContractForValidatorGeneratorTests {
             Does.Contain("ContractFor"));
     }
 
+    [TestCase("public struct Target { }")]
+    [TestCase("public enum Target { Value }")]
+    [TestCase("public delegate void Target();")]
+    public void ContractForTargetMustBeAClassOrInterface(
+        string targetDeclaration)
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+            """ +
+            targetDeclaration +
+            """
+
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+            }
+            """);
+
+        var diagnostic = AssertSingle(run, "SPCF0001");
+        Assert.That(
+            GetLocatedText(diagnostic),
+            Does.Contain("ContractFor"));
+    }
+
     [Test]
-    public void LookalikeAttributeIsNotTrusted() {
+    public void LookalikeAttributeIsNotTrusted()
+    {
         var run = Run(
             """
             using System;
@@ -319,7 +355,8 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void MissingMemberIsReportedAtTargetIdentifier() {
+    public void MissingMemberIsReportedAtTargetIdentifier()
+    {
         var run = Run(
             """
             using SharpProof.Attributes;
@@ -461,7 +498,8 @@ public sealed class ContractForValidatorGeneratorTests {
             }
         }
         """)]
-    public void ExactSignatureMismatchesFailClosed(string declarations) {
+    public void ExactSignatureMismatchesFailClosed(string declarations)
+    {
         var run = Run(
             """
             #nullable enable
@@ -478,7 +516,8 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void NestedGenericOwnerScopesDoNotAliasByOrdinal() {
+    public void NestedGenericOwnerScopesDoNotAliasByOrdinal()
+    {
         var run = Run(
             """
             using SharpProof.Attributes;
@@ -503,7 +542,8 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void StaticAndInstanceOverloadCollapseIsAmbiguous() {
+    public void StaticAndInstanceOverloadCollapseIsAmbiguous()
+    {
         var run = Run(
             """
             using SharpProof.Attributes;
@@ -531,7 +571,8 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void BodylessCompanionMemberFailsClosed() {
+    public void BodylessCompanionMemberFailsClosed()
+    {
         var run = Run(
             """
             using SharpProof.Attributes;
@@ -551,7 +592,8 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void BodyDiscoveryDoesNotRequireTheContractClauseApi() {
+    public void BodyDiscoveryDoesNotRequireTheContractClauseApi()
+    {
         var compilation =
             GeneratorTestHost.CreateCompilationWithoutAttributes(
                 ("Subject.cs",
@@ -581,7 +623,8 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void EveryInvalidContractClausePlacementIsRejected() {
+    public void EveryInvalidContractClausePlacementIsRejected()
+    {
         var run = Run(
             """
             using SharpProof.Attributes;
@@ -624,7 +667,8 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void NestedCallableContractBelongsToTheNestedCallable() {
+    public void NestedCallableContractBelongsToTheNestedCallable()
+    {
         var run = Run(
             """
             using SharpProof.Attributes;
@@ -648,7 +692,8 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void IncrementalRunsAndTreeOrderAreDeterministic() {
+    public void IncrementalRunsAndTreeOrderAreDeterministic()
+    {
         const string target =
             """
             #nullable enable
@@ -724,7 +769,8 @@ public sealed class ContractForValidatorGeneratorTests {
     }
 
     [Test]
-    public void GeneratorContainsNoTextualBindingOrSourceSynthesis() {
+    public void GeneratorContainsNoTextualBindingOrSourceSynthesis()
+    {
         var root = FindRepositoryRoot();
         var files = Directory.GetFiles(
             Path.Combine(root, "SharpProof.ContractForGenerator"),
@@ -739,27 +785,34 @@ public sealed class ContractForValidatorGeneratorTests {
             "AddSource("
         ];
 
-        foreach (var file in files) {
+        foreach (var file in files)
+        {
             var text = File.ReadAllText(file);
             foreach (var token in forbidden)
+            {
                 Assert.That(text, Does.Not.Contain(token), file);
+            }
         }
     }
 
-    private static GeneratorRun Run(string source) =>
-        GeneratorTestHost.Run(
+    private static GeneratorRun Run(string source)
+    {
+        return GeneratorTestHost.Run(
             GeneratorTestHost.CreateCompilation(("Subject.cs", source)));
+    }
 
     private static Diagnostic AssertSingle(
         GeneratorRun run,
-        string diagnosticId) {
+        string diagnosticId)
+    {
         Assert.That(
             run.Diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo([diagnosticId]));
         return run.Diagnostics[0];
     }
 
-    private static string GetLocatedText(Diagnostic diagnostic) {
+    private static string GetLocatedText(Diagnostic diagnostic)
+    {
         var tree = diagnostic.Location.SourceTree ??
                    throw new InvalidOperationException(
                        "Expected a source diagnostic.");
@@ -768,13 +821,18 @@ public sealed class ContractForValidatorGeneratorTests {
             .ToString();
     }
 
-    private static string FindRepositoryRoot() {
+    private static string FindRepositoryRoot()
+    {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null) {
+        while (directory != null)
+        {
             if (Directory.Exists(Path.Combine(
                     directory.FullName,
                     "SharpProof.ContractForGenerator")))
+            {
                 return directory.FullName;
+            }
+
             directory = directory.Parent;
         }
         throw new InvalidOperationException(

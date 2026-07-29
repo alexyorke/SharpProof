@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "releaseTag": "v1.0.0",
+  "commit": "0000000000000000000000000000000000000000",
+  "pilots": [
+    {
+      "id": "pilot-library-a",
+      "selectedClaims": 50,
+      "weeklyCycles": [
+        {
+          "weekEnding": "2000-01-02",
+          "selectedClaims": 50,
+          "unwaivedUnknown": 0,
+          "status": "passed",
+          "evidenceUrl": "https://example.invalid/pilot-a/week-1"
+        },
+        {
+          "weekEnding": "2000-01-09",
+          "selectedClaims": 50,
+          "unwaivedUnknown": 0,
+          "status": "passed",
+          "evidenceUrl": "https://example.invalid/pilot-a/week-2"
+        },
+        {
+          "weekEnding": "2000-01-16",
+          "selectedClaims": 50,
+          "unwaivedUnknown": 0,
+          "status": "passed",
+          "evidenceUrl": "https://example.invalid/pilot-a/week-3"
+        },
+        {
+          "weekEnding": "2000-01-23",
+          "selectedClaims": 50,
+          "unwaivedUnknown": 0,
+          "status": "passed",
+          "evidenceUrl": "https://example.invalid/pilot-a/week-4"
+        }
+      ]
+    },
+    {
+      "id": "pilot-library-b",
+      "selectedClaims": 50,
+      "weeklyCycles": [
+        {
+          "weekEnding": "2000-01-02",
+          "selectedClaims": 50,
+          "unwaivedUnknown": 0,
+          "status": "passed",
+          "evidenceUrl": "https://example.invalid/pilot-b/week-1"
+        },
+        {
+          "weekEnding": "2000-01-09",
+          "selectedClaims": 50,
+          "unwaivedUnknown": 0,
+          "status": "passed",
+          "evidenceUrl": "https://example.invalid/pilot-b/week-2"
+        },
+        {
+          "weekEnding": "2000-01-16",
+          "selectedClaims": 50,
+          "unwaivedUnknown": 0,
+          "status": "passed",
+          "evidenceUrl": "https://example.invalid/pilot-b/week-3"
+        },
+        {
+          "weekEnding": "2000-01-23",
+          "selectedClaims": 50,
+          "unwaivedUnknown": 0,
+          "status": "passed",
+          "evidenceUrl": "https://example.invalid/pilot-b/week-4"
+        }
+      ]
+    }
+  ],
+  "openDefects": {
+    "p0": 0,
+    "p1": 0,
+    "evidenceUrl": "https://example.invalid/open-defects"
+  },
+  "soundnessReviews": [
+    {
+      "reviewer": "reviewer-a",
+      "independent": true,
+      "commit": "0000000000000000000000000000000000000000",
+      "disposition": "approved",
+      "evidenceUrl": "https://example.invalid/review-a"
+    },
+    {
+      "reviewer": "reviewer-b",
+      "independent": true,
+      "commit": "0000000000000000000000000000000000000000",
+      "disposition": "approved",
+      "evidenceUrl": "https://example.invalid/review-b"
+    }
+  ],
+  "governance": {
+    "protectedDefaultBranch": true,
+    "protectedReleaseTags": true,
+    "protectedPublishingEnvironments": true,
+    "requiredChecks": true,
+    "independentReviewRequired": true,
+    "evidenceUrl": "https://example.invalid/repository-rules"
+  }
+}

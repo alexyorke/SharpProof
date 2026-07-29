@@ -1,6 +1,7 @@
 namespace SharpProof.Ir;
 
-public sealed class IrProgramBuilder(IrFactory factory) {
+public sealed class IrProgramBuilder(IrFactory factory)
+{
     private static long s_nextScope;
     private readonly IrFactory _factory =
         factory ?? throw new ArgumentNullException(nameof(factory));
@@ -10,7 +11,8 @@ public sealed class IrProgramBuilder(IrFactory factory) {
     private IrBlockId? _entry;
     private bool _built;
 
-    public IrBlockId CreateBlock(string? name = null) {
+    public IrBlockId CreateBlock(string? name = null)
+    {
         EnsureMutable();
         var id = new IrBlockId(_scope, _blocks.Count);
         var nameId = string.IsNullOrWhiteSpace(name)
@@ -21,89 +23,49 @@ public sealed class IrProgramBuilder(IrFactory factory) {
         return id;
     }
 
-    public void SetEntry(IrBlockId entry) {
+    public void SetEntry(IrBlockId entry)
+    {
         EnsureMutable();
         GetBlock(entry);
         _entry = entry;
     }
 
-    public IrMemberLocation MemberLocation(
-        IrMemberId member, IrTerm? receiver, params IrTerm[] arguments) {
-        if (arguments == null) throw new ArgumentNullException(nameof(arguments));
+    public IrMemberLocation MemberLocation(IrMemberId member, IrTerm? receiver, params IrTerm[] arguments)
+    {
+        if (arguments == null)
+        {
+            throw new ArgumentNullException(nameof(arguments));
+        }
+
         var memberInfo = _factory.GetMemberInfo(member);
-        ValidateCallShape(memberInfo, receiver, arguments, nameof(arguments));
-        return new IrMemberLocation(
-            memberInfo.ReturnType,
-            member,
-            receiver,
-            [.. arguments]);
+        _factory.ValidateCallShape(memberInfo, receiver, arguments, nameof(arguments));
+        return new IrMemberLocation(memberInfo.ReturnType, member, receiver, [.. arguments]);
     }
 
-    public IrSequenceLocation SequenceLocation(IrTerm sequence, IrTerm index) {
-        ValidateTerm(sequence, nameof(sequence));
-        ValidateTerm(index, nameof(index));
-        var sequenceType = _factory.GetTypeInfo(sequence.Type);
-        if (sequenceType.Kind != IrTypeKind.Sequence ||
-            sequenceType.ElementType == null)
-            throw new ArgumentException(
-                "A sequence location requires a sequence term.",
-                nameof(sequence));
-        if (index.Type != _factory.IntegerType)
-            throw new ArgumentException(
-                "A sequence location requires an integer index.",
-                nameof(index));
+    public IrSequenceLocation SequenceLocation(IrTerm sequence, IrTerm index)
+    {
+        var elementType = _factory.ValidateSequenceTerms(
+            sequence, index,
+            "A sequence location requires a sequence term.",
+            "A sequence location requires an integer index.",
+            nameof(sequence), nameof(index));
         return new IrSequenceLocation(
-            sequenceType.ElementType.Value,
-            sequence,
-            index);
+            elementType, sequence, index);
     }
 
-    public IrAssignInstruction Assign(
-        IrBlockId block,
-        OperationId operation,
-        IrVarId target,
-        IrTerm value) {
-        var variable = _factory.GetVariableInfo(target);
-        ValidateOperation(operation);
-        ValidateTerm(value, nameof(value));
-        RequireSameType(
-            variable.Type, value.Type,
-            "The assigned value does not match the target type.", nameof(value));
-        return Append(
-            block,
-            id => new IrAssignInstruction(id, operation, target, value));
+    public IrAssignInstruction Assign(IrBlockId block, OperationId operation, IrVarId target, IrTerm value)
+    {
+        return Append(block, id => new IrAssignInstruction(id, operation, target, value));
     }
 
-    public IrLoadInstruction Load(
-        IrBlockId block,
-        OperationId operation,
-        IrVarId target,
-        IrLocation location) {
-        var variable = _factory.GetVariableInfo(target);
-        ValidateOperation(operation);
-        ValidateLocation(location);
-        RequireSameType(
-            variable.Type, location.Type,
-            "The loaded location does not match the target type.", nameof(location));
-        return Append(
-            block,
-            id => new IrLoadInstruction(id, operation, target, location));
+    public IrLoadInstruction Load(IrBlockId block, OperationId operation, IrVarId target, IrLocation location)
+    {
+        return Append(block, id => new IrLoadInstruction(id, operation, target, location));
     }
 
-    public IrStoreInstruction Store(
-        IrBlockId block,
-        OperationId operation,
-        IrLocation location,
-        IrTerm value) {
-        ValidateOperation(operation);
-        ValidateLocation(location);
-        ValidateTerm(value, nameof(value));
-        RequireSameType(
-            location.Type, value.Type,
-            "The stored value does not match the location type.", nameof(value));
-        return Append(
-            block,
-            id => new IrStoreInstruction(id, operation, location, value));
+    public IrStoreInstruction Store(IrBlockId block, OperationId operation, IrLocation location, IrTerm value)
+    {
+        return Append(block, id => new IrStoreInstruction(id, operation, location, value));
     }
 
     public IrCallInstruction Call(
@@ -112,129 +74,81 @@ public sealed class IrProgramBuilder(IrFactory factory) {
         IrVarId? target,
         IrMemberId member,
         IrTerm? receiver,
-        params IrTerm[] arguments) {
-        if (arguments == null) throw new ArgumentNullException(nameof(arguments));
-        ValidateOperation(operation);
-        var memberInfo = _factory.GetMemberInfo(member);
-        ValidateCallShape(memberInfo, receiver, arguments, nameof(arguments));
-        if (target.HasValue &&
-            _factory.GetVariableInfo(target.Value).Type != memberInfo.ReturnType)
-            throw new ArgumentException(
-                "The call result does not match the target type.",
-                nameof(target));
-        return Append(
-            block,
-            id => new IrCallInstruction(
-                id,
-                operation,
-                target,
-                member,
-                receiver,
-                [.. arguments]));
+        params IrTerm[] arguments)
+    {
+        if (arguments == null)
+        {
+            throw new ArgumentNullException(nameof(arguments));
+        }
+
+        return Append(block, id => new IrCallInstruction(
+            id, operation, target, member, receiver, [.. arguments]));
     }
 
-    public IrAssumeInstruction Assume(IrBlockId block, OperationId operation, IrTerm condition) {
-        if (condition == null) throw new ArgumentNullException(nameof(condition));
-        ValidateBoolean(condition, nameof(condition));
-        ValidateOperation(operation);
-        return Append(
-            block,
-            id => new IrAssumeInstruction(id, operation, condition));
+    public IrAssumeInstruction Assume(IrBlockId block, OperationId operation, IrTerm condition)
+    {
+        return Append(block, id => new IrAssumeInstruction(id, operation, condition));
     }
 
-    public IrAssertInstruction Assert(IrBlockId block, OperationId operation, IrTerm condition) {
-        if (condition == null) throw new ArgumentNullException(nameof(condition));
-        ValidateBoolean(condition, nameof(condition));
-        ValidateOperation(operation);
-        return Append(
-            block,
-            id => new IrAssertInstruction(id, operation, condition));
+    public IrAssertInstruction Assert(IrBlockId block, OperationId operation, IrTerm condition)
+    {
+        return Append(block, id => new IrAssertInstruction(id, operation, condition));
     }
 
     public IrHavocInstruction Havoc(
         IrBlockId block,
         OperationId operation,
         IrHavocKind havocKind,
-        params IrVarId[] variables) {
-        if (variables == null) throw new ArgumentNullException(nameof(variables));
-        ValidateOperation(operation);
-        if (!Enum.IsDefined(typeof(IrHavocKind), havocKind))
-            throw new ArgumentOutOfRangeException(nameof(havocKind));
-        if (havocKind == IrHavocKind.Memory && variables.Length != 0)
-            throw new ArgumentException(
-                "Memory havoc cannot name variables.",
-                nameof(variables));
-        if (havocKind != IrHavocKind.Memory && variables.Length == 0)
-            throw new ArgumentException(
-                "Variable havoc requires at least one variable.",
-                nameof(variables));
-        foreach (var variable in variables) _factory.GetVariableInfo(variable);
+        params IrVarId[] variables)
+    {
+        if (variables == null)
+        {
+            throw new ArgumentNullException(nameof(variables));
+        }
+
         var distinct = variables
             .Distinct()
             .OrderBy(static variable => variable.Value)
             .ToImmutableArray();
-        return Append(
-            block,
-            id => new IrHavocInstruction(
-                id,
-                operation,
-                havocKind,
-                distinct));
+        return Append(block,
+            id => new IrHavocInstruction(id, operation, havocKind, distinct));
     }
 
     public IrBranchInstruction Branch(
-        IrBlockId block,
-        OperationId operation,
-        IrTerm condition,
-        IrBlockId whenTrue,
-        IrBlockId whenFalse) {
-        if (condition == null) throw new ArgumentNullException(nameof(condition));
-        ValidateBoolean(condition, nameof(condition));
-        ValidateOperation(operation);
-        GetBlock(whenTrue);
-        GetBlock(whenFalse);
-        return Append(
-            block,
-            id => new IrBranchInstruction(
-                id,
-                operation,
-                condition,
-                whenTrue,
-                whenFalse));
+        IrBlockId block, OperationId operation, IrTerm condition,
+        IrBlockId whenTrue, IrBlockId whenFalse)
+    {
+        return Append(block, id => new IrBranchInstruction(
+            id, operation, condition, whenTrue, whenFalse));
     }
 
-    public IrGotoInstruction Goto(
-        IrBlockId block,
-        OperationId operation,
-        IrBlockId target) {
-        ValidateOperation(operation);
-        GetBlock(target);
-        return Append(
-            block,
-            id => new IrGotoInstruction(id, operation, target));
+    public IrGotoInstruction Goto(IrBlockId block, OperationId operation, IrBlockId target)
+    {
+        return Append(block, id => new IrGotoInstruction(id, operation, target));
     }
 
-    public IrReturnInstruction Return(
-        IrBlockId block,
-        OperationId operation,
-        IrTerm? value = null) {
-        ValidateOperation(operation);
-        if (value != null) ValidateTerm(value, nameof(value));
-        return Append(
-            block,
-            id => new IrReturnInstruction(id, operation, value));
+    public IrReturnInstruction Return(IrBlockId block, OperationId operation, IrTerm? value = null)
+    {
+        return Append(block, id => new IrReturnInstruction(id, operation, value));
     }
 
-    public IrProgram Build() {
+    public IrProgram Build()
+    {
         EnsureMutable();
         if (_entry == null)
+        {
             throw new InvalidOperationException(
                 "A program must contain at least one block.");
-        foreach (var block in _blocks) {
+        }
+
+        foreach (var block in _blocks)
+        {
             if (block.Instructions.Count == 0 ||
                 !block.Instructions[block.Instructions.Count - 1].IsTerminal)
+            {
                 throw new InvalidOperationException(
                     "Every program block must end in branch, goto, or return.");
+            }
         }
         _built = true;
         return new IrProgram(
@@ -244,131 +158,218 @@ public sealed class IrProgramBuilder(IrFactory factory) {
             [.. _blocks.Select(static block => block.Freeze())]);
     }
 
-    private T Append<T>(IrBlockId blockId, Func<IrInstructionId, T> create)
-        where T : IrInstruction {
+    private T Append<T>(IrBlockId blockId, Func<IrInstructionId, T> create) where T : IrInstruction
+    {
+        var instruction = create(new IrInstructionId(_scope, _nextInstruction));
+        ValidateInstruction(instruction);
         EnsureMutable();
         var block = GetBlock(blockId);
         if (block.Instructions.Count != 0 &&
             block.Instructions[block.Instructions.Count - 1].IsTerminal)
+        {
             throw new InvalidOperationException(
                 "No instruction can follow a block terminator.");
-        var instruction = create(
-            new IrInstructionId(_scope, _nextInstruction++));
+        }
+
+        _nextInstruction++;
         block.Instructions.Add(instruction);
         return instruction;
     }
 
-    private MutableBlock GetBlock(IrBlockId id) {
+    private void ValidateInstruction(IrInstruction instruction)
+    {
+        ValidateOperation(instruction.Operation);
+        switch (instruction)
+        {
+            case IrAssignInstruction value:
+                RequireSameType(
+                    _factory.GetVariableInfo(value.Target).Type, ValidateTerm(value.Value, "value"),
+                    "The assigned value does not match the target type.", "value");
+                break;
+            case IrLoadInstruction value:
+                RequireSameType(
+                    _factory.GetVariableInfo(value.Target).Type, ValidateLocation(value.Location),
+                    "The loaded location does not match the target type.", "location");
+                break;
+            case IrStoreInstruction value:
+                RequireSameType(
+                    ValidateLocation(value.Location), ValidateTerm(value.Value, "value"),
+                    "The stored value does not match the location type.", "value");
+                break;
+            case IrCallInstruction value:
+                var member = _factory.GetMemberInfo(value.Member);
+                _factory.ValidateCallShape(
+                    member, value.Receiver, value.Arguments, "arguments");
+                if (value.Target.HasValue &&
+                    _factory.GetVariableInfo(value.Target.Value).Type != member.ReturnType)
+                {
+                    throw InvalidArgument(
+                        "The call result does not match the target type.", "target");
+                }
+
+                break;
+            case IrAssumeInstruction or IrAssertInstruction:
+                ValidateBoolean(instruction is IrAssumeInstruction assume
+                    ? assume.Condition
+                    : ((IrAssertInstruction)instruction).Condition, "condition");
+                break;
+            case IrHavocInstruction value:
+                if (!Enum.IsDefined(typeof(IrHavocKind), value.HavocKind))
+                {
+                    throw OutOfRange("havocKind");
+                }
+
+                var memoryOnly = value.HavocKind == IrHavocKind.Memory;
+                if (memoryOnly != value.Variables.IsEmpty)
+                {
+                    throw InvalidArgument(memoryOnly
+                        ? "Memory havoc cannot name variables."
+                        : "Variable havoc requires at least one variable.", "variables");
+                }
+
+                foreach (var variableId in value.Variables)
+                {
+                    _factory.GetVariableInfo(variableId);
+                }
+
+                break;
+            case IrBranchInstruction value:
+                ValidateBoolean(value.Condition, "condition");
+                GetBlock(value.WhenTrue);
+                GetBlock(value.WhenFalse);
+                break;
+            case IrGotoInstruction value:
+                GetBlock(value.Target);
+                break;
+            case IrReturnInstruction value:
+                if (value.Value != null)
+                {
+                    ValidateTerm(value.Value, "value");
+                }
+
+                break;
+            default:
+                throw new ArgumentException(
+                    "Unknown IR instruction kind.", nameof(instruction));
+        }
+    }
+
+    private MutableBlock GetBlock(IrBlockId id)
+    {
         if (id.Scope != _scope)
+        {
             throw new ArgumentException(
                 "The block identifier belongs to a different program builder.",
                 nameof(id));
+        }
+
         if (id.Value < 0 || id.Value >= _blocks.Count)
+        {
             throw new ArgumentOutOfRangeException(nameof(id));
+        }
+
         return _blocks[id.Value];
     }
 
-    private void ValidateLocation(IrLocation location) {
-        if (location == null) throw new ArgumentNullException(nameof(location));
+    private IrTypeId ValidateLocation(IrLocation location)
+    {
+        if (location == null)
+        {
+            throw new ArgumentNullException(nameof(location));
+        }
+
         _factory.GetTypeInfo(location.Type);
-        switch (location) {
+        switch (location)
+        {
             case IrMemberLocation member:
                 var memberInfo = _factory.GetMemberInfo(member.Member);
-                ValidateCallShape(
-                    memberInfo,
-                    member.Receiver,
-                    member.Arguments,
-                    nameof(location));
+                _factory.ValidateCallShape(
+                    memberInfo, member.Receiver, member.Arguments, nameof(location));
                 RequireSameType(
-                    memberInfo.ReturnType, member.Type,
-                    "The member location has an invalid type.", nameof(location));
+                    memberInfo.ReturnType, member.Type, "The member location has an invalid type.", nameof(location));
                 break;
             case IrSequenceLocation sequence:
-                ValidateTerm(sequence.Sequence, nameof(location));
-                ValidateTerm(sequence.Index, nameof(location));
-                var sequenceInfo = _factory.GetTypeInfo(sequence.Sequence.Type);
-                if (sequenceInfo.Kind != IrTypeKind.Sequence ||
-                    sequenceInfo.ElementType != sequence.Type ||
-                    sequence.Index.Type != _factory.IntegerType)
-                    throw new ArgumentException(
-                        "The sequence location has an invalid type.",
-                        nameof(location));
+                var elementType = _factory.ValidateSequenceTerms(
+                    sequence.Sequence, sequence.Index,
+                    "The sequence location has an invalid type.",
+                    "The sequence location has an invalid type.",
+                    nameof(location), nameof(location));
+                RequireSameType(
+                    elementType, sequence.Type, "The sequence location has an invalid type.", nameof(location));
                 break;
             default:
                 throw new ArgumentException(
                     "Unknown IR location kind.",
                     nameof(location));
         }
+        return location.Type;
     }
 
-    private void ValidateCallShape(
-        IrMemberInfo member,
-        IrTerm? receiver,
-        IReadOnlyList<IrTerm> arguments,
-        string parameterName) {
-        if (member.IsStatic != (receiver == null))
-            throw new ArgumentException(
-                member.IsStatic
-                    ? "A static member cannot have a receiver."
-                    : "An instance member requires a receiver.",
-                parameterName);
-        if (receiver != null) {
-            ValidateTerm(receiver, parameterName);
-            if (receiver.Type != member.DeclaringType)
-                throw new ArgumentException(
-                    "An instance receiver must match the member declaring type.",
-                    parameterName);
-        }
-        if (arguments.Count != member.ParameterTypes.Length)
-            throw new ArgumentException(
-                "The argument count does not match the member signature.",
-                parameterName);
-        for (var index = 0; index < arguments.Count; index++) {
-            var argument = arguments[index] ??
-                           throw new ArgumentException(
-                               "Arguments cannot contain null.",
-                               parameterName);
-            ValidateTerm(argument, parameterName);
-            if (argument.Type != member.ParameterTypes[index])
-                throw new ArgumentException(
-                    "An argument does not match the member signature.",
-                    parameterName);
-        }
-    }
-
-    private void ValidateBoolean(IrTerm condition, string parameterName) {
+    private void ValidateBoolean(IrTerm condition, string parameterName)
+    {
         ValidateTerm(condition, parameterName);
         if (condition.Type != _factory.BooleanType)
+        {
             throw new ArgumentException(
                 "The condition must be boolean.",
                 parameterName);
+        }
     }
 
-    private void ValidateTerm(IrTerm term, string parameterName) {
-        if (term == null) throw new ArgumentNullException(parameterName);
+    private IrTypeId ValidateTerm(IrTerm term, string parameterName)
+    {
+        if (term == null)
+        {
+            throw new ArgumentNullException(parameterName);
+        }
+
         _factory.EnsureTerm(term, parameterName);
+        return term.Type;
     }
 
-    private void ValidateOperation(OperationId operation) =>
+    private void ValidateOperation(OperationId operation)
+    {
         _factory.GetOperationInfo(operation);
+    }
 
     private static void RequireSameType(
-        IrTypeId actual, IrTypeId expected, string detail, string parameterName) {
-        if (actual != expected) throw new ArgumentException(detail, parameterName);
+        IrTypeId actual, IrTypeId expected, string detail, string parameterName)
+    {
+        if (actual != expected)
+        {
+            throw new ArgumentException(detail, parameterName);
+        }
     }
 
-    private void EnsureMutable() {
+    private static ArgumentException InvalidArgument(
+        string detail, string parameterName)
+    {
+        return new(detail, parameterName);
+    }
+
+    private static ArgumentOutOfRangeException OutOfRange(string parameterName)
+    {
+        return new(parameterName);
+    }
+
+    private void EnsureMutable()
+    {
         if (_built)
+        {
             throw new InvalidOperationException(
                 "The program builder has already been consumed.");
+        }
     }
 
-    private sealed class MutableBlock(IrBlockId id, IrStringId? name) {
+    private sealed class MutableBlock(IrBlockId id, IrStringId? name)
+    {
         internal IrBlockId Id { get; } = id;
         internal IrStringId? Name { get; } = name;
         internal List<IrInstruction> Instructions { get; } = [];
 
-        internal IrBasicBlock Freeze() =>
-            new(Id, Name, [.. Instructions]);
+        internal IrBasicBlock Freeze()
+        {
+            return new(Id, Name, [.. Instructions]);
+        }
     }
 }

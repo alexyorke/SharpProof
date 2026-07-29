@@ -167,7 +167,7 @@ function Invoke-FuzzRun {
         }
         $runnerPassed = [bool]$result.Passed
 
-        if ($runnerSchemaVersion -ne 3) {
+        if ($runnerSchemaVersion -ne 4) {
             throw "runner schema '$runnerSchemaVersion' is not supported"
         }
         if ($observedCases -ne $Cases) {
@@ -190,13 +190,21 @@ function Invoke-FuzzRun {
                 "runner accounted for $($agreements + $abstentions) of " +
                 "$observedCases cases")
         }
+        if ($abstentions -ne 0 -or $agreements -ne $observedCases) {
+            throw (
+                "supported-domain fuzzing requires zero abstentions and " +
+                "agreement for every case; agreements=$agreements, " +
+                "abstentions=$abstentions")
+        }
         foreach ($countName in @(
                 'FrontendAgreements',
                 'SmtAgreements',
                 'PartialSmtAgreements')) {
             $count = [int]$result.$countName
-            if ($count -lt 0 -or $count -gt $observedCases) {
-                throw "runner '$countName' count is out of range"
+            if ($count -ne $observedCases) {
+                throw (
+                    "runner '$countName' reported $count agreements; " +
+                    "expected $observedCases")
             }
         }
         if ($failureCount -ne 0) {

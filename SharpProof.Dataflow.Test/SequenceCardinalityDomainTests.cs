@@ -1,7 +1,8 @@
 namespace SharpProof.Dataflow.Test;
 
 [TestFixture]
-public sealed class SequenceCardinalityDomainTests {
+public sealed class SequenceCardinalityDomainTests
+{
     private readonly SequenceCardinalityDomain _domain = SequenceCardinalityDomain.Instance;
 
     private static IReadOnlyList<SequenceCardinalityValue> Samples => [
@@ -20,11 +21,14 @@ public sealed class SequenceCardinalityDomainTests {
     ];
 
     [Test]
-    public void OrderAndJoinSatisfySampledProductLaws() =>
+    public void OrderAndJoinSatisfySampledProductLaws()
+    {
         DomainLawAssertions.AssertOrderAndJoinLaws(_domain, Samples);
+    }
 
     [Test]
-    public void LengthCanonicalizesCardinalityKind() {
+    public void LengthCanonicalizesCardinalityKind()
+    {
         var zero = _domain.Create(
             SequenceCardinalityKind.Top,
             IntervalValue.Constant(0));
@@ -42,7 +46,8 @@ public sealed class SequenceCardinalityDomainTests {
     }
 
     [Test]
-    public void EmptyAndNonEmptyJoinToTopWithLengthHull() {
+    public void EmptyAndNonEmptyJoinToTopWithLengthHull()
+    {
         var joined = _domain.Join(
             SequenceCardinalityValue.Empty,
             SequenceCardinalityValue.KnownLength(2));
@@ -53,7 +58,8 @@ public sealed class SequenceCardinalityDomainTests {
     }
 
     [Test]
-    public void CardinalityTransfersAreMonotone() {
+    public void CardinalityTransfersAreMonotone()
+    {
         DomainLawAssertions.AssertMonotone(
             _domain,
             Samples,
@@ -64,7 +70,8 @@ public sealed class SequenceCardinalityDomainTests {
     }
 
     [Test]
-    public void AppendAndConcatTrackLengths() {
+    public void AppendAndConcatTrackLengths()
+    {
         var appended = _domain.Append(SequenceCardinalityValue.Empty);
         var concatenated = _domain.Concat(
             SequenceCardinalityValue.KnownLength(2),
@@ -75,9 +82,11 @@ public sealed class SequenceCardinalityDomainTests {
     }
 
     [Test]
-    public void WideningTerminatesForGrowingLengths() {
+    public void WideningTerminatesForGrowingLengths()
+    {
         var previous = SequenceCardinalityValue.Empty;
-        for (var length = 1; length <= 64; length++) {
+        for (var length = 1; length <= 64; length++)
+        {
             var next = _domain.Create(
                 SequenceCardinalityKind.Top,
                 IntervalValue.Range(0, length));
@@ -97,6 +106,8 @@ public sealed class SequenceCardinalityDomainTests {
     }
 
     [Test]
-    public void HavocIsConservative() =>
+    public void HavocIsConservative()
+    {
         DomainLawAssertions.AssertConservativeHavoc(_domain, Samples);
+    }
 }

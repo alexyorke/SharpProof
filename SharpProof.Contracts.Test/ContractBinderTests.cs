@@ -9,9 +9,11 @@ using SharpProof.Ir;
 namespace SharpProof.Contracts.Test;
 
 [TestFixture]
-public sealed class ContractBinderTests {
+public sealed class ContractBinderTests
+{
     [Test]
-    public void DirectCompilerBoundContractWinsAndSymbolIdentityRejectsShadows() {
+    public void DirectCompilerBoundContractWinsAndSymbolIdentityRejectsShadows()
+    {
         var source =
             """
             using SharpProof.Attributes;
@@ -47,7 +49,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void DirectClauseSourceAlsoWinsForRequiresOnlyBinding() {
+    public void DirectClauseSourceAlsoWinsForRequiresOnlyBinding()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -76,7 +79,46 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void InvalidDirectIntrinsicCannotBeHiddenByACompanion() {
+    public void InvalidTargetPlacementDoesNotPoisonAValidCompanion()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static long Read(long value) {
+                    if (value > 0) {
+                        Contract.Ensures(
+                            Contract.Result<long>() == value);
+                    }
+                    return value;
+                }
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static long Read(long value) {
+                    Contract.Ensures(
+                        Contract.Result<long>() == value);
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+            Assert.That(result.Contracts!.UsesCompanion, Is.True);
+            Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
+            Assert.That(result.Contracts.Clauses[0].Evidence,
+                Is.EqualTo(BoundContractEvidence.Companion));
+        }
+    }
+
+    [Test]
+    public void InvalidDirectIntrinsicCannotBeHiddenByACompanion()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -109,7 +151,8 @@ public sealed class ContractBinderTests {
         ContractBindingFailure.OldOutsideEnsures)]
     public void StandaloneIntrinsicsFailClosed(
         string statement,
-        ContractBindingFailure expected) {
+        ContractBindingFailure expected)
+    {
         var source =
             """
             using SharpProof.Attributes;
@@ -128,7 +171,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void TypeCompanionDoesNotHijackConstructorClosedContracts() {
+    public void TypeCompanionDoesNotHijackConstructorClosedContracts()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -155,7 +199,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void NestedCallableClausesDoNotPoisonContainingContracts() {
+    public void NestedCallableClausesDoNotPoisonContainingContracts()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -183,7 +228,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void ResultAndOldBindToTypedResultAndPreStateVariables() {
+    public void ResultAndOldBindToTypedResultAndPreStateVariables()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -224,7 +270,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void ArrayLengthOverResultBindsToSequenceLength() {
+    public void ArrayLengthOverResultBindsToSequenceLength()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -258,7 +305,8 @@ public sealed class ContractBinderTests {
     [TestCase("string?", "string")]
     public void ResultTypeMustExactlyMatchTheCallableReturnType(
         string returnType,
-        string resultType) {
+        string resultType)
+    {
         var source =
             """
             #nullable enable
@@ -289,7 +337,8 @@ public sealed class ContractBinderTests {
     [TestCase("decimal")]
     [TestCase("Choice")]
     public void EqualityWithAnUnmodeledValueDomainFailsClosed(
-        string typeName) {
+        string typeName)
+    {
         var source =
             """
             using SharpProof.Attributes;
@@ -310,7 +359,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void EqualityRetainsTheAdmittedUnsignedIntegerDomain() {
+    public void EqualityRetainsTheAdmittedUnsignedIntegerDomain()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -337,7 +387,8 @@ public sealed class ContractBinderTests {
         ContractBindingFailure.OldOutsideEnsures)]
     public void ResultAndOldOutsideEnsuresFailClosed(
         string expression,
-        ContractBindingFailure expected) {
+        ContractBindingFailure expected)
+    {
         var source =
             """
             using SharpProof.Attributes;
@@ -358,7 +409,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void NestedOldFailsClosed() {
+    public void NestedOldFailsClosed()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -376,7 +428,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void AssumeIsExplicitEvidenceAndNotARequirement() {
+    public void AssumeIsExplicitEvidenceAndNotARequirement()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -396,7 +449,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void RequiresOnlyBindingIgnoresUnsupportedEnsuresAndAssumeClauses() {
+    public void RequiresOnlyBindingIgnoresUnsupportedEnsuresAndAssumeClauses()
+    {
         const string source =
             """
             using System;
@@ -430,7 +484,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void ConditionalAndUnaryPostconditionsBindExactly() {
+    public void ConditionalAndUnaryPostconditionsBindExactly()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -453,7 +508,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void NarrowingConversionInAPostconditionFailsClosed() {
+    public void NarrowingConversionInAPostconditionFailsClosed()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -473,7 +529,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void PlacementFailuresAreTypedAndBindingsAreCompilationCached() {
+    public void PlacementFailuresAreTypedAndBindingsAreCompilationCached()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -506,7 +563,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void ClosedAttributesProduceTypedConditions() {
+    public void ClosedAttributesProduceTypedConditions()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -535,12 +593,57 @@ public sealed class ContractBinderTests {
             Is.True);
     }
 
+    [TestCase("sbyte")]
+    [TestCase("byte")]
+    [TestCase("short")]
+    [TestCase("ushort")]
+    [TestCase("char")]
+    [TestCase("int")]
+    [TestCase("uint")]
+    [TestCase("long")]
+    public void PositiveClosedContractAcceptsEveryCatalogInteger(
+        string typeName)
+    {
+        var source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static TYPE Read([Positive] TYPE value) => value;
+            }
+            """.Replace("TYPE", typeName, StringComparison.Ordinal);
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+    }
+
+    [TestCase("ulong")]
+    [TestCase("nint")]
+    [TestCase("nuint")]
+    public void PositiveClosedContractStillRejectsUnmodeledIntegers(
+        string typeName)
+    {
+        var source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static TYPE Read([Positive] TYPE value) => value;
+            }
+            """.Replace("TYPE", typeName, StringComparison.Ordinal);
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("Target", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+    }
+
     [TestCase("Value")]
     [TestCase("Choice")]
     [TestCase("System.DateTime")]
     [TestCase("System.IntPtr")]
     [TestCase("Value?")]
-    public void NotNullRejectsNonReferenceDomains(string typeName) {
+    public void NotNullRejectsNonReferenceDomains(string typeName)
+    {
         var source =
             """
             using SharpProof.Attributes;
@@ -562,7 +665,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void ClosedPreconditionRejectsOutParameters() {
+    public void ClosedPreconditionRejectsOutParameters()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -580,7 +684,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void InvalidClosedReturnContractFailsAtReturnBinding() {
+    public void InvalidClosedReturnContractFailsAtReturnBinding()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -597,7 +702,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void ExactGenericCompanionIsDiscoveredAndBound() {
+    public void ExactGenericCompanionIsDiscoveredAndBound()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -622,7 +728,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void OpenGenericConstraintOrderIsSemanticallyMatched() {
+    public void OpenGenericConstraintOrderIsSemanticallyMatched()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -655,7 +762,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void ConstructedContainingTypeUsesOpenGenericCompanion() {
+    public void ConstructedContainingTypeUsesOpenGenericCompanion()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -698,7 +806,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void ConstructedGenericMethodUsesGenericCompanionMember() {
+    public void ConstructedGenericMethodUsesGenericCompanionMember()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -744,7 +853,8 @@ public sealed class ContractBinderTests {
     [TestCase("Other", ContractBindingFailure.CompanionSignatureMismatch)]
     public void TupleElementNamesAreMatchedExactly(
         string companionElementName,
-        ContractBindingFailure expected) {
+        ContractBindingFailure expected)
+    {
         var source =
             """
             #nullable enable
@@ -837,7 +947,8 @@ public sealed class ContractBinderTests {
             }
         }
         """)]
-    public void ExactMemberShapeMismatchesFailClosed(string source) {
+    public void ExactMemberShapeMismatchesFailClosed(string source)
+    {
         using var subject = ContractSubject.Create(source);
 
         Assert.That(
@@ -846,7 +957,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void NestedGenericOwnerScopesDoNotAliasByOrdinal() {
+    public void NestedGenericOwnerScopesDoNotAliasByOrdinal()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -871,7 +983,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void StaticAndInstanceOverloadCollapseFailsAsAmbiguous() {
+    public void StaticAndInstanceOverloadCollapseFailsAsAmbiguous()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -897,7 +1010,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void LookalikeContractForAttributeIsIgnored() {
+    public void LookalikeContractForAttributeIsIgnored()
+    {
         const string source =
             """
             using System;
@@ -958,7 +1072,8 @@ public sealed class ContractBinderTests {
         ContractBindingFailure.AmbiguousCompanion)]
     public void InvalidCompanionShapesFailClosed(
         string companion,
-        ContractBindingFailure expected) {
+        ContractBindingFailure expected)
+    {
         var source =
             """
             using SharpProof.Attributes;
@@ -972,7 +1087,8 @@ public sealed class ContractBinderTests {
     }
 
     [Test]
-    public void ProductionBinderContainsNoTextualOrSpeculativeBindingEscapeHatches() {
+    public void ProductionBinderContainsNoTextualOrSpeculativeBindingEscapeHatches()
+    {
         var root = FindRepositoryRoot();
         var files = Directory.GetFiles(
             Path.Combine(root, "SharpProof.Contracts"),
@@ -985,34 +1101,48 @@ public sealed class ContractBinderTests {
             "GetSpeculative",
             "ToDisplayString("
         };
-        foreach (var file in files) {
+        foreach (var file in files)
+        {
             var text = File.ReadAllText(file);
             foreach (var token in forbidden)
+            {
                 Assert.That(text, Does.Not.Contain(token), file);
+            }
         }
     }
 
-    private static string FindRepositoryRoot() {
+    private static string FindRepositoryRoot()
+    {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null) {
+        while (directory != null)
+        {
             if (Directory.Exists(Path.Combine(directory.FullName, "SharpProof.Contracts")))
+            {
                 return directory.FullName;
+            }
+
             directory = directory.Parent;
         }
         throw new InvalidOperationException("Repository root was not found.");
     }
 
-    private sealed class ContractSubject : IDisposable {
+    private sealed class ContractSubject : IDisposable
+    {
         private readonly ContractBinder _binder;
 
-        private ContractSubject(CSharpCompilation compilation) {
+        private ContractSubject(CSharpCompilation compilation)
+        {
             Compilation = compilation;
             _binder = new ContractBinder(compilation, new IrFactory());
         }
 
-        private CSharpCompilation Compilation { get; }
+        private CSharpCompilation Compilation
+        {
+            get;
+        }
 
-        internal static ContractSubject Create(string source) {
+        internal static ContractSubject Create(string source)
+        {
             var syntaxTree = CSharpSyntaxTree.ParseText(
                 source,
                 new CSharpParseOptions(
@@ -1039,7 +1169,8 @@ public sealed class ContractBinderTests {
 
         internal ContractBindingResult Bind(
             string typeName,
-            string methodName) {
+            string methodName)
+        {
             var method = GetMethod(typeName, methodName);
             return _binder.Bind(method);
         }
@@ -1048,7 +1179,8 @@ public sealed class ContractBinderTests {
             string typeName,
             string methodName,
             int parameterCount,
-            bool isStatic) {
+            bool isStatic)
+        {
             var method = GetMethod(
                 typeName,
                 methodName,
@@ -1059,12 +1191,14 @@ public sealed class ContractBinderTests {
 
         internal ContractBindingResult BindRequires(
             string typeName,
-            string methodName) {
+            string methodName)
+        {
             var method = GetMethod(typeName, methodName);
             return _binder.BindRequires(method);
         }
 
-        internal ContractBindingResult BindConstructor(string typeName) {
+        internal ContractBindingResult BindConstructor(string typeName)
+        {
             var type = Compilation.GetTypeByMetadataName(typeName) ??
                        throw new InvalidOperationException(typeName);
             var constructor = type.InstanceConstructors.Single(
@@ -1075,7 +1209,8 @@ public sealed class ContractBinderTests {
         internal ContractBindingResult BindCallRequires(
             string callerTypeName,
             string callerMethodName,
-            string calledMethodName) {
+            string calledMethodName)
+        {
             var caller = GetMethod(callerTypeName, callerMethodName);
             var declaration = caller.DeclaringSyntaxReferences
                 .Single()
@@ -1083,7 +1218,8 @@ public sealed class ContractBinderTests {
             var invocation = declaration.DescendantNodes()
                 .OfType<InvocationExpressionSyntax>()
                 .Single(candidate =>
-                    candidate.Expression switch {
+                    candidate.Expression switch
+                    {
                         MemberAccessExpressionSyntax member =>
                             member.Name.Identifier.ValueText ==
                             calledMethodName,
@@ -1101,7 +1237,8 @@ public sealed class ContractBinderTests {
 
         private IMethodSymbol GetMethod(
             string typeName,
-            string methodName) {
+            string methodName)
+        {
             var type = Compilation.GetTypeByMetadataName(typeName) ??
                        throw new InvalidOperationException(typeName);
             return type.GetMembers(methodName)
@@ -1113,7 +1250,8 @@ public sealed class ContractBinderTests {
             string typeName,
             string methodName,
             int parameterCount,
-            bool isStatic) {
+            bool isStatic)
+        {
             var type = Compilation.GetTypeByMetadataName(typeName) ??
                        throw new InvalidOperationException(typeName);
             return type.GetMembers(methodName)
@@ -1123,10 +1261,12 @@ public sealed class ContractBinderTests {
                     method.IsStatic == isStatic);
         }
 
-        public void Dispose() {
+        public void Dispose()
+        {
         }
 
-        private static ImmutableArray<MetadataReference> GetReferences() {
+        private static ImmutableArray<MetadataReference> GetReferences()
+        {
             var paths = ((string)AppContext.GetData(
                     "TRUSTED_PLATFORM_ASSEMBLIES")!)
                 .Split(Path.PathSeparator)

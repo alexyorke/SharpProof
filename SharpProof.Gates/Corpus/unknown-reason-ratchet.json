@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "maximumTotalUnknown": 309,
+  "maximumByReason": {
+    "SP0002": 28,
+    "SP0016": 20,
+    "SP0045": 30,
+    "SP0045+SP0046": 10,
+    "SP0046": 30,
+    "SP0047": 181,
+    "silent-unclassified": 10
+  }
+}

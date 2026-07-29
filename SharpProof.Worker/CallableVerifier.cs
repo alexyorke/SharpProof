@@ -1,497 +1,295 @@
+using static SharpProof.Worker.SymbolicTermOperations;
+using static SharpProof.Worker.PostconditionObligationBuilder;
+
 namespace SharpProof.Worker;
 
-internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressionDepth) {
-    private const int MaximumBodyPaths = 64;
-    private const int MaximumExecutionStates = 4096;
+internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressionDepth)
+{
     private readonly ProofKernel _kernel = new(backend ?? throw new ArgumentNullException(nameof(backend)));
-    private readonly int _maximumExpressionDepth = maximumExpressionDepth > 0 ? maximumExpressionDepth
-        : throw new ArgumentOutOfRangeException(nameof(maximumExpressionDepth));
-    internal async Task<ImmutableArray<WorkerClaimResult>> VerifyAsync(CompilerCallablePreparation target,
-        MethodResourceBudget resourceBudget, CancellationToken cancellationToken) {
+    private readonly AcyclicBlockPredicateExecutor _executor = new(maximumExpressionDepth);
+    private readonly int _maximumExpressionDepth =
+        maximumExpressionDepth > 0
+            ? maximumExpressionDepth
+            : throw new ArgumentOutOfRangeException(nameof(maximumExpressionDepth));
+
+    internal async Task<ImmutableArray<WorkerClaimResult>> VerifyAsync(
+        CompilerCallablePreparation target,
+        MethodResourceBudget resourceBudget,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(resourceBudget);
         cancellationToken.ThrowIfCancellationRequested();
-        if (!target.IsSuccess) return CallableClaimResultAssembler.Unknowns(target, target.FailureReason);
+        if (!target.IsSuccess)
+        {
+            return CallableClaimResultAssembler.PostconditionUnknowns(target, target.FailureReason);
+        }
+
         var factory = target.Factory;
         var ensures = target.Clauses.Where(static clause => clause.Kind == CompilerContractKind.Ensures).ToImmutableArray();
-        if (ensures.Length != target.Entry.ClaimIds.Length ||
-            !ensures.Select(static clause => clause.ClaimId!).SequenceEqual(
-                target.Entry.ClaimIds, StringComparer.Ordinal))
-            return CallableClaimResultAssembler.Unknowns(target, WorkerClaimReason.UnsupportedContract);
-        if (ensures.IsDefaultOrEmpty) return [];
-        var paths = target.Body switch {
+        if (ensures.Length > target.Entry.ClaimIds.Length ||
+            !ensures.Select(static clause => clause.ClaimId!).SequenceEqual(target.Entry.ClaimIds.Take(ensures.Length),
+                StringComparer.Ordinal))
+        {
+            return CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.UnsupportedContract);
+        }
+
+        if (ensures.IsDefaultOrEmpty)
+        {
+            return [];
+        }
+
+        SymbolicBodyExecution body = target.Body switch
+        {
             { Kind: CompilerPreparedBodyKind.Trivial } => TrivialBody(factory),
-            { Kind: CompilerPreparedBodyKind.Program, Program: not null } prepared when HasBoundSpecCalls(prepared) =>
-                ExecuteAcyclicBody(target.Variables, factory, prepared.Program,
+            { Kind: CompilerPreparedBodyKind.Program, Program: not null } prepared =>
+                _executor.Execute(target.Variables, factory, prepared.Program,
                     prepared.SpecCalls, prepared.ParameterBindings.ToImmutableDictionary(
                         static item => item.Key, item => (IrTerm)factory.Variable(item.Value)),
                     prepared.ParameterBindings),
-            _ => default
+            _ => SymbolicBodyExecution.Failed(WorkerClaimReason.UnsupportedBody)
         };
-        if (paths.IsDefault)
-            return CallableClaimResultAssembler.Unknowns(target, WorkerClaimReason.UnsupportedBody);
+        if (!body.IsSuccess)
+        {
+            return CallableClaimResultAssembler.PostconditionUnknowns(target, body.Reason);
+        }
 
         var assumptions = ImmutableArray.CreateBuilder<Assumption>();
+        var preconditions = ImmutableArray.CreateBuilder<Assumption>();
         var assumptionLabels = new Dictionary<ProofJustification, string>(ReferenceEqualityComparer.Instance);
         var userAssumptionIds = new Dictionary<ProofJustification, string>(ReferenceEqualityComparer.Instance);
         var assumptionOrdinal = 0;
-        foreach (var clause in target.Clauses) {
-            if (clause.Kind == CompilerContractKind.Ensures) continue;
-            var predicate = ApplyBodySubstitutions(factory, clause.Condition, target.Variables,
-                null, ImmutableDictionary<IrVarId, IrTerm>.Empty, allowMissingResult: true);
+        foreach (var clause in target.Clauses)
+        {
+            if (clause.Kind == CompilerContractKind.Ensures)
+            {
+                continue;
+            }
+
+            var predicate = ApplyBodySubstitutions(factory, clause.Condition, target.Variables, null,
+                ImmutableDictionary<IrVarId, IrTerm>.Empty, allowMissingResult: true);
             if (predicate == null || GetDepth(predicate) > _maximumExpressionDepth)
-                return CallableClaimResultAssembler.Unknowns(target, WorkerClaimReason.UnsupportedExpression);
+            {
+                return CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.UnsupportedExpression);
+            }
+
             ProofJustification justification = clause.Kind == CompilerContractKind.Assume
                 ? new UserAssumedJustification(new SourceLocationId(assumptionOrdinal))
                 : new LoweredJustification(factory.CreateOperation("contract:" + assumptionOrdinal));
-            assumptions.Add(new Assumption(factory, predicate, justification));
+            var assumption = new Assumption(factory, predicate, justification);
+            assumptions.Add(assumption);
+            if (clause.Kind == CompilerContractKind.Requires)
+            {
+                preconditions.Add(assumption);
+            }
+
             if (clause.Kind == CompilerContractKind.Assume)
+            {
                 userAssumptionIds.Add(justification, clause.AssumptionId!);
-            assumptionLabels.Add(justification, clause.Kind.ToString().ToLowerInvariant() + ":" +
-                assumptionOrdinal.ToString(CultureInfo.InvariantCulture));
+            }
+
+            assumptionLabels.Add(justification,
+                ClauseLabel(clause.Kind) + ":" + assumptionOrdinal.ToString(CultureInfo.InvariantCulture));
             assumptionOrdinal++;
         }
-        foreach (var path in paths) {
-            foreach (var specAssumption in path.SpecAssumptions) {
-                var pathCondition = SpecResultDomainProjection.Rewrite(factory, path.Condition, path.SpecResultProjections);
-                var specPredicate = SpecResultDomainProjection.Rewrite(factory, specAssumption.Predicate, path.SpecResultProjections);
-                var predicate = Guard(factory, pathCondition, specPredicate);
-                if (GetDepth(predicate) > _maximumExpressionDepth)
-                    return CallableClaimResultAssembler.Unknowns(target, WorkerClaimReason.UnsupportedExpression);
-                ProofJustification justification = new SpecJustification(specAssumption.Spec);
-                assumptions.Add(new Assumption(factory, predicate, justification));
-                assumptionLabels.Add(justification, "spec:" + specAssumption.WitnessIdentifier);
+        foreach (var specAssumption in body.SpecAssumptions)
+        {
+            var guard = SpecResultDomainProjection.Rewrite(factory, specAssumption.Guard, body.SpecResultProjections);
+            var specPredicate = SpecResultDomainProjection.Rewrite(
+                factory, specAssumption.Predicate, body.SpecResultProjections);
+            var predicate = Guard(factory, guard, specPredicate);
+            if (GetDepth(predicate) > _maximumExpressionDepth)
+            {
+                return CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.UnsupportedExpression);
             }
+
+            ProofJustification justification = new SpecJustification(specAssumption.Spec);
+            assumptions.Add(new Assumption(factory, predicate, justification));
+            assumptionLabels.Add(justification, "spec:" + specAssumption.WitnessIdentifier);
         }
-        if (!TryAddSourceDomainAssumptions(factory, target.Variables, paths, assumptions, assumptionLabels))
-            return CallableClaimResultAssembler.Unknowns(target, WorkerClaimReason.UnsupportedExpression);
-        AddNormalCompletionAssumption(factory, paths, assumptions, assumptionLabels);
-        if (assumptions.Any(assumption =>
-                GetDepth(assumption.Predicate) > _maximumExpressionDepth))
-            return CallableClaimResultAssembler.Unknowns(target, WorkerClaimReason.UnsupportedExpression);
-        var assumptionsUseSupportedDomain = assumptions.All(assumption =>
-            IsSupportedProofDomain(factory, assumption.Predicate));
+        if (!TryAddSourceDomainAssumptions(
+                factory, target.Variables, body.Returns, body.SpecResultProjections, assumptions, assumptionLabels))
+        {
+            return CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.UnsupportedExpression);
+        }
+
+        var normalCompletion = AddNormalCompletionAssumption(
+            factory,
+            body.Returns,
+            body.SpecResultProjections,
+            assumptions,
+            assumptionLabels);
+        if (assumptions.Any(assumption => GetDepth(assumption.Predicate) > _maximumExpressionDepth))
+        {
+            return CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.UnsupportedExpression);
+        }
+
+        var assumptionsUseSupportedDomain =
+            assumptions.All(assumption => IsSupportedProofDomain(factory, assumption.Predicate));
         ImmutableArray<IrVarId> replayVariables = [.. target.Variables.Where(variable =>
             variable.Role is CompilerVariableRole.Receiver or CompilerVariableRole.Parameter &&
             factory.GetTypeInfo(factory.GetVariableInfo(variable.Variable).Type).Kind is
                 IrTypeKind.Boolean or IrTypeKind.Integer).Select(static variable => variable.Variable)];
+        ProofOutcome? vacuityUnknown = null;
+        var contradictoryPreconditions = preconditions.Any(static assumption =>
+            assumption.Predicate is IrBooleanTerm { Value: false });
+        if (!contradictoryPreconditions && preconditions.Any(static assumption =>
+                assumption.Predicate is not IrBooleanTerm { Value: true }))
+        {
+            var preconditionOutcome = await ProbeSatisfiabilityAsync(
+                    factory,
+                    preconditions,
+                    replayVariables,
+                    resourceBudget,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (preconditionOutcome == null)
+            {
+                return CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.ResourceLimit);
+            }
 
+            contradictoryPreconditions = preconditionOutcome is ProvenOutcome;
+            if (preconditionOutcome is not (ProvenOutcome or RefutedOutcome))
+            {
+                vacuityUnknown = preconditionOutcome;
+            }
+        }
+        var noModeledNormalReturn = normalCompletion is IrBooleanTerm { Value: false };
+        if (!contradictoryPreconditions && vacuityUnknown == null && normalCompletion is not IrBooleanTerm)
+        {
+            var bodyEvidence = assumptions.Where(
+                static assumption =>
+                    assumption.Justification is not UserAssumedJustification);
+            var completionOutcome = await ProbeSatisfiabilityAsync(
+                    factory,
+                    bodyEvidence,
+                    replayVariables,
+                    resourceBudget,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (completionOutcome == null)
+            {
+                return CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.ResourceLimit);
+            }
+
+            noModeledNormalReturn = completionOutcome is ProvenOutcome;
+            if (completionOutcome is not (ProvenOutcome or RefutedOutcome))
+            {
+                vacuityUnknown = completionOutcome;
+            }
+        }
         var records = ImmutableArray.CreateBuilder<WorkerClaimResult>(ensures.Length);
-        for (var index = 0; index < ensures.Length; index++) {
+        for (var index = 0; index < ensures.Length; index++)
+        {
             cancellationToken.ThrowIfCancellationRequested();
-            var pathObligations = ImmutableArray.CreateBuilder<IrTerm>(paths.Length);
+            var pathObligations = ImmutableArray.CreateBuilder<IrTerm>(body.Returns.Length);
             var missingReturnValue = false;
-            foreach (var path in paths) {
+            foreach (var path in body.Returns)
+            {
                 var pathCondition = ApplyBodySubstitutions(factory, ensures[index].Condition,
                     target.Variables, path.ReturnTerm, path.CurrentStates);
-                if (pathCondition == null) { missingReturnValue = true; break; }
-                pathCondition = SpecResultDomainProjection.Rewrite(factory, pathCondition, path.SpecResultProjections);
-                var executionCondition = SpecResultDomainProjection.Rewrite(factory, path.Condition, path.SpecResultProjections);
+                if (pathCondition == null)
+                {
+                    missingReturnValue = true;
+                    break;
+                }
+                pathCondition = SpecResultDomainProjection.Rewrite(factory, pathCondition, body.SpecResultProjections);
+                var executionCondition = SpecResultDomainProjection.Rewrite(
+                    factory, path.Predicate, body.SpecResultProjections);
                 pathObligations.Add(Guard(factory, executionCondition, pathCondition));
             }
-            if (missingReturnValue) {
+            if (missingReturnValue)
+            {
                 records.Add(CallableClaimResultAssembler.Unknown(target, index, WorkerClaimReason.MissingReturnValue));
                 continue;
             }
             var condition = Conjoin(factory, pathObligations);
-            if (GetDepth(condition) > _maximumExpressionDepth) {
+            if (GetDepth(condition) > _maximumExpressionDepth)
+            {
                 records.Add(CallableClaimResultAssembler.Unknown(target, index, WorkerClaimReason.DeepPostcondition));
                 continue;
             }
-            if (!assumptionsUseSupportedDomain || !IsSupportedProofDomain(factory, condition)) {
+            if (!assumptionsUseSupportedDomain || !IsSupportedProofDomain(factory, condition))
+            {
                 records.Add(CallableClaimResultAssembler.Unknown(target, index, WorkerClaimReason.UnsupportedExpression));
                 continue;
             }
-            if (!resourceBudget.TryStartQuery()) {
-                records.AddRange(CallableClaimResultAssembler.Unknowns(target, WorkerClaimReason.ResourceLimit).Skip(index));
+            if (!resourceBudget.TryStartQuery())
+            {
+                records.AddRange(CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.ResourceLimit).Skip(index));
                 break;
             }
             var query = new VerificationQuery(factory, assumptions,
                 new Goal(factory, condition, ProofDiagnosticKind.Postcondition, new SourceLocationId(index)),
                 replayVariables);
             var outcome = await _kernel.VerifyAsync(query, cancellationToken).ConfigureAwait(false);
-            if (resourceBudget.IsExceeded) {
-                records.AddRange(CallableClaimResultAssembler.Unknowns(target, WorkerClaimReason.ResourceLimit).Skip(index));
+            if (resourceBudget.IsExceeded)
+            {
+                records.AddRange(CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.ResourceLimit).Skip(index));
                 break;
             }
+            if (outcome is ProvenOutcome && vacuityUnknown != null)
+            {
+                outcome = vacuityUnknown;
+            }
+
             var replayed = outcome is RefutedOutcome refuted
-                ? CallableCounterexampleReplayer.Replay(
-                    target, index, refuted.Model.Assignments, cancellationToken)
+                ? CallableCounterexampleReplayer.Replay(target, index, refuted.Model.Assignments, cancellationToken)
                 : WorkerClaimReason.None;
             cancellationToken.ThrowIfCancellationRequested();
+            var vacuity = contradictoryPreconditions ? WorkerVacuityKind.ContradictoryPreconditions :
+                noModeledNormalReturn ? WorkerVacuityKind.NoModeledNormalReturn : WorkerVacuityKind.None;
             records.Add(CallableClaimResultAssembler.FromOutcome(target, index, outcome, target.Variables,
-                assumptionLabels, userAssumptionIds, replayed));
+                assumptionLabels, userAssumptionIds, replayed, vacuity));
         }
         return records.ToImmutable();
     }
 
-    private static bool TryAddSourceDomainAssumptions(IrFactory factory,
-        ImmutableArray<CompilerCanonicalVariable> variables, ImmutableArray<BodyPath> paths,
-        ImmutableArray<Assumption>.Builder assumptions,
-        Dictionary<ProofJustification, string> assumptionLabels) {
-        var seenPredicates = assumptions.Select(static assumption => assumption.Predicate.Id).ToHashSet();
-        foreach (var variable in variables
-                     .Where(static variable => variable.Role is CompilerVariableRole.Receiver
-                         or CompilerVariableRole.Parameter or CompilerVariableRole.Result)
-                     .OrderBy(static variable => GetDomainRoleOrder(variable.Role))
-                     .ThenBy(static variable => variable.Ordinal)) {
-            if (variable.SourceIntegerInterval is not { } sourceInterval) continue;
-            var interval = IntervalDomain.Instance.Range(sourceInterval.Minimum, sourceInterval.Maximum);
-            if (interval.IsBottom) return false;
-            if (variable.Role == CompilerVariableRole.Result) {
-                foreach (var path in paths) {
-                    if (path.ReturnTerm == null ||
-                        path.ReturnTerm.Type != factory.IntegerType ||
-                        !SpecResultDomainProjection.TryCreateIntervalPredicate(factory, path.ReturnTerm, interval, out var predicate) ||
-                        predicate == null)
-                        return false;
-                    AddDomainAssumption(Guard(factory,
-                        SpecResultDomainProjection.Rewrite(factory, path.Condition, path.SpecResultProjections), predicate), variable);
-                }
-            }
-            else {
-                if (!SpecResultDomainProjection.TryCreateIntervalPredicate(factory,
-                        factory.Variable(variable.Variable), interval, out var predicate))
-                    return false;
-                if (predicate == null) return false;
-                AddDomainAssumption(predicate, variable);
-            }
-        }
-        return true;
-
-        void AddDomainAssumption(IrTerm predicate, CompilerCanonicalVariable variable) {
-            if (predicate is IrBooleanTerm { Value: true } || !seenPredicates.Add(predicate.Id)) return;
-            var label = CreateDomainLabel(variable);
-            ProofJustification justification = new LoweredJustification(factory.CreateOperation("source-" + label));
-            assumptions.Add(new Assumption(factory, predicate, justification));
-            assumptionLabels.Add(justification, label);
-        }
-    }
-
-    private static void AddNormalCompletionAssumption(IrFactory factory, ImmutableArray<BodyPath> paths,
-        ImmutableArray<Assumption>.Builder assumptions,
-        Dictionary<ProofJustification, string> assumptionLabels) {
-        var completions = ImmutableArray.CreateBuilder<IrTerm>(paths.Length);
-        foreach (var path in paths) {
-            var completion = path.ReturnTerm == null ? path.Condition : factory.Binary(
-                IrBinaryOperator.AndAlso, path.Condition,
-                factory.Binary(IrBinaryOperator.Equal, path.ReturnTerm, path.ReturnTerm));
-            completions.Add(SpecResultDomainProjection.Rewrite(factory, completion, path.SpecResultProjections));
-        }
-        var predicate = Disjoin(factory, completions);
-        if (predicate is IrBooleanTerm { Value: true } ||
-            assumptions.Any(assumption => assumption.Predicate.Id == predicate.Id))
-            return;
-        ProofJustification justification = new LoweredJustification(factory.CreateOperation("body:normal-completion"));
-        assumptions.Add(new Assumption(factory, predicate, justification));
-        assumptionLabels.Add(justification, "body:normal-completion");
-    }
-
-    private static int GetDomainRoleOrder(CompilerVariableRole role) => role switch {
-        CompilerVariableRole.Receiver => 0,
-        CompilerVariableRole.Parameter => 1,
-        CompilerVariableRole.Result => 2,
-        _ => 3
-    };
-
-    private static string CreateDomainLabel(CompilerCanonicalVariable variable) => variable.Role switch {
-        CompilerVariableRole.Receiver => "domain:receiver",
-        CompilerVariableRole.Parameter => "domain:parameter:" + variable.Ordinal.ToString(CultureInfo.InvariantCulture),
-        CompilerVariableRole.Result => "domain:result",
-        _ => throw new ArgumentOutOfRangeException(nameof(variable))
-    };
-
-    private static bool IsSupportedProofDomain(IrFactory factory, IrTerm root) {
-        var pending = new Stack<IrTerm>(); var visited = new HashSet<IrId>();
-        pending.Push(root);
-        while (pending.Count != 0) {
-            var term = pending.Pop();
-            if (!visited.Add(term.Id)) continue;
-            if (term is IrVariableTerm variable) {
-                var kind = factory.GetTypeInfo(variable.Type).Kind;
-                if (kind is not (IrTypeKind.Boolean or IrTypeKind.Integer)) return false;
-            }
-            if (term is IrBinaryTerm { Operator: IrBinaryOperator.StringConcat }) return false;
-            if (term is IrLengthTerm length && length.Value.Type == factory.StringType) return false;
-            foreach (var child in IrTraversal.GetChildren(term)) pending.Push(child);
-        }
-        return true;
-    }
-
-    private ImmutableArray<BodyPath> ExecuteAcyclicBody(ImmutableArray<CompilerCanonicalVariable> variables,
-        IrFactory factory, IrProgram program,
-        ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> specCalls,
-        ImmutableDictionary<IrVarId, IrTerm> initialEnvironment,
-        ImmutableDictionary<IrVarId, IrVarId> parameterBindings) {
-        var pending = new Stack<SymbolicExecutionState>();
-        pending.Push(new SymbolicExecutionState(program.Entry, initialEnvironment, factory.Boolean(true),
-            ImmutableDictionary<IrVarId, SpecResultProjection>.Empty, []));
-        var paths = ImmutableArray.CreateBuilder<BodyPath>();
-        var executionStates = 0;
-        while (pending.Count != 0) {
-            if (++executionStates > MaximumExecutionStates)
-                return default;
-            var state = pending.Pop(); var block = program.GetBlock(state.Block);
-            var environment = state.Environment;
-            var specResultProjections = state.SpecResultProjections;
-            var specAssumptions = state.SpecAssumptions;
-            OperationId? expectedMemoryHavoc = null; var transferred = false;
-            for (var index = 0; index < block.Instructions.Length; index++) {
-                var instruction = block.Instructions[index];
-                if (expectedMemoryHavoc is { } expectedOperation) {
-                    expectedMemoryHavoc = null;
-                    if (instruction is IrHavocInstruction havoc &&
-                        havoc.Operation == expectedOperation && havoc.HavocKind == IrHavocKind.Memory &&
-                        havoc.Variables.IsEmpty)
-                        continue;
-                    return default;
-                }
-                switch (instruction) {
-                    case IrAssignInstruction assign:
-                        if (!TrySubstitute(factory, assign.Value, environment, out var assigned) ||
-                            GetDepth(assigned) > _maximumExpressionDepth)
-                            return default;
-                        environment = environment.SetItem(assign.Target, assigned);
-                        break;
-                    case IrCallInstruction call:
-                        if (!specCalls.TryGetValue(call.Id, out var specCall) ||
-                            !TryApplySpecCall(factory, call, specCall, environment, out var resultTerm,
-                                out var addedAssumptions, out var resultProjection, out var consumesMemoryHavoc))
-                            return default;
-                        environment = environment.SetItem(call.Target!.Value, resultTerm);
-                        if (resultProjection != default)
-                            specResultProjections = specResultProjections.SetItem(call.Target.Value, resultProjection);
-                        specAssumptions = specAssumptions.AddRange(addedAssumptions);
-                        expectedMemoryHavoc = consumesMemoryHavoc ? call.Operation : null;
-                        break;
-                    case IrBranchInstruction branch:
-                        if (!TrySubstitute(factory, branch.Condition, environment, out var condition) ||
-                            condition.Type != factory.BooleanType ||
-                            GetDepth(condition) > _maximumExpressionDepth)
-                            return default;
-                        if (condition is IrBooleanTerm literal) {
-                            pending.Push(new SymbolicExecutionState(literal.Value ? branch.WhenTrue : branch.WhenFalse,
-                                environment, state.PathCondition, specResultProjections, specAssumptions));
-                        }
-                        else {
-                            var whenTrue = factory.Binary(IrBinaryOperator.AndAlso, state.PathCondition, condition);
-                            var whenFalse = factory.Binary(IrBinaryOperator.AndAlso, state.PathCondition,
-                                factory.Unary(IrUnaryOperator.Not, condition));
-                            if (GetDepth(whenTrue) > _maximumExpressionDepth || GetDepth(whenFalse) > _maximumExpressionDepth)
-                                return default;
-                            pending.Push(new SymbolicExecutionState(branch.WhenFalse, environment, whenFalse,
-                                specResultProjections, specAssumptions));
-                            pending.Push(new SymbolicExecutionState(branch.WhenTrue, environment, whenTrue,
-                                specResultProjections, specAssumptions));
-                        }
-                        transferred = true;
-                        break;
-                    case IrGotoInstruction go:
-                        pending.Push(new SymbolicExecutionState(go.Target, environment, state.PathCondition,
-                            specResultProjections, specAssumptions));
-                        transferred = true;
-                        break;
-                    case IrReturnInstruction returned:
-                        if (returned.Value == null || !TrySubstitute(factory, returned.Value, environment, out var returnTerm) ||
-                            GetDepth(returnTerm) > _maximumExpressionDepth)
-                            return default;
-                        paths.Add(new BodyPath(state.PathCondition, returnTerm,
-                            CreateCurrentStates(variables, factory, environment, parameterBindings),
-                            specResultProjections, specAssumptions));
-                        if (paths.Count > MaximumBodyPaths)
-                            return default;
-                        transferred = true;
-                        break;
-                    case IrLoadInstruction:
-                    case IrStoreInstruction:
-                    case IrHavocInstruction:
-                    case IrAssumeInstruction:
-                    case IrAssertInstruction:
-                    default:
-                        return default;
-                }
-                if (transferred) break;
-            }
-            if (!transferred) return default;
-        }
-        return paths.Count == 0 ? default : paths.ToImmutable();
-    }
-
-    private bool TryApplySpecCall(IrFactory factory, IrCallInstruction call, CompilerPreparedSpecCall specCall,
-        IReadOnlyDictionary<IrVarId, IrTerm> environment,
-        [NotNullWhen(true)] out IrTerm? resultTerm,
-        out ImmutableArray<BodySpecAssumption> assumptions, out SpecResultProjection projection, out bool consumesMemoryHavoc) {
-        resultTerm = null; assumptions = []; projection = default; consumesMemoryHavoc = specCall.ConsumesMemoryHavoc;
-        if (!call.Target.HasValue ||
-            !ApiSpecTable.Default.TryGetByWitnessIdentifier(specCall.WitnessIdentifier, out var template) ||
-            !template.Result.HasValue ||
-            consumesMemoryHavoc != (template.Facets.Effects.Effects != SpecEffect.None) ||
-            !IsSpecResultType(factory, template.Target.ResultType,
-                factory.GetVariableInfo(call.Target.Value).Type) ||
-            call.Arguments.Length != template.Parameters.Length ||
-            template.Receiver.HasValue != (call.Receiver != null))
-            return false;
-
-        var substitutions = new Dictionary<SpecVarId, IrTerm>();
-        if (template.Receiver.HasValue) {
-            if (!TrySubstitute(factory, call.Receiver!, environment, out var receiver))
-                return false;
-            substitutions.Add(template.Receiver.Value, receiver);
-        }
-
-        for (var index = 0; index < call.Arguments.Length; index++) {
-            if (!TrySubstitute(factory, call.Arguments[index], environment, out var argument)) return false;
-            substitutions.Add(template.Parameters[index], argument);
-        }
-
-        resultTerm = factory.Variable(call.Target.Value);
-        substitutions.Add(template.Result.Value, resultTerm);
-        if (!SpecResultDomainProjection.TryCreate(factory, template, call.Target.Value, out projection, out var facetPredicates)) {
-            resultTerm = null; projection = default; return false;
-        }
-        var instantiated = ApiSpecInstantiator.InstantiatePostconditions(template, factory, substitutions);
-        if (instantiated.Status != SpecInstantiationStatus.Succeeded) {
-            resultTerm = null; projection = default; return false;
-        }
-        var projectionMap = projection != default
-            ? ImmutableDictionary<IrVarId, SpecResultProjection>.Empty.Add(call.Target.Value, projection)
-            : ImmutableDictionary<IrVarId, SpecResultProjection>.Empty;
-        var predicates = instantiated.Postconditions.Select(predicate =>
-                SpecResultDomainProjection.Rewrite(factory, predicate, projectionMap))
-            .Concat(facetPredicates).ToImmutableArray();
-        if (predicates.IsDefaultOrEmpty || predicates.Any(predicate => GetDepth(predicate) > _maximumExpressionDepth)) {
-            resultTerm = null; projection = default; return false;
-        }
-        assumptions = [.. predicates.Select(predicate =>
-            new BodySpecAssumption(template.Id, template.Target.WitnessIdentifier, predicate))];
-        return true;
-    }
-
-    private static bool HasBoundSpecCalls(CompilerPreparedBody body) => body.SpecCalls.All(item =>
-        ApiSpecTable.Default.TryGetByWitnessIdentifier(item.Value.WitnessIdentifier, out var template) &&
-        template.Target.DocumentationCommentId == item.Value.CallIdentity);
-
-    private static bool IsSpecResultType(IrFactory factory, SpecValueType? specType, IrTypeId resultType) =>
-        specType switch {
-            SpecValueType.Boolean => resultType == factory.BooleanType,
-            SpecValueType.Integer => resultType == factory.IntegerType,
-            SpecValueType.String => resultType == factory.StringType,
-            SpecValueType.Sequence => factory.GetTypeInfo(resultType).Kind == IrTypeKind.Sequence,
-            _ => false
-        };
-
-    private static ImmutableDictionary<IrVarId, IrTerm> CreateCurrentStates(
-        ImmutableArray<CompilerCanonicalVariable> variables, IrFactory factory,
-        ImmutableDictionary<IrVarId, IrTerm> environment, IReadOnlyDictionary<IrVarId, IrVarId> parameterBindings) {
-        var result = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
-        foreach (var variable in variables) {
-            if (variable.Role == CompilerVariableRole.Parameter)
-                result[variable.Variable] = factory.Variable(variable.Variable);
-        }
-        foreach (var binding in parameterBindings) {
-            if (environment.TryGetValue(binding.Key, out var value))
-                result[binding.Value] = value;
-        }
-        return result.ToImmutable();
-    }
-
-    private static bool TrySubstitute(IrFactory factory, IrTerm term,
-        IReadOnlyDictionary<IrVarId, IrTerm> environment,
-        [NotNullWhen(true)] out IrTerm? substituted) {
-        if (!IrTraversal.CollectVariables(term).All(environment.ContainsKey)) {
-            substituted = null;
-            return false;
-        }
-        try {
-            substituted = IrSubstitution.Substitute(factory, term, environment);
-            return true;
-        }
-        catch (ArgumentException) {
-            substituted = null;
-            return false;
-        }
-    }
-
-    private static IrTerm? ApplyBodySubstitutions(IrFactory factory, IrTerm term,
-        ImmutableArray<CompilerCanonicalVariable> variables, IrTerm? returnTerm,
-        IReadOnlyDictionary<IrVarId, IrTerm> currentStates, bool allowMissingResult = false) {
-        var replacements = new Dictionary<IrVarId, IrTerm>();
-        foreach (var variable in variables) {
-            if (variable.Role == CompilerVariableRole.PreState &&
-                variable.CurrentStateVariable.HasValue)
-                replacements[variable.Variable] =
-                    factory.Variable(variable.CurrentStateVariable.Value);
-            else if (variable.Role == CompilerVariableRole.Result) {
-                if (returnTerm == null) {
-                    if (!allowMissingResult &&
-                        IrTraversal.CollectVariables(term).Contains(variable.Variable))
-                        return null;
-                }
-                else {
-                    replacements[variable.Variable] = returnTerm;
-                }
-            }
-        }
-        foreach (var currentState in currentStates)
-            replacements[currentState.Key] = currentState.Value;
-        try { return IrSubstitution.Substitute(factory, term, replacements); }
-        catch (ArgumentException) { return null; }
-    }
-
-    private static IrTerm Guard(IrFactory factory, IrTerm condition, IrTerm consequence) =>
-        factory.Binary(IrBinaryOperator.OrElse, factory.Unary(IrUnaryOperator.Not, condition), consequence);
-
-    private static IrTerm Conjoin(IrFactory factory, IReadOnlyList<IrTerm> terms) =>
-        Combine(factory, terms, IrBinaryOperator.AndAlso, identity: true);
-
-    private static IrTerm Disjoin(IrFactory factory, IReadOnlyList<IrTerm> terms) =>
-        Combine(factory, terms, IrBinaryOperator.OrElse, identity: false);
-
-    private static IrTerm Combine(
+    private async Task<ProofOutcome?> ProbeSatisfiabilityAsync(
         IrFactory factory,
-        IReadOnlyList<IrTerm> terms,
-        IrBinaryOperator @operator,
-        bool identity) {
-        if (terms.Count == 0) return factory.Boolean(identity);
-        return Visit(0, terms.Count);
-
-        IrTerm Visit(int start, int count) {
-            if (count == 1) return terms[start];
-            var leftCount = count / 2;
-            return factory.Binary(
-                @operator,
-                Visit(start, leftCount),
-                Visit(start + leftCount, count - leftCount));
+        IEnumerable<Assumption> evidence,
+        ImmutableArray<IrVarId> replayVariables,
+        MethodResourceBudget resourceBudget,
+        CancellationToken cancellationToken)
+    {
+        if (!resourceBudget.TryStartQuery())
+        {
+            return null;
         }
+
+        var query = new VerificationQuery(
+            factory,
+            evidence,
+            new Goal(
+                factory,
+                factory.Boolean(false),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)),
+            replayVariables);
+        var outcome = await _kernel.VerifyAsync(query, cancellationToken)
+            .ConfigureAwait(false);
+        return resourceBudget.IsExceeded ? null : outcome;
     }
 
-    private static int GetDepth(IrTerm root) {
-        var memo = new Dictionary<IrId, int>();
-        return Visit(root);
-
-        int Visit(IrTerm term) {
-            if (memo.TryGetValue(term.Id, out var existing)) return existing;
-            var children = IrTraversal.GetChildren(term);
-            var depth = children.Length == 0
-                ? 1
-                : 1 + children.Max(Visit);
-            memo.Add(term.Id, depth);
-            return depth;
-        }
+    private static SymbolicBodyExecution TrivialBody(IrFactory factory)
+    {
+        return new(
+            WorkerClaimReason.None,
+            [new SymbolicReturn(
+                factory.Boolean(true),
+                null,
+                ImmutableDictionary<IrVarId, IrTerm>.Empty)],
+            ImmutableDictionary<IrVarId, SpecResultProjection>.Empty,
+            []);
     }
 
-    private static ImmutableArray<BodyPath> TrivialBody(IrFactory factory) =>
-        [new BodyPath(factory.Boolean(true), null, ImmutableDictionary<IrVarId, IrTerm>.Empty,
-            ImmutableDictionary<IrVarId, SpecResultProjection>.Empty, [])];
-
-    private sealed record SymbolicExecutionState(IrBlockId Block,
-        ImmutableDictionary<IrVarId, IrTerm> Environment, IrTerm PathCondition,
-        ImmutableDictionary<IrVarId, SpecResultProjection> SpecResultProjections,
-        ImmutableArray<BodySpecAssumption> SpecAssumptions);
-
-    private readonly record struct BodyPath(IrTerm Condition, IrTerm? ReturnTerm,
-        ImmutableDictionary<IrVarId, IrTerm> CurrentStates,
-        ImmutableDictionary<IrVarId, SpecResultProjection> SpecResultProjections,
-        ImmutableArray<BodySpecAssumption> SpecAssumptions);
-
-    private readonly record struct BodySpecAssumption(SpecId Spec, string WitnessIdentifier, IrTerm Predicate);
+    private static string ClauseLabel(CompilerContractKind kind)
+    {
+        return kind switch
+        {
+            CompilerContractKind.Requires => "requires",
+            CompilerContractKind.Assume => "assume",
+            CompilerContractKind.Ensures => "ensures",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
+    }
 }

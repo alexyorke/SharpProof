@@ -12,9 +12,14 @@ profile/feature defaults, and verifier-package requirements.
 `SharpProof.Verifier.Win-x64.props` and
 `SharpProof.Verifier.Win-x64.targets` define worker budgets, policy defaults,
 compiler-manifest properties, paths, invocation, and host enforcement.
-`SharpProof.Worker.Protocol/ProtocolModel.cs` defines matching protocol defaults
-and validation bounds. The release gate mirrors selected values in
+`SharpProof.Worker.Protocol/ProtocolModel.schema.json` is the authoritative
+model, and checked-in `ProtocolModel.generated.cs` defines the matching runtime
+defaults and validation bounds. The release gate mirrors selected values in
 `eng/acceptance/contract.json` and verifies that they agree.
+`SharpProof.Frontend/CSharpScalarSemantics.json` is the corresponding review
+source for admitted integer widths and ranges, value-preserving conversions,
+checked behavior, and Roslyn-to-IR operator mappings; CI verifies its generated
+C# projection before building.
 
 ## Package and worker defaults
 
@@ -94,7 +99,7 @@ process boundary.
 
 `SharpProofVerifyMaximumExpressionDepth` is also a compiler-visible property.
 The collector parses it, enforces the 1-through-256 range, and seals it into the
-schema-3 artifact. The launcher supplies the same property as the worker request
+schema-4 artifact. The launcher supplies the same property as the worker request
 budget. A mismatch is `CompilerManifestMismatch` and stops before cache lookup
 or backend creation; neither side may silently use a different depth.
 
@@ -115,20 +120,31 @@ proof inputs, so they do not alter the semantic cache payload.
 effect-only annotations from the manifest; `effects` excludes postcondition
 claims and contract assumptions; `all` includes both.
 
+## Fixed portable analyzer bounds
+
+The live analyzer's compilation-scoped managed CFG pass accepts at most 256
+Roslyn CFG blocks and 4,096 descendant operations per callable. It rejects
+reachable cycles in this preview. Crossing either budget, or encountering a
+cycle, produces a typed incomplete result; selected effect contracts become
+`Unknown` with SP0047 evidence, and incomplete flow cannot discharge a
+call-site precondition. These bounds are deterministic and the analyzer never
+loads Z3.
+
 ## Fixed worker body bounds
 
-`SharpProof.Worker/CallableVerifier.cs` also has three fixed, non-configurable
-bounds for one admitted acyclic body:
+The compiler lowerer and acyclic predicate executor have three fixed,
+non-configurable bounds for one admitted body:
 
 | Bound | Limit |
 |---|---:|
 | Reachable CFG blocks | 64 |
-| Normal-return paths | 64 |
-| Symbolic execution states | 4,096 |
+| Lowered body instructions | 4,096 |
+| Symbolic operations | 65,536 |
 
 Crossing one of these bounds returns `Unknown` with `UnsupportedBody`; it does
-not produce a partial proof. Loops are rejected by the acyclic-body check
-before symbolic execution.
+not produce a partial proof. The executor merges predecessor states with
+symbolic path predicates instead of enumerating a fixed number of paths or
+states. Loops are rejected by the acyclic-body check before symbolic execution.
 
 The manifest discovers local functions, lambdas, anonymous methods, and the
 top-level entry point, including their directly owned postconditions. These
@@ -165,10 +181,11 @@ is the observed runner total rather than the requested budget.
 | IDE edit p95 | At most 100 ms |
 | IDE edit maximum | At most 250 ms |
 
-The active contract also fixes protocol version 6, cache schema version 7,
-claim-manifest schema version 2, and compiler artifact schema version 3, along
-with the narrow proof-kernel and component TCB path/LOC ratchets and the
-reference surfaces `netstandard2.0`, `net8.0`, and `net472`.
+The active contract also fixes protocol version 8, cache schema version 9,
+claim-manifest schema version 4, and compiler artifact schema version 5, along
+with exact proof-kernel and component TCB path inventories, formatting-neutral
+Roslyn complexity ratchets, and the reference surfaces `netstandard2.0`,
+`net8.0`, and `net472`.
 
 Unknown rate is reported by the corpus as explicit, silent, and total metrics;
 it is not a release threshold.

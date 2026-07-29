@@ -1,13 +1,17 @@
 namespace SharpProof.Analyzer;
 
-internal static class AnalyzerSyntaxHelpers {
-    internal static Location GetCallableDeclarationLocation(SyntaxNode node) =>
-        node switch {
+internal static class AnalyzerSyntaxHelpers
+{
+    internal static Location GetCallableDeclarationLocation(SyntaxNode node)
+    {
+        return node switch
+        {
             MethodDeclarationSyntax method => method.Identifier.GetLocation(),
             PropertyDeclarationSyntax property => property.Identifier.GetLocation(),
             IndexerDeclarationSyntax indexer => indexer.ThisKeyword.GetLocation(),
             ConstructorDeclarationSyntax constructor => constructor.Identifier.GetLocation(),
-            AccessorDeclarationSyntax accessor => accessor.Parent?.Parent switch {
+            AccessorDeclarationSyntax accessor => accessor.Parent?.Parent switch
+            {
                 PropertyDeclarationSyntax property => property.Identifier.GetLocation(),
                 IndexerDeclarationSyntax indexer => indexer.ThisKeyword.GetLocation(),
                 _ => accessor.Keyword.GetLocation()
@@ -17,10 +21,12 @@ internal static class AnalyzerSyntaxHelpers {
                 conversion.ImplicitOrExplicitKeyword.GetLocation(),
             _ => node.GetLocation()
         };
+    }
 
     internal static Location GetCallableDeclarationLocation(
         IMethodSymbol method,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var reference = method.DeclaringSyntaxReferences.FirstOrDefault();
         return reference == null
             ? method.Locations.FirstOrDefault() ?? Location.None

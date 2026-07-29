@@ -8,7 +8,8 @@ using SharpProof.Attributes;
 namespace SharpProof.Contracts.Test;
 
 [TestFixture]
-public sealed class ContractClauseInventoryTests {
+public sealed class ContractClauseInventoryTests
+{
     private static readonly BoundContractKind[] InventoryKinds = [
         BoundContractKind.Requires,
         BoundContractKind.Ensures,
@@ -32,7 +33,8 @@ public sealed class ContractClauseInventoryTests {
     ];
 
     [Test]
-    public void InventoryClassifiesEveryPlacementInStableSourceOrder() {
+    public void InventoryClassifiesEveryPlacementInStableSourceOrder()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -78,7 +80,8 @@ public sealed class ContractClauseInventoryTests {
     }
 
     [Test]
-    public void UnconditionalNestedBlockIsMisplacedAndBreaksThePrologue() {
+    public void UnconditionalNestedBlockIsMisplacedAndBreaksThePrologue()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -99,7 +102,8 @@ public sealed class ContractClauseInventoryTests {
     }
 
     [Test]
-    public void EmptyStatementBreaksTheContiguousPrologue() {
+    public void EmptyStatementBreaksTheContiguousPrologue()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -122,7 +126,8 @@ public sealed class ContractClauseInventoryTests {
     }
 
     [Test]
-    public void CompilerSymbolIdentityRejectsTextualShadows() {
+    public void CompilerSymbolIdentityRejectsTextualShadows()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -147,7 +152,8 @@ public sealed class ContractClauseInventoryTests {
     }
 
     [Test]
-    public void ExpressionBodiedClauseIsAValidPrologue() {
+    public void ExpressionBodiedClauseIsAValidPrologue()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -164,7 +170,8 @@ public sealed class ContractClauseInventoryTests {
     }
 
     [Test]
-    public void TopLevelDirectClausesUseTheGlobalStatementPrologue() {
+    public void TopLevelDirectClausesUseTheGlobalStatementPrologue()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -190,7 +197,8 @@ public sealed class ContractClauseInventoryTests {
     }
 
     [Test]
-    public void ClauseInventoryDoesNotRequireUnrelatedSharpProofApis() {
+    public void ClauseInventoryDoesNotRequireUnrelatedSharpProofApis()
+    {
         const string source =
             """
             namespace SharpProof.Attributes {
@@ -218,7 +226,8 @@ public sealed class ContractClauseInventoryTests {
     }
 
     [Test]
-    public void ConditionalAncestorsOutsideLocalCallableAreIgnored() {
+    public void ConditionalAncestorsOutsideLocalCallableAreIgnored()
+    {
         const string source =
             """
             using SharpProof.Attributes;
@@ -254,7 +263,8 @@ public sealed class ContractClauseInventoryTests {
         string source,
         string typeName,
         string methodName,
-        bool includeSharpProofReference = true) {
+        bool includeSharpProofReference = true)
+    {
         var compilation = CreateCompilation(
             source,
             includeSharpProofReference);
@@ -269,7 +279,8 @@ public sealed class ContractClauseInventoryTests {
     private static CSharpCompilation CreateCompilation(
         string source,
         bool includeSharpProofReference,
-        OutputKind outputKind = OutputKind.DynamicallyLinkedLibrary) {
+        OutputKind outputKind = OutputKind.DynamicallyLinkedLibrary)
+    {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,
             new CSharpParseOptions(
@@ -295,12 +306,16 @@ public sealed class ContractClauseInventoryTests {
     }
 
     private static ImmutableArray<MetadataReference> GetReferences(
-        bool includeSharpProofReference) {
+        bool includeSharpProofReference)
+    {
         var paths = ((string)AppContext.GetData(
                 "TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator);
         if (includeSharpProofReference)
+        {
             paths = [.. paths, typeof(Contract).Assembly.Location];
+        }
+
         return [.. paths.Select(static path =>
             MetadataReference.CreateFromFile(path))
             .DistinctBy(static reference => reference.Display,

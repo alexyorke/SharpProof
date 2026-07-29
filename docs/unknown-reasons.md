@@ -125,7 +125,7 @@ before assembling a `Refuted` record.
 
 ## Worker verification records
 
-Protocol version 6 binds compiler-manifest evidence and separates run state,
+Protocol version 8 binds compiler-manifest evidence and separates run state,
 callable coverage, and claim outcome.
 Every enum reserves `Unspecified` as its zero value; a valid request or response
 must use a permitted nonzero value where the field is required.
@@ -133,9 +133,8 @@ must use a permitted nonzero value where the field is required.
 The compiler artifact's `WorkerFeatureSet` is exactly:
 
 - `Unspecified` - invalid placeholder;
-- `Effects` - select effect annotations and exclude postcondition claims; the
-  current worker reports these callables as incomplete because it has no
-  effect-proof claim kind;
+- `Effects` - select effect annotations and exclude postcondition claims; each
+  effective selected effect contract receives a typed effect claim;
 - `Contracts` - select contract annotations, assumptions, and postcondition
   claims while excluding effect-only annotations; and
 - `All` - select both surfaces.
@@ -198,11 +197,11 @@ Every manifest claim has exactly one non-`Unspecified` outcome.
 | `None` | A terminal `Proven` or `Refuted` record has no abstention |
 | `UnsupportedCallable` | Callable kind, target, companion, or contract binding target is unsupported |
 | `UnsupportedContract` | Contract structure or intrinsic use is invalid/unsupported |
-| `UnsupportedBody` | The bounded acyclic body executor cannot model the body |
+| `UnsupportedBody` | The bounded acyclic analyzer or worker cannot model the body, including a selected analyzer body with reachable cyclic flow |
 | `UnsupportedExpression` | Contract/body expression, spec application, or proof encoding is unsupported |
 | `DeepPostcondition` | The constructed obligation exceeds `MaximumExpressionDepth`; it does not mean general deep verification is implemented |
 | `MissingReturnValue` | A result-dependent postcondition has a normal path without a usable return value |
-| `ResourceLimit` | Per-query or per-method resource allowance is exhausted |
+| `ResourceLimit` | A deterministic analyzer block/operation budget or worker per-query/per-method resource allowance is exhausted |
 | `MethodTimeout` | The method wall boundary is reached |
 | `ProjectTimeout` | The project boundary leaves the record unfinished |
 | `Canceled` | Caller cancellation stopped this claim after its manifest was sealed |
@@ -212,6 +211,43 @@ Every manifest claim has exactly one non-`Unspecified` outcome.
 | `CounterexampleReplayFailed` | Exact term replay or an otherwise executable compiler-produced whole-body replay disagreed with the candidate model; the assembled run fails |
 | `PostconditionMayBeUndefined` | Evaluating the postcondition can throw for a candidate input, so its Boolean truth value is not defined on every modeled normal-return state |
 | `CounterexampleNotReplayable` | The candidate model depends on a modeled call that the independent whole-body interpreter intentionally does not execute |
+| `EffectSummaryIncomplete` | The compiler-produced effect summary has an unknown facet or is otherwise incomplete |
+| `EffectContractNotEstablished` | A complete may-effect summary does not establish the selected effect contract and no definite replayable violation witness is available |
+
+Effect claim records have an additional closed certainty field:
+
+- `CompleteMayEffectSummary` means the relevant may-effect facet was complete;
+- `IncompleteMayEffectSummary` means that facet was incomplete;
+- `TrustedCompleteBoundary` means a complete bodyless contract was accepted as
+  an explicit trusted boundary;
+- `DefiniteViolation` means a simple unconditional direct effect has a
+  source-located structured witness that the worker can validate against the
+  sealed constraint; and
+- `Unavailable` means infrastructure or invalid contract evidence prevented a
+  semantic effect result.
+
+A may-effect summary is suitable for proving the absence of a disallowed
+effect, but the presence of a may-effect is not itself a concrete trace.
+Consequently a complete summary that does not establish the contract remains
+`Unknown(EffectContractNotEstablished)`. A claim is `Refuted` only for the
+narrow `DefiniteViolation` subset: managed object/array allocation, explicit
+throw, receiver-field access, empty `lock`, and exact `Monitor` calls in a
+simple unconditional body. The worker independently checks the structured
+witness against the sealed constraint. Conditional, path-dependent,
+static-initialization-sensitive, and may-only conflicts remain `Unknown`.
+Analyzer evidence preserves the more specific
+`ManagedAbstractFlow:BlockBudgetExceeded`,
+or `ManagedAbstractFlow:OperationBudgetExceeded` detail through JSON, SARIF,
+and cache records even when the closed claim reason is projected to
+`ResourceLimit`. Cyclic scalar flow disables scalar refinement, but does not
+make an effect claim incomplete: the effect engine can still prove the claim
+from its conservative scan of every compiler-reachable block.
+
+Proven postconditions additionally carry `WorkerVacuityKind`: `None`,
+`ContradictoryPreconditions`, or `NoModeledNormalReturn`. The last two make
+partial-correctness vacuity visible rather than silently presenting the result
+as an ordinary proof. The field is preserved by canonical JSON, SARIF
+projection, and semantic cache reuse.
 
 The worker intentionally coalesces some lower-layer distinctions. For example,
 proof `UnsupportedOperation`, `ApproximationTouchedGoal`,
@@ -245,8 +281,9 @@ mis-owned claims make the response malformed rather than successful.
 
 The response summary includes counts for every claim outcome and reason,
 assumptions (including used, user, and trusted counts), cache state,
-protocol/manifest/cache/tool/spec versions, effective budgets, and elapsed
-time.
+protocol/manifest/cache/tool/spec versions, the canonical packaged worker
+runtime-closure digest and API spec-content SHA-256 identity, effective
+budgets, and elapsed time.
 
 ## Protocol errors are separate
 
@@ -283,6 +320,6 @@ Unknown outcomes, protocol errors, cancellation, timeout, malformed results,
 backend failures, and failed replay are never semantic cache entries. Only a
 `Complete`, exact-manifest response with complete callable coverage and claims
 that are hygienic `Proven` or replay-validated `Refuted` is cacheable. Cache
-schema version 7 stores the semantic payload; every read revalidates it against
+schema version 9 stores the semantic payload; every read revalidates it against
 the complete current manifest. `require-proven` runs bypass this local semantic
 cache.

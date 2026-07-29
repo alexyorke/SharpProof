@@ -1,16 +1,19 @@
 namespace SharpProof.Effects.Test;
 
 [TestFixture]
-public sealed class EffectValueValidationTests {
+public sealed class EffectValueValidationTests
+{
     [Test]
-    public void ContractMetadataIntegerConversionRejectsInvalidValues() {
+    public void ContractMetadataIntegerConversionRejectsInvalidValues()
+    {
         object[] invalidValues = [
             new object(),
             "not-an-integer",
             decimal.MaxValue
         ];
 
-        foreach (var value in invalidValues) {
+        foreach (var value in invalidValues)
+        {
             Assert.That(
                 EffectContractMetadata.TryConvertInt64(value, out var result),
                 Is.False);
@@ -23,8 +26,10 @@ public sealed class EffectValueValidationTests {
     [TestCase(EffectRegionKind.Receiver, 1)]
     public void RegionIdentifiersRejectInvalidKindAndOrdinalPairs(
         EffectRegionKind kind,
-        int ordinal) =>
+        int ordinal)
+    {
         Assert.Throws<ArgumentOutOfRangeException>(
             (Action)(() =>
                 _ = new EffectRegionId(kind, ordinal)));
+    }
 }

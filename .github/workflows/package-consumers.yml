@@ -210,6 +210,15 @@ jobs:
           dotnet-version: "8.0.x"
           global-json-file: global.json
 
+      - name: Prime the framework-only package cache
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        run: >-
+          dotnet restore
+          "$env:GITHUB_WORKSPACE/SharpProof.Attributes/SharpProof.Attributes.csproj"
+          --source https://api.nuget.org/v3/index.json
+          --nologo
+
       - name: Download exact NuGet artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -234,6 +243,173 @@ jobs:
             -ExpectedSmt '${{ matrix.expected_smt }}' `
             -PackageSource $packageSource
 
+  minimum-sdk-consumer:
+    name: Actual SDK 9.0.300 framework consumers
+    needs: package
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup the minimum qualified .NET SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "9.0.300"
+
+      - name: Prime the framework-only package cache
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        run: >-
+          dotnet restore
+          "$env:GITHUB_WORKSPACE/SharpProof.Attributes/SharpProof.Attributes.csproj"
+          --source https://api.nuget.org/v3/index.json
+          --nologo
+
+      - name: Download exact NuGet artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nuget-packages
+          path: nupkgs
+
+      - name: Build package-backed framework consumers with SDK 9.0.300
+        shell: pwsh
+        run: |
+          $packageSource = (Resolve-Path ./nupkgs).Path
+          ./scripts/Test-SharpProofPackageConsumers.ps1 `
+            -Configuration Release `
+            -ExpectedSmt Required `
+            -PackageSource $packageSource `
+            -ConsumerSdkVersion 9.0.300 `
+            -FrameworkConsumersOnly
+
+  release-qualification:
+    name: Qualify the exact release SHA
+    if: >-
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      github.repository == 'alexyorke/SharpProof'
+    needs:
+      - package
+      - package-consumer
+      - minimum-sdk-consumer
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup required .NET SDKs
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "8.0.x"
+          global-json-file: global.json
+
+      - name: Restore the exact tagged source
+        shell: pwsh
+        run: .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
+
+      - name: Run full weekly-equivalent acceptance
+        shell: pwsh
+        run: |
+          .\scripts\Generate-Readme.ps1 -Verify
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\eng\acceptance\Verify.ps1 -Configuration Release
+
+      - name: Run nightly supported-domain fuzzing
+        shell: pwsh
+        run: >-
+          .\scripts\Invoke-SharpProofFuzzCampaign.ps1
+          -OutputDirectory artifacts/release-qualification/fuzz
+
+      - name: Kill trusted-boundary mutations
+        shell: pwsh
+        run: >-
+          .\scripts\Test-SharpProofTrustedMutations.ps1
+          -Configuration Release
+          -OutputPath artifacts/release-qualification/mutations.json
+
+      - name: Retain exact corpus and performance outcomes
+        shell: pwsh
+        run: |
+          .\scripts\Invoke-SharpProofGateEvidence.ps1 `
+            -Gate corpus `
+            -OutputPath artifacts/release-qualification/corpus.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\scripts\Invoke-SharpProofGateEvidence.ps1 `
+            -Gate performance `
+            -OutputPath artifacts/release-qualification/performance.json
+
+      - name: Collect and enforce release coverage
+        shell: pwsh
+        run: |
+          .\scripts\Invoke-SharpProofDotnet.ps1 `
+            -MemoryLimitMb 12288 `
+            -TimeoutSeconds 1200 `
+            test SharpProof.Dev.Tests.slnf `
+            -c Release `
+            --no-build `
+            --collect "XPlat Code Coverage" `
+            --results-directory artifacts/release-qualification/coverage
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\scripts\Test-SharpProofCoverage.ps1 `
+            -CoverageRoot artifacts/release-qualification/coverage `
+            -ComparisonRef HEAD^ `
+            -SummaryPath artifacts/release-qualification/coverage.json
+
+      - name: Audit the exact release dependency graph
+        shell: pwsh
+        run: |
+          New-Item `
+            -ItemType Directory `
+            -Force `
+            -Path artifacts/release-qualification |
+            Out-Null
+          .\scripts\Invoke-SharpProofDotnet.ps1 `
+            list SharpProof.sln package `
+            --vulnerable `
+            --include-transitive |
+            Tee-Object `
+              -FilePath artifacts/release-qualification/dependency-audit.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Record the qualified tag and commit
+        shell: pwsh
+        run: |
+          $evidence = [pscustomobject][ordered]@{
+            schemaVersion = 1
+            tag = $env:GITHUB_REF_NAME
+            commit = $env:GITHUB_SHA
+            acceptance = 'passed'
+            corpus = 'passed'
+            performance = 'passed'
+            fuzz = 'passed'
+            mutations = 'passed'
+            coverage = 'passed'
+            dependencyAudit = 'passed'
+          }
+          $json = ($evidence | ConvertTo-Json) -replace "`r`n", "`n"
+          [IO.File]::WriteAllText(
+            'artifacts/release-qualification/qualification.json',
+            $json + "`n",
+            [Text.UTF8Encoding]::new($false))
+
+      - name: Validate owner-controlled final 1.0 gates
+        if: github.ref_name == 'v1.0.0'
+        shell: pwsh
+        run: >-
+          .\scripts\Test-SharpProofHumanReleaseGates.ps1
+          -ExpectedCommit $env:GITHUB_SHA
+
+      - name: Upload exact-SHA release qualification evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: release-qualification-${{ github.sha }}
+          path: artifacts/release-qualification
+          if-no-files-found: error
+          retention-days: 90
+
   publish-private-preview:
     name: Promote preview.1 to the private feed
     if: >-
@@ -243,7 +419,9 @@ jobs:
     needs:
       - package
       - package-consumer
+      - minimum-sdk-consumer
       - attest
+      - release-qualification
     runs-on: ubuntu-latest
     environment: nuget.private-preview
     permissions:
@@ -299,7 +477,9 @@ jobs:
     needs:
       - package
       - package-consumer
+      - minimum-sdk-consumer
       - attest
+      - release-qualification
     runs-on: ubuntu-latest
     environment: nuget.org
     permissions:
@@ -331,7 +511,7 @@ jobs:
 
       - name: Exchange GitHub OIDC token for a temporary NuGet key
         id: nuget-login
-        uses: NuGet/login@ebc737b6fc418a6ca0073cf116ec8dc156d8b81e # v1
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
         with:
           user: ${{ vars.NUGET_USER }}
 

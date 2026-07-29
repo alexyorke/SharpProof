@@ -5,7 +5,8 @@ using SharpProof.Verify;
 
 namespace SharpProof.Fuzz;
 
-public enum FiniteDomainSatisfiability {
+public enum FiniteDomainSatisfiability
+{
     Satisfiable,
     Unsatisfiable
 }
@@ -17,29 +18,46 @@ public sealed record FiniteDomainDifferentialResult(
     int FiniteDomainAssumptions,
     string Detail);
 
-public sealed class FiniteDomainSmtDifferentialOracle {
-    public static ImmutableArray<long> IntegerDomain { get; } =
+public sealed class FiniteDomainSmtDifferentialOracle
+{
+    public static ImmutableArray<long> IntegerDomain
+    {
+        get;
+    } =
         [-2, -1, 0, 1, 2];
 
     public static bool IsDefinedForAllAssignments(
         IrFactory factory,
         IrTerm formula,
-        CancellationToken cancellationToken = default) {
-        if (factory == null) throw new ArgumentNullException(nameof(factory));
-        if (formula == null) throw new ArgumentNullException(nameof(formula));
+        CancellationToken cancellationToken = default)
+    {
+        if (factory == null)
+        {
+            throw new ArgumentNullException(nameof(factory));
+        }
+
+        if (formula == null)
+        {
+            throw new ArgumentNullException(nameof(formula));
+        }
+
         if (formula.Type != factory.BooleanType)
+        {
             throw new ArgumentException(
                 "The finite-domain formula must be Boolean.",
                 nameof(formula));
+        }
 
         var variables = CollectVariables(formula);
         var interpreter = new IrInterpreter(factory);
         var environment = new Dictionary<IrVarId, IrValue>();
         return Check(0);
 
-        bool Check(int index) {
+        bool Check(int index)
+        {
             cancellationToken.ThrowIfCancellationRequested();
-            if (index == variables.Length) {
+            if (index == variables.Length)
+            {
                 var evaluated = interpreter.Evaluate(
                     formula,
                     environment,
@@ -51,20 +69,34 @@ public sealed class FiniteDomainSmtDifferentialOracle {
             var variable = variables[index];
             var type = factory.GetTypeInfo(
                 factory.GetVariableInfo(variable).Type).Kind;
-            if (type == IrTypeKind.Boolean) {
+            if (type == IrTypeKind.Boolean)
+            {
                 environment[variable] = factory.CreateBooleanValue(false);
-                if (!Check(index + 1)) return false;
+                if (!Check(index + 1))
+                {
+                    return false;
+                }
+
                 environment[variable] = factory.CreateBooleanValue(true);
-                if (!Check(index + 1)) return false;
-            }
-            else if (type == IrTypeKind.Integer) {
-                foreach (var value in IntegerDomain) {
-                    environment[variable] =
-                        factory.CreateIntegerValue(value);
-                    if (!Check(index + 1)) return false;
+                if (!Check(index + 1))
+                {
+                    return false;
                 }
             }
-            else {
+            else if (type == IrTypeKind.Integer)
+            {
+                foreach (var value in IntegerDomain)
+                {
+                    environment[variable] =
+                        factory.CreateIntegerValue(value);
+                    if (!Check(index + 1))
+                    {
+                        return false;
+                    }
+                }
+            }
+            else
+            {
                 return false;
             }
             environment.Remove(variable);
@@ -79,24 +111,37 @@ public sealed class FiniteDomainSmtDifferentialOracle {
     public async Task<FiniteDomainDifferentialResult> CompareAsync(
         IrFactory factory,
         IrTerm formula,
-        CancellationToken cancellationToken = default) {
-        if (factory == null) throw new ArgumentNullException(nameof(factory));
-        if (formula == null) throw new ArgumentNullException(nameof(formula));
+        CancellationToken cancellationToken = default)
+    {
+        if (factory == null)
+        {
+            throw new ArgumentNullException(nameof(factory));
+        }
+
+        if (formula == null)
+        {
+            throw new ArgumentNullException(nameof(formula));
+        }
+
         if (formula.Type != factory.BooleanType)
+        {
             throw new ArgumentException(
                 "The finite-domain formula must be Boolean.",
                 nameof(formula));
+        }
 
         cancellationToken.ThrowIfCancellationRequested();
         var variables = CollectVariables(formula);
         var assumptions = ImmutableArray.CreateBuilder<Assumption>(
             variables.Length);
-        foreach (var variable in variables) {
+        foreach (var variable in variables)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             if (!TryCreateDomainPredicate(
                     factory,
                     variable,
-                    out var predicate)) {
+                    out var predicate))
+            {
                 return new FiniteDomainDifferentialResult(
                     FuzzOracleStatus.Abstained,
                     FiniteDomainSatisfiability.Unsatisfiable,
@@ -134,12 +179,14 @@ public sealed class FiniteDomainSmtDifferentialOracle {
         var outcome = await new ProofKernel(backend)
             .VerifyAsync(query, cancellationToken)
             .ConfigureAwait(false);
-        var actual = outcome switch {
+        var actual = outcome switch
+        {
             RefutedOutcome => FiniteDomainSatisfiability.Satisfiable,
             ProvenOutcome => FiniteDomainSatisfiability.Unsatisfiable,
             _ => (FiniteDomainSatisfiability?)null
         };
-        if (actual == null) {
+        if (actual == null)
+        {
             var detail = outcome is UnknownOutcome unknown
                 ? "SMT abstained: " + unknown.Reason + "."
                 : "SMT returned an unrecognized proof outcome.";
@@ -170,20 +217,24 @@ public sealed class FiniteDomainSmtDifferentialOracle {
         IrFactory factory,
         IrTerm formula,
         ImmutableArray<IrVarId> variables,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken)
+    {
         var interpreter = new IrInterpreter(factory);
         var environment = new Dictionary<IrVarId, IrValue>();
         return Search(0);
 
-        bool Search(int index) {
+        bool Search(int index)
+        {
             cancellationToken.ThrowIfCancellationRequested();
-            if (index == variables.Length) {
+            if (index == variables.Length)
+            {
                 var evaluated = interpreter.Evaluate(
                     formula,
                     environment,
                     cancellationToken);
                 return evaluated.Status == IrEvaluationStatus.Value &&
-                       evaluated.Value is {
+                       evaluated.Value is
+                       {
                            Kind: IrValueKind.Boolean,
                            Boolean: true
                        };
@@ -192,20 +243,34 @@ public sealed class FiniteDomainSmtDifferentialOracle {
             var variable = variables[index];
             var type = factory.GetTypeInfo(
                 factory.GetVariableInfo(variable).Type).Kind;
-            if (type == IrTypeKind.Boolean) {
+            if (type == IrTypeKind.Boolean)
+            {
                 environment[variable] = factory.CreateBooleanValue(false);
-                if (Search(index + 1)) return true;
+                if (Search(index + 1))
+                {
+                    return true;
+                }
+
                 environment[variable] = factory.CreateBooleanValue(true);
-                if (Search(index + 1)) return true;
-            }
-            else if (type == IrTypeKind.Integer) {
-                foreach (var value in IntegerDomain) {
-                    environment[variable] =
-                        factory.CreateIntegerValue(value);
-                    if (Search(index + 1)) return true;
+                if (Search(index + 1))
+                {
+                    return true;
                 }
             }
-            else {
+            else if (type == IrTypeKind.Integer)
+            {
+                foreach (var value in IntegerDomain)
+                {
+                    environment[variable] =
+                        factory.CreateIntegerValue(value);
+                    if (Search(index + 1))
+                    {
+                        return true;
+                    }
+                }
+            }
+            else
+            {
                 return false;
             }
             environment.Remove(variable);
@@ -216,11 +281,13 @@ public sealed class FiniteDomainSmtDifferentialOracle {
     private static bool TryCreateDomainPredicate(
         IrFactory factory,
         IrVarId variable,
-        out IrTerm? predicate) {
+        out IrTerm? predicate)
+    {
         var variableTerm = factory.Variable(variable);
         var type = factory.GetTypeInfo(
             factory.GetVariableInfo(variable).Type).Kind;
-        switch (type) {
+        switch (type)
+        {
             case IrTypeKind.Boolean:
                 predicate = Or(
                     factory,
@@ -252,34 +319,56 @@ public sealed class FiniteDomainSmtDifferentialOracle {
 
     private static IrTerm Or(
         IrFactory factory,
-        IEnumerable<IrTerm> predicates) {
+        IEnumerable<IrTerm> predicates)
+    {
         using var enumerator = predicates.GetEnumerator();
-        if (!enumerator.MoveNext()) return factory.Boolean(false);
+        if (!enumerator.MoveNext())
+        {
+            return factory.Boolean(false);
+        }
+
         var result = enumerator.Current;
         while (enumerator.MoveNext())
+        {
             result = factory.Binary(
                 IrBinaryOperator.OrElse,
                 result,
                 enumerator.Current);
+        }
+
         return result;
     }
 
-    private static ImmutableArray<IrVarId> CollectVariables(IrTerm root) {
+    private static ImmutableArray<IrVarId> CollectVariables(IrTerm root)
+    {
         var variables = new SortedDictionary<int, IrVarId>();
         var seen = new HashSet<IrId>();
         Visit(root);
         return [.. variables.Values];
 
-        void Visit(IrTerm term) {
-            if (!seen.Add(term.Id)) return;
-            switch (term) {
+        void Visit(IrTerm term)
+        {
+            if (!seen.Add(term.Id))
+            {
+                return;
+            }
+
+            switch (term)
+            {
                 case IrVariableTerm variable:
                     variables[variable.Variable.Value] = variable.Variable;
                     break;
                 case IrOpaqueTerm opaque:
-                    if (opaque.Receiver != null) Visit(opaque.Receiver);
+                    if (opaque.Receiver != null)
+                    {
+                        Visit(opaque.Receiver);
+                    }
+
                     foreach (var argument in opaque.Arguments)
+                    {
                         Visit(argument);
+                    }
+
                     break;
                 case IrUnaryTerm unary:
                     Visit(unary.Operand);
@@ -308,116 +397,190 @@ public sealed class FiniteDomainSmtDifferentialOracle {
     }
 }
 
-public static class IrStructuralShrinker {
+public static class IrStructuralShrinker
+{
     public static async Task<IrTerm> MinimizeAsync(
         IrFactory factory,
         IrTerm term,
         Func<IrTerm, CancellationToken, Task<bool>> preservesMismatch,
-        CancellationToken cancellationToken = default) {
-        if (factory == null) throw new ArgumentNullException(nameof(factory));
-        if (term == null) throw new ArgumentNullException(nameof(term));
+        CancellationToken cancellationToken = default)
+    {
+        if (factory == null)
+        {
+            throw new ArgumentNullException(nameof(factory));
+        }
+
+        if (term == null)
+        {
+            throw new ArgumentNullException(nameof(term));
+        }
+
         if (preservesMismatch == null)
+        {
             throw new ArgumentNullException(nameof(preservesMismatch));
+        }
 
         var current = term;
-        while (true) {
+        while (true)
+        {
             cancellationToken.ThrowIfCancellationRequested();
             var currentSize = StructuralSize(current);
             var changed = false;
-            foreach (var candidate in GetCandidates(factory, current)) {
+            foreach (var candidate in GetCandidates(factory, current))
+            {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (StructuralSize(candidate) >= currentSize) continue;
+                if (StructuralSize(candidate) >= currentSize)
+                {
+                    continue;
+                }
+
                 if (!await preservesMismatch(candidate, cancellationToken)
                         .ConfigureAwait(false))
+                {
                     continue;
+                }
+
                 current = candidate;
                 changed = true;
                 break;
             }
-            if (!changed) return current;
+            if (!changed)
+            {
+                return current;
+            }
         }
     }
 
     public static ImmutableArray<IrTerm> GetCandidates(
         IrFactory factory,
-        IrTerm term) {
-        if (factory == null) throw new ArgumentNullException(nameof(factory));
-        if (term == null) throw new ArgumentNullException(nameof(term));
+        IrTerm term)
+    {
+        if (factory == null)
+        {
+            throw new ArgumentNullException(nameof(factory));
+        }
+
+        if (term == null)
+        {
+            throw new ArgumentNullException(nameof(term));
+        }
 
         var candidates = new List<IrTerm>();
         var seen = new HashSet<IrId>();
         var originalSize = StructuralSize(term);
 
-        void Add(IrTerm candidate) {
-            if (candidate.Id == term.Id) return;
-            if (StructuralSize(candidate) >= originalSize) return;
-            if (seen.Add(candidate.Id)) candidates.Add(candidate);
+        void Add(IrTerm candidate)
+        {
+            if (candidate.Id == term.Id)
+            {
+                return;
+            }
+
+            if (StructuralSize(candidate) >= originalSize)
+            {
+                return;
+            }
+
+            if (seen.Add(candidate.Id))
+            {
+                candidates.Add(candidate);
+            }
         }
 
         foreach (var child in Children(term))
+        {
             if (child.Type == term.Type)
+            {
                 Add(child);
+            }
+        }
 
-        if (term.Type == factory.BooleanType) {
+        if (term.Type == factory.BooleanType)
+        {
             Add(factory.Boolean(false));
             Add(factory.Boolean(true));
         }
-        else if (term.Type == factory.IntegerType) {
+        else if (term.Type == factory.IntegerType)
+        {
             Add(factory.Integer(0));
             Add(factory.Integer(1));
         }
 
         var children = Children(term);
-        for (var index = 0; index < children.Length; index++) {
+        for (var index = 0; index < children.Length; index++)
+        {
             foreach (var childCandidate in GetCandidates(
                          factory,
-                         children[index])) {
+                         children[index]))
+            {
                 var rebuilt = TryReplaceChild(
                     factory,
                     term,
                     index,
                     childCandidate);
-                if (rebuilt != null) Add(rebuilt);
+                if (rebuilt != null)
+                {
+                    Add(rebuilt);
+                }
             }
         }
         return [.. candidates];
     }
 
-    public static int StructuralSize(IrTerm term) {
-        if (term == null) throw new ArgumentNullException(nameof(term));
+    public static int StructuralSize(IrTerm term)
+    {
+        if (term == null)
+        {
+            throw new ArgumentNullException(nameof(term));
+        }
+
         var seen = new HashSet<IrId>();
         Visit(term);
         return seen.Count;
 
-        void Visit(IrTerm current) {
-            if (!seen.Add(current.Id)) return;
+        void Visit(IrTerm current)
+        {
+            if (!seen.Add(current.Id))
+            {
+                return;
+            }
+
             foreach (var child in Children(current))
+            {
                 Visit(child);
+            }
         }
     }
 
-    private static ImmutableArray<IrTerm> Children(IrTerm term) => term switch {
-        IrOpaqueTerm opaque => [
-            .. opaque.Receiver == null ? [] : new[] { opaque.Receiver },
+    private static ImmutableArray<IrTerm> Children(IrTerm term)
+    {
+        return term switch
+        {
+            IrOpaqueTerm opaque => [
+                .. opaque.Receiver == null ? [] : new[] { opaque.Receiver },
             .. opaque.Arguments
-        ],
-        IrUnaryTerm unary => [unary.Operand],
-        IrBinaryTerm binary => [binary.Left, binary.Right],
-        IrConditionalTerm conditional =>
-            [conditional.Condition, conditional.WhenTrue, conditional.WhenFalse],
-        IrCastTerm cast => [cast.Operand],
-        IrLengthTerm length => [length.Value],
-        IrSequenceAccessTerm access => [access.Sequence, access.Index],
-        _ => []
-    };
+            ],
+            IrUnaryTerm unary => [unary.Operand],
+            IrBinaryTerm binary => [binary.Left, binary.Right],
+            IrConditionalTerm conditional =>
+                [conditional.Condition, conditional.WhenTrue, conditional.WhenFalse],
+            IrCastTerm cast => [cast.Operand],
+            IrLengthTerm length => [length.Value],
+            IrSequenceAccessTerm access => [access.Sequence, access.Index],
+            _ => []
+        };
+    }
 
     private static IrTerm? TryReplaceChild(
         IrFactory factory,
         IrTerm term,
         int index,
-        IrTerm replacement) {
-        try {
-            return term switch {
+        IrTerm replacement)
+    {
+        try
+        {
+            return term switch
+            {
                 IrUnaryTerm unary when index == 0 =>
                     factory.Unary(unary.Operator, replacement),
                 IrBinaryTerm binary =>
@@ -441,7 +604,8 @@ public static class IrStructuralShrinker {
                 _ => null
             };
         }
-        catch (ArgumentException) {
+        catch (ArgumentException)
+        {
             return null;
         }
     }

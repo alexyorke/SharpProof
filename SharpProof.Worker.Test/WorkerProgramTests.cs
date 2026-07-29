@@ -3,9 +3,11 @@ using NUnit.Framework;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-public sealed class WorkerProgramTests {
+public sealed class WorkerProgramTests
+{
     [Test]
-    public async Task DirectInvocationRequiresContainmentStartBarrier() {
+    public async Task DirectInvocationRequiresContainmentStartBarrier()
+    {
         var directory = Path.Combine(
             Path.GetTempPath(),
             "SharpProof.Worker.Test",
@@ -25,8 +27,10 @@ public sealed class WorkerProgramTests {
     }
 
     [Test]
-    public void NativeBackendLoadFailuresAreClassified() {
-        using (Assert.EnterMultipleScope()) {
+    public void NativeBackendLoadFailuresAreClassified()
+    {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 Program.IsBackendUnavailable(new DllNotFoundException()),
                 Is.True);

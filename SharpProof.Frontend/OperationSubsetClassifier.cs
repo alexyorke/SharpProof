@@ -1,12 +1,17 @@
 namespace SharpProof.Frontend;
 
-public static class OperationSubsetClassifier {
-    public static FrontendSubsetClassification Classify(OperationKind kind) {
+public static class OperationSubsetClassifier
+{
+    public static FrontendSubsetClassification Classify(OperationKind kind)
+    {
         if (!Enum.IsDefined(typeof(OperationKind), kind))
+        {
             return FrontendSubsetClassification.Abstain(
                 FrontendAbstention.UnknownOperationKind);
+        }
 
-        return kind switch {
+        return kind switch
+        {
             OperationKind.Literal or
             OperationKind.LocalReference or
             OperationKind.ParameterReference or
@@ -28,15 +33,19 @@ public static class OperationSubsetClassifier {
         };
     }
 
-    public static ImmutableArray<OperationKind> GetKnownOperationKinds() =>
-        [.. Enum.GetValues(typeof(OperationKind))
+    public static ImmutableArray<OperationKind> GetKnownOperationKinds()
+    {
+        return [.. Enum.GetValues(typeof(OperationKind))
             .Cast<OperationKind>()
             .Distinct()
             .OrderBy(static kind => (int)kind)];
+    }
 
-    public static string CreateSnapshot() {
+    public static string CreateSnapshot()
+    {
         var builder = new StringBuilder();
-        foreach (var kind in GetKnownOperationKinds()) {
+        foreach (var kind in GetKnownOperationKinds())
+        {
             var classification = Classify(kind);
             builder.Append(((int)kind).ToString(CultureInfo.InvariantCulture));
             builder.Append('|');

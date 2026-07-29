@@ -228,6 +228,7 @@ $changedTcb = [pscustomobject][ordered]@{
     coverableLines = 0
     linePercent = 100.0
     minimumLinePercent = [double]$baseline.minimumChangedTcbLinePercent
+    nonCoverableFiles = @()
     uncoveredLines = @()
     passed = $true
 }
@@ -239,6 +240,9 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
         $contract.trustedComputingBase.components |
             ForEach-Object { @($_.paths) } |
             ForEach-Object { ([string]$_).Replace('\', '/') } |
+            Where-Object {
+                $_.EndsWith('.cs', [StringComparison]::OrdinalIgnoreCase)
+            } |
             Sort-Object -Unique
     )
     $diffTarget = if ($IncludeWorkingTree) {
@@ -291,13 +295,20 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
     }
     $changedCovered = 0
     $changedCoverable = 0
+    $nonCoverableChangedFiles =
+        [Collections.Generic.List[string]]::new()
     $uncoveredChangedLines = [Collections.Generic.List[string]]::new()
     foreach ($entry in $changedLines.GetEnumerator()) {
         if ($entry.Value.Count -eq 0) {
             continue
         }
         if (-not $lineHits.ContainsKey($entry.Key)) {
-            throw "Changed TCB file has no coverage data: $($entry.Key)"
+            # Coverlet emits zero-hit sequence points for executable code.
+            # A changed file that is absent while its project is present in
+            # the report therefore contains no instrumentable lines, such as
+            # an interface made entirely of abstract declarations.
+            $nonCoverableChangedFiles.Add($entry.Key)
+            continue
         }
         $fileHits = $lineHits[$entry.Key]
         foreach ($number in $entry.Value) {
@@ -330,6 +341,7 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
         coverableLines = $changedCoverable
         linePercent = $changedPercent
         minimumLinePercent = [double]$baseline.minimumChangedTcbLinePercent
+        nonCoverableFiles = @($nonCoverableChangedFiles | Sort-Object)
         uncoveredLines = @($uncoveredChangedLines | Sort-Object)
         passed = $changedPercent + 0.005 -ge
             [double]$baseline.minimumChangedTcbLinePercent
