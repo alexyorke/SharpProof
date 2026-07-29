@@ -4,7 +4,6 @@ using System.Security;
 using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
-using SharpProof.Attributes;
 using SharpProof.CompilerProbe.TestAsset;
 using SharpProof.Worker.Protocol;
 
@@ -788,8 +787,10 @@ public sealed class FinalCompilationProbeTests
             var control = enableProbe
                 ? "<EmitSharpProofProbe>true</EmitSharpProofProbe>"
                 : "";
-            var analyzerPath = Escape(CompilerProbeContract.AssemblyPath);
-            var attributesPath = Escape(typeof(Contract).Assembly.Location);
+            var analyzerPath = Escape(
+                ProductBuildOutputs.CompilerProbeAssemblyPath());
+            var attributesPath = Escape(
+                ProductBuildOutputs.AttributesAssemblyPath());
             var additionalFile = Escape(
                 CompilerProbeContract.AdditionalFileName);
             var outputProperty = Escape(
@@ -834,7 +835,8 @@ public sealed class FinalCompilationProbeTests
 
         private string CreatePackedProjectXml(string packageVersion)
         {
-            var analyzerPath = Escape(CompilerProbeContract.AssemblyPath);
+            var analyzerPath = Escape(
+                ProductBuildOutputs.CompilerProbeAssemblyPath());
             var additionalFile = Escape(
                 CompilerProbeContract.AdditionalFileName);
             var outputProperty = Escape(
@@ -878,22 +880,7 @@ public sealed class FinalCompilationProbeTests
 
         private static string FindRepositoryRoot()
         {
-            var directory = new DirectoryInfo(
-                typeof(Contract).Assembly.Location);
-            while (directory != null)
-            {
-                if (File.Exists(
-                        Path.Combine(
-                            directory.FullName,
-                            "SharpProof.Release.props")))
-                {
-                    return directory.FullName;
-                }
-
-                directory = directory.Parent;
-            }
-            throw new InvalidOperationException(
-                "Repository root was not found.");
+            return PackagedProductFeed.FindRepositoryRoot();
         }
 
         private static string Escape(string value)

@@ -6,7 +6,6 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Xml.Linq;
 using NUnit.Framework;
-using SharpProof.Attributes;
 using SharpProof.Worker;
 using SharpProof.Worker.Launcher;
 using SharpProof.Worker.Protocol;
@@ -1880,7 +1879,7 @@ public sealed class WorkerMsBuildIntegrationTests
         {
             var repository = FindRepositoryRoot();
             var attributes = SecurityElement.Escape(
-                typeof(Contract).Assembly.Location);
+                ProductBuildOutputs.AttributesAssemblyPath());
             var props = SecurityElement.Escape(
                 Path.Combine(
                     repository,
