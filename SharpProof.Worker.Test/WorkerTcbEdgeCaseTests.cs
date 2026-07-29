@@ -751,6 +751,7 @@ public sealed class WorkerTcbEdgeCaseTests
             var response = await cache.TryReadAsync(
                 inputHash,
                 manifest,
+                [],
                 new WorkerBudgets(),
                 CancellationToken.None);
 
@@ -785,6 +786,7 @@ public sealed class WorkerTcbEdgeCaseTests
             var response = await cache.TryReadAsync(
                 inputHash,
                 manifest,
+                [],
                 new WorkerBudgets(),
                 CancellationToken.None);
 

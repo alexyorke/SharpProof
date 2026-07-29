@@ -31,10 +31,9 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 10,
+    "schemaVersion": 11,
     "maximumMiB": 512,
     "cacheableOutcomes": [
-      "Proven",
       "Refuted"
     ]
   },
@@ -173,9 +172,9 @@
         ]
       },
       {
-        "name": "effectReplay",
+        "name": "effectResultAssembly",
         "paths": [
-          "SharpProof.Worker/EffectWitnessReplayer.cs"
+          "SharpProof.Worker/EffectClaimResultAssembler.cs"
         ]
       },
       {

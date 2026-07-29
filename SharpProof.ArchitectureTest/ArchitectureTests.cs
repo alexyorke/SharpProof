@@ -461,8 +461,8 @@ public sealed class ArchitectureTests
                 "SharpProof.Ir/IrProgramInterpreter.cs",
                 "SharpProof.Worker/CallableCounterexampleReplayer.cs"
             ],
-            ["effectReplay"] = [
-                "SharpProof.Worker/EffectWitnessReplayer.cs"
+            ["effectResultAssembly"] = [
+                "SharpProof.Worker/EffectClaimResultAssembler.cs"
             ],
             ["policy"] = [
                 "SharpProof.Worker.Launcher/Program.cs",

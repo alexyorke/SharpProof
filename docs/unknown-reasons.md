@@ -208,7 +208,7 @@ Every manifest claim has exactly one non-`Unspecified` outcome.
 | `BackendUnavailable` | Z3/backend loading or availability failed |
 | `InfrastructureFailure` | Non-semantic worker infrastructure failed |
 | `MalformedBackendResult` | The backend result cannot pass structural/kernel validation |
-| `CounterexampleReplayFailed` | Exact term replay or an otherwise executable compiler-produced whole-body replay disagreed with the candidate model; the assembled run fails |
+| `CounterexampleReplayFailed` | Exact term/whole-body replay disagreed with a postcondition candidate, or a compiler-only effect violation lacks an independently executable trace; the assembled run fails |
 | `PostconditionMayBeUndefined` | Evaluating the postcondition can throw for a candidate input, so its Boolean truth value is not defined on every modeled normal-return state |
 | `CounterexampleNotReplayable` | The candidate model depends on a modeled call that the independent whole-body interpreter intentionally does not execute |
 | `EffectSummaryIncomplete` | The compiler-produced effect summary has an unknown facet or is otherwise incomplete |
@@ -220,21 +220,23 @@ Effect claim records have an additional closed certainty field:
 - `IncompleteMayEffectSummary` means that facet was incomplete;
 - `TrustedCompleteBoundary` means a complete bodyless contract was accepted as
   an explicit trusted boundary;
-- `DefiniteViolation` means a simple unconditional direct effect has a
-  source-located structured witness that the worker can validate against the
-  sealed constraint; and
+- `DefiniteViolation` is compiler evidence that a simple unconditional direct
+  effect has a source-located structured witness; it is not independently
+  replayable by the worker; and
 - `Unavailable` means infrastructure or invalid contract evidence prevented a
   semantic effect result.
 
 A may-effect summary is suitable for proving the absence of a disallowed
 effect, but the presence of a may-effect is not itself a concrete trace.
 Consequently a complete summary that does not establish the contract remains
-`Unknown(EffectContractNotEstablished)`. A claim is `Refuted` only for the
-narrow `DefiniteViolation` subset: managed object/array allocation, explicit
-throw, receiver-field access, empty `lock`, and exact `Monitor` calls in a
-simple unconditional body. The worker independently checks the structured
-witness against the sealed constraint. Conditional, path-dependent,
-static-initialization-sensitive, and may-only conflicts remain `Unknown`.
+`Unknown(EffectContractNotEstablished)`. A compiler `DefiniteViolation`
+candidate is also not enough: the current artifact does not lower an
+independently executable effect path. The worker therefore maps every compiler
+candidate `Refuted` to the fatal typed result
+`Unknown(CounterexampleReplayFailed)` with unavailable certainty and no
+published witness. The worker emits no effect `Refuted` result today.
+Conditional, path-dependent, static-initialization-sensitive, and may-only
+conflicts remain `Unknown(EffectContractNotEstablished)`.
 Analyzer evidence preserves the more specific
 `ManagedAbstractFlow:BlockBudgetExceeded`,
 or `ManagedAbstractFlow:OperationBudgetExceeded` detail through JSON, SARIF,
@@ -246,8 +248,8 @@ from its conservative scan of every compiler-reachable block.
 Proven postconditions additionally carry `WorkerVacuityKind`: `None`,
 `ContradictoryPreconditions`, or `NoModeledNormalReturn`. The last two make
 partial-correctness vacuity visible rather than silently presenting the result
-as an ordinary proof. The field is preserved by canonical JSON, SARIF
-projection, and semantic cache reuse.
+as an ordinary proof. The field is preserved by canonical JSON and SARIF
+projection. Proven claims do not enter the semantic cache.
 
 The worker intentionally coalesces some lower-layer distinctions. For example,
 proof `UnsupportedOperation`, `ApproximationTouchedGoal`,
@@ -318,8 +320,10 @@ admitted product subset.
 
 Unknown outcomes, protocol errors, cancellation, timeout, malformed results,
 backend failures, and failed replay are never semantic cache entries. Only a
-`Complete`, exact-manifest response with complete callable coverage and claims
-that are hygienic `Proven` or replay-validated `Refuted` is cacheable. Cache
-schema version 10 stores the semantic payload; every read revalidates it against
-the complete current manifest. `require-proven` runs bypass this local semantic
-cache.
+`Complete`, exact-manifest, postcondition-only response with complete callable
+coverage and all claims replay-validated `Refuted` is cacheable. Cache schema
+version 11 revalidates every read against the complete current manifest,
+reconstructs supported scalar models, checks entry assumptions and source
+ranges, and repeats whole-body replay. Proven claims, effect claims, and
+unsupported models are not written or reused. `require-proven` runs bypass
+this local semantic cache.

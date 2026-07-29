@@ -852,6 +852,90 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void TypeInitializationSuppressesOnlyTheDefiniteAllocationWitness()
+    {
+        var discovery = Build((
+            "Subject.cs",
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class PlainAllocation {
+                public PlainAllocation() {
+                }
+            }
+
+            public sealed class ThrowingInitialization {
+                static ThrowingInitialization() {
+                    throw new InvalidOperationException();
+                }
+
+                public ThrowingInitialization() {
+                }
+            }
+
+            public static class Subject {
+                [ZeroAllocations]
+                public static object FrameworkObject() =>
+                    new object();
+
+                [ZeroAllocations]
+                public static PlainAllocation PlainSourceType() =>
+                    new PlainAllocation();
+
+                [ZeroAllocations]
+                public static ThrowingInitialization BlockedByTypeInitializer() =>
+                    new ThrowingInitialization();
+            }
+            """));
+        var evidence = discovery.Targets.Values
+            .Where(static target => !target.EffectClaims.IsDefaultOrEmpty)
+            .ToDictionary(
+                static target => target.Method.Name,
+                static target => target.EffectClaims.Single().Evidence,
+                StringComparer.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                evidence["FrameworkObject"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(
+                evidence["FrameworkObject"].Certainty,
+                Is.EqualTo(WorkerEffectEvidenceCertainty.DefiniteViolation));
+            Assert.That(
+                evidence["FrameworkObject"].Witness?.Kind,
+                Is.EqualTo("managed-allocation"));
+            Assert.That(
+                evidence["PlainSourceType"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(
+                evidence["PlainSourceType"].Certainty,
+                Is.EqualTo(WorkerEffectEvidenceCertainty.DefiniteViolation));
+            Assert.That(
+                evidence["PlainSourceType"].Witness?.Kind,
+                Is.EqualTo("managed-allocation"));
+            Assert.That(
+                evidence["BlockedByTypeInitializer"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence["BlockedByTypeInitializer"].Reason,
+                Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
+            Assert.That(
+                evidence["BlockedByTypeInitializer"].Certainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary));
+            Assert.That(
+                evidence["BlockedByTypeInitializer"].Witness,
+                Is.Null);
+            Assert.That(
+                evidence["BlockedByTypeInitializer"].Evidence,
+                Does.Contain("actual.allocation=Unknown")
+                    .And.Contain("UnmodeledCall"));
+        }
+    }
+
+    [Test]
     public void ExceptionConstructorEvidenceRequiresAnExactApprovedSpec()
     {
         var discovery = Build((

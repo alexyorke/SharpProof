@@ -51,14 +51,17 @@ analysis is informational, warning, or error SP0047 output.
 trusted evidence. Neither policy changes solver semantics or converts a failed
 run into success.
 
-Only exact-manifest, complete `Proven` and replay-validated `Refuted` project
-results enter the content-addressed disk cache. Cache keys include protocol,
-semantics, tool identity and canonical packaged worker runtime-closure digest,
-target framework, the exact
-closed compiler artifact and lowered IR, budgets, spec versions, and a
-canonical digest of the complete trusted spec content. Cache schema version 10
-revalidates the stored semantic payload against the complete current manifest.
-Strict `require-proven` runs do not consume or write this local semantic cache.
+Only exact-manifest, complete, postcondition-only project results whose claims
+are all replay-validated `Refuted` enter the content-addressed disk cache.
+Cache keys include protocol, semantics, tool identity and canonical packaged
+worker runtime-closure digest, target framework, the exact closed compiler
+artifact and lowered IR, budgets, spec versions, and a canonical digest of the
+complete trusted spec content. Cache schema version 11 revalidates the stored
+payload against the complete current manifest, reconstructs each supported
+scalar model, checks entry assumptions and source ranges, and repeats
+whole-body replay. Proven claims, effect claims, and unsupported models are not
+cached. Strict `require-proven` runs do not consume or write this local
+semantic cache.
 
 See [Typed abstention reasons](unknown-reasons.md) for exact statuses and
 reasons, and [Analysis limits](analysis-limits.md) for configured and fixed

@@ -244,9 +244,9 @@ Assert-Equal $contract.worker.methodRlimit 20000000 'worker.methodRlimit'
 Assert-Equal $contract.worker.maximumMethodWallSeconds 10 'worker.maximumMethodWallSeconds'
 Assert-Equal $contract.worker.maximumProjectWallSeconds 300 'worker.maximumProjectWallSeconds'
 Assert-Equal $contract.worker.forcedTerminationMilliseconds 1000 'worker.forcedTerminationMilliseconds'
-Assert-Equal $contract.cache.schemaVersion 10 'cache.schemaVersion'
+Assert-Equal $contract.cache.schemaVersion 11 'cache.schemaVersion'
 Assert-Equal $contract.cache.maximumMiB 512 'cache.maximumMiB'
-Assert-Equal ($contract.cache.cacheableOutcomes -join ',') 'Proven,Refuted' 'cache.cacheableOutcomes'
+Assert-Equal ($contract.cache.cacheableOutcomes -join ',') 'Refuted' 'cache.cacheableOutcomes'
 Assert-Equal `
     (Get-MsBuildProperty $portableProps '_SharpProofPortablePackagePresent' 'portable package') `
     'true' `
@@ -359,7 +359,7 @@ try {
         'scalarSemanticsCatalog',
         'effectAnalysis',
         'replay',
-        'effectReplay',
+        'effectResultAssembly',
         'policy',
         'resultAssembly',
         'compilerInputIdentity',

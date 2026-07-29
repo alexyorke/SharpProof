@@ -359,7 +359,7 @@ public sealed class CompilerManifestArtifactTests
             """);
         var target = CompilerManifestArtifactJson.DecodeCallables(artifact).Single();
         var evidence = target.EffectClaims.Single();
-        var result = EffectWitnessReplayer.Assemble(target, evidence);
+        var result = EffectClaimResultAssembler.Assemble(target, evidence);
 
         using (Assert.EnterMultipleScope())
         {

@@ -331,6 +331,17 @@ internal static class RequiresCallSiteAnalyzer
             return AliasEvaluation.Snapshot;
         }
 
+        if (callSite.TargetMethod.IsExtensionMethod &&
+            callSite.TargetMethod.ReducedFrom == null &&
+            callSite.Instance == null &&
+            variable.Ordinal == 0 &&
+            argument.Syntax is not ArgumentSyntax)
+        {
+            return IsLocalAlias(actual)
+                ? AliasEvaluation.CallEntry
+                : AliasEvaluation.Unsupported;
+        }
+
         if (argument.Syntax is not ArgumentSyntax syntax ||
             syntax.RefKindKeyword.Kind() is not (
                 SyntaxKind.RefKeyword or SyntaxKind.InKeyword))

@@ -13,7 +13,7 @@ namespace SharpProof.Worker.Test;
 public sealed class ExceptionIdentityReplayTests
 {
     [Test]
-    public void AliasedSameSimpleNameExceptionTypesRemainDistinctDuringReplay()
+    public void AliasedExceptionIdentitiesRemainDistinctWhenEffectReplayIsUnavailable()
     {
         var allowedReference = CreateExceptionReference(
             "Collision.Exceptions",
@@ -213,25 +213,28 @@ public sealed class ExceptionIdentityReplayTests
             EffectClaims = [evidence]
         };
 
-        var result = EffectWitnessReplayer.Assemble(target, evidence);
+        var result = EffectClaimResultAssembler.Assemble(target, evidence);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                result.Reason,
+                Is.EqualTo(
+                    WorkerClaimReason.CounterexampleReplayFailed));
             Assert.That(
                 result.EffectCertainty,
-                Is.EqualTo(WorkerEffectEvidenceCertainty.DefiniteViolation));
-            Assert.That(result.EffectWitness, Is.Not.Null);
+                Is.EqualTo(WorkerEffectEvidenceCertainty.Unavailable));
+            Assert.That(result.EffectWitness, Is.Null);
             Assert.That(
-                result.EffectWitness!.ExactExceptionTypeHierarchy,
+                evidence.Witness!.ExactExceptionTypeHierarchy,
                 Does.Contain(thrownIdentity).And.Not.Contain(allowedIdentity));
-            Assert.That(result.Model, Has.Length.EqualTo(1));
+            Assert.That(result.Model, Is.Empty);
         }
     }
 
     [Test]
-    public void ConstructedGenericExceptionReplayUsesClosedTypeIdentity()
+    public void ConstructedGenericExceptionEvidenceCannotReplaceBodyReplay()
     {
         var tree = CSharpSyntaxTree.ParseText(
             """
@@ -273,10 +276,10 @@ public sealed class ExceptionIdentityReplayTests
                 Does.Contain(thrownIdentity).And.Not.Contain(allowedIdentity));
             Assert.That(
                 mismatched.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Refuted));
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 mismatched.Reason,
-                Is.EqualTo(WorkerClaimReason.None));
+                Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
             Assert.That(
                 matched.Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Unknown));
@@ -332,7 +335,7 @@ public sealed class ExceptionIdentityReplayTests
             {
                 EffectClaims = [evidence]
             };
-            return EffectWitnessReplayer.Assemble(target, evidence);
+            return EffectClaimResultAssembler.Assemble(target, evidence);
         }
     }
 

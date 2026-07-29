@@ -717,7 +717,9 @@ internal sealed class OperationEffectScanner
 
     private bool RecordAllocation(IObjectCreationOperation creation)
     {
-        if (creation.Type?.IsReferenceType != true ||
+        if (creation.Type is not INamedTypeSymbol type ||
+            !type.IsReferenceType ||
+            EffectMethodNodeBuilder.HasPotentialStaticInitialization(type) ||
             creation.Initializer != null ||
             !creation.Arguments.All(argument => DefiniteOperationFacts.IsHarmlessValue(argument.Value)))
         {

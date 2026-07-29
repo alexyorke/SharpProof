@@ -70,12 +70,12 @@ $mutations = @(
         Filter = 'FullyQualifiedName~TrivialNormalCompletionRequiresItsPostconditionToBeFalse'
     },
     [pscustomobject]@{
-        Name = 'effect-witness-replay-kind'
-        File = 'SharpProof.Worker\EffectWitnessReplayer.cs'
-        Original = 'WorkerEffectSet.Allocates) != 0,'
-        Mutated = 'WorkerEffectSet.Throws) != 0,'
+        Name = 'effect-refutation-fail-closed'
+        File = 'SharpProof.Worker\EffectClaimResultAssembler.cs'
+        Original = 'if (evidence.Outcome == WorkerClaimOutcome.Refuted)'
+        Mutated = 'if (evidence.Outcome == WorkerClaimOutcome.Unknown)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
-        Filter = 'FullyQualifiedName~EffectWitnessReplayRejectsConstraintMismatch'
+        Filter = 'FullyQualifiedName~CompilerOnlyEffectViolationFailsClosedWithoutAReplayTrace'
     },
     [pscustomobject]@{
         Name = 'cache-manifest-binding'

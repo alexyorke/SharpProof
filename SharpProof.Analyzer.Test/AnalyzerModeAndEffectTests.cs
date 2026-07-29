@@ -699,6 +699,64 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task TypeInitializationCannotFabricateADefiniteAllocationViolation()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class PlainAllocation {
+                public PlainAllocation() {
+                }
+            }
+
+            public sealed class ThrowingInitialization {
+                static ThrowingInitialization() {
+                    throw new InvalidOperationException();
+                }
+
+                public ThrowingInitialization() {
+                }
+            }
+
+            public static class Fixture {
+                [ZeroAllocations]
+                public static object FrameworkObject() =>
+                    new object();
+
+                [ZeroAllocations]
+                public static PlainAllocation PlainSourceType() =>
+                    new PlainAllocation();
+
+                [ZeroAllocations]
+                public static ThrowingInitialization BlockedByTypeInitializer() =>
+                    new ThrowingInitialization();
+            }
+            """,
+            "effects",
+            ["SP0045"],
+            new SharpProofAnalyzer(factory));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0045", "SP0045", "SP0045"]));
+            Assert.That(
+                factory.Outcomes["FrameworkObject"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
+            Assert.That(
+                factory.Outcomes["PlainSourceType"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
+            Assert.That(
+                factory.Outcomes["BlockedByTypeInitializer"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+        }
+    }
+
+    [Test]
     public async Task CompilerBoundGhostContractsHaveNoRuntimeEffects()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

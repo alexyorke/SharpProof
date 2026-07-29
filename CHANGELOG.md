@@ -38,17 +38,23 @@ contain documented breaking changes.
   generator hosts, with a clear older-host rejection.
 - Opt-in deterministic SARIF 2.1.0 projection of validated claim, incomplete
   callable, assumption, and run-failure results.
-- Source-located structured effect-violation witnesses for the narrow
-  unconditional direct-operation subset, with independent worker validation
-  and SARIF/cache preservation.
+- Source-located structured compiler effect-violation candidates for the
+  narrow unconditional direct-operation subset. The worker reports these as
+  `Unknown(CounterexampleReplayFailed)` until it can replay an executable
+  lowered-body effect trace.
 
 ### Changed
 
 - The verifier consumes the final compiler compilation artifact instead of
   reconstructing a compilation from source files.
-- Protocol version 9 and cache schema 10 distinguish undefined
+- Protocol version 9 and cache schema 11 distinguish undefined
   postconditions, non-replayable modeled calls, genuine replay failures,
   effect-evidence certainty, and explicit vacuity evidence.
+- The semantic disk cache accepts only complete, postcondition-only responses
+  whose claims are all replay-validated `Refuted` outcomes. It reconstructs
+  scalar models, validates source intervals and entry assumptions, and replays
+  every claim on both read and write eligibility; `Proven` and effect claims
+  are never cached.
 - Compiler artifact schema 8 records both raw and effective per-tree
   preprocessor symbols and binds them through compilation fingerprint domain
   5; worker-side validation rejects runtime-enabled ghost contracts.
@@ -80,6 +86,10 @@ contain documented breaking changes.
   cannot execute in a supposedly verified runtime body.
 - SAT models must exactly match the requested scalar model closure and pass
   independent replay before SharpProof emits `Refuted`.
+- Compiler-only effect violation candidates cannot become `Refuted` without
+  executable lowered-body replay evidence.
+- Disk-cache payloads are treated as untrusted input; malformed, stale,
+  unsupported, or non-replaying models are discarded and recomputed.
 - Built-in API specifications approve only exact assembly-name,
   public-key-token, and reference-family triples observed across supported
   framework surfaces; unobserved identities or origins are not trusted.
@@ -101,6 +111,10 @@ contain documented breaking changes.
 - Explicit `ref` and `in` precondition arguments now read aliased local or
   parameter storage at call-entry state after later argument side effects;
   unsupported aliases remain `Unknown`.
+- Synthesized `ref` and `in` extension receivers use the same call-entry alias
+  semantics as explicit arguments, while nonlocal aliases remain `Unknown`.
+- Contract-selected methods whose precondition call-site analysis is unknown
+  now emit one SP0047; unselected advisory callers remain quiet.
 - Concrete precondition replay preserves potentially failing object-to-string
   casts and proves them only from definite string runtime-type evidence.
 - Analyzer, binder, and manifest discovery now share one effective contract
@@ -115,6 +129,9 @@ contain documented breaking changes.
 - Framework exception constructors are no longer blanket-trusted. Exact
   declarative throw and termination facets are required for a definite
   direct-throw witness; all other constructors fail closed.
+- Object creation whose target type may still run a type initializer no longer
+  produces a definite allocation-violation witness; its may-effect remains
+  visible as incomplete allocation evidence.
 - Preconditions on reduced extension-method calls now bind the extension
   receiver and reduced arguments to their original parameter ordinals.
 - Closed parameter contracts now use one validator in the analyzer and binder;

@@ -181,7 +181,7 @@ is the observed runner total rather than the requested budget.
 | IDE edit p95 | At most 100 ms |
 | IDE edit maximum | At most 250 ms |
 
-The active contract also fixes protocol version 9, cache schema version 10,
+The active contract also fixes protocol version 9, cache schema version 11,
 claim-manifest schema version 4, and compiler artifact schema version 8, along
 with exact proof-kernel and component TCB path inventories, formatting-neutral
 Roslyn complexity ratchets, and the reference surfaces `netstandard2.0`,
@@ -200,8 +200,9 @@ run statuses. Malformed output, backend/replay failure, containment failure,
 and infrastructure failure make the run `Failed` and fail the build under
 every policy.
 
-Only exact-manifest, complete hygienic `Proven` and replay-validated `Refuted`
-project responses can enter the semantic cache. See
+Only exact-manifest, complete, postcondition-only project responses whose
+claims are all replay-validated `Refuted` can enter the semantic cache. Every
+cache hit reconstructs its scalar models and repeats whole-body replay. See
 [Typed abstention reasons](unknown-reasons.md) for exact reason values.
 
 Replay validation has two layers: exact backend-model and lowered-term checks

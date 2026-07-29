@@ -112,8 +112,9 @@ baseline test passes, then applies one deterministic mutation at a time. Each
 mutation must still compile and must be killed by its designated assertion; a
 survivor, timeout, ambiguous target, or missing target fails the run. The
 current set covers scalar semantics, lowering, SMT comparison, API-spec
-resolution, postcondition replay, effect-witness replay, cache/manifest
-binding, protocol manifest/result equality, and launcher containment.
+resolution, postcondition replay, fail-closed effect-result assembly,
+cache/manifest binding, protocol manifest/result equality, and launcher
+containment.
 
 Nightly and release-qualification workflows run this gate and retain its
 commit-bound JSON summary as evidence. Release qualification records

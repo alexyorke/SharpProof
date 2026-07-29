@@ -2280,11 +2280,29 @@ public sealed class EffectAnalysisTests
             public sealed class UserException : Exception {
             }
 
+            public sealed class PlainAllocation {
+                public PlainAllocation() {
+                }
+            }
+
+            public sealed class ThrowingInitialization {
+                static ThrowingInitialization() {
+                    throw new InvalidOperationException();
+                }
+
+                public ThrowingInitialization() {
+                }
+            }
+
             public sealed class Sample {
                 private int _field;
                 private volatile int _volatile;
 
                 public object Allocate() => new object();
+                public PlainAllocation AllocatePlain() =>
+                    new PlainAllocation();
+                public ThrowingInitialization AllocateBlockedByTypeInitializer() =>
+                    new ThrowingInitialization();
                 public int[] AllocateArray() => new int[1];
                 public void Throw() => throw new InvalidOperationException();
                 public void ThrowUser() => throw new UserException();
@@ -2315,6 +2333,8 @@ public sealed class EffectAnalysisTests
         var session = new EffectAnalysisSession(compilation);
 
         AssertKinds("Allocate", "managed-allocation");
+        AssertKinds("AllocatePlain", "managed-allocation");
+        AssertKinds("AllocateBlockedByTypeInitializer");
         AssertKinds("AllocateArray", "managed-array-allocation");
         AssertKinds("Throw", "managed-allocation", "explicit-throw");
         AssertKinds("ThrowUser", "managed-allocation");
@@ -2336,6 +2356,12 @@ public sealed class EffectAnalysisTests
                 Is.EqualTo(EffectContractCapabilityKind.Synchronization));
             Assert.That(Witnesses("Synchronize")[0].Effects,
                 Is.EqualTo(EffectContractKind.Allocates));
+            Assert.That(
+                session.Analyze(Method(
+                    compilation,
+                    "AllocateBlockedByTypeInitializer")).Summary.Allocation &
+                EffectAllocationKind.Managed,
+                Is.EqualTo(EffectAllocationKind.Managed));
         }
         return;
 

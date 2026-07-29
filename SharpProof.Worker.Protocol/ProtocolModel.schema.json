@@ -408,7 +408,7 @@
   },
   "declarations": [
     {"kind":"staticClass","name":"WorkerProtocolVersions","constants":[{"name":"Current","type":"string","value":"9"},{"name":"EmptySha256","type":"string","value":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}]},
-    {"kind":"staticClass","name":"WorkerCacheVersions","constants":[{"name":"Current","type":"int","value":10}]},
+    {"kind":"staticClass","name":"WorkerCacheVersions","constants":[{"name":"Current","type":"int","value":11}]},
     {"kind":"staticClass","name":"WorkerManifestVersions","constants":[{"name":"Current","type":"int","value":4}]},
     {"kind":"staticClass","name":"WorkerLauncherDefaults","constants":[{"name":"TerminationGraceMilliseconds","type":"int","value":1000}]},
     {"kind":"class","name":"WorkerVerifyRequest","properties":[{"name":"ProtocolVersion","jsonName":"protocolVersion","order":0,"type":"string","set":true,"default":{"kind":"member","value":"WorkerProtocolVersions.Current"}},{"name":"CompilerManifest","jsonName":"compilerManifest","order":1,"type":"WorkerFileReference","set":true,"default":{"kind":"new"}},{"name":"Budgets","jsonName":"budgets","order":2,"type":"WorkerBudgets","set":true,"default":{"kind":"new"}},{"name":"Cache","jsonName":"cache","order":3,"type":"WorkerCacheOptions","set":true,"default":{"kind":"new"}},{"name":"VerifyPolicy","jsonName":"verifyPolicy","order":4,"type":"WorkerVerifyPolicy","set":true,"default":{"kind":"member","value":"WorkerVerifyPolicy.Advisory"}},{"name":"AssumptionPolicy","jsonName":"assumptionPolicy","order":5,"type":"WorkerAssumptionPolicy","set":true,"default":{"kind":"member","value":"WorkerAssumptionPolicy.Allow"}}]},

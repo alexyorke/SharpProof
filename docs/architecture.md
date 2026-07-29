@@ -166,11 +166,13 @@ a stale successful result associated with a partly updated evidence set. The
 content-addressed cache includes semantic, protocol, tool, compilation,
 reference, option, target-framework, canonical packaged worker runtime-closure,
 and spec-content identity.
-Cache schema version 10
-stores only the validated semantic payload. A hit is accepted only when its
-manifest hash and complete result set match the current manifest. Only
-complete callables whose claims are hygienic `Proven` or replay-validated
-`Refuted` are cacheable.
+Cache schema version 11 stores only complete, postcondition-only, all-refuted
+semantic payloads. A hit is accepted only when its manifest hash and complete
+result set match the current manifest and every canonical Boolean/integer model
+can be reconstructed against the hydrated callable. The worker rechecks entry
+assumptions and source ranges, then independently executes the whole body and
+postcondition before reuse. Proven claims, effect claims, and unsupported
+models are not cacheable.
 
 During Windows verification, the production analyzer observes the final
 post-generator Roslyn `Compilation` and atomically emits compiler artifact
@@ -180,12 +182,13 @@ lowering. Every selected callable has either a typed failure record or a
 portable graph containing its bound clauses, canonical variables, whole-body
 CFG/IR, body start, initial environment, parameter mappings, and exact
 API-spec witness metadata. Every selected effect-attribute occurrence also has
-one compiler-sealed `Proven`, `Refuted`, or typed `Unknown` evidence record.
-Repeated attributes retain distinct claim IDs while sharing their effective
-combined constraint/evidence. A `Refuted` effect record requires a structured
-unconditional direct witness that the worker independently validates against
-the sealed constraint. Callable IDs, claim ownership, and user-assumption IDs
-remain tied to the sealed manifest.
+one compiler-sealed `Proven`, candidate `Refuted`, or typed `Unknown` evidence
+record. Repeated attributes retain distinct claim IDs while sharing their
+effective combined constraint/evidence. Because the artifact does not yet
+carry an independently executable effect path, the worker fails every compiler
+candidate `Refuted` closed as `Unknown(CounterexampleReplayFailed)` rather than
+publishing an effect refutation. Callable IDs, claim ownership, and
+user-assumption IDs remain tied to the sealed manifest.
 
 The artifact also contains compiler error diagnostics with mapped locations,
 handwritten and generated tree hashes, raw and effective per-tree preprocessor

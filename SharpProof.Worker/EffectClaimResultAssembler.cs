@@ -1,0 +1,30 @@
+namespace SharpProof.Worker;
+
+internal static class EffectClaimResultAssembler
+{
+    internal static WorkerClaimResult Assemble(
+        CompilerCallablePreparation target,
+        CompilerEffectClaimArtifact evidence)
+    {
+        if (evidence.Outcome == WorkerClaimOutcome.Refuted)
+        {
+            return CallableClaimResultAssembler.Create(
+                target,
+                evidence.ClaimId,
+                WorkerClaimOutcome.Unknown,
+                WorkerClaimReason.CounterexampleReplayFailed,
+                WorkerEffectEvidenceCertainty.Unavailable);
+        }
+
+        var result = CallableClaimResultAssembler.Create(
+            target,
+            evidence.ClaimId,
+            evidence.Outcome,
+            evidence.Reason,
+            evidence.Certainty);
+        result.ProofCore = evidence.Outcome == WorkerClaimOutcome.Proven
+            ? ["compiler-effect:" + evidence.EvidenceSha256]
+            : [];
+        return result;
+    }
+}

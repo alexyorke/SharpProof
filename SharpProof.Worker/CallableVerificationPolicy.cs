@@ -32,7 +32,7 @@ internal static class CallableVerificationPolicy
                 .ToDictionary(static item => item.claimId, static item => item.index, StringComparer.Ordinal);
             var records = postconditions
                 .Concat(target.EffectClaims.Select(evidence =>
-                    EffectWitnessReplayer.Assemble(target, evidence)))
+                    EffectClaimResultAssembler.Assemble(target, evidence)))
                 .OrderBy(result => ordinal[result.ClaimId])
                 .ToImmutableArray();
             var reason = records.Any(static record => record.Outcome == WorkerClaimOutcome.Unknown)

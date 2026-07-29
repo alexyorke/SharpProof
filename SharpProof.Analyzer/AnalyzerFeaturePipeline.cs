@@ -75,7 +75,8 @@ internal static class AnalyzerFeaturePipeline
             session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Abstained);
             return;
         }
-        ValidateContractClauses(method, session, context.ReportDiagnostic);
+        var hasInvalidContractClauses =
+            ValidateContractClauses(method, session, context.ReportDiagnostic);
         var selection = GetSelection(
             method, session, context.ReportDiagnostic, context.CancellationToken);
         if (selection.IsSuppressed)
@@ -87,6 +88,7 @@ internal static class AnalyzerFeaturePipeline
         var semanticModel = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
             context.Compilation, declaration.SyntaxTree);
         var outcome = AnalyzerSemanticOutcome.NotApplicable;
+        var subsetIncompleteReported = false;
         var classifySubset = session.Configuration.EffectsEnabled || selection.Contracts;
         var subset = classifySubset
             ? LanguageSubsetGate.ClassifyEffects(
@@ -108,6 +110,7 @@ internal static class AnalyzerFeaturePipeline
                     subset.OperationKind is { } operation
                         ? subset.Reason + " (" + operation + ")"
                         : subset.Reason.ToString()));
+                subsetIncompleteReported = true;
             }
 
             outcome = AnalyzerSemanticOutcomes.Combine(
@@ -127,33 +130,51 @@ internal static class AnalyzerFeaturePipeline
 
         if (session.Configuration.ContractsEnabled)
         {
-            outcome = AnalyzerSemanticOutcomes.Combine(
-                outcome,
+            var requiresOutcome =
                 RequiresCallSiteAnalyzer.Analyze(
                     method,
                     declaration,
                     semanticModel,
                     session,
                     context.ReportDiagnostic,
-                    context.CancellationToken));
+                    context.CancellationToken);
+            outcome = AnalyzerSemanticOutcomes.Combine(
+                outcome,
+                requiresOutcome);
+            if (selection.Contracts &&
+                requiresOutcome == AnalyzerSemanticOutcome.Unknown &&
+                !subsetIncompleteReported &&
+                !hasInvalidContractClauses &&
+                !method.IsAbstract &&
+                !method.IsExtern)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+                    AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(declaration),
+                    method.Name,
+                    "RequiresCallSiteAnalysisUnknown"));
+            }
         }
 
         session.RecordSemanticOutcome(method, outcome);
     }
 
-    private static void ValidateContractClauses(
+    private static bool ValidateContractClauses(
         IMethodSymbol method,
         AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic)
     {
         var inventory = session.GetContractClauses(method);
-        ReportInvalidIntrinsics(
-            session.GetContractIntrinsicViolations(inventory), session, reportDiagnostic);
+        var intrinsicViolations =
+            session.GetContractIntrinsicViolations(inventory);
+        ReportInvalidIntrinsics(intrinsicViolations, session, reportDiagnostic);
         ReportInvalidClauses(inventory.Clauses, reportDiagnostic);
         foreach (var owner in GetNestedOwners(inventory, session.Compilation))
         {
             ReportInvalidClauses(session.GetContractClauses(owner).Clauses, reportDiagnostic);
         }
+        return inventory.HasPlacementErrors ||
+            !intrinsicViolations.IsDefaultOrEmpty;
     }
 
     private static IEnumerable<IMethodSymbol> GetNestedOwners(

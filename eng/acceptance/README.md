@@ -37,9 +37,9 @@ is acceptable only when:
   every claim-bearing facet and postcondition has an executable runtime witness
   plus a deterministic mutation probe;
 - deterministic trusted-boundary mutations, including independent
-  postcondition and effect-witness replay mutations, must all compile and be
-  killed by their designated tests; nightly and release qualification retain
-  the commit-bound evidence;
+  postcondition replay and fail-closed effect-result assembly mutations, must
+  all compile and be killed by their designated tests; nightly and release
+  qualification retain the commit-bound evidence;
 - the analyzer payload has no dependency on SharpProof verification or Z3
   assemblies;
 - the build, test, package, corpus, fuzz, architecture, cancellation, and

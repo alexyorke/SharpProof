@@ -7,8 +7,12 @@ internal sealed class VerificationCache(string directory, long maximumBytes)
     private readonly long _maximumBytes = maximumBytes > 0 ? maximumBytes :
         throw new ArgumentOutOfRangeException(nameof(maximumBytes));
 
-    internal async Task<WorkerVerifyResponse?> TryReadAsync(string inputHash,
-        WorkerClaimManifest manifest, WorkerBudgets budgets, CancellationToken cancellationToken)
+    internal async Task<WorkerVerifyResponse?> TryReadAsync(
+        string inputHash,
+        WorkerClaimManifest manifest,
+        ImmutableArray<CompilerCallablePreparation> targets,
+        WorkerBudgets budgets,
+        CancellationToken cancellationToken)
     {
         var path = GetPath(inputHash);
         if (!File.Exists(path))
@@ -40,7 +44,12 @@ internal sealed class VerificationCache(string directory, long maximumBytes)
             var response = WorkerResultAssembler.Create(inputHash, manifest,
                 WorkerRunStatus.Complete, WorkerRunFailureReason.None, callables,
                 claims, budgets, WorkerCacheStatus.Hit, 0);
-            if (!IsCacheable(response, inputHash, manifest))
+            if (!IsCacheable(
+                    response,
+                    inputHash,
+                    manifest,
+                    targets,
+                    cancellationToken))
             {
                 return null;
             }
@@ -125,8 +134,12 @@ internal sealed class VerificationCache(string directory, long maximumBytes)
         return WorkerProtocolJson.ComputeSha256(Encoding.UTF8.GetBytes(value));
     }
 
-    internal static bool IsCacheable(WorkerVerifyResponse? response, string expectedInputHash,
-        WorkerClaimManifest expectedManifest)
+    internal static bool IsCacheable(
+        WorkerVerifyResponse? response,
+        string expectedInputHash,
+        WorkerClaimManifest expectedManifest,
+        ImmutableArray<CompilerCallablePreparation> targets,
+        CancellationToken cancellationToken = default)
     {
         return expectedManifest != null && WorkerProtocolJson.IsSha256(expectedInputHash) && response is
         {
@@ -138,9 +151,166 @@ internal sealed class VerificationCache(string directory, long maximumBytes)
         callables.All(static result =>
             result != null && result.Coverage == WorkerCallableCoverage.Complete &&
             result.Reason == WorkerCallableCoverageReason.None) &&
-        claims.All(static result => result != null && result.Outcome is
-            WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted) &&
-        WorkerProtocolJson.Validate(response, expectedInputHash, expectedManifest).IsValid;
+        claims.Length != 0 &&
+        claims.All(static result =>
+            result != null && result.Outcome == WorkerClaimOutcome.Refuted) &&
+        expectedManifest.Claims.Length == claims.Length &&
+        expectedManifest.Claims.All(static claim =>
+            claim.Kind == WorkerClaimKind.Postcondition) &&
+        WorkerProtocolJson.Validate(response, expectedInputHash, expectedManifest).IsValid &&
+        ReplayCachedClaims(claims, expectedManifest, targets, cancellationToken);
+    }
+
+    private static bool ReplayCachedClaims(
+        WorkerClaimResult[] claims,
+        WorkerClaimManifest manifest,
+        ImmutableArray<CompilerCallablePreparation> targets,
+        CancellationToken cancellationToken)
+    {
+        if (targets.IsDefault ||
+            targets.Length != manifest.Callables.Length)
+        {
+            return false;
+        }
+
+        var targetByCallable = targets.ToDictionary(
+            static target => target.Entry.CallableId,
+            StringComparer.Ordinal);
+        var claimById = manifest.Claims.ToDictionary(
+            static claim => claim.ClaimId,
+            StringComparer.Ordinal);
+        foreach (var claim in claims)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!claimById.TryGetValue(claim.ClaimId, out var declaration) ||
+                declaration.Kind != WorkerClaimKind.Postcondition ||
+                !targetByCallable.TryGetValue(declaration.CallableId, out var target) ||
+                !TryCreateModel(target, claim.Model, out var model))
+            {
+                return false;
+            }
+
+            var postconditions = target.Clauses.Where(static clause =>
+                clause.Kind == CompilerContractKind.Ensures).ToArray();
+            var ordinal = Array.FindIndex(
+                postconditions,
+                clause => clause.ClaimId == claim.ClaimId);
+            if (ordinal < 0 ||
+                !EntryAssumptionsHold(target, model, cancellationToken) ||
+                CallableCounterexampleReplayer.Replay(
+                    target,
+                    ordinal,
+                    model,
+                    cancellationToken) != WorkerClaimReason.None)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryCreateModel(
+        CompilerCallablePreparation target,
+        WorkerModelValue[] rows,
+        out ImmutableDictionary<IrVarId, IrValue> model)
+    {
+        model = ImmutableDictionary<IrVarId, IrValue>.Empty;
+        if (rows == null)
+        {
+            return false;
+        }
+
+        var variables = target.Variables.ToDictionary(
+            static variable => variable.ModelLabel,
+            StringComparer.Ordinal);
+        var result = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
+        foreach (var row in rows)
+        {
+            if (row == null ||
+                !variables.TryGetValue(row.Variable, out var variable) ||
+                !TryCreateValue(target.Factory, variable, row, out var value) ||
+                !result.TryAdd(variable.Variable, value))
+            {
+                return false;
+            }
+        }
+
+        foreach (var variable in target.Variables.Where(static variable =>
+                     variable.Role is CompilerVariableRole.Receiver or
+                         CompilerVariableRole.Parameter))
+        {
+            var type = target.Factory.GetVariableInfo(variable.Variable).Type;
+            if ((type != target.Factory.BooleanType &&
+                 type != target.Factory.IntegerType) ||
+                !result.ContainsKey(variable.Variable))
+            {
+                return false;
+            }
+        }
+
+        model = result.ToImmutable();
+        return true;
+    }
+
+    private static bool TryCreateValue(
+        IrFactory factory,
+        CompilerCanonicalVariable variable,
+        WorkerModelValue row,
+        out IrValue value)
+    {
+        var type = factory.GetVariableInfo(variable.Variable).Type;
+        if (type == factory.BooleanType &&
+            row.Kind == nameof(IrValueKind.Boolean) &&
+            row.Value is "true" or "false")
+        {
+            value = factory.CreateBooleanValue(row.Value == "true");
+            return true;
+        }
+
+        if (type == factory.IntegerType &&
+            row.Kind == nameof(IrValueKind.Integer) &&
+            long.TryParse(
+                row.Value,
+                NumberStyles.AllowLeadingSign,
+                CultureInfo.InvariantCulture,
+                out var integer) &&
+            row.Value == integer.ToString(CultureInfo.InvariantCulture) &&
+            (variable.SourceIntegerInterval is not { } interval ||
+             integer >= interval.Minimum &&
+             integer <= interval.Maximum))
+        {
+            value = factory.CreateIntegerValue(integer);
+            return true;
+        }
+
+        value = null!;
+        return false;
+    }
+
+    private static bool EntryAssumptionsHold(
+        CompilerCallablePreparation target,
+        ImmutableDictionary<IrVarId, IrValue> model,
+        CancellationToken cancellationToken)
+    {
+        var interpreter = new IrInterpreter(target.Factory);
+        foreach (var clause in target.Clauses.Where(static clause =>
+                     clause.Kind is CompilerContractKind.Requires or
+                         CompilerContractKind.Assume))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var evaluated = interpreter.Evaluate(
+                clause.Condition,
+                model,
+                cancellationToken);
+            if (evaluated.Status != IrEvaluationStatus.Value ||
+                evaluated.Value is not { Kind: IrValueKind.Boolean, Boolean: true })
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private sealed record CacheEnvelope(

@@ -7,7 +7,7 @@ compiler-bound subset.
 SharpProof has three semantic outcomes:
 
 - `Proven`: the goal follows from exact lowering and accountable evidence.
-- `Refuted`: an executable counterexample or effect trace was replayed.
+- `Refuted`: an executable postcondition counterexample was replayed.
 - `Unknown`: the language, model, evidence, or resource budget was insufficient.
 
 The default `advisory` profile is quiet for unannotated code. Unsupported code
@@ -20,7 +20,7 @@ SP0047 instead of disappearing. Diagnostic silence is still not a proof.
 |---|---|---|
 | Effect analyzer | Checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, and `[AllowedExceptions]` over the admitted source subset | Advisory "not proven" diagnostics on selected code |
 | Contract analyzer | Replays definitely executed, compiler-bound `Contract.Requires(...)` clauses with exact call inputs | SP0027 only when the precondition concretely evaluates to false |
-| Worker | Builds an accountable claim manifest and verifies bounded `Contract.Ensures(...)` obligations over acyclic Boolean bodies, admitted integer comparisons, checked `long` arithmetic, and a few exact API-result facts | One `Proven`, replay-validated `Refuted`, or typed `Unknown` result for every manifest claim |
+| Worker | Builds an accountable claim manifest and verifies bounded `Contract.Ensures(...)` obligations over acyclic Boolean bodies, admitted integer comparisons, checked `long` arithmetic, and a few exact API-result facts | One `Proven`, replay-validated postcondition `Refuted`, or typed `Unknown` result for every manifest claim |
 
 The analyzer does not run SMT or load Z3. General source-callee
 assume/guarantee verification, loops in the worker, mutable-heap
@@ -330,35 +330,28 @@ Each manifest claim receives:
 
 - `Proven` carries its canonical proof core, which can be empty for a hygienic
   tautology.
-- `Refuted` has a replay-validated concrete model and fails the build with
-  worker exit code 5.
+- `Refuted` is currently limited to postconditions with a replay-validated
+  concrete model and fails the build with worker exit code 5.
 - `Unknown` has a closed reason such as `UnsupportedBody`,
   `DeepPostcondition`, `EffectSummaryIncomplete`,
   `EffectContractNotEstablished`, `ResourceLimit`, or `MethodTimeout`.
 
 Effect claims use canonical compiler-produced evidence. They are `Proven` only
-when a complete effect summary establishes the selected contract. A claim is
-`Refuted` only when the compiler records a definite, unconditional direct
-operation witness and the worker independently validates that structured
-witness against the sealed effective constraint. The current direct-witness
-subset covers simple managed object/array allocation, explicit throw,
-receiver-field access, empty `lock`, and exact `Monitor` calls. Conditional,
-path-dependent, static-initialization-sensitive, or may-only conflicts remain
-`Unknown(EffectContractNotEstablished)`; incomplete summaries remain
-`Unknown(EffectSummaryIncomplete)`. Exception constraints and exact witness
-hierarchies use full assembly identity plus type-reference documentation ID, so
-aliased same-simple-name assemblies remain distinct during worker replay.
-Exact exception-type refutation requires an exact framework constructor row
-whose complete throw facet is `DoesNotThrow` and whose termination facet is
-`Terminates`. Unmodeled framework and user exception constructors remain typed
-`Unknown`; they cannot create a definite direct-throw witness. The certainty
-field distinguishes `DefiniteViolation`, complete or incomplete may-effect
-summaries, trusted complete boundaries, and unavailable evidence.
+when a complete effect summary establishes the selected contract. The compiler
+can record a source-located `DefiniteViolation` candidate for a narrow direct
+operation, but that candidate is not an independently executable trace.
+Until effect operations and paths are lowered for worker replay, every such
+compiler `Refuted` candidate fails closed as
+`Unknown(CounterexampleReplayFailed)` with unavailable effect certainty and no
+published witness. Consequently, the worker emits no effect `Refuted` result
+today. Conditional, path-dependent, static-initialization-sensitive, or
+may-only conflicts remain `Unknown(EffectContractNotEstablished)`; incomplete
+summaries remain `Unknown(EffectSummaryIncomplete)`.
 
 Proven postconditions explicitly record `ContradictoryPreconditions` or
 `NoModeledNormalReturn` when the proof is vacuous under partial-correctness
-semantics. This evidence is preserved in canonical JSON, cache entries, and
-SARIF; an ordinary non-vacuous proof records `None`.
+semantics. This evidence is preserved in canonical JSON and SARIF; an ordinary
+non-vacuous proof records `None`. Proven claims do not enter the disk cache.
 
 `SharpProofVerifyPolicy` controls a valid incomplete result:
 
@@ -377,12 +370,14 @@ under every policy. The worker uses deterministic query, method, project,
 expression-depth, memory, process, and parallelism limits. Its
 content-addressed cache defaults to
 `obj/<Configuration>/<TargetFramework>/SharpProof/cache` in the MSBuild
-integration. Cache schema version 10 stores only a semantically complete
-payload whose manifest hash and exact claim set validate against the current
-request and whose outcomes are all `Proven` or replay-validated `Refuted`.
-Timeout, cancellation, `Unknown`, malformed, infrastructure, and failed-replay
-responses are not reusable. `require-proven` runs bypass this local semantic
-cache so strict CI never relies on untrusted cached proof output.
+integration. Cache schema version 11 stores only complete, postcondition-only
+responses whose claims are all `Refuted`. Before accepting a hit, the worker
+reconstructs every canonical Boolean/integer model against the current lowered
+callable, validates entry assumptions and source ranges, and independently
+replays the whole body and postcondition. Proven claims, effect claims,
+unsupported models, timeout, cancellation, `Unknown`, malformed,
+infrastructure, and failed-replay responses are neither written nor reused.
+`require-proven` runs bypass this local semantic cache.
 
 The result includes deterministic JSON counts by outcome and reason, assumption
 counts, cache status, protocol/tool/spec versions, the canonical packaged

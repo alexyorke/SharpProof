@@ -870,10 +870,10 @@ public sealed class WorkerMsBuildIntegrationTests
         {
             Assert.That(
                 firstResponse.Summary.CacheStatus,
-                Is.EqualTo(WorkerCacheStatus.Written));
+                Is.EqualTo(WorkerCacheStatus.Miss));
             Assert.That(
                 secondResponse.Summary.CacheStatus,
-                Is.EqualTo(WorkerCacheStatus.Hit));
+                Is.EqualTo(WorkerCacheStatus.Miss));
             Assert.That(
                 firstResponse.Summary.ElapsedMilliseconds,
                 Is.GreaterThanOrEqualTo(0));
