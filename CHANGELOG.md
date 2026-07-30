@@ -135,6 +135,10 @@ contain documented breaking changes.
 
 ### Fixed
 
+- Symbolic body execution now carries successful receiver and argument
+  evaluation through modeled API calls in C# evaluation order. Partial terms
+  embedded directly in a call can no longer be omitted from subsequent
+  normal-completion predicates or spec guards.
 - Symbolic body execution now carries assignment right-hand-side definedness
   into the evolving normal-completion predicate. An unused division, overflow,
   or other throwing expression can no longer yield a spurious counterexample

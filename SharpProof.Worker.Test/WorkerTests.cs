@@ -1723,6 +1723,42 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task CfgLoweredPartialSpecArgumentPreservesNormalCompletion()
+    {
+        using var project = TestProject.Create(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int AbsoluteBranch(long divisor) {
+                    Contract.Ensures(divisor != 0);
+                    return Math.Abs(1L / divisor == 0 ? 1 : -1);
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        var record = response.ClaimResults.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                response.RunStatus,
+                Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(
+                record.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                record.Reason,
+                Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(record.Model, Is.Empty);
+        }
+    }
+
+    [Test]
     public async Task SpecResultFacetsProveConcatAndArrayEmptyContracts()
     {
         using var project = TestProject.Create(

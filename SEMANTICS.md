@@ -58,10 +58,13 @@ applies to everything selected by that feature set; disabled features are not
 silently counted as analyzed. Repeated effect attributes receive distinct
 manifest claims while sharing the effective combined constraint and evidence.
 Each effect claim is `Proven` only when a complete compiler-produced effect
-summary establishes its contract. It is `Refuted` only for a structured
-`DefiniteViolation` witness produced from a simple unconditional direct
-operation and independently checked by the worker against the sealed
-constraint. Conditional and may-only conflicts remain
+summary establishes its contract. The compiler can record a structured
+`DefiniteViolation` candidate for a simple unconditional direct operation, but
+the current artifact does not carry an independently executable effect path.
+The worker therefore fails closed by mapping every such candidate to the fatal
+typed result `Unknown(CounterexampleReplayFailed)` with unavailable certainty
+and no published witness. The worker does not emit effect `Refuted` results.
+Conditional and may-only conflicts remain
 `Unknown(EffectContractNotEstablished)`; incomplete evidence is
 `Unknown(EffectSummaryIncomplete)`. Other certainty values distinguish a
 complete or incomplete may-effect summary, a trusted complete boundary, and
@@ -70,10 +73,11 @@ unavailable evidence.
 Exception constraints and exact witness hierarchies use the type-reference
 documentation ID qualified by the full compiler assembly identity: name,
 version, culture, and public-key token. Compiler classification and worker
-replay therefore cannot confuse types imported through aliases from distinct
-same-simple-name assemblies. Type-reference IDs preserve constructed generic
-arguments. Exact user-defined generic exception witnesses remain outside the
-admitted direct-refutation subset and therefore remain `Unknown`.
+artifact validation therefore cannot confuse types imported through aliases
+from distinct same-simple-name assemblies. Type-reference IDs preserve
+constructed generic arguments. Exact user-defined generic exception witnesses
+remain outside the admitted direct-candidate subset and therefore remain
+`Unknown`.
 
 Every selected callable has explicit `Complete` or `Incomplete` coverage.
 Every manifest claim has exactly one `Proven`, `Refuted`, or `Unknown` result.
@@ -211,10 +215,13 @@ therefore makes the corresponding contract `Unknown`; a may-effect alone cannot
 produce `Refuted`. Separately, the compiler recognizes a narrow set of simple
 unconditional direct operations: managed object/array allocation, explicit
 throw, receiver-field access, empty `lock`, and exact `Monitor` calls. It
-records a source-located structured witness, and the worker independently
-validates the witness/constraint conflict before returning `Refuted`.
+records a source-located structured candidate, but the worker cannot
+independently replay its effect operation and path. The candidate is therefore
+reported as the fatal typed result
+`Unknown(CounterexampleReplayFailed)`, not `Refuted`.
 Static-field access, conditional/path-dependent operations, and
-user-constructed exact exception types remain outside that refutation subset.
+user-constructed exact exception types remain outside that direct-candidate
+subset.
 The analyzer's definitive SP0013, SP0015, and SP0030 diagnostics remain
 reserved; direct violations are accountable through worker claim results and
 SARIF.

@@ -135,6 +135,7 @@ internal sealed class AcyclicBlockPredicateExecutor
 
                         environment = environment.SetItem(
                             call.Target!.Value, application.Result);
+                        predicate = application.Predicate;
                         expectedMemoryHavoc = application.ConsumesMemoryHavoc ? call.Operation : null;
                         break;
                     case IrBranchInstruction branch:
@@ -310,6 +311,12 @@ internal sealed class AcyclicBlockPredicateExecutor
                     return null;
                 }
 
+                if (ConstrainNormalExecution(guard, receiver) is not { } receiverGuard)
+                {
+                    return null;
+                }
+
+                guard = receiverGuard;
                 substitutions.Add(template.Receiver.Value, receiver);
             }
             for (var index = 0; index < call.Arguments.Length; index++)
@@ -320,6 +327,12 @@ internal sealed class AcyclicBlockPredicateExecutor
                     return null;
                 }
 
+                if (ConstrainNormalExecution(guard, argument) is not { } argumentGuard)
+                {
+                    return null;
+                }
+
+                guard = argumentGuard;
                 substitutions.Add(template.Parameters[index], argument);
             }
             var result = factory.Variable(call.Target.Value);
@@ -363,7 +376,7 @@ internal sealed class AcyclicBlockPredicateExecutor
 
             _assumptions.AddRange(predicates.Select(predicate => new GuardedBodySpecAssumption(
                 template.Id, template.Target.WitnessIdentifier, guard, predicate)));
-            return new SpecApplication(result, prepared.ConsumesMemoryHavoc);
+            return new SpecApplication(result, guard, prepared.ConsumesMemoryHavoc);
         }
 
         private ImmutableDictionary<IrVarId, IrTerm>? CreateCurrentStates(
@@ -515,7 +528,10 @@ internal sealed class AcyclicBlockPredicateExecutor
         private readonly record struct FlowState(
             int Order, IrTerm Predicate,
             ImmutableDictionary<IrVarId, IrTerm> Environment);
-        private readonly record struct SpecApplication(IrTerm Result, bool ConsumesMemoryHavoc);
+        private readonly record struct SpecApplication(
+            IrTerm Result,
+            IrTerm Predicate,
+            bool ConsumesMemoryHavoc);
     }
 }
 
