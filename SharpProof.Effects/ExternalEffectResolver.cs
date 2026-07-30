@@ -20,7 +20,7 @@ internal sealed class ExternalEffectResolver
     private readonly INamedTypeSymbol? _effectContractAttribute;
     private readonly INamedTypeSymbol? _exceptionType;
     private readonly ResolvedApiSpecTable _specs;
-    private readonly INamedTypeSymbol? _trustedAttribute;
+    private readonly TrustedBoundaryPolicy _trustedBoundaries;
 
     internal ExternalEffectResolver(Compilation compilation, ApiSpecTable apiSpecs)
         : this(
@@ -37,8 +37,8 @@ internal sealed class ExternalEffectResolver
         _effectContractAttribute = contractApi.ResolveAttribute(
             EffectContractMetadata.AttributeMetadataName);
         _exceptionType = compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
-        _trustedAttribute = contractApi.ResolveAttribute(
-            EffectContractMetadata.TrustedAttributeMetadataName);
+        _trustedBoundaries =
+            TrustedBoundaryPolicy.ForCompilation(compilation);
         _specs = apiSpecs ?? throw new ArgumentNullException(nameof(apiSpecs));
     }
 
@@ -98,7 +98,7 @@ internal sealed class ExternalEffectResolver
             }
             resolved = candidate;
         }
-        if (!HasValidTrustReason(method))
+        if (!_trustedBoundaries.AuthorizesDeclaredContracts(method))
         {
             return new(EffectContractResolutionKind.Untrusted, resolved!);
         }
@@ -117,49 +117,6 @@ internal sealed class ExternalEffectResolver
             EffectContractResolutionKind.Invalid,
             EffectSummaryOperations.UnknownBoundary(EffectUncertainty.InvalidContract),
             attribute, reason);
-    }
-
-    private bool HasValidTrustReason(IMethodSymbol method)
-    {
-        if (_trustedAttribute == null)
-        {
-            return false;
-        }
-
-        foreach (var symbol in EnumerateTrustScopes(method))
-        {
-            foreach (var attribute in symbol.GetAttributes())
-            {
-                if (IsTrusted(attribute) &&
-                    attribute.ConstructorArguments.Length == 1 &&
-                    attribute.ConstructorArguments[0].Value is string reason &&
-                    !string.IsNullOrWhiteSpace(reason))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private static IEnumerable<ISymbol> EnumerateTrustScopes(IMethodSymbol method)
-    {
-        yield return method;
-        if (method.AssociatedSymbol is IPropertySymbol property)
-        {
-            yield return property;
-        }
-
-        for (var type = method.ContainingType; type != null; type = type.ContainingType)
-        {
-            yield return type;
-        }
-
-        if (method.ContainingAssembly != null)
-        {
-            yield return method.ContainingAssembly;
-        }
     }
 
     private IEnumerable<AttributeData> EnumerateDirectContractAttributes(IMethodSymbol method)
@@ -395,11 +352,6 @@ internal sealed class ExternalEffectResolver
     private bool IsEffectContract(AttributeData attribute)
     {
         return IsAttribute(attribute, _effectContractAttribute);
-    }
-
-    private bool IsTrusted(AttributeData attribute)
-    {
-        return IsAttribute(attribute, _trustedAttribute);
     }
 
     private static bool IsAttribute(AttributeData attribute, INamedTypeSymbol? attributeType)

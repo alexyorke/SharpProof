@@ -2570,7 +2570,7 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
-    public void ReturnAnnotationsRefineReceiversDivisorsAndIndexes()
+    public void UnverifiedReturnAnnotationsCannotDischargeRuntimeExceptions()
     {
         var compilation = EffectTestHost.CreateCompilation(
             """
@@ -2579,19 +2579,81 @@ public sealed class EffectAnalysisTests
 
             public static class Sample {
                 [return: NotNull]
+                private static string MissingText() => null!;
+
+                [return: Positive]
+                private static int ZeroDivisor() => 0;
+
+                [return: InRange(0, 0)]
+                private static int InvalidIndex() => 1;
+
+                [SharpProofTrusted(" ")]
+                [return: Positive]
+                private static int InvalidTrustReason() => 0;
+
+                public static int NullReceiver() =>
+                    MissingText().Length;
+
+                public static int Division() =>
+                    10 / ZeroDivisor();
+
+                public static int Bounds() {
+                    var values = new int[1];
+                    return values[InvalidIndex()];
+                }
+
+                public static int BlankTrustReason() =>
+                    10 / InvalidTrustReason();
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        AssertThrows(
+            session.Analyze(Method(compilation, "NullReceiver"))
+                .Summary,
+            "System.NullReferenceException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "Division"))
+                .Summary,
+            "System.DivideByZeroException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "Bounds"))
+                .Summary,
+            "System.IndexOutOfRangeException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "BlankTrustReason"))
+                .Summary,
+            "System.DivideByZeroException");
+    }
+
+    [Test]
+    public void TrustedReturnAnnotationsRefineReceiversDivisorsAndIndexes()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public static class Sample {
+                [SharpProofTrusted("Reviewed return contract.")]
+                [return: NotNull]
                 private static string Text() => "";
 
+                [SharpProofTrusted("Reviewed return contract.")]
                 [return: Positive]
                 private static int Divisor() => 1;
 
+                [SharpProofTrusted("Reviewed return contract.")]
                 [return: InRange(0, 1)]
                 private static int Index() => 1;
 
+                [SharpProofTrusted("Reviewed return contract.")]
                 private static string TextProperty {
                     [return: NotNull]
                     get => "";
                 }
 
+                [SharpProofTrusted("Reviewed return contract.")]
                 [return: InRange(2, 1)]
                 private static int Malformed() => 0;
 

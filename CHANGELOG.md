@@ -135,6 +135,10 @@ contain documented breaking changes.
 
 ### Fixed
 
+- Portable abstract flow no longer treats ordinary source `[NotNull]`,
+  `[Positive]`, or `[InRange]` return annotations as established facts before
+  verification. Only an explicit nonblank `[SharpProofTrusted]` boundary or
+  an approved exact API specification can refine a callee result.
 - Symbolic body execution now carries successful receiver and argument
   evaluation through modeled API calls in C# evaluation order. Partial terms
   embedded directly in a call can no longer be omitted from subsequent

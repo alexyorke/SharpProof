@@ -19,6 +19,7 @@ internal sealed class ManagedAbstractFlow
     private readonly INamedTypeSymbol? _inRangeAttribute;
     private readonly INamedTypeSymbol? _notNullAttribute;
     private readonly INamedTypeSymbol? _positiveAttribute;
+    private readonly TrustedBoundaryPolicy _trustedBoundaries;
 
     private ManagedAbstractFlow(Compilation compilation)
         : this(compilation, new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation))
@@ -40,6 +41,8 @@ internal sealed class ManagedAbstractFlow
         _notNullAttribute = contractApi.ResolveAttribute(ContractApiMetadata.NotNull);
         _positiveAttribute = contractApi.ResolveAttribute(ContractApiMetadata.Positive);
         _inRangeAttribute = contractApi.ResolveAttribute(ContractApiMetadata.InRange);
+        _trustedBoundaries =
+            TrustedBoundaryPolicy.ForCompilation(compilation);
     }
 
     internal static ManagedAbstractFlow ForCompilation(Compilation compilation)
@@ -496,11 +499,14 @@ internal sealed class ManagedAbstractFlow
 
     private ManagedAbstractValue ReturnValue(IMethodSymbol? method, ITypeSymbol? type)
     {
-        var value = method == null
-            ? ManagedAbstractValue.TopForType(type)
-            : ApplyAttributes(
+        var value = ManagedAbstractValue.TopForType(type);
+        if (method != null &&
+            _trustedBoundaries.AuthorizesDeclaredContracts(method))
+        {
+            value = ApplyAttributes(
                 ManagedAbstractValue.TopForType(type),
                 method.GetReturnTypeAttributes());
+        }
         if (method == null ||
             !_apiSpecs.TryGet(method, out var spec) ||
             !value.TryGetNullness(out var nullness))
