@@ -825,9 +825,12 @@ function Get-SharpProofGitHubArtifactRecord {
             foreach ($candidate in $archive.Entries) {
                 $candidatePath = [string]$candidate.FullName
                 $candidateSegments = $candidatePath.Split('/')
+                $externalAttributeBits = [BitConverter]::ToUInt32(
+                    [BitConverter]::GetBytes(
+                        [int]$candidate.ExternalAttributes),
+                    0)
                 $unixMode = (
-                    ([uint32]$candidate.ExternalAttributes -shr 16) -band
-                    0xf000)
+                    ($externalAttributeBits -shr 16) -band 0xf000)
                 if ([string]::IsNullOrWhiteSpace($candidatePath) -or
                     $candidatePath.Contains('\') -or
                     $candidatePath.StartsWith(

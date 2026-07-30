@@ -23,6 +23,8 @@ public sealed class HumanReleaseGateScriptTests
         "4444444444444444444444444444444444444444";
     private const string QualifiedRcVersion = "1.0.0-rc.7";
     private const string GitHubApiToken = "fixture-github-token";
+    private const int UnixRegularFileAttributes =
+        unchecked((int)0x81A40000u);
     private static readonly string Digest = new('a', 64);
     private static readonly string GitHubApiMock =
         """
@@ -2783,6 +2785,7 @@ public sealed class HumanReleaseGateScriptTests
                 var entry = archive.CreateEntry(
                     entryName,
                     CompressionLevel.Optimal);
+                entry.ExternalAttributes = UnixRegularFileAttributes;
                 entry.LastWriteTime = new DateTimeOffset(
                     2000,
                     1,
@@ -2802,6 +2805,7 @@ public sealed class HumanReleaseGateScriptTests
                         var extra = archive.CreateEntry(
                             additionalEntry.Key,
                             CompressionLevel.Optimal);
+                        extra.ExternalAttributes = UnixRegularFileAttributes;
                         extra.LastWriteTime = new DateTimeOffset(
                             2000,
                             1,
