@@ -5,13 +5,15 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using NUnit.Framework;
 
 namespace SharpProof.Package.Test;
 
 [TestFixture]
 [NonParallelizable]
-public sealed class HumanReleaseGateScriptTests
+public sealed partial class HumanReleaseGateScriptTests
 {
     private const string ProductCommit =
         "1111111111111111111111111111111111111111";
@@ -430,10 +432,18 @@ public sealed class HumanReleaseGateScriptTests
             workspace.ProductCommit);
 
         Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
-        Assert.That(
-            result.Output,
-            Does.Contain(expectedMessage),
-            result.Output);
+        AssertOutputContains(result.Output, expectedMessage);
+    }
+
+    [Test]
+    public void WrappedCliXmlDiagnosticsRemainSearchable()
+    {
+        AssertOutputContains(
+            """
+            #< CLIXML
+            <Objs Version="1.1.0.1" xmlns="http://schemas.microsoft.com/powershell/2004/04"><S S="Error">_x001B_[31;1mPilot artifact does not_x000A_</S><S S="Error">_x001B_[31;1mexactly match the declared evidence._x001B_[0m</S></Objs>
+            """,
+            "Pilot artifact does not exactly match");
     }
 
     [Test]
@@ -563,9 +573,7 @@ public sealed class HumanReleaseGateScriptTests
             workspace.ProductCommit);
 
         Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
-        Assert.That(
-            result.Output,
-            Does.Contain("must be an annotated tag"));
+        AssertOutputContains(result.Output, "must be an annotated tag");
     }
 
     [Test]
@@ -935,7 +943,7 @@ public sealed class HumanReleaseGateScriptTests
             workspace.Repository);
 
         Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
-        Assert.That(result.Output, Does.Contain("receipt"));
+        AssertOutputContains(result.Output, "receipt");
     }
 
     [Test]
@@ -990,9 +998,9 @@ public sealed class HumanReleaseGateScriptTests
             immutableReceipts);
 
         Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
-        Assert.That(
+        AssertOutputContains(
             result.Output,
-            Does.Contain("immutable GitHub Actions artifact"));
+            "immutable GitHub Actions artifact");
     }
 
     [Test]
@@ -1879,6 +1887,71 @@ public sealed class HumanReleaseGateScriptTests
         throw new InvalidOperationException(
             "Repository root was not found.");
     }
+
+    private static void AssertOutputContains(
+        string output,
+        string expectedMessage)
+    {
+        Assert.That(
+            NormalizeProcessOutput(output),
+            Does.Contain(expectedMessage),
+            output);
+    }
+
+    private static string NormalizeProcessOutput(string output)
+    {
+        var normalized = output;
+        var clixmlStart = output.IndexOf(
+            "<Objs ",
+            StringComparison.Ordinal);
+        if (clixmlStart >= 0)
+        {
+            try
+            {
+                var document = XDocument.Parse(
+                    output[clixmlStart..],
+                    LoadOptions.None);
+                normalized = string.Join(
+                    " ",
+                    document
+                        .Descendants()
+                        .Where(element =>
+                            element.Name.LocalName == "S")
+                        .Select(element => element.Value));
+            }
+            catch (System.Xml.XmlException)
+            {
+                // Preserve the raw process output for assertion diagnostics.
+            }
+        }
+
+        normalized = normalized
+            .Replace(
+                "_x000A_",
+                "\n",
+                StringComparison.Ordinal)
+            .Replace(
+                "_x000D_",
+                "\r",
+                StringComparison.Ordinal)
+            .Replace(
+                "_x001B_",
+                "\u001B",
+                StringComparison.Ordinal);
+        normalized = AnsiEscapeSequence().Replace(
+            normalized,
+            string.Empty);
+        return string.Join(
+            " ",
+            normalized.Split(
+                (char[]?)null,
+                StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    [GeneratedRegex(
+        "\u001B\\[[0-?]*[ -/]*[@-~]",
+        RegexOptions.CultureInvariant)]
+    private static partial Regex AnsiEscapeSequence();
 
     private sealed class EvidenceWorkspace : IDisposable
     {

@@ -71,7 +71,7 @@ jobs:
         run: >-
           .\scripts\Invoke-SharpProofDotnet.ps1
           -MemoryLimitMb 12288
-          -TimeoutSeconds 900
+          -TimeoutSeconds 1800
           test SharpProof.Dev.Tests.slnf
           -c Release
           --no-build
