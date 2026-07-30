@@ -15,6 +15,10 @@ public sealed class FinalCompilationProbeTests
 {
     private const string NetStandardTargetFramework = "netstandard2.0";
     private const string NetTargetFramework = "net8.0";
+    private static bool IsSupportedWorkerHost =>
+        OperatingSystem.IsWindows() &&
+        RuntimeInformation.ProcessArchitecture == Architecture.X64 &&
+        RuntimeInformation.OSArchitecture == Architecture.X64;
 
     [Test]
     public async Task MultiTargetBuildWritesOneIsolatedFinalCompilationPerTargetFramework()
@@ -112,7 +116,7 @@ public sealed class FinalCompilationProbeTests
         Assert.That(restore.ExitCode, Is.Zero, restore.Output);
 
         var first = await workspace.RebuildAsync();
-        Assert.That(first.ExitCode, Is.Zero, first.Output);
+        AssertPackedBuildOutcome(first);
         var firstOracle = await ProbeArtifact.ReadAsync(
             workspace.PackedProbeArtifactPath);
         var firstManifest = await CompilerManifestArtifact.ReadAsync(
@@ -132,7 +136,7 @@ public sealed class FinalCompilationProbeTests
             firstOracle.GetTreeChecksum("Subject.cs");
 
         var noOp = await workspace.RebuildAsync();
-        Assert.That(noOp.ExitCode, Is.Zero, noOp.Output);
+        AssertPackedBuildOutcome(noOp);
         Assert.That(
             await File.ReadAllBytesAsync(workspace.CompilerManifestPath),
             Is.EqualTo(firstManifest.Bytes));
@@ -145,7 +149,7 @@ public sealed class FinalCompilationProbeTests
 
         workspace.WriteProbeInput("changed-generator-input");
         var changed = await workspace.RebuildAsync();
-        Assert.That(changed.ExitCode, Is.Zero, changed.Output);
+        AssertPackedBuildOutcome(changed);
         var changedOracle = await ProbeArtifact.ReadAsync(
             workspace.PackedProbeArtifactPath);
         var changedManifest = await CompilerManifestArtifact.ReadAsync(
@@ -169,9 +173,7 @@ public sealed class FinalCompilationProbeTests
                 changedManifest.CompilationSha256,
                 Is.Not.EqualTo(firstManifest.CompilationSha256));
         }
-        if (OperatingSystem.IsWindows() &&
-            RuntimeInformation.ProcessArchitecture == Architecture.X64 &&
-            RuntimeInformation.OSArchitecture == Architecture.X64)
+        if (IsSupportedWorkerHost)
         {
             var verification = await workspace.VerifyPackedArtifactAsync();
             using (Assert.EnterMultipleScope())
@@ -190,9 +192,7 @@ public sealed class FinalCompilationProbeTests
     [Test]
     public async Task GeneratedRefutationTraversesArtifactReplayAndCache()
     {
-        if (!OperatingSystem.IsWindows() ||
-            RuntimeInformation.ProcessArchitecture != Architecture.X64 ||
-            RuntimeInformation.OSArchitecture != Architecture.X64)
+        if (!IsSupportedWorkerHost)
         {
             Assert.Ignore("The verifier is intentionally Windows x64 only.");
         }
@@ -260,6 +260,21 @@ public sealed class FinalCompilationProbeTests
 
         Assert.That(build.ExitCode, Is.Zero, build.Output);
         Assert.That(workspace.GetArtifactPaths(), Is.Empty);
+    }
+
+    private static void AssertPackedBuildOutcome(ProcessResult result)
+    {
+        if (IsSupportedWorkerHost)
+        {
+            Assert.That(result.ExitCode, Is.Zero, result.Output);
+            return;
+        }
+
+        Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
+        Assert.That(
+            result.Output,
+            Does.Contain(
+                "SharpProof out-of-process verification is supported only on Windows x64"));
     }
 
     public enum ProbeSuppression
