@@ -22,6 +22,8 @@ internal sealed record PerformanceGateResult(
     ImmutableArray<double> OrderBalancedRatios,
     int UnannotatedAdvisoryAnalyzerDriverRunCount,
     int UnannotatedAdvisoryAnalysisSessionCreateCount,
+    int UnannotatedAdvisoryApiSpecCreateCount,
+    int UnannotatedAdvisoryEffectAnalysisCreateCount,
     double OrderBalancedMedianRatio,
     double RawMedianRatio,
     double BaselineFirstMedianRatio,
@@ -70,6 +72,13 @@ internal static class PerformanceGate
             throw new InvalidOperationException(
                 "The call-bearing advisory performance probe must create " +
                 "exactly one semantic analysis session.");
+        }
+        if (configurationProbe.ApiSpecCreateCount != 0 ||
+            configurationProbe.EffectAnalysisCreateCount != 0)
+        {
+            throw new InvalidOperationException(
+                "Unselected advisory code must not create API-spec or " +
+                "effect-analysis state.");
         }
         var packageBuildTiming =
             await MeasureUnannotatedAdvisoryPackageBuildsAsync(
@@ -190,6 +199,8 @@ internal static class PerformanceGate
             packageBuildStatistics.OrderBalancedRatios,
             unannotatedAdvisoryAnalyzerDriverRuns,
             unannotatedAdvisoryAnalysisSessionCreates,
+            configurationProbe.ApiSpecCreateCount,
+            configurationProbe.EffectAnalysisCreateCount,
             medianRatio,
             packageBuildStatistics.RawMedianRatio,
             packageBuildStatistics.BaselineFirstMedianRatio,
@@ -246,7 +257,9 @@ internal static class PerformanceGate
             stopwatch.Elapsed.TotalMilliseconds / iterations,
             iterations,
             diagnosticCount,
-            sessionFactory.CreateCount);
+            sessionFactory.CreateCount,
+            sessionFactory.ApiSpecCreateCount,
+            sessionFactory.EffectAnalysisCreateCount);
     }
 
     private static CSharpCompilation CreateTimingCompilation(
@@ -1244,7 +1257,9 @@ internal static class PerformanceGate
         double MeanMilliseconds,
         int AnalyzerDriverRunCount,
         int DiagnosticCount,
-        int AnalysisSessionCreateCount);
+        int AnalysisSessionCreateCount,
+        int ApiSpecCreateCount,
+        int EffectAnalysisCreateCount);
 
     private sealed record IdeEditMeasurement(
         double[] Latencies,
@@ -1252,10 +1267,16 @@ internal static class PerformanceGate
 
     private sealed class CountingSessionFactory : IAnalyzerSessionFactory
     {
+        private readonly List<AnalyzerSession> _sessions = [];
+
         internal int CreateCount
         {
             get; private set;
         }
+        internal int ApiSpecCreateCount =>
+            _sessions.Count(static session => session.HasCreatedApiSpecs);
+        internal int EffectAnalysisCreateCount =>
+            _sessions.Count(static session => session.HasCreatedEffectAnalysis);
 
         public AnalyzerSession Create(
             Compilation compilation,
@@ -1263,10 +1284,12 @@ internal static class PerformanceGate
             CancellationToken cancellationToken)
         {
             CreateCount++;
-            return new AnalyzerSession(
+            var session = new AnalyzerSession(
                 compilation,
                 configuration,
                 cancellationToken);
+            _sessions.Add(session);
+            return session;
         }
     }
 

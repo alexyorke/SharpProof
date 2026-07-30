@@ -33,6 +33,11 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator
         ImmutableArray<INamedTypeSymbol> candidates)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
+        if (candidates.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
         var contractFor = ContractSelectionInventory.ForCompilation(compilation).ContractFor;
         if (contractFor == null)
         {

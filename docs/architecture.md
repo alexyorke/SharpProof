@@ -263,15 +263,22 @@ never takes this path. The activation probe is part of the declared discovery
 trusted computing base; new selection or implicit-call syntax must extend the
 probe and its regressions in the same change.
 
-Once a semantic session is active, every source callable still receives
-attribute, clause-placement, intrinsic, rejection, suppression, and call-site
-precondition validation. Supported-subset classification and effect analysis
-run only for a callable selected by an effective contract. Before allocating a
-precondition CFG, a sound negative screen walks calls owned by that callable
-and uses the same cached binder as full analysis. It skips the CFG only when
-every target binds successfully with zero entry clauses. Operation-root or
-binding failure, a possible entry clause, and relevant static initialization
-all retain full fail-closed analysis. The pipeline, screen, and binder-owning
+The advisory activation probe distinguishes contract/attribute candidates
+from ordinary call-bearing code. A candidate compilation retains method
+attribute, clause-placement, intrinsic, rejection, suppression, subset, and
+effect processing. A contract-free compilation registers only operation-block
+precondition screening. Its source and metadata call targets still use the
+same conservative policy, so an external closed precondition remains visible
+to an unannotated caller. Contract inventories, companion resolution, binders,
+API specifications, and effect analysis are independently lazy and are
+created only on first demand.
+
+Before allocating a precondition CFG, a sound negative screen walks calls
+owned by that callable and uses the same cached binder as full analysis. It
+skips the CFG only when every target binds successfully with zero entry
+clauses. Operation-root or binding failure, a possible entry clause, and
+relevant static initialization all retain full fail-closed analysis. The
+activation probe, lazy compilation model, pipeline, screen, and binder-owning
 session are part of the declared effect-analysis trusted computing base.
 When the containing operation tree has a relevant nested owner, the pass
 creates the root CFG once and follows Roslyn local-function and anonymous-

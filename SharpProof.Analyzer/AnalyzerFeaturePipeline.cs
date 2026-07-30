@@ -2,6 +2,41 @@ namespace SharpProof.Analyzer;
 
 internal static class AnalyzerFeaturePipeline
 {
+    internal static void AnalyzeUnselectedOperationBlock(
+        OperationBlockAnalysisContext context,
+        AnalyzerSession session)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        if (context.OwningSymbol is not IMethodSymbol method ||
+            method.DeclaringSyntaxReferences.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        var declaration = FindDeclaration(
+            method,
+            context.OperationBlocks,
+            context.CancellationToken);
+        if (declaration == null)
+        {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Abstained);
+            return;
+        }
+
+        var semanticModel = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(context.Compilation, declaration.SyntaxTree);
+        var outcome = RequiresCallSiteAnalyzer.Analyze(
+            method,
+            declaration,
+            semanticModel,
+            session,
+            context.ReportDiagnostic,
+            context.CancellationToken);
+        session.RecordSemanticOutcome(method, outcome);
+    }
+
     internal static void ValidateMethodAttributes(
         SymbolAnalysisContext context,
         AnalyzerSession session)

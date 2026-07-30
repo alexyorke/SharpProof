@@ -262,6 +262,13 @@ uses this fast path. Adding a new source form that can select analysis or
 surface an analyzed call site therefore also requires extending this
 discovery policy and its tests.
 
+When ordinary calls activate advisory analysis without any local
+contract/attribute candidate, SharpProof runs only the conservative call-site
+precondition screen. It still checks source and metadata targets, including
+closed parameter annotations, but does not initialize contract inventories,
+companion resolution, API specifications, or effect analysis unless a target
+or selected callable demands them.
+
 Effect and incomplete-proof diagnostics are enabled informational diagnostics
 by default. A concretely replayed false precondition is SP0027 at Warning.
 Configuration, contract-usage, and compiler-artifact errors remain enabled at

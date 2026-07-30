@@ -88,7 +88,7 @@ public sealed class AnalyzerModeAndEffectTests
     [TestCase(
         "public static class Fixture { " +
         "public static int Read() { return 1; } }")]
-    public async Task AdvisoryPotentialWorkDoesNotUseTheFastPath(
+    public async Task AdvisoryPotentialWorkCreatesOnlyALightweightSession(
         string source)
     {
         var factory = new SpecReuseSessionFactory();
@@ -98,8 +98,13 @@ public sealed class AnalyzerModeAndEffectTests
             [],
             new SharpProofAnalyzer(factory));
 
-        Assert.That(diagnostics, Is.Empty);
-        Assert.That(factory.Session, Is.Not.Null);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostics, Is.Empty);
+            Assert.That(factory.Session, Is.Not.Null);
+            Assert.That(factory.Session!.HasCreatedApiSpecs, Is.False);
+            Assert.That(factory.Session.HasCreatedEffectAnalysis, Is.False);
+        }
     }
 
     [Test]

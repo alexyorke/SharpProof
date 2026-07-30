@@ -78,6 +78,11 @@ contain documented breaking changes.
   analysis builds a CFG only when the cached contract binder finds an entry
   clause or cannot establish that none exists; malformed bindings and static
   initialization remain fail-closed.
+- Contract-free advisory compilations now skip duplicate method-attribute and
+  selected-contract work while retaining source and metadata precondition
+  screening. Contract inventories, companion resolution, binders, API
+  specifications, and effect analysis are initialized only when demanded;
+  external closed preconditions remain visible to unannotated callers.
 - Coverage collection uses the managed Microsoft collector so the exact
   trusted contract-API payload remains unchanged while tests run. Coverage
   instrumentation can no longer turn payload-identity checks into unrelated

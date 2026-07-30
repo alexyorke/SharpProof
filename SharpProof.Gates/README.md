@@ -80,9 +80,10 @@ contributes no analyzer items and that advisory/strict profiles contribute both
 the analyzer and contract generator. The performance path compares an
 unannotated advisory package build with its compiler-only baseline. The
 analyzer still runs in the advisory build, while the absence of selected
-contracts keeps its output quiet. A conservative activation probe avoids the
-heavyweight semantic session for this call-free source while retaining
-configuration, runtime-contract, and compiler-artifact checks.
+contracts keeps its output quiet. The call-bearing fixture exercises the
+conservative no-precondition screen. The compilation model is demand-loaded,
+so contract, specification, and effect state remains unrealized unless a
+selected callable or possible callee precondition needs it.
 
 The gate copies the repository `global.json` above both temporary projects,
 requires the temporary root to resolve the same SDK as the repository, and

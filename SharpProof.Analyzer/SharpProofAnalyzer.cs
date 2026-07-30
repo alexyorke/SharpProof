@@ -60,10 +60,14 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
             ReportInvalidConfiguration(endContext, configuration);
             FinalCompilationCollector.Collect(endContext, configuration);
         });
-        if (configuration.Profile == SharpProofProfile.Advisory &&
-            !RequiresSemanticAnalysis(
+        var activation = configuration.Profile == SharpProofProfile.Advisory
+            ? GetAdvisoryActivation(
                 context.Compilation,
-                context.CancellationToken))
+                context.CancellationToken)
+            : AdvisoryActivation.Full;
+        if (!activation.Any ||
+            !configuration.ContractsEnabled &&
+            !activation.RequiresFullOperationAnalysis)
         {
             return;
         }
@@ -72,50 +76,109 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
             context.Compilation,
             configuration,
             context.CancellationToken);
-        context.RegisterSymbolAction(
-            symbolContext => AnalyzerFeaturePipeline.ValidateMethodAttributes(symbolContext, session),
-            SymbolKind.Method);
-        context.RegisterOperationBlockAction(operationContext =>
-            AnalyzerFeaturePipeline.AnalyzeOperationBlock(operationContext, session));
+        if (activation.RequiresSymbolAnalysis)
+        {
+            context.RegisterSymbolAction(
+                symbolContext => AnalyzerFeaturePipeline.ValidateMethodAttributes(
+                    symbolContext,
+                    session),
+                SymbolKind.Method);
+        }
+        if (activation.RequiresOperationAnalysis)
+        {
+            if (activation.RequiresFullOperationAnalysis)
+            {
+                context.RegisterOperationBlockAction(operationContext =>
+                    AnalyzerFeaturePipeline.AnalyzeOperationBlock(
+                        operationContext,
+                        session));
+            }
+            else
+            {
+                context.RegisterOperationBlockAction(operationContext =>
+                    AnalyzerFeaturePipeline.AnalyzeUnselectedOperationBlock(
+                        operationContext,
+                        session));
+            }
+        }
     }
 
-    private static bool RequiresSemanticAnalysis(
+    private static AdvisoryActivation GetAdvisoryActivation(
         Compilation compilation,
         CancellationToken cancellationToken)
     {
+        var requiresOperationAnalysis = false;
         foreach (var tree in compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var node in tree.GetRoot(cancellationToken)
                          .DescendantNodes())
             {
-                if (node is ArgumentListSyntax or
-                    BaseObjectCreationExpressionSyntax or
-                    BaseListSyntax or
-                    ConstructorDeclarationSyntax or
-                    StatementSyntax or
-                    QueryExpressionSyntax or
-                    AwaitExpressionSyntax or
-                    InterpolatedStringExpressionSyntax or
-                    WithExpressionSyntax or
-                    CollectionExpressionSyntax or
-                    RecursivePatternSyntax)
-                {
-                    return true;
-                }
-
                 if (node is AttributeSyntax attribute &&
                     !IsAssemblyOrModuleAttribute(attribute))
                 {
-                    return true;
+                    return AdvisoryActivation.Full;
+                }
+
+                if (node is InvocationExpressionSyntax invocation &&
+                    IsContractApiCandidate(invocation.Expression))
+                {
+                    return new(
+                        RequiresSymbolAnalysis: false,
+                        RequiresOperationAnalysis: true,
+                        RequiresFullOperationAnalysis: true);
+                }
+
+                if (IsPotentialOperation(node))
+                {
+                    requiresOperationAnalysis = true;
                 }
             }
         }
 
-        return compilation.Assembly.GetAttributes().Any(
+        var hasSharpProofAssemblyAttribute =
+            compilation.Assembly.GetAttributes().Any(
             static attribute =>
                 IsSharpProofAttributesNamespace(
                     attribute.AttributeClass?.ContainingNamespace));
+        return hasSharpProofAssemblyAttribute
+            ? AdvisoryActivation.Full
+            : new(
+                RequiresSymbolAnalysis: false,
+                RequiresOperationAnalysis: requiresOperationAnalysis,
+                RequiresFullOperationAnalysis: false);
+    }
+
+    private static bool IsPotentialOperation(SyntaxNode node)
+    {
+        return node is ArgumentListSyntax or
+            BaseObjectCreationExpressionSyntax or
+            BaseListSyntax or
+            ConstructorDeclarationSyntax or
+            StatementSyntax or
+            QueryExpressionSyntax or
+            AwaitExpressionSyntax or
+            InterpolatedStringExpressionSyntax or
+            WithExpressionSyntax or
+            CollectionExpressionSyntax or
+            RecursivePatternSyntax;
+    }
+
+    private static bool IsContractApiCandidate(ExpressionSyntax expression)
+    {
+        SimpleNameSyntax? name = expression switch
+        {
+            SimpleNameSyntax simple => simple,
+            MemberAccessExpressionSyntax member => member.Name,
+            MemberBindingExpressionSyntax binding => binding.Name,
+            _ => null
+        };
+        return name?.Identifier.ValueText is
+            "Requires" or
+            "Ensures" or
+            "Assume" or
+            "Old" or
+            "Result";
     }
 
     private static bool IsSharpProofAttributesNamespace(
@@ -179,5 +242,20 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
             invalidValue.Key,
             invalidValue.Value,
             invalidValue.Reason);
+    }
+
+    private readonly record struct AdvisoryActivation(
+        bool RequiresSymbolAnalysis,
+        bool RequiresOperationAnalysis,
+        bool RequiresFullOperationAnalysis)
+    {
+        internal static AdvisoryActivation Full { get; } =
+            new(
+                RequiresSymbolAnalysis: true,
+                RequiresOperationAnalysis: true,
+                RequiresFullOperationAnalysis: true);
+
+        internal bool Any =>
+            RequiresSymbolAnalysis || RequiresOperationAnalysis;
     }
 }

@@ -361,6 +361,8 @@ public sealed class PerformanceGateTests
             Assert.That(measurement.AnalyzerDriverRunCount, Is.EqualTo(3));
             Assert.That(measurement.DiagnosticCount, Is.Zero);
             Assert.That(measurement.AnalysisSessionCreateCount, Is.Zero);
+            Assert.That(measurement.ApiSpecCreateCount, Is.Zero);
+            Assert.That(measurement.EffectAnalysisCreateCount, Is.Zero);
         }
     }
 
@@ -390,6 +392,8 @@ public sealed class PerformanceGateTests
             Assert.That(
                 measurement.AnalysisSessionCreateCount,
                 Is.EqualTo(2));
+            Assert.That(measurement.ApiSpecCreateCount, Is.Zero);
+            Assert.That(measurement.EffectAnalysisCreateCount, Is.Zero);
         }
     }
 

@@ -39,6 +39,36 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task UnannotatedCallerStillChecksExternalClosedPreconditions()
+    {
+        var external = AnalyzerTestHost.EmitReference(
+            """
+            using SharpProof.Attributes;
+
+            public static class ExternalFixture {
+                public static void Positive([Positive] int value) {
+                }
+            }
+            """,
+            "ExternalClosedPrecondition");
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            public static class Fixture {
+                public static void Call() {
+                    ExternalFixture.Positive(-1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"],
+            additionalReferences: [external]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
     public async Task UnsupportedEffectsSyntaxDoesNotHideConcretePreconditionViolation()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
