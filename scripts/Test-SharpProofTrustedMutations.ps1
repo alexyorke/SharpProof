@@ -129,7 +129,7 @@ $mutations = @(
         Name = 'protocol-manifest-result-equality'
         File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
         Original = "actual.OrderBy(static value => value, StringComparer.Ordinal)`n            .SequenceEqual(expected.OrderBy(static value => value, StringComparer.Ordinal),`n                StringComparer.Ordinal)"
-        Mutated = 'true'
+        Mutated = 'actual.Any() == actual.Any() && expected.Any() == expected.Any()'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~StrictResponseValidationRequiresExactManifestAndResultSets'
     },
