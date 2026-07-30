@@ -226,7 +226,9 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         try
         {
             var flow = model.AnalyzeControlFlow(statement);
-            return !flow.Succeeded || flow.StartPointIsReachable;
+            return flow == null ||
+                !flow.Succeeded ||
+                flow.StartPointIsReachable;
         }
         catch (ArgumentException)
         {

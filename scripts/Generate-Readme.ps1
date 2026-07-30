@@ -518,7 +518,7 @@ foreach ($propertyName in $workerPropertyNames) {
 }
 
 $compilerCallableLowerer = Get-RequiredText (
-    'SharpProof.Analyzer\CompilerArtifact\CompilerCallableLowerer.cs')
+    'SharpProof.CompilerCollector\CompilerArtifact\CompilerCallableLowerer.cs')
 $compilerPreparation = Get-RequiredText (
     'SharpProof.CompilerArtifact\CompilerArtifactModel.generated.cs')
 $bodyExecutor = Get-RequiredText (

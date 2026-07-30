@@ -1,6 +1,6 @@
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo(
-    "SharpProof.Contracts")]
+    "SharpProof.Analyzer.Test")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo(
-    "SharpProof.CompilerCollector")]
+    "SharpProof.Worker.Test")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo(
-    "SharpProof.Frontend.Test")]
+    "SharpProof.Gates")]

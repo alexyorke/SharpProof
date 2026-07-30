@@ -11,6 +11,7 @@ public sealed class BoundaryEnforcementTests
         "SharpProof.Analyzer",
         "SharpProof.Attributes",
         "SharpProof.CompilerArtifact",
+        "SharpProof.CompilerCollector",
         "SharpProof.ContractForGenerator",
         "SharpProof.Contracts",
         "SharpProof.Dataflow",
@@ -18,6 +19,7 @@ public sealed class BoundaryEnforcementTests
         "SharpProof.Frontend",
         "SharpProof.Ir",
         "SharpProof.Meta.Analyzers",
+        "SharpProof.PortableAnalyzer",
         "SharpProof.Smt",
         "SharpProof.Specs",
         "SharpProof.Verify",
@@ -29,12 +31,14 @@ public sealed class BoundaryEnforcementTests
     private static readonly string[] SoundnessCriticalProjects = [
         "SharpProof.Analyzer",
         "SharpProof.CompilerArtifact",
+        "SharpProof.CompilerCollector",
         "SharpProof.ContractForGenerator",
         "SharpProof.Contracts",
         "SharpProof.Dataflow",
         "SharpProof.Effects",
         "SharpProof.Frontend",
         "SharpProof.Ir",
+        "SharpProof.PortableAnalyzer",
         "SharpProof.Smt",
         "SharpProof.Specs",
         "SharpProof.Verify",
@@ -180,7 +184,6 @@ public sealed class BoundaryEnforcementTests
     {
         var direct = ProjectReferences("SharpProof.Analyzer");
         string[] expectedDirect = [
-            "SharpProof.CompilerArtifact",
             "SharpProof.Contracts",
             "SharpProof.Effects",
             "SharpProof.Frontend",
@@ -192,13 +195,25 @@ public sealed class BoundaryEnforcementTests
             Is.EqualTo(expectedDirect));
 
         var closure = TransitiveProjectClosure("SharpProof.Analyzer");
+        Assert.That(
+            closure,
+            Does.Not.Contain("SharpProof.CompilerArtifact"));
+        Assert.That(
+            closure,
+            Does.Not.Contain("SharpProof.Worker.Protocol"));
         Assert.That(closure, Does.Not.Contain("SharpProof.Smt"));
         Assert.That(closure, Does.Not.Contain("SharpProof.Verify"));
         Assert.That(
             ProjectPackages("SharpProof.Analyzer"),
             Does.Not.Contain("Microsoft.Z3"));
+        Assert.That(
+            ProjectPackages("SharpProof.Analyzer"),
+            Does.Not.Contain("System.Text.Json"));
 
         var source = ReadProductionSources("SharpProof.Analyzer");
+        Assert.That(
+            source,
+            Does.Not.Contain("SharpProof.Worker.Protocol"));
         Assert.That(source, Does.Not.Contain("Microsoft.Z3"));
         Assert.That(source, Does.Not.Contain("SharpProof.Smt"));
         Assert.That(source, Does.Not.Contain("SharpProof.Verify"));
@@ -333,6 +348,7 @@ public sealed class BoundaryEnforcementTests
             @"SharpProof.Attributes\SharpProof.Attributes.csproj",
             @"SharpProof.CompilerProbe.TestAsset\SharpProof.CompilerProbe.TestAsset.csproj",
             @"SharpProof.CompilerArtifact\SharpProof.CompilerArtifact.csproj",
+            @"SharpProof.CompilerCollector\SharpProof.CompilerCollector.csproj",
             @"SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj",
             @"SharpProof.ContractForGenerator\SharpProof.ContractForGenerator.csproj",
             @"SharpProof.Contracts.Test\SharpProof.Contracts.Test.csproj",
@@ -349,6 +365,7 @@ public sealed class BoundaryEnforcementTests
             @"SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj",
             @"SharpProof.Package.Test\SharpProof.Package.Test.csproj",
             @"SharpProof.Package\SharpProof.Package.csproj",
+            @"SharpProof.PortableAnalyzer\SharpProof.PortableAnalyzer.csproj",
             @"SharpProof.Smoke.Net472\SharpProof.Smoke.Net472.csproj",
             @"SharpProof.Smt.Test\SharpProof.Smt.Test.csproj",
             @"SharpProof.Smt\SharpProof.Smt.csproj",

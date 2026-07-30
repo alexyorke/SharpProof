@@ -77,17 +77,6 @@ public sealed class AnalyzerModeAndEffectTests
     [TestCase(
         "using System; public static class Fixture { " +
         "[Obsolete] public static int Read() => 1; }")]
-    [TestCase(
-        "public static class Fixture { " +
-        "public static int Read(int value) => System.Math.Abs(value); }")]
-    [TestCase(
-        "public static class Fixture { " +
-        "public static object Create() => new object(); }")]
-    [TestCase(
-        "public class Base { } public sealed class Derived : Base { }")]
-    [TestCase(
-        "public static class Fixture { " +
-        "public static int Read() { return 1; } }")]
     public async Task AdvisoryPotentialWorkCreatesOnlyALightweightSession(
         string source)
     {
@@ -105,6 +94,31 @@ public sealed class AnalyzerModeAndEffectTests
             Assert.That(factory.Session!.HasCreatedApiSpecs, Is.False);
             Assert.That(factory.Session.HasCreatedEffectAnalysis, Is.False);
         }
+    }
+
+    [TestCase(
+        "public static class Fixture { " +
+        "public static int Read(int value) => System.Math.Abs(value); }")]
+    [TestCase(
+        "public static class Fixture { " +
+        "public static object Create() => new object(); }")]
+    [TestCase(
+        "public class Base { } public sealed class Derived : Base { }")]
+    [TestCase(
+        "public static class Fixture { " +
+        "public static int Read() { return 1; } }")]
+    public async Task AdvisoryWorkWithoutSharpProofContractsCreatesNoSession(
+        string source)
+    {
+        var factory = new ThrowingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            source,
+            mode: null,
+            [],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(factory.CreateCount, Is.Zero);
     }
 
     [Test]
@@ -1723,6 +1737,40 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task BottomEntryCannotDirectlyProveAnEffectContract()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [EffectContract(
+                    SharpProofEffect.None,
+                    Complete = true)]
+                public static int Impossible(
+                    [Positive, InRange(-2, -1)] int value) =>
+                    value;
+            }
+            """,
+            mode: null,
+            ["SP0047"],
+            new SharpProofAnalyzer(factory),
+            features: "effects");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(
+                    static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0047"]));
+            Assert.That(
+                factory.Outcomes["Impossible"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+        }
+    }
+
+    [Test]
     public async Task IntrinsicLengthReadsArgumentState()
     {
         var factory = new RecordingSessionFactory();
@@ -1877,12 +1925,20 @@ public sealed class AnalyzerModeAndEffectTests
             Location.None, session, static _ => { }, default).Single();
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(budgetEvaluation.Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
+            Assert.That(
+                budgetEvaluation.Reason,
+                Is.EqualTo(EffectEvaluationReason.ResourceLimit));
             Assert.That(budgetEvaluation.Evidence, Does.Contain("OperationBudgetExceeded"));
-            Assert.That(refutedEvaluation.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(
+                refutedEvaluation.Outcome,
+                Is.EqualTo(EffectEvaluationOutcome.Refuted));
             Assert.That(refutedEvaluation.Evidence, Does.Contain("OperationBudgetExceeded"));
-            Assert.That(cyclicEvaluation.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(cyclicEvaluation.Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                cyclicEvaluation.Outcome,
+                Is.EqualTo(EffectEvaluationOutcome.Proven));
+            Assert.That(
+                cyclicEvaluation.Reason,
+                Is.EqualTo(EffectEvaluationReason.None));
             Assert.That(cyclicEvaluation.Evidence, Does.Contain("actual.analysisIncompleteReason=None"));
         }
     }

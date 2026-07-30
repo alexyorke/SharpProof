@@ -479,16 +479,17 @@ internal sealed class ManagedAbstractFlow
 
     private ManagedAbstractValue EvaluateProperty(IPropertyReferenceOperation property, ManagedFlowState state)
     {
-        if (property.Instance != null && property.Property.Name is "Length" or "LongLength")
+        if (CompilerIdentityBridge.IsIntrinsicSequenceLength(property))
         {
-            var receiver = EvaluateCore(property.Instance, state);
+            var instance = property.Instance!;
+            var receiver = EvaluateCore(instance, state);
             if (receiver.TryGetCardinality(out var length))
             {
                 return ManagedAbstractValue.Integer(length);
             }
 
-            if (property.Instance.Type is IArrayTypeSymbol ||
-                property.Instance.Type?.SpecialType == SpecialType.System_String)
+            if (instance.Type is IArrayTypeSymbol ||
+                instance.Type?.SpecialType == SpecialType.System_String)
             {
                 return ManagedAbstractValue.Integer(IntervalValue.Range(
                     0, property.Type?.SpecialType == SpecialType.System_Int64 ? long.MaxValue : int.MaxValue));

@@ -72,6 +72,46 @@ $mutations = @(
         Filter = 'FullyQualifiedName~UnverifiedReturnAnnotationsCannotDischargeRuntimeExceptions'
     },
     [pscustomobject]@{
+        Name = 'advisory-contract-candidate-detection'
+        File = 'SharpProof.Frontend\ContractApiMetadata.cs'
+        Original = '            EnsuresMethodName or'
+        Mutated = '            RequiresMethodName or'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ContractCandidateActivationRunsClausePlacementValidation'
+    },
+    [pscustomobject]@{
+        Name = 'advisory-full-activation-selection'
+        File = 'SharpProof.Analyzer\SharpProofAnalyzer.cs'
+        Original = 'return AdvisoryActivation.Full;'
+        Mutated = "return new(`n                        RequiresSymbolAnalysis: false,`n                        RequiresOperationAnalysis: true,`n                        RequiresFullOperationAnalysis: false);"
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~SelectedGeneratedMethodIsAnalyzedAndReported'
+    },
+    [pscustomobject]@{
+        Name = 'advisory-lazy-state-creation'
+        File = 'SharpProof.Analyzer\AnalyzerSession.cs'
+        Original = '_callPreconditions = new('
+        Mutated = "_ = _apiSpecs.Value;`n        _callPreconditions = new("
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~AdvisoryPotentialWorkCreatesOnlyALightweightSession'
+    },
+    [pscustomobject]@{
+        Name = 'external-precondition-screening'
+        File = 'SharpProof.Analyzer\EffectCallPreconditionPolicy.cs'
+        Original = 'return requires.All(clause =>'
+        Mutated = 'return true || requires.All(clause =>'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ExternalClosedPreconditionMustAlsoBeEstablished'
+    },
+    [pscustomobject]@{
+        Name = 'generated-selected-analysis-accountability'
+        File = 'SharpProof.Analyzer\SharpProofAnalyzer.cs'
+        Original = "context.ConfigureGeneratedCodeAnalysis(`n            GeneratedCodeAnalysisFlags.Analyze |`n            GeneratedCodeAnalysisFlags.ReportDiagnostics);"
+        Mutated = 'context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~SelectedGeneratedMethodIsAnalyzedAndReported'
+    },
+    [pscustomobject]@{
         Name = 'trusted-boundary-nonblank-reason'
         File = 'SharpProof.Effects\TrustedBoundaryPolicy.cs'
         Original = '!string.IsNullOrWhiteSpace(reason));'
@@ -118,6 +158,30 @@ $mutations = @(
         Mutated = 'if (evidence.Outcome == WorkerClaimOutcome.Unknown)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~CompilerOnlyEffectViolationFailsClosedWithoutAReplayTrace'
+    },
+    [pscustomobject]@{
+        Name = 'effect-vacuity-requires-entry-contradiction'
+        File = 'SharpProof.Worker\EffectClaimResultAssembler.cs'
+        Original = 'if (entryFeasibility.IsContradictory)'
+        Mutated = 'if (!entryFeasibility.IsUnknown)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~EffectOnlyClaimRemainsAccountableWhileMixedRequiresFailsClosed'
+    },
+    [pscustomobject]@{
+        Name = 'effect-vacuity-used-assumption-core'
+        File = 'SharpProof.Worker\CallableClaimResultAssembler.cs'
+        Original = 'usedAssumptionIds.Contains(evidence.Id)'
+        Mutated = 'evidence.Kind == WorkerAssumptionKind.Precondition'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~LiteralEffectVacuityMarksOnlyItsContradictoryPreconditionUsed'
+    },
+    [pscustomobject]@{
+        Name = 'live-effect-bottom-entry-fails-closed'
+        File = 'SharpProof.Analyzer\EffectContractDiagnostics.cs'
+        Original = "var declaredComplete = !entryIsBottom && !summary.IsBottom &&`n            projection.IsComplete &&"
+        Mutated = "var declaredComplete = projection.IsComplete &&"
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~BottomEntryCannotDirectlyProveAnEffectContract'
     },
     [pscustomobject]@{
         Name = 'cache-manifest-binding'

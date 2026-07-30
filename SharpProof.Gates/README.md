@@ -81,9 +81,12 @@ the analyzer and contract generator. The performance path compares an
 unannotated advisory package build with its compiler-only baseline. The
 analyzer still runs in the advisory build, while the absence of selected
 contracts keeps its output quiet. The call-bearing fixture exercises the
-conservative no-precondition screen. The compilation model is demand-loaded,
-so contract, specification, and effect state remains unrealized unless a
-selected callable or possible callee precondition needs it.
+contract-free activation screen. Candidate contract syntax is found from the
+shared API inventory, while external parameter/return contracts are screened
+directly from immutable compiler-reference metadata. When neither exists, no
+semantic session or per-method callback is created. Contract, specification,
+and effect state remains unrealized unless a selected callable or possible
+external callee precondition needs it.
 
 The gate copies the repository `global.json` above both temporary projects,
 requires the temporary root to resolve the same SDK as the repository, and

@@ -205,10 +205,7 @@ public sealed class FinalCompilationProbeTests
         var restore = await workspace.RestoreAsync(feed.Source);
         Assert.That(restore.ExitCode, Is.Zero, restore.Output);
         var build = await workspace.RebuildAsync();
-        Assert.That(build.ExitCode, Is.Zero, build.Output);
-
-        var first = await workspace.VerifyPackedArtifactAsync();
-        Assert.That(first.ExitCode, Is.Not.Zero, first.Output);
+        Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
         var firstResponse = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(workspace.VerifyResultPath))!;
         using (Assert.EnterMultipleScope())
@@ -854,8 +851,11 @@ public sealed class FinalCompilationProbeTests
                     <LangVersion>12.0</LangVersion>
                     <Nullable>enable</Nullable>
                     <SharpProofProfile>advisory</SharpProofProfile>
-                    <SharpProofVerify>false</SharpProofVerify>
-                    <_SharpProofCompilerManifestPath>{Escape(CompilerManifestPath)}</_SharpProofCompilerManifestPath>
+                    <SharpProofVerify>true</SharpProofVerify>
+                    <SharpProofVerifyRequestFile>{Escape(Path.Combine(_root, "published", "request.json"))}</SharpProofVerifyRequestFile>
+                    <SharpProofVerifyResultFile>{Escape(VerifyResultPath)}</SharpProofVerifyResultFile>
+                    <SharpProofCompilerManifestFile>{Escape(CompilerManifestPath)}</SharpProofCompilerManifestFile>
+                    <SharpProofVerifyCacheDirectory>{Escape(Path.Combine(_root, "published", "cache"))}</SharpProofVerifyCacheDirectory>
                     <_SharpProofCompilationTargetFramework>$(TargetFramework)</_SharpProofCompilationTargetFramework>
                     <_SharpProofProjectDirectory>$(MSBuildProjectDirectory)</_SharpProofProjectDirectory>
                     <{outputProperty}>{Escape(PackedProbeArtifactPath)}</{outputProperty}>

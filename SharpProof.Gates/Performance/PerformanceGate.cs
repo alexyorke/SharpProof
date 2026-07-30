@@ -67,11 +67,12 @@ internal static class PerformanceGate
             configurationProbe.AnalyzerDriverRunCount;
         var unannotatedAdvisoryAnalysisSessionCreates =
             configurationProbe.AnalysisSessionCreateCount;
-        if (unannotatedAdvisoryAnalysisSessionCreates != 1)
+        if (unannotatedAdvisoryAnalysisSessionCreates != 0)
         {
             throw new InvalidOperationException(
-                "The call-bearing advisory performance probe must create " +
-                "exactly one semantic analysis session.");
+                "The call-bearing advisory performance probe must not create " +
+                "a semantic analysis session when neither source nor referenced " +
+                "metadata contains SharpProof contracts.");
         }
         if (configurationProbe.ApiSpecCreateCount != 0 ||
             configurationProbe.EffectAnalysisCreateCount != 0)
@@ -397,7 +398,6 @@ internal static class PerformanceGate
             AppContext.BaseDirectory.TrimEnd(
                 Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)).Parent!.Name;
         var analyzerDirectory = EscapeAnalyzerDirectory(repositoryRoot, configuration);
-        var generatorPath = EscapePath(AppContext.BaseDirectory, "SharpProof.ContractForGenerator.dll");
         var imports = importSharpProof
             ? ($"""<Import Project="{props}" />""" + Environment.NewLine,
                Environment.NewLine + $"""<Import Project="{targets}" />""")
@@ -413,7 +413,6 @@ internal static class PerformanceGate
                 <Deterministic>true</Deterministic>
                 <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
                 <SharpProofAnalyzerDirectory>{analyzerDirectory}</SharpProofAnalyzerDirectory>
-                <SharpProofContractForGeneratorPath>{generatorPath}</SharpProofContractForGeneratorPath>
               </PropertyGroup>
               {imports.Item1}{imports.Item2}
             </Project>
@@ -424,7 +423,12 @@ internal static class PerformanceGate
 
     private static string? EscapeAnalyzerDirectory(string root, string configuration)
     {
-        return EscapePath(root, "SharpProof.Analyzer", "bin", configuration, "netstandard2.0");
+        return EscapePath(
+            root,
+            "SharpProof.PortableAnalyzer",
+            "bin",
+            configuration,
+            "netstandard2.0");
     }
 
     private static string? EscapePath(params string[] segments)
@@ -1102,9 +1106,24 @@ internal static class PerformanceGate
                         (string?)element.Attribute("Condition"),
                         "'$(SharpProofVerify)' == ''",
                         StringComparison.Ordinal));
-        var analyzerGroup = portableTargets.Descendants("ItemGroup")
-            .SingleOrDefault(static group =>
-                group.Elements("Analyzer").Any());
+        var analyzerGroups = portableTargets.Descendants("ItemGroup")
+            .Where(static group =>
+                group.Elements("Analyzer").Any())
+            .ToArray();
+        var analyzerGroup = analyzerGroups.SingleOrDefault(group =>
+            string.Equals(
+                NormalizeMsBuildCondition(
+                    (string?)group.Attribute("Condition")),
+                "'$(_SharpProofProfileNormalized)'!='off'",
+                StringComparison.Ordinal));
+        var collectorGroup = analyzerGroups.SingleOrDefault(group =>
+            string.Equals(
+                NormalizeMsBuildCondition(
+                    (string?)group.Attribute("Condition")),
+                "'$(SharpProofVerify)'=='true'AND" +
+                "'$(_SharpProofProfileNormalized)'!='off'AND" +
+                "'$(DesignTimeBuild)'!='true'",
+                StringComparison.Ordinal));
         var verifierMarker = verifierProps
             .Descendants("_SharpProofVerifierPackagePresent")
             .SingleOrDefault();
@@ -1176,6 +1195,8 @@ internal static class PerformanceGate
             !string.Equals(features?.Value, "all", StringComparison.Ordinal) ||
             !string.Equals(verify?.Value, "false", StringComparison.Ordinal) ||
             portableContainsVerifierWork ||
+            analyzerGroups.Length != 2 ||
+            collectorGroup == null ||
             !string.Equals(
                 normalizedCondition,
                 "'$(_SharpProofProfileNormalized)'!='off'",

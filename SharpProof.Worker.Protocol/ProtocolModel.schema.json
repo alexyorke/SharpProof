@@ -113,6 +113,7 @@
       "rows": [
         ["Proven","None","CompleteMayEffectSummary"],
         ["Proven","None","TrustedCompleteBoundary"],
+        ["Proven","None","VacuousEntry"],
         ["Refuted","None","DefiniteViolation"],
         ["Unknown","EffectSummaryIncomplete","IncompleteMayEffectSummary"],
         ["Unknown","EffectContractNotEstablished","CompleteMayEffectSummary"],
@@ -129,7 +130,8 @@
       "rows": [
         ["*","*","None"],
         ["Postcondition","Proven","ContradictoryPreconditions"],
-        ["Postcondition","Proven","NoModeledNormalReturn"]
+        ["Postcondition","Proven","NoModeledNormalReturn"],
+        ["Effect","Proven","ContradictoryPreconditions"]
       ]
     },
     {
@@ -291,6 +293,9 @@
         {"code":"response.proof_core","condition":{"op":"distinctNonblank","property":"ProofCore"}},
         {"code":"response.model","condition":{"op":"validModel","property":"Model"}},
         {"code":"response.assumptions","condition":{"op":"validAssumptions","property":"Assumptions"}},
+        {"code":"response.vacuity_evidence","condition":{"op":"implies",
+          "if":{"op":"notEqualsMember","property":"Vacuity","member":"WorkerVacuityKind.None"},
+          "then":{"op":"hasItems","property":"ProofCore"}}},
         {"code":"response.claim_payload","condition":{"op":"stateTable","table":"ClaimPayload","arguments":[
           {"op":"property","property":"Outcome"},
           {"op":"hasItems","property":"ProofCore"},
@@ -432,7 +437,7 @@
     {"kind":"enum","name":"WorkerCallableCoverage","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"Complete","value":1},{"name":"Incomplete","value":2}]},
     {"kind":"enum","name":"WorkerCallableCoverageReason","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"None","value":1},{"name":"UnsupportedCallable","value":2},{"name":"UnsupportedContract","value":3},{"name":"SemanticUnknown","value":4},{"name":"MissingClaimResult","value":5},{"name":"MethodTimeout","value":6},{"name":"ProjectTimeout","value":7},{"name":"Canceled","value":8},{"name":"InfrastructureFailure","value":9}]},
     {"kind":"enum","name":"WorkerClaimOutcome","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"Proven","value":1},{"name":"Refuted","value":2},{"name":"Unknown","value":3}]},
-    {"kind":"enum","name":"WorkerEffectEvidenceCertainty","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"IncompleteMayEffectSummary","value":1},{"name":"CompleteMayEffectSummary","value":2},{"name":"TrustedCompleteBoundary","value":3},{"name":"DefiniteViolation","value":4},{"name":"Unavailable","value":5}]},
+    {"kind":"enum","name":"WorkerEffectEvidenceCertainty","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"IncompleteMayEffectSummary","value":1},{"name":"CompleteMayEffectSummary","value":2},{"name":"TrustedCompleteBoundary","value":3},{"name":"DefiniteViolation","value":4},{"name":"Unavailable","value":5},{"name":"VacuousEntry","value":6}]},
     {"kind":"enum","name":"WorkerEffectSet","underlyingType":"long","flags":true,"members":[{"name":"None","value":0},{"name":"ReadsReceiverState","value":1},{"name":"ReadsArgumentState","value":2},{"name":"ReadsCapturedState","value":4},{"name":"ReadsStaticState","value":8},{"name":"ReadsAmbientState","value":16},{"name":"WritesReceiverState","value":32},{"name":"WritesArgumentState","value":64},{"name":"WritesCapturedState","value":128},{"name":"WritesStaticState","value":256},{"name":"WritesAmbientState","value":512},{"name":"Allocates","value":1024},{"name":"Throws","value":2048},{"name":"Synchronizes","value":4096},{"name":"UsesNondeterminism","value":8192},{"name":"UsesNativeCode","value":16384},{"name":"UsesReflection","value":32768},{"name":"AllKnown","value":65535}]},
     {"kind":"enum","name":"WorkerEffectCapabilitySet","underlyingType":"int","flags":true,"members":[{"name":"None","value":0},{"name":"IO","value":1},{"name":"FileRead","value":2},{"name":"FileWrite","value":4},{"name":"Network","value":8},{"name":"Console","value":16},{"name":"Process","value":32},{"name":"Environment","value":64},{"name":"Registry","value":128},{"name":"Clock","value":256},{"name":"Randomness","value":512},{"name":"Reflection","value":1024},{"name":"Synchronization","value":2048},{"name":"NativeInterop","value":4096},{"name":"AllKnown","value":8191}]},
     {"kind":"enum","name":"WorkerVacuityKind","underlyingType":"int","flags":false,"members":[{"name":"None","value":0},{"name":"ContradictoryPreconditions","value":1},{"name":"NoModeledNormalReturn","value":2}]},

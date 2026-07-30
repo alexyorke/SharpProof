@@ -121,7 +121,10 @@ internal sealed class ContractApiIdentityResolver
     internal bool IsRejectedClauseMethod(IMethodSymbol method)
     {
         var definition = method.OriginalDefinition;
-        return definition.Name is "Requires" or "Ensures" or "Assume" &&
+        return definition.Name is
+            ContractApiMetadata.RequiresMethodName or
+            ContractApiMetadata.EnsuresMethodName or
+            ContractApiMetadata.AssumeMethodName &&
             HasMetadataName(
                 definition.ContainingType,
                 ContractApiMetadata.Contract) &&
@@ -310,9 +313,9 @@ internal sealed class ContractApiIdentityResolver
             Arity: 0
         } &&
         HasConditionalSymbol(contract) &&
-        HasSingleClause(contract, "Requires") &&
-        HasSingleClause(contract, "Ensures") &&
-        HasSingleClause(contract, "Assume") &&
+        HasSingleClause(contract, ContractApiMetadata.RequiresMethodName) &&
+        HasSingleClause(contract, ContractApiMetadata.EnsuresMethodName) &&
+        HasSingleClause(contract, ContractApiMetadata.AssumeMethodName) &&
         HasSingleResult(contract) &&
         HasSingleOld(contract);
     }
@@ -384,7 +387,9 @@ internal sealed class ContractApiIdentityResolver
 
     private static bool HasSingleResult(INamedTypeSymbol contract)
     {
-        var members = contract.GetMembers("Result").OfType<IMethodSymbol>()
+        var members = contract
+            .GetMembers(ContractApiMetadata.ResultMethodName)
+            .OfType<IMethodSymbol>()
             .ToImmutableArray();
         return members.Length == 1 &&
             members[0] is
@@ -405,7 +410,9 @@ internal sealed class ContractApiIdentityResolver
 
     private static bool HasSingleOld(INamedTypeSymbol contract)
     {
-        var members = contract.GetMembers("Old").OfType<IMethodSymbol>()
+        var members = contract
+            .GetMembers(ContractApiMetadata.OldMethodName)
+            .OfType<IMethodSymbol>()
             .ToImmutableArray();
         return members.Length == 1 &&
             members[0] is

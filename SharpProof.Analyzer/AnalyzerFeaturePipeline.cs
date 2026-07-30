@@ -25,6 +25,15 @@ internal static class AnalyzerFeaturePipeline
             return;
         }
 
+        if (AnalyzerGeneratedCodePolicy.IsGenerated(
+                method,
+                declaration.SyntaxTree,
+                context.Compilation,
+                context.CancellationToken))
+        {
+            return;
+        }
+
         var semanticModel = SharpProof.Frontend.Host.CompilationModelProvider
             .GetSemanticModel(context.Compilation, declaration.SyntaxTree);
         var outcome = RequiresCallSiteAnalyzer.Analyze(
@@ -128,12 +137,6 @@ internal static class AnalyzerFeaturePipeline
             session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Abstained);
             return;
         }
-        var hasInvalidContractClauses =
-            ValidateContractClauses(
-                method,
-                session,
-                context.ReportDiagnostic,
-                context.CancellationToken);
         var rejectedContractApi =
             session.Attributes.GetRejectedSelectionFeatures(method) !=
                 ContractSelectionFeatures.None ||
@@ -141,6 +144,23 @@ internal static class AnalyzerFeaturePipeline
                 .HasRejectedContractApiUsage;
         var selection = GetSelection(
             method, session, context.ReportDiagnostic, context.CancellationToken);
+        if (!selection.Any &&
+            !rejectedContractApi &&
+            AnalyzerGeneratedCodePolicy.IsGenerated(
+                method,
+                declaration.SyntaxTree,
+                context.Compilation,
+                context.CancellationToken))
+        {
+            return;
+        }
+
+        var hasInvalidContractClauses =
+            ValidateContractClauses(
+                method,
+                session,
+                context.ReportDiagnostic,
+                context.CancellationToken);
         if (rejectedContractApi)
         {
             session.RecordSemanticOutcome(

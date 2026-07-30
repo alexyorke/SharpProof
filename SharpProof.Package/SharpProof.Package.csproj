@@ -23,10 +23,12 @@
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj"
                       PrivateAssets="all"
                       TreatAsPackageReference="false" />
-    <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj"
+    <ProjectReference Include="..\SharpProof.CompilerCollector\SharpProof.CompilerCollector.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
                       PrivateAssets="all"
                       TreatAsPackageReference="false" />
-    <ProjectReference Include="..\SharpProof.ContractForGenerator\SharpProof.ContractForGenerator.csproj"
+    <ProjectReference Include="..\SharpProof.PortableAnalyzer\SharpProof.PortableAnalyzer.csproj"
                       ReferenceOutputAssembly="false"
                       SkipGetTargetFrameworkProperties="true"
                       PrivateAssets="all"

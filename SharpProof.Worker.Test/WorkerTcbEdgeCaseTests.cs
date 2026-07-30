@@ -437,7 +437,7 @@ public sealed class WorkerTcbEdgeCaseTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(backend.CallCount, Is.EqualTo(1));
             Assert.That(results.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 results.Single().Reason,

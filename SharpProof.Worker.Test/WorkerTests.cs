@@ -206,6 +206,156 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task EffectClaimCanBeProvenVacuouslyOnlyFromContradictoryEntry()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [EffectContract(
+                    SharpProofEffect.None,
+                    Complete = true)]
+                public static int Impossible(
+                    [Positive, InRange(-2, -1)] int value) =>
+                    value;
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: true);
+        request.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var first = await worker.VerifyAsync(request);
+        var response = await worker.VerifyAsync(request);
+        var result = response.ClaimResults.Single();
+        var usedPreconditions = result.Assumptions.Where(
+            static assumption =>
+                assumption.Kind ==
+                WorkerAssumptionKind.Precondition);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                result.EffectCertainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.VacuousEntry));
+            Assert.That(
+                result.Vacuity,
+                Is.EqualTo(
+                    WorkerVacuityKind
+                        .ContradictoryPreconditions));
+            Assert.That(result.ProofCore, Is.Not.Empty);
+            Assert.That(usedPreconditions, Is.Not.Empty);
+            Assert.That(
+                usedPreconditions.All(
+                    static assumption => assumption.Used),
+                Is.True);
+            Assert.That(
+                first.Summary.CacheStatus,
+                Is.EqualTo(WorkerCacheStatus.Disabled));
+            Assert.That(
+                response.Summary.CacheStatus,
+                Is.EqualTo(WorkerCacheStatus.Disabled));
+            Assert.That(CacheFiles(project), Is.Empty);
+            Assert.That(
+                WorkerProtocolJson.Validate(response).IsValid,
+                Is.True);
+        }
+    }
+
+    [Test]
+    public async Task LiteralEffectVacuityMarksOnlyItsContradictoryPreconditionUsed()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [DoesNotThrow]
+                public static int Impossible(int value) {
+                    Contract.Requires(false);
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+        var result = response.ClaimResults.Single();
+        var preconditions = result.Assumptions.Where(
+            static assumption =>
+                assumption.Kind ==
+                WorkerAssumptionKind.Precondition).ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Vacuity,
+                Is.EqualTo(
+                    WorkerVacuityKind.ContradictoryPreconditions));
+            Assert.That(preconditions, Has.Length.EqualTo(2));
+            Assert.That(
+                preconditions.Count(
+                    static assumption => assumption.Used),
+                Is.EqualTo(1));
+            Assert.That(
+                WorkerProtocolJson.Validate(response).IsValid,
+                Is.True);
+        }
+    }
+
+    [Test]
+    public async Task UnknownEntryFeasibilityKeepsEffectClaimUnknown()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [DoesNotThrow]
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        var backend = new CountingBackend(
+            BackendCheckResult.Unknown(
+                BackendFailureReason.ResourceLimit));
+        using var worker = new SharpProofWorker(backend);
+
+        var response = await worker.VerifyAsync(request);
+        var result = response.ClaimResults.Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(backend.CallCount, Is.EqualTo(1));
+            Assert.That(
+                result.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                result.Reason,
+                Is.EqualTo(WorkerClaimReason.ResourceLimit));
+            Assert.That(
+                result.EffectCertainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.Unavailable));
+            Assert.That(
+                result.Vacuity,
+                Is.EqualTo(WorkerVacuityKind.None));
+            Assert.That(
+                response.CallableResults.Single().Coverage,
+                Is.EqualTo(WorkerCallableCoverage.Incomplete));
+            Assert.That(
+                WorkerProtocolJson.Validate(response).IsValid,
+                Is.True);
+        }
+    }
+
+    [Test]
     public async Task EffectOnlyClaimRemainsAccountableWhileMixedRequiresFailsClosed()
     {
         using var project = TestProject.Create(

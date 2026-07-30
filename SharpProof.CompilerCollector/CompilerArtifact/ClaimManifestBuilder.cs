@@ -1,5 +1,6 @@
 using SharpProof.Analyzer;
 
+// This builder runs only in the build-time compiler collector.
 namespace SharpProof.CompilerArtifact;
 
 internal sealed class ClaimManifestBuilder(
@@ -268,7 +269,9 @@ internal sealed class ClaimManifestBuilder(
                     Ordinal = ordinalOffset + claims.Count,
                     Kind = WorkerClaimKind.Effect,
                     Evidence = WorkerClaimEvidence.Attribute,
-                    EffectContractKind = evaluation.Kind,
+                    EffectContractKind =
+                        CompilerEffectEvaluationWireMappings.ToWorker(
+                            evaluation.Kind),
                     Location = ToSourceLocation(AttributeLocation(attribute, method))
                 };
                 var evidence = CreateEffectEvidence(claimId, evaluation);
@@ -287,10 +290,18 @@ internal sealed class ClaimManifestBuilder(
         return new()
         {
             ClaimId = claimId,
-            ContractKind = evaluation.Kind,
-            Outcome = evaluation.Outcome,
-            Reason = evaluation.Reason,
-            Certainty = evaluation.Certainty,
+            ContractKind =
+                CompilerEffectEvaluationWireMappings.ToWorker(
+                    evaluation.Kind),
+            Outcome =
+                CompilerEffectEvaluationWireMappings.ToWorker(
+                    evaluation.Outcome),
+            Reason =
+                CompilerEffectEvaluationWireMappings.ToWorker(
+                    evaluation.Reason),
+            Certainty =
+                CompilerEffectEvaluationWireMappings.ToWorker(
+                    evaluation.Certainty),
             Constraint = new CompilerEffectConstraintArtifact
             {
                 AllowedEffects = ToWorkerEffects(evaluation.Constraint.Effects),

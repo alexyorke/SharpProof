@@ -21,12 +21,14 @@ internal static class AnalyzerTestHost
         DiagnosticAnalyzer? analyzer = null,
         IEnumerable<MetadataReference>? additionalReferences = null,
         string? profile = null,
-        string? features = null)
+        string? features = null,
+        string filePath = "input.cs")
     {
         var compilation = CreateCompilation(
             source,
             enabledIds,
-            additionalReferences);
+            additionalReferences,
+            filePath);
         return await AnalyzeAsync(
                 compilation,
                 mode,
@@ -39,13 +41,14 @@ internal static class AnalyzerTestHost
     internal static CSharpCompilation CreateCompilation(
         string source,
         IEnumerable<string> enabledIds,
-        IEnumerable<MetadataReference>? additionalReferences = null)
+        IEnumerable<MetadataReference>? additionalReferences = null,
+        string filePath = "input.cs")
     {
         var enabled = enabledIds.ToImmutableHashSet(StringComparer.Ordinal);
         var tree = CSharpSyntaxTree.ParseText(
             source,
             ParseOptions,
-            "input.cs");
+            filePath);
         var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
         if (!enabled.IsEmpty)
         {

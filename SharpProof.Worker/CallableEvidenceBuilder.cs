@@ -154,6 +154,151 @@ internal static class CallableEvidenceBuilder
                     assumption.Predicate))));
     }
 
+    internal static CallableEntryEvidenceBuildResult BuildEntry(
+        CompilerCallablePreparation target,
+        int maximumExpressionDepth)
+    {
+        var factory = target.Factory;
+        var assumptions = ImmutableArray.CreateBuilder<Assumption>();
+        var labels = new Dictionary<ProofJustification, string>(
+            ReferenceEqualityComparer.Instance);
+        var assumptionIds =
+            new Dictionary<ProofJustification, string>(
+                ReferenceEqualityComparer.Instance);
+        var seenPredicates = new HashSet<IrId>();
+        var assumptionOrdinal = 0;
+        var hasNontrivialPrecondition = false;
+        foreach (var clause in target.Clauses)
+        {
+            if (clause.Kind == CompilerContractKind.Ensures)
+            {
+                continue;
+            }
+
+            if (clause.Kind == CompilerContractKind.Requires)
+            {
+                var predicate = ApplyBodySubstitutions(
+                    factory,
+                    clause.Condition,
+                    target.Variables,
+                    null,
+                    ImmutableDictionary<IrVarId, IrTerm>.Empty,
+                    allowMissingResult: true);
+                if (predicate == null ||
+                    GetDepth(predicate) > maximumExpressionDepth ||
+                    !IsSupportedProofDomain(factory, predicate))
+                {
+                    return CallableEntryEvidenceBuildResult.Fail(
+                        WorkerClaimReason.UnsupportedExpression);
+                }
+
+                if (predicate is not IrBooleanTerm { Value: true })
+                {
+                    hasNontrivialPrecondition = true;
+                    Add(
+                        predicate,
+                        "requires:" +
+                        assumptionOrdinal.ToString(
+                            CultureInfo.InvariantCulture),
+                        clause.AssumptionId);
+                }
+            }
+
+            assumptionOrdinal++;
+        }
+
+        foreach (var variable in target.Variables
+                     .Where(static variable =>
+                         variable.Role is
+                             CompilerVariableRole.Receiver or
+                             CompilerVariableRole.Parameter)
+                     .OrderBy(static variable =>
+                         variable.Role ==
+                         CompilerVariableRole.Receiver
+                             ? -1
+                             : variable.Ordinal))
+        {
+            if (variable.SourceIntegerInterval is not { } sourceInterval)
+            {
+                continue;
+            }
+
+            var interval = IntervalDomain.Instance.Range(
+                sourceInterval.Minimum,
+                sourceInterval.Maximum);
+            var term = factory.Variable(variable.Variable);
+            if (interval.IsBottom ||
+                term.Type != factory.IntegerType ||
+                !SpecResultDomainProjection.TryCreateIntervalPredicate(
+                    factory,
+                    term,
+                    interval,
+                    out var predicate) ||
+                predicate == null ||
+                GetDepth(predicate) > maximumExpressionDepth ||
+                !IsSupportedProofDomain(factory, predicate))
+            {
+                return CallableEntryEvidenceBuildResult.Fail(
+                    WorkerClaimReason.UnsupportedExpression);
+            }
+
+            if (predicate is not IrBooleanTerm { Value: true })
+            {
+                Add(
+                    predicate,
+                    variable.Role == CompilerVariableRole.Receiver
+                        ? "domain:receiver"
+                        : "domain:parameter:" +
+                          variable.Ordinal.ToString(
+                              CultureInfo.InvariantCulture),
+                    assumptionId: null);
+            }
+        }
+
+        var replayVariables = target.Variables
+            .Where(variable =>
+                variable.Role is
+                    CompilerVariableRole.Receiver or
+                    CompilerVariableRole.Parameter &&
+                factory.GetTypeInfo(
+                    factory.GetVariableInfo(variable.Variable).Type)
+                    .Kind is
+                    IrTypeKind.Boolean or
+                    IrTypeKind.Integer)
+            .Select(static variable => variable.Variable)
+            .ToImmutableArray();
+        return CallableEntryEvidenceBuildResult.Success(
+            new CallableEntryEvidence(
+                assumptions.ToImmutable(),
+                labels,
+                assumptionIds,
+                replayVariables,
+                hasNontrivialPrecondition));
+
+        void Add(
+            IrTerm predicate,
+            string label,
+            string? assumptionId)
+        {
+            if (!seenPredicates.Add(predicate.Id))
+            {
+                return;
+            }
+
+            ProofJustification justification =
+                new LoweredJustification(
+                    factory.CreateOperation(
+                        "entry-feasibility:" + label));
+            assumptions.Add(
+                new Assumption(factory, predicate, justification));
+            labels.Add(justification, label);
+            if (!string.IsNullOrWhiteSpace(assumptionId))
+            {
+                assumptionIds.Add(justification, assumptionId);
+            }
+        }
+    }
+
     private static string ClauseLabel(CompilerContractKind kind)
     {
         return kind switch

@@ -1,3 +1,4 @@
+// Protocol wire mappings are confined to the build-time collector.
 namespace SharpProof.CompilerArtifact;
 
 internal static class CompilerOptionWireMappings

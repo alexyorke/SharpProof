@@ -24,15 +24,19 @@ internal static class CallableVerificationPolicy
         methodBoundary.CancelAfter(methodWallTimeMilliseconds);
         try
         {
-            var postconditions = await verifier.VerifyAsync(target,
+            var proof = await verifier.VerifyWithEntryFeasibilityAsync(
+                target,
                 new MethodResourceBudget(readConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit),
                 methodBoundary.Token).ConfigureAwait(false);
             var ordinal = target.Entry.ClaimIds
                 .Select(static (claimId, index) => (claimId, index))
                 .ToDictionary(static item => item.claimId, static item => item.index, StringComparer.Ordinal);
-            var records = postconditions
+            var records = proof.Postconditions
                 .Concat(target.EffectClaims.Select(evidence =>
-                    EffectClaimResultAssembler.Assemble(target, evidence)))
+                    EffectClaimResultAssembler.Assemble(
+                        target,
+                        evidence,
+                        proof.EntryFeasibility)))
                 .OrderBy(result => ordinal[result.ClaimId])
                 .ToImmutableArray();
             var reason = records.Any(static record => record.Outcome == WorkerClaimOutcome.Unknown)

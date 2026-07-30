@@ -1,5 +1,7 @@
 #pragma warning disable RS1035 // This build-only analyzer emits the selected seal.
 namespace SharpProof.Analyzer;
+
+// Compiler artifact emission is isolated from the live analyzer entry point.
 internal static class FinalCompilationCollector
 {
     private const string OutputOption = "build_property._SharpProofCompilerManifestPath",

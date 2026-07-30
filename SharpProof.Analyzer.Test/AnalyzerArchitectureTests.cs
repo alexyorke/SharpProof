@@ -24,6 +24,7 @@ public sealed class AnalyzerArchitectureTests
         "SharpProof.Analyzer",
         "SharpProof.Attributes",
         "SharpProof.CompilerArtifact",
+        "SharpProof.CompilerCollector",
         "SharpProof.Contracts",
         "SharpProof.Dataflow",
         "SharpProof.Effects",

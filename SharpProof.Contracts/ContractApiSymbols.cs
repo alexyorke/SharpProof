@@ -21,8 +21,14 @@ internal sealed class ContractApiSymbols(
             return null;
         }
 
-        var result = FindGenericIntrinsic(clauses.ContractType, "Result", 0);
-        var old = FindGenericIntrinsic(clauses.ContractType, "Old", 1);
+        var result = FindGenericIntrinsic(
+            clauses.ContractType,
+            ContractApiMetadata.ResultMethodName,
+            0);
+        var old = FindGenericIntrinsic(
+            clauses.ContractType,
+            ContractApiMetadata.OldMethodName,
+            1);
         if (result == null || old == null)
         {
             return null;
@@ -94,9 +100,12 @@ internal sealed class ContractClauseSymbols(INamedTypeSymbol contractType)
 
         return definition.Name switch
         {
-            "Requires" => BoundContractKind.Requires,
-            "Ensures" => BoundContractKind.Ensures,
-            "Assume" => BoundContractKind.Assume,
+            ContractApiMetadata.RequiresMethodName =>
+                BoundContractKind.Requires,
+            ContractApiMetadata.EnsuresMethodName =>
+                BoundContractKind.Ensures,
+            ContractApiMetadata.AssumeMethodName =>
+                BoundContractKind.Assume,
             _ => null
         };
     }

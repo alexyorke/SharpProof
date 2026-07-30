@@ -50,12 +50,14 @@ internal static class EffectContractDiagnostics
             return AnalyzerSemanticOutcome.NotApplicable;
         }
 
-        if (evaluations.Any(static item => item.Outcome == WorkerClaimOutcome.Refuted))
+        if (evaluations.Any(static item =>
+                item.Outcome == EffectEvaluationOutcome.Refuted))
         {
             return AnalyzerSemanticOutcome.Refuted;
         }
 
-        return evaluations.All(static item => item.Outcome == WorkerClaimOutcome.Proven)
+        return evaluations.All(static item =>
+                item.Outcome == EffectEvaluationOutcome.Proven)
             ? AnalyzerSemanticOutcome.Proven
             : AnalyzerSemanticOutcome.Unknown;
     }
@@ -93,6 +95,10 @@ internal static class EffectContractDiagnostics
             : session.AnalyzeEffects(method, cancellationToken);
         var summary = result.Summary;
         var projection = result.Projection;
+        var entryIsBottom = ManagedAbstractFlow
+            .ForCompilation(session.Compilation)
+            .CreateEntryState(method)
+            .IsBottom;
         if (summary.AnalysisIncompleteReason != EffectAnalysisIncompleteReason.None &&
             summaryContracts.IsDefaultOrEmpty)
         {
@@ -111,29 +117,34 @@ internal static class EffectContractDiagnostics
         var summaryEvidence = CreateSummaryEvidence(summary);
         var flowComplete =
             summary.AnalysisIncompleteReason == EffectAnalysisIncompleteReason.None;
-        var purityComplete = flowComplete && !summary.IsBottom && !summary.Reads.IsUnknown &&
+        var purityComplete = flowComplete && !entryIsBottom &&
+            !summary.IsBottom && !summary.Reads.IsUnknown &&
             !summary.Writes.IsUnknown && !summary.Capabilities.IsUnknown;
-        var allocationComplete = flowComplete && !summary.IsBottom &&
+        var allocationComplete = flowComplete && !entryIsBottom &&
+            !summary.IsBottom &&
             summary.Allocation != EffectAllocationKind.Unknown;
-        var capabilityComplete = flowComplete && !summary.IsBottom && !summary.Capabilities.IsUnknown;
-        var exceptionComplete = flowComplete && !summary.IsBottom && !summary.Throws.IncludesUnknown;
+        var capabilityComplete = flowComplete && !entryIsBottom &&
+            !summary.IsBottom && !summary.Capabilities.IsUnknown;
+        var exceptionComplete = flowComplete && !entryIsBottom &&
+            !summary.IsBottom && !summary.Throws.IncludesUnknown;
         var disallowedCapabilities = projection.Capabilities & ~capabilities.Value;
         var disallowedExceptions = exceptions.IsValid
             ? summary.Throws.Types.Where(type => !IsAllowed(type, exceptions.Types)).ToImmutableArray()
             : [];
         var declaredProjection = EffectSummaryProjector.Project(contract.Summary);
         var declaredValid = contract.Kind != EffectContractResolutionKind.Invalid;
-        var declaredComplete = projection.IsComplete &&
+        var declaredComplete = !entryIsBottom && !summary.IsBottom &&
+            projection.IsComplete &&
             contract.Kind is not (EffectContractResolutionKind.Incomplete or EffectContractResolutionKind.Missing);
         var incompleteReason = MapIncompleteReason(summary);
 
         var evaluations = ImmutableArray.CreateBuilder<EffectClaimEvaluation>(6);
-        Add(pure, WorkerEffectContractKind.EnforcePure, purityComplete,
+        Add(pure, EffectEvaluationContractKind.EnforcePure, purityComplete,
             EffectContractMappings.IsObservablePure(summary),
             GeneratedDiagnosticDescriptors.PurityNotVerifiedRule, [method.Name],
             "constraint=observable-pure",
             direct.FirstOrDefault(EffectContractMappings.IsPurityViolation), EffectClaimConstraint.Empty);
-        Add(zeroAllocations, WorkerEffectContractKind.ZeroAllocations, allocationComplete,
+        Add(zeroAllocations, EffectEvaluationContractKind.ZeroAllocations, allocationComplete,
             summary.Allocation == EffectAllocationKind.None,
             GeneratedDiagnosticDescriptors.ZeroAllocationsNotVerifiedRule,
             [method.Name, allocationComplete
@@ -143,7 +154,7 @@ internal static class EffectContractDiagnostics
             direct.FirstOrDefault(static witness =>
                 (witness.Effects & EffectContractKind.Allocates) != 0),
             EffectClaimConstraint.Empty);
-        Add(allowedCapabilities, WorkerEffectContractKind.AllowedCapabilities, capabilityComplete,
+        Add(allowedCapabilities, EffectEvaluationContractKind.AllowedCapabilities, capabilityComplete,
             disallowedCapabilities == EffectContractCapabilityKind.None,
             GeneratedDiagnosticDescriptors.CapabilityUnknownRule,
             ["method summary", method.Name, capabilityComplete
@@ -153,7 +164,7 @@ internal static class EffectContractDiagnostics
             direct.FirstOrDefault(witness => (witness.Capabilities & ~capabilities.Value) != 0),
             new EffectClaimConstraint(EffectContractKind.None, capabilities.Value, []),
             capabilities.IsValid);
-        Add(noThrow, WorkerEffectContractKind.DoesNotThrow, exceptionComplete, summary.Throws.IsEmpty,
+        Add(noThrow, EffectEvaluationContractKind.DoesNotThrow, exceptionComplete, summary.Throws.IsEmpty,
             GeneratedDiagnosticDescriptors.ExceptionContractNotVerifiedRule,
             [method.Name, "[DoesNotThrow]", exceptionComplete
                 ? "may-effect summary includes disallowed exceptions: " +
@@ -162,7 +173,7 @@ internal static class EffectContractDiagnostics
             "allowed.exceptions=[]",
             direct.FirstOrDefault(static witness => (witness.Effects & EffectContractKind.Throws) != 0),
             EffectClaimConstraint.Empty);
-        Add(allowedExceptions, WorkerEffectContractKind.AllowedExceptions, exceptionComplete,
+        Add(allowedExceptions, EffectEvaluationContractKind.AllowedExceptions, exceptionComplete,
             disallowedExceptions.IsDefaultOrEmpty,
             GeneratedDiagnosticDescriptors.ExceptionContractNotVerifiedRule,
             [method.Name, "[AllowedExceptions]", exceptionComplete
@@ -175,7 +186,7 @@ internal static class EffectContractDiagnostics
             new EffectClaimConstraint(
                 EffectContractKind.None, EffectContractCapabilityKind.None, exceptions.Types),
             exceptions.IsValid);
-        Add(summaryContracts, WorkerEffectContractKind.EffectContract, declaredComplete,
+        Add(summaryContracts, EffectEvaluationContractKind.EffectContract, declaredComplete,
             bodyless
                 ? contract.Kind == EffectContractResolutionKind.Valid && declaredProjection.IsComplete
                 : contract.Kind is not (
@@ -203,7 +214,7 @@ internal static class EffectContractDiagnostics
         return evaluations.ToImmutable();
 
         void Add(
-            ImmutableArray<AttributeData> selected, WorkerEffectContractKind kind,
+            ImmutableArray<AttributeData> selected, EffectEvaluationContractKind kind,
             bool complete, bool isEstablished, DiagnosticDescriptor? diagnostic,
             object[] arguments, string evidence, EffectDirectWitness? candidateViolation,
             EffectClaimConstraint constraint, bool valid = true, bool trusted = false)
@@ -213,7 +224,7 @@ internal static class EffectContractDiagnostics
                 return;
             }
 
-            if (kind != WorkerEffectContractKind.EffectContract)
+            if (kind != EffectEvaluationContractKind.EffectContract)
             {
                 evidence = SummaryFacetEvidence(summaryEvidence, complete, evidence);
             }
@@ -236,46 +247,47 @@ internal static class EffectContractDiagnostics
     }
 
     private static (
-        WorkerClaimOutcome Outcome,
-        WorkerClaimReason Reason,
-        WorkerEffectEvidenceCertainty Certainty) Classify(
+        EffectEvaluationOutcome Outcome,
+        EffectEvaluationReason Reason,
+        EffectEvaluationCertainty Certainty) Classify(
         bool established, bool violated, bool valid, bool complete, bool trusted,
-        WorkerClaimReason incompleteReason)
+        EffectEvaluationReason incompleteReason)
     {
         return (established, violated, valid, complete, trusted) switch
         {
-            (true, _, _, _, true) => (WorkerClaimOutcome.Proven, WorkerClaimReason.None,
-                WorkerEffectEvidenceCertainty.TrustedCompleteBoundary),
-            (true, _, _, _, _) => (WorkerClaimOutcome.Proven, WorkerClaimReason.None,
-                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary),
-            (_, true, _, _, _) => (WorkerClaimOutcome.Refuted, WorkerClaimReason.None,
-                WorkerEffectEvidenceCertainty.DefiniteViolation),
-            (_, _, false, _, _) => (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedContract,
-                WorkerEffectEvidenceCertainty.Unavailable),
-            (_, _, _, _, true) => (WorkerClaimOutcome.Unknown,
+            (true, _, _, _, true) => (EffectEvaluationOutcome.Proven, EffectEvaluationReason.None,
+                EffectEvaluationCertainty.TrustedCompleteBoundary),
+            (true, _, _, _, _) => (EffectEvaluationOutcome.Proven, EffectEvaluationReason.None,
+                EffectEvaluationCertainty.CompleteMayEffectSummary),
+            (_, true, _, _, _) => (EffectEvaluationOutcome.Refuted, EffectEvaluationReason.None,
+                EffectEvaluationCertainty.DefiniteViolation),
+            (_, _, false, _, _) => (EffectEvaluationOutcome.Unknown, EffectEvaluationReason.UnsupportedContract,
+                EffectEvaluationCertainty.Unavailable),
+            (_, _, _, _, true) => (EffectEvaluationOutcome.Unknown,
                 complete
-                    ? WorkerClaimReason.EffectContractNotEstablished
+                    ? EffectEvaluationReason.EffectContractNotEstablished
                     : incompleteReason,
-                WorkerEffectEvidenceCertainty.TrustedCompleteBoundary),
-            (_, _, _, false, _) => (WorkerClaimOutcome.Unknown, incompleteReason,
-                WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary),
-            _ => (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished,
-                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary)
+                EffectEvaluationCertainty.TrustedCompleteBoundary),
+            (_, _, _, false, _) => (EffectEvaluationOutcome.Unknown, incompleteReason,
+                EffectEvaluationCertainty.IncompleteMayEffectSummary),
+            _ => (EffectEvaluationOutcome.Unknown, EffectEvaluationReason.EffectContractNotEstablished,
+                EffectEvaluationCertainty.CompleteMayEffectSummary)
         };
     }
 
-    private static WorkerClaimReason MapIncompleteReason(EffectSummary summary)
+    private static EffectEvaluationReason MapIncompleteReason(
+        EffectSummary summary)
     {
         var reason = summary.AnalysisIncompleteReason;
         if ((reason & (EffectAnalysisIncompleteReason.BlockBudgetExceeded |
                        EffectAnalysisIncompleteReason.OperationBudgetExceeded)) != 0)
         {
-            return WorkerClaimReason.ResourceLimit;
+            return EffectEvaluationReason.ResourceLimit;
         }
 
         return (reason & EffectAnalysisIncompleteReason.CyclicControlFlow) != 0
-            ? WorkerClaimReason.UnsupportedBody
-            : WorkerClaimReason.EffectSummaryIncomplete;
+            ? EffectEvaluationReason.UnsupportedBody
+            : EffectEvaluationReason.EffectSummaryIncomplete;
     }
 
     private static (EffectContractCapabilityKind Value, bool IsValid) DecodeCapabilities(
@@ -426,8 +438,9 @@ internal static class EffectContractDiagnostics
 }
 
 internal sealed record EffectClaimEvaluation(
-    WorkerEffectContractKind Kind, ImmutableArray<AttributeData> Attributes,
-    WorkerClaimOutcome Outcome, WorkerClaimReason Reason, WorkerEffectEvidenceCertainty Certainty,
+    EffectEvaluationContractKind Kind, ImmutableArray<AttributeData> Attributes,
+    EffectEvaluationOutcome Outcome, EffectEvaluationReason Reason,
+    EffectEvaluationCertainty Certainty,
     string Evidence, EffectDirectWitness? Witness, EffectClaimConstraint Constraint,
     DiagnosticDescriptor? Diagnostic, Location DiagnosticLocation, object[] DiagnosticArguments);
 

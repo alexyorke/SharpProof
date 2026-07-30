@@ -367,7 +367,7 @@ public sealed class PerformanceGateTests
     }
 
     [Test]
-    public void CallBearingAdvisoryMeasurementExercisesSemanticScreening()
+    public void CallBearingAdvisoryMeasurementSkipsUnneededSemanticScreening()
     {
         var source =
             PerformanceGate.CreateCallBearingUnannotatedAdvisorySource(
@@ -391,7 +391,7 @@ public sealed class PerformanceGateTests
             Assert.That(measurement.DiagnosticCount, Is.Zero);
             Assert.That(
                 measurement.AnalysisSessionCreateCount,
-                Is.EqualTo(2));
+                Is.Zero);
             Assert.That(measurement.ApiSpecCreateCount, Is.Zero);
             Assert.That(measurement.EffectAnalysisCreateCount, Is.Zero);
         }
@@ -559,7 +559,7 @@ public sealed class PerformanceGateTests
                 Is.EqualTo(1));
             Assert.That(
                 result.UnannotatedAdvisoryAnalysisSessionCreateCount,
-                Is.EqualTo(1));
+                Is.Zero);
             Assert.That(result.BaselineRetainedBytes, Is.GreaterThan(0));
             Assert.That(
                 result.UnannotatedAdvisoryRetainedBytes,

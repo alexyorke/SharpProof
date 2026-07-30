@@ -1,4 +1,5 @@
 using System.Text;
+// This capture runs only in the build-time compiler collector.
 namespace SharpProof.CompilerArtifact;
 #pragma warning disable RS1035 // Build-only compiler evidence must hash final reference images.
 

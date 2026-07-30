@@ -377,19 +377,61 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
-    public void VacuityEvidenceIsLimitedToProvenPostconditions()
+    public void VacuityEvidenceIsClosedAndRequiresProofCore()
     {
         var response = CreateResponse(CreateManifest());
         response.ClaimResults[0].Vacuity =
             WorkerVacuityKind.ContradictoryPreconditions;
+        response.ClaimResults[0].ProofCore = ["requires:0"];
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
 
         SetUnknown(response, WorkerClaimReason.UnsupportedBody);
+        response.ClaimResults[0].ProofCore = [];
         response.CallableResults[0].Coverage =
             WorkerCallableCoverage.Incomplete;
         response.CallableResults[0].Reason =
             WorkerCallableCoverageReason.SemanticUnknown;
         response.Summary = CreateSummary(response);
+        Assert.That(
+            WorkerProtocolJson.Validate(response).Errors
+                .Select(static error => error.Code),
+            Does.Contain("response.vacuity"));
+
+        var effectManifest = CreateManifest();
+        effectManifest.Callables[0].SelectedFeatures = [
+            WorkerSelectedFeature.Effects
+        ];
+        effectManifest.Callables[0].SelectionReasons = [
+            WorkerSelectionReason.ExplicitAnnotation
+        ];
+        effectManifest.Claims[0].Kind =
+            WorkerClaimKind.Effect;
+        effectManifest.Claims[0].Evidence =
+            WorkerClaimEvidence.Attribute;
+        effectManifest.Claims[0].EffectContractKind =
+            WorkerEffectContractKind.DoesNotThrow;
+        WorkerProtocolJson.SealManifest(effectManifest);
+        response = CreateResponse(effectManifest);
+        response.ClaimResults[0].EffectCertainty =
+            WorkerEffectEvidenceCertainty.VacuousEntry;
+        response.ClaimResults[0].Vacuity =
+            WorkerVacuityKind.ContradictoryPreconditions;
+        response.ClaimResults[0].ProofCore = ["requires:0"];
+        Assert.That(
+            WorkerProtocolJson.Validate(response).IsValid,
+            Is.True);
+
+        response.ClaimResults[0].ProofCore = [];
+        Assert.That(
+            WorkerProtocolJson.Validate(response).Errors
+                .Select(static error => error.Code),
+            Does.Contain("response.vacuity_evidence"));
+
+        response.ClaimResults[0].ProofCore = [
+            "body:normal-completion"
+        ];
+        response.ClaimResults[0].Vacuity =
+            WorkerVacuityKind.NoModeledNormalReturn;
         Assert.That(
             WorkerProtocolJson.Validate(response).Errors
                 .Select(static error => error.Code),

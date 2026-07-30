@@ -8,17 +8,17 @@ release package.
 .NET components
 
 Package: Microsoft.Bcl.AsyncInterfaces 10.0.10
-Package: System.Buffers 4.6.1
+Package: System.Buffers 4.5.1
 Package: System.Collections.Immutable 9.0.18
 Package: System.IO.Pipelines 10.0.10
-Package: System.Memory 4.6.3
-Package: System.Numerics.Vectors 4.6.1
+Package: System.Memory 4.5.5
+Package: System.Numerics.Vectors 4.5.0
 Package: System.Reflection.Metadata 9.0.0
-Package: System.Runtime.CompilerServices.Unsafe 6.1.2
+Package: System.Runtime.CompilerServices.Unsafe 6.0.0
 Package: System.Text.Encoding.CodePages 7.0.0
 Package: System.Text.Encodings.Web 10.0.10
 Package: System.Text.Json 10.0.10
-Package: System.Threading.Tasks.Extensions 4.6.3
+Package: System.Threading.Tasks.Extensions 4.5.4
 Source: https://github.com/dotnet/runtime
 License: MIT
 Copyright (c) .NET Foundation and Contributors

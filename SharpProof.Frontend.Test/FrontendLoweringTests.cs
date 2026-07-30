@@ -88,6 +88,34 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void LookalikeAndHiddenLengthMembersAreNeverIntrinsic()
+    {
+        AssertClassification(
+            """
+            public sealed class Lookalike {
+                public long LongLength => 1L;
+            }
+            public static long Target(Lookalike value) =>
+                value.LongLength;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedMemberAccess);
+        AssertClassification(
+            """
+            public class Base {
+                public int Length => 1;
+            }
+            public sealed class Derived : Base {
+                public new int Length => 2;
+            }
+            public static long Target(Derived value) =>
+                value.Length;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedMemberAccess);
+    }
+
+    [Test]
     public void InterpreterPreservesLeftToRightAndShortCircuitEvaluation()
     {
         using var order = CompiledMethod.Create(

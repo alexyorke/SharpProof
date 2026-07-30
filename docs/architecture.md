@@ -256,22 +256,26 @@ session. Unsupported unannotated analyzer callables are silent, while
 unsupported explicitly selected callables report SP0047.
 
 The advisory analyzer has a conservative compilation-start fast path for
-call-free, unselected source. It retains configuration validation,
-`SHARPPROOF_CONTRACTS` rejection, and final compiler-artifact collection while
-skipping semantic-session construction and per-method callbacks. Strict mode
-never takes this path. The activation probe is part of the declared discovery
-trusted computing base; new selection or implicit-call syntax must extend the
-probe and its regressions in the same change.
+contract-free, unselected source. It retains configuration validation and
+`SHARPPROOF_CONTRACTS` rejection while skipping semantic-session construction
+and per-method callbacks. Final compiler-artifact collection is a separate
+build-only analyzer and is not loaded by ordinary advisory builds. Strict mode
+never takes the fast path. The activation probe is part of the declared
+discovery trusted computing base; new selection or implicit-call syntax must
+extend the probe and its regressions in the same change.
 
 The advisory activation probe distinguishes contract/attribute candidates
 from ordinary call-bearing code. A candidate compilation retains method
 attribute, clause-placement, intrinsic, rejection, suppression, subset, and
-effect processing. A contract-free compilation registers only operation-block
-precondition screening. Its source and metadata call targets still use the
-same conservative policy, so an external closed precondition remains visible
-to an unannotated caller. Contract inventories, companion resolution, binders,
-API specifications, and effect analysis are independently lazy and are
-created only on first demand.
+effect processing. For otherwise contract-free source, the probe reads
+portable-executable custom-attribute metadata without populating Roslyn symbol
+caches. It registers operation-block precondition screening only when a
+referenced assembly contains a closed SharpProof parameter or return contract;
+compilation references receive the equivalent symbol check. Thus external
+closed preconditions remain visible to unannotated callers, while ordinary
+source and BCL calls create no semantic session. Contract inventories,
+companion resolution, binders, API specifications, and effect analysis are
+independently lazy and are created only on first demand.
 
 Before allocating a precondition CFG, a sound negative screen walks calls
 owned by that callable and uses the same cached binder as full analysis. It

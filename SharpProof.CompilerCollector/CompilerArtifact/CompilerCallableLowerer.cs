@@ -1,3 +1,4 @@
+// This lowerer runs only in the build-time compiler collector.
 namespace SharpProof.CompilerArtifact;
 
 internal sealed class CompilerCallableLowerer

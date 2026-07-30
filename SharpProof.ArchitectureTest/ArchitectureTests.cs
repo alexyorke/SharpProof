@@ -24,7 +24,9 @@ public sealed class ArchitectureTests
 
     private static readonly string[] ProductionProjects = [
         "SharpProof.Ir",
+        "SharpProof.PortableAnalyzer",
         "SharpProof.CompilerArtifact",
+        "SharpProof.CompilerCollector",
         "SharpProof.ContractForGenerator",
         "SharpProof.Specs",
         "SharpProof.Dataflow",
@@ -45,13 +47,108 @@ public sealed class ArchitectureTests
     ];
 
     [Test]
+    public void RepositoryRestoreIsHermeticLockedAndSdkPinned()
+    {
+        var root = RepositoryRoot();
+        using var globalJson = JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(root, "global.json")));
+        var sdk = globalJson.RootElement.GetProperty("sdk");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                sdk.GetProperty("version").GetString(),
+                Is.EqualTo("9.0.315"));
+            Assert.That(
+                sdk.GetProperty("rollForward").GetString(),
+                Is.EqualTo("disable"));
+        }
+
+        var nuget = XDocument.Load(Path.Combine(root, "NuGet.Config"));
+        var packageSources = nuget
+            .Descendants("packageSources")
+            .Single();
+        var source = packageSources.Elements("add").Single();
+        var mapping = nuget
+            .Descendants("packageSourceMapping")
+            .Single()
+            .Elements("packageSource")
+            .Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                packageSources.Elements("clear"),
+                Has.Exactly(1).Items);
+            Assert.That(
+                (string?)source.Attribute("key"),
+                Is.EqualTo("nuget.org"));
+            Assert.That(
+                (string?)source.Attribute("value"),
+                Is.EqualTo(
+                    "https://api.nuget.org/v3/index.json"));
+            Assert.That(
+                (string?)mapping.Attribute("key"),
+                Is.EqualTo("nuget.org"));
+            Assert.That(
+                (string?)mapping.Elements("package")
+                    .Single()
+                    .Attribute("pattern"),
+                Is.EqualTo("*"));
+        }
+
+        var props = XDocument.Load(
+            Path.Combine(root, "Directory.Build.props"));
+        Assert.That(
+            props.Descendants("RestorePackagesWithLockFile")
+                .Single()
+                .Value,
+            Is.EqualTo("true"));
+        Assert.That(
+            props.Descendants("RestoreLockedMode")
+                .Single()
+                .Value,
+            Is.EqualTo("true"));
+
+        var solution = File.ReadAllText(
+            Path.Combine(root, "SharpProof.sln"));
+        var projects = Regex.Matches(
+                solution,
+                "\"([^\"]+\\.csproj)\"",
+                RegexOptions.CultureInvariant)
+            .Select(static match =>
+                match.Groups[1].Value.Replace(
+                    '\\',
+                    Path.DirectorySeparatorChar))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        Assert.That(projects, Is.Not.Empty);
+        Assert.That(
+            projects.Where(project =>
+                !File.Exists(Path.Combine(
+                    Path.GetDirectoryName(
+                        Path.Combine(root, project))!,
+                    "packages.lock.json"))),
+            Is.Empty);
+    }
+
+    [Test]
     public void NewLayerProjectReferencesFollowTheDependencyDag()
     {
         var allowed = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             ["SharpProof.Ir"] = [],
+            ["SharpProof.PortableAnalyzer"] = ["SharpProof.Attributes"],
             ["SharpProof.CompilerArtifact"] = [
                 "SharpProof.Ir",
+                "SharpProof.Worker.Protocol"
+            ],
+            ["SharpProof.CompilerCollector"] = [
+                "SharpProof.Analyzer",
+                "SharpProof.CompilerArtifact",
+                "SharpProof.Contracts",
+                "SharpProof.Effects",
+                "SharpProof.Frontend",
+                "SharpProof.Ir",
+                "SharpProof.Specs",
                 "SharpProof.Worker.Protocol"
             ],
             ["SharpProof.ContractForGenerator"] = ["SharpProof.Contracts"],
@@ -215,6 +312,7 @@ public sealed class ArchitectureTests
         var semanticConsumers = new[] {
             "SharpProof.Analyzer",
             "SharpProof.CompilerArtifact",
+            "SharpProof.CompilerCollector",
             "SharpProof.Contracts",
             "SharpProof.Dataflow",
             "SharpProof.Effects",
@@ -381,9 +479,11 @@ public sealed class ArchitectureTests
             ["discovery"] = [
                 "SharpProof.Analyzer/SharpProofAnalyzer.cs",
                 "SharpProof.Analyzer/ContractRuntimePolicy.cs",
-                "SharpProof.Analyzer/FinalCompilationCollector.cs",
-                "SharpProof.Analyzer/CompilerArtifact/ClaimManifestBuilder.cs",
-                "SharpProof.Analyzer/CompilerArtifact/SemanticClaimIdentity.cs",
+                "SharpProof.CompilerCollector/FinalCompilationCollectorAnalyzer.cs",
+                "SharpProof.CompilerCollector/FinalCompilationCollector.cs",
+                "SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs",
+                "SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectEvaluationWireMappings.cs",
+                "SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs",
                 "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
                 "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
                 "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
@@ -392,8 +492,8 @@ public sealed class ArchitectureTests
                 "SharpProof.Frontend/SharpProof.Frontend.csproj"
             ],
             ["lowering"] = [
-                "SharpProof.Analyzer/CompilerArtifact/CompilerCallableLowerer.cs",
-                "SharpProof.Analyzer/CompilerArtifact/CompilerManifestArtifactProducer.cs",
+                "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs",
+                "SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs",
                 "SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs",
                 "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
                 "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
@@ -408,6 +508,7 @@ public sealed class ArchitectureTests
             ],
             ["execution"] = [
                 "SharpProof.Worker/CallableEvidenceBuilder.cs",
+                "SharpProof.Worker/CallableEntryFeasibility.cs",
                 "SharpProof.Worker/CallableVerifier.cs",
                 "SharpProof.Worker/AcyclicBlockPredicateExecutor.cs",
                 "SharpProof.Worker/SpecResultDomainProjection.cs",
@@ -442,6 +543,7 @@ public sealed class ArchitectureTests
                 "SharpProof.Analyzer/CallArgumentAliasPolicy.cs",
                 "SharpProof.Analyzer/EffectCallPreconditionPolicy.cs",
                 "SharpProof.Analyzer/EffectContractDiagnostics.cs",
+                "SharpProof.Analyzer/EffectEvaluationTypes.cs",
                 "SharpProof.Analyzer/ManagedContractFacts.cs",
                 "SharpProof.Analyzer/RequiresCallSiteAnalyzer.cs",
                 "SharpProof.Analyzer/RequiresCallSiteDiscovery.cs",
@@ -491,8 +593,8 @@ public sealed class ArchitectureTests
                 "SharpProof.Worker.Protocol/WorkerResultAssembler.cs"
             ],
             ["compilerInputIdentity"] = [
-                "SharpProof.Analyzer/CompilerArtifact/CompilerCompilationCapture.cs",
-                "SharpProof.Analyzer/CompilerArtifact/CompilerOptionWireMappings.cs",
+                "SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs",
+                "SharpProof.CompilerCollector/CompilerArtifact/CompilerOptionWireMappings.cs",
                 "SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs",
                 "SharpProof.CompilerArtifact/CompilationFingerprint.cs"
             ],
@@ -512,6 +614,12 @@ public sealed class ArchitectureTests
                 "SharpProof.CompilerArtifact/CompilerManifestArtifact.cs",
                 "SharpProof.Worker/WorkerInputSnapshot.cs",
                 "SharpProof.Worker/VerificationCache.cs"
+            ],
+            ["portableShippingBoundary"] = [
+                "SharpProof.PortableAnalyzer/SharpProof.PortableAnalyzer.csproj",
+                "SharpProof.Package/SharpProof.nuspec",
+                "SharpProof.Package/buildTransitive/SharpProof.props",
+                "SharpProof.Package/buildTransitive/SharpProof.targets"
             ]
         };
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(

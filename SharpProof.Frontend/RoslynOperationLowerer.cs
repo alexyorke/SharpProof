@@ -160,11 +160,7 @@ public sealed class RoslynOperationLowerer
 
     internal static bool IsIntrinsicLength(IPropertyReferenceOperation property)
     {
-        return property.Instance != null &&
-        property.Property.Name is "Length" or "LongLength" &&
-        property.Arguments.IsDefaultOrEmpty &&
-        (property.Instance.Type?.SpecialType == SpecialType.System_String ||
-         property.Instance.Type is IArrayTypeSymbol);
+        return CompilerIdentityBridge.IsIntrinsicSequenceLength(property);
     }
 
     private static bool TryGetNullComparisonValue(

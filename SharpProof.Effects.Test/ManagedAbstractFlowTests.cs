@@ -494,4 +494,39 @@ public sealed class ManagedAbstractFlowTests
             Assert.That(cardinality, Is.EqualTo(IntervalValue.Constant(0)));
         }
     }
+
+    [Test]
+    public void LookalikeLengthPropertyCannotReadReceiverCardinality()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class Lookalike {
+                public int Length => 7;
+            }
+
+            public static class Sample {
+                public static int Calls(Lookalike value) => value.Length;
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Calls");
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var property = (IPropertyReferenceOperation)model.GetOperation(
+            syntax.ExpressionBody!.Expression)!;
+        var state = ManagedFlowState.Empty.Set(
+            method.Parameters.Single(),
+            ManagedAbstractValue.Reference(
+                NullnessValue.NonNull,
+                IntervalValue.Constant(99)));
+
+        var value = ManagedAbstractFlow.ForCompilation(compilation)
+            .Evaluate(property, state);
+
+        Assert.That(value.TryGetInteger(out var interval), Is.True);
+        Assert.That(
+            interval,
+            Is.EqualTo(IntervalValue.Range(int.MinValue, int.MaxValue)));
+    }
 }

@@ -1,3 +1,5 @@
+using System.Reflection.Metadata;
+
 namespace SharpProof.Analyzer;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
@@ -27,18 +29,29 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
         }
 
         context.EnableConcurrentExecution();
-        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+        context.ConfigureGeneratedCodeAnalysis(
+            GeneratedCodeAnalysisFlags.Analyze |
+            GeneratedCodeAnalysisFlags.ReportDiagnostics);
         context.RegisterCompilationStartAction(InitializeCompilation);
     }
 
     private void InitializeCompilation(CompilationStartAnalysisContext context)
     {
         var configuration = AnalyzerConfiguration.FromOptions(context.Options);
-        context.RegisterSyntaxTreeAction(AnalyzeTreeConfiguration);
+        var configurationDiagnostics = GetConfigurationDiagnostics(
+            context.Compilation,
+            context.Options,
+            configuration,
+            context.CancellationToken);
         if (configuration.Profile == SharpProofProfile.Off)
         {
-            context.RegisterCompilationEndAction(endContext =>
-                ReportInvalidConfiguration(endContext, configuration));
+            if (!configurationDiagnostics.IsEmpty)
+            {
+                context.RegisterCompilationEndAction(
+                    CreateConfigurationReporter(
+                        configurationDiagnostics));
+            }
+
             return;
         }
 
@@ -46,20 +59,21 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
                 context.Compilation,
                 context.CancellationToken))
         {
-            context.RegisterCompilationEndAction(endContext =>
-            {
-                ReportInvalidConfiguration(endContext, configuration);
-                endContext.ReportDiagnostic(CreateInvalidConfigurationDiagnostic(
-                    ContractRuntimePolicy.InvalidConfiguration()));
-            });
+            context.RegisterCompilationEndAction(
+                CreateConfigurationReporter(
+                    configurationDiagnostics.Add(
+                        CreateInvalidConfigurationDiagnostic(
+                            ContractRuntimePolicy.InvalidConfiguration()))));
             return;
         }
 
-        context.RegisterCompilationEndAction(endContext =>
+        if (!configurationDiagnostics.IsEmpty)
         {
-            ReportInvalidConfiguration(endContext, configuration);
-            FinalCompilationCollector.Collect(endContext, configuration);
-        });
+            context.RegisterCompilationEndAction(
+                CreateConfigurationReporter(
+                    configurationDiagnostics));
+        }
+
         var activation = configuration.Profile == SharpProofProfile.Advisory
             ? GetAdvisoryActivation(
                 context.Compilation,
@@ -107,10 +121,15 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
         Compilation compilation,
         CancellationToken cancellationToken)
     {
-        var requiresOperationAnalysis = false;
         foreach (var tree in compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (!MayContainAdvisoryActivationSyntax(
+                    tree.GetText(cancellationToken)))
+            {
+                continue;
+            }
+
             foreach (var node in tree.GetRoot(cancellationToken)
                          .DescendantNodes())
             {
@@ -128,11 +147,6 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
                         RequiresOperationAnalysis: true,
                         RequiresFullOperationAnalysis: true);
                 }
-
-                if (IsPotentialOperation(node))
-                {
-                    requiresOperationAnalysis = true;
-                }
             }
         }
 
@@ -143,25 +157,305 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
                     attribute.AttributeClass?.ContainingNamespace));
         return hasSharpProofAssemblyAttribute
             ? AdvisoryActivation.Full
-            : new(
-                RequiresSymbolAnalysis: false,
-                RequiresOperationAnalysis: requiresOperationAnalysis,
-                RequiresFullOperationAnalysis: false);
+            : MayContainExternalClosedPreconditions(
+                    compilation,
+                    cancellationToken)
+                ? AdvisoryActivation.Lightweight
+                : AdvisoryActivation.None;
     }
 
-    private static bool IsPotentialOperation(SyntaxNode node)
+    private static bool MayContainAdvisoryActivationSyntax(SourceText text)
     {
-        return node is ArgumentListSyntax or
-            BaseObjectCreationExpressionSyntax or
-            BaseListSyntax or
-            ConstructorDeclarationSyntax or
-            StatementSyntax or
-            QueryExpressionSyntax or
-            AwaitExpressionSyntax or
-            InterpolatedStringExpressionSyntax or
-            WithExpressionSyntax or
-            CollectionExpressionSyntax or
-            RecursivePatternSyntax;
+        for (var index = 0; index < text.Length; index++)
+        {
+            if (text[index] == '[')
+            {
+                return true;
+            }
+        }
+
+        foreach (var candidate in
+                 ContractApiMetadata.ContractMethodCandidateNames)
+        {
+            if (ContainsOrdinal(text, candidate))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsOrdinal(SourceText text, string value)
+    {
+        var lastStart = text.Length - value.Length;
+        for (var start = 0; start <= lastStart; start++)
+        {
+            var matches = true;
+            for (var offset = 0; offset < value.Length; offset++)
+            {
+                if (text[start + offset] == value[offset])
+                {
+                    continue;
+                }
+
+                matches = false;
+                break;
+            }
+
+            if (matches)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool MayContainExternalClosedPreconditions(
+        Compilation compilation,
+        CancellationToken cancellationToken)
+    {
+        if (compilation.GetTypeByMetadataName(
+                ContractApiMetadata.Contract) == null)
+        {
+            return false;
+        }
+
+        foreach (var reference in compilation.References)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (reference is PortableExecutableReference portable)
+            {
+                if (PortableReferenceContainsClosedPrecondition(portable))
+                {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (reference is CompilationReference)
+            {
+                var symbol = compilation.GetAssemblyOrModuleSymbol(reference);
+                if (symbol == null)
+                {
+                    return true;
+                }
+
+                var closedContractAttributes = GetClosedContractAttributes(
+                    compilation);
+                if (symbol is IAssemblySymbol assembly &&
+                    NamespaceContainsClosedPrecondition(
+                        assembly.GlobalNamespace,
+                        closedContractAttributes,
+                        cancellationToken))
+                {
+                    return true;
+                }
+
+                if (symbol is IModuleSymbol module &&
+                    NamespaceContainsClosedPrecondition(
+                        module.GlobalNamespace,
+                        closedContractAttributes,
+                        cancellationToken))
+                {
+                    return true;
+                }
+
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static ImmutableArray<INamedTypeSymbol>
+        GetClosedContractAttributes(
+        Compilation compilation)
+    {
+        return ImmutableArray.Create(
+                compilation.GetTypeByMetadataName(
+                    ContractApiMetadata.NotNull),
+                compilation.GetTypeByMetadataName(
+                    ContractApiMetadata.Positive),
+                compilation.GetTypeByMetadataName(
+                    ContractApiMetadata.InRange))
+            .Where(static symbol => symbol != null)
+            .Select(static symbol => symbol!)
+            .ToImmutableArray();
+    }
+
+    private static bool PortableReferenceContainsClosedPrecondition(
+        PortableExecutableReference reference)
+    {
+        try
+        {
+            return reference.GetMetadata() switch
+            {
+                AssemblyMetadata assembly => assembly.GetModules().Any(
+                    static module =>
+                        ModuleContainsClosedPrecondition(
+                            module.GetMetadataReader())),
+                ModuleMetadata module => ModuleContainsClosedPrecondition(
+                    module.GetMetadataReader()),
+                _ => true
+            };
+        }
+        catch (ArgumentException)
+        {
+            return true;
+        }
+        catch (BadImageFormatException)
+        {
+            return true;
+        }
+        catch (IOException)
+        {
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return true;
+        }
+    }
+
+    private static bool ModuleContainsClosedPrecondition(
+        MetadataReader reader)
+    {
+        foreach (var handle in reader.CustomAttributes)
+        {
+            var attribute = reader.GetCustomAttribute(handle);
+            if (attribute.Parent.Kind == HandleKind.Parameter &&
+                IsClosedContractAttribute(reader, attribute))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsClosedContractAttribute(
+        MetadataReader reader,
+        CustomAttribute attribute)
+    {
+        var type = attribute.Constructor.Kind switch
+        {
+            HandleKind.MemberReference => reader.GetMemberReference(
+                    (MemberReferenceHandle)attribute.Constructor)
+                .Parent,
+            HandleKind.MethodDefinition => reader.GetMethodDefinition(
+                    (MethodDefinitionHandle)attribute.Constructor)
+                .GetDeclaringType(),
+            _ => default
+        };
+        return type.Kind switch
+        {
+            HandleKind.TypeReference => IsClosedContractAttribute(
+                reader,
+                reader.GetTypeReference((TypeReferenceHandle)type)
+                    .Namespace,
+                reader.GetTypeReference((TypeReferenceHandle)type)
+                    .Name),
+            HandleKind.TypeDefinition => IsClosedContractAttribute(
+                reader,
+                reader.GetTypeDefinition((TypeDefinitionHandle)type)
+                    .Namespace,
+                reader.GetTypeDefinition((TypeDefinitionHandle)type)
+                    .Name),
+            _ => false
+        };
+    }
+
+    private static bool IsClosedContractAttribute(
+        MetadataReader reader,
+        StringHandle namespaceHandle,
+        StringHandle nameHandle)
+    {
+        if (!string.Equals(
+                reader.GetString(namespaceHandle),
+                "SharpProof.Attributes",
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return reader.GetString(nameHandle) is
+            "NotNullAttribute" or
+            "PositiveAttribute" or
+            "InRangeAttribute";
+    }
+
+    private static bool NamespaceContainsClosedPrecondition(
+        INamespaceSymbol @namespace,
+        ImmutableArray<INamedTypeSymbol> closedContractAttributes,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        foreach (var type in @namespace.GetTypeMembers())
+        {
+            if (TypeContainsClosedPrecondition(
+                    type,
+                    closedContractAttributes,
+                    cancellationToken))
+            {
+                return true;
+            }
+        }
+
+        foreach (var child in @namespace.GetNamespaceMembers())
+        {
+            if (NamespaceContainsClosedPrecondition(
+                    child,
+                    closedContractAttributes,
+                    cancellationToken))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TypeContainsClosedPrecondition(
+        INamedTypeSymbol type,
+        ImmutableArray<INamedTypeSymbol> closedContractAttributes,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        foreach (var method in type.GetMembers().OfType<IMethodSymbol>())
+        {
+            if (ContainsClosedContractAttribute(
+                    method.GetReturnTypeAttributes(),
+                    closedContractAttributes) ||
+                method.Parameters.Any(parameter =>
+                    ContainsClosedContractAttribute(
+                        parameter.GetAttributes(),
+                        closedContractAttributes)))
+            {
+                return true;
+            }
+        }
+
+        return type.GetTypeMembers().Any(nested =>
+            TypeContainsClosedPrecondition(
+                nested,
+                closedContractAttributes,
+                cancellationToken));
+    }
+
+    private static bool ContainsClosedContractAttribute(
+        ImmutableArray<AttributeData> attributes,
+        ImmutableArray<INamedTypeSymbol> closedContractAttributes)
+    {
+        return attributes.Any(attribute =>
+            closedContractAttributes.Any(expected =>
+                SymbolEqualityComparer.Default.Equals(
+                    attribute.AttributeClass?.OriginalDefinition,
+                    expected.OriginalDefinition)));
     }
 
     private static bool IsContractApiCandidate(ExpressionSyntax expression)
@@ -173,12 +467,9 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
             MemberBindingExpressionSyntax binding => binding.Name,
             _ => null
         };
-        return name?.Identifier.ValueText is
-            "Requires" or
-            "Ensures" or
-            "Assume" or
-            "Old" or
-            "Result";
+        return name != null &&
+            ContractApiMetadata.IsContractMethodCandidateName(
+                name.Identifier.ValueText);
     }
 
     private static bool IsSharpProofAttributesNamespace(
@@ -208,28 +499,52 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
             SyntaxKind.ModuleKeyword;
     }
 
-    private static void ReportInvalidConfiguration(
-        CompilationAnalysisContext context,
-        AnalyzerConfiguration configuration)
+    private static ImmutableArray<Diagnostic> GetConfigurationDiagnostics(
+        Compilation compilation,
+        AnalyzerOptions analyzerOptions,
+        AnalyzerConfiguration configuration,
+        CancellationToken cancellationToken)
     {
+        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
         foreach (var invalidValue in configuration.InvalidConfigurationValues)
         {
-            context.ReportDiagnostic(CreateInvalidConfigurationDiagnostic(invalidValue));
+            diagnostics.Add(
+                CreateInvalidConfigurationDiagnostic(invalidValue));
         }
+
+        foreach (var tree in compilation.SyntaxTrees)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var options = analyzerOptions.AnalyzerConfigOptionsProvider
+                .GetOptions(tree);
+            var invalidValues =
+                AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
+                    options,
+                    analyzerOptions.AnalyzerConfigOptionsProvider.GlobalOptions);
+            var location = Location.Create(tree, new TextSpan(0, 0));
+            foreach (var invalidValue in invalidValues)
+            {
+                diagnostics.Add(
+                    CreateInvalidConfigurationDiagnostic(
+                        invalidValue,
+                        location));
+            }
+        }
+
+        return diagnostics.ToImmutable();
     }
 
-    private static void AnalyzeTreeConfiguration(SyntaxTreeAnalysisContext context)
+    private static Action<CompilationAnalysisContext>
+        CreateConfigurationReporter(
+        ImmutableArray<Diagnostic> diagnostics)
     {
-        var options = context.Options.AnalyzerConfigOptionsProvider.GetOptions(context.Tree);
-        var invalidValues = AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
-            options,
-            context.Options.AnalyzerConfigOptionsProvider.GlobalOptions);
-        var location = Location.Create(context.Tree, new TextSpan(0, 0));
-        foreach (var invalidValue in invalidValues)
+        return context =>
         {
-            context.ReportDiagnostic(
-                CreateInvalidConfigurationDiagnostic(invalidValue, location));
-        }
+            foreach (var diagnostic in diagnostics)
+            {
+                context.ReportDiagnostic(diagnostic);
+            }
+        };
     }
 
     private static Diagnostic CreateInvalidConfigurationDiagnostic(
@@ -254,6 +569,12 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
                 RequiresSymbolAnalysis: true,
                 RequiresOperationAnalysis: true,
                 RequiresFullOperationAnalysis: true);
+        internal static AdvisoryActivation Lightweight { get; } =
+            new(
+                RequiresSymbolAnalysis: false,
+                RequiresOperationAnalysis: true,
+                RequiresFullOperationAnalysis: false);
+        internal static AdvisoryActivation None => default;
 
         internal bool Any =>
             RequiresSymbolAnalysis || RequiresOperationAnalysis;

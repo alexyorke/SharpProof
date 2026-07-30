@@ -15,6 +15,7 @@
     <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" />
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
     <ProjectReference Include="..\SharpProof.CompilerArtifact\SharpProof.CompilerArtifact.csproj" />
+    <ProjectReference Include="..\SharpProof.CompilerCollector\SharpProof.CompilerCollector.csproj" />
     <ProjectReference Include="..\SharpProof.Dataflow\SharpProof.Dataflow.csproj" />
     <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
     <ProjectReference Include="..\SharpProof.Specs\SharpProof.Specs.csproj" />

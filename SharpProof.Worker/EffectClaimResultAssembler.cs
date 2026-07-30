@@ -6,6 +6,45 @@ internal static class EffectClaimResultAssembler
         CompilerCallablePreparation target,
         CompilerEffectClaimArtifact evidence)
     {
+        return Assemble(
+            target,
+            evidence,
+            CallableEntryFeasibility.Feasible);
+    }
+
+    internal static WorkerClaimResult Assemble(
+        CompilerCallablePreparation target,
+        CompilerEffectClaimArtifact evidence,
+        CallableEntryFeasibility entryFeasibility)
+    {
+        if (entryFeasibility.IsUnknown)
+        {
+            return CallableClaimResultAssembler.Create(
+                target,
+                evidence.ClaimId,
+                WorkerClaimOutcome.Unknown,
+                entryFeasibility.Reason,
+                WorkerEffectEvidenceCertainty.Unavailable);
+        }
+
+        if (entryFeasibility.IsContradictory)
+        {
+            var vacuous = CallableClaimResultAssembler.Create(
+                target,
+                evidence.ClaimId,
+                WorkerClaimOutcome.Proven,
+                WorkerClaimReason.None,
+                WorkerEffectEvidenceCertainty.VacuousEntry);
+            vacuous.Vacuity =
+                WorkerVacuityKind.ContradictoryPreconditions;
+            vacuous.ProofCore = [.. entryFeasibility.ProofCore];
+            vacuous.Assumptions =
+                CallableClaimResultAssembler.MarkAssumptionsUsed(
+                    target,
+                    entryFeasibility.UsedAssumptionIds);
+            return vacuous;
+        }
+
         if (evidence.Outcome == WorkerClaimOutcome.Refuted)
         {
             return CallableClaimResultAssembler.Create(

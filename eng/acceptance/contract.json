@@ -52,9 +52,11 @@
         "paths": [
           "SharpProof.Analyzer/SharpProofAnalyzer.cs",
           "SharpProof.Analyzer/ContractRuntimePolicy.cs",
-          "SharpProof.Analyzer/FinalCompilationCollector.cs",
-          "SharpProof.Analyzer/CompilerArtifact/ClaimManifestBuilder.cs",
-          "SharpProof.Analyzer/CompilerArtifact/SemanticClaimIdentity.cs",
+          "SharpProof.CompilerCollector/FinalCompilationCollectorAnalyzer.cs",
+          "SharpProof.CompilerCollector/FinalCompilationCollector.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectEvaluationWireMappings.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs",
           "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
           "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
           "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
@@ -66,8 +68,8 @@
       {
         "name": "lowering",
         "paths": [
-          "SharpProof.Analyzer/CompilerArtifact/CompilerCallableLowerer.cs",
-          "SharpProof.Analyzer/CompilerArtifact/CompilerManifestArtifactProducer.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs",
           "SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs",
           "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
           "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
@@ -85,6 +87,7 @@
         "name": "execution",
         "paths": [
           "SharpProof.Worker/CallableEvidenceBuilder.cs",
+          "SharpProof.Worker/CallableEntryFeasibility.cs",
           "SharpProof.Worker/CallableVerifier.cs",
           "SharpProof.Worker/AcyclicBlockPredicateExecutor.cs",
           "SharpProof.Worker/SpecResultDomainProjection.cs",
@@ -142,6 +145,7 @@
           "SharpProof.Analyzer/CallArgumentAliasPolicy.cs",
           "SharpProof.Analyzer/EffectCallPreconditionPolicy.cs",
           "SharpProof.Analyzer/EffectContractDiagnostics.cs",
+          "SharpProof.Analyzer/EffectEvaluationTypes.cs",
           "SharpProof.Analyzer/ManagedContractFacts.cs",
           "SharpProof.Analyzer/RequiresCallSiteAnalyzer.cs",
           "SharpProof.Analyzer/RequiresCallSiteDiscovery.cs",
@@ -206,8 +210,8 @@
       {
         "name": "compilerInputIdentity",
         "paths": [
-          "SharpProof.Analyzer/CompilerArtifact/CompilerCompilationCapture.cs",
-          "SharpProof.Analyzer/CompilerArtifact/CompilerOptionWireMappings.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerOptionWireMappings.cs",
           "SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs",
           "SharpProof.CompilerArtifact/CompilationFingerprint.cs"
         ]
@@ -237,6 +241,15 @@
           "SharpProof.CompilerArtifact/CompilerManifestArtifact.cs",
           "SharpProof.Worker/WorkerInputSnapshot.cs",
           "SharpProof.Worker/VerificationCache.cs"
+        ]
+      },
+      {
+        "name": "portableShippingBoundary",
+        "paths": [
+          "SharpProof.PortableAnalyzer/SharpProof.PortableAnalyzer.csproj",
+          "SharpProof.Package/SharpProof.nuspec",
+          "SharpProof.Package/buildTransitive/SharpProof.props",
+          "SharpProof.Package/buildTransitive/SharpProof.targets"
         ]
       }
     ]
