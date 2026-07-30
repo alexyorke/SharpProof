@@ -210,12 +210,14 @@ internal sealed class OperationEffectScanner
         IPropertyReferenceOperation property, EffectAccess access, IOperation? assignedValue = null)
     {
         if (access == EffectAccess.Read &&
-            IsIntrinsicCardinalityProperty(property))
+            IsIntrinsicArrayCardinalityProperty(property))
         {
             return EffectSummaryOperations.Join(
                 property.Instance == null
                     ? EffectSummary.Empty : Scan(property.Instance),
-                PotentialNullReceiver(property.Instance, property));
+                PotentialNullReceiver(property.Instance, property),
+                EffectSummaryOperations.Read(
+                    ClassifyRegion(property.Instance, aliasSource: true)));
         }
 
         var accessor = access == EffectAccess.Read
@@ -1040,14 +1042,13 @@ internal sealed class OperationEffectScanner
         };
     }
 
-    private static bool IsIntrinsicCardinalityProperty(
+    private static bool IsIntrinsicArrayCardinalityProperty(
         IPropertyReferenceOperation property)
     {
         return property.Arguments.IsDefaultOrEmpty &&
         property.Instance != null &&
         property.Property.Name is "Length" or "LongLength" &&
-        (property.Instance.Type is IArrayTypeSymbol ||
-         property.Instance.Type?.SpecialType == SpecialType.System_String);
+        property.Instance.Type is IArrayTypeSymbol;
     }
 
     private static bool IsIntegral(ITypeSymbol? type)

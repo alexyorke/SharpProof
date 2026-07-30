@@ -223,6 +223,67 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void StringAndArrayLengthsReadTheirParameterRegionsCompletely()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static int StringLength(string value) => value.Length;
+
+                public static int ArrayLength(int[] values) {
+                    var alias = values;
+                    return alias.Length;
+                }
+
+                public static long ArrayLongLength(int[] values) =>
+                    values.LongLength;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[] {
+                     "StringLength",
+                     "ArrayLength",
+                     "ArrayLongLength"
+                 })
+        {
+            var result = session.Analyze(
+                Method(compilation, methodName));
+            var summary = result.Summary;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    summary.Reads.Regions,
+                    Is.EquivalentTo(new[] {
+                        EffectRegionId.Parameter(0)
+                    }),
+                    methodName);
+                Assert.That(
+                    summary.Writes.IsEmpty,
+                    Is.True,
+                    methodName);
+                Assert.That(
+                    summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    methodName);
+                Assert.That(
+                    result.Projection.IsComplete,
+                    Is.True,
+                    methodName);
+                Assert.That(
+                    summary.Uncertainty.HasFlag(
+                        EffectUncertainty.DirectCall),
+                    Is.EqualTo(methodName == "StringLength"),
+                    methodName);
+                AssertContainsThrows(
+                    summary,
+                    "System.NullReferenceException");
+            }
+        }
+    }
+
+    [Test]
     public void PropertyIncrementUsesBothAccessorsWithoutBecomingIncomplete()
     {
         var result = Analyze(

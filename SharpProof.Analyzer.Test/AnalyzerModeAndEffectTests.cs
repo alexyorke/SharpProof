@@ -1718,6 +1718,78 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task IntrinsicLengthReadsArgumentState()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [EffectContract(SharpProofEffect.None, Complete = true)]
+                public static int UndeclaredStringRead(string value) {
+                    Contract.Requires(value != null);
+                    return value.Length;
+                }
+
+                [EffectContract(SharpProofEffect.None, Complete = true)]
+                public static int UndeclaredArrayRead(int[] value) {
+                    Contract.Requires(value != null);
+                    return value.Length;
+                }
+
+                [EffectContract(
+                    SharpProofEffect.ReadsArgumentState,
+                    Complete = true)]
+                public static int DeclaredStringRead(string value) {
+                    Contract.Requires(value != null);
+                    return value.Length;
+                }
+
+                [EffectContract(
+                    SharpProofEffect.ReadsArgumentState,
+                    Complete = true)]
+                public static int DeclaredArrayRead(int[] value) {
+                    Contract.Requires(value != null);
+                    return value.Length;
+                }
+            }
+            """,
+            mode: null,
+            ["SP0047"],
+            new SharpProofAnalyzer(factory),
+            features: "effects");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0047", "SP0047"]));
+            Assert.That(
+                diagnostics.Select(diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+                Is.EqualTo((string[])[
+                    "SharpProof could not completely analyze selected method " +
+                    "'UndeclaredStringRead': EffectContractDoesNotCoverBodySummary",
+                    "SharpProof could not completely analyze selected method " +
+                    "'UndeclaredArrayRead': EffectContractDoesNotCoverBodySummary"
+                ]));
+            Assert.That(
+                factory.Outcomes["UndeclaredStringRead"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["UndeclaredArrayRead"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["DeclaredStringRead"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["DeclaredArrayRead"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+        }
+    }
+
+    [Test]
     public async Task BudgetIncompleteManagedFlowCannotProveSelectedEffectContracts()
     {
         var padding = string.Concat(

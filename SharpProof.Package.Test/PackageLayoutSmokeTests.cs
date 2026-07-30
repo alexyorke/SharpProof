@@ -791,6 +791,46 @@ public sealed class PackageLayoutSmokeTests
     }
 
     [Test]
+    public async Task PackedAnalyzerDoesNotHideIntrinsicLengthReads()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(
+            feed.Version,
+            PackagedProductFeed.PortablePackageId,
+            """
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                [EffectContract(SharpProofEffect.None, Complete = true)]
+                public static int ReadString([NotNull] string value) =>
+                    value.Length;
+
+                [EffectContract(SharpProofEffect.None, Complete = true)]
+                public static int ReadArray([NotNull] int[] value) =>
+                    value.Length;
+            }
+            """,
+            "effects",
+            "SP0047");
+        var restore = await RestoreConsumerAsync(workspace, feed);
+        Assert.That(restore.ExitCode, Is.Zero, restore.Output);
+
+        var build = await BuildAnalyzerConsumerAsync(workspace);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(build.ExitCode, Is.Zero, build.Output);
+            Assert.That(build.Output, Does.Contain("SP0047"));
+            Assert.That(
+                build.Output,
+                Does.Contain("'ReadString'")
+                    .And.Contain("'ReadArray'")
+                    .And.Contain(
+                        "EffectContractDoesNotCoverBodySummary"));
+        }
+    }
+
+    [Test]
     public async Task PackedConsumerProbeCapturesFinalCompilerInputs()
     {
         var feed = await PackagedProductFeed.GetAsync();

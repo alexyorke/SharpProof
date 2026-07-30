@@ -183,6 +183,9 @@ contain documented breaking changes.
 - Catch handlers are evaluated in source order. An exception rethrown by an
   earlier handler can no longer be consumed by a later sibling catch, and
   filtered, runtime-subtype, and unknown exception paths remain fail-closed.
+- String `Length` and array `Length`/`LongLength` now contribute receiver-state
+  reads, including alias-aware argument-region remapping. A complete empty
+  effect contract can no longer be proven for these state reads.
 - `SharpProofEffect.Throws` no longer implicitly permits managed allocation;
   every declared effect flag is enforced independently.
 - Throwing a possibly null exception expression now includes the possible
