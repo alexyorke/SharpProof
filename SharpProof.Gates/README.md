@@ -133,6 +133,10 @@ resolution, postcondition replay, fail-closed effect-result assembly,
 cache/manifest binding, protocol manifest/result equality, and launcher
 containment.
 
+Pass one or more exact names through `-MutationName` to qualify a focused
+mutation while developing the gate. Omitting it remains the release behavior
+and runs the complete set.
+
 Nightly and release-qualification workflows run this gate and retain its
 commit-bound JSON summary as evidence. Release qualification records
 `mutations=passed` only after all mutations are killed; this is a release

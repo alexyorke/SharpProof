@@ -5,6 +5,8 @@ param(
 
     [string]$OutputPath = 'artifacts\mutation\summary.json',
 
+    [string[]]$MutationName = @(),
+
     [switch]$KeepWorkspace
 )
 
@@ -129,7 +131,7 @@ $mutations = @(
         Name = 'protocol-manifest-result-equality'
         File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
         Original = "actual.OrderBy(static value => value, StringComparer.Ordinal)`n            .SequenceEqual(expected.OrderBy(static value => value, StringComparer.Ordinal),`n                StringComparer.Ordinal)"
-        Mutated = 'actual.Any() == actual.Any() && expected.Any() == expected.Any()'
+        Mutated = 'actual.Concat(expected).All(static _ => true)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~StrictResponseValidationRequiresExactManifestAndResultSets'
     },
@@ -142,6 +144,16 @@ $mutations = @(
         Filter = 'FullyQualifiedName~WorkerContainmentIsMandatoryOnTheSupportedHost'
     }
 )
+
+if ($MutationName.Count -gt 0) {
+    $knownNames = @($mutations.Name)
+    $requestedNames = @($MutationName | Select-Object -Unique)
+    $unknownNames = @($requestedNames | Where-Object { $_ -notin $knownNames })
+    if ($unknownNames.Count -gt 0) {
+        throw "Unknown mutation name(s): $($unknownNames -join ', ')."
+    }
+    $mutations = @($mutations | Where-Object { $_.Name -in $requestedNames })
+}
 
 $mutationRoot = Join-Path ([IO.Path]::GetTempPath()) 'SharpProof-mutation'
 $workspace = Join-Path $mutationRoot (
