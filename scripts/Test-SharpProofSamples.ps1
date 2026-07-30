@@ -171,10 +171,19 @@ function New-IsolatedNuGetConfig {
   <packageSources>
     <clear />
     <add key="SharpProofLocal" value="$escapedSource" />
+    <add key="nuget.org"
+         value="https://api.nuget.org/v3/index.json"
+         protocolVersion="3" />
   </packageSources>
   <packageSourceMapping>
     <packageSource key="SharpProofLocal">
-      <package pattern="*" />
+      <package pattern="SharpProof*" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="Microsoft.*" />
+      <package pattern="NETStandard.*" />
+      <package pattern="runtime.*" />
+      <package pattern="System.*" />
     </packageSource>
   </packageSourceMapping>
 </configuration>
