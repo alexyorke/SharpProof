@@ -1027,19 +1027,22 @@ public sealed class PackageLayoutSmokeTests
         PackagedProductFeed feed,
         bool includeNetStandardFrameworkPackages = false)
     {
+        var offlineFrameworkSource =
+            includeNetStandardFrameworkPackages
+                ? workspace.PrepareNetStandardFrameworkSource()
+                : null;
+        var nugetConfig = IsolatedPackageFeedConfiguration.Write(
+            workspace.ConsumerDirectory,
+            feed.Source,
+            offlineFrameworkSource);
         var arguments = new List<string> {
             "restore",
             workspace.ConsumerProject,
             "--nologo",
             "/nodeReuse:false",
-            "--source",
-            feed.Source
+            "--configfile",
+            nugetConfig
         };
-        if (includeNetStandardFrameworkPackages)
-        {
-            arguments.Add("--source");
-            arguments.Add(workspace.PrepareNetStandardFrameworkSource());
-        }
         arguments.Add("--packages");
         arguments.Add(workspace.PackageCache);
         return RunDotNetAsync(

@@ -698,13 +698,16 @@ public sealed class FinalCompilationProbeTests
 
         internal Task<ProcessResult> RestoreAsync(string packageSource)
         {
+            var nugetConfig = IsolatedPackageFeedConfiguration.Write(
+                _root,
+                packageSource);
             return RunDotNetAsync([
                 "restore",
                 ProjectPath,
                 "--nologo",
                 "/nodeReuse:false",
-                "--source",
-                packageSource,
+                "--configfile",
+                nugetConfig,
                 "--packages",
                 PackageCache
             ]);
