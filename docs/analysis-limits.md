@@ -152,6 +152,13 @@ forms currently remain outside worker execution and produce
 `UnsupportedCallable`; nested clauses are assigned only to their owning
 callable.
 
+The portable call-site precondition pass is narrower than worker execution but
+does traverse executable local-function, lambda, and anonymous-method child
+CFGs. It analyzes each nested body once with its own scalar flow state and
+keeps its outcome separate from the containing method. Captured entry values
+that cannot be established remain unknown. Quoted expression-tree lambdas are
+not treated as executing delegates.
+
 ## Acceptance-only thresholds
 
 These values come from `eng/acceptance/contract.json`. They are repository
@@ -166,8 +173,8 @@ release gates, not end-user MSBuild defaults.
 | Forced termination | At most 1,000 ms |
 | Performance warmups | 5 |
 | Performance samples | 30 |
-| Off-profile median ratio | At most 1.10 |
-| Off-profile p95 ratio | At most 1.20 |
+| Unannotated advisory order-balanced median ratio | At most 1.10 |
+| Unannotated advisory paired p95 ratio | At most 1.20 |
 | Retained-memory ratio | At most 1.05 |
 | Retained-memory absolute increase | At most 32 MiB |
 | Enabled analyzer retained compilations | 0 |
@@ -181,8 +188,8 @@ is the observed runner total rather than the requested budget.
 | IDE edit p95 | At most 100 ms |
 | IDE edit maximum | At most 250 ms |
 
-The active contract also fixes protocol version 8, cache schema version 9,
-claim-manifest schema version 4, and compiler artifact schema version 5, along
+The active contract also fixes protocol version 9, cache schema version 11,
+claim-manifest schema version 4, and compiler artifact schema version 8, along
 with exact proof-kernel and component TCB path inventories, formatting-neutral
 Roslyn complexity ratchets, and the reference surfaces `netstandard2.0`,
 `net8.0`, and `net472`.
@@ -200,8 +207,9 @@ run statuses. Malformed output, backend/replay failure, containment failure,
 and infrastructure failure make the run `Failed` and fail the build under
 every policy.
 
-Only exact-manifest, complete hygienic `Proven` and replay-validated `Refuted`
-project responses can enter the semantic cache. See
+Only exact-manifest, complete, postcondition-only project responses whose
+claims are all replay-validated `Refuted` can enter the semantic cache. Every
+cache hit reconstructs its scalar models and repeats whole-body replay. See
 [Typed abstention reasons](unknown-reasons.md) for exact reason values.
 
 Replay validation has two layers: exact backend-model and lowered-term checks

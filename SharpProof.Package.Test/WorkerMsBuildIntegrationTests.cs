@@ -870,10 +870,10 @@ public sealed class WorkerMsBuildIntegrationTests
         {
             Assert.That(
                 firstResponse.Summary.CacheStatus,
-                Is.EqualTo(WorkerCacheStatus.Written));
+                Is.EqualTo(WorkerCacheStatus.Miss));
             Assert.That(
                 secondResponse.Summary.CacheStatus,
-                Is.EqualTo(WorkerCacheStatus.Hit));
+                Is.EqualTo(WorkerCacheStatus.Miss));
             Assert.That(
                 firstResponse.Summary.ElapsedMilliseconds,
                 Is.GreaterThanOrEqualTo(0));
@@ -1524,7 +1524,7 @@ public sealed class WorkerMsBuildIntegrationTests
                     Is.EqualTo("SharpProof.CompilerManifest"));
                 Assert.That(
                     root.GetProperty("schemaVersion").GetInt32(),
-                    Is.EqualTo(5));
+                    Is.EqualTo(8));
                 Assert.That(
                     root.GetProperty("protocolVersion").GetString(),
                     Is.EqualTo(WorkerProtocolVersions.Current));
@@ -1900,7 +1900,13 @@ public sealed class WorkerMsBuildIntegrationTests
                     "The test build configuration was not found.");
             var analyzerDirectory = SecurityElement.Escape(Path.Combine(
                 repository,
-                "SharpProof.Analyzer",
+                "SharpProof.PortableAnalyzer",
+                "bin",
+                testConfiguration,
+                "netstandard2.0"));
+            var collectorDirectory = SecurityElement.Escape(Path.Combine(
+                repository,
+                "SharpProof.CompilerCollector",
                 "bin",
                 testConfiguration,
                 "netstandard2.0"));
@@ -1941,7 +1947,10 @@ public sealed class WorkerMsBuildIntegrationTests
                   <PropertyGroup>
                     <SharpProofAnalyzerDirectory>{analyzerDirectory}</SharpProofAnalyzerDirectory>
                     <_SharpProofAnalyzerDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>
-                    <SharpProofContractForGeneratorPath>{analyzerDirectory}/SharpProof.ContractForGenerator.dll</SharpProofContractForGeneratorPath>
+                    <SharpProofPortableAnalyzerPath>{analyzerDirectory}/SharpProof.PortableAnalyzer.dll</SharpProofPortableAnalyzerPath>
+                    <SharpProofCollectorDirectory>{collectorDirectory}</SharpProofCollectorDirectory>
+                    <_SharpProofCollectorDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofCollectorDirectory)'))</_SharpProofCollectorDirectory>
+                    <SharpProofCompilerCollectorPath>{collectorDirectory}/SharpProof.CompilerCollector.dll</SharpProofCompilerCollectorPath>
                 {configuredProperties}
                     <TargetFramework Condition="'$(TargetFrameworks)' == ''">net8.0</TargetFramework>
                     <LangVersion>12.0</LangVersion>
@@ -1963,7 +1972,7 @@ public sealed class WorkerMsBuildIntegrationTests
                   <Target Name="_RemoveSharpProofAnalyzersForWorkerTargetTest"
                           BeforeTargets="CoreCompile">
                     <ItemGroup>
-                      <Analyzer Remove="$(SharpProofContractForGeneratorPath)" />
+                      <Analyzer Remove="$(SharpProofPortableAnalyzerPath)" />
                     </ItemGroup>
                   </Target>
                 </Project>

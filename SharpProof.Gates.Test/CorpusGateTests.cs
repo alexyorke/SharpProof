@@ -26,6 +26,9 @@ public sealed class CorpusGateTests
                 synthetic.Select(static item => item.Variant).Distinct(),
                 Is.EquivalentTo(Enum.GetValues<CorpusVariant>()));
             Assert.That(
+                synthetic.Select(static item => item.Support),
+                Has.None.EqualTo(CorpusSupport.Unspecified));
+            Assert.That(
                 openSource.Length,
                 Is.InRange(
                     OpenSourceCorpusCatalog.MinimumMethodCount,
@@ -52,13 +55,20 @@ public sealed class CorpusGateTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(document.SchemaVersion, Is.EqualTo(1));
+            Assert.That(document.SchemaVersion, Is.EqualTo(2));
             Assert.That(document.Sources, Has.Length.EqualTo(1));
             Assert.That(document.Sources[0].Repository, Is.EqualTo(
                 "https://github.com/aalhour/C-Sharp-Algorithms"));
             Assert.That(document.Sources[0].Commit, Has.Length.EqualTo(40));
             Assert.That(document.Sources[0].LicenseSpdx, Is.EqualTo("MIT"));
             Assert.That(document.Methods, Has.Length.EqualTo(200));
+            Assert.That(
+                document.Methods.Count(static method =>
+                    method.Support == CorpusSupport.Supported),
+                Is.EqualTo(1));
+            Assert.That(
+                document.Methods.Select(static method => method.Support),
+                Has.None.EqualTo(CorpusSupport.Unspecified));
             Assert.That(
                 selectedFileCount,
                 Is.GreaterThanOrEqualTo(
@@ -88,6 +98,7 @@ public sealed class CorpusGateTests
             Assert.That(result.CaseCount, Is.EqualTo(480));
             Assert.That(result.BaseCaseCount, Is.EqualTo(228));
             Assert.That(result.OpenSourceMethodCount, Is.EqualTo(200));
+            Assert.That(result.SupportedOpenSourceMethodCount, Is.EqualTo(1));
             Assert.That(result.OpenSourceFileCount, Is.EqualTo(87));
             Assert.That(result.SyntheticSeedCount, Is.EqualTo(28));
             Assert.That(result.SupportedCaseCount, Is.EqualTo(171));
@@ -128,6 +139,29 @@ public sealed class CorpusGateTests
             Assert.That(result.CacheReplayCount, Is.GreaterThan(0));
             Assert.That(result.ConcurrentReplayCount, Is.GreaterThan(0));
         }
+    }
+
+    [Test]
+    public void SupportedUnknownFailsIndependentlyOfExpectedVerdict()
+    {
+        var item = new CorpusCase(
+            "explicit-supported",
+            "explicit-supported",
+            CorpusVariant.Baseline,
+            "effects",
+            CorpusVerdict.Unknown,
+            CorpusSupport.Supported,
+            "public static int Value() => 1;");
+        var failures = CorpusGate.ValidateSupportedOutcomes(
+            [item],
+            [(item.Id, CorpusVerdict.Unknown)]);
+
+        Assert.That(
+            failures,
+            Is.EqualTo([
+                "1 supported corpus cases produced Unknown; supported cases " +
+                "must have an accountable Proven or Refuted result."
+            ]));
     }
 
     [Test]

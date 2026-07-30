@@ -70,7 +70,7 @@ public sealed class CompilerManifestArtifactTests
                 Is.EqualTo(parse.Features));
             Assert.That(
                 artifact.Compilation.Options.ResolverPolicy,
-                Is.EqualTo("EvidenceOnly"));
+                Is.EqualTo(CompilerResolverPolicy.EvidenceOnly));
             Assert.That(json, Does.Not.Contain(SourceMarker));
             Assert.That(json, Does.Not.Contain("\"text\":"));
         }
@@ -100,8 +100,8 @@ public sealed class CompilerManifestArtifactTests
     public void RecomputedOuterHashCannotHideMalformedNestedEvidence()
     {
         Action<CompilerCompilationSnapshot>[] corruptions = [
-            snapshot => snapshot.Options.OutputKind = "invalid",
-            snapshot => snapshot.Options.ResolverPolicy = "ignored",
+            snapshot => snapshot.Options.ReferencesSupersedeLowerVersions = true,
+            snapshot => snapshot.Options.Usings = [string.Empty],
             snapshot => snapshot.SyntaxTrees[0].Features = null!,
             snapshot => snapshot.SyntaxTrees[0].Sha256 = "invalid",
             snapshot => snapshot.References[0].Aliases = null!,
@@ -124,6 +124,19 @@ public sealed class CompilerManifestArtifactTests
                 (Action)(() =>
                     CompilerManifestArtifactJson.Deserialize(json)));
         }
+    }
+
+    [Test]
+    public void UnknownCompilerOptionNameIsRejected()
+    {
+        var json = CompilerManifestArtifactJson.Serialize(CreateArtifact())
+            .Replace(
+                "\"outputKind\":\"DynamicallyLinkedLibrary\"",
+                "\"outputKind\":\"FutureOutputKind\"",
+                StringComparison.Ordinal);
+
+        Assert.Throws<JsonException>(
+            (Action)(() => CompilerManifestArtifactJson.Deserialize(json)));
     }
 
     [Test]
@@ -326,6 +339,49 @@ public sealed class CompilerManifestArtifactTests
         CompilerEffectClaimArtifactCodec.Seal(evidence);
         Assert.Throws<InvalidDataException>((Action)(() =>
             CompilerManifestArtifactJson.DecodeCallables(artifact)));
+    }
+
+    [Test]
+    public void UnmodeledExceptionConstructorCannotFabricateAReplayWitness()
+    {
+        var artifact = CreateContractArtifact(
+            """
+            using System;
+            using System.Collections.Generic;
+            using SharpProof.Attributes;
+
+            internal static class Subject {
+                [DoesNotThrow]
+                internal static AggregateException Create() =>
+                    new AggregateException(
+                        (IEnumerable<Exception>)null!);
+            }
+            """);
+        var target = CompilerManifestArtifactJson.DecodeCallables(artifact).Single();
+        var evidence = target.EffectClaims.Single();
+        var result = EffectClaimResultAssembler.Assemble(target, evidence);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                evidence.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence.Reason,
+                Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
+            Assert.That(
+                evidence.Certainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary));
+            Assert.That(evidence.Evidence, Does.Contain("UnmodeledCall"));
+            Assert.That(evidence.Witness, Is.Null);
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                result.Reason,
+                Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
+            Assert.That(result.EffectWitness, Is.Null);
+            Assert.That(result.Model, Is.Empty);
+        }
     }
 
     [Test]
@@ -608,8 +664,7 @@ public sealed class CompilerManifestArtifactTests
     private static CompilerManifestArtifact CreateContractArtifact(string? source = null)
     {
         var parse = new CSharpParseOptions(
-            LanguageVersion.CSharp12,
-            preprocessorSymbols: [Contract.ConditionalSymbol]);
+            LanguageVersion.CSharp12);
         var compilation = CreateCompilation(
             parse,
             source ?? """

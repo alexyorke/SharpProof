@@ -321,23 +321,73 @@ function Test-ThirdPartyComponentVersions {
         [object]$Manifest
     )
 
-    $assetPaths = @{
-        'SharpProof' = 'SharpProof.Package\obj\project.assets.json'
-        'SharpProof.Verifier.Win-x64' =
-            'SharpProof.Worker\obj\project.assets.json'
+    $assetRoutes = @{
+        'SharpProof' = @(
+            @{
+                EntryPrefix = 'tools/analyzers/dotnet/cs/'
+                AssetsPath =
+                    'SharpProof.PortableAnalyzer\obj\project.assets.json'
+            },
+            @{
+                EntryPrefix = 'tools/collector/'
+                AssetsPath =
+                    'SharpProof.CompilerCollector\obj\project.assets.json'
+            }
+        )
+        'SharpProof.Verifier.Win-x64' = @(
+            @{
+                EntryPrefix = 'tools/net9/'
+                AssetsPath = 'SharpProof.Worker\obj\project.assets.json'
+            }
+        )
     }
-    foreach ($packageId in $assetPaths.Keys) {
-        $assetsPath = Join-Path $RepositoryRoot $assetPaths[$packageId]
-        if (-not (Test-Path -LiteralPath $assetsPath -PathType Leaf)) {
-            throw "Restored assets are missing for '$packageId': $assetsPath"
-        }
-        $assets = Get-Content -LiteralPath $assetsPath -Raw |
-            ConvertFrom-Json -AsHashtable
-        $libraryKeys = @($assets.libraries.Keys)
+    $assetLibraries = @{}
+    foreach ($packageId in $assetRoutes.Keys) {
         foreach ($component in @(
                 $Manifest.packages.PSObject.Properties[$packageId].Value)) {
             $id = [string]$component.id
             $version = [string]$component.version
+            $componentAssetPaths = @(
+                @(
+                    foreach ($entry in @($component.entries)) {
+                        $entryText = [string]$entry
+                        $matchingRoutes = @(
+                            $assetRoutes[$packageId] |
+                                Where-Object {
+                                    $entryText.StartsWith(
+                                        [string]$_.EntryPrefix,
+                                        [StringComparison]::Ordinal)
+                                }
+                        )
+                        if ($matchingRoutes.Count -ne 1) {
+                            throw (
+                                "Third-party component entry '$entryText' " +
+                                "for '$packageId' does not map to exactly " +
+                                'one restored-assets owner.')
+                        }
+                        [string]$matchingRoutes[0].AssetsPath
+                    }
+                ) | Sort-Object -Unique
+            )
+            if ($componentAssetPaths.Count -ne 1) {
+                throw (
+                    "Third-party component '$id $version' for '$packageId' " +
+                    'spans multiple restored-assets owners: ' +
+                    ($componentAssetPaths -join ', '))
+            }
+            $relativeAssetsPath = $componentAssetPaths[0]
+            $assetsPath = Join-Path $RepositoryRoot $relativeAssetsPath
+            if (-not (Test-Path -LiteralPath $assetsPath -PathType Leaf)) {
+                throw (
+                    "Restored assets are missing for '$packageId' entry " +
+                    "owner '$relativeAssetsPath': $assetsPath")
+            }
+            if (-not $assetLibraries.ContainsKey($assetsPath)) {
+                $assets = Get-Content -LiteralPath $assetsPath -Raw |
+                    ConvertFrom-Json -AsHashtable
+                $assetLibraries[$assetsPath] = @($assets.libraries.Keys)
+            }
+            $libraryKeys = @($assetLibraries[$assetsPath])
             $matchingVersions = @(
                 $libraryKeys |
                     Where-Object {

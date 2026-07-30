@@ -17,13 +17,65 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
         MethodResourceBudget resourceBudget,
         CancellationToken cancellationToken)
     {
+        var verification = await VerifyWithEntryFeasibilityAsync(
+                target,
+                resourceBudget,
+                cancellationToken)
+            .ConfigureAwait(false);
+        return verification.Postconditions;
+    }
+
+    internal async Task<CallableProofVerification>
+        VerifyWithEntryFeasibilityAsync(
+            CompilerCallablePreparation target,
+            MethodResourceBudget resourceBudget,
+            CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(resourceBudget);
         cancellationToken.ThrowIfCancellationRequested();
         if (!target.IsSuccess)
         {
-            return CallableClaimResultAssembler.PostconditionUnknowns(target, target.FailureReason);
+            return new CallableProofVerification(
+                CallableClaimResultAssembler.PostconditionUnknowns(
+                    target,
+                    target.FailureReason),
+                CallableEntryFeasibility.Unknown(
+                    target.FailureReason));
         }
 
+        if (target.Entry.ClaimIds.Length == 0)
+        {
+            return new CallableProofVerification(
+                [],
+                CallableEntryFeasibility.Feasible);
+        }
+
+        var entryFeasibility =
+            await CallableEntryFeasibilityEvaluator.EvaluateAsync(
+                target,
+                resourceBudget,
+                _kernel,
+                _maximumExpressionDepth,
+                cancellationToken)
+            .ConfigureAwait(false);
+        var postconditions = await VerifyPostconditionsAsync(
+                target,
+                resourceBudget,
+                entryFeasibility,
+                cancellationToken)
+            .ConfigureAwait(false);
+        return new CallableProofVerification(
+            postconditions,
+            entryFeasibility);
+    }
+
+    private async Task<ImmutableArray<WorkerClaimResult>>
+        VerifyPostconditionsAsync(
+            CompilerCallablePreparation target,
+            MethodResourceBudget resourceBudget,
+            CallableEntryFeasibility entryFeasibility,
+            CancellationToken cancellationToken)
+    {
         var factory = target.Factory;
         var ensures = target.Clauses.Where(static clause => clause.Kind == CompilerContractKind.Ensures).ToImmutableArray();
         if (ensures.Length > target.Entry.ClaimIds.Length ||
@@ -36,6 +88,13 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
         if (ensures.IsDefaultOrEmpty)
         {
             return [];
+        }
+
+        if (entryFeasibility.IsUnknown)
+        {
+            return CallableClaimResultAssembler.PostconditionUnknowns(
+                target,
+                entryFeasibility.Reason);
         }
 
         SymbolicBodyExecution body = target.Body switch
@@ -53,108 +112,30 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             return CallableClaimResultAssembler.PostconditionUnknowns(target, body.Reason);
         }
 
-        var assumptions = ImmutableArray.CreateBuilder<Assumption>();
-        var preconditions = ImmutableArray.CreateBuilder<Assumption>();
-        var assumptionLabels = new Dictionary<ProofJustification, string>(ReferenceEqualityComparer.Instance);
-        var userAssumptionIds = new Dictionary<ProofJustification, string>(ReferenceEqualityComparer.Instance);
-        var assumptionOrdinal = 0;
-        foreach (var clause in target.Clauses)
+        var evidenceResult = CallableEvidenceBuilder.Build(
+            target,
+            body,
+            _maximumExpressionDepth);
+        if (!evidenceResult.IsSuccess)
         {
-            if (clause.Kind == CompilerContractKind.Ensures)
-            {
-                continue;
-            }
-
-            var predicate = ApplyBodySubstitutions(factory, clause.Condition, target.Variables, null,
-                ImmutableDictionary<IrVarId, IrTerm>.Empty, allowMissingResult: true);
-            if (predicate == null || GetDepth(predicate) > _maximumExpressionDepth)
-            {
-                return CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.UnsupportedExpression);
-            }
-
-            ProofJustification justification = clause.Kind == CompilerContractKind.Assume
-                ? new UserAssumedJustification(new SourceLocationId(assumptionOrdinal))
-                : new LoweredJustification(factory.CreateOperation("contract:" + assumptionOrdinal));
-            var assumption = new Assumption(factory, predicate, justification);
-            assumptions.Add(assumption);
-            if (clause.Kind == CompilerContractKind.Requires)
-            {
-                preconditions.Add(assumption);
-            }
-
-            if (clause.Kind == CompilerContractKind.Assume)
-            {
-                userAssumptionIds.Add(justification, clause.AssumptionId!);
-            }
-
-            assumptionLabels.Add(justification,
-                ClauseLabel(clause.Kind) + ":" + assumptionOrdinal.ToString(CultureInfo.InvariantCulture));
-            assumptionOrdinal++;
+            return CallableClaimResultAssembler.PostconditionUnknowns(
+                target,
+                evidenceResult.FailureReason);
         }
-        foreach (var specAssumption in body.SpecAssumptions)
-        {
-            var guard = SpecResultDomainProjection.Rewrite(factory, specAssumption.Guard, body.SpecResultProjections);
-            var specPredicate = SpecResultDomainProjection.Rewrite(
-                factory, specAssumption.Predicate, body.SpecResultProjections);
-            var predicate = Guard(factory, guard, specPredicate);
-            if (GetDepth(predicate) > _maximumExpressionDepth)
-            {
-                return CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.UnsupportedExpression);
-            }
-
-            ProofJustification justification = new SpecJustification(specAssumption.Spec);
-            assumptions.Add(new Assumption(factory, predicate, justification));
-            assumptionLabels.Add(justification, "spec:" + specAssumption.WitnessIdentifier);
-        }
-        if (!TryAddSourceDomainAssumptions(
-                factory, target.Variables, body.Returns, body.SpecResultProjections, assumptions, assumptionLabels))
-        {
-            return CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.UnsupportedExpression);
-        }
-
-        var normalCompletion = AddNormalCompletionAssumption(
-            factory,
-            body.Returns,
-            body.SpecResultProjections,
-            assumptions,
-            assumptionLabels);
-        if (assumptions.Any(assumption => GetDepth(assumption.Predicate) > _maximumExpressionDepth))
-        {
-            return CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.UnsupportedExpression);
-        }
-
-        var assumptionsUseSupportedDomain =
-            assumptions.All(assumption => IsSupportedProofDomain(factory, assumption.Predicate));
-        ImmutableArray<IrVarId> replayVariables = [.. target.Variables.Where(variable =>
-            variable.Role is CompilerVariableRole.Receiver or CompilerVariableRole.Parameter &&
-            factory.GetTypeInfo(factory.GetVariableInfo(variable.Variable).Type).Kind is
-                IrTypeKind.Boolean or IrTypeKind.Integer).Select(static variable => variable.Variable)];
-        ProofOutcome? vacuityUnknown = null;
-        var contradictoryPreconditions = preconditions.Any(static assumption =>
-            assumption.Predicate is IrBooleanTerm { Value: false });
-        if (!contradictoryPreconditions && preconditions.Any(static assumption =>
-                assumption.Predicate is not IrBooleanTerm { Value: true }))
-        {
-            var preconditionOutcome = await ProbeSatisfiabilityAsync(
-                    factory,
-                    preconditions,
-                    replayVariables,
-                    resourceBudget,
-                    cancellationToken)
-                .ConfigureAwait(false);
-            if (preconditionOutcome == null)
-            {
-                return CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.ResourceLimit);
-            }
-
-            contradictoryPreconditions = preconditionOutcome is ProvenOutcome;
-            if (preconditionOutcome is not (ProvenOutcome or RefutedOutcome))
-            {
-                vacuityUnknown = preconditionOutcome;
-            }
-        }
+        var evidence = evidenceResult.Evidence!;
+        var assumptions = evidence.Assumptions;
+        var assumptionLabels = evidence.AssumptionLabels;
+        var userAssumptionIds = evidence.UserAssumptionIds;
+        var normalCompletion = evidence.NormalCompletion;
+        var replayVariables = evidence.ReplayVariables;
+        var normalCompletionUnknown = WorkerClaimReason.None;
+        var normalCompletionProofCore =
+            normalCompletion is IrBooleanTerm { Value: false }
+                ? ImmutableArray.Create("body:normal-completion")
+                : [];
         var noModeledNormalReturn = normalCompletion is IrBooleanTerm { Value: false };
-        if (!contradictoryPreconditions && vacuityUnknown == null && normalCompletion is not IrBooleanTerm)
+        if (!entryFeasibility.IsContradictory &&
+            normalCompletion is not IrBooleanTerm)
         {
             var bodyEvidence = assumptions.Where(
                 static assumption =>
@@ -172,9 +153,23 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             }
 
             noModeledNormalReturn = completionOutcome is ProvenOutcome;
-            if (completionOutcome is not (ProvenOutcome or RefutedOutcome))
+            if (completionOutcome is ProvenOutcome proven)
             {
-                vacuityUnknown = completionOutcome;
+                normalCompletionProofCore = CallableProofCore.Create(
+                    proven,
+                    assumptionLabels);
+                if (normalCompletionProofCore.IsDefaultOrEmpty)
+                {
+                    noModeledNormalReturn = false;
+                    normalCompletionUnknown =
+                        WorkerClaimReason.MalformedBackendResult;
+                }
+            }
+            else if (completionOutcome is UnknownOutcome unknown)
+            {
+                normalCompletionUnknown =
+                    CallableClaimResultAssembler.MapAbstention(
+                        unknown.Reason);
             }
         }
         var records = ImmutableArray.CreateBuilder<WorkerClaimResult>(ensures.Length);
@@ -208,7 +203,8 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 records.Add(CallableClaimResultAssembler.Unknown(target, index, WorkerClaimReason.DeepPostcondition));
                 continue;
             }
-            if (!assumptionsUseSupportedDomain || !IsSupportedProofDomain(factory, condition))
+            if (!evidence.UsesSupportedDomain ||
+                !IsSupportedProofDomain(factory, condition))
             {
                 records.Add(CallableClaimResultAssembler.Unknown(target, index, WorkerClaimReason.UnsupportedExpression));
                 continue;
@@ -227,19 +223,67 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 records.AddRange(CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.ResourceLimit).Skip(index));
                 break;
             }
-            if (outcome is ProvenOutcome && vacuityUnknown != null)
+            if (outcome is ProvenOutcome &&
+                normalCompletionUnknown != WorkerClaimReason.None)
             {
-                outcome = vacuityUnknown;
+                records.Add(
+                    CallableClaimResultAssembler.Unknown(
+                        target,
+                        index,
+                        normalCompletionUnknown));
+                continue;
             }
 
             var replayed = outcome is RefutedOutcome refuted
                 ? CallableCounterexampleReplayer.Replay(target, index, refuted.Model.Assignments, cancellationToken)
                 : WorkerClaimReason.None;
             cancellationToken.ThrowIfCancellationRequested();
-            var vacuity = contradictoryPreconditions ? WorkerVacuityKind.ContradictoryPreconditions :
+            var vacuity = entryFeasibility.IsContradictory
+                ? WorkerVacuityKind.ContradictoryPreconditions :
                 noModeledNormalReturn ? WorkerVacuityKind.NoModeledNormalReturn : WorkerVacuityKind.None;
-            records.Add(CallableClaimResultAssembler.FromOutcome(target, index, outcome, target.Variables,
-                assumptionLabels, userAssumptionIds, replayed, vacuity));
+            var record = CallableClaimResultAssembler.FromOutcome(
+                target,
+                index,
+                outcome,
+                target.Variables,
+                assumptionLabels,
+                userAssumptionIds,
+                replayed,
+                vacuity);
+            if (record.Outcome == WorkerClaimOutcome.Proven)
+            {
+                record.ProofCore = CallableProofCore.Merge(
+                    record.ProofCore,
+                    vacuity switch
+                    {
+                        WorkerVacuityKind.ContradictoryPreconditions =>
+                            entryFeasibility.ProofCore,
+                        WorkerVacuityKind.NoModeledNormalReturn =>
+                            normalCompletionProofCore,
+                        _ => []
+                    });
+                if (vacuity != WorkerVacuityKind.None &&
+                    record.ProofCore.Length == 0)
+                {
+                    record = CallableClaimResultAssembler.Unknown(
+                        target,
+                        index,
+                        WorkerClaimReason.MalformedBackendResult);
+                }
+                else if (vacuity ==
+                         WorkerVacuityKind
+                             .ContradictoryPreconditions)
+                {
+                    record.Assumptions =
+                        CallableClaimResultAssembler
+                            .MarkAssumptionsUsed(
+                                target,
+                                entryFeasibility
+                                    .UsedAssumptionIds);
+                }
+            }
+
+            records.Add(record);
         }
         return records.ToImmutable();
     }
@@ -282,14 +326,4 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             []);
     }
 
-    private static string ClauseLabel(CompilerContractKind kind)
-    {
-        return kind switch
-        {
-            CompilerContractKind.Requires => "requires",
-            CompilerContractKind.Assume => "assume",
-            CompilerContractKind.Ensures => "ensures",
-            _ => throw new ArgumentOutOfRangeException(nameof(kind))
-        };
-    }
 }

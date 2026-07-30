@@ -55,4 +55,21 @@ public sealed class NullnessDomainTests
     {
         DomainLawAssertions.AssertConservativeHavoc(_domain, Samples);
     }
+
+    [Test]
+    public void ClosedDomainComparisonsAndInvalidValuesAreExplicit()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                _domain.Compare(NullnessValue.Null, NullnessValue.Null),
+                Is.Zero);
+            Assert.That(
+                _domain.Compare(NullnessValue.MaybeNull, NullnessValue.Null),
+                Is.Positive);
+            Assert.Throws<ArgumentOutOfRangeException>(
+                (Action)(() =>
+                    _domain.AssumeNull((NullnessValue)int.MaxValue)));
+        }
+    }
 }

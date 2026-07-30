@@ -10,7 +10,36 @@ internal static class RequiresCallSiteAnalyzer
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
-        return new Analysis(caller, declaration, semanticModel, session, reportDiagnostic, cancellationToken).Run();
+        return RequiresCallSiteTreeAnalyzer.Analyze(
+            caller,
+            declaration,
+            semanticModel,
+            session,
+            reportDiagnostic,
+            cancellationToken);
+    }
+
+    internal static AnalyzerSemanticOutcome AnalyzeCallable(
+        IMethodSymbol caller,
+        SyntaxNode declaration,
+        SemanticModel semanticModel,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        ControlFlowGraph? graph,
+        IOperation? operationRoot,
+        bool screenForPotentialCalls,
+        CancellationToken cancellationToken)
+    {
+        return new Analysis(
+                caller,
+                declaration,
+                semanticModel,
+                session,
+                reportDiagnostic,
+                graph,
+                operationRoot,
+                cancellationToken)
+            .Run(screenForPotentialCalls);
     }
 
     private sealed class Analysis(
@@ -19,14 +48,33 @@ internal static class RequiresCallSiteAnalyzer
         SemanticModel semanticModel,
         AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic,
+        ControlFlowGraph? graph,
+        IOperation? operationRoot,
         CancellationToken cancellationToken)
     {
         private readonly IrFactory _factory = session.IrFactory;
+        private readonly RequiresCallSiteDiscovery _discovery =
+            new(
+                caller,
+                declaration,
+                semanticModel,
+                cancellationToken,
+                graph,
+                operationRoot);
 
-        internal AnalyzerSemanticOutcome Run()
+        internal AnalyzerSemanticOutcome Run(
+            bool screenForPotentialCalls)
         {
+            if (screenForPotentialCalls &&
+                !_discovery.HasPotentialCallSite(
+                    session.HasPotentialCallPreconditions))
+            {
+                return AnalyzerSemanticOutcome.NotApplicable;
+            }
+
             var binding = session.BindRequires(caller);
-            var callSites = GetReachableCallSites(binding.IsSuccess ? binding.Contracts : null);
+            var callSites = _discovery.Get(
+                binding.IsSuccess ? binding.Contracts : null);
             if (callSites == null)
             {
                 return AnalyzerSemanticOutcome.Unknown;
@@ -41,188 +89,8 @@ internal static class RequiresCallSiteAnalyzer
             return outcome;
         }
 
-        private ImmutableArray<CallSiteCandidate>? GetReachableCallSites(BoundMethodContracts? callerContracts)
-        {
-            if (!TryCreateGraph(out var operationRoot, out var graph))
-            {
-                return null;
-            }
-
-            var managedFlow = ManagedAbstractFlow.ForCompilation(semanticModel.Compilation);
-            var entryState = ManagedContractFacts.ApplyRequires(
-                managedFlow.CreateEntryState(caller), callerContracts);
-            var flowAnalysis = managedFlow.Analyze(caller, graph, entryState, cancellationToken);
-            var flowResult = flowAnalysis.Result;
-            var callSites = new Dictionary<(SyntaxTree Tree, TextSpan Span), CallSiteCandidate>();
-            var initializer = (operationRoot as IConstructorBodyOperation)?.Initializer;
-            var operationFacts = new DefiniteOperationFacts(semanticModel.Compilation, cancellationToken);
-            foreach (var block in graph.Blocks)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!block.IsReachable)
-                {
-                    continue;
-                }
-
-                var roots = block.Operations
-                    .Concat(block.BranchValue == null ? [] : [block.BranchValue])
-                    .Concat(block.Ordinal == graph.Blocks[0].Ordinal && initializer != null ? [initializer] : []);
-                foreach (var operation in roots.SelectMany(static root => root.DescendantsAndSelf()))
-                {
-                    var call = GetCall(operation);
-                    if (call == null)
-                    {
-                        continue;
-                    }
-
-                    var hasFlowState = flowResult?.TryGetState(operation, out _) == true;
-                    if (flowAnalysis.IsComplete &&
-                        !hasFlowState &&
-                        !IsInsideExceptionHandler(operation))
-                    {
-                        continue;
-                    }
-
-                    var candidate = new CallSiteCandidate(
-                        operation,
-                        call.Value.TargetMethod,
-                        call.Value.Instance,
-                        call.Value.Arguments,
-                        (hasFlowState || !flowAnalysis.IsComplete) &&
-                        HasReplayablePrefix(operation, operationFacts),
-                        hasFlowState ? flowResult : null,
-                        flowAnalysis.Status);
-                    var key = (operation.Syntax.SyntaxTree, operation.Syntax.Span);
-                    if (!callSites.TryGetValue(key, out var existing) ||
-                        !existing.CanReplay && candidate.CanReplay)
-                    {
-                        callSites[key] = candidate;
-                    }
-                }
-            }
-            return [.. callSites.Values.OrderBy(static candidate => candidate.Operation.Syntax.SpanStart)];
-        }
-
-        private bool TryCreateGraph(out IOperation? operationRoot, out ControlFlowGraph graph)
-        {
-            try
-            {
-                var flowSyntax = GetPropertyExpression(declaration) ?? declaration;
-                operationRoot = semanticModel.GetOperation(flowSyntax, cancellationToken);
-                while (operationRoot?.Parent != null)
-                {
-                    operationRoot = operationRoot.Parent;
-                }
-
-                var created = operationRoot switch
-                {
-                    IMethodBodyOperation method =>
-                        ControlFlowGraph.Create(method, cancellationToken),
-                    IConstructorBodyOperation constructor =>
-                        ControlFlowGraph.Create(constructor, cancellationToken),
-                    IBlockOperation block =>
-                        ControlFlowGraph.Create(block, cancellationToken),
-                    _ => ControlFlowGraph.Create(declaration, semanticModel, cancellationToken)
-                };
-                if (created == null)
-                {
-                    graph = null!;
-                    return false;
-                }
-                graph = created;
-                return true;
-            }
-            catch (Exception exception) when (
-                exception is ArgumentException or InvalidOperationException)
-            {
-                operationRoot = null;
-                graph = null!;
-                return false;
-            }
-        }
-
-        private bool HasReplayablePrefix(
-            IOperation callSite,
-            DefiniteOperationFacts operationFacts)
-        {
-            if (declaration is BaseMethodDeclarationSyntax
-                {
-                    ExpressionBody.Expression: { } expressionBody
-                })
-            {
-                return expressionBody.Span == callSite.Syntax.Span;
-            }
-
-            if (declaration is AccessorDeclarationSyntax
-                {
-                    ExpressionBody.Expression: { } accessorExpression
-                })
-            {
-                return accessorExpression.Span == callSite.Syntax.Span;
-            }
-
-            var propertyExpression = GetPropertyExpression(declaration);
-            if (propertyExpression != null)
-            {
-                return propertyExpression.Span == callSite.Syntax.Span;
-            }
-
-            if (declaration is ConstructorDeclarationSyntax constructor &&
-                callSite.Syntax is ConstructorInitializerSyntax initializer &&
-                ReferenceEquals(initializer.Parent, constructor))
-            {
-                return true;
-            }
-
-            var body = declaration switch
-            {
-                BaseMethodDeclarationSyntax method => method.Body,
-                AccessorDeclarationSyntax accessor => accessor.Body,
-                _ => null
-            };
-            if (body == null)
-            {
-                return false;
-            }
-
-            var statement = callSite.Syntax.AncestorsAndSelf().OfType<StatementSyntax>()
-                .FirstOrDefault(candidate => ReferenceEquals(candidate.Parent, body));
-            return statement != null &&
-                   IsDirectReplayableStatement(statement, callSite, operationFacts) &&
-                   body.Statements
-                       .TakeWhile(candidate => !ReferenceEquals(candidate, statement))
-                       .All(prior =>
-                           prior is EmptyStatementSyntax or LocalFunctionStatementSyntax ||
-                           operationFacts.CompletesNormally(
-                               semanticModel.GetOperation(prior, cancellationToken)));
-        }
-
-        private bool IsDirectReplayableStatement(
-            StatementSyntax statement,
-            IOperation callSite,
-            DefiniteOperationFacts operationFacts)
-        {
-            var span = callSite.Syntax.Span;
-            return statement switch
-            {
-                ExpressionStatementSyntax
-                {
-                    Expression: AssignmentExpressionSyntax assignment
-                } when assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) =>
-                    assignment.Right.Span == span &&
-                    operationFacts.CompletesNormally(
-                        semanticModel.GetOperation(assignment.Left, cancellationToken)),
-                ExpressionStatementSyntax expression => expression.Expression.Span == span,
-                LocalDeclarationStatementSyntax local =>
-                    local.Declaration.Variables.Count == 1 &&
-                    local.Declaration.Variables[0].Initializer?.Value.Span == span,
-                ReturnStatementSyntax returned => returned.Expression?.Span == span,
-                ThrowStatementSyntax thrown => thrown.Expression?.Span == span,
-                _ => false
-            };
-        }
-
-        private AnalyzerSemanticOutcome AnalyzeCallSite(CallSiteCandidate candidate)
+        private AnalyzerSemanticOutcome AnalyzeCallSite(
+            RequiresCallSiteCandidate candidate)
         {
             if (!SymbolEqualityComparer.Default.Equals(
                     semanticModel.GetEnclosingSymbol(
@@ -232,14 +100,17 @@ internal static class RequiresCallSiteAnalyzer
                 return AnalyzerSemanticOutcome.NotApplicable;
             }
 
-            if ((candidate.TargetMethod.IsStatic ||
-                 candidate.TargetMethod.MethodKind == MethodKind.Constructor) &&
-                candidate.TargetMethod.ContainingType.StaticConstructors.Length != 0)
+            var contractTarget =
+                candidate.TargetMethod.ReducedFrom ??
+                candidate.TargetMethod;
+            if ((contractTarget.IsStatic ||
+                 contractTarget.MethodKind == MethodKind.Constructor) &&
+                contractTarget.ContainingType.StaticConstructors.Length != 0)
             {
                 return AnalyzerSemanticOutcome.Unknown;
             }
 
-            var binding = session.BindRequires(candidate.TargetMethod);
+            var binding = session.BindRequires(contractTarget);
             if (!binding.IsSuccess || binding.Contracts == null)
             {
                 return AnalyzerSemanticOutcome.Unknown;
@@ -270,7 +141,7 @@ internal static class RequiresCallSiteAnalyzer
         }
 
         private AnalyzerSemanticOutcome AnalyzeAbstractCallSite(
-            CallSiteCandidate candidate,
+            RequiresCallSiteCandidate candidate,
             BoundMethodContracts contracts,
             ImmutableArray<BoundContractClause> requires)
         {
@@ -290,12 +161,28 @@ internal static class RequiresCallSiteAnalyzer
             }
 
             var variables = new Dictionary<IrVarId, ManagedAbstractValue>();
+            var definitelyStrings = new HashSet<IrVarId>();
             foreach (var variable in GetInputVariables(contracts))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var actual = GetActual(candidate, variable);
-                if (actual == null ||
-                    !candidate.Flow.TryEvaluate(candidate.Operation, actual, out var value))
+                if (actual == null)
+                {
+                    return AnalyzerSemanticOutcome.Unknown;
+                }
+
+                var alias = GetAliasEvaluation(candidate, variable, actual);
+                ManagedAbstractValue value;
+                if (alias == CallArgumentEvaluation.Unsupported ||
+                    !(alias == CallArgumentEvaluation.CallEntry
+                        ? candidate.Flow.TryEvaluateAtOrigin(
+                            candidate.Operation,
+                            actual,
+                            out value)
+                        : candidate.Flow.TryEvaluate(
+                            candidate.Operation,
+                            actual,
+                            out value)))
                 {
                     return AnalyzerSemanticOutcome.Unknown;
                 }
@@ -308,6 +195,10 @@ internal static class RequiresCallSiteAnalyzer
                 }
 
                 variables.Add(variable.Variable, value);
+                if (IsDefinitelyString(actual))
+                {
+                    definitelyStrings.Add(variable.Variable);
+                }
             }
 
             return CompleteEvaluation(
@@ -315,7 +206,10 @@ internal static class RequiresCallSiteAnalyzer
                 requires.Select(clause =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var value = ManagedContractFacts.Evaluate(clause.Condition, variables);
+                    var value = ManagedContractFacts.Evaluate(
+                        clause.Condition,
+                        variables,
+                        definitelyStrings);
                     return new ClauseEvaluation(
                         value.TryGetBoolean(out var proven) ? proven : null,
                         clause.Condition);
@@ -323,13 +217,15 @@ internal static class RequiresCallSiteAnalyzer
         }
 
         private AnalyzerSemanticOutcome? AnalyzeConcreteCall(
-            CallSiteCandidate callSite,
+            RequiresCallSiteCandidate callSite,
             BoundMethodContracts contracts,
             ImmutableArray<BoundContractClause> requires)
         {
-            if (callSite.TargetMethod.ReducedFrom != null ||
-                callSite.TargetMethod.Parameters.Any(
-                    static parameter => parameter.RefKind != RefKind.None))
+            if (contracts.Target.Parameters.Any(
+                    static parameter => parameter.RefKind != RefKind.None) ||
+                requires.Any(static clause =>
+                    ManagedContractFacts.ContainsPotentiallyFailingCast(
+                        clause.Condition)))
             {
                 return null;
             }
@@ -389,7 +285,7 @@ internal static class RequiresCallSiteAnalyzer
         }
 
         private AnalyzerSemanticOutcome CompleteEvaluation(
-            CallSiteCandidate callSite,
+            RequiresCallSiteCandidate callSite,
             IEnumerable<ClauseEvaluation> evaluations)
         {
             var outcome = AnalyzerSemanticOutcome.Proven;
@@ -426,60 +322,99 @@ internal static class RequiresCallSiteAnalyzer
     }
 
     private static IOperation? GetActual(
-        CallSiteCandidate callSite,
+        RequiresCallSiteCandidate callSite,
         BoundContractVariable variable)
     {
+        var isReducedExtension =
+            callSite.TargetMethod.ReducedFrom != null;
         return variable.Role switch
         {
             BoundContractVariableRole.Receiver => callSite.Instance,
+            BoundContractVariableRole.Parameter
+                when isReducedExtension && variable.Ordinal == 0 =>
+                callSite.Instance,
             BoundContractVariableRole.Parameter =>
-                callSite.Arguments.FirstOrDefault(argument =>
-                    argument.Parameter?.Ordinal == variable.Ordinal)?.Value,
+                GetArgument(callSite, variable)?.Value,
             _ => null
         };
     }
 
-    private static CallTarget? GetCall(IOperation operation)
+    private static CallArgumentEvaluation GetAliasEvaluation(
+        RequiresCallSiteCandidate callSite,
+        BoundContractVariable variable,
+        IOperation actual)
     {
-        return operation switch
+        if (variable.Role != BoundContractVariableRole.Parameter)
         {
-            IInvocationOperation invocation => new(
-                invocation.TargetMethod, invocation.Instance, invocation.Arguments),
-            IObjectCreationOperation { Constructor: { } constructor } creation =>
-                new(constructor, null, creation.Arguments),
-            _ => null
-        };
-    }
+            return CallArgumentEvaluation.Snapshot;
+        }
 
-    private static ExpressionSyntax? GetPropertyExpression(SyntaxNode declaration)
-    {
-        return declaration switch
+        var isReducedExtension = callSite.TargetMethod.ReducedFrom != null;
+        if (isReducedExtension && variable.Ordinal == 0)
         {
-            PropertyDeclarationSyntax property => property.ExpressionBody?.Expression,
-            IndexerDeclarationSyntax indexer => indexer.ExpressionBody?.Expression,
-            _ => null
-        };
+            var receiverKind =
+                callSite.TargetMethod.ReducedFrom!.Parameters[0].RefKind;
+            return CallArgumentAliasPolicy.Classify(
+                receiverKind,
+                actual,
+                argumentSyntax: null,
+                isSyntheticReceiver: true);
+        }
+
+        var argument = GetArgument(callSite, variable);
+        if (argument?.Parameter == null)
+        {
+            return CallArgumentEvaluation.Unsupported;
+        }
+
+        var isSyntheticReceiver =
+            callSite.TargetMethod.IsExtensionMethod &&
+            callSite.TargetMethod.ReducedFrom == null &&
+            callSite.Instance == null &&
+            variable.Ordinal == 0 &&
+            argument.Syntax is not ArgumentSyntax;
+        return CallArgumentAliasPolicy.Classify(
+            argument.Parameter.RefKind,
+            actual,
+            argument.Syntax,
+            isSyntheticReceiver);
     }
 
-    private static bool IsInsideExceptionHandler(IOperation operation)
+    private static IArgumentOperation? GetArgument(
+        RequiresCallSiteCandidate callSite,
+        BoundContractVariable variable)
     {
-        return operation.Syntax.AncestorsAndSelf().Any(static syntax =>
-            syntax is CatchClauseSyntax or CatchFilterClauseSyntax or FinallyClauseSyntax);
+        var isReducedExtension =
+            callSite.TargetMethod.ReducedFrom != null;
+        var ordinal = isReducedExtension
+            ? variable.Ordinal - 1
+            : variable.Ordinal;
+        IArgumentOperation? result = null;
+        foreach (var argument in callSite.Arguments)
+        {
+            if (argument.Parameter?.Ordinal != ordinal)
+            {
+                continue;
+            }
+
+            if (argument.ArgumentKind ==
+                    ArgumentKind.ParamArray ||
+                result != null)
+            {
+                return null;
+            }
+
+            result = argument;
+        }
+
+        return result;
     }
 
-    private readonly record struct CallTarget(
-        IMethodSymbol TargetMethod,
-        IOperation? Instance,
-        ImmutableArray<IArgumentOperation> Arguments);
-
-    private readonly record struct CallSiteCandidate(
-        IOperation Operation,
-        IMethodSymbol TargetMethod,
-        IOperation? Instance,
-        ImmutableArray<IArgumentOperation> Arguments,
-        bool CanReplay,
-        ManagedFlowResult? Flow,
-        ManagedFlowStatus FlowStatus);
+    private static bool IsDefinitelyString(IOperation operation)
+    {
+        return DefiniteOperationFacts.UnwrapHarmlessValue(operation)
+            .Type?.SpecialType == SpecialType.System_String;
+    }
 
     private readonly record struct ClauseEvaluation(bool? Value, IrTerm Condition);
 }

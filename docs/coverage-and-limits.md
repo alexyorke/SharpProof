@@ -13,8 +13,8 @@ unsupported expressions, approximate facts, and exhausted budgets remain
 
 | Surface | Runs where | Implemented behavior | Current boundary |
 |---|---|---|---|
-| Effect contracts | Analyzer with `SharpProofFeatures=effects` or `all` | Runs a bounded acyclic scalar CFG pass, then computes conservative may summaries for reads, writes, allocation, capabilities, exceptions, termination, and completeness; checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, `[AllowedExceptions]`, and `[EffectContract]`; emits one accountable worker claim per selected attribute | Impossible refined branches are excluded. A loop disables scalar refinement but the conservative all-block scan can still prove effect absence. Possible effects, exhausted budgets, and unresolved boundaries remain typed `Unknown`; only the narrow independently replayed direct-witness subset can be `Refuted` |
-| Call-site preconditions | Analyzer with `SharpProofFeatures=contracts` or `all` | Binds source `Contract.Requires` clauses and closed parameter attributes with compiler symbols for ordinary calls and object creation; combines exact IR replay with compilation-scoped Boolean, nullness, interval, cardinality, return-annotation, approved API-spec result, and effect facts at definite call sites | Unknown values, possible throws, cycles, and exhausted analysis budgets do not become violations or proofs; unsupported explicitly selected methods report SP0047 |
+| Effect contracts | Analyzer with `SharpProofFeatures=effects` or `all` | Runs a bounded acyclic scalar CFG pass, then computes conservative may summaries for reads, writes, allocation, capabilities, exceptions, termination, and completeness; checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, `[AllowedExceptions]`, and `[EffectContract]`; emits one accountable worker claim per selected attribute | Impossible refined branches are excluded. A loop disables scalar refinement but the conservative all-block scan can still prove effect absence. Possible effects, exhausted budgets, and unresolved boundaries remain typed `Unknown`. Compiler violation candidates also remain `Unknown(CounterexampleReplayFailed)` until an executable lowered-body effect trace can be replayed |
+| Call-site preconditions | Analyzer with `SharpProofFeatures=contracts` or `all` | Binds source `Contract.Requires` clauses and closed parameter attributes with compiler symbols for ordinary calls and object creation; follows executable local-function, lambda, and anonymous-method child CFGs exactly once; combines exact IR replay with compilation-scoped Boolean, nullness, interval, cardinality, explicitly trusted return-annotation, approved API-spec result, and effect facts at definite call sites | Unknown or captured values, possible throws, cycles, quoted expression-tree lambdas, and exhausted analysis budgets do not become violations or proofs; unsupported explicitly selected methods report SP0047 |
 | Postconditions | Optional Windows x64 worker with `SharpProofFeatures=contracts` or `all`; strict enables the worker by default | Manifests `Contract.Ensures` and return attributes, including directly owned local-function, lambda, anonymous-method, and top-level claims, then proves admitted bounded obligations over normal-return paths with Boolean logic, bounded integer comparisons, checked `long` arithmetic, and replay-gated counterexamples | The additional callable forms are currently visible as `UnsupportedCallable`; `effects` excludes postcondition claims; this is bounded `Ensures` verification, not arbitrary deep, recursive, looping, heap, or sequence verification |
 | Worker body execution | Compiler collector plus opt-in Windows x64 worker | The compiler emits portable whole-body CFG/IR; the worker executes its bounded acyclic subset with locals, reassignment, branches, multiple returns, entry-state `Old`, supported expressions, and eligible resolved API specs | Loops, stateful instructions outside the narrow admitted model, unresolved calls, unsupported mutation, and exceeded bounds abstain |
 | `ContractFor` validation | Incremental generator loaded with any non-`off` profile | Validates companion type and member identity, including receiver, overload, generic constraints, ref/scoped kinds, nullability, defaults, and return shape | It validates and binds existing source; it emits no generated source and does not make an unsupported contract provable |
@@ -58,6 +58,13 @@ conversion, unsupported member access, or unsupported invocation form still
 causes frontend abstention. The effect scanner can likewise return an
 incomplete summary for admitted syntax.
 
+The table describes selected effect and verifier-body admission. The separate
+call-site precondition pass traverses Roslyn child CFGs for executable local
+functions, lambdas, and anonymous methods without admitting those callable
+forms to effect or postcondition verification. Nested outcomes remain attached
+to their owner and are not folded into the containing method. Expression-tree
+lambdas remain quoted, non-executing code for this pass.
+
 The verifier body subset is narrower than the analyzer gate: compiler artifact
 lowering and the worker executor accept only acyclic, bounded instructions they
 can substitute and model exactly. Analyzer admission must not be read as worker
@@ -77,7 +84,9 @@ support.
 
 The compiler elides `Requires`, `Ensures`, and `Assume` calls unless
 `SHARPPROOF_CONTRACTS` is defined. SharpProof binds their compiler operations;
-it does not parse free-form contract strings.
+it does not parse free-form contract strings. Enabled analysis rejects that
+reserved symbol through both package configuration and the final compiler
+compilation, including source-local directives and generated syntax trees.
 
 ### Closed attributes
 
@@ -109,7 +118,7 @@ compiler-elided call, including its argument evaluation.
 
 ## Resolved API specification inventory
 
-The default table has seven BCL rows. Every row resolves by documentation
+The default table has eleven BCL rows. Every row resolves by documentation
 comment ID and original symbol identity across the supported reference
 surfaces. Effects, allocation, throws, nullness, and cardinality are separate
 facets; an exact fact in one facet does not make an unknown facet exact.
@@ -117,6 +126,10 @@ facets; an exact fact in one facet does not make an unknown facet exact.
 | Spec ID and row | Effects | Allocation | Throws | Result fact |
 |---|---|---|---|---|
 | `bcl.array.empty` - `System.Array.Empty<T>()` | Unknown because the generic cache can trigger type initialization | Unknown | Does not throw | Non-null, empty sequence |
+| `bcl.exception.ctor` - `System.Exception..ctor()` | Writes the fresh receiver | None at the call boundary | Does not throw | None |
+| `bcl.exception.ctor.string` - `System.Exception..ctor(string)` | Writes the fresh receiver | None at the call boundary | Does not throw | None |
+| `bcl.invalid-operation-exception.ctor` - `System.InvalidOperationException..ctor()` | Writes the fresh receiver | None at the call boundary | Does not throw | None |
+| `bcl.invalid-operation-exception.ctor.string` - `System.InvalidOperationException..ctor(string)` | Writes the fresh receiver | None at the call boundary | Does not throw | None |
 | `bcl.object.ctor` - `System.Object..ctor()` | None at the call boundary | None at the call boundary | Does not throw | None |
 | `bcl.string.length` - `System.String.Length` getter | Reads receiver state | None | Does not throw | Result equals receiver length |
 | `bcl.string.concat.string-string` - `System.String.Concat(string, string)` | None | May allocate | Does not throw | Non-null string |
@@ -124,9 +137,15 @@ facets; an exact fact in one facet does not make an unknown facet exact.
 | `bcl.math.abs.int32` - `Math.Abs(int)` | None | None | May throw `OverflowException` | Result is non-negative on normal return |
 | `bcl.enumerable.empty` - `Enumerable.Empty<T>()` | Unknown because the generic cache can trigger type initialization | Unknown | Does not throw | Non-null, empty sequence |
 
-These seven rows are the complete supported built-in BCL surface. Anything
+These eleven rows are the complete supported built-in BCL surface. Anything
 outside this table, or any row that does not resolve exactly for the current
-target framework, fails closed.
+target framework, fails closed. Object creation always analyzes a source
+constructor or resolves an exact catalog row; exception constructors are not
+implicitly trusted. In particular,
+`AggregateException(IEnumerable<Exception>)` is unmodeled and produces an
+incomplete effect result. A direct `throw new` refutation witness is available
+only when the exact constructor has approved `DoesNotThrow` and `Terminates`
+facets; either facet remaining unknown prevents a definite witness.
 
 The worker projects validated call-result facets only into bounded proxies:
 
@@ -145,14 +164,21 @@ The table also contains compiler-bound ghost rows for `Contract.Requires`,
 contract semantics and the throwing behavior of direct `Result`/`Old`
 invocation; they are not BCL coverage.
 
+Contract API symbols are accepted only from the `SharpProof.Attributes`
+assembly identity matching the analyzer payload. Clause methods also require
+the exact supported signatures and one real
+`Conditional("SHARPPROOF_CONTRACTS")` attribute. Rejected source/project
+shadows, identity mismatches, and malformed lookalikes remain visibly selected
+but contribute no contract, effect, trust, suppression, or compiler-bound
+ghost specification evidence.
+
 ## Outcomes, accountability, and cache boundary
 
 - `Proven` requires a hygienic core containing only lowered facts, resolved
   specs, verified contracts, or explicit user assumptions.
-- `Refuted` requires executable replay of the candidate model or independent
-  validation of a compiler-produced `DefiniteViolation` effect witness. The
-  analyzer's general effect may-analysis does not by itself produce definitive
-  effect refutations.
+- `Refuted` requires executable replay of a postcondition candidate model.
+  Compiler-produced effect evidence is not independently executable and
+  therefore cannot produce an effect refutation.
   The proof kernel first checks exact backend-model closure and re-evaluates
   the lowered assumptions and goal. The worker then independently executes the
   compiler-produced whole-body program along the concrete CFG path and
@@ -168,7 +194,7 @@ invocation; they are not BCL coverage.
 - `Unknown` covers unsupported, unresolved, approximate, method-time-limited,
   or resource-exhausted claim analysis. Unsupported unannotated analyzer
   callables are silent; unsupported selected callables produce SP0047.
-- Protocol version 8 binds a compiler-manifest artifact and separately records
+- Protocol version 9 binds a compiler-manifest artifact and separately records
   run status, callable coverage, and one
   outcome for each stable manifest claim ID. Exact manifest/result equality is
   mandatory.
@@ -182,18 +208,22 @@ invocation; they are not BCL coverage.
   trusted complete boundaries, definite direct violations, and unavailable
   evidence. A disallowed effect in a may-effect summary is not a replayed
   counterexample, so it remains `Unknown(EffectContractNotEstablished)`.
-  `Refuted` is limited to simple unconditional direct managed allocation,
-  explicit throw, receiver-field access, empty `lock`, and exact `Monitor`
-  witnesses whose structured conflict is independently checked by the worker.
-  Conditional, static-initialization-sensitive, and may-only conflicts remain
-  `Unknown`.
+  A compiler `DefiniteViolation` candidate is also insufficient because its
+  effect operation and path are not lowered for independent worker replay.
+  The worker maps such a compiler `Refuted` candidate to the fatal typed result
+  `Unknown(CounterexampleReplayFailed)` with unavailable certainty and no
+  published witness. Conditional, static-initialization-sensitive, and
+  may-only conflicts remain `Unknown(EffectContractNotEstablished)`.
 - Proven postconditions expose `ContradictoryPreconditions` or
-  `NoModeledNormalReturn` vacuity evidence in JSON, cache payloads, and SARIF.
+  `NoModeledNormalReturn` vacuity evidence in JSON and SARIF. Proven claims are
+  not disk-cache entries.
 - Caller cancellation is run status `Canceled`, project timeout is
   `TimedOut`, and infrastructure/protocol/backend/replay failure is `Failed`.
   None is a successful claim outcome.
-- Cache schema version 9 stores only complete validated payloads. Cache reads
-  are checked against the entire current manifest. Unknown, cancellation,
+- Cache schema version 11 stores only complete, postcondition-only, all-refuted
+  payloads. Cache reads are checked against the entire current manifest, then
+  every supported scalar model is reconstructed and whole-body replayed.
+  Proven claims, effect claims, unsupported models, `Unknown`, cancellation,
   timeout, malformed result, infrastructure failure, and failed replay are not
   semantic cache entries. `require-proven` disables the local semantic cache.
 - `SharpProofVerifyPolicy` maps incomplete selected analysis to informational,
@@ -203,7 +233,7 @@ invocation; they are not BCL coverage.
 ## Closed compiler artifact and remaining limits
 
 During Windows verification, the production analyzer captures compiler
-artifact schema version 5 from the post-generator compilation. The artifact
+artifact schema version 8 from the post-generator compilation. The artifact
 contains:
 
 - the feature-selected, sealed claim manifest;

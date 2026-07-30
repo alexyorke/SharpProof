@@ -152,7 +152,11 @@ public sealed class SharpProofWorker : IDisposable
             if (cache != null)
             {
                 var cached = await cache.TryReadAsync(
-                    snapshot.InputHash, manifest, request.Budgets, projectBoundary.Token).ConfigureAwait(false);
+                    snapshot.InputHash,
+                    manifest,
+                    targets,
+                    request.Budgets,
+                    projectBoundary.Token).ConfigureAwait(false);
                 projectBoundary.Token.ThrowIfCancellationRequested();
                 if (cached != null)
                 {
@@ -222,7 +226,11 @@ public sealed class SharpProofWorker : IDisposable
                     WorkerCacheStatus.Rejected, responseValidation.Errors);
             }
             if (cache != null && VerificationCache.IsCacheable(
-                    response, snapshot.InputHash, manifest))
+                    response,
+                    snapshot.InputHash,
+                    manifest,
+                    targets,
+                    projectBoundary.Token))
             {
                 var written = await cache.TryWriteAsync(
                     response, snapshot.InputHash, manifest, projectBoundary.Token).ConfigureAwait(false);

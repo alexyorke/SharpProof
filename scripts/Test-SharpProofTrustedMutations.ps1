@@ -5,6 +5,8 @@ param(
 
     [string]$OutputPath = 'artifacts\mutation\summary.json',
 
+    [string[]]$MutationName = @(),
+
     [switch]$KeepWorkspace
 )
 
@@ -62,6 +64,86 @@ $mutations = @(
         Filter = 'FullyQualifiedName~ResolverRejectsATypeFromAnUnapprovedAssemblyIdentity'
     },
     [pscustomobject]@{
+        Name = 'untrusted-return-annotation'
+        File = 'SharpProof.Effects\ManagedAbstractFlow.cs'
+        Original = "_trustedBoundaries.AuthorizesDeclaredContracts(method))"
+        Mutated = '(_trustedBoundaries.AuthorizesDeclaredContracts(method) || method.ContainingAssembly != null))'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~UnverifiedReturnAnnotationsCannotDischargeRuntimeExceptions'
+    },
+    [pscustomobject]@{
+        Name = 'effect-discovery-operation-stage'
+        File = 'SharpProof.Effects\OperationEffectScanner.cs'
+        Original = '            OperationSupportStage.EffectDiscovery,'
+        Mutated = '            OperationSupportStage.ContractExpressionLowering,'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~CatchVariableFlowUsesTheEffectDiscoveryCatalog'
+    },
+    [pscustomobject]@{
+        Name = 'runtime-interpolation-fails-closed'
+        File = 'SharpProof.Frontend\OperationSupportCatalog.cs'
+        Original = "            OperationKind.ConditionalAccessInstance or`n            OperationKind.ObjectOrCollectionInitializer or"
+        Mutated = "            OperationKind.ConditionalAccessInstance or`n            OperationKind.InterpolatedString or`n            OperationKind.ObjectOrCollectionInitializer or"
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~StringConstructionDistinguishesKnownAndUnknownAllocation'
+    },
+    [pscustomobject]@{
+        Name = 'advisory-contract-candidate-detection'
+        File = 'SharpProof.Frontend\ContractApiMetadata.cs'
+        Original = '        EnsuresMethodName,'
+        Mutated = '        RequiresMethodName,'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ContractCandidateActivationRunsClausePlacementValidation'
+    },
+    [pscustomobject]@{
+        Name = 'advisory-full-activation-selection'
+        File = 'SharpProof.Analyzer\SharpProofAnalyzer.cs'
+        Original = 'return AdvisoryActivation.Full;'
+        Mutated = "return new(`n                        RequiresSymbolAnalysis: false,`n                        RequiresOperationAnalysis: true,`n                        RequiresFullOperationAnalysis: false);"
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~SelectedGeneratedMethodIsAnalyzedAndReported'
+    },
+    [pscustomobject]@{
+        Name = 'advisory-lazy-state-creation'
+        File = 'SharpProof.Analyzer\AnalyzerSession.cs'
+        Original = '_callPreconditions = new('
+        Mutated = "_ = _apiSpecs.Value;`n        _callPreconditions = new("
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~AdvisoryPotentialWorkCreatesOnlyALightweightSession'
+    },
+    [pscustomobject]@{
+        Name = 'external-precondition-screening'
+        File = 'SharpProof.Analyzer\SharpProofAnalyzer.cs'
+        Original = '            "PositiveAttribute" or'
+        Mutated = '            "NotNullAttribute" or'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~UnannotatedCallerStillChecksExternalClosedPreconditions'
+    },
+    [pscustomobject]@{
+        Name = 'compilation-reference-model-owner'
+        File = 'SharpProof.Frontend\CompilationModelProvider.cs'
+        Original = '        return owner.GetSemanticModel(tree, ignoreAccessibility: false);'
+        Mutated = '        return compilation.GetSemanticModel(tree, ignoreAccessibility: false);'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~CompilationReferenceNestedParameterContractActivatesCallAnalysis'
+    },
+    [pscustomobject]@{
+        Name = 'generated-selected-analysis-accountability'
+        File = 'SharpProof.Analyzer\SharpProofAnalyzer.cs'
+        Original = "context.ConfigureGeneratedCodeAnalysis(`n            GeneratedCodeAnalysisFlags.Analyze |`n            GeneratedCodeAnalysisFlags.ReportDiagnostics);"
+        Mutated = 'context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~SelectedGeneratedMethodIsAnalyzedAndReported'
+    },
+    [pscustomobject]@{
+        Name = 'trusted-boundary-nonblank-reason'
+        File = 'SharpProof.Effects\TrustedBoundaryPolicy.cs'
+        Original = '!string.IsNullOrWhiteSpace(reason));'
+        Mutated = 'reason != "\0");'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~UnverifiedReturnAnnotationsCannotDischargeRuntimeExceptions'
+    },
+    [pscustomobject]@{
         Name = 'counterexample-replay-polarity'
         File = 'SharpProof.Worker\CallableCounterexampleReplayer.cs'
         Original = 'evaluated.Value is { Kind: IrValueKind.Boolean, Boolean: false }'
@@ -70,12 +152,60 @@ $mutations = @(
         Filter = 'FullyQualifiedName~TrivialNormalCompletionRequiresItsPostconditionToBeFalse'
     },
     [pscustomobject]@{
-        Name = 'effect-witness-replay-kind'
-        File = 'SharpProof.Worker\EffectWitnessReplayer.cs'
-        Original = 'WorkerEffectSet.Allocates) != 0,'
-        Mutated = 'WorkerEffectSet.Throws) != 0,'
+        Name = 'modeled-call-flow-definedness'
+        File = 'SharpProof.Worker\AcyclicBlockPredicateExecutor.cs'
+        Original = 'predicate = application.Predicate;'
+        Mutated = 'predicate = factory.Boolean(true);'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
-        Filter = 'FullyQualifiedName~EffectWitnessReplayRejectsConstraintMismatch'
+        Filter = 'FullyQualifiedName~SpecCallArgumentDefinednessConstrainsSubsequentFlow'
+    },
+    [pscustomobject]@{
+        Name = 'modeled-call-receiver-definedness'
+        File = 'SharpProof.Worker\AcyclicBlockPredicateExecutor.cs'
+        Original = 'guard = receiverGuard;'
+        Mutated = 'guard = factory.Boolean(true);'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~SpecCallReceiverDefinednessConstrainsSubsequentFlow'
+    },
+    [pscustomobject]@{
+        Name = 'modeled-call-argument-definedness'
+        File = 'SharpProof.Worker\AcyclicBlockPredicateExecutor.cs'
+        Original = 'guard = argumentGuard;'
+        Mutated = 'guard = factory.Boolean(true);'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~SpecCallArgumentDefinednessConstrainsSubsequentFlow'
+    },
+    [pscustomobject]@{
+        Name = 'effect-refutation-fail-closed'
+        File = 'SharpProof.Worker\EffectClaimResultAssembler.cs'
+        Original = 'if (evidence.Outcome == WorkerClaimOutcome.Refuted)'
+        Mutated = 'if (evidence.Outcome == WorkerClaimOutcome.Unknown)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~CompilerOnlyEffectViolationFailsClosedWithoutAReplayTrace'
+    },
+    [pscustomobject]@{
+        Name = 'effect-vacuity-requires-entry-contradiction'
+        File = 'SharpProof.Worker\EffectClaimResultAssembler.cs'
+        Original = 'if (entryFeasibility.IsContradictory)'
+        Mutated = 'if (!entryFeasibility.IsUnknown)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~EffectOnlyClaimRemainsAccountableWhileMixedRequiresFailsClosed'
+    },
+    [pscustomobject]@{
+        Name = 'effect-vacuity-used-assumption-core'
+        File = 'SharpProof.Worker\CallableClaimResultAssembler.cs'
+        Original = 'usedAssumptionIds.Contains(evidence.Id)'
+        Mutated = 'usedAssumptionIds.Contains(evidence.Id) || evidence.Kind == WorkerAssumptionKind.Precondition'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~LiteralEffectVacuityMarksOnlyItsContradictoryPreconditionUsed'
+    },
+    [pscustomobject]@{
+        Name = 'live-effect-bottom-entry-fails-closed'
+        File = 'SharpProof.Analyzer\EffectContractDiagnostics.cs'
+        Original = "var declaredComplete = !entryIsBottom && !summary.IsBottom &&`n            projection.IsComplete &&"
+        Mutated = "var declaredComplete = projection.IsComplete &&"
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~BottomEntryCannotDirectlyProveAnEffectContract'
     },
     [pscustomobject]@{
         Name = 'cache-manifest-binding'
@@ -83,13 +213,13 @@ $mutations = @(
         Original = '!string.Equals(payload.ManifestHash, manifest.Hash, StringComparison.Ordinal) ||'
         Mutated = 'false ||'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
-        Filter = 'FullyQualifiedName~CacheRejectsPayloadSealedForADifferentManifest'
+        Filter = 'FullyQualifiedName~RehashedCacheSealedForDifferentManifestMissesAndRecomputes'
     },
     [pscustomobject]@{
         Name = 'protocol-manifest-result-equality'
         File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
         Original = "actual.OrderBy(static value => value, StringComparer.Ordinal)`n            .SequenceEqual(expected.OrderBy(static value => value, StringComparer.Ordinal),`n                StringComparer.Ordinal)"
-        Mutated = 'true'
+        Mutated = 'actual.Concat(expected).All(static _ => true)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~StrictResponseValidationRequiresExactManifestAndResultSets'
     },
@@ -103,7 +233,17 @@ $mutations = @(
     }
 )
 
-$mutationRoot = Join-Path $repositoryRoot 'artifacts\mutation'
+if ($MutationName.Count -gt 0) {
+    $knownNames = @($mutations.Name)
+    $requestedNames = @($MutationName | Select-Object -Unique)
+    $unknownNames = @($requestedNames | Where-Object { $_ -notin $knownNames })
+    if ($unknownNames.Count -gt 0) {
+        throw "Unknown mutation name(s): $($unknownNames -join ', ')."
+    }
+    $mutations = @($mutations | Where-Object { $_.Name -in $requestedNames })
+}
+
+$mutationRoot = Join-Path ([IO.Path]::GetTempPath()) 'SharpProof-mutation'
 $workspace = Join-Path $mutationRoot (
     'workspace-' + [Guid]::NewGuid().ToString('N'))
 $sourceRoot = Join-Path $workspace 'source'

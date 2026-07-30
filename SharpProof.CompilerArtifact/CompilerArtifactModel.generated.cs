@@ -11,7 +11,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 5;
+    internal const int Current = 8;
 }
 
 internal enum CompilerContractKind
@@ -190,6 +190,59 @@ internal sealed class CompilerSpecCallArtifact
     public bool ConsumesMemoryHavoc { get; set; }
 }
 
+internal enum CompilerOutputKind
+{
+    ConsoleApplication = 0,
+    WindowsApplication = 1,
+    DynamicallyLinkedLibrary = 2,
+    NetModule = 3,
+    WindowsRuntimeMetadata = 4,
+    WindowsRuntimeApplication = 5
+}
+
+internal enum CompilerOptimizationLevel
+{
+    Debug = 0,
+    Release = 1
+}
+
+internal enum CompilerPlatform
+{
+    AnyCpu = 0,
+    AnyCpu32BitPreferred = 1,
+    Arm = 2,
+    Arm64 = 3,
+    Itanium = 4,
+    X64 = 5,
+    X86 = 6
+}
+
+internal enum CompilerNullableContext
+{
+    Disable = 0,
+    Warnings = 1,
+    Annotations = 2,
+    Enable = 3
+}
+
+internal enum CompilerMetadataImportOptions
+{
+    Public = 0,
+    Internal = 1,
+    All = 2
+}
+
+internal enum CompilerAssemblyIdentityComparer
+{
+    Default = 0,
+    Desktop = 1
+}
+
+internal enum CompilerResolverPolicy
+{
+    EvidenceOnly = 0
+}
+
 internal sealed class CompilerDiagnosticArtifact
 {
     public string Code { get; set; } = string.Empty;
@@ -274,7 +327,7 @@ internal static class CompilerEffectClaimArtifactCodec
         var witness = value.Witness;
         var constraint = value.Constraint;
         using var hash = new CanonicalHashWriter();
-        hash.Add("SharpProof.CompilerEffectClaimEvidence", 6, value.ClaimId,
+        hash.Add("SharpProof.CompilerEffectClaimEvidence", 7, value.ClaimId,
             value.ContractKind, value.Outcome, value.Reason, value.Certainty,
             constraint.AllowedEffects, constraint.AllowedCapabilities);
         foreach (var type in constraint.AllowedExceptionTypes

@@ -13,6 +13,7 @@ internal sealed record CorpusGateResult(
     int CaseCount,
     int BaseCaseCount,
     int OpenSourceMethodCount,
+    int SupportedOpenSourceMethodCount,
     int OpenSourceFileCount,
     int SyntheticSeedCount,
     int VariantCount,
@@ -94,6 +95,20 @@ internal static class CorpusGate
                 .Count() != cases.Length)
         {
             failures.Add("Corpus case IDs are not unique.");
+        }
+
+        var unclassifiedCases = cases
+            .Where(static item =>
+                item.Support is not (
+                    CorpusSupport.Supported or
+                    CorpusSupport.IntentionallyUnsupported))
+            .Select(static item => item.Id)
+            .ToArray();
+        if (unclassifiedCases.Length != 0)
+        {
+            failures.Add(
+                "Corpus cases require an explicit support classification: " +
+                string.Join(", ", unclassifiedCases));
         }
 
         if (expected.Count != cases.Length)
@@ -181,23 +196,28 @@ internal static class CorpusGate
             StringComparer.Ordinal);
         var supportedCaseCount = cases.Count(static item =>
             item.Support == CorpusSupport.Supported);
-        var intentionallyUnsupportedCaseCount = cases.Length - supportedCaseCount;
+        var supportedOpenSourceMethodCount = cases.Count(static item =>
+            item.Origin == CorpusOrigin.OpenSource &&
+            item.Support == CorpusSupport.Supported);
+        var intentionallyUnsupportedCaseCount = cases.Count(static item =>
+            item.Support == CorpusSupport.IntentionallyUnsupported);
         var supportedUnknownCount = immutableObservations.Count(observation =>
             casesById[observation.CaseId].Support == CorpusSupport.Supported &&
             observation.Verdict is
                 CorpusVerdict.Unknown or CorpusVerdict.SilentUnknown);
-        if (supportedUnknownCount != 0)
-        {
-            failures.Add(
-                $"{supportedUnknownCount} supported corpus cases produced Unknown; " +
-                "supported cases must have an accountable Proven or Refuted result.");
-        }
+        failures.AddRange(
+            ValidateSupportedOutcomes(
+                cases,
+                [.. immutableObservations.Select(static observation =>
+                    (observation.CaseId, observation.Verdict))]));
 
         var unknownReasons = CountUnknownReasons(immutableObservations);
         ValidateUnknownReasonRatchet(
             unknownReasonRatchet,
             unknownReasons,
             totalUnknownCount,
+            supportedCaseCount,
+            supportedOpenSourceMethodCount,
             failures);
         var observationCount = immutableObservations.Length;
         return new CorpusGateResult(
@@ -205,6 +225,7 @@ internal static class CorpusGate
             cases.Length,
             CorpusCatalog.Seeds.Length + openSourceCases.Length,
             openSourceCases.Length,
+            supportedOpenSourceMethodCount,
             openSourceDocument.Methods
                 .Select(static method => method.Path)
                 .Distinct(StringComparer.Ordinal)
@@ -233,6 +254,27 @@ internal static class CorpusGate
             unknownReasons,
             allowedDegradations.ToImmutable(),
             failures.ToImmutable());
+    }
+
+    internal static ImmutableArray<string> ValidateSupportedOutcomes(
+        ImmutableArray<CorpusCase> cases,
+        ImmutableArray<(string CaseId, CorpusVerdict Verdict)> observations)
+    {
+        var casesById = cases.ToImmutableDictionary(
+            static item => item.Id,
+            StringComparer.Ordinal);
+        var supportedUnknownCount = observations.Count(observation =>
+            casesById.TryGetValue(observation.CaseId, out var item) &&
+            item.Support == CorpusSupport.Supported &&
+            observation.Verdict is
+                CorpusVerdict.Unknown or CorpusVerdict.SilentUnknown);
+        return supportedUnknownCount == 0
+            ? []
+            : [
+                $"{supportedUnknownCount} supported corpus cases produced " +
+                "Unknown; supported cases must have an accountable Proven " +
+                "or Refuted result."
+            ];
     }
 
     public static async Task<string> RenderActualSnapshotAsync(
@@ -586,8 +628,27 @@ internal static class CorpusGate
         CorpusUnknownReasonRatchet ratchet,
         ImmutableArray<CorpusUnknownReasonCount> actual,
         int totalUnknownCount,
+        int supportedCaseCount,
+        int supportedOpenSourceMethodCount,
         ImmutableArray<string>.Builder failures)
     {
+        if (supportedCaseCount < ratchet.MinimumSupportedCases)
+        {
+            failures.Add(
+                "Corpus support regressed from the ratcheted minimum of " +
+                $"{ratchet.MinimumSupportedCases} cases to " +
+                $"{supportedCaseCount}.");
+        }
+
+        if (supportedOpenSourceMethodCount <
+            ratchet.MinimumSupportedOpenSourceMethods)
+        {
+            failures.Add(
+                "Supported OSS corpus coverage regressed from the ratcheted " +
+                $"minimum of {ratchet.MinimumSupportedOpenSourceMethods} " +
+                $"methods to {supportedOpenSourceMethodCount}.");
+        }
+
         if (totalUnknownCount > ratchet.MaximumTotalUnknown)
         {
             failures.Add(
@@ -620,18 +681,24 @@ internal static class CorpusGate
     {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
         var root = document.RootElement;
-        if (root.GetProperty("schemaVersion").GetInt32() != 1)
+        if (root.GetProperty("schemaVersion").GetInt32() != 2)
         {
             throw new InvalidDataException(
                 "Unsupported corpus Unknown-reason ratchet schema.");
         }
 
+        var minimumSupportedCases =
+            root.GetProperty("minimumSupportedCases").GetInt32();
+        var minimumSupportedOpenSourceMethods =
+            root.GetProperty("minimumSupportedOpenSourceMethods").GetInt32();
         var maximumTotalUnknown =
             root.GetProperty("maximumTotalUnknown").GetInt32();
-        if (maximumTotalUnknown < 0)
+        if (minimumSupportedCases < 0 ||
+            minimumSupportedOpenSourceMethods < 0 ||
+            maximumTotalUnknown < 0)
         {
             throw new InvalidDataException(
-                "The corpus Unknown maximum cannot be negative.");
+                "Corpus support minima and Unknown maxima cannot be negative.");
         }
 
         var maximumByReason =
@@ -655,6 +722,8 @@ internal static class CorpusGate
             }
         }
         return new CorpusUnknownReasonRatchet(
+            minimumSupportedCases,
+            minimumSupportedOpenSourceMethods,
             maximumTotalUnknown,
             maximumByReason.ToImmutable());
     }

@@ -1,5 +1,6 @@
 using SharpProof.Analyzer;
 
+// This builder runs only in the build-time compiler collector.
 namespace SharpProof.CompilerArtifact;
 
 internal sealed class ClaimManifestBuilder(
@@ -13,10 +14,10 @@ internal sealed class ClaimManifestBuilder(
         ContractClauseInventoryBuilder.ForCompilation(compilation);
     private readonly ContractSelectionInventory _attributes =
         ContractSelectionInventory.ForCompilation(compilation);
+    private readonly EffectiveContractSourceResolver _contractSources =
+        EffectiveContractSourceResolver.ForCompilation(compilation);
     private readonly AnalyzerSession _effectSession =
         new(compilation, AnalyzerConfiguration.AdvisoryAll, cancellationToken);
-    private readonly ImmutableArray<ContractForSymbolMatcher.CompanionDescriptor> _companions =
-        ContractForSymbolMatcher.DiscoverCompanions(compilation, cancellationToken);
 
     internal ClaimManifestBuildResult Build()
     {
@@ -48,19 +49,13 @@ internal sealed class ClaimManifestBuilder(
     private ManifestCallableTarget? BuildTarget(CallableSeed seed, string callableId)
     {
         var target = seed.Method;
-        var inventory = _clauses.Create(target);
-        var source = target;
-        var usesCompanion = false;
-        if (!inventory.Clauses.Any(static clause => clause.IsValid) &&
-            ContractForSymbolMatcher.ResolveCompanion(_companions, target).Method is { } companion)
-        {
-            source = companion;
-            inventory = _clauses.Create(source);
-            usesCompanion = true;
-        }
+        var resolution = _contractSources.Resolve(target);
+        var source = resolution.Source;
+        var inventory = resolution.Inventory;
+        var usesCompanion = resolution.UsesCompanion;
         var postconditions = CreatePostconditions(
             target, source, inventory, usesCompanion, callableId);
-        var selected = SelectFeatures(target, inventory);
+        var selected = SelectFeatures(target, resolution);
         var assumptions = CreateAssumptions(
             target, source, inventory, usesCompanion, callableId);
         if (postconditions.IsDefaultOrEmpty && selected.IsDefaultOrEmpty && assumptions.IsDefaultOrEmpty)
@@ -174,12 +169,11 @@ internal sealed class ClaimManifestBuilder(
 
     private ImmutableArray<WorkerSelectedFeature> SelectFeatures(
         IMethodSymbol method,
-        ContractClauseInventory inventory)
+        EffectiveContractSourceResolution resolution)
     {
         var selected = _attributes.Select(
             method,
-            inventory.Clauses.Any(static clause =>
-                clause.Placement != ContractClausePlacement.NestedCallable),
+            resolution.HasSelectedContractIntent,
             TrustedAttributes(method).Any());
         var result = ImmutableArray.CreateBuilder<WorkerSelectedFeature>(2);
         if (EffectsEnabled && (selected & ContractSelectionFeatures.Effects) != 0)
@@ -275,7 +269,9 @@ internal sealed class ClaimManifestBuilder(
                     Ordinal = ordinalOffset + claims.Count,
                     Kind = WorkerClaimKind.Effect,
                     Evidence = WorkerClaimEvidence.Attribute,
-                    EffectContractKind = evaluation.Kind,
+                    EffectContractKind =
+                        CompilerEffectEvaluationWireMappings.ToWorker(
+                            evaluation.Kind),
                     Location = ToSourceLocation(AttributeLocation(attribute, method))
                 };
                 var evidence = CreateEffectEvidence(claimId, evaluation);
@@ -294,16 +290,24 @@ internal sealed class ClaimManifestBuilder(
         return new()
         {
             ClaimId = claimId,
-            ContractKind = evaluation.Kind,
-            Outcome = evaluation.Outcome,
-            Reason = evaluation.Reason,
-            Certainty = evaluation.Certainty,
+            ContractKind =
+                CompilerEffectEvaluationWireMappings.ToWorker(
+                    evaluation.Kind),
+            Outcome =
+                CompilerEffectEvaluationWireMappings.ToWorker(
+                    evaluation.Outcome),
+            Reason =
+                CompilerEffectEvaluationWireMappings.ToWorker(
+                    evaluation.Reason),
+            Certainty =
+                CompilerEffectEvaluationWireMappings.ToWorker(
+                    evaluation.Certainty),
             Constraint = new CompilerEffectConstraintArtifact
             {
                 AllowedEffects = ToWorkerEffects(evaluation.Constraint.Effects),
                 AllowedCapabilities = ToWorkerCapabilities(evaluation.Constraint.Capabilities),
                 AllowedExceptionTypes = [.. evaluation.Constraint.ExceptionTypes
-                    .Select(EffectTypeIdentity)
+                    .Select(CompilerExceptionTypeIdentity.Encode)
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(static value => value, StringComparer.Ordinal)]
             },
@@ -315,7 +319,9 @@ internal sealed class ClaimManifestBuilder(
                     Detail = witness.Detail,
                     Effects = ToWorkerEffects(witness.Effects),
                     Capabilities = ToWorkerCapabilities(witness.Capabilities),
-                    ExactExceptionTypeHierarchy = CreateExceptionHierarchy(witness.ExceptionType),
+                    ExactExceptionTypeHierarchy =
+                        CompilerExceptionTypeIdentity.EncodeHierarchy(
+                            witness.ExceptionType),
                     Location = ToSourceLocation(witness.Location)
                 },
             Evidence = evaluation.Evidence
@@ -442,7 +448,7 @@ internal sealed class ClaimManifestBuilder(
                 }
             }
         }
-        foreach (var companion in _companions)
+        foreach (var companion in _contractSources.Companions)
         {
             foreach (var method in ContractForSymbolMatcher.GetOrdinaryMethods(companion.Target))
             {
@@ -456,7 +462,9 @@ internal sealed class ClaimManifestBuilder(
         void Add(IMethodSymbol? method)
         {
             if (method != null &&
-                !ContractForSymbolMatcher.IsCompanionType(_companions, method.ContainingType))
+                !ContractForSymbolMatcher.IsCompanionType(
+                    _contractSources.Companions,
+                    method.ContainingType))
             {
                 methods.Add(ContractClauseInventoryBuilder.NormalizeCallable(method));
             }
@@ -592,22 +600,6 @@ internal sealed class ClaimManifestBuilder(
             Line = mapped.StartLinePosition.Line + 1,
             Column = mapped.StartLinePosition.Character + 1
         };
-    }
-
-    private static string[] CreateExceptionHierarchy(INamedTypeSymbol? type)
-    {
-        var identities = new List<string>();
-        for (var current = type; current != null; current = current.BaseType)
-        {
-            identities.Add(EffectTypeIdentity(current));
-        }
-
-        return [.. identities.OrderBy(static value => value, StringComparer.Ordinal)];
-    }
-    private static string EffectTypeIdentity(INamedTypeSymbol type)
-    {
-        return (type.ContainingAssembly?.Identity.Name ?? string.Empty) + ":" +
-        (DocumentationCommentId.CreateDeclarationId(type) ?? type.MetadataName);
     }
 
     private readonly record struct ClaimCandidate(

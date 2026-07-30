@@ -2,7 +2,7 @@
   "schema": "SharpProof.ApiSpecCatalog",
   "schemaVersion": 1,
   "tableIdentity": "SharpProof.ApiSpec.Default",
-  "tableVersion": "3",
+  "tableVersion": "5",
   "assemblySets": [
     {
       "id": "framework",
@@ -274,6 +274,194 @@
     },
     {
       "target": {
+        "witnessIdentifier": "bcl.exception.ctor",
+        "documentationCommentId": "M:System.Exception.#ctor",
+        "containingTypeMetadataName": "System.Exception",
+        "memberKind": "Constructor",
+        "memberName": ".ctor",
+        "isStatic": false,
+        "genericArity": 0,
+        "receiverType": "Reference",
+        "parameterTypes": [],
+        "resultType": null,
+        "approvedAssemblySet": "framework"
+      },
+      "facets": {
+        "effects": {
+          "values": [
+            "WritesReceiverState"
+          ],
+          "evidence": "observed"
+        },
+        "allocation": {
+          "behavior": "None",
+          "evidence": "observed"
+        },
+        "throws": {
+          "behavior": "DoesNotThrow",
+          "exceptionMetadataNames": [],
+          "evidence": "observed"
+        },
+        "termination": {
+          "behavior": "Terminates",
+          "evidence": "observed"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "documented"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "documented"
+        }
+      },
+      "postconditions": []
+    },
+    {
+      "target": {
+        "witnessIdentifier": "bcl.exception.ctor.string",
+        "documentationCommentId": "M:System.Exception.#ctor(System.String)",
+        "containingTypeMetadataName": "System.Exception",
+        "memberKind": "Constructor",
+        "memberName": ".ctor",
+        "isStatic": false,
+        "genericArity": 0,
+        "receiverType": "Reference",
+        "parameterTypes": [
+          "String"
+        ],
+        "resultType": null,
+        "approvedAssemblySet": "framework"
+      },
+      "facets": {
+        "effects": {
+          "values": [
+            "WritesReceiverState"
+          ],
+          "evidence": "observed"
+        },
+        "allocation": {
+          "behavior": "None",
+          "evidence": "observed"
+        },
+        "throws": {
+          "behavior": "DoesNotThrow",
+          "exceptionMetadataNames": [],
+          "evidence": "observed"
+        },
+        "termination": {
+          "behavior": "Terminates",
+          "evidence": "observed"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "documented"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "documented"
+        }
+      },
+      "postconditions": []
+    },
+    {
+      "target": {
+        "witnessIdentifier": "bcl.invalid-operation-exception.ctor",
+        "documentationCommentId": "M:System.InvalidOperationException.#ctor",
+        "containingTypeMetadataName": "System.InvalidOperationException",
+        "memberKind": "Constructor",
+        "memberName": ".ctor",
+        "isStatic": false,
+        "genericArity": 0,
+        "receiverType": "Reference",
+        "parameterTypes": [],
+        "resultType": null,
+        "approvedAssemblySet": "framework"
+      },
+      "facets": {
+        "effects": {
+          "values": [
+            "WritesReceiverState"
+          ],
+          "evidence": "observed"
+        },
+        "allocation": {
+          "behavior": "None",
+          "evidence": "observed"
+        },
+        "throws": {
+          "behavior": "DoesNotThrow",
+          "exceptionMetadataNames": [],
+          "evidence": "observed"
+        },
+        "termination": {
+          "behavior": "Terminates",
+          "evidence": "observed"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "documented"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "documented"
+        }
+      },
+      "postconditions": []
+    },
+    {
+      "target": {
+        "witnessIdentifier": "bcl.invalid-operation-exception.ctor.string",
+        "documentationCommentId": "M:System.InvalidOperationException.#ctor(System.String)",
+        "containingTypeMetadataName": "System.InvalidOperationException",
+        "memberKind": "Constructor",
+        "memberName": ".ctor",
+        "isStatic": false,
+        "genericArity": 0,
+        "receiverType": "Reference",
+        "parameterTypes": [
+          "String"
+        ],
+        "resultType": null,
+        "approvedAssemblySet": "framework"
+      },
+      "facets": {
+        "effects": {
+          "values": [
+            "WritesReceiverState"
+          ],
+          "evidence": "observed"
+        },
+        "allocation": {
+          "behavior": "None",
+          "evidence": "observed"
+        },
+        "throws": {
+          "behavior": "DoesNotThrow",
+          "exceptionMetadataNames": [],
+          "evidence": "observed"
+        },
+        "termination": {
+          "behavior": "Terminates",
+          "evidence": "observed"
+        },
+        "nullness": {
+          "result": "NotApplicable",
+          "evidence": "documented"
+        },
+        "cardinality": {
+          "result": "NotApplicable",
+          "exactCount": null,
+          "evidence": "documented"
+        }
+      },
+      "postconditions": []
+    },
+    {
+      "target": {
         "witnessIdentifier": "bcl.object.ctor",
         "documentationCommentId": "M:System.Object.#ctor",
         "containingTypeMetadataName": "System.Object",
@@ -300,6 +488,10 @@
         "throws": {
           "behavior": "DoesNotThrow",
           "exceptionMetadataNames": [],
+          "evidence": "observed"
+        },
+        "termination": {
+          "behavior": "Terminates",
           "evidence": "observed"
         },
         "nullness": {

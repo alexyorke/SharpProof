@@ -14,6 +14,10 @@ public static class FrameworkTypeMetadataNames
     public const string DivideByZeroException =
         "System.DivideByZeroException";
     public const string Exception = "System.Exception";
+    public const string ExpressionOfT =
+        "System.Linq.Expressions.Expression`1";
+    public const string GeneratedCodeAttribute =
+        "System.CodeDom.Compiler.GeneratedCodeAttribute";
     public const string IndexOutOfRangeException =
         "System.IndexOutOfRangeException";
     public const string InvalidCastException = "System.InvalidCastException";

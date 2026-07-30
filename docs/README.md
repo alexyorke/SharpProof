@@ -36,7 +36,7 @@ The implementation remains the authority for enumerated surfaces:
   `*DiagnosticDescriptors.generated.cs` files are checked-in compiled
   projections.
 - `SharpProof.Worker.Protocol/ProtocolModel.schema.json` declares protocol
-  version 8, manifest schema version 4, cache schema version 9, policies, run
+  version 9, manifest schema version 4, cache schema version 11, policies, run
   statuses, callable coverage, claim outcomes/reasons, and summary records.
   `ProtocolModel.generated.cs` is the checked-in compiled projection.
 - `SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json` is the

@@ -33,6 +33,7 @@ internal enum CorpusOrigin
 
 internal enum CorpusSupport
 {
+    Unspecified,
     Supported,
     IntentionallyUnsupported
 }
@@ -53,6 +54,8 @@ internal sealed record CorpusUnknownReasonCount(
     int Count);
 
 internal sealed record CorpusUnknownReasonRatchet(
+    int MinimumSupportedCases,
+    int MinimumSupportedOpenSourceMethods,
     int MaximumTotalUnknown,
     ImmutableDictionary<string, int> MaximumByReason);
 
@@ -72,6 +75,7 @@ internal sealed record CorpusSeed(
     string Id,
     string Mode,
     CorpusVerdict ExpectedVerdict,
+    CorpusSupport Support,
     string Attributes,
     string Body,
     string AdditionalMembers);
@@ -121,4 +125,5 @@ internal sealed record OpenSourceCorpusMethod(
     string DeclarationSha256,
     string MethodName,
     string Mode,
-    CorpusVerdict ExpectedVerdict);
+    CorpusVerdict ExpectedVerdict,
+    CorpusSupport Support);

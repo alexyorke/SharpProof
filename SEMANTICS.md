@@ -23,7 +23,7 @@ depends on a modeled call which the independent interpreter cannot execute is
 also `Unknown`; it is never reported as a refutation. Backend unavailability,
 infrastructure failure, malformed backend output, containment failure, and a
 failed replay of an otherwise replayable counterexample make protocol version
-8 mark the whole run `Failed`; these conditions are fatal under every build
+9 mark the whole run `Failed`; these conditions are fatal under every build
 policy. Unsupported unannotated analyzer callables remain silent. Explicitly
 selected unsupported callables produce SP0047.
 
@@ -40,7 +40,7 @@ exhaustion, and all `Unknown` outcomes are not reusable proof-cache entries.
 
 ## Accountable selection and worker runs
 
-Worker protocol version 8 separates `WorkerRunStatus` from
+Worker protocol version 9 separates `WorkerRunStatus` from
 `WorkerClaimOutcome`. The compiler-symbol-based manifest is sealed before
 verification. It contains every selected callable, every discovered
 postcondition, and every selected effect-attribute occurrence with a stable
@@ -58,14 +58,26 @@ applies to everything selected by that feature set; disabled features are not
 silently counted as analyzed. Repeated effect attributes receive distinct
 manifest claims while sharing the effective combined constraint and evidence.
 Each effect claim is `Proven` only when a complete compiler-produced effect
-summary establishes its contract. It is `Refuted` only for a structured
-`DefiniteViolation` witness produced from a simple unconditional direct
-operation and independently checked by the worker against the sealed
-constraint. Conditional and may-only conflicts remain
+summary establishes its contract. The compiler can record a structured
+`DefiniteViolation` candidate for a simple unconditional direct operation, but
+the current artifact does not carry an independently executable effect path.
+The worker therefore fails closed by mapping every such candidate to the fatal
+typed result `Unknown(CounterexampleReplayFailed)` with unavailable certainty
+and no published witness. The worker does not emit effect `Refuted` results.
+Conditional and may-only conflicts remain
 `Unknown(EffectContractNotEstablished)`; incomplete evidence is
 `Unknown(EffectSummaryIncomplete)`. Other certainty values distinguish a
 complete or incomplete may-effect summary, a trusted complete boundary, and
 unavailable evidence.
+
+Exception constraints and exact witness hierarchies use the type-reference
+documentation ID qualified by the full compiler assembly identity: name,
+version, culture, and public-key token. Compiler classification and worker
+artifact validation therefore cannot confuse types imported through aliases
+from distinct same-simple-name assemblies. Type-reference IDs preserve
+constructed generic arguments. Exact user-defined generic exception witnesses
+remain outside the admitted direct-candidate subset and therefore remain
+`Unknown`.
 
 Every selected callable has explicit `Complete` or `Incomplete` coverage.
 Every manifest claim has exactly one `Proven`, `Refuted`, or `Unknown` result.
@@ -122,7 +134,9 @@ A postcondition is established only when its bound C# expression is both
 defined and true on every normal return; a possible exception while evaluating
 the postcondition produces `Unknown`. Verification assumptions include the
 lowered body's normal-completion condition, so throwing executions are not
-mistaken for normal-return counterexamples.
+mistaken for normal-return counterexamples. Successful evaluation of every
+executed assignment right-hand side contributes to that condition even when
+the assigned value is never read.
 
 `Contract.Assume` is explicit user evidence and must remain visible as
 `Justification.UserAssumed`. A diagnostic suppression changes reporting only; it
@@ -137,6 +151,15 @@ calls do not evaluate their arguments. A direct runtime invocation of
 `Contract.Result<T>()` or `Contract.Old<T>(...)` is invalid and may allocate and
 throw `InvalidOperationException`; their effect specs describe that direct-call
 behavior.
+
+Contract clauses and annotations are evidence only when their symbols resolve
+to the `SharpProof.Attributes` assembly identity and built-DLL SHA-256 payload
+matching the analyzer, and the `Contract` type has the exact supported shape.
+Each clause method must carry exactly one real
+`Conditional("SHARPPROOF_CONTRACTS")` attribute. A source, project, identity,
+payload, or shape lookalike is selected only for accountable abstention; it
+contributes no assumption, postcondition, effect, suppression, trust fact, or
+compiler-bound ghost specification.
 
 Callee postconditions may be assumed only after verification or explicit trust.
 
@@ -154,7 +177,9 @@ observable purity. They are not compatible with `[ZeroAllocations]`.
 
 Compile-time constant and enum-member references are values, not static-state
 reads. Built-in compound assignments and increments over properties include
-the effects of both the getter and setter.
+the effects of both the getter and setter. Until the computed stored value is
+represented explicitly, a setter entry precondition on that value makes the
+computed write incomplete rather than borrowing an operand as false evidence.
 
 An operation that may throw and is not discharged by the analysis makes
 `[DoesNotThrow]` unknown. This includes implicit exceptions from dereferences,
@@ -190,13 +215,27 @@ therefore makes the corresponding contract `Unknown`; a may-effect alone cannot
 produce `Refuted`. Separately, the compiler recognizes a narrow set of simple
 unconditional direct operations: managed object/array allocation, explicit
 throw, receiver-field access, empty `lock`, and exact `Monitor` calls. It
-records a source-located structured witness, and the worker independently
-validates the witness/constraint conflict before returning `Refuted`.
+records a source-located structured candidate, but the worker cannot
+independently replay its effect operation and path. The candidate is therefore
+reported as the fatal typed result
+`Unknown(CounterexampleReplayFailed)`, not `Refuted`.
 Static-field access, conditional/path-dependent operations, and
-user-constructed exact exception types remain outside that refutation subset.
+user-constructed exact exception types remain outside that direct-candidate
+subset.
 The analyzer's definitive SP0013, SP0015, and SP0030 diagnostics remain
 reserved; direct violations are accountable through worker claim results and
 SARIF.
+
+An imported callee effect summary is complete only when the call has no entry
+preconditions or every compiler-bound `Requires` and closed parameter
+precondition is established at that call site. An unproven or invalidly placed
+callee precondition produces
+`Unknown(EffectSummaryIncomplete)` with
+`CallPreconditionNotProven` evidence. Standalone effect analysis uses a
+conservative contract-intent check and therefore also fails closed.
+Mutation-bearing value arguments are not recomputed from post-mutation state,
+and expanded `params` calls are incomplete until the synthesized array and its
+allocation are represented explicitly.
 
 ## Analyzer activation and language boundary
 
@@ -214,6 +253,21 @@ Analyzer behavior is selected through the compilation-global
 - feature value `effects` enables effect contracts, `contracts` enables
   call-site contract analysis, and `all` (the default) enables both. The
   package carries the same selection into the compiler artifact and its manifest.
+
+Advisory compilation startup may omit the heavyweight semantic session only
+after a conservative syntax and assembly-attribute probe finds no current
+selection or call-site trigger. Configuration validation, runtime-contract
+rejection, and compiler-artifact collection still execute. Strict mode never
+uses this fast path. Adding a new source form that can select analysis or
+surface an analyzed call site therefore also requires extending this
+discovery policy and its tests.
+
+When ordinary calls activate advisory analysis without any local
+contract/attribute candidate, SharpProof runs only the conservative call-site
+precondition screen. It still checks source and metadata targets, including
+closed parameter annotations, but does not initialize contract inventories,
+companion resolution, API specifications, or effect analysis unless a target
+or selected callable demands them.
 
 Effect and incomplete-proof diagnostics are enabled informational diagnostics
 by default. A concretely replayed false precondition is SP0027 at Warning.
@@ -234,6 +288,12 @@ direct calls, object and array creation, `if`, `for`, `while`, `do`, constant
 `switch`, `try`/`catch`/`finally`, `using`, `lock`, conditional access, and
 ordinary interpolation.
 
+Effect exception flow evaluates catches in source order. A selected handler
+can consume an exception or let a rethrow escape, but an exception thrown or
+rethrown from that handler is never offered to later sibling catches.
+Nonconstant filters and uncertain runtime subtypes retain every feasible
+escape path.
+
 It rejects async and iterator bodies, `foreach`, closures, local functions,
 delegates, ref parameters or locals, ref returns, ref-like types, open type
 parameters, dynamic binding, unsafe and pointer constructs, function pointers,
@@ -243,15 +303,25 @@ and primary constructors. A closed constructed generic API call is accepted only
 when a specification resolves for that exact call. Every Roslyn `OperationKind`
 is classified by a checked-in decision table; an unknown future kind is rejected.
 
-The packaged verifier consumes compiler artifact schema version 5 produced
+That rejection defines selected effect admission, not whether the contracts
+feature can inspect a call site. Call-site precondition analysis recursively
+follows Roslyn child CFGs for executable local functions, lambdas, and anonymous
+methods. Each callable is analyzed once under its own entry and flow state, and
+its outcome is not combined with the containing callable. Unavailable captured
+facts remain unknown. An expression-tree lambda is quoted code and is not
+treated as an executing call site.
+
+The packaged verifier consumes compiler artifact schema version 8 produced
 from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed
 lowering failure or portable whole-body CFG/IR with bound clauses, canonical
 variables, body-entry state, parameter mappings, and bound API-spec witness
 metadata. It also carries compiler error diagnostics and mapped locations,
-handwritten and generated tree hashes and parse evidence, a bounded
-proof-relevant compilation-option set, assembly and target identity, and
-compiler/reference provenance. It contains no source text.
+handwritten and generated tree hashes, raw and effective per-tree preprocessor
+symbols, and parse evidence, plus a bounded proof-relevant compilation-option
+set, assembly and target identity, and compiler/reference provenance. An
+effective `SHARPPROOF_CONTRACTS` symbol invalidates the artifact before
+verification. The artifact contains no source text.
 
 Before cache lookup or backend creation, the worker validates the artifact
 digest and canonical shape, requires the compiler-visible maximum expression

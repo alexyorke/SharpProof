@@ -264,7 +264,7 @@ public sealed class IrFactory
     {
         lock (_gate)
         {
-            if (!IsNullable(GetTypeInfoCore(type, nameof(type)).Kind))
+            if (!IrTermServices.IsNullable(GetTypeInfoCore(type, nameof(type)).Kind))
             {
                 throw new ArgumentException("Null requires a string, reference, or sequence type.", nameof(type));
             }
@@ -356,7 +356,7 @@ public sealed class IrFactory
     {
         lock (_gate)
         {
-            if (!IsNullable(GetTypeInfoCore(type, nameof(type)).Kind))
+            if (!IrTermServices.IsNullable(GetTypeInfoCore(type, nameof(type)).Kind))
             {
                 throw new ArgumentException("Null requires a string, reference, or sequence type.", nameof(type));
             }
@@ -399,13 +399,15 @@ public sealed class IrFactory
         {
             EnsureTermCore(operand, nameof(operand));
             var semantics = IrOperatorCatalog.Get(@operator);
-            var expectedType = GetBuiltInType(semantics.Operand);
+            var expectedType = IrTermServices.GetBuiltInType(
+                this,
+                semantics.Operand);
             if (operand.Type != expectedType)
             {
                 throw new ArgumentException("The operand type is not valid for the unary operator.", nameof(operand));
             }
 
-            var folded = FoldUnary(@operator, operand);
+            var folded = IrTermServices.FoldUnary(this, @operator, operand);
             if (folded != null)
             {
                 return folded;
@@ -435,9 +437,14 @@ public sealed class IrFactory
             EnsureTermCore(left, nameof(left));
             EnsureTermCore(right, nameof(right));
             var semantics = IrOperatorCatalog.Get(@operator);
-            var resultType = ValidateBinaryAndGetResultType(
-                @operator, semantics.Operand, semantics.Result, left, right);
-            var folded = FoldBinary(@operator, left, right);
+            var resultType = IrTermServices.ValidateBinaryAndGetResultType(
+                this,
+                @operator,
+                semantics.Operand,
+                semantics.Result,
+                left,
+                right);
+            var folded = IrTermServices.FoldBinary(this, @operator, left, right);
             if (folded != null)
             {
                 return folded;
@@ -511,7 +518,7 @@ public sealed class IrFactory
                 return operand;
             }
 
-            if (operand is IrNullTerm && IsNullable(target.Kind))
+            if (operand is IrNullTerm && IrTermServices.IsNullable(target.Kind))
             {
                 return Null(targetType);
             }
@@ -564,11 +571,14 @@ public sealed class IrFactory
 
         lock (_gate)
         {
-            var elementType = ValidateSequenceTermsCore(
-                sequence, index,
+            var elementType = IrTermServices.ValidateSequenceTerms(
+                this,
+                sequence,
+                index,
                 "Sequence access requires a sequence value.",
                 "Sequence access requires an integer index.",
-                nameof(sequence), nameof(index));
+                nameof(sequence),
+                nameof(index));
             return Intern(
                 new StructuralKey(IrTermKind.SequenceAccess, elementType.Value,
                     children: [sequence.Id.Value, index.Id.Value]),
@@ -590,8 +600,14 @@ public sealed class IrFactory
     {
         lock (_gate)
         {
-            return ValidateSequenceTermsCore(
-            sequence, index, sequenceMessage, indexMessage, sequenceParameter, indexParameter);
+            return IrTermServices.ValidateSequenceTerms(
+                this,
+                sequence,
+                index,
+                sequenceMessage,
+                indexMessage,
+                sequenceParameter,
+                indexParameter);
         }
     }
 
@@ -601,7 +617,13 @@ public sealed class IrFactory
     {
         lock (_gate)
         {
-            ValidateCallShapeCore(member, receiver, arguments, parameterName, opaque: false);
+            IrTermServices.ValidateCallShape(
+                this,
+                member,
+                receiver,
+                arguments,
+                parameterName,
+                opaque: false);
         }
     }
 
@@ -615,7 +637,13 @@ public sealed class IrFactory
         lock (_gate)
         {
             var memberInfo = GetMemberInfoCore(member, nameof(member));
-            ValidateCallShapeCore(memberInfo, receiver, arguments, nameof(arguments), opaque: true);
+            IrTermServices.ValidateCallShape(
+                this,
+                memberInfo,
+                receiver,
+                arguments,
+                nameof(arguments),
+                opaque: true);
             if (purity == IrOpaquePurity.Pure)
             {
                 if (!operation.IsDefault)
@@ -638,230 +666,6 @@ public sealed class IrFactory
                 id => new IrOpaqueTerm(id, memberInfo.ReturnType, member, receiver,
                     immutableArguments, purity, operation));
         }
-    }
-
-    private void ValidateCallShapeCore(
-        IrMemberInfo member, IrTerm? receiver, IReadOnlyList<IrTerm> arguments,
-        string parameterName, bool opaque)
-    {
-        var receiverParameter = opaque ? nameof(receiver) : parameterName;
-        if (member.IsStatic && receiver != null)
-        {
-            throw new ArgumentException("A static member cannot have a receiver.", receiverParameter);
-        }
-
-        if (!member.IsStatic && receiver == null)
-        {
-            if (opaque)
-            {
-                throw new ArgumentNullException(nameof(receiver), "An instance member requires a receiver.");
-            }
-
-            throw new ArgumentException("An instance member requires a receiver.", parameterName);
-        }
-        if (receiver != null)
-        {
-            EnsureTermCore(receiver, receiverParameter);
-            if (receiver.Type != member.DeclaringType)
-            {
-                throw new ArgumentException(
-                    "An instance receiver must match the member declaring type.", receiverParameter);
-            }
-        }
-        if (arguments.Count != member.ParameterTypes.Length)
-        {
-            throw new ArgumentException("The argument count does not match the member signature.", parameterName);
-        }
-
-        for (var index = 0; index < arguments.Count; index++)
-        {
-            var argument = arguments[index] ??
-                throw new ArgumentException(opaque
-                    ? "Opaque arguments cannot contain null."
-                    : "Arguments cannot contain null.", parameterName);
-            EnsureTermCore(argument, parameterName);
-            if (argument.Type != member.ParameterTypes[index])
-            {
-                throw new ArgumentException(opaque
-                    ? "An opaque argument type does not match the member signature."
-                    : "An argument does not match the member signature.", parameterName);
-            }
-        }
-    }
-
-    private IrTypeId ValidateSequenceTermsCore(
-        IrTerm sequence, IrTerm index, string sequenceMessage, string indexMessage,
-        string sequenceParameter, string indexParameter)
-    {
-        if (sequence == null)
-        {
-            throw new ArgumentNullException(sequenceParameter);
-        }
-
-        if (index == null)
-        {
-            throw new ArgumentNullException(indexParameter);
-        }
-
-        EnsureTermCore(sequence, sequenceParameter);
-        EnsureTermCore(index, indexParameter);
-        var type = GetTypeInfoCore(sequence.Type, sequenceParameter);
-        if (type.Kind != IrTypeKind.Sequence || type.ElementType == null)
-        {
-            throw new ArgumentException(sequenceMessage, sequenceParameter);
-        }
-
-        if (index.Type != IntegerType)
-        {
-            throw new ArgumentException(indexMessage, indexParameter);
-        }
-
-        return type.ElementType.Value;
-    }
-
-    private IrTerm? FoldUnary(IrUnaryOperator @operator, IrTerm operand)
-    {
-        return (@operator, operand) switch
-        {
-            (IrUnaryOperator.Not, IrBooleanTerm value) => Boolean(!value.Value),
-            (IrUnaryOperator.Negate, IrIntegerTerm { Value: not long.MinValue } value) => Integer(-value.Value),
-            _ => null
-        };
-    }
-
-    private IrTerm? FoldBinary(IrBinaryOperator @operator, IrTerm left, IrTerm right)
-    {
-        if (@operator == IrBinaryOperator.AndAlso && left is IrBooleanTerm andLeft)
-        {
-            return andLeft.Value ? right : left;
-        }
-
-        if (@operator == IrBinaryOperator.OrElse && left is IrBooleanTerm orLeft)
-        {
-            return orLeft.Value ? left : right;
-        }
-
-        if (@operator is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual)
-        {
-            var equal = TryCompareConstants(left, right);
-            if (equal.HasValue)
-            {
-                return Boolean(@operator == IrBinaryOperator.Equal ? equal.Value : !equal.Value);
-            }
-        }
-        if (left is IrIntegerTerm leftInteger && right is IrIntegerTerm rightInteger)
-        {
-            return FoldIntegerBinary(@operator, leftInteger.Value, rightInteger.Value);
-        }
-
-        if (left is IrStringTerm leftString && right is IrStringTerm rightString &&
-            @operator == IrBinaryOperator.StringConcat)
-        {
-            return String(GetStringCore(leftString.Value) + GetStringCore(rightString.Value));
-        }
-
-        return null;
-    }
-
-    private IrTerm? FoldIntegerBinary(IrBinaryOperator @operator, long left, long right)
-    {
-        var result = IrScalarOperations.Evaluate(@operator, left, right);
-        return result.Kind switch
-        {
-            IrScalarResultKind.Integer => Integer(result.Value),
-            IrScalarResultKind.Boolean => Boolean(result.Value != 0),
-            _ => null
-        };
-    }
-
-    private static bool? TryCompareConstants(IrTerm left, IrTerm right)
-    {
-        if (left is IrBooleanTerm leftBoolean && right is IrBooleanTerm rightBoolean)
-        {
-            return leftBoolean.Value == rightBoolean.Value;
-        }
-
-        if (left is IrIntegerTerm leftInteger && right is IrIntegerTerm rightInteger)
-        {
-            return leftInteger.Value == rightInteger.Value;
-        }
-
-        if (left is IrStringTerm leftString && right is IrStringTerm rightString)
-        {
-            return leftString.Value == rightString.Value;
-        }
-
-        if (left is IrNullTerm && right is IrNullTerm)
-        {
-            return true;
-        }
-
-        if (left is IrNullTerm && IsNonNullLiteral(right) || right is IrNullTerm && IsNonNullLiteral(left))
-        {
-            return false;
-        }
-
-        return null;
-    }
-
-    private IrTypeId ValidateBinaryAndGetResultType(
-        IrBinaryOperator @operator,
-        IrTypeKind? operandKind,
-        IrTypeKind resultKind,
-        IrTerm left,
-        IrTerm right)
-    {
-        if (!operandKind.HasValue)
-        {
-            if (left.Type != right.Type)
-            {
-                throw new ArgumentException(
-                    "Equality operands must have the same type.",
-                    nameof(right));
-            }
-
-            return GetBuiltInType(resultKind);
-        }
-        return RequireTypes(
-            left,
-            right,
-            GetBuiltInType(operandKind.Value),
-            GetBuiltInType(resultKind),
-            @operator);
-    }
-
-    private static IrTypeId RequireTypes(
-        IrTerm left, IrTerm right, IrTypeId expected, IrTypeId result,
-        IrBinaryOperator @operator)
-    {
-        if (left.Type != expected || right.Type != expected)
-        {
-            throw new ArgumentException(
-            "Operands are not valid for binary operator " + @operator + ".", nameof(right));
-        }
-
-        return result;
-    }
-
-    private static bool IsNonNullLiteral(IrTerm term)
-    {
-        return term is IrBooleanTerm or IrIntegerTerm or IrStringTerm;
-    }
-
-    private static bool IsNullable(IrTypeKind kind)
-    {
-        return kind is IrTypeKind.String or IrTypeKind.Reference or IrTypeKind.Sequence;
-    }
-
-    private IrTypeId GetBuiltInType(IrTypeKind kind)
-    {
-        return kind switch
-        {
-            IrTypeKind.Boolean => BooleanType,
-            IrTypeKind.Integer => IntegerType,
-            IrTypeKind.String => StringType,
-            _ => throw new ArgumentOutOfRangeException(nameof(kind))
-        };
     }
 
     private static int PurityKey(IrOpaquePurity purity)

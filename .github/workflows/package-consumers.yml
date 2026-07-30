@@ -13,6 +13,14 @@ permissions:
   contents: read
 
 jobs:
+  security:
+    name: Exact-SHA security
+    uses: ./.github/workflows/security-reusable.yml
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+
   package:
     name: Pack exact release artifacts
     runs-on: windows-latest
@@ -55,27 +63,9 @@ jobs:
             if ($LASTEXITCODE -ne 0) {
               throw 'Release tags must identify a commit contained in origin/master.'
             }
-            $previousTag = switch ($env:GITHUB_REF_NAME) {
-              'v1.0.0-preview.1' { $null }
-              'v1.0.0-preview.2' { 'v1.0.0-preview.1' }
-              'v1.0.0-rc.1' { 'v1.0.0-preview.2' }
-              'v1.0.0' { 'v1.0.0-rc.1' }
-              default {
-                throw "Release tag '$($env:GITHUB_REF_NAME)' is not allowlisted."
-              }
-            }
-            if ($null -ne $previousTag) {
-              & git rev-parse --verify "$previousTag^{commit}"
-              if ($LASTEXITCODE -ne 0) {
-                throw "Required predecessor tag '$previousTag' does not exist."
-              }
-              & git merge-base --is-ancestor $previousTag $env:GITHUB_SHA
-              if ($LASTEXITCODE -ne 0) {
-                throw (
-                  "Required predecessor tag '$previousTag' is not an " +
-                  'ancestor of this release.')
-              }
-            }
+            $null = .\scripts\Resolve-SharpProofReleaseCoverageBaseline.ps1 `
+              -Tag $env:GITHUB_REF_NAME `
+              -ReleaseCommit $env:GITHUB_SHA
           }
           "SHARPPROOF_RELEASE_VERSION=$version" >> $env:GITHUB_ENV
 
@@ -84,6 +74,7 @@ jobs:
         run: >-
           .\scripts\Invoke-SharpProofDotnet.ps1
           restore SharpProof.sln
+          --locked-mode
           /p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION
 
       - name: Build package payloads
@@ -291,6 +282,7 @@ jobs:
       - package
       - package-consumer
       - minimum-sdk-consumer
+      - security
     runs-on: windows-latest
     permissions:
       contents: read
@@ -305,9 +297,33 @@ jobs:
           dotnet-version: "8.0.x"
           global-json-file: global.json
 
+      - name: Initialize honest release qualification status
+        shell: pwsh
+        run: >-
+          .\scripts\Write-SharpProofReleaseQualification.ps1
+          -Status running
+          -Tag $env:GITHUB_REF_NAME
+          -ReleaseCommit $env:GITHUB_SHA
+
+      - name: Resolve the immutable release coverage baseline
+        shell: pwsh
+        run: |
+          $selectionJson = `
+            .\scripts\Resolve-SharpProofReleaseCoverageBaseline.ps1 `
+              -Tag $env:GITHUB_REF_NAME `
+              -ReleaseCommit $env:GITHUB_SHA
+          $selection = $selectionJson | ConvertFrom-Json
+          $coverageBaseline = [string]$selection.coverageBaselineCommit
+          $releaseCommit = [string]$selection.releaseCommit
+          "SHARPPROOF_COVERAGE_BASELINE=$coverageBaseline" >> $env:GITHUB_ENV
+          "SHARPPROOF_RELEASE_COMMIT=$releaseCommit" >> $env:GITHUB_ENV
+
       - name: Restore the exact tagged source
         shell: pwsh
-        run: .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
+        run: >-
+          .\scripts\Invoke-SharpProofDotnet.ps1
+          restore SharpProof.sln
+          --locked-mode
 
       - name: Run full weekly-equivalent acceptance
         shell: pwsh
@@ -343,18 +359,14 @@ jobs:
       - name: Collect and enforce release coverage
         shell: pwsh
         run: |
-          .\scripts\Invoke-SharpProofDotnet.ps1 `
+          .\scripts\Invoke-SharpProofCoverage.ps1 `
             -MemoryLimitMb 12288 `
             -TimeoutSeconds 1200 `
-            test SharpProof.Dev.Tests.slnf `
-            -c Release `
-            --no-build `
-            --collect "XPlat Code Coverage" `
-            --results-directory artifacts/release-qualification/coverage
+            -ResultsDirectory artifacts/release-qualification/coverage
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           .\scripts\Test-SharpProofCoverage.ps1 `
             -CoverageRoot artifacts/release-qualification/coverage `
-            -ComparisonRef HEAD^ `
+            -ComparisonRef $env:SHARPPROOF_COVERAGE_BASELINE `
             -SummaryPath artifacts/release-qualification/coverage.json
 
       - name: Audit the exact release dependency graph
@@ -373,33 +385,54 @@ jobs:
               -FilePath artifacts/release-qualification/dependency-audit.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Record the qualified tag and commit
-        shell: pwsh
-        run: |
-          $evidence = [pscustomobject][ordered]@{
-            schemaVersion = 1
-            tag = $env:GITHUB_REF_NAME
-            commit = $env:GITHUB_SHA
-            acceptance = 'passed'
-            corpus = 'passed'
-            performance = 'passed'
-            fuzz = 'passed'
-            mutations = 'passed'
-            coverage = 'passed'
-            dependencyAudit = 'passed'
-          }
-          $json = ($evidence | ConvertTo-Json) -replace "`r`n", "`n"
-          [IO.File]::WriteAllText(
-            'artifacts/release-qualification/qualification.json',
-            $json + "`n",
-            [Text.UTF8Encoding]::new($false))
-
-      - name: Validate owner-controlled final 1.0 gates
+      - name: Validate externally tagged owner-controlled final 1.0 gates
         if: github.ref_name == 'v1.0.0'
         shell: pwsh
+        run: |
+          $evidenceRepository =
+            "https://github.com/$env:GITHUB_REPOSITORY.git"
+          .\scripts\Test-SharpProofHumanReleaseGates.ps1 `
+            -ExpectedProductCommit $env:GITHUB_SHA `
+            -EvidenceRepository $evidenceRepository `
+            -EvidenceRef refs/tags/evidence/v1.0.0 `
+            -OutputPath artifacts/release-qualification/human-gates.json
+
+      - name: Record successful release qualification
+        shell: pwsh
         run: >-
-          .\scripts\Test-SharpProofHumanReleaseGates.ps1
-          -ExpectedCommit $env:GITHUB_SHA
+          .\scripts\Write-SharpProofReleaseQualification.ps1
+          -Status passed
+          -Tag $env:GITHUB_REF_NAME
+          -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT
+          -CoverageBaselineCommit $env:SHARPPROOF_COVERAGE_BASELINE
+          -HumanEvidencePath
+          artifacts/release-qualification/human-gates.json
+
+      - name: Record failed release qualification
+        if: ${{ failure() }}
+        shell: pwsh
+        run: >-
+          .\scripts\Write-SharpProofReleaseQualification.ps1
+          -Status failed
+          -Tag $env:GITHUB_REF_NAME
+          -ReleaseCommit $env:GITHUB_SHA
+          -CoverageBaselineCommit $env:SHARPPROOF_COVERAGE_BASELINE
+          -HumanEvidencePath
+          artifacts/release-qualification/human-gates.json
+          -FailureKind workflow-failed
+
+      - name: Record canceled release qualification
+        if: ${{ cancelled() }}
+        shell: pwsh
+        run: >-
+          .\scripts\Write-SharpProofReleaseQualification.ps1
+          -Status failed
+          -Tag $env:GITHUB_REF_NAME
+          -ReleaseCommit $env:GITHUB_SHA
+          -CoverageBaselineCommit $env:SHARPPROOF_COVERAGE_BASELINE
+          -HumanEvidencePath
+          artifacts/release-qualification/human-gates.json
+          -FailureKind canceled
 
       - name: Upload exact-SHA release qualification evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -422,6 +455,7 @@ jobs:
       - minimum-sdk-consumer
       - attest
       - release-qualification
+      - security
     runs-on: ubuntu-latest
     environment: nuget.private-preview
     permissions:
@@ -480,6 +514,7 @@ jobs:
       - minimum-sdk-consumer
       - attest
       - release-qualification
+      - security
     runs-on: ubuntu-latest
     environment: nuget.org
     permissions:

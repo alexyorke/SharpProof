@@ -495,8 +495,8 @@ foreach ($declaration in $declarations) {
 $envelope = Get-RequiredMember $schema 'artifactEnvelope' 'schema'
 if ([string](Get-RequiredMember $envelope 'schema' 'artifact envelope') -ne
         'SharpProof.CompilerManifest' -or
-    [int](Get-RequiredMember $envelope 'version' 'artifact envelope') -ne 5) {
-    throw 'The compiler-artifact envelope must remain schema version 5.'
+    [int](Get-RequiredMember $envelope 'version' 'artifact envelope') -ne 8) {
+    throw 'The compiler-artifact envelope must remain schema version 8.'
 }
 
 $catalogs = @(Get-RequiredMember $schema 'wireEnumCatalogs' 'schema')
@@ -543,8 +543,8 @@ $evidence = Get-RequiredMember $schema 'effectEvidence' 'schema'
 $domain = [string](Get-RequiredMember $evidence 'domain' 'effect evidence')
 $evidenceVersion = [int](Get-RequiredMember $evidence 'version' 'effect evidence')
 if ($domain -ne 'SharpProof.CompilerEffectClaimEvidence' -or
-    $evidenceVersion -ne 6) {
-    throw 'Compiler effect evidence must preserve domain version 6.'
+    $evidenceVersion -ne 7) {
+    throw 'Compiler effect evidence must preserve domain version 7.'
 }
 $unknownReasons = @(Get-RequiredMember `
     $evidence 'unknownReasons' 'effect evidence')

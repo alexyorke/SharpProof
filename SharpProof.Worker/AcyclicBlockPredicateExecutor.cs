@@ -81,6 +81,7 @@ internal sealed class AcyclicBlockPredicateExecutor
         private bool ExecuteBlock(IrBasicBlock block, FlowState state)
         {
             var environment = state.Environment;
+            var predicate = state.Predicate;
             OperationId? expectedMemoryHavoc = null;
             for (var index = 0; index < block.Instructions.Length; index++)
             {
@@ -114,24 +115,34 @@ internal sealed class AcyclicBlockPredicateExecutor
                             return false;
                         }
 
+                        var constrainedPredicate = ConstrainNormalExecution(
+                            predicate,
+                            assigned);
+                        if (constrainedPredicate == null)
+                        {
+                            return false;
+                        }
+
+                        predicate = constrainedPredicate;
                         environment = environment.SetItem(assign.Target, assigned);
                         break;
                     case IrCallInstruction call:
                         if (!specCalls.TryGetValue(call.Id, out var prepared) ||
-                            ApplySpec(call, prepared, environment, state.Predicate) is not { } application)
+                            ApplySpec(call, prepared, environment, predicate) is not { } application)
                         {
                             return false;
                         }
 
                         environment = environment.SetItem(
                             call.Target!.Value, application.Result);
+                        predicate = application.Predicate;
                         expectedMemoryHavoc = application.ConsumesMemoryHavoc ? call.Operation : null;
                         break;
                     case IrBranchInstruction branch:
                         return index == block.Instructions.Length - 1 &&
-                            TransferBranch(block.Id, branch, state.Predicate, environment);
+                            TransferBranch(block.Id, branch, predicate, environment);
                     case IrGotoInstruction go:
-                        AddIncoming(go.Target, block.Id.Value << 1, state.Predicate, environment);
+                        AddIncoming(go.Target, block.Id.Value << 1, predicate, environment);
                         return index == block.Instructions.Length - 1;
                     case IrReturnInstruction returned:
                         if (index != block.Instructions.Length - 1 || returned.Value == null)
@@ -151,13 +162,32 @@ internal sealed class AcyclicBlockPredicateExecutor
                             return false;
                         }
 
-                        _returns.Add(new SymbolicReturn(state.Predicate, returnTerm, currentStates));
+                        _returns.Add(new SymbolicReturn(predicate, returnTerm, currentStates));
                         return true;
                     default:
                         return false;
                 }
             }
             return false;
+        }
+
+        private IrTerm? ConstrainNormalExecution(IrTerm predicate, IrTerm evaluated)
+        {
+            if (!SymbolicTermOperations.RequiresDefinednessWitness(evaluated))
+            {
+                return predicate;
+            }
+
+            if (!Spend(2))
+            {
+                return null;
+            }
+
+            var constrained = SymbolicTermOperations.ConstrainSuccessfulEvaluation(
+                factory,
+                predicate,
+                evaluated);
+            return Supported(constrained) ? constrained : null;
         }
 
         private bool TransferBranch(
@@ -281,6 +311,12 @@ internal sealed class AcyclicBlockPredicateExecutor
                     return null;
                 }
 
+                if (ConstrainNormalExecution(guard, receiver) is not { } receiverGuard)
+                {
+                    return null;
+                }
+
+                guard = receiverGuard;
                 substitutions.Add(template.Receiver.Value, receiver);
             }
             for (var index = 0; index < call.Arguments.Length; index++)
@@ -291,6 +327,12 @@ internal sealed class AcyclicBlockPredicateExecutor
                     return null;
                 }
 
+                if (ConstrainNormalExecution(guard, argument) is not { } argumentGuard)
+                {
+                    return null;
+                }
+
+                guard = argumentGuard;
                 substitutions.Add(template.Parameters[index], argument);
             }
             var result = factory.Variable(call.Target.Value);
@@ -334,7 +376,7 @@ internal sealed class AcyclicBlockPredicateExecutor
 
             _assumptions.AddRange(predicates.Select(predicate => new GuardedBodySpecAssumption(
                 template.Id, template.Target.WitnessIdentifier, guard, predicate)));
-            return new SpecApplication(result, prepared.ConsumesMemoryHavoc);
+            return new SpecApplication(result, guard, prepared.ConsumesMemoryHavoc);
         }
 
         private ImmutableDictionary<IrVarId, IrTerm>? CreateCurrentStates(
@@ -486,7 +528,10 @@ internal sealed class AcyclicBlockPredicateExecutor
         private readonly record struct FlowState(
             int Order, IrTerm Predicate,
             ImmutableDictionary<IrVarId, IrTerm> Environment);
-        private readonly record struct SpecApplication(IrTerm Result, bool ConsumesMemoryHavoc);
+        private readonly record struct SpecApplication(
+            IrTerm Result,
+            IrTerm Predicate,
+            bool ConsumesMemoryHavoc);
     }
 }
 
@@ -511,6 +556,37 @@ internal readonly record struct GuardedBodySpecAssumption(
 
 internal static class SymbolicTermOperations
 {
+    internal static bool RequiresDefinednessWitness(IrTerm? term)
+    {
+        return term is not (
+            null or
+            IrBooleanTerm or
+            IrIntegerTerm or
+            IrStringTerm or
+            IrNullTerm or
+            IrVariableTerm);
+    }
+
+    internal static IrTerm ConstrainSuccessfulEvaluation(
+        IrFactory factory,
+        IrTerm predicate,
+        IrTerm? evaluated)
+    {
+        if (!RequiresDefinednessWitness(evaluated))
+        {
+            return predicate;
+        }
+
+        var successfulEvaluation = factory.Binary(
+            IrBinaryOperator.Equal,
+            evaluated!,
+            evaluated!);
+        return factory.Binary(
+            IrBinaryOperator.AndAlso,
+            predicate,
+            successfulEvaluation);
+    }
+
     internal static IrTerm Guard(IrFactory factory, IrTerm condition, IrTerm consequence)
     {
         return factory.Binary(IrBinaryOperator.OrElse,

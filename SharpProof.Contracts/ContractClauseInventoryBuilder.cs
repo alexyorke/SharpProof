@@ -5,6 +5,8 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     private static readonly ConditionalWeakTable<Compilation, ContractClauseInventoryBuilder> Cache = new();
     private readonly Compilation _compilation =
         compilation ?? throw new ArgumentNullException(nameof(compilation));
+    private readonly ContractApiIdentityResolver _identity =
+        ContractApiIdentityResolver.ForCompilation(compilation);
     private readonly ContractClauseSymbols? _api = ContractClauseSymbols.TryCreate(compilation);
     private readonly Dictionary<SyntaxTree, int> _treeOrdinals = compilation.SyntaxTrees
         .Select(static (tree, ordinal) => (tree, ordinal))
@@ -52,6 +54,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             IInvocationOperation Invocation,
             int TreeOrdinal)>();
         var resolvedBody = implementationBody;
+        var hasRejectedContractApiUsage = false;
         foreach (var body in GetBodies(callable, implementationBody))
         {
             var model = SharpProof.Frontend.Host.CompilationModelProvider
@@ -67,6 +70,9 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             {
                 if (_api?.GetClauseKind(invocation.TargetMethod) is not { } kind)
                 {
+                    hasRejectedContractApiUsage |=
+                        _identity.IsRejectedClauseMethod(
+                            invocation.TargetMethod);
                     continue;
                 }
 
@@ -74,17 +80,43 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
                     GetTreeOrdinal(invocation.Syntax.SyntaxTree)));
             }
         }
-        var kindOrdinals = new int[3];
+        var requiresOrdinal = 0;
+        var ensuresOrdinal = 0;
+        var assumeOrdinal = 0;
         var sourceOrdinal = 0;
         var clauses = found
             .OrderBy(static clause => clause.TreeOrdinal)
             .ThenBy(static clause => clause.Invocation.Syntax.SpanStart)
             .ThenBy(static clause => clause.Invocation.Syntax.Span.Length)
             .Select(clause => new ContractClauseOccurrence(
-                clause.Kind, clause.Placement, kindOrdinals[(int)clause.Kind]++,
+                clause.Kind, clause.Placement, NextOrdinal(
+                    clause.Kind,
+                    ref requiresOrdinal,
+                    ref ensuresOrdinal,
+                    ref assumeOrdinal),
                 sourceOrdinal++, clause.Invocation))
             .ToImmutableArray();
-        return new ContractClauseInventory(callable, _api != null, resolvedBody, clauses);
+        return new ContractClauseInventory(
+            callable,
+            _api != null,
+            hasRejectedContractApiUsage,
+            resolvedBody,
+            clauses);
+    }
+
+    private static int NextOrdinal(
+        BoundContractKind kind,
+        ref int requiresOrdinal,
+        ref int ensuresOrdinal,
+        ref int assumeOrdinal)
+    {
+        return kind switch
+        {
+            BoundContractKind.Requires => requiresOrdinal++,
+            BoundContractKind.Ensures => ensuresOrdinal++,
+            BoundContractKind.Assume => assumeOrdinal++,
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown contract kind.")
+        };
     }
 
     private ContractClausePlacement Classify(
@@ -194,7 +226,9 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         try
         {
             var flow = model.AnalyzeControlFlow(statement);
-            return !flow.Succeeded || flow.StartPointIsReachable;
+            return flow == null ||
+                !flow.Succeeded ||
+                flow.StartPointIsReachable;
         }
         catch (ArgumentException)
         {

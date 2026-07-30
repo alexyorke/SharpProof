@@ -19,40 +19,33 @@
     <SharpProofMode>$(_SharpProofEffectiveLegacyMode)</SharpProofMode>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">true</SharpProofVerify>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == ''">false</SharpProofVerify>
+    <_SharpProofContractsRuntimeEnabled
+        Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(DefineConstants)', '(^|[;,])\s*SHARPPROOF_CONTRACTS\s*($|[;,])'))">true</_SharpProofContractsRuntimeEnabled>
   </PropertyGroup>
   <ItemGroup Condition="'$(_SharpProofProfileNormalized)' != 'off'">
-    <Analyzer Include="
-        $(_SharpProofAnalyzerDirectory)/SharpProof.Analyzer.dll;
-        $(SharpProofContractForGeneratorPath)">
+    <Analyzer Include="$(SharpProofPortableAnalyzerPath)">
       <SharpProofAnalyzerRole>EntryPoint</SharpProofAnalyzerRole>
     </Analyzer>
-    <!--
-      Roslyn registers dependency locations only for compiler analyzer
-      references. Keep this list explicit and managed-only; the previous
-      backslash wildcard was not portable to non-Windows hosts.
-    -->
+  </ItemGroup>
+  <ItemGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(DesignTimeBuild)' != 'true'">
+    <Analyzer Include="$(SharpProofCompilerCollectorPath)">
+      <SharpProofAnalyzerRole>Collector</SharpProofAnalyzerRole>
+    </Analyzer>
     <Analyzer Include="
-        $(_SharpProofAnalyzerDirectory)/Microsoft.Bcl.AsyncInterfaces.dll;
-        $(_SharpProofAnalyzerDirectory)/SharpProof.CompilerArtifact.dll;
-        $(_SharpProofAnalyzerDirectory)/SharpProof.Contracts.dll;
-        $(_SharpProofAnalyzerDirectory)/SharpProof.Dataflow.dll;
-        $(_SharpProofAnalyzerDirectory)/SharpProof.Effects.dll;
-        $(_SharpProofAnalyzerDirectory)/SharpProof.Frontend.dll;
-        $(_SharpProofAnalyzerDirectory)/SharpProof.Ir.dll;
-        $(_SharpProofAnalyzerDirectory)/SharpProof.Specs.dll;
-        $(_SharpProofAnalyzerDirectory)/SharpProof.Worker.Protocol.dll;
-        $(_SharpProofAnalyzerDirectory)/System.Buffers.dll;
-        $(_SharpProofAnalyzerDirectory)/System.Collections.Immutable.dll;
-        $(_SharpProofAnalyzerDirectory)/System.IO.Pipelines.dll;
-        $(_SharpProofAnalyzerDirectory)/System.Memory.dll;
-        $(_SharpProofAnalyzerDirectory)/System.Numerics.Vectors.dll;
-        $(_SharpProofAnalyzerDirectory)/System.Reflection.Metadata.dll;
-        $(_SharpProofAnalyzerDirectory)/System.Runtime.CompilerServices.Unsafe.dll;
-        $(_SharpProofAnalyzerDirectory)/System.Text.Encoding.CodePages.dll;
-        $(_SharpProofAnalyzerDirectory)/System.Text.Encodings.Web.dll;
-        $(_SharpProofAnalyzerDirectory)/System.Text.Json.dll;
-        $(_SharpProofAnalyzerDirectory)/System.Threading.Tasks.Extensions.dll">
-      <SharpProofAnalyzerRole>Dependency</SharpProofAnalyzerRole>
+        $(_SharpProofCollectorDirectory)/Microsoft.Bcl.AsyncInterfaces.dll;
+        $(_SharpProofCollectorDirectory)/SharpProof.Analyzer.dll;
+        $(_SharpProofCollectorDirectory)/SharpProof.CompilerArtifact.dll;
+        $(_SharpProofCollectorDirectory)/SharpProof.Contracts.dll;
+        $(_SharpProofCollectorDirectory)/SharpProof.Dataflow.dll;
+        $(_SharpProofCollectorDirectory)/SharpProof.Effects.dll;
+        $(_SharpProofCollectorDirectory)/SharpProof.Frontend.dll;
+        $(_SharpProofCollectorDirectory)/SharpProof.Ir.dll;
+        $(_SharpProofCollectorDirectory)/SharpProof.Specs.dll;
+        $(_SharpProofCollectorDirectory)/SharpProof.Worker.Protocol.dll;
+        $(_SharpProofCollectorDirectory)/System.IO.Pipelines.dll;
+        $(_SharpProofCollectorDirectory)/System.Text.Encodings.Web.dll;
+        $(_SharpProofCollectorDirectory)/System.Text.Json.dll">
+      <SharpProofAnalyzerRole>CollectorDependency</SharpProofAnalyzerRole>
       <Visible>false</Visible>
     </Analyzer>
   </ItemGroup>
@@ -74,6 +67,8 @@
            Text="SharpProofVerify must be true or false." />
     <Error Condition="'$(_SharpProofProfileNormalized)' == 'strict' AND '$(SharpProofVerify)' != 'true'"
            Text="SharpProofProfile=strict requires SharpProofVerify=true; use the advisory profile to make verification optional." />
+    <Error Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofContractsRuntimeEnabled)' == 'true'"
+           Text="SHARPPROOF_CONTRACTS enables runtime evaluation of ghost contracts and is not supported while SharpProof analysis is enabled. Remove it from DefineConstants or set SharpProofProfile=off." />
     <Warning Condition="'$(_SharpProofLegacyModeProvided)' == 'true'"
              Text="SharpProofMode='$(_SharpProofLegacyModeValue)' is deprecated during preview. Use SharpProofProfile and SharpProofFeatures; all-experimental maps to SharpProofFeatures=all." />
   </Target>

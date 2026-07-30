@@ -664,15 +664,39 @@ public sealed class ContractBinderTests
             Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
     }
 
+    [TestCase("[NotNull]", "string")]
+    [TestCase("[Positive]", "long")]
+    [TestCase("[InRange(1, 10)]", "long")]
+    public void ClosedPreconditionRejectsOutParameters(
+        string attribute,
+        string type)
+    {
+        var source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static void Read(ATTRIBUTE out TYPE value) {
+                    value = default!;
+                }
+            }
+            """
+            .Replace("ATTRIBUTE", attribute, StringComparison.Ordinal)
+            .Replace("TYPE", type, StringComparison.Ordinal);
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("Target", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+    }
+
     [Test]
-    public void ClosedPreconditionRejectsOutParameters()
+    public void NotNullRejectsUnconstrainedTypeParameters()
     {
         const string source =
             """
             using SharpProof.Attributes;
             public static class Target {
-                public static void Read([Positive] out long value) {
-                    value = 1;
+                public static void Read<T>([NotNull] T value) {
                 }
             }
             """;
@@ -681,6 +705,28 @@ public sealed class ContractBinderTests
         Assert.That(
             subject.Bind("Target", "Read").Failure,
             Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+    }
+
+    [Test]
+    public void NotNullAcceptsReferenceConstrainedTypeParameters()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static void Read<T>([NotNull] T value)
+                    where T : class {
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(
+            result.Contracts!.Clauses.Single().Evidence,
+            Is.EqualTo(BoundContractEvidence.ClosedAttribute));
     }
 
     [Test]
@@ -1040,6 +1086,40 @@ public sealed class ContractBinderTests
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         Assert.That(result.Contracts!.UsesCompanion, Is.False);
         Assert.That(result.Contracts.Clauses, Is.Empty);
+    }
+
+    [Test]
+    public void SourceShadowedRuntimeContractApiCannotBecomeProofEvidence()
+    {
+        const string source =
+            """
+            namespace SharpProof.Attributes {
+                public static class Contract {
+                    public static void Requires(bool condition) {
+                        System.Console.WriteLine(condition);
+                    }
+                    public static void Ensures(bool condition) {
+                        System.Console.WriteLine(condition);
+                    }
+                    public static void Assume(bool condition) {
+                        System.Console.WriteLine(condition);
+                    }
+                }
+            }
+            public static class Target {
+                public static int Read(int value) {
+                    SharpProof.Attributes.Contract.Ensures(value > 0);
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(
+            result.Failure,
+            Is.EqualTo(ContractBindingFailure.ContractApiUnavailable));
     }
 
     [TestCase(

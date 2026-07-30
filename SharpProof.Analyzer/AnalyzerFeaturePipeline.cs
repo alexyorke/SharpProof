@@ -2,6 +2,50 @@ namespace SharpProof.Analyzer;
 
 internal static class AnalyzerFeaturePipeline
 {
+    internal static void AnalyzeUnselectedOperationBlock(
+        OperationBlockAnalysisContext context,
+        AnalyzerSession session)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        if (context.OwningSymbol is not IMethodSymbol method ||
+            method.DeclaringSyntaxReferences.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        var declaration = FindDeclaration(
+            method,
+            context.OperationBlocks,
+            context.CancellationToken);
+        if (declaration == null)
+        {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Abstained);
+            return;
+        }
+
+        if (AnalyzerGeneratedCodePolicy.IsGenerated(
+                method,
+                declaration.SyntaxTree,
+                context.Compilation,
+                context.CancellationToken))
+        {
+            return;
+        }
+
+        var semanticModel = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(context.Compilation, declaration.SyntaxTree);
+        var outcome = RequiresCallSiteAnalyzer.Analyze(
+            method,
+            declaration,
+            semanticModel,
+            session,
+            context.ReportDiagnostic,
+            context.CancellationToken);
+        session.RecordSemanticOutcome(method, outcome);
+    }
+
     internal static void ValidateMethodAttributes(
         SymbolAnalysisContext context,
         AnalyzerSession session)
@@ -15,6 +59,17 @@ internal static class AnalyzerFeaturePipeline
 
         EffectContractDiagnostics.ValidateArguments(method, session, context.ReportDiagnostic);
         ClosedContractDiagnostics.Validate(method, session, context.ReportDiagnostic);
+        var rejectedContractApi =
+            session.Attributes.GetRejectedSelectionFeatures(method) !=
+            ContractSelectionFeatures.None;
+        if (rejectedContractApi &&
+            session.TryMarkRejectedContractApiReported(method))
+        {
+            ReportRejectedContractApi(
+                method,
+                context.ReportDiagnostic,
+                context.CancellationToken);
+        }
         var selection = GetSelection(
             method, session, context.ReportDiagnostic, context.CancellationToken);
         if ((!method.IsAbstract && !method.IsExtern) || !selection.Any)
@@ -25,6 +80,13 @@ internal static class AnalyzerFeaturePipeline
         if (selection.IsSuppressed)
         {
             session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Suppressed);
+            return;
+        }
+        if (rejectedContractApi)
+        {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Abstained);
             return;
         }
         if (!selection.Contracts &&
@@ -75,9 +137,37 @@ internal static class AnalyzerFeaturePipeline
             session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Abstained);
             return;
         }
-        ValidateContractClauses(method, session, context.ReportDiagnostic);
+        var rejectedContractApi =
+            session.Attributes.GetRejectedSelectionFeatures(method) !=
+                ContractSelectionFeatures.None ||
+            session.GetContractClauses(method)
+                .HasRejectedContractApiUsage;
         var selection = GetSelection(
             method, session, context.ReportDiagnostic, context.CancellationToken);
+        if (!selection.Any &&
+            !rejectedContractApi &&
+            AnalyzerGeneratedCodePolicy.IsGenerated(
+                method,
+                declaration.SyntaxTree,
+                context.Compilation,
+                context.CancellationToken))
+        {
+            return;
+        }
+
+        var hasInvalidContractClauses =
+            ValidateContractClauses(
+                method,
+                session,
+                context.ReportDiagnostic,
+                context.CancellationToken);
+        if (rejectedContractApi)
+        {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Abstained);
+            return;
+        }
         if (selection.IsSuppressed)
         {
             session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Suppressed);
@@ -87,7 +177,8 @@ internal static class AnalyzerFeaturePipeline
         var semanticModel = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
             context.Compilation, declaration.SyntaxTree);
         var outcome = AnalyzerSemanticOutcome.NotApplicable;
-        var classifySubset = session.Configuration.EffectsEnabled || selection.Contracts;
+        var subsetIncompleteReported = false;
+        var classifySubset = selection.Any;
         var subset = classifySubset
             ? LanguageSubsetGate.ClassifyEffects(
                 method,
@@ -108,12 +199,13 @@ internal static class AnalyzerFeaturePipeline
                     subset.OperationKind is { } operation
                         ? subset.Reason + " (" + operation + ")"
                         : subset.Reason.ToString()));
+                subsetIncompleteReported = true;
             }
 
             outcome = AnalyzerSemanticOutcomes.Combine(
                 outcome, AnalyzerSemanticOutcome.Abstained);
         }
-        else if (session.Configuration.EffectsEnabled)
+        else if (selection.Effects)
         {
             outcome = AnalyzerSemanticOutcomes.Combine(
                 outcome,
@@ -127,33 +219,75 @@ internal static class AnalyzerFeaturePipeline
 
         if (session.Configuration.ContractsEnabled)
         {
-            outcome = AnalyzerSemanticOutcomes.Combine(
-                outcome,
+            var requiresOutcome =
                 RequiresCallSiteAnalyzer.Analyze(
                     method,
                     declaration,
                     semanticModel,
                     session,
                     context.ReportDiagnostic,
-                    context.CancellationToken));
+                    context.CancellationToken);
+            outcome = AnalyzerSemanticOutcomes.Combine(
+                outcome,
+                requiresOutcome);
+            if (selection.Contracts &&
+                requiresOutcome == AnalyzerSemanticOutcome.Unknown &&
+                !subsetIncompleteReported &&
+                !hasInvalidContractClauses &&
+                !method.IsAbstract &&
+                !method.IsExtern)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+                    AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(declaration),
+                    method.Name,
+                    "RequiresCallSiteAnalysisUnknown"));
+            }
         }
 
         session.RecordSemanticOutcome(method, outcome);
     }
 
-    private static void ValidateContractClauses(
+    private static bool ValidateContractClauses(
         IMethodSymbol method,
         AnalyzerSession session,
-        Action<Diagnostic> reportDiagnostic)
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken)
     {
         var inventory = session.GetContractClauses(method);
-        ReportInvalidIntrinsics(
-            session.GetContractIntrinsicViolations(inventory), session, reportDiagnostic);
+        if (inventory.HasRejectedContractApiUsage &&
+            session.TryMarkRejectedContractApiReported(method))
+        {
+            ReportRejectedContractApi(
+                method,
+                reportDiagnostic,
+                cancellationToken);
+        }
+        var intrinsicViolations =
+            session.GetContractIntrinsicViolations(inventory);
+        ReportInvalidIntrinsics(intrinsicViolations, session, reportDiagnostic);
         ReportInvalidClauses(inventory.Clauses, reportDiagnostic);
         foreach (var owner in GetNestedOwners(inventory, session.Compilation))
         {
             ReportInvalidClauses(session.GetContractClauses(owner).Clauses, reportDiagnostic);
         }
+        return inventory.HasRejectedContractApiUsage ||
+            inventory.HasPlacementErrors ||
+            !intrinsicViolations.IsDefaultOrEmpty;
+    }
+
+    private static void ReportRejectedContractApi(
+        IMethodSymbol method,
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken)
+    {
+        reportDiagnostic(Diagnostic.Create(
+            GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+            AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
+                method,
+                cancellationToken),
+            method.Name,
+            "ContractApiIdentityRejected"));
     }
 
     private static IEnumerable<IMethodSymbol> GetNestedOwners(
@@ -252,7 +386,7 @@ internal static class AnalyzerFeaturePipeline
         var features = session.Attributes.Select(
             method,
             session.Configuration.ContractsEnabled &&
-            !session.GetContractClauses(method).Clauses.IsEmpty) &
+            session.ResolveContractSource(method).HasSelectedContractIntent) &
             ((session.Configuration.ContractsEnabled
                   ? ContractSelectionFeatures.Contracts
                   : ContractSelectionFeatures.None) |

@@ -95,6 +95,20 @@ internal static class CallableClaimResultAssembler
         };
     }
 
+    internal static WorkerAssumptionEvidence[] MarkAssumptionsUsed(
+        CompilerCallablePreparation target,
+        IReadOnlySet<string> usedAssumptionIds)
+    {
+        return [.. target.Entry.Assumptions.Select(evidence =>
+            new WorkerAssumptionEvidence
+            {
+                Id = evidence.Id,
+                Kind = evidence.Kind,
+                Used = evidence.Used ||
+                    usedAssumptionIds.Contains(evidence.Id)
+            })];
+    }
+
     private static WorkerModelValue[] CreateModel(
         RefutedOutcome outcome, IReadOnlyList<CompilerCanonicalVariable> variables)
     {
@@ -126,7 +140,8 @@ internal static class CallableClaimResultAssembler
         };
     }
 
-    private static WorkerClaimReason MapAbstention(AbstentionReason reason)
+    internal static WorkerClaimReason MapAbstention(
+        AbstentionReason reason)
     {
         return reason switch
         {

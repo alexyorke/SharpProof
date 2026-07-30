@@ -5,19 +5,21 @@ public sealed class ContractBinder(
     IrFactory factory,
     ContractClauseInventoryBuilder? clauseInventory = null)
 {
-    private readonly Compilation _compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
     private readonly IrFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
     private readonly ContractApiSymbols? _api = ContractApiSymbols.TryCreate(compilation);
     private readonly ContractIntrinsicValidator _intrinsics = new(compilation);
-    private readonly RoslynOperationLowerer _types = new(factory);
+    private readonly ContractCanonicalization _canonicalization =
+        new(compilation, factory);
     private readonly ContractClauseInventoryBuilder _clauseInventory =
         clauseInventory ?? ContractClauseInventoryBuilder.ForCompilation(compilation);
     private readonly ConcurrentDictionary<IMethodSymbol, ContractBindingResult> _bindings =
         new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<IMethodSymbol, ContractBindingResult> _requiresBindings =
         new(SymbolEqualityComparer.Default);
-    private readonly ImmutableArray<ContractForSymbolMatcher.CompanionDescriptor> _companions =
-        compilation == null ? [] : ContractForSymbolMatcher.DiscoverCompanions(compilation);
+    private readonly EffectiveContractSourceResolver _contractSources =
+        clauseInventory == null
+            ? EffectiveContractSourceResolver.ForCompilation(compilation)
+            : new EffectiveContractSourceResolver(compilation, clauseInventory);
 
     public ContractBindingResult Bind(
         IMethodSymbol target,
@@ -79,56 +81,46 @@ public sealed class ContractBinder(
             return ContractBindingResult.Fail(ContractBindingFailure.UnsupportedTarget);
         }
 
-        var source = ContractClauseInventoryBuilder.NormalizeCallable(target);
-        var usesCompanion = false;
-        var inventory = _clauseInventory.Create(source, implementationBody);
-        var sourceBody = inventory.ImplementationBody;
-        var hasValidDirectClause = inventory.Clauses.Any(static clause => clause.IsValid);
-        if (!hasValidDirectClause && target.MethodKind == MethodKind.Ordinary)
+        var resolution = _contractSources.Resolve(target, implementationBody);
+        if (!resolution.HasValidDirectClause &&
+            target.MethodKind == MethodKind.Ordinary)
         {
-            var directFailure = ValidateIntrinsics(source, sourceBody, requiresOnly);
+            var directFailure = ValidateIntrinsics(
+                resolution.DirectInventory.Callable,
+                resolution.DirectInventory.ImplementationBody,
+                requiresOnly);
             if (directFailure != ContractBindingFailure.None)
             {
                 return ContractBindingResult.Fail(directFailure);
             }
-
-            var companion = ContractForSymbolMatcher.ResolveCompanion(_companions, target);
-            if (companion.Failure != ContractBindingFailure.None)
-            {
-                return ContractBindingResult.Fail(companion.Failure);
-            }
-
-            if (companion.Method != null)
-            {
-                source = companion.Method;
-                inventory = _clauseInventory.Create(source);
-                sourceBody = inventory.ImplementationBody;
-                if (sourceBody == null)
-                {
-                    return ContractBindingResult.Fail(ContractBindingFailure.CompanionBodyUnavailable);
-                }
-
-                usesCompanion = true;
-                if (inventory.HasPlacementErrors)
-                {
-                    return ContractBindingResult.Fail(ContractBindingFailure.InvalidClausePlacement);
-                }
-            }
         }
-        if (!usesCompanion && inventory.HasPlacementErrors)
+        if (resolution.Failure != ContractBindingFailure.None)
         {
-            return ContractBindingResult.Fail(ContractBindingFailure.InvalidClausePlacement);
+            return ContractBindingResult.Fail(resolution.Failure);
         }
 
-        var expressionBinder = new ContractExpressionBinder(_factory, _api, source, CreateTypeSpecializer(source));
+        var source = resolution.Source;
+        var inventory = resolution.Inventory;
+        var usesCompanion = resolution.UsesCompanion;
+        var expressionBinder = new ContractExpressionBinder(
+            _factory,
+            _api,
+            source,
+            _canonicalization.CreateTypeSpecializer(source));
         var invocationResult = BindInvocations(expressionBinder, inventory, usesCompanion, requiresOnly);
         if (invocationResult.Failure != ContractBindingFailure.None)
         {
             return ContractBindingResult.Fail(invocationResult.Failure);
         }
 
-        var canonical = CreateCanonicalVariables(target, includeResult: !requiresOnly);
-        var substitutions = CreateCanonicalSubstitutions(source, usesCompanion, expressionBinder, canonical);
+        var canonical = _canonicalization.CreateVariables(
+            target,
+            includeResult: !requiresOnly);
+        var substitutions = _canonicalization.CreateSubstitutions(
+            source,
+            usesCompanion,
+            expressionBinder,
+            canonical);
         if (substitutions == null)
         {
             return ContractBindingResult.Fail(ContractBindingFailure.UnsupportedExpression);
@@ -237,223 +229,10 @@ public sealed class ContractBinder(
         return ContractBindingFailure.None;
     }
 
-    private Func<ITypeSymbol?, ITypeSymbol?> CreateTypeSpecializer(IMethodSymbol source)
-    {
-        var substitutions = new Dictionary<ITypeParameterSymbol, ITypeSymbol>(
-            SymbolEqualityComparer.Default);
-        AddParameters(source.OriginalDefinition.TypeParameters, source.TypeArguments);
-        for (var type = source.ContainingType;
-             type != null;
-             type = type.ContainingType)
-        {
-            AddParameters(type.OriginalDefinition.TypeParameters, type.TypeArguments);
-        }
-
-        return Specialize;
-
-        ITypeSymbol? Specialize(ITypeSymbol? type)
-        {
-            if (type == null)
-            {
-                return null;
-            }
-
-            if (type is ITypeParameterSymbol parameter && substitutions.TryGetValue(parameter, out var replacement))
-            {
-                return type.NullableAnnotation == NullableAnnotation.Annotated
-                    ? replacement.WithNullableAnnotation(NullableAnnotation.Annotated)
-                    : replacement;
-            }
-
-            if (type is IArrayTypeSymbol array)
-            {
-                return Specialize(array.ElementType) is { } element
-                    ? _compilation.CreateArrayTypeSymbol(element, array.Rank, array.ElementNullableAnnotation)
-                        .WithNullableAnnotation(array.NullableAnnotation)
-                    : null;
-            }
-
-            if (type is IPointerTypeSymbol pointer)
-            {
-                return Specialize(pointer.PointedAtType) is { } pointedAt
-                    ? _compilation.CreatePointerTypeSymbol(pointedAt) : null;
-            }
-
-            if (type is not INamedTypeSymbol named || named.IsUnboundGenericType)
-            {
-                return type;
-            }
-
-            var arguments = ImmutableArray.CreateBuilder<ITypeSymbol>(named.TypeArguments.Length);
-            foreach (var argument in named.TypeArguments)
-            {
-                var specialized = Specialize(argument);
-                if (specialized == null)
-                {
-                    return null;
-                }
-
-                arguments.Add(specialized);
-            }
-            var containing = Specialize(named.ContainingType) as INamedTypeSymbol;
-            if (named.ContainingType != null && containing == null)
-            {
-                return null;
-            }
-
-            var changed = !arguments.SequenceEqual(named.TypeArguments, SymbolEqualityComparer.IncludeNullability) ||
-                !SymbolEqualityComparer.IncludeNullability.Equals(named.ContainingType, containing);
-            if (!changed)
-            {
-                return named;
-            }
-
-            if (named.IsTupleType)
-            {
-                return null;
-            }
-
-            try
-            {
-                var definition = containing == null
-                    ? named.OriginalDefinition
-                    : containing.GetTypeMembers(named.Name, named.Arity).SingleOrDefault();
-                if (definition == null)
-                {
-                    return null;
-                }
-
-                return (definition.Arity == 0
-                        ? definition
-                        : definition.Construct([.. arguments]))
-                    .WithNullableAnnotation(named.NullableAnnotation);
-            }
-            catch (ArgumentException) { return null; }
-        }
-
-        void AddParameters(
-            ImmutableArray<ITypeParameterSymbol> parameters, ImmutableArray<ITypeSymbol> arguments)
-        {
-            for (var index = 0; index < parameters.Length; index++)
-            {
-                substitutions[parameters[index]] = arguments[index];
-            }
-        }
-    }
-
-    private CanonicalVariables CreateCanonicalVariables(
-        IMethodSymbol target,
-        bool includeResult)
-    {
-        var result = new CanonicalVariables(_factory);
-        if (!target.IsStatic && target.MethodKind != MethodKind.Constructor)
-        {
-            result.Receiver = result.Add(
-                target.ContainingType,
-                BoundContractVariableRole.Receiver,
-                -1,
-                _types.GetTypeId(target.ContainingType),
-                "receiver");
-        }
-
-        for (var index = 0; index < target.Parameters.Length; index++)
-        {
-            var parameter = target.Parameters[index];
-            result.Parameters.Add(result.Add(
-                parameter,
-                BoundContractVariableRole.Parameter,
-                index,
-                _types.GetTypeId(parameter.Type),
-                "parameter:" + index.ToString(
-                    System.Globalization.CultureInfo.InvariantCulture)));
-        }
-        if (includeResult &&
-            !target.ReturnsVoid &&
-            target.MethodKind != MethodKind.Constructor)
-        {
-            result.Result = result.Add(
-                null,
-                BoundContractVariableRole.Result,
-                -1,
-                _types.GetTypeId(target.ReturnType),
-                "result");
-        }
-
-        return result;
-    }
-
-    private Dictionary<IrVarId, IrTerm>? CreateCanonicalSubstitutions(
-        IMethodSymbol source,
-        bool usesCompanion,
-        ContractExpressionBinder expressionBinder,
-        CanonicalVariables canonical)
-    {
-        var replacements = new Dictionary<IrVarId, IrTerm>();
-        foreach (var binding in expressionBinder.VariableBindings)
-        {
-            IrVarId? canonicalVariable = null;
-            if (binding.Symbol is IParameterSymbol parameter &&
-                parameter.ContainingSymbol is IMethodSymbol owner &&
-                SymbolEqualityComparer.Default.Equals(
-                    owner.OriginalDefinition,
-                    source.OriginalDefinition))
-            {
-                var ordinal = parameter.Ordinal -
-                    (usesCompanion && canonical.Receiver.HasValue ? 1 : 0);
-                canonicalVariable = ordinal < 0
-                    ? canonical.Receiver
-                    : ordinal < canonical.Parameters.Count
-                        ? canonical.Parameters[ordinal]
-                        : null;
-            }
-            if (!canonicalVariable.HasValue)
-            {
-                return null;
-            }
-
-            replacements[binding.Variable] =
-                _factory.Variable(canonicalVariable.Value);
-        }
-
-        if (expressionBinder.ResultVariable.HasValue)
-        {
-            if (!canonical.Result.HasValue)
-            {
-                return null;
-            }
-
-            replacements[expressionBinder.ResultVariable.Value] =
-                _factory.Variable(canonical.Result.Value);
-        }
-
-        foreach (var receiverVariable in expressionBinder.ReceiverVariables)
-        {
-            if (usesCompanion || !canonical.Receiver.HasValue)
-            {
-                return null;
-            }
-
-            replacements[receiverVariable] =
-                _factory.Variable(canonical.Receiver.Value);
-        }
-
-        foreach (var preState in expressionBinder.PreStateVariables)
-        {
-            if (!replacements.TryGetValue(preState.Key, out var current) ||
-                current is not IrVariableTerm currentVariable)
-            {
-                return null;
-            }
-
-            var canonicalPre = canonical.GetOrCreatePreState(
-                currentVariable.Variable);
-            replacements[preState.Value] = _factory.Variable(canonicalPre);
-        }
-        return replacements;
-    }
-
     private ClauseBindingResult BindClosedAttributes(
-        IMethodSymbol target, CanonicalVariables variables, bool requiresOnly)
+        IMethodSymbol target,
+        ContractCanonicalVariables variables,
+        bool requiresOnly)
     {
         var clauses = ImmutableArray.CreateBuilder<BoundContractClause>();
         for (var index = 0; index < target.Parameters.Length; index++)
@@ -491,82 +270,77 @@ public sealed class ContractBinder(
     {
         foreach (var attribute in attributes)
         {
-            var isNotNull = ContractSelectionInventory.Is(attribute, _api!.Selections.NotNull);
-            var isPositive = ContractSelectionInventory.Is(attribute, _api.Selections.Positive);
-            var isInRange = ContractSelectionInventory.Is(attribute, _api.Selections.InRange);
-            if (!isNotNull && !isPositive && !isInRange)
+            var validation = ClosedContractAttributeValidator.Validate(
+                attribute,
+                sourceType,
+                refKind,
+                _api!.Selections);
+            if (!validation.IsRecognized)
             {
                 continue;
             }
 
-            if (refKind == RefKind.Out)
+            if (!validation.IsValid)
             {
                 return ContractBindingFailure.InvalidClosedAttribute;
             }
 
-            IrTerm? condition = null;
-            if (isNotNull)
+            IrTerm condition;
+            switch (validation.Kind)
             {
-                var type = _factory.GetTypeInfo(value.Type);
-                if (!sourceType.IsReferenceType ||
-                    type.Kind is not (IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence))
-                {
-                    return ContractBindingFailure.InvalidClosedAttribute;
-                }
+                case ClosedContractAttributeKind.NotNull:
+                    var type = _factory.GetTypeInfo(value.Type);
+                    if (type.Kind is not (
+                            IrTypeKind.Reference or
+                            IrTypeKind.String or
+                            IrTypeKind.Sequence))
+                    {
+                        return ContractBindingFailure.InvalidClosedAttribute;
+                    }
 
-                condition = _factory.Binary(IrBinaryOperator.NotEqual, value, _factory.Null(value.Type));
-            }
-            else if (isPositive)
-            {
-                if (!IsSupportedInteger(sourceType) || value.Type != _factory.IntegerType)
-                {
-                    return ContractBindingFailure.InvalidClosedAttribute;
-                }
+                    condition = _factory.Binary(
+                        IrBinaryOperator.NotEqual,
+                        value,
+                        _factory.Null(value.Type));
+                    break;
+                case ClosedContractAttributeKind.Positive:
+                    if (value.Type != _factory.IntegerType)
+                    {
+                        return ContractBindingFailure.InvalidClosedAttribute;
+                    }
 
-                condition = _factory.Binary(IrBinaryOperator.GreaterThan, value, _factory.Integer(0));
-            }
-            else
-            {
-                if (!IsSupportedInteger(sourceType) ||
-                    value.Type != _factory.IntegerType ||
-                    attribute.ConstructorArguments.Length != 2 ||
-                    !TryGetInt64(attribute.ConstructorArguments[0], out var minimum) ||
-                    !TryGetInt64(attribute.ConstructorArguments[1], out var maximum) ||
-                    minimum > maximum)
-                {
-                    return ContractBindingFailure.InvalidClosedAttribute;
-                }
+                    condition = _factory.Binary(
+                        IrBinaryOperator.GreaterThan,
+                        value,
+                        _factory.Integer(0));
+                    break;
+                case ClosedContractAttributeKind.InRange:
+                    if (value.Type != _factory.IntegerType)
+                    {
+                        return ContractBindingFailure.InvalidClosedAttribute;
+                    }
 
-                condition = _factory.Binary(
-                    IrBinaryOperator.AndAlso,
-                    _factory.Binary(IrBinaryOperator.GreaterThanOrEqual, value, _factory.Integer(minimum)),
-                    _factory.Binary(IrBinaryOperator.LessThanOrEqual, value, _factory.Integer(maximum)));
-            }
-            if (condition == null)
-            {
-                continue;
+                    condition = _factory.Binary(
+                        IrBinaryOperator.AndAlso,
+                        _factory.Binary(
+                            IrBinaryOperator.GreaterThanOrEqual,
+                            value,
+                            _factory.Integer(validation.Minimum)),
+                        _factory.Binary(
+                            IrBinaryOperator.LessThanOrEqual,
+                            value,
+                            _factory.Integer(validation.Maximum)));
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        "Unknown closed contract attribute kind: " +
+                        validation.Kind);
             }
 
             clauses.Add(new BoundContractClause(
                 kind, condition, _factory.CreateOperation("closed-attribute"), BoundContractEvidence.ClosedAttribute));
         }
         return ContractBindingFailure.None;
-    }
-
-    private static bool IsSupportedInteger(ITypeSymbol type)
-    {
-        return CSharpScalarSemantics.IsSupportedInteger(type.SpecialType);
-    }
-
-    private static bool TryGetInt64(TypedConstant value, out long result)
-    {
-        if (value.Value is long number)
-        {
-            result = number;
-            return true;
-        }
-        result = 0;
-        return false;
     }
 
     private sealed class ClauseBindingResult(
@@ -581,49 +355,4 @@ public sealed class ContractBinder(
         }
     }
 
-    private sealed class CanonicalVariables(IrFactory factory)
-    {
-        private readonly IrFactory _factory = factory;
-        private readonly List<BoundContractVariable> _variables = [];
-        private readonly Dictionary<IrVarId, IrVarId> _preState = [];
-
-        internal IrVarId? Receiver
-        {
-            get; set;
-        }
-        internal List<IrVarId> Parameters { get; } = [];
-        internal IrVarId? Result
-        {
-            get; set;
-        }
-
-        internal IrVarId Add(
-            ISymbol? symbol, BoundContractVariableRole role, int ordinal, IrTypeId type, string name)
-        {
-            var variable = _factory.CreateVariable(name, type);
-            _variables.Add(new BoundContractVariable(symbol, role, ordinal, variable, null));
-            return variable;
-        }
-
-        internal IrVarId GetOrCreatePreState(IrVarId current)
-        {
-            if (_preState.TryGetValue(current, out var existing))
-            {
-                return existing;
-            }
-
-            var info = _factory.GetVariableInfo(current);
-            var variable = _factory.CreateVariable(
-                "pre:" + current.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), info.Type);
-            _preState.Add(current, variable);
-            _variables.Add(new BoundContractVariable(
-                null, BoundContractVariableRole.PreState, -1, variable, current));
-            return variable;
-        }
-
-        internal ImmutableArray<BoundContractVariable> ToBoundVariables()
-        {
-            return [.. _variables];
-        }
-    }
 }

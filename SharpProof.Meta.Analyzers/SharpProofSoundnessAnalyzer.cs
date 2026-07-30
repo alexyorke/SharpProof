@@ -17,6 +17,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         "System.Threading.CancellationToken", "SharpProof.Frontend.Host.CompilationModelProvider",
         "SharpProof.Analyzer.GeneratedDiagnosticDescriptors", "SharpProof.ContractForGenerator.GeneratedDiagnosticDescriptors",
         "System.String", "SharpProof.Verify.Assumption", "SharpProof.Verify.ProofKernel",
+        "SharpProof.Worker.CallableEvidenceBuilder",
         "SharpProof.Worker.CallableVerifier", "SharpProof.Worker.PostconditionObligationBuilder",
         "SharpProof.Effects.EffectSummary",
         "SharpProof.Effects.EffectSummaryDomain", "SharpProof.Effects.EffectSummaryOperations",
@@ -61,7 +62,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, symbols), OperationKind.ObjectCreation);
             startContext.RegisterOperationAction(AnalyzeBinaryOperation, OperationKind.BinaryOperator);
             startContext.RegisterSymbolAction(AnalyzeField, SymbolKind.Field);
-            startContext.RegisterSyntaxNodeAction(c => AnalyzeCatchClause(c, symbols), SyntaxKind.CatchClause);
+            startContext.RegisterSyntaxNodeAction(
+                c => CancellationBoundaryAnalyzer.AnalyzeCatchClause(c, symbols),
+                SyntaxKind.CatchClause);
         });
     }
 
@@ -134,6 +137,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 symbols,
                 KnownType.ProofKernel,
                 KnownType.CallableVerifier,
+                KnownType.CallableEvidenceBuilder,
                 KnownType.PostconditionObligationBuilder))
         {
             Report(context, MetaDiagnosticDescriptors.AssumptionConstruction, creation.Syntax.GetLocation());
@@ -321,161 +325,6 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static void AnalyzeCatchClause(SyntaxNodeAnalysisContext context, KnownSymbols symbols)
-    {
-        var clause = (CatchClauseSyntax)context.Node;
-        if (clause.Declaration?.Type == null)
-        {
-            return;
-        }
-
-        var caughtType = context.SemanticModel.GetTypeInfo(clause.Declaration.Type, context.CancellationToken).Type;
-        if (!IsSameType(caughtType, symbols[KnownType.OperationCanceledException]) ||
-            RethrowsCancellationImmediately(clause) ||
-            IsAuditedCancellationBoundary(clause, context, context.ContainingSymbol, symbols))
-        {
-            return;
-        }
-
-        Report(context, MetaDiagnosticDescriptors.SwallowedCancellation, clause.CatchKeyword.GetLocation());
-    }
-
-    private static bool RethrowsCancellationImmediately(CatchClauseSyntax clause)
-    {
-        return clause.Block.Statements.FirstOrDefault() is ThrowStatementSyntax { Expression: null };
-    }
-
-    private static bool IsAuditedCancellationBoundary(
-        CatchClauseSyntax clause,
-        SyntaxNodeAnalysisContext context,
-        ISymbol? containingSymbol,
-        KnownSymbols symbols)
-    {
-        if (containingSymbol is not IMethodSymbol method)
-        {
-            return false;
-        }
-
-        if (IsAuditedWorkerMain(method, symbols[KnownType.WorkerProgram], symbols.TaskOfInt32) ||
-            IsAuditedWorkerMain(method, symbols[KnownType.WorkerLauncherProgram], symbols.TaskOfInt32) ||
-            SymbolEqualityComparer.Default.Equals(method, symbols.WorkerVerifyAsync))
-        {
-            return true;
-        }
-
-        if (method is not { Name: "VerifyTargetAsync", IsStatic: true, Parameters.Length: 7 } ||
-            !IsSameType(method.ContainingType, symbols[KnownType.CallableVerificationPolicy]) ||
-            !SymbolEqualityComparer.Default.Equals(method.ReturnType, symbols.VerifyTargetTask) ||
-            method.Parameters[6].Name != "callerCancellation" ||
-            !IsSameType(method.Parameters[6].Type, symbols[KnownType.CancellationToken]))
-        {
-            return false;
-        }
-
-        return ThrowsIfCallerCancellationRequested(clause, context, method, symbols) ||
-               ReifiesCallerCancellation(clause, context, method, symbols);
-    }
-
-    private static bool ThrowsIfCallerCancellationRequested(
-        CatchClauseSyntax clause,
-        SyntaxNodeAnalysisContext context,
-        IMethodSymbol method,
-        KnownSymbols symbols)
-    {
-        if (clause.Block.Statements.FirstOrDefault() is not ExpressionStatementSyntax expression ||
-            context.SemanticModel.GetOperation(expression.Expression, context.CancellationToken) is not IInvocationOperation invocation ||
-            invocation.TargetMethod.Name != "ThrowIfCancellationRequested" ||
-            !IsSameType(invocation.TargetMethod.ContainingType, symbols[KnownType.CancellationToken]))
-        {
-            return false;
-        }
-
-        return ReferencesParameter(invocation.Instance, method.Parameters[6]);
-    }
-
-    private static bool ReifiesCallerCancellation(
-        CatchClauseSyntax clause,
-        SyntaxNodeAnalysisContext context,
-        IMethodSymbol method,
-        KnownSymbols symbols)
-    {
-        if (clause.Block.Statements.FirstOrDefault() is not IfStatementSyntax { Else: null } cancellationIf ||
-            context.SemanticModel.GetOperation(cancellationIf.Condition, context.CancellationToken) is not
-                IPropertyReferenceOperation cancellationRequested ||
-            cancellationRequested.Property.Name != "IsCancellationRequested" ||
-            !IsSameType(cancellationRequested.Property.ContainingType, symbols[KnownType.CancellationToken]) ||
-            !ReferencesParameter(cancellationRequested.Instance, method.Parameters[6]) ||
-            SoleReturn(cancellationIf.Statement)?.Expression is not ExpressionSyntax returnExpression ||
-            context.SemanticModel.GetOperation(returnExpression, context.CancellationToken) is not IInvocationOperation invocation ||
-            invocation.TargetMethod is not { Name: "Unknown", IsStatic: true, Parameters.Length: 3 } ||
-            !IsSameType(invocation.TargetMethod.ContainingType, symbols[KnownType.CallableVerificationPolicy]) ||
-            !IsSameType(invocation.TargetMethod.ReturnType, symbols[KnownType.CallableVerificationResult]))
-        {
-            return false;
-        }
-
-        var target = invocation.Arguments.FirstOrDefault(candidate => candidate.Parameter?.Ordinal == 0);
-        return ReferencesParameter(target?.Value, method.Parameters[1]) &&
-               IsCanceledReasonArgument(invocation, 1, symbols[KnownType.WorkerClaimReason]) &&
-               IsCanceledReasonArgument(invocation, 2, symbols[KnownType.WorkerCallableCoverageReason]);
-    }
-
-    private static ReturnStatementSyntax? SoleReturn(StatementSyntax statement)
-    {
-        return statement switch
-        {
-            ReturnStatementSyntax direct => direct,
-            BlockSyntax { Statements.Count: 1 } block => block.Statements[0] as ReturnStatementSyntax,
-            _ => null
-        };
-    }
-
-    private static bool IsCanceledReasonArgument(
-        IInvocationOperation invocation,
-        int parameterOrdinal,
-        INamedTypeSymbol? expectedType)
-    {
-        if (expectedType == null ||
-            !IsSameType(invocation.TargetMethod.Parameters[parameterOrdinal].Type, expectedType))
-        {
-            return false;
-        }
-
-        var argument = invocation.Arguments.FirstOrDefault(candidate => candidate.Parameter?.Ordinal == parameterOrdinal);
-        IOperation? value = argument?.Value;
-        while (value is IConversionOperation conversion)
-        {
-            value = conversion.Operand;
-        }
-
-        return value is IFieldReferenceOperation field &&
-               field.Field is { Name: "Canceled", IsStatic: true } &&
-               IsSameType(field.Field.ContainingType, expectedType);
-    }
-
-    private static bool ReferencesParameter(IOperation? receiver, IParameterSymbol parameter)
-    {
-        while (receiver is IConversionOperation conversion)
-        {
-            receiver = conversion.Operand;
-        }
-
-        return receiver is IParameterReferenceOperation reference &&
-               SymbolEqualityComparer.Default.Equals(reference.Parameter, parameter);
-    }
-
-    private static bool IsAuditedWorkerMain(
-        IMethodSymbol method,
-        INamedTypeSymbol? program,
-        INamedTypeSymbol? taskOfInt32)
-    {
-        return method is { Name: "Main", IsStatic: true, Parameters.Length: 1 } &&
-        IsSameType(method.ContainingType, program) &&
-        SymbolEqualityComparer.Default.Equals(method.ReturnType, taskOfInt32) &&
-        method.Parameters[0].Type is IArrayTypeSymbol { Rank: 1 } arguments &&
-        arguments.ElementType.SpecialType == SpecialType.System_String;
-    }
-
     private static bool IsSemanticNamespace(ISymbol symbol)
     {
         return IsCriticalStateNamespace(symbol.ContainingNamespace) ||
@@ -537,17 +386,13 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(rule, at, args));
     }
 
-    private static void Report(SyntaxNodeAnalysisContext context, DiagnosticDescriptor rule, Location? at, params object?[] args)
-    {
-        context.ReportDiagnostic(Diagnostic.Create(rule, at, args));
-    }
-
-    private enum KnownType
+    internal enum KnownType
     {
         Compilation, SemanticModel, SyntaxFactory, Symbol, DiagnosticDescriptor,
         OperationCanceledException, CancellationToken, CompilationModelProvider,
         AnalyzerDiagnosticDescriptors, ContractForDiagnosticDescriptors, String,
-        Assumption, ProofKernel, CallableVerifier, PostconditionObligationBuilder,
+        Assumption, ProofKernel, CallableEvidenceBuilder, CallableVerifier,
+        PostconditionObligationBuilder,
         EffectSummary, EffectSummaryDomain,
         EffectSummaryOperations, ExternalEffectResolver, ProvenOutcome, RefutedOutcome,
         ValidatedModel, WorkerProgram, WorkerLauncherProgram, SharpProofWorker,
@@ -556,7 +401,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         WorkerVerifyResponse
     }
 
-    private sealed class KnownSymbols
+    internal sealed class KnownSymbols
     {
         private readonly ImmutableArray<INamedTypeSymbol?> _types;
 

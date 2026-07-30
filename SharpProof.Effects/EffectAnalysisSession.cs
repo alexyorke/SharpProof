@@ -42,7 +42,9 @@ public sealed class EffectAnalysisSession
     private readonly INamedTypeSymbol? _conditionalAttribute;
     private readonly Dictionary<SyntaxTree, ImmutableHashSet<string>> _definedPreprocessorSymbols = [];
     private readonly ExternalEffectResolver _external;
-    private readonly ManagedAbstractFlow _managedFlow;
+    private readonly IEffectCallPreconditionPolicy
+        _callPreconditions;
+    private readonly EffectMethodNodeBuilder _nodeBuilder;
     private readonly object _gate = new();
     private readonly Dictionary<IMethodSymbol, EffectMethodNode> _nodes = new(SymbolEqualityComparer.Default);
     private volatile ImmutableDictionary<IMethodSymbol, EffectSummary> _summaries =
@@ -52,17 +54,28 @@ public sealed class EffectAnalysisSession
         : this(
             compilation,
             new ApiSpecResolver(apiSpecs ?? ApiSpecTable.Default)
-                .Resolve(compilation ?? throw new ArgumentNullException(nameof(compilation))))
+                .Resolve(compilation ?? throw new ArgumentNullException(nameof(compilation))),
+            callPreconditions: null)
     {
     }
 
-    internal EffectAnalysisSession(Compilation compilation, ResolvedApiSpecTable apiSpecs)
+    internal EffectAnalysisSession(
+        Compilation compilation,
+        ResolvedApiSpecTable apiSpecs,
+        IEffectCallPreconditionPolicy? callPreconditions = null)
     {
         _compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
         _conditionalAttribute = compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.ConditionalAttribute);
         _external = new ExternalEffectResolver(compilation,
             apiSpecs ?? throw new ArgumentNullException(nameof(apiSpecs)));
-        _managedFlow = ManagedAbstractFlow.Create(compilation, apiSpecs);
+        _callPreconditions =
+            callPreconditions ??
+            new ConservativeEffectCallPreconditionPolicy(
+                compilation);
+        _nodeBuilder = new EffectMethodNodeBuilder(
+            this,
+            compilation,
+            ManagedAbstractFlow.Create(compilation, apiSpecs));
     }
 
     public Compilation Compilation => _compilation;
@@ -114,19 +127,40 @@ public sealed class EffectAnalysisSession
     internal int AnalyzedSourceMethodCount => _summaries.Count;
 
     internal EffectSummary ResolveCall(
-        IMethodSymbol target, EffectRegionSet receiver,
+        IMethodSymbol caller, IMethodSymbol target,
+        EffectRegionSet receiver,
         ImmutableArray<EffectRegionSet> arguments, bool dispatchUncertain,
-        List<EffectCallSite> sourceCalls, IOperation origin)
+        List<EffectCallSite> sourceCalls, IOperation origin,
+        IOperation? instance,
+        ImmutableArray<IOperation?> actualArguments,
+        ManagedFlowResult? flow)
     {
         if (target.ReducedFrom != null)
         {
+            actualArguments = [instance, .. actualArguments];
+            instance = null;
             arguments = [receiver, .. arguments];
             receiver = EffectRegionSet.Empty;
         }
         var normalized = NormalizeMethod(target);
+        var preconditions = _callPreconditions.Assess(
+            new EffectCallPreconditionContext(
+                caller,
+                normalized,
+                instance,
+                actualArguments,
+                flow,
+                origin));
+        var preconditionEvidence =
+            preconditions == EffectCallPreconditionStatus.NotProven
+                ? EffectSummaryOperations.IncompleteAnalysis(
+                    EffectAnalysisIncompleteReason
+                        .CallPreconditionNotProven)
+                : EffectSummary.Empty;
         if (dispatchUncertain)
         {
             return EffectSummaryOperations.Join(
+                preconditionEvidence,
                 EffectSummaryOperations.DirectCall(),
                 EffectSummaryOperations.UnknownBoundary(
                     EffectUncertainty.DirectCall |
@@ -136,11 +170,26 @@ public sealed class EffectAnalysisSession
         if (IsSourceMethod(normalized))
         {
             sourceCalls.Add(new EffectCallSite(normalized, receiver, arguments, origin));
-            return EffectSummaryOperations.DirectCall();
+            return EffectSummaryOperations.Join(
+                preconditionEvidence,
+                EffectSummaryOperations.DirectCall());
         }
         return EffectSummaryOperations.Join(
+            preconditionEvidence,
             EffectSummaryOperations.DirectCall(),
             EffectSummaryOperations.Remap(_external.Resolve(normalized), receiver, arguments));
+    }
+
+    internal EffectSummary ResolveEntryPreconditions(
+        IMethodSymbol method)
+    {
+        return _callPreconditions.AssessEntry(
+                NormalizeMethod(method)) ==
+            EffectCallPreconditionStatus.NotProven
+                ? EffectSummaryOperations.IncompleteAnalysis(
+                    EffectAnalysisIncompleteReason
+                        .CallPreconditionNotProven)
+                : EffectSummary.Empty;
     }
 
     internal EffectThrowSet ResolveExceptionSet(params string[] metadataNames)
@@ -151,7 +200,7 @@ public sealed class EffectAnalysisSession
     internal bool IsConditionallyElided(IInvocationOperation invocation)
     {
         if (_conditionalAttribute == null ||
-            invocation.Syntax.SyntaxTree.Options is not CSharpParseOptions options)
+            invocation.Syntax.SyntaxTree.Options is not CSharpParseOptions)
         {
             return false;
         }
@@ -170,35 +219,19 @@ public sealed class EffectAnalysisSession
             return false;
         }
 
-        var definedSymbols = GetDefinedPreprocessorSymbols(invocation.Syntax.SyntaxTree, options);
+        var definedSymbols = GetDefinedPreprocessorSymbols(invocation.Syntax.SyntaxTree);
         return conditionalSymbols.All(symbol => !definedSymbols.Contains(symbol!));
     }
 
     private ImmutableHashSet<string> GetDefinedPreprocessorSymbols(
-        SyntaxTree tree, CSharpParseOptions options)
+        SyntaxTree tree)
     {
         if (_definedPreprocessorSymbols.TryGetValue(tree, out var cached))
         {
             return cached;
         }
 
-        var definedSymbols = options.PreprocessorSymbolNames
-            .ToImmutableHashSet(StringComparer.Ordinal)
-            .ToBuilder();
-        foreach (var trivia in tree.GetRoot().DescendantTrivia(descendIntoTrivia: true))
-        {
-            var directive = trivia.GetStructure();
-            switch (directive)
-            {
-                case DefineDirectiveTriviaSyntax { IsActive: true } define:
-                    definedSymbols.Add(define.Name.ValueText);
-                    break;
-                case UndefDirectiveTriviaSyntax { IsActive: true } undef:
-                    definedSymbols.Remove(undef.Name.ValueText);
-                    break;
-            }
-        }
-        cached = definedSymbols.ToImmutable();
+        cached = CSharpPreprocessorSymbols.GetDefined(tree);
         _definedPreprocessorSymbols.Add(tree, cached);
         return cached;
     }
@@ -235,7 +268,8 @@ public sealed class EffectAnalysisSession
 
         var isSourceType = SymbolEqualityComparer.Default.Equals(
             normalizedTarget.ContainingAssembly, _compilation.Assembly);
-        var mayInitialize = !isSourceType || HasPotentialStaticInitialization(normalizedTarget);
+        var mayInitialize = !isSourceType ||
+            EffectMethodNodeBuilder.HasPotentialStaticInitialization(normalizedTarget);
         return mayInitialize
             ? EffectSummaryOperations.UnknownBoundary(EffectUncertainty.UnmodeledCall)
             : EffectSummary.Empty;
@@ -276,7 +310,9 @@ public sealed class EffectAnalysisSession
         CancellationToken cancellationToken)
     {
         var summaries = existing.ToBuilder();
-        foreach (var method in FindRecursiveMethods(nodes, cancellationToken))
+        foreach (var method in EffectCallGraph.FindRecursiveMethods(
+                     nodes,
+                     cancellationToken))
         {
             summaries[method] = EffectSummaryDomain.Instance.Join(nodes[method].LocalSummary,
                 EffectSummaryOperations.UnknownBoundary(
@@ -338,7 +374,7 @@ public sealed class EffectAnalysisSession
 
             if (!_nodes.TryGetValue(method, out var node))
             {
-                node = BuildNode(method, cancellationToken);
+                node = _nodeBuilder.Build(method, cancellationToken);
                 _nodes.Add(method, node);
             }
             nodes.Add(method, node);
@@ -386,247 +422,6 @@ public sealed class EffectAnalysisSession
         }
         return [.. methods.OrderBy(
             static method => method, EffectSymbolComparer<IMethodSymbol>.Instance)];
-    }
-
-    private EffectMethodNode BuildNode(IMethodSymbol method, CancellationToken cancellationToken)
-    {
-        var calls = new List<EffectCallSite>();
-        var root = GetOperationRoot(method, cancellationToken);
-        if (root == null)
-        {
-            return new EffectMethodNode(EffectSummaryOperations.UnknownBoundary(
-                EffectUncertainty.UnsupportedOperation), [], []);
-        }
-
-        var graph = TryCreateControlFlowGraph(root, cancellationToken);
-        var abstractAnalysis = graph == null
-            ? null
-            : _managedFlow.Analyze(
-                method,
-                graph,
-                entryState: null,
-                cancellationToken);
-        var scanner = new OperationEffectScanner(
-            this, method, calls, root, abstractAnalysis?.Result,
-            allowDirectWitnesses: graph != null);
-        var localSummary = graph == null
-            ? EffectSummaryOperations.Join(scanner.Scan(root), EffectSummaryOperations.Unsupported())
-            : AnalyzeControlFlowGraph(graph, scanner);
-        // Cyclic scalar flow does not invalidate the conservative all-block effect scan.
-        if (abstractAnalysis is
-            {
-                IsComplete: false,
-                IncompleteReason: not EffectAnalysisIncompleteReason.CyclicControlFlow
-            })
-        {
-            localSummary = EffectSummaryOperations.Join(
-                localSummary,
-                EffectSummaryOperations.IncompleteAnalysis(
-                    abstractAnalysis.IncompleteReason));
-        }
-
-        localSummary = EffectSummaryOperations.Join(
-            localSummary,
-            scanner.ScanLexicalControlEffects(root),
-            ScanConstructorMemberInitializers(method, scanner, cancellationToken),
-            CanTriggerOwnTypeInitialization(method) &&
-            HasPotentialStaticInitialization(method.ContainingType)
-                ? EffectSummaryOperations.UnknownBoundary(EffectUncertainty.UnmodeledCall)
-                : EffectSummary.Empty);
-        return new EffectMethodNode(localSummary, [.. calls], scanner.DirectWitnesses);
-    }
-
-    private EffectSummary ScanConstructorMemberInitializers(
-        IMethodSymbol method, OperationEffectScanner scanner,
-        CancellationToken cancellationToken)
-    {
-        var staticInitializers = method.MethodKind == MethodKind.StaticConstructor;
-        if (!staticInitializers && method.MethodKind != MethodKind.Constructor)
-        {
-            return EffectSummary.Empty;
-        }
-
-        var summary = EffectSummary.Empty;
-        var write = EffectSummaryOperations.Write(EffectRegionSet.Create(
-            staticInitializers ? EffectRegionId.Static() : EffectRegionId.Receiver));
-        foreach (var member in method.ContainingType.GetMembers()
-                     .Where(member => !member.IsImplicitlyDeclared &&
-                         IsInitializableMember(member, staticInitializers))
-                     .OrderBy(static member => member.MetadataName, StringComparer.Ordinal))
-        {
-            foreach (var syntaxReference in member.DeclaringSyntaxReferences
-                         .OrderBy(static reference => reference.SyntaxTree.FilePath, StringComparer.Ordinal)
-                         .ThenBy(static reference => reference.Span.Start))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var declaration = syntaxReference.GetSyntax(cancellationToken);
-                var expression = GetInitializerExpression(declaration);
-                if (expression == null)
-                {
-                    continue;
-                }
-
-                var model = SharpProof.Frontend.Host.CompilationModelProvider
-                    .GetSemanticModel(_compilation, expression.SyntaxTree);
-                var operation = model.GetOperation(expression, cancellationToken);
-                summary = EffectSummaryDomain.Instance.Join(summary,
-                    operation == null
-                        ? EffectSummaryOperations.Unsupported()
-                        : EffectSummaryOperations.Join(scanner.Scan(operation), write));
-            }
-        }
-        return summary;
-    }
-
-    private static bool HasPotentialStaticInitialization(INamedTypeSymbol type)
-    {
-        return type.StaticConstructors.Any(static constructor => !constructor.IsImplicitlyDeclared) ||
-        type.GetMembers().Any(member => !member.IsImplicitlyDeclared &&
-            IsInitializableMember(member, staticInitializers: true) &&
-            member.DeclaringSyntaxReferences.Any(reference => GetInitializerExpression(reference.GetSyntax()) != null));
-    }
-
-    private static bool CanTriggerOwnTypeInitialization(IMethodSymbol method)
-    {
-        return method.MethodKind == MethodKind.Constructor ||
-        method.IsStatic && method.MethodKind != MethodKind.StaticConstructor;
-    }
-
-    private static bool IsInitializableMember(
-        ISymbol member, bool staticInitializers)
-    {
-        return member switch
-        {
-            IFieldSymbol field => !field.IsConst && field.IsStatic == staticInitializers,
-            IPropertySymbol property => property.IsStatic == staticInitializers,
-            IEventSymbol @event => @event.IsStatic == staticInitializers,
-            _ => false
-        };
-    }
-
-    private static ExpressionSyntax? GetInitializerExpression(SyntaxNode declaration)
-    {
-        return declaration switch
-        {
-            VariableDeclaratorSyntax variable => variable.Initializer?.Value,
-            PropertyDeclarationSyntax property => property.Initializer?.Value,
-            _ => null
-        };
-    }
-
-    private static EffectSummary AnalyzeControlFlowGraph(
-        ControlFlowGraph graph, OperationEffectScanner scanner)
-    {
-        var summary = EffectSummary.Empty;
-        foreach (var block in graph.Blocks.Where(static block => block.IsReachable))
-        {
-            summary = EffectSummaryOperations.JoinFrom(summary,
-                block.Operations.Where(scanner.IsReachable).Select(scanner.Scan));
-            if (block.BranchValue != null && scanner.IsReachable(block.BranchValue))
-            {
-                summary = EffectSummaryOperations.Join(summary, scanner.Scan(block.BranchValue));
-            }
-        }
-        return ManagedAbstractFlow.IsAcyclic(graph)
-            ? summary
-            : EffectSummaryOperations.Join(summary, EffectSummaryOperations.MayDiverge());
-    }
-
-    private IOperation? GetOperationRoot(IMethodSymbol method, CancellationToken cancellationToken)
-    {
-        foreach (var syntaxReference in method.DeclaringSyntaxReferences
-                     .OrderBy(static reference => reference.SyntaxTree.FilePath, StringComparer.Ordinal)
-                     .ThenBy(static reference => reference.Span.Start))
-        {
-            var syntax = syntaxReference.GetSyntax(cancellationToken);
-            var model = SharpProof.Frontend.Host.CompilationModelProvider
-                .GetSemanticModel(_compilation, syntax.SyntaxTree);
-            var operation = model.GetOperation(syntax, cancellationToken);
-            if (operation is IMethodBodyOperation or IConstructorBodyOperation or IBlockOperation)
-            {
-                return operation;
-            }
-
-            foreach (var node in syntax.DescendantNodes())
-            {
-                operation = model.GetOperation(node, cancellationToken);
-                if (operation is IMethodBodyOperation or IConstructorBodyOperation)
-                {
-                    return operation;
-                }
-            }
-        }
-        return null;
-    }
-
-    private static ControlFlowGraph? TryCreateControlFlowGraph(
-        IOperation root, CancellationToken cancellationToken)
-    {
-        try
-        {
-            return root switch
-            {
-                IMethodBodyOperation method => ControlFlowGraph.Create(method, cancellationToken),
-                IConstructorBodyOperation constructor => ControlFlowGraph.Create(constructor, cancellationToken),
-                IBlockOperation { Parent: null } block => ControlFlowGraph.Create(block, cancellationToken),
-                _ => null
-            };
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
-    }
-
-    private static HashSet<IMethodSymbol> FindRecursiveMethods(
-        IReadOnlyDictionary<IMethodSymbol, EffectMethodNode> nodes,
-        CancellationToken cancellationToken)
-    {
-        var states = new Dictionary<IMethodSymbol, byte>(SymbolEqualityComparer.Default);
-        var stack = new List<IMethodSymbol>();
-        var recursive = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-
-        void Visit(IMethodSymbol method)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            states.Add(method, 1);
-            stack.Add(method);
-            foreach (var target in nodes[method].Calls
-                         .Select(static call => call.Target)
-                         .Where(nodes.ContainsKey)
-                         .Distinct<IMethodSymbol>(SymbolEqualityComparer.Default)
-                         .OrderBy(static target => target, EffectSymbolComparer<IMethodSymbol>.Instance))
-            {
-                if (!states.TryGetValue(target, out var state))
-                {
-                    Visit(target);
-                }
-                else if (state == 1)
-                {
-                    for (var index = stack.Count - 1; index >= 0; index--)
-                    {
-                        recursive.Add(stack[index]);
-                        if (SymbolEqualityComparer.Default.Equals(stack[index], target))
-                        {
-                            break;
-                        }
-                    }
-                }
-            }
-            stack.RemoveAt(stack.Count - 1);
-            states[method] = 2;
-        }
-
-        foreach (var method in nodes.Keys.OrderBy(
-                     static method => method, EffectSymbolComparer<IMethodSymbol>.Instance))
-        {
-            if (!states.ContainsKey(method))
-            {
-                Visit(method);
-            }
-        }
-
-        return recursive;
     }
 
     private bool IsSourceMethod(IMethodSymbol method)

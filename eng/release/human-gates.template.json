@@ -1,73 +1,304 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "releaseTag": "v1.0.0",
-  "commit": "0000000000000000000000000000000000000000",
+  "productCommit": "0000000000000000000000000000000000000000",
+  "evidenceRef": "refs/tags/evidence/v1.0.0",
   "pilots": [
     {
       "id": "pilot-library-a",
       "selectedClaims": 50,
+      "package": {
+        "version": "1.0.0",
+        "releaseManifestSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "artifacts": [
+          {
+            "id": "SharpProof.Attributes",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          {
+            "id": "SharpProof",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          {
+            "id": "SharpProof.Verifier.Win-x64",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      },
+      "runtime": {
+        "operatingSystem": "windows",
+        "architecture": "x64",
+        "dotnetSdkVersion": "9.0.300",
+        "dotnetRuntimeVersion": "9.0.0",
+        "roslynVersion": "4.14.0"
+      },
+      "tool": {
+        "productCommit": "0000000000000000000000000000000000000000",
+        "workerVersion": "1.0.0",
+        "protocolVersion": "9",
+        "manifestSchemaVersion": 4,
+        "compilerArtifactSchemaVersion": 8,
+        "workerBinarySha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "policy": {
+        "profile": "strict",
+        "features": "all",
+        "verifyPolicy": "require-proven",
+        "assumptionPolicy": "error"
+      },
       "weeklyCycles": [
         {
           "weekEnding": "2000-01-02",
-          "selectedClaims": 50,
-          "unwaivedUnknown": 0,
-          "status": "passed",
-          "evidenceUrl": "https://example.invalid/pilot-a/week-1"
+          "outcomes": {
+            "selectedClaims": 50,
+            "proven": 50,
+            "refuted": 0,
+            "unknown": 0,
+            "assumptions": 0,
+            "infrastructureFailures": 0
+          },
+          "result": {
+            "format": "SharpProof.WorkerVerifyResponse",
+            "runStatus": "Complete",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "workflow": {
+            "provider": "github-actions",
+            "repository": "owner/pilot-library-a",
+            "name": "SharpProof strict weekly",
+            "runId": 1,
+            "runAttempt": 1,
+            "sourceCommit": "0000000000000000000000000000000000000000",
+            "evidenceUrl": "https://example.invalid/pilot-a/week-1"
+          }
         },
         {
           "weekEnding": "2000-01-09",
-          "selectedClaims": 50,
-          "unwaivedUnknown": 0,
-          "status": "passed",
-          "evidenceUrl": "https://example.invalid/pilot-a/week-2"
+          "outcomes": {
+            "selectedClaims": 50,
+            "proven": 50,
+            "refuted": 0,
+            "unknown": 0,
+            "assumptions": 0,
+            "infrastructureFailures": 0
+          },
+          "result": {
+            "format": "SharpProof.WorkerVerifyResponse",
+            "runStatus": "Complete",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "workflow": {
+            "provider": "github-actions",
+            "repository": "owner/pilot-library-a",
+            "name": "SharpProof strict weekly",
+            "runId": 2,
+            "runAttempt": 1,
+            "sourceCommit": "0000000000000000000000000000000000000000",
+            "evidenceUrl": "https://example.invalid/pilot-a/week-2"
+          }
         },
         {
           "weekEnding": "2000-01-16",
-          "selectedClaims": 50,
-          "unwaivedUnknown": 0,
-          "status": "passed",
-          "evidenceUrl": "https://example.invalid/pilot-a/week-3"
+          "outcomes": {
+            "selectedClaims": 50,
+            "proven": 50,
+            "refuted": 0,
+            "unknown": 0,
+            "assumptions": 0,
+            "infrastructureFailures": 0
+          },
+          "result": {
+            "format": "SharpProof.WorkerVerifyResponse",
+            "runStatus": "Complete",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "workflow": {
+            "provider": "github-actions",
+            "repository": "owner/pilot-library-a",
+            "name": "SharpProof strict weekly",
+            "runId": 3,
+            "runAttempt": 1,
+            "sourceCommit": "0000000000000000000000000000000000000000",
+            "evidenceUrl": "https://example.invalid/pilot-a/week-3"
+          }
         },
         {
           "weekEnding": "2000-01-23",
-          "selectedClaims": 50,
-          "unwaivedUnknown": 0,
-          "status": "passed",
-          "evidenceUrl": "https://example.invalid/pilot-a/week-4"
+          "outcomes": {
+            "selectedClaims": 50,
+            "proven": 50,
+            "refuted": 0,
+            "unknown": 0,
+            "assumptions": 0,
+            "infrastructureFailures": 0
+          },
+          "result": {
+            "format": "SharpProof.WorkerVerifyResponse",
+            "runStatus": "Complete",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "workflow": {
+            "provider": "github-actions",
+            "repository": "owner/pilot-library-a",
+            "name": "SharpProof strict weekly",
+            "runId": 4,
+            "runAttempt": 1,
+            "sourceCommit": "0000000000000000000000000000000000000000",
+            "evidenceUrl": "https://example.invalid/pilot-a/week-4"
+          }
         }
       ]
     },
     {
       "id": "pilot-library-b",
       "selectedClaims": 50,
+      "package": {
+        "version": "1.0.0",
+        "releaseManifestSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "artifacts": [
+          {
+            "id": "SharpProof.Attributes",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          {
+            "id": "SharpProof",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          {
+            "id": "SharpProof.Verifier.Win-x64",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      },
+      "runtime": {
+        "operatingSystem": "windows",
+        "architecture": "x64",
+        "dotnetSdkVersion": "9.0.300",
+        "dotnetRuntimeVersion": "9.0.0",
+        "roslynVersion": "4.14.0"
+      },
+      "tool": {
+        "productCommit": "0000000000000000000000000000000000000000",
+        "workerVersion": "1.0.0",
+        "protocolVersion": "9",
+        "manifestSchemaVersion": 4,
+        "compilerArtifactSchemaVersion": 8,
+        "workerBinarySha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "policy": {
+        "profile": "strict",
+        "features": "all",
+        "verifyPolicy": "require-proven",
+        "assumptionPolicy": "error"
+      },
       "weeklyCycles": [
         {
           "weekEnding": "2000-01-02",
-          "selectedClaims": 50,
-          "unwaivedUnknown": 0,
-          "status": "passed",
-          "evidenceUrl": "https://example.invalid/pilot-b/week-1"
+          "outcomes": {
+            "selectedClaims": 50,
+            "proven": 50,
+            "refuted": 0,
+            "unknown": 0,
+            "assumptions": 0,
+            "infrastructureFailures": 0
+          },
+          "result": {
+            "format": "SharpProof.WorkerVerifyResponse",
+            "runStatus": "Complete",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "workflow": {
+            "provider": "github-actions",
+            "repository": "owner/pilot-library-b",
+            "name": "SharpProof strict weekly",
+            "runId": 1,
+            "runAttempt": 1,
+            "sourceCommit": "0000000000000000000000000000000000000000",
+            "evidenceUrl": "https://example.invalid/pilot-b/week-1"
+          }
         },
         {
           "weekEnding": "2000-01-09",
-          "selectedClaims": 50,
-          "unwaivedUnknown": 0,
-          "status": "passed",
-          "evidenceUrl": "https://example.invalid/pilot-b/week-2"
+          "outcomes": {
+            "selectedClaims": 50,
+            "proven": 50,
+            "refuted": 0,
+            "unknown": 0,
+            "assumptions": 0,
+            "infrastructureFailures": 0
+          },
+          "result": {
+            "format": "SharpProof.WorkerVerifyResponse",
+            "runStatus": "Complete",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "workflow": {
+            "provider": "github-actions",
+            "repository": "owner/pilot-library-b",
+            "name": "SharpProof strict weekly",
+            "runId": 2,
+            "runAttempt": 1,
+            "sourceCommit": "0000000000000000000000000000000000000000",
+            "evidenceUrl": "https://example.invalid/pilot-b/week-2"
+          }
         },
         {
           "weekEnding": "2000-01-16",
-          "selectedClaims": 50,
-          "unwaivedUnknown": 0,
-          "status": "passed",
-          "evidenceUrl": "https://example.invalid/pilot-b/week-3"
+          "outcomes": {
+            "selectedClaims": 50,
+            "proven": 50,
+            "refuted": 0,
+            "unknown": 0,
+            "assumptions": 0,
+            "infrastructureFailures": 0
+          },
+          "result": {
+            "format": "SharpProof.WorkerVerifyResponse",
+            "runStatus": "Complete",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "workflow": {
+            "provider": "github-actions",
+            "repository": "owner/pilot-library-b",
+            "name": "SharpProof strict weekly",
+            "runId": 3,
+            "runAttempt": 1,
+            "sourceCommit": "0000000000000000000000000000000000000000",
+            "evidenceUrl": "https://example.invalid/pilot-b/week-3"
+          }
         },
         {
           "weekEnding": "2000-01-23",
-          "selectedClaims": 50,
-          "unwaivedUnknown": 0,
-          "status": "passed",
-          "evidenceUrl": "https://example.invalid/pilot-b/week-4"
+          "outcomes": {
+            "selectedClaims": 50,
+            "proven": 50,
+            "refuted": 0,
+            "unknown": 0,
+            "assumptions": 0,
+            "infrastructureFailures": 0
+          },
+          "result": {
+            "format": "SharpProof.WorkerVerifyResponse",
+            "runStatus": "Complete",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "workflow": {
+            "provider": "github-actions",
+            "repository": "owner/pilot-library-b",
+            "name": "SharpProof strict weekly",
+            "runId": 4,
+            "runAttempt": 1,
+            "sourceCommit": "0000000000000000000000000000000000000000",
+            "evidenceUrl": "https://example.invalid/pilot-b/week-4"
+          }
         }
       ]
     }
@@ -81,14 +312,14 @@
     {
       "reviewer": "reviewer-a",
       "independent": true,
-      "commit": "0000000000000000000000000000000000000000",
+      "productCommit": "0000000000000000000000000000000000000000",
       "disposition": "approved",
       "evidenceUrl": "https://example.invalid/review-a"
     },
     {
       "reviewer": "reviewer-b",
       "independent": true,
-      "commit": "0000000000000000000000000000000000000000",
+      "productCommit": "0000000000000000000000000000000000000000",
       "disposition": "approved",
       "evidenceUrl": "https://example.invalid/review-b"
     }

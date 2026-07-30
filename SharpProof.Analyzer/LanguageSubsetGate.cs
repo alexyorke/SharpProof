@@ -38,77 +38,11 @@ internal static class LanguageSubsetGate
 {
     internal static readonly ImmutableDictionary<OperationKind, bool> OperationKindDecisions =
         Enum.GetValues(typeof(OperationKind)).Cast<OperationKind>().Distinct()
-            .ToImmutableDictionary(static kind => kind, static kind => IsSupported(kind));
-
-    private static bool IsSupported(OperationKind kind)
-    {
-        return kind is
-            OperationKind.Block or
-            OperationKind.VariableDeclarationGroup or
-            OperationKind.Switch or
-            OperationKind.Loop or
-            OperationKind.Labeled or
-            OperationKind.Branch or
-            OperationKind.Empty or
-            OperationKind.Return or
-            OperationKind.Lock or
-            OperationKind.Try or
-            OperationKind.Using or
-            OperationKind.ExpressionStatement or
-            OperationKind.Literal or
-            OperationKind.Conversion or
-            OperationKind.Invocation or
-            OperationKind.ArrayElementReference or
-            OperationKind.LocalReference or
-            OperationKind.ParameterReference or
-            OperationKind.FieldReference or
-            OperationKind.PropertyReference or
-            OperationKind.Unary or
-            OperationKind.Binary or
-            OperationKind.Conditional or
-            OperationKind.Coalesce or
-            OperationKind.ObjectCreation or
-            OperationKind.ArrayCreation or
-            OperationKind.InstanceReference or
-            OperationKind.IsType or
-            OperationKind.SimpleAssignment or
-            OperationKind.CompoundAssignment or
-            OperationKind.Parenthesized or
-            OperationKind.ConditionalAccess or
-            OperationKind.ConditionalAccessInstance or
-            OperationKind.InterpolatedString or
-            OperationKind.ObjectOrCollectionInitializer or
-            OperationKind.MemberInitializer or
-            OperationKind.NameOf or
-            OperationKind.DefaultValue or
-            OperationKind.TypeOf or
-            OperationKind.Increment or
-            OperationKind.Throw or
-            OperationKind.Decrement or
-            OperationKind.FieldInitializer or
-            OperationKind.VariableInitializer or
-            OperationKind.PropertyInitializer or
-            OperationKind.ParameterInitializer or
-            OperationKind.ArrayInitializer or
-            OperationKind.VariableDeclarator or
-            OperationKind.VariableDeclaration or
-            OperationKind.Argument or
-            OperationKind.CatchClause or
-            OperationKind.SwitchCase or
-            OperationKind.CaseClause or
-            OperationKind.InterpolatedStringText or
-            OperationKind.Interpolation or
-            OperationKind.MethodBodyOperation or
-            OperationKind.ConstructorBodyOperation or
-            OperationKind.Discard or
-            OperationKind.FlowCapture or
-            OperationKind.FlowCaptureReference or
-            OperationKind.IsNull or
-            OperationKind.CaughtException or
-            OperationKind.CoalesceAssignment or
-            OperationKind.UsingDeclaration or
-            OperationKind.Attribute;
-    }
+            .ToImmutableDictionary(
+                static kind => kind,
+                static kind => OperationSupportCatalog.IsSupported(
+                    OperationSupportStage.EffectDiscovery,
+                    kind));
 
     internal static LanguageSubsetDecision ClassifyEffects(
         IMethodSymbol method,

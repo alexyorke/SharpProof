@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "sources": [
     {
       "id": "aalhour-c-sharp-algorithms",
@@ -622,7 +622,8 @@
       "declarationSha256": "aca20ae713d4817d9c0472dc52e2002d7a6ad5076833c89eec178a9eacb2bd02",
       "methodName": "IsNumber",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0002",
@@ -633,7 +634,8 @@
       "declarationSha256": "b342d8cdcc3da31c8e4ffb0dd96fd6d46429b53ff785e782fe94085bd18d58a8",
       "methodName": "Swap",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0003",
@@ -644,7 +646,8 @@
       "declarationSha256": "c4a2e2bf506d5c38061739deebcb4e3307be4415c10e592a3967fd4caa8766be",
       "methodName": "_bellmanFord",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0004",
@@ -655,7 +658,8 @@
       "declarationSha256": "7fc065298af86425a3cb05e585f572a771c3aff2716cf2a27361a007cd8ddc46",
       "methodName": "_initializeDataMembers",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0005",
@@ -666,7 +670,8 @@
       "declarationSha256": "7f05790cab81d0aefbb915b1e37aa61aaa2e85265021ecd44bae401f656e1244",
       "methodName": "PrintAll",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0006",
@@ -677,7 +682,8 @@
       "declarationSha256": "63119941bf52e455d62f5f49c4124fd8f76e01e3b7308448e3323a7a525d30d1",
       "methodName": "_initializeDataMembers",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0007",
@@ -688,7 +694,8 @@
       "declarationSha256": "780bf86c61ab47f1a734201662ae114b95c861afac96fe8531ecd76b0988babc",
       "methodName": "_bfsConnectedComponent",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0008",
@@ -699,7 +706,8 @@
       "declarationSha256": "bb95ab9b061e9e32b9e904fd88afd202c42a01886e963df599e40b154daa79d3",
       "methodName": "_isUndirectedCyclic",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0009",
@@ -710,7 +718,8 @@
       "declarationSha256": "2746be39d7595a6a432ad332cb7f15e620df2ccc29a759b393c9580ecce8aa35",
       "methodName": "_visitNeighbors",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0010",
@@ -721,7 +730,8 @@
       "declarationSha256": "824af3d150f0e2ef2f6c33a248789e46c8ceb47e3c78aca082f3272465129a72",
       "methodName": "HasPath",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0011",
@@ -732,7 +742,8 @@
       "declarationSha256": "83fa9bf199e9e7a158f641e3edfa53ac9a9f2a0d950b95230118478aa05ce16a",
       "methodName": "_dijkstra",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0012",
@@ -743,7 +754,8 @@
       "declarationSha256": "cf30045a464085f6fcd41d35272f8b2b9ccf47745521f8b58a9fba38876c81f0",
       "methodName": "_topoSortHelper",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0013",
@@ -754,7 +766,8 @@
       "declarationSha256": "98b9655db8573e9ca3862d54c2550782a9c9dad49dd60ce49162216b87a5ba34",
       "methodName": "Calculate",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0014",
@@ -765,7 +778,8 @@
       "declarationSha256": "01d1a9464dad57fcc6eae387c82ee140dde4bcf2f8104983a818fee1289c6b1c",
       "methodName": "_recursiveHelper",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0015",
@@ -776,7 +790,8 @@
       "declarationSha256": "905e65ea85f97ec8985ab0a655079eb25464267fb4e8fc6e05027eec3ddec554",
       "methodName": "FindGCDEuclidean",
       "mode": "effects",
-      "expectedVerdict": "Proven"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0016",
@@ -787,7 +802,8 @@
       "declarationSha256": "9a1cadb41ff0a7d0a24f80d364fadd0131d15ddcc9052476532d0df13fdd1d78",
       "methodName": "GeneratePrimesUpTo",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0017",
@@ -798,7 +814,8 @@
       "declarationSha256": "cf4bfd6d75eeb4fb1943a19fc43d0663edd5c84bb8ce075b5f97f22bd3260fcf",
       "methodName": "GeneratePrimesUpTo",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0018",
@@ -809,7 +826,8 @@
       "declarationSha256": "d4e4de6b93338b008ef2da2b5939db420f73662b1a885c0d5643d040baf6d740",
       "methodName": "BinarySearch",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0019",
@@ -820,7 +838,8 @@
       "declarationSha256": "7d80e750f61714cd45f74338f7fe78698f689bb9ed2ca8c2aae9eabeea07fa27",
       "methodName": "UnbalancedBSTSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0020",
@@ -831,7 +850,8 @@
       "declarationSha256": "ca624c572bb611d031f0f25293db96203aa10b5a98d2f27a961a75de6383727e",
       "methodName": "BubbleSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0021",
@@ -842,7 +862,8 @@
       "declarationSha256": "c31842d01a1f52eb3e08e939fae2826dc94db50dea5d531dcfadd51303717046",
       "methodName": "BucketSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0022",
@@ -853,7 +874,8 @@
       "declarationSha256": "b9a21339cc2268444485878700a7afdfe356e4df8d8cd301b07e27c68aee4218",
       "methodName": "CombSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0023",
@@ -864,7 +886,8 @@
       "declarationSha256": "7dac99f6e198030dad8bb349c72d2a76858cdfd76d01deca6fd57d6f7f77b990",
       "methodName": "CountingSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0024",
@@ -875,7 +898,8 @@
       "declarationSha256": "9e54a713ff442b599994181a79018388f398a208fc0f8f3d58177a8563332ee8",
       "methodName": "CycleSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0025",
@@ -886,7 +910,8 @@
       "declarationSha256": "1a7b5888c667ce08f2c8384c1f8aeeccb75d6768280aacaebd936b9138a03820",
       "methodName": "GnomeSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0026",
@@ -897,7 +922,8 @@
       "declarationSha256": "f687da2d877a897db8c3620480d333560cf765261435b04d9c88823d6455ff8a",
       "methodName": "HeapSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0027",
@@ -908,7 +934,8 @@
       "declarationSha256": "15bdae57479719de0b63bc644fb5ece0c401cc43a9c4a8256e332aefc7d1794e",
       "methodName": "InsertionSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0028",
@@ -919,7 +946,8 @@
       "declarationSha256": "74293ab01a5b8275081a2cea33e490c581fbcde1612f446ae5ca52e35743368a",
       "methodName": "LSDRadixSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0029",
@@ -930,7 +958,8 @@
       "declarationSha256": "8f3e8030bdcf077e9ea63f55923693002fa1034e48f3c29305f8dbde869df040",
       "methodName": "MergeSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0030",
@@ -941,7 +970,8 @@
       "declarationSha256": "f2d94d762a482144c41f71da3e1e52302f45340d05b21d088f126787db4576e0",
       "methodName": "OddEvenSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0031",
@@ -952,7 +982,8 @@
       "declarationSha256": "b7bc06f051cffba243a88ee0d17b87c0bf15f1d2140b75ed49579589363341e9",
       "methodName": "PigeonHoleSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0032",
@@ -963,7 +994,8 @@
       "declarationSha256": "ab2d05e04b5bb45cf29b5c9853d6db7e62b483dd640af1f1d22727ac8bf6af33",
       "methodName": "QuickSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0033",
@@ -974,7 +1006,8 @@
       "declarationSha256": "5b6d5d5854ef1940af83b65e3d934668c36c4223401614a4b16d3f540a30e343",
       "methodName": "SelectionSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0034",
@@ -985,7 +1018,8 @@
       "declarationSha256": "5bc71c5362aec4fae03748bcdc68eec8c284d0778055149b6da1df9e71aeab44",
       "methodName": "ShellSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0035",
@@ -996,7 +1030,8 @@
       "declarationSha256": "f1e927fbc2ead687e9495a49f9bc4e07096595e1b9804bd065e8c05f0a3bf5ba",
       "methodName": "GetMinDistance",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0036",
@@ -1007,7 +1042,8 @@
       "declarationSha256": "f33f94e3f9f9c7f7df02876baf532be83923e612bb22a060ac5b24063e36ef93",
       "methodName": "_permutations",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0037",
@@ -1018,7 +1054,8 @@
       "declarationSha256": "63fbc4e3f3d941d374696a6847f3326690d4198390accefd63938d93c1266eb2",
       "methodName": "PreOrderVisitor",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0038",
@@ -1029,7 +1066,8 @@
       "declarationSha256": "1786d9b67b33dfa7ebff6f81069eea7cdad64e39231b6c56304fdcc1075ae19a",
       "methodName": "IsGreaterThanOrEqualTo",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0039",
@@ -1040,7 +1078,8 @@
       "declarationSha256": "68379a0d26cf7120ddbe8b25bead9bf64c8ba2779268f84c2e60b24e3300a4f1",
       "methodName": "PadCenter",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0040",
@@ -1051,7 +1090,8 @@
       "declarationSha256": "6d67eb0974e3ae0954631d5a1efba5df2bab07c1527569ca5c8092162061a83f",
       "methodName": "_initializeData",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0041",
@@ -1062,7 +1102,8 @@
       "declarationSha256": "df31b6fd18f41941a73025fb37e3df2cb2bb3ffce0676097c68966e44769d9aa",
       "methodName": "_rehash",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0042",
@@ -1073,7 +1114,8 @@
       "declarationSha256": "87af311d6ce541a5e7dedd76a93e068785ba6ae2a0c6a6b7884cb43878b06989",
       "methodName": "_expandCapacity",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0043",
@@ -1084,7 +1126,8 @@
       "declarationSha256": "1974f25a2409f54fd3810e7e7e6ba4250e4c8f70812715c10f14edc38abd8919",
       "methodName": "_expand",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0044",
@@ -1095,7 +1138,8 @@
       "declarationSha256": "9c9a80d5156d30802025924e233bdaa3caa009072e52d6004e4a0bc0eeb0cc2e",
       "methodName": "_hash",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0045",
@@ -1106,7 +1150,8 @@
       "declarationSha256": "65bebea154a1327182f7059d588a2bb89d9ae5e710f5266a94a8e7c0b3956cfa",
       "methodName": "IsComplete",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0046",
@@ -1117,7 +1162,8 @@
       "declarationSha256": "56fb0719924903a5cd1ca7fa78d8b6328ed0689dfe0b581f748a840deb35cc8a",
       "methodName": "_doesEdgeExist",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0047",
@@ -1128,7 +1174,8 @@
       "declarationSha256": "be2037010159e60824e15eddcc817a7d1fa98417412a11564d81e8701bf606f9",
       "methodName": "_doesEdgeExist",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0048",
@@ -1139,7 +1186,8 @@
       "declarationSha256": "8ee5a3d714ebd76bb8f67119e1bb28bf6e8ddbcc0556434405e4a8d35eea2fde",
       "methodName": "_doesEdgeExist",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0049",
@@ -1150,7 +1198,8 @@
       "declarationSha256": "6a5e06709c0754b9c5085235525e973c1102280335667e46b6cc2e6d4688d4c7",
       "methodName": "_tryGetEdge",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0050",
@@ -1161,7 +1210,8 @@
       "declarationSha256": "7d59a7a073d5a4f3d4debb0f5dfa28efac9b3e5a841cdb4de7175fe960dad9bf",
       "methodName": "_doesEdgeExist",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0051",
@@ -1172,7 +1222,8 @@
       "declarationSha256": "c5cb8f3b8187a08dc1a470ca21d678f15d26a87c458f4ed9a795f1cb9e190a5a",
       "methodName": "_doesEdgeExist",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0052",
@@ -1183,7 +1234,8 @@
       "declarationSha256": "be6faacc23494d6ad6a4b06237602b0f376fffba664c9a7e294434612d37c6c0",
       "methodName": "_doesEdgeExist",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0053",
@@ -1194,7 +1246,8 @@
       "declarationSha256": "acb3cf75a545fa9ab98e4dcf030afa8fb20a375c56d34878863f6b3fee32a716",
       "methodName": "_tryGetEdge",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0054",
@@ -1205,7 +1258,8 @@
       "declarationSha256": "2176ac611abbec7c5a9ced6fe4cb6f0b594f778aea5efb5865659e149c55d10f",
       "methodName": "GenerateNewFunctions",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0055",
@@ -1216,7 +1270,8 @@
       "declarationSha256": "76472a7445dd9b52675459edcf02e6bcf6eb24ea38c52531d5d451a2bf977d07",
       "methodName": "GenerateNewFunctions",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0056",
@@ -1227,7 +1282,8 @@
       "declarationSha256": "7b67744140a77acaa44b19747b3eabb9421c772f4b6e2074b18f5756833c1b80",
       "methodName": "_buildMaxHeap",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0057",
@@ -1238,7 +1294,8 @@
       "declarationSha256": "1a11fe754e74eaffaa9adc37f5a8bf8141650f044bdce8121a0ea61b53eff1a6",
       "methodName": "_buildMinHeap",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0058",
@@ -1249,7 +1306,8 @@
       "declarationSha256": "e2e1cd8d871487515d68fc5f99add97cd473486bfcea57005457555d9793cd84",
       "methodName": "_removeAtIndex",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0059",
@@ -1260,7 +1318,8 @@
       "declarationSha256": "120be84f96cfe1020d349327224d389a55216b2ca80471fe670b36340f811608",
       "methodName": "PeekAtHighestPriority",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0060",
@@ -1271,7 +1330,8 @@
       "declarationSha256": "34981bf90762424228f56f0c1851873a1076f0b4cfaae53752c1aac3f5543f38",
       "methodName": "_validPriorityType",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0061",
@@ -1282,7 +1342,8 @@
       "declarationSha256": "a5533ba8d3f217827c26892690614ce5e57e5522169c31d5c50ab47f477eb60c",
       "methodName": "_ensureCapacity",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0062",
@@ -1293,7 +1354,8 @@
       "declarationSha256": "428783d253476916e24d878b8921b204a7c09341a41592f16353abca67fbe5d2",
       "methodName": "Add",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0063",
@@ -1304,7 +1366,8 @@
       "declarationSha256": "ac3091243aefd64b03a14faf5fb780f99b0a05d98f5d5342e99dffda7382fc03",
       "methodName": "CompareTo",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0064",
@@ -1315,7 +1378,8 @@
       "declarationSha256": "ee30f8ef2f6b0fa1b26d02c2e0f612b0eab5f5a4a591138647a672ee1c0e5982",
       "methodName": "CompareTo",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0065",
@@ -1326,7 +1390,8 @@
       "declarationSha256": "42fbc0482aebdd5680478b990f17e98cd74e3d20d9a917fb16136500ef0211d9",
       "methodName": "_resize",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0066",
@@ -1337,7 +1402,8 @@
       "declarationSha256": "0c989c9c497db62b9a5ea526b5bf766061735eeda631e6e799e7dce98e58a57a",
       "methodName": "CompareTo",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0067",
@@ -1348,7 +1414,8 @@
       "declarationSha256": "0ea3defffd11511309fc52e40cda1b791d5d6bcbb4e9af547ec5ba5392034011",
       "methodName": "_getNextLevel",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0068",
@@ -1359,7 +1426,8 @@
       "declarationSha256": "87126ee45488b35ebae7fec4e2f48390c6c3df42c3ffc671dc967ae39559dd6c",
       "methodName": "CompareTo",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0069",
@@ -1370,7 +1438,8 @@
       "declarationSha256": "b540d1083b7c1fae5785c155ac3ce6ec953c72782e7fb194eb2b8a23bf941699",
       "methodName": "Push",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0070",
@@ -1381,7 +1450,8 @@
       "declarationSha256": "dd001f39ff1f1cb33a97527ebdc409c66af2177c0aa8ceb3ad9a9669a42e97d7",
       "methodName": "ContainsKey",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0071",
@@ -1392,7 +1462,8 @@
       "declarationSha256": "260aa338567f0bdf778a975acd3aac11aca074028542005128d7c43820e828cb",
       "methodName": "Contains",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0072",
@@ -1403,7 +1474,8 @@
       "declarationSha256": "d3ee026e3b80a34acc82f6947c4c63fa123700a87216061204b62923696ec78e",
       "methodName": "_getNodeHeight",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0073",
@@ -1414,7 +1486,8 @@
       "declarationSha256": "309d59b90ea040e7687ab623ba7002c2f87f746c1f9290fc9ed67b0e2d055d14",
       "methodName": "_subtreeSize",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0074",
@@ -1425,7 +1498,8 @@
       "declarationSha256": "27ca25f9a947882d66efbfd42a1161c6595749039a58bda731ecbe63fa2ad868",
       "methodName": "Insert",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0075",
@@ -1436,7 +1510,8 @@
       "declarationSha256": "d09fa02be2f13a29b0e88b2d6bc0e52f306d7015c2e0e09d6d29889d4c95392b",
       "methodName": "_replaceNodeInParent",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0076",
@@ -1447,7 +1522,8 @@
       "declarationSha256": "e9f914f1bfc67d63e594e86505d4839b1fd610582288b19d115947273b0f96ed",
       "methodName": "_getTreeHeight",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0077",
@@ -1458,7 +1534,8 @@
       "declarationSha256": "7764e6750ce0786227a0a5fc688bdb8ee2e2b55a1f8a5a1c121eeb2478979402",
       "methodName": "CompareTo",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0078",
@@ -1469,7 +1546,8 @@
       "declarationSha256": "f75927f4663fe5092a90b310b1787476edda7d608a1f5bf1de0575432f5f33bf",
       "methodName": "CompareTo",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0079",
@@ -1480,7 +1558,8 @@
       "declarationSha256": "4df9ca4f1244b442eb1254f3f2a2bbec6e834e6431f08aede6462beb0d22150c",
       "methodName": "IsRoot",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0080",
@@ -1491,7 +1570,8 @@
       "declarationSha256": "40466d7e69fe33b2368ea6009de6d485e07b08e9f38f3d8251d535048f6d6293",
       "methodName": "_safeGetGrandParent",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0081",
@@ -1502,7 +1582,8 @@
       "declarationSha256": "964717b94f896f07016663eaa99dbfa5ade74201eff51725989fa0741528add5",
       "methodName": "Insert",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0082",
@@ -1513,7 +1594,8 @@
       "declarationSha256": "bc0f460b70fd8b77c54d57a1b8931a856b81d9b8d67fd4c9bc55deba0f426bbc",
       "methodName": "AddLeftChild",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0083",
@@ -1524,7 +1606,8 @@
       "declarationSha256": "3f9f2d6456388ce737e58cb906e667b96109315954c2a1117a668c520de445b2",
       "methodName": "DrawTree",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0084",
@@ -1535,7 +1618,8 @@
       "declarationSha256": "f41623b54c116ae3aa42ba4ec299aac63f6d3cd6bf7ffc696be506f1eba3ef58",
       "methodName": "Add",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0085",
@@ -1546,7 +1630,8 @@
       "declarationSha256": "04a1c6a3f1ad8302b776a080c0288e39ac269188bedf459fdcc905f7168fc865",
       "methodName": "Add",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0086",
@@ -1557,7 +1642,8 @@
       "declarationSha256": "539d5f417ebb334cef44d39fe3c53dc4b04c4f8c37c2f57a4e1f98b7885c710d",
       "methodName": "GetByPrefix",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0087",
@@ -1568,7 +1654,8 @@
       "declarationSha256": "119a3a503c19be8e7d684c4cb8b1f67a8bfb559a70ecf61d6d014626ff5dd88c",
       "methodName": "GetByPrefix",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0088",
@@ -1579,7 +1666,8 @@
       "declarationSha256": "1b7911f7f483b86d53a1d617b0aa577896417f8a1ad1a58e0c0edf597113cf37",
       "methodName": "IsEqualTo",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0089",
@@ -1590,7 +1678,8 @@
       "declarationSha256": "5a1d799d7a826a42a741487a1c713ee3950a03392b2226038cd8403f80660d6f",
       "methodName": "Swap",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0090",
@@ -1601,7 +1690,8 @@
       "declarationSha256": "a5c404bbc922da324d143512ac75dfe79561d3fceab2bbd766bf22cc56d71950",
       "methodName": "_initializeDataMembers",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0091",
@@ -1612,7 +1702,8 @@
       "declarationSha256": "3692f50f82be675def4db2a360207e11381a293f72f8919e12a96871b376044a",
       "methodName": "_isBipartiteHelper",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0092",
@@ -1623,7 +1714,8 @@
       "declarationSha256": "8ac85acd74f44cc6345f76560695d33ed73c5bcfc174ac34f6f1b4d13da8c117",
       "methodName": "VisitAll",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0093",
@@ -1634,7 +1726,8 @@
       "declarationSha256": "c9b45aa74cfc5eb6da8808003c096b3519318d3756d97bf33fd0e4d0ac9b8bf6",
       "methodName": "_breadthFirstSearch",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0094",
@@ -1645,7 +1738,8 @@
       "declarationSha256": "40004d77577b5a2035fcccc5eb1fc14f17eab76cb89af6b165b9a2cd031a5266",
       "methodName": "Compute",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0095",
@@ -1656,7 +1750,8 @@
       "declarationSha256": "96f5bd27b16695d3b726383d279c680dff8c4ecfadc26e1ad0908ad30b94522c",
       "methodName": "_isDirectedCyclic",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0096",
@@ -1667,7 +1762,8 @@
       "declarationSha256": "b41a511dfa33bbb0c128ff5e4ce8e17ff432c23eed628e2e2f4932aec2b3db45",
       "methodName": "VisitAll",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0097",
@@ -1678,7 +1774,8 @@
       "declarationSha256": "796c3aa3d17cb6441df23694c422a227194ec2b3955e0663ea0af059bdb2b82f",
       "methodName": "PathDistance",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0098",
@@ -1689,7 +1786,8 @@
       "declarationSha256": "473917ce6d567b5acc711a04fbcb400187dd01a9d13e94e631a47d04a3d08cd7",
       "methodName": "_initialize",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0099",
@@ -1700,7 +1798,8 @@
       "declarationSha256": "dcad37fb435e36519eeb04aec432561063270f12ce1aba9ebb4ffa7e4a2a9e14",
       "methodName": "Sort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0100",
@@ -1711,7 +1810,8 @@
       "declarationSha256": "dcdff602d098413ac301976811010855412238ce5681d02ef260cdace3bec4f3",
       "methodName": "Factorial",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0101",
@@ -1722,7 +1822,8 @@
       "declarationSha256": "81c6e008ecef4470a2ede816041364fa56ff6494225c964edca67999279af588",
       "methodName": "GetNumber",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0102",
@@ -1733,7 +1834,8 @@
       "declarationSha256": "984aa08198352bae0a7f60d51ff8be8768a44c87b11343e4fcff7e778e6a1956",
       "methodName": "FindGCDStein",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0103",
@@ -1744,7 +1846,8 @@
       "declarationSha256": "98a38564ca65013e8b089add8180519cdc5c2ddebc510f7deab35410efbea2c7",
       "methodName": "MoveNext",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0104",
@@ -1755,7 +1858,8 @@
       "declarationSha256": "16fee1d6822345adc6abeefa933c30cff8390fa01bc74aea7ce3ced358af096c",
       "methodName": "_inOrderTravelAndAdd",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0105",
@@ -1766,7 +1870,8 @@
       "declarationSha256": "ad448c0035f935abe95f68db47f7a159ba72b15775445f7dcaacd405e5a4ce9d",
       "methodName": "BubbleSortAscending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0106",
@@ -1777,7 +1882,8 @@
       "declarationSha256": "7425379d79f7f778726c54d73161766168f7b83110433fe002ebeaf68d86d550",
       "methodName": "BucketSortAscending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0107",
@@ -1788,7 +1894,8 @@
       "declarationSha256": "4da08d68bc6288990aba0d53de4e5b2585b4eb13518cea8e9175f5b92912c6a0",
       "methodName": "CombSortAscending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0108",
@@ -1799,7 +1906,8 @@
       "declarationSha256": "92f5007f1b64a3476059caa24ea936aa8114ae3678acd2c3bd4c9e390a1569e1",
       "methodName": "CycleSortDescending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0109",
@@ -1810,7 +1918,8 @@
       "declarationSha256": "d9a9352b7f999e0edadda3e40b0f3cb0d85f3ddef076ae838b5e096a5d6d4591",
       "methodName": "GnomeSortAscending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0110",
@@ -1821,7 +1930,8 @@
       "declarationSha256": "7476ea4c460a30b67de4a55f52f0355090a6e82b020440b12751bd70085a60fb",
       "methodName": "HeapSortAscending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0111",
@@ -1832,7 +1942,8 @@
       "declarationSha256": "0fc676aadc14939a73a3818d034e8da3a3a0555f72a3187ad38904a5e6a39f81",
       "methodName": "InsertionSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0112",
@@ -1843,7 +1954,8 @@
       "declarationSha256": "768b156f6e6796d6a56892b4cb7a06aad1c8cad932d1bdf5dd43aff8b6412800",
       "methodName": "LSDRadixSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0113",
@@ -1854,7 +1966,8 @@
       "declarationSha256": "b4b9b91a395c19adf4d8afe4f811e941e0fba0241452c7e04a5872399a3d4bf5",
       "methodName": "InternalMergeSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0114",
@@ -1865,7 +1978,8 @@
       "declarationSha256": "bf3ae2078fab4461290f59a49a01deca2f64de5c067f4081ba297bc7f026a08c",
       "methodName": "OddEvenSortAscending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0115",
@@ -1876,7 +1990,8 @@
       "declarationSha256": "2fc8d3c2d43f263a217b5d06bfd2d43480886c103053662db13af9af9375e74b",
       "methodName": "PigeonHoleSortAscending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0116",
@@ -1887,7 +2002,8 @@
       "declarationSha256": "254fc651801e08ccbe4a5bcad8950a2b04448b25b50774184498d00c581d13e9",
       "methodName": "InternalQuickSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0117",
@@ -1898,7 +2014,8 @@
       "declarationSha256": "b9c1c3e355788d99c20bd491002d100b4956e6f4408bb39879363676fe01e96b",
       "methodName": "SelectionSortAscending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0118",
@@ -1909,7 +2026,8 @@
       "declarationSha256": "448952915ea061b56988d7a9770694b6f70b32d1a87414dd8063014c40b2bc55",
       "methodName": "ShellSortAscending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0119",
@@ -1920,7 +2038,8 @@
       "declarationSha256": "7b9914631423361a7b6e47d9353c6dbe808adfcb10aa771fd84dc7328c626564",
       "methodName": "GetMinDistance",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0120",
@@ -1931,7 +2050,8 @@
       "declarationSha256": "7b8b834b2ba70f230d4c3aab5deb74a387f4e27eb8cffa4cc36484734cc14ff0",
       "methodName": "_mergePermutations",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0121",
@@ -1942,7 +2062,8 @@
       "declarationSha256": "bde271751179884a3bdd540186bab252fbffed23652d42a5b62e7028bc31d055",
       "methodName": "InOrderVisitor",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0122",
@@ -1953,7 +2074,8 @@
       "declarationSha256": "85d416347868d8764c6ea4c06b813c53c5425e5527744f66295f5961ba9ef897",
       "methodName": "IsLessThanOrEqualTo",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0123",
@@ -1964,7 +2086,8 @@
       "declarationSha256": "1ee10a57b9b8000913f177679c99b58f76582e5f5d1d08a28a62696fb04924ce",
       "methodName": "Populate",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0124",
@@ -1975,7 +2098,8 @@
       "declarationSha256": "6c887dc10f7df215897bdecc36cdfc92cde065fc2c6fe1261e93a7da76dff737",
       "methodName": "IsPrime",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0125",
@@ -1986,7 +2110,8 @@
       "declarationSha256": "a4548ff38bc22650fae1cb62c889974723875872e94463ee8a840abaa2dd94e9",
       "methodName": "_contractCapacity",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0126",
@@ -1997,7 +2122,8 @@
       "declarationSha256": "a533da8630f906c024b43a88b5102166e07f4a752913dbd032313bc770112c0b",
       "methodName": "_contractCapacity",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0127",
@@ -2008,7 +2134,8 @@
       "declarationSha256": "d69be8f06657fce74e0d82641f778d74d8fdd3cde17fb203bd1cb8d4ae4220d0",
       "methodName": "_rehash",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0128",
@@ -2019,7 +2146,8 @@
       "declarationSha256": "24b579869acb472bfa6a1f141d62f0b5b27a890396af2b0e3c2dffd609699b02",
       "methodName": "_findSlot",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0129",
@@ -2030,7 +2158,8 @@
       "declarationSha256": "8dda5e1a97b8642f7c4469b3b2d83edb5f5b4c7b8de0ae7fee9e0ba02022aaa3",
       "methodName": "ExpandToMaximal",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0130",
@@ -2041,7 +2170,8 @@
       "declarationSha256": "d3b05c413f04d67cc24e69aca172b60fb5d50bae0ebdb2b159774347a2dc2a3f",
       "methodName": "IncomingEdges",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0131",
@@ -2052,7 +2182,8 @@
       "declarationSha256": "1d63ec65c2d6a8a82d4aa9415b03be1fb2c046bcc0f0c6368bf53e1b5ad14cf0",
       "methodName": "IncomingEdges",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0132",
@@ -2063,7 +2194,8 @@
       "declarationSha256": "d258de7e6eafc9a821454067d154873d1b3c260ed09ccb355f0a75aa78bd187b",
       "methodName": "_getEdgeWeight",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0133",
@@ -2074,7 +2206,8 @@
       "declarationSha256": "1f6dcf16772c882b4b9234fbf96bbbe152d9e4f57e119706855f63ca1b093101",
       "methodName": "_doesEdgeExist",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0134",
@@ -2085,7 +2218,8 @@
       "declarationSha256": "22a8509822b12e1afcaec026256c5dc06a37e3e26ea27f11e6c48df5dab76f4a",
       "methodName": "_doesVertexExist",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0135",
@@ -2096,7 +2230,8 @@
       "declarationSha256": "981b9fc25e2565f2f88f5df56d9d36fc8ac84d80c7d5434b32b81a2d88010f24",
       "methodName": "IncomingEdges",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0136",
@@ -2107,7 +2242,8 @@
       "declarationSha256": "5420b6cb1ae0028a0244bd500019dda0e5e1bf57f4cdae21269da88db05d3800",
       "methodName": "_getEdgeWeight",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0137",
@@ -2118,7 +2254,8 @@
       "declarationSha256": "d1ba98801eb6555db644454ec5d950bb048cd41eb2231b2c1fbe08df18594fa0",
       "methodName": "IncomingEdges",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0138",
@@ -2129,7 +2266,8 @@
       "declarationSha256": "bded9a5f926d0a32915a5adad9b715db3fdc90d2430a6d9ae93d72011505be65",
       "methodName": "Hash",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0139",
@@ -2140,7 +2278,8 @@
       "declarationSha256": "77a82eff93da43f16a31fbdc0aa03b37d669415c280bc58dd8e08ba0a891ef27",
       "methodName": "UniversalHash",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0140",
@@ -2151,7 +2290,8 @@
       "declarationSha256": "02dbfb719b194669aa91ff4b52b0ce335eb173b008ea2e9eaf175963ce2f1cf5",
       "methodName": "_siftUp",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0141",
@@ -2162,7 +2302,8 @@
       "declarationSha256": "e48f3b17f947b7921715b6d32fbab56df87ef99307337070b3c7f34619fc2cff",
       "methodName": "_siftUp",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0142",
@@ -2173,7 +2314,8 @@
       "declarationSha256": "6e7c2922aec2172fe40b1aea8f3bf96710431b2501ac4e55d3bd91c5483f89b2",
       "methodName": "_mergeForestOnly",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0143",
@@ -2184,7 +2326,8 @@
       "declarationSha256": "d0c128872a7d59c4fe949eb6877c938045317cbf16237846ab09f9ac0166e278",
       "methodName": "Enqueue",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0144",
@@ -2195,7 +2338,8 @@
       "declarationSha256": "eb58281c7d80513688d258e261290006ced7b7100f5fdf699dfe322ef8f8cfe6",
       "methodName": "PeekAtMinPriority",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0145",
@@ -2206,7 +2350,8 @@
       "declarationSha256": "0fb4f76dd8faf317f8db6759f02eb7ece78f840e73bc905a702ef552b7ba624a",
       "methodName": "_resizeCapacity",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0146",
@@ -2217,7 +2362,8 @@
       "declarationSha256": "6306d69895b57c25f22af8347cfcb01c0bb1b0af8822ab59b07ba4b932a64779",
       "methodName": "innerInsert",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0147",
@@ -2228,7 +2374,8 @@
       "declarationSha256": "7090381a0e7ce21f87fbbd99495b19d33f5f90982a91e6cc2699c5876de4fad4",
       "methodName": "_getElementAt",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0148",
@@ -2239,7 +2386,8 @@
       "declarationSha256": "65d2e9e885fdefa4e36289c432a24795f317a1134a61bcf3f5540350ea752548",
       "methodName": "_getNodeByIndex",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0149",
@@ -2250,7 +2398,8 @@
       "declarationSha256": "03bbba660314e3ddb2fd6be1634ae120199e021bf3464d01c8f0eda0ea0a0afa",
       "methodName": "Enqueue",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0150",
@@ -2261,7 +2410,8 @@
       "declarationSha256": "4ef378c4943908b0cd1c212d818279a3aa882f8b390e3694732ba16beee5a149",
       "methodName": "IsEmpty",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0151",
@@ -2272,7 +2422,8 @@
       "declarationSha256": "2f5db2fe5d3561a3ff84d7969bffe45300e72551538e5acd9b9b47f82cf35297",
       "methodName": "Add",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0152",
@@ -2283,7 +2434,8 @@
       "declarationSha256": "d60de4dc38da78485833bc5a110b63be17d0ab0ff4568b3bb9d7f88bc5f90669",
       "methodName": "Pop",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0153",
@@ -2294,7 +2446,8 @@
       "declarationSha256": "41942b7ad8a169adc37e9f4e51e15ecf32f76c02584defc55968f997876fea3f",
       "methodName": "Contains",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0154",
@@ -2305,7 +2458,8 @@
       "declarationSha256": "dac0907a82d2badd56e2d5c16bdb10cd4a2d6ad9e44bfaae285245cc8805a61f",
       "methodName": "IndexOf",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0155",
@@ -2316,7 +2470,8 @@
       "declarationSha256": "30c3c654442b94184f2a5201cb437822ffbe7edeb4a09db4106eb187873a7252",
       "methodName": "_updateNodeHeight",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0156",
@@ -2327,7 +2482,8 @@
       "declarationSha256": "7f40db2f760e60eb5abf4f92ec42b560954208499cdb80c7880f3eba77922591",
       "methodName": "_updateSubtreeSize",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0157",
@@ -2338,7 +2494,8 @@
       "declarationSha256": "7334e659017f1bb83d97ea0711f5e0bcf228e942640cd70a068410da566fb844",
       "methodName": "Search",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0158",
@@ -2349,7 +2506,8 @@
       "declarationSha256": "a9f6829004762aeea218ba10f6f8395dada2caae8f27bcb2bcb8c13e23d34168",
       "methodName": "_remove",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0159",
@@ -2360,7 +2518,8 @@
       "declarationSha256": "8dc3c609a985f889a1a7549e736abf33e565b8a9f7b0b19c2f427f18fd3aafb8",
       "methodName": "_insertNode",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0160",
@@ -2371,7 +2530,8 @@
       "declarationSha256": "081dea002da37fcfd8006178f2323609318058bbfe86ef600b1a04e163f8f5c0",
       "methodName": "_safeGetGrandParent",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0161",
@@ -2382,7 +2542,8 @@
       "declarationSha256": "12b6e20916dd88af2f4533af495cccc764a5a0b302abad8daa7de3b65cb3c27f",
       "methodName": "_safeGetParent",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0162",
@@ -2393,7 +2554,8 @@
       "declarationSha256": "a711444ce6b9738e28038de005b7d5f5e9af5f70d16d03519a55b89b1b44deb8",
       "methodName": "Insert",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0163",
@@ -2404,7 +2566,8 @@
       "declarationSha256": "7c4e00faa0efda6f923e876616d412c3c8a110d87084d592347974ab9abb03cd",
       "methodName": "AddRightChild",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0164",
@@ -2415,7 +2578,8 @@
       "declarationSha256": "e1def00b7b993bf2acada8493a1b8eb632be507c85c7ae700cf118cbde14848b",
       "methodName": "DrawTree",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0165",
@@ -2426,7 +2590,8 @@
       "declarationSha256": "19f949e35d5cc0b01da3324e1bdf24fdc9e1aa2aa8b5b36a900d8f4c521daa7c",
       "methodName": "Remove",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0166",
@@ -2437,7 +2602,8 @@
       "declarationSha256": "d4ebaf45a40949e982017318a4712d6dfea98c42e81fbee385c186985b406013",
       "methodName": "UpdateWord",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0167",
@@ -2448,7 +2614,8 @@
       "declarationSha256": "1aa200fe7ae66444bc9fbbeab8af298a7f4b9e6dabb06a47f8810fcc1e1e935d",
       "methodName": "GetTerminalChildren",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0168",
@@ -2459,7 +2626,8 @@
       "declarationSha256": "2cb0901cc05f92c68bc2dd4a4fdfac088f33fa7cc3bb6b76a32145f61fff537d",
       "methodName": "GetTerminalChildren",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0169",
@@ -2470,7 +2638,8 @@
       "declarationSha256": "45a4571d1c5bd40d0f5a6046df06ade34297402c3549c574f0ca32ecc2a738f8",
       "methodName": "IsGreaterThan",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0170",
@@ -2481,7 +2650,8 @@
       "declarationSha256": "4c237ff100c9c3bb263e3f7cb3546191b8ab388ce8d75d80a4288358305b7195",
       "methodName": "Populate",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0171",
@@ -2492,7 +2662,8 @@
       "declarationSha256": "c0dd43c205719703004af573ee308e38de937f09f03390d07ca149f1caff597e",
       "methodName": "_checkOptimalityConditions",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0172",
@@ -2503,7 +2674,8 @@
       "declarationSha256": "1de100e65be56a67633c65fc19785b9f1332c19de345cf79c2b5047842393d4e",
       "methodName": "IsBipartite",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0173",
@@ -2514,7 +2686,8 @@
       "declarationSha256": "251a24b44c4f9148b97832cc65082138280a918d72d2e3d8951eaa8fdb607cc1",
       "methodName": "FindFirstMatch",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0174",
@@ -2525,7 +2698,8 @@
       "declarationSha256": "661dbd7e12bbe049485d4aa8d04d1d4b6f76c10eee8d261d2994a15b4755e925",
       "methodName": "_breadthFirstSearch",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0175",
@@ -2536,7 +2710,8 @@
       "declarationSha256": "6f6590bdcc1fc1fd281debb46a058ccc1f28f291c37b18847a9df48534edd34d",
       "methodName": "IsCyclic",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0176",
@@ -2547,7 +2722,8 @@
       "declarationSha256": "c929031d7e846653f1eab337b3f48403e9574c31cf27e112c984397328385976",
       "methodName": "PrintAll",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0177",
@@ -2558,7 +2734,8 @@
       "declarationSha256": "5f1ac8ca6aacedaf2ce8e3090bac40bd58f60155963785d7342d9ecc0f4b1094",
       "methodName": "ShortestPath",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0178",
@@ -2569,7 +2746,8 @@
       "declarationSha256": "c861573bf5ec0f06e8ec4c9116645fc2c9fdfbfcddc98abd32dc2d0fb33f6522",
       "methodName": "HasPathTo",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0179",
@@ -2580,7 +2758,8 @@
       "declarationSha256": "45b93c1223aa4f07306219f40fa7d116725763ec8a33aa19094b5a83d12666d3",
       "methodName": "GetNumberByBinomialCoefficients",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0180",
@@ -2591,7 +2770,8 @@
       "declarationSha256": "003e1136818a2a2e582bdecd942120d6303fccf20bde15a6071dedafd1ef7dcf",
       "methodName": "Stein",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0181",
@@ -2602,7 +2782,8 @@
       "declarationSha256": "3c3255be13acbad285e4b62979b8febf1839bf8cb466bf0997817a6e103535f0",
       "methodName": "Reset",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0182",
@@ -2613,7 +2794,8 @@
       "declarationSha256": "9987307b941e367073d78afc54a908f7da84017177eada29e9719dc812166091",
       "methodName": "CompareTo",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0183",
@@ -2624,7 +2806,8 @@
       "declarationSha256": "f96906c5972242b2a919529570787867caa7faf2a9b85fe4c5ee29b68e73ef75",
       "methodName": "BubbleSortDescending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0184",
@@ -2635,7 +2818,8 @@
       "declarationSha256": "7801523ae9a19d67d9cbce349475433d51402a40b55d04c4d84608bd2faffac3",
       "methodName": "BucketSortDescending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0185",
@@ -2646,7 +2830,8 @@
       "declarationSha256": "3a1202affd3940a1b35faf2772fd53961399f4865970e793bac8ade1f1a00918",
       "methodName": "CombSortDescending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0186",
@@ -2657,7 +2842,8 @@
       "declarationSha256": "06a2e54bd1000ba7749c7b10fd7f98a3cef6e15b7920ea2fe9eae0592fddd2a3",
       "methodName": "CycleSortAscending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0187",
@@ -2668,7 +2854,8 @@
       "declarationSha256": "9f79c8ce05ec14ba6384f62168a7fda7188c0d89c3931eb3e89ac258c1898ec0",
       "methodName": "GnomeSortDescending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0188",
@@ -2679,7 +2866,8 @@
       "declarationSha256": "0c87f2475f55515c205b83654881f2d0dd7a865ce353a0fd69e0439b970c9c59",
       "methodName": "HeapSortDescending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0189",
@@ -2690,7 +2878,8 @@
       "declarationSha256": "f8f687a2787f771ca38c5de69a72492d7009ee5aad8fb102ea50ac42dbf0322d",
       "methodName": "LSDRadixSort",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0190",
@@ -2701,7 +2890,8 @@
       "declarationSha256": "007bb9cd6f33e5c0d91db29fa1fbf4cddbafdd9dc079b3401d310d878a66baff",
       "methodName": "InternalMerge",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0191",
@@ -2712,7 +2902,8 @@
       "declarationSha256": "109fd9c94bc03981d65e1479f4f432dc4d99a8d3bd0757e65aa993d3c88c658d",
       "methodName": "OddEvenSortDescending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0192",
@@ -2723,7 +2914,8 @@
       "declarationSha256": "dca9ccd389e1a240f0337636aeadee82c6fab13fe4a779a994af93d1bb47a3dd",
       "methodName": "PigeonHoleSortDescending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0193",
@@ -2734,7 +2926,8 @@
       "declarationSha256": "b58edc3a6b694d12628f41b91fced0bbca0f9d0c7bf9c5fbb54126c150d73c22",
       "methodName": "InternalPartition",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0194",
@@ -2745,7 +2938,8 @@
       "declarationSha256": "5fe6e1aef7cce29de2b2ad924525d96c5786f0cac6262d7870ace96e927a66c5",
       "methodName": "SelectionSortDescending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0195",
@@ -2756,7 +2950,8 @@
       "declarationSha256": "7544345a49be805d45f6cc3c6c46250058667b2accce501d82e3ad0dcd1e4084",
       "methodName": "ShellSortDescending",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0196",
@@ -2767,7 +2962,8 @@
       "declarationSha256": "ed0593a5778a2784960865bd5040d74c5a7fbfb0266ade440dcc9e89cfd1c1c1",
       "methodName": "GetMinDistance",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0197",
@@ -2778,7 +2974,8 @@
       "declarationSha256": "38f54122d662a0575630abd3840fdd7925567d9c4b1062218375e673fc2dae5d",
       "methodName": "ComputeDistinct",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0198",
@@ -2789,7 +2986,8 @@
       "declarationSha256": "096e3bf13912919018d7a106261233df2988a32a46259f5d3901002da2f39041",
       "methodName": "PostOrderVisitor",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0199",
@@ -2800,7 +2998,8 @@
       "declarationSha256": "27c2b7fb8c031634f212d11d63ba10485de8409c6a6d93808cdf7337b652be69",
       "methodName": "HandleNullCases",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0200",
@@ -2811,7 +3010,8 @@
       "declarationSha256": "ac0fb3a6af2f682803f646ec5be84a2e6ffa80812a9fee0e6167e1113b35c741",
       "methodName": "GetNextPrime",
       "mode": "effects",
-      "expectedVerdict": "Unknown"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     }
   ]
 }

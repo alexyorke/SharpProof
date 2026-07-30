@@ -50,10 +50,7 @@ internal static class OpenSourceCorpusCatalog
                 CorpusVariant.Baseline,
                 method.Mode,
                 method.ExpectedVerdict,
-                method.ExpectedVerdict is
-                    CorpusVerdict.Proven or CorpusVerdict.Refuted
-                    ? CorpusSupport.Supported
-                    : CorpusSupport.IntentionallyUnsupported,
+                method.Support,
                 string.Empty,
                 CorpusOrigin.OpenSource,
                 $"{method.SourceId}:{method.Path}:{method.StartLine}"))];
@@ -98,7 +95,7 @@ internal static class OpenSourceCorpusCatalog
         OpenSourceCorpusDocument document,
         string corpusDirectory)
     {
-        if (document.SchemaVersion != 1)
+        if (document.SchemaVersion != 2)
         {
             throw new InvalidDataException(
                 $"Unsupported OSS corpus schema {document.SchemaVersion}.");
@@ -242,6 +239,15 @@ internal static class OpenSourceCorpusCatalog
             {
                 throw new InvalidDataException(
                     $"OSS corpus method {method.Id} must run in effects mode.");
+            }
+
+            if (method.Support is not (
+                    CorpusSupport.Supported or
+                    CorpusSupport.IntentionallyUnsupported))
+            {
+                throw new InvalidDataException(
+                    $"OSS corpus method {method.Id} requires an explicit " +
+                    "support classification.");
             }
         }
 

@@ -5,7 +5,7 @@ internal static class ApiSpecContentDigest
     internal static string Compute(ImmutableArray<ApiSpecTemplate> templates)
     {
         using var hash = new CanonicalHashWriter();
-        hash.Add("api-spec-content-v1", templates.Length);
+        hash.Add("api-spec-content-v2", templates.Length);
         foreach (var template in templates)
         {
             var target = template.Target;
@@ -38,6 +38,17 @@ internal static class ApiSpecContentDigest
 
             Add(hash, facets.Nullness.Evidence, facets.Nullness.Result);
             Add(hash, facets.Cardinality.Evidence, facets.Cardinality.Result, facets.Cardinality.ExactCount);
+            if (facets.Termination == null)
+            {
+                hash.Add("termination", null);
+            }
+            else
+            {
+                Add(
+                    hash,
+                    facets.Termination.Evidence,
+                    facets.Termination.Behavior);
+            }
             hash.Add("variables", template.Variables.Length);
             foreach (var variable in template.Variables)
             {

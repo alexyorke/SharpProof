@@ -16,11 +16,21 @@ internal sealed record PerformanceGateResult(
     bool Passed,
     int Warmups,
     int Samples,
-    int DefaultOffAnalyzerDriverRunCount,
-    double MedianRatio,
-    double P95Ratio,
+    string PackageBuildEstimatorVersion,
+    PackageBuildSdkIdentity PackageBuildSdk,
+    ImmutableArray<PackageBuildSample> PackageBuildSamples,
+    ImmutableArray<double> OrderBalancedRatios,
+    int UnannotatedAdvisoryAnalyzerDriverRunCount,
+    int UnannotatedAdvisoryAnalysisSessionCreateCount,
+    int UnannotatedAdvisoryApiSpecCreateCount,
+    int UnannotatedAdvisoryEffectAnalysisCreateCount,
+    double OrderBalancedMedianRatio,
+    double RawMedianRatio,
+    double BaselineFirstMedianRatio,
+    double UnannotatedAdvisoryFirstMedianRatio,
+    double RawP95Ratio,
     long BaselineRetainedBytes,
-    long DefaultOffRetainedBytes,
+    long UnannotatedAdvisoryRetainedBytes,
     double RetainedMemoryRatio,
     double RetainedMemoryIncreaseMiB,
     int EnabledRetainedCompilationCount,
@@ -43,48 +53,67 @@ internal static class PerformanceGate
     {
         var contract = AcceptancePerformanceContract.Load(repositoryRoot);
         ValidateContract(contract);
-        var source = CreateDefaultOffSource(320);
+        var callBearingSource =
+            CreateCallBearingUnannotatedAdvisorySource(320);
+        var callFreeSource =
+            CreateCallFreeUnannotatedAdvisorySource(320);
         ValidateAdvisoryPackagePolicy(repositoryRoot);
-        var configurationProbe = MeasureDefaultOffAnalyzerBatch(
-            source,
-            "DefaultOffConfigurationProbe",
+        var configurationProbe = MeasureUnannotatedAdvisoryAnalyzerBatch(
+            callBearingSource,
+            "UnannotatedAdvisoryConfigurationProbe",
             iterations: 1,
             cancellationToken);
-        var defaultOffAnalyzerDriverRuns =
+        var unannotatedAdvisoryAnalyzerDriverRuns =
             configurationProbe.AnalyzerDriverRunCount;
+        var unannotatedAdvisoryAnalysisSessionCreates =
+            configurationProbe.AnalysisSessionCreateCount;
+        if (unannotatedAdvisoryAnalysisSessionCreates != 0)
+        {
+            throw new InvalidOperationException(
+                "The call-bearing advisory performance probe must not create " +
+                "a semantic analysis session when neither source nor referenced " +
+                "metadata contains SharpProof contracts.");
+        }
+        if (configurationProbe.ApiSpecCreateCount != 0 ||
+            configurationProbe.EffectAnalysisCreateCount != 0)
+        {
+            throw new InvalidOperationException(
+                "Unselected advisory code must not create API-spec or " +
+                "effect-analysis state.");
+        }
         var packageBuildTiming =
-            await MeasureDefaultOffPackageBuildsAsync(
+            await MeasureUnannotatedAdvisoryPackageBuildsAsync(
                     repositoryRoot,
-                    source,
+                    callBearingSource,
                     contract.Warmups,
                     contract.Samples,
                     cancellationToken)
                 .ConfigureAwait(false);
-        var baselineTimes = packageBuildTiming.BaselineMilliseconds;
-        var defaultOffTimes = packageBuildTiming.DefaultOffMilliseconds;
-
-        var medianRatio = Ratio(
-            Percentile(defaultOffTimes, 0.50),
-            Percentile(baselineTimes, 0.50));
-        var p95Ratio = Ratio(
-            Percentile(defaultOffTimes, 0.95),
-            Percentile(baselineTimes, 0.95));
+        var packageBuildStatistics = PackageBuildEstimator.Estimate(
+            packageBuildTiming.Samples);
+        var medianRatio =
+            packageBuildStatistics.OrderBalancedMedianRatio;
+        var p95Ratio = packageBuildStatistics.P95Ratio;
 
         WarmRetentionPaths(
-            source,
+            callFreeSource,
             contract.Warmups,
             cancellationToken);
         var baselineRetained = MeasureCompilerOnlyRetainedBytes(
-            source,
+            callFreeSource,
             "Baseline",
             cancellationToken);
-        var defaultOffRetained = MeasureDefaultOffAnalyzerRetainedBytes(
-            source,
-            "DefaultOff",
+        var unannotatedAdvisoryRetained =
+            MeasureUnannotatedAdvisoryAnalyzerRetainedBytes(
+            callFreeSource,
+            "UnannotatedAdvisory",
             cancellationToken);
-        var retainedRatio = Ratio(defaultOffRetained, baselineRetained);
+        var retainedRatio = Ratio(
+            unannotatedAdvisoryRetained,
+            baselineRetained);
         var retainedIncreaseMiB =
-            (defaultOffRetained - baselineRetained) / (1024d * 1024d);
+            (unannotatedAdvisoryRetained - baselineRetained) /
+            (1024d * 1024d);
         WarmEnabledAnalyzerRetentionPaths(
             contract.Warmups,
             cancellationToken);
@@ -112,14 +141,15 @@ internal static class PerformanceGate
         if (medianRatio > contract.MaximumMedianRatio)
         {
             failures.Add(
-                $"Default-off median ratio {Format(medianRatio)} exceeds " +
+                "Unannotated advisory order-balanced median ratio " +
+                $"{Format(medianRatio)} exceeds " +
                 $"{Format(contract.MaximumMedianRatio)}.");
         }
 
         if (p95Ratio > contract.MaximumP95Ratio)
         {
             failures.Add(
-                $"Default-off p95 ratio {Format(p95Ratio)} exceeds " +
+                $"Unannotated advisory paired p95 ratio {Format(p95Ratio)} exceeds " +
                 $"{Format(contract.MaximumP95Ratio)}.");
         }
 
@@ -164,11 +194,21 @@ internal static class PerformanceGate
             failures.Count == 0,
             contract.Warmups,
             contract.Samples,
-            defaultOffAnalyzerDriverRuns,
+            PackageBuildEstimator.Version,
+            packageBuildTiming.Sdk,
+            packageBuildTiming.Samples,
+            packageBuildStatistics.OrderBalancedRatios,
+            unannotatedAdvisoryAnalyzerDriverRuns,
+            unannotatedAdvisoryAnalysisSessionCreates,
+            configurationProbe.ApiSpecCreateCount,
+            configurationProbe.EffectAnalysisCreateCount,
             medianRatio,
+            packageBuildStatistics.RawMedianRatio,
+            packageBuildStatistics.BaselineFirstMedianRatio,
+            packageBuildStatistics.UnannotatedAdvisoryFirstMedianRatio,
             p95Ratio,
             baselineRetained,
-            defaultOffRetained,
+            unannotatedAdvisoryRetained,
             retainedRatio,
             retainedIncreaseMiB,
             enabledRetention.RetainedCompilationCount,
@@ -182,8 +222,8 @@ internal static class PerformanceGate
             failures.ToImmutable());
     }
 
-    internal static DefaultOffBatchMeasurement
-        MeasureDefaultOffAnalyzerBatch(
+    internal static UnannotatedAdvisoryBatchMeasurement
+        MeasureUnannotatedAdvisoryAnalyzerBatch(
             string source,
             string kind,
             int iterations,
@@ -202,24 +242,25 @@ internal static class PerformanceGate
                 kind,
                 index);
             _ = compilation.GetDiagnostics(cancellationToken);
-            diagnosticCount += AnalyzeDefaultOff(
+            diagnosticCount += AnalyzeUnannotatedAdvisory(
                 compilation,
                 analyzer,
                 cancellationToken);
         }
         stopwatch.Stop();
-        if (diagnosticCount != 0 || sessionFactory.CreateCount != iterations)
+        if (diagnosticCount != 0)
         {
             throw new InvalidOperationException(
-                "Unannotated advisory analysis must stay quiet and create " +
-                "exactly one analysis session per compilation.");
+                "Unannotated advisory analysis must stay quiet.");
         }
 
-        return new DefaultOffBatchMeasurement(
+        return new UnannotatedAdvisoryBatchMeasurement(
             stopwatch.Elapsed.TotalMilliseconds / iterations,
             iterations,
             diagnosticCount,
-            sessionFactory.CreateCount);
+            sessionFactory.CreateCount,
+            sessionFactory.ApiSpecCreateCount,
+            sessionFactory.EffectAnalysisCreateCount);
     }
 
     private static CSharpCompilation CreateTimingCompilation(
@@ -236,7 +277,7 @@ internal static class PerformanceGate
     }
 
     private static async Task<PackageBuildTiming>
-        MeasureDefaultOffPackageBuildsAsync(
+        MeasureUnannotatedAdvisoryPackageBuildsAsync(
             string repositoryRoot,
             string source,
             int warmups,
@@ -258,18 +299,26 @@ internal static class PerformanceGate
         }
 
         var baselineDirectory = Path.Combine(resolvedRoot, "baseline");
-        var defaultOffDirectory = Path.Combine(resolvedRoot, "default-off");
+        var unannotatedAdvisoryDirectory = Path.Combine(
+            resolvedRoot,
+            "unannotated-advisory");
         Directory.CreateDirectory(baselineDirectory);
-        Directory.CreateDirectory(defaultOffDirectory);
+        Directory.CreateDirectory(unannotatedAdvisoryDirectory);
         try
         {
+            var sdk = await PackageBuildSdkPin.PinAndValidateAsync(
+                    repositoryRoot,
+                    resolvedRoot,
+                    cancellationToken)
+                .ConfigureAwait(false);
             var baselineProject = CreatePerformanceProbeProject(
                 baselineDirectory,
                 source,
                 repositoryRoot,
                 importSharpProof: false);
-            var defaultOffProject = CreatePerformanceProbeProject(
-                defaultOffDirectory,
+            var unannotatedAdvisoryProject =
+                CreatePerformanceProbeProject(
+                unannotatedAdvisoryDirectory,
                 source,
                 repositoryRoot,
                 importSharpProof: true);
@@ -280,7 +329,7 @@ internal static class PerformanceGate
                     cancellationToken)
                 .ConfigureAwait(false);
             await RunDotnetAsync(
-                    defaultOffProject,
+                    unannotatedAdvisoryProject,
                     restore: true,
                     symbol: null,
                     cancellationToken)
@@ -289,28 +338,34 @@ internal static class PerformanceGate
             {
                 await RunBuildPairAsync(
                         baselineProject,
-                        defaultOffProject,
+                        unannotatedAdvisoryProject,
                         $"SHARPPROOF_WARMUP_{index}",
-                        defaultFirst: (index & 1) != 0,
+                        unannotatedAdvisoryFirst: (index & 1) != 0,
                         cancellationToken)
                     .ConfigureAwait(false);
             }
 
-            var baseline = new double[samples];
-            var defaultOff = new double[samples];
+            var measurements =
+                ImmutableArray.CreateBuilder<PackageBuildSample>(samples);
             for (var index = 0; index < samples; index++)
             {
+                var unannotatedAdvisoryFirst = (index & 1) != 0;
                 var pair = await RunBuildPairAsync(
                         baselineProject,
-                        defaultOffProject,
+                        unannotatedAdvisoryProject,
                         $"SHARPPROOF_SAMPLE_{index}",
-                        defaultFirst: (index & 1) != 0,
+                        unannotatedAdvisoryFirst,
                         cancellationToken)
                     .ConfigureAwait(false);
-                baseline[index] = pair.BaselineMilliseconds;
-                defaultOff[index] = pair.DefaultOffMilliseconds;
+                measurements.Add(new PackageBuildSample(
+                    index,
+                    unannotatedAdvisoryFirst,
+                    pair.BaselineMilliseconds,
+                    pair.UnannotatedAdvisoryMilliseconds));
             }
-            return new PackageBuildTiming(baseline, defaultOff);
+            return new PackageBuildTiming(
+                sdk,
+                measurements.MoveToImmutable());
         }
         finally
         {
@@ -343,7 +398,6 @@ internal static class PerformanceGate
             AppContext.BaseDirectory.TrimEnd(
                 Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)).Parent!.Name;
         var analyzerDirectory = EscapeAnalyzerDirectory(repositoryRoot, configuration);
-        var generatorPath = EscapePath(AppContext.BaseDirectory, "SharpProof.ContractForGenerator.dll");
         var imports = importSharpProof
             ? ($"""<Import Project="{props}" />""" + Environment.NewLine,
                Environment.NewLine + $"""<Import Project="{targets}" />""")
@@ -359,7 +413,6 @@ internal static class PerformanceGate
                 <Deterministic>true</Deterministic>
                 <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
                 <SharpProofAnalyzerDirectory>{analyzerDirectory}</SharpProofAnalyzerDirectory>
-                <SharpProofContractForGeneratorPath>{generatorPath}</SharpProofContractForGeneratorPath>
               </PropertyGroup>
               {imports.Item1}{imports.Item2}
             </Project>
@@ -370,7 +423,12 @@ internal static class PerformanceGate
 
     private static string? EscapeAnalyzerDirectory(string root, string configuration)
     {
-        return EscapePath(root, "SharpProof.Analyzer", "bin", configuration, "netstandard2.0");
+        return EscapePath(
+            root,
+            "SharpProof.PortableAnalyzer",
+            "bin",
+            configuration,
+            "netstandard2.0");
     }
 
     private static string? EscapePath(params string[] segments)
@@ -380,15 +438,15 @@ internal static class PerformanceGate
 
     private static async Task<PackageBuildPair> RunBuildPairAsync(
         string baselineProject,
-        string defaultOffProject,
+        string unannotatedAdvisoryProject,
         string symbol,
-        bool defaultFirst,
+        bool unannotatedAdvisoryFirst,
         CancellationToken cancellationToken)
     {
-        if (defaultFirst)
+        if (unannotatedAdvisoryFirst)
         {
-            var defaultOff = await RunDotnetAsync(
-                    defaultOffProject,
+            var unannotatedAdvisory = await RunDotnetAsync(
+                    unannotatedAdvisoryProject,
                     restore: false,
                     symbol,
                     cancellationToken)
@@ -399,7 +457,9 @@ internal static class PerformanceGate
                     symbol,
                     cancellationToken)
                 .ConfigureAwait(false);
-            return new PackageBuildPair(baseline, defaultOff);
+            return new PackageBuildPair(
+                baseline,
+                unannotatedAdvisory);
         }
         else
         {
@@ -409,13 +469,15 @@ internal static class PerformanceGate
                     symbol,
                     cancellationToken)
                 .ConfigureAwait(false);
-            var defaultOff = await RunDotnetAsync(
-                    defaultOffProject,
+            var unannotatedAdvisory = await RunDotnetAsync(
+                    unannotatedAdvisoryProject,
                     restore: false,
                     symbol,
                     cancellationToken)
                 .ConfigureAwait(false);
-            return new PackageBuildPair(baseline, defaultOff);
+            return new PackageBuildPair(
+                baseline,
+                unannotatedAdvisory);
         }
     }
 
@@ -464,9 +526,17 @@ internal static class PerformanceGate
         {
             if (!process.HasExited)
             {
-                process.Kill(entireProcessTree: true);
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch (InvalidOperationException)
+                {
+                }
             }
 
+            await process.WaitForExitAsync(CancellationToken.None)
+                .ConfigureAwait(false);
             throw;
         }
         stopwatch.Stop();
@@ -476,7 +546,8 @@ internal static class PerformanceGate
         if (process.ExitCode != 0)
         {
             throw new InvalidOperationException(
-                $"The default-off package performance probe failed:{Environment.NewLine}" +
+                "The unannotated advisory package performance probe failed:" +
+                Environment.NewLine +
                 output);
         }
 
@@ -496,19 +567,19 @@ internal static class PerformanceGate
                 source,
                 $"RetentionBaselineWarmup_{index}");
             _ = baseline.GetDiagnostics(cancellationToken);
-            var defaultOff = AnalyzerGateHost.CreateCompilation(
+            var unannotatedAdvisory = AnalyzerGateHost.CreateCompilation(
                 source,
-                $"RetentionDefaultOffWarmup_{index}");
-            _ = defaultOff.GetDiagnostics(cancellationToken);
-            _ = AnalyzeDefaultOff(
-                defaultOff,
+                $"RetentionUnannotatedAdvisoryWarmup_{index}");
+            _ = unannotatedAdvisory.GetDiagnostics(cancellationToken);
+            _ = AnalyzeUnannotatedAdvisory(
+                unannotatedAdvisory,
                 analyzer,
                 cancellationToken);
         }
-        if (sessionFactory.CreateCount != warmups)
+        if (sessionFactory.CreateCount != 0)
         {
             throw new InvalidOperationException(
-                "Advisory retention warmup created an unexpected number of sessions.");
+                "Call-free advisory retention warmup created an analysis session.");
         }
 
         ForceCollection();
@@ -537,7 +608,7 @@ internal static class PerformanceGate
         return Math.Max(1, after - before);
     }
 
-    private static long MeasureDefaultOffAnalyzerRetainedBytes(
+    private static long MeasureUnannotatedAdvisoryAnalyzerRetainedBytes(
         string source,
         string kind,
         CancellationToken cancellationToken)
@@ -555,18 +626,18 @@ internal static class PerformanceGate
                 source,
                 $"Retained_{kind}_{index}");
             _ = compilation.GetDiagnostics(cancellationToken);
-            diagnosticCount += AnalyzeDefaultOff(
+            diagnosticCount += AnalyzeUnannotatedAdvisory(
                 compilation,
                 analyzer,
                 cancellationToken);
             retained.Add(compilation);
         }
         if (diagnosticCount != 0 ||
-            sessionFactory.CreateCount != RetainedCompilationCount)
+            sessionFactory.CreateCount != 0)
         {
             throw new InvalidOperationException(
-                "Unannotated advisory retention must stay quiet and create " +
-                "exactly one analysis session per compilation.");
+                "Unannotated call-free advisory retention must stay quiet " +
+                "and avoid analysis-session construction.");
         }
 
         ForceCollection();
@@ -576,7 +647,7 @@ internal static class PerformanceGate
         return Math.Max(1, after - before);
     }
 
-    private static int AnalyzeDefaultOff(
+    private static int AnalyzeUnannotatedAdvisory(
         Compilation compilation,
         DiagnosticAnalyzer analyzer,
         CancellationToken cancellationToken)
@@ -803,10 +874,34 @@ internal static class PerformanceGate
             $"{duplicateCount}.");
     }
 
-    private static string CreateDefaultOffSource(int methodCount)
+    internal static string CreateCallBearingUnannotatedAdvisorySource(
+        int methodCount)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("public static class DefaultOffFixture {");
+        builder.AppendLine(
+            "public static class UnannotatedAdvisoryFixture {");
+        builder.AppendLine(
+            "    private static int Normalize(int value) => value;");
+        for (var index = 0; index < methodCount; index++)
+        {
+            builder.Append("    public static int M")
+                .Append(index.ToString(CultureInfo.InvariantCulture))
+                .Append(
+                    "(int value) => System.Math.Max(Normalize(value), ")
+                .Append(index.ToString(CultureInfo.InvariantCulture))
+                .AppendLine(");");
+        }
+
+        builder.AppendLine("}");
+        return builder.ToString();
+    }
+
+    private static string CreateCallFreeUnannotatedAdvisorySource(
+        int methodCount)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine(
+            "public static class UnannotatedAdvisoryFixture {");
         for (var index = 0; index < methodCount; index++)
         {
             builder.Append("    public static int M")
@@ -875,7 +970,8 @@ internal static class PerformanceGate
         if (retainedRatio > contract.MaximumRetainedMemoryRatio)
         {
             failures.Add(
-                $"Default-off retained memory ratio {Format(retainedRatio)} " +
+                "Unannotated advisory retained memory ratio " +
+                $"{Format(retainedRatio)} " +
                 $"exceeds {Format(contract.MaximumRetainedMemoryRatio)}.");
         }
 
@@ -883,7 +979,7 @@ internal static class PerformanceGate
             contract.MaximumRetainedMemoryIncreaseMiB)
         {
             failures.Add(
-                $"Default-off retained memory increase " +
+                $"Unannotated advisory retained memory increase " +
                 $"{Format(retainedIncreaseMiB)} MiB exceeds " +
                 $"{contract.MaximumRetainedMemoryIncreaseMiB} MiB.");
         }
@@ -1010,9 +1106,24 @@ internal static class PerformanceGate
                         (string?)element.Attribute("Condition"),
                         "'$(SharpProofVerify)' == ''",
                         StringComparison.Ordinal));
-        var analyzerGroup = portableTargets.Descendants("ItemGroup")
-            .SingleOrDefault(static group =>
-                group.Elements("Analyzer").Any());
+        var analyzerGroups = portableTargets.Descendants("ItemGroup")
+            .Where(static group =>
+                group.Elements("Analyzer").Any())
+            .ToArray();
+        var analyzerGroup = analyzerGroups.SingleOrDefault(group =>
+            string.Equals(
+                NormalizeMsBuildCondition(
+                    (string?)group.Attribute("Condition")),
+                "'$(_SharpProofProfileNormalized)'!='off'",
+                StringComparison.Ordinal));
+        var collectorGroup = analyzerGroups.SingleOrDefault(group =>
+            string.Equals(
+                NormalizeMsBuildCondition(
+                    (string?)group.Attribute("Condition")),
+                "'$(SharpProofVerify)'=='true'AND" +
+                "'$(_SharpProofProfileNormalized)'!='off'AND" +
+                "'$(DesignTimeBuild)'!='true'",
+                StringComparison.Ordinal));
         var verifierMarker = verifierProps
             .Descendants("_SharpProofVerifierPackagePresent")
             .SingleOrDefault();
@@ -1084,6 +1195,8 @@ internal static class PerformanceGate
             !string.Equals(features?.Value, "all", StringComparison.Ordinal) ||
             !string.Equals(verify?.Value, "false", StringComparison.Ordinal) ||
             portableContainsVerifierWork ||
+            analyzerGroups.Length != 2 ||
+            collectorGroup == null ||
             !string.Equals(
                 normalizedCondition,
                 "'$(_SharpProofProfileNormalized)'!='off'",
@@ -1154,18 +1267,20 @@ internal static class PerformanceGate
         double RetainedMemoryIncreaseMiB);
 
     private sealed record PackageBuildTiming(
-        double[] BaselineMilliseconds,
-        double[] DefaultOffMilliseconds);
+        PackageBuildSdkIdentity Sdk,
+        ImmutableArray<PackageBuildSample> Samples);
 
     private readonly record struct PackageBuildPair(
         double BaselineMilliseconds,
-        double DefaultOffMilliseconds);
+        double UnannotatedAdvisoryMilliseconds);
 
-    internal sealed record DefaultOffBatchMeasurement(
+    internal sealed record UnannotatedAdvisoryBatchMeasurement(
         double MeanMilliseconds,
         int AnalyzerDriverRunCount,
         int DiagnosticCount,
-        int AnalysisSessionCreateCount);
+        int AnalysisSessionCreateCount,
+        int ApiSpecCreateCount,
+        int EffectAnalysisCreateCount);
 
     private sealed record IdeEditMeasurement(
         double[] Latencies,
@@ -1173,10 +1288,16 @@ internal static class PerformanceGate
 
     private sealed class CountingSessionFactory : IAnalyzerSessionFactory
     {
+        private readonly List<AnalyzerSession> _sessions = [];
+
         internal int CreateCount
         {
             get; private set;
         }
+        internal int ApiSpecCreateCount =>
+            _sessions.Count(static session => session.HasCreatedApiSpecs);
+        internal int EffectAnalysisCreateCount =>
+            _sessions.Count(static session => session.HasCreatedEffectAnalysis);
 
         public AnalyzerSession Create(
             Compilation compilation,
@@ -1184,10 +1305,12 @@ internal static class PerformanceGate
             CancellationToken cancellationToken)
         {
             CreateCount++;
-            return new AnalyzerSession(
+            var session = new AnalyzerSession(
                 compilation,
                 configuration,
                 cancellationToken);
+            _sessions.Add(session);
+            return session;
         }
     }
 

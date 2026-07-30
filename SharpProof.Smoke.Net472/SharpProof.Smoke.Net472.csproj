@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <Import Project="..\SharpProof.AnalyzerConsumer.props" />
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
     <LangVersion>latest</LangVersion>
@@ -8,4 +7,5 @@
     <IsPackable>false</IsPackable>
     <WarningsAsErrors>$(WarningsAsErrors);AD0001;CS8032;CS8034;CS8785</WarningsAsErrors>
   </PropertyGroup>
+  <Import Project="..\SharpProof.AnalyzerConsumer.props" />
 </Project>

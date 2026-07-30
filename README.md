@@ -7,7 +7,7 @@ compiler-bound subset.
 SharpProof has three semantic outcomes:
 
 - `Proven`: the goal follows from exact lowering and accountable evidence.
-- `Refuted`: an executable counterexample or effect trace was replayed.
+- `Refuted`: an executable postcondition counterexample was replayed.
 - `Unknown`: the language, model, evidence, or resource budget was insufficient.
 
 The default `advisory` profile is quiet for unannotated code. Unsupported code
@@ -20,7 +20,7 @@ SP0047 instead of disappearing. Diagnostic silence is still not a proof.
 |---|---|---|
 | Effect analyzer | Checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, and `[AllowedExceptions]` over the admitted source subset | Advisory "not proven" diagnostics on selected code |
 | Contract analyzer | Replays definitely executed, compiler-bound `Contract.Requires(...)` clauses with exact call inputs | SP0027 only when the precondition concretely evaluates to false |
-| Worker | Builds an accountable claim manifest and verifies bounded `Contract.Ensures(...)` obligations over acyclic Boolean bodies, admitted integer comparisons, checked `long` arithmetic, and a few exact API-result facts | One `Proven`, replay-validated `Refuted`, or typed `Unknown` result for every manifest claim |
+| Worker | Builds an accountable claim manifest and verifies bounded `Contract.Ensures(...)` obligations over acyclic Boolean bodies, admitted integer comparisons, checked `long` arithmetic, and a few exact API-result facts | One `Proven`, replay-validated postcondition `Refuted`, or typed `Unknown` result for every manifest claim |
 
 The analyzer does not run SMT or load Z3. General source-callee
 assume/guarantee verification, loops in the worker, mutable-heap
@@ -77,7 +77,7 @@ both implemented feature groups:
   verification.
 
 `SharpProofFeatures` values are `effects`, `contracts`, and `all` (the
-default). The effective selection is sealed into the schema-5 compiler
+default). The effective selection is sealed into the schema-8 compiler
 artifact and filters its manifest: `contracts` excludes effect-only
 annotations, `effects` excludes postcondition claims and contract assumptions,
 and `all` selects both surfaces. Every effective effect contract has one typed
@@ -217,6 +217,13 @@ methods report SP0047; unsupported unannotated methods remain silent. A closed
 constructed generic API call is admitted only when its exact specification
 resolves.
 
+That subset boundary applies to selected effect and verifier-body analysis.
+The lighter call-site precondition pass also follows executable local-function,
+lambda, and anonymous-method CFGs so a definite bad nested call still reports
+SP0027. It assigns each result to the nested callable, treats captured facts
+conservatively, and does not treat quoted expression-tree lambdas as executing
+delegates.
+
 ## Call-site preconditions
 
 Contracts are normal C# expressions bound by compiler symbol identity:
@@ -239,9 +246,16 @@ SP0027 covers ordinary invocations and object creation. Exact concrete
 expressions use compiler-bound IR replay. Other definitely executed calls use
 a compilation-scoped CFG analysis that tracks Boolean facts, nullness, integer
 intervals, sequence cardinality, and effects through branches and joins. The
-analysis propagates caller `Requires` clauses and parameter attributes, so it
+analysis refines both scalar operands on comparison edges and propagates caller
+`Requires` clauses and parameter attributes, so it
 can establish non-null, division, bounds, range, and overflow facts without
 running Z3 in the live analyzer.
+
+Executable local functions, lambdas, and anonymous methods are checked through
+their Roslyn child CFGs exactly once. Their outcomes are not folded into the
+containing method. Captured values that cannot be established at the nested
+entry remain `Unknown`; expression-tree lambdas are quoted code and are not
+reported as executing call sites.
 
 A violation is emitted only when the receiver and argument prefix is known to
 complete normally and the instantiated precondition is definitely false.
@@ -257,8 +271,11 @@ definitely non-throwing, expression-bodied member, and constructor initializer.
 calls and do not evaluate their arguments. They are static-analysis contracts,
 not runtime guards.
 
-Do not define `SHARPPROOF_CONTRACTS` in an ordinary application or test build.
-Doing so emits the contract calls and evaluates their arguments.
+SharpProof analysis rejects `SHARPPROOF_CONTRACTS` because defining it emits
+the ghost contract calls and evaluates their arguments. The portable package
+also rejects the symbol in `DefineConstants`; compiler-side validation covers
+source-local directives and generated trees. Set `SharpProofProfile=off` only
+when intentionally compiling without SharpProof analysis.
 `Contract.Result<T>()` and `Contract.Old(...)` throw
 `InvalidOperationException` when directly executed.
 
@@ -307,7 +324,7 @@ current manifest/request/result set. The default result is published under:
 obj/<Configuration>/<TargetFramework>/SharpProof/result.json
 ```
 
-Worker protocol version 8 separates the project run from semantic claim
+Worker protocol version 9 separates the project run from semantic claim
 outcomes. The compiler artifact records the effective `SharpProofFeatures`
 selection before manifest construction. A compiler-symbol-based manifest
 selects callables and assigns stable `spc1:` semantic IDs to direct clauses,
@@ -326,31 +343,28 @@ Each manifest claim receives:
 
 - `Proven` carries its canonical proof core, which can be empty for a hygienic
   tautology.
-- `Refuted` has a replay-validated concrete model and fails the build with
-  worker exit code 5.
+- `Refuted` is currently limited to postconditions with a replay-validated
+  concrete model and fails the build with worker exit code 5.
 - `Unknown` has a closed reason such as `UnsupportedBody`,
   `DeepPostcondition`, `EffectSummaryIncomplete`,
   `EffectContractNotEstablished`, `ResourceLimit`, or `MethodTimeout`.
 
 Effect claims use canonical compiler-produced evidence. They are `Proven` only
-when a complete effect summary establishes the selected contract. A claim is
-`Refuted` only when the compiler records a definite, unconditional direct
-operation witness and the worker independently validates that structured
-witness against the sealed effective constraint. The current direct-witness
-subset covers simple managed object/array allocation, explicit throw,
-receiver-field access, empty `lock`, and exact `Monitor` calls. Conditional,
-path-dependent, static-initialization-sensitive, or may-only conflicts remain
-`Unknown(EffectContractNotEstablished)`; incomplete summaries remain
-`Unknown(EffectSummaryIncomplete)`. Exact exception-type refutation is limited
-to admitted framework exception construction; a user exception constructor
-still establishes that some exception escapes, but not its exact type. The
-certainty field distinguishes `DefiniteViolation`, complete or incomplete
-may-effect summaries, trusted complete boundaries, and unavailable evidence.
+when a complete effect summary establishes the selected contract. The compiler
+can record a source-located `DefiniteViolation` candidate for a narrow direct
+operation, but that candidate is not an independently executable trace.
+Until effect operations and paths are lowered for worker replay, every such
+compiler `Refuted` candidate fails closed as
+`Unknown(CounterexampleReplayFailed)` with unavailable effect certainty and no
+published witness. Consequently, the worker emits no effect `Refuted` result
+today. Conditional, path-dependent, static-initialization-sensitive, or
+may-only conflicts remain `Unknown(EffectContractNotEstablished)`; incomplete
+summaries remain `Unknown(EffectSummaryIncomplete)`.
 
 Proven postconditions explicitly record `ContradictoryPreconditions` or
 `NoModeledNormalReturn` when the proof is vacuous under partial-correctness
-semantics. This evidence is preserved in canonical JSON, cache entries, and
-SARIF; an ordinary non-vacuous proof records `None`.
+semantics. This evidence is preserved in canonical JSON and SARIF; an ordinary
+non-vacuous proof records `None`. Proven claims do not enter the disk cache.
 
 `SharpProofVerifyPolicy` controls a valid incomplete result:
 
@@ -369,12 +383,14 @@ under every policy. The worker uses deterministic query, method, project,
 expression-depth, memory, process, and parallelism limits. Its
 content-addressed cache defaults to
 `obj/<Configuration>/<TargetFramework>/SharpProof/cache` in the MSBuild
-integration. Cache schema version 9 stores only a semantically complete
-payload whose manifest hash and exact claim set validate against the current
-request and whose outcomes are all `Proven` or replay-validated `Refuted`.
-Timeout, cancellation, `Unknown`, malformed, infrastructure, and failed-replay
-responses are not reusable. `require-proven` runs bypass this local semantic
-cache so strict CI never relies on untrusted cached proof output.
+integration. Cache schema version 11 stores only complete, postcondition-only
+responses whose claims are all `Refuted`. Before accepting a hit, the worker
+reconstructs every canonical Boolean/integer model against the current lowered
+callable, validates entry assumptions and source ranges, and independently
+replays the whole body and postcondition. Proven claims, effect claims,
+unsupported models, timeout, cancellation, `Unknown`, malformed,
+infrastructure, and failed-replay responses are neither written nor reused.
+`require-proven` runs bypass this local semantic cache.
 
 The result includes deterministic JSON counts by outcome and reason, assumption
 counts, cache status, protocol/tool/spec versions, the canonical packaged
@@ -457,6 +473,15 @@ must be direct expression statements in one contiguous method-body prologue.
 `Result<T>` is valid only inside `Ensures`; `Old(...)` is valid only inside
 `Ensures` and cannot be nested.
 
+SharpProof accepts these APIs only from the `SharpProof.Attributes` assembly
+whose version and public key match the analyzer payload. It also validates the
+exact `Contract` type and requires one real
+`[Conditional("SHARPPROOF_CONTRACTS")]` on each clause method. Source or
+project lookalikes, mismatched package identities, and malformed clause APIs
+contribute no facts and report SP0047; a rejected `ContractFor` lookalike
+reports SPCF0001. The compiler-bound ghost API specifications use this same
+identity and shape gate.
+
 The currently consumed closed value attributes are:
 
 - `[NotNull]`
@@ -470,11 +495,15 @@ return targets. The inactive `[Pure]` attribute has been removed; use
 
 ## Exact built-in API specifications
 
-The default table contains these seven BCL rows:
+The default table contains these eleven BCL rows:
 
 | API | Current modeled facts |
 |---|---|
 | `Array.Empty<T>()` | Effects and allocation unknown across type initialization; does not throw; non-null empty array result |
+| `Exception()` | Writes only the fresh receiver, has no additional allocation, and does not throw |
+| `Exception(string)` | Writes only the fresh receiver, has no additional allocation, and does not throw |
+| `InvalidOperationException()` | Writes only the fresh receiver, has no additional allocation, and does not throw |
+| `InvalidOperationException(string)` | Writes only the fresh receiver, has no additional allocation, and does not throw |
 | `object` constructor | Call boundary has no effects or allocation and does not throw; `new object()` still allocates the object |
 | `string.Length` | Reads receiver state; no allocation; does not throw inside the resolved call boundary |
 | `string.Concat(string, string)` | No side effects; may allocate; does not throw; non-null result |
@@ -532,23 +561,21 @@ and temporary OIDC credentials. Both paths download, revalidate, and promote
 the exact package bytes that passed the cross-platform consumer matrix.
 Before any write, the publisher validates `SharpProof.release.json` and every
 artifact hash, then queries the feed's V3 `PackageBaseAddress` for all three
-IDs. An existing package is reusable only when its exact ZIP entry names and
-uncompressed payloads match the tested local package; only the repository
-signature entry `.signature.p7s` may differ. The publisher then sends main and
+IDs and rejects any existing main package. The publisher then sends main and
 symbol packages separately in dependency order: Attributes, SharpProof, then
-the verifier. `--skip-duplicate` is used only after that remote main-package
-match, so an interrupted main/symbol publication can resume without accepting
-unknown remote bytes. A mismatched payload or an unverified publication race
-fails closed before it can be skipped.
+the verifier. Publication is intentionally non-overwriting, and no push uses
+`--skip-duplicate`, so an existing symbol package or publication race also
+fails the release. An interrupted publication must use a new package version
+rather than treating remote bytes as reusable.
 Repository owners must configure `NUGET_PRIVATE_SOURCE` and
 `NUGET_PRIVATE_API_KEY` in the private-preview environment, and `NUGET_USER`
 plus a matching NuGet trusted-publishing policy in the public environment.
 The private source must be an HTTPS NuGet V3 service index, and its API key
 must permit V3 package reads plus package and symbol publication. NuGet V3 has
-no corresponding symbol-package download resource, so retry safety anchors on
-the exact downloadable main package and resubmits the tested `.snupkg`
-separately. The workflow contains no feed credential values. An offline plan
-and local remote-payload simulation are available through:
+no corresponding symbol-package download resource, so symbol-package
+nonexistence is enforced by a push without duplicate skipping. The workflow
+contains no feed credential values. An offline plan and local remote-presence
+simulation are available through:
 
 ```powershell
 .\scripts\Publish-SharpProofRelease.ps1 `
@@ -558,7 +585,7 @@ and local remote-payload simulation are available through:
 
 ## Closed compiler artifact and remaining release gaps
 
-The build-only collector now emits compiler artifact schema version 5 from the
+The build-only collector now emits compiler artifact schema version 8 from the
 final post-generator Roslyn `Compilation`. It seals the feature-selected claim
 manifest and, for each selected callable, either a typed lowering failure or
 portable whole-body CFG/IR with bound contract clauses, canonical variables,
@@ -629,9 +656,11 @@ inventories, and formatting-neutral Roslyn complexity ratchets,
 builds the solution, runs architecture and banned-API checks, lattice and
 finite-CFG laws, runtime and differential oracles, worker/package integration,
 cache/concurrency/cancellation tests, the pinned corpus, a fixed-seed
-1,000-case fuzz run, and performance budgets. Corpus cases carry reviewed
-support labels: supported cases have zero `Unknown` tolerance, while
-intentionally unsupported Unknown buckets are capped by a checked-in ratchet.
+1,000-case fuzz run, and performance budgets. Corpus cases carry explicit
+reviewed support labels independently from their expected verdicts and
+snapshots: supported cases have zero `Unknown` tolerance, supported totals
+cannot decrease, and intentionally unsupported Unknown buckets are capped by a
+checked-in ratchet.
 Nightly and release qualification additionally require every deterministic
 trusted-boundary mutation, including both replay paths, to be killed and retain
 the commit-bound JSON evidence.

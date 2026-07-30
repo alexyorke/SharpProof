@@ -160,11 +160,7 @@ public sealed class RoslynOperationLowerer
 
     internal static bool IsIntrinsicLength(IPropertyReferenceOperation property)
     {
-        return property.Instance != null &&
-        property.Property.Name is "Length" or "LongLength" &&
-        property.Arguments.IsDefaultOrEmpty &&
-        (property.Instance.Type?.SpecialType == SpecialType.System_String ||
-         property.Instance.Type is IArrayTypeSymbol);
+        return CompilerIdentityBridge.IsIntrinsicSequenceLength(property);
     }
 
     private static bool TryGetNullComparisonValue(
@@ -444,16 +440,29 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitDefaultValue(
             IDefaultValueOperation operation, LoweringContext argument)
         {
-            var type = _owner.GetTypeId(operation.Type);
-            var info = _owner._factory.GetTypeInfo(type);
-            return info.Kind switch
+            var specialType = operation.Type?.SpecialType ?? SpecialType.None;
+            if (specialType == SpecialType.System_Boolean)
             {
-                IrTypeKind.Boolean => LoweredExpression.Exact(_owner._factory.Boolean(false)),
-                IrTypeKind.Integer => LoweredExpression.Exact(_owner._factory.Integer(0)),
-                IrTypeKind.String or IrTypeKind.Reference or IrTypeKind.Sequence =>
-                    LoweredExpression.Exact(_owner._factory.Null(type)),
-                _ => _owner.Opaque(operation, FrontendAbstention.UnsupportedType)
-            };
+                return LoweredExpression.Exact(
+                    _owner._factory.Boolean(false));
+            }
+
+            if (CSharpScalarSemantics.IsSupportedInteger(specialType))
+            {
+                return LoweredExpression.Exact(
+                    _owner._factory.Integer(0));
+            }
+
+            if (operation.Type?.IsReferenceType != true)
+            {
+                return _owner.Opaque(
+                    operation,
+                    FrontendAbstention.UnsupportedType);
+            }
+
+            var type = _owner.GetTypeId(operation.Type);
+            return LoweredExpression.Exact(
+                _owner._factory.Null(type));
         }
 
         public override LoweredExpression VisitUnaryOperator(
@@ -488,6 +497,15 @@ public sealed class RoslynOperationLowerer
 
             if (semantics.IsIdentity)
             {
+                if (!CSharpScalarSemantics.IsSupportedInteger(
+                        operation.Type?.SpecialType ?? SpecialType.None))
+                {
+                    return OpaqueOperand(
+                        operation,
+                        operation.Operand,
+                        FrontendAbstention.UnsupportedType);
+                }
+
                 return operand;
             }
 

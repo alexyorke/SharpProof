@@ -1,0 +1,120 @@
+name: Reusable exact-SHA security gates
+
+on:
+  workflow_call:
+    inputs:
+      run-dependency-review:
+        description: Run the pull-request dependency delta review.
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    if: inputs.run-dependency-review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Reject vulnerable dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: low
+          deny-licenses: GPL-2.0-only, GPL-3.0-only, AGPL-1.0-only, AGPL-3.0-only
+
+  dependency-audit:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup the repository SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "8.0.x"
+          global-json-file: global.json
+
+      - name: Restore the locked graph with NuGet audit enforcement
+        shell: pwsh
+        run: >-
+          .\scripts\Invoke-SharpProofDotnet.ps1
+          restore SharpProof.sln
+          --locked-mode
+
+      - name: Reject vulnerable direct or transitive packages
+        shell: pwsh
+        run: >-
+          .\scripts\Invoke-SharpProofDotnet.ps1
+          list SharpProof.sln package
+          --vulnerable
+          --include-transitive
+
+  banned-apis:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup the repository SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "8.0.x"
+          global-json-file: global.json
+
+      - name: Restore the locked graph
+        shell: pwsh
+        run: >-
+          .\scripts\Invoke-SharpProofDotnet.ps1
+          restore SharpProof.sln
+          --locked-mode
+
+      - name: Enforce banned APIs and production analyzer warnings
+        shell: pwsh
+        run: >-
+          .\scripts\Invoke-SharpProofDotnet.ps1
+          build SharpProof.sln
+          --configuration Release
+          --no-restore
+
+  codeql:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup the repository SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "8.0.x"
+          global-json-file: global.json
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@adfda868f108ac4222129de456ea554034a27db7 # v4
+        with:
+          languages: csharp
+          build-mode: manual
+
+      - name: Restore the locked graph
+        shell: pwsh
+        run: >-
+          .\scripts\Invoke-SharpProofDotnet.ps1
+          restore SharpProof.sln
+          --locked-mode
+
+      - name: Build the analyzed production graph
+        shell: pwsh
+        run: >-
+          .\scripts\Invoke-SharpProofDotnet.ps1
+          build SharpProof.sln
+          --configuration Release
+          --no-restore
+
+      - name: Analyze the exact checked-out SHA
+        uses: github/codeql-action/analyze@adfda868f108ac4222129de456ea554034a27db7 # v4
+        with:
+          category: /language:csharp

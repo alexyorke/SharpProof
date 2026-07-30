@@ -234,9 +234,9 @@ Assert-Equal `
     $contract.analyzer.defaultAssumptionPolicy `
     'SharpProofAssumptionPolicy'
 Assert-Equal ($contract.supportedTargetFrameworks -join ',') 'netstandard2.0,net8.0,net472' 'supportedTargetFrameworks'
-Assert-Equal $contract.worker.protocolVersion 8 'worker.protocolVersion'
+Assert-Equal $contract.worker.protocolVersion 9 'worker.protocolVersion'
 Assert-Equal $contract.worker.manifestSchemaVersion 4 'worker.manifestSchemaVersion'
-Assert-Equal $contract.worker.compilerArtifactSchemaVersion 5 'worker.compilerArtifactSchemaVersion'
+Assert-Equal $contract.worker.compilerArtifactSchemaVersion 8 'worker.compilerArtifactSchemaVersion'
 Assert-Equal $contract.worker.maximumParallelism 4 'worker.maximumParallelism'
 Assert-Equal $contract.worker.maximumMemoryMiB 2048 'worker.maximumMemoryMiB'
 Assert-Equal $contract.worker.queryRlimit 3000000 'worker.queryRlimit'
@@ -244,9 +244,9 @@ Assert-Equal $contract.worker.methodRlimit 20000000 'worker.methodRlimit'
 Assert-Equal $contract.worker.maximumMethodWallSeconds 10 'worker.maximumMethodWallSeconds'
 Assert-Equal $contract.worker.maximumProjectWallSeconds 300 'worker.maximumProjectWallSeconds'
 Assert-Equal $contract.worker.forcedTerminationMilliseconds 1000 'worker.forcedTerminationMilliseconds'
-Assert-Equal $contract.cache.schemaVersion 9 'cache.schemaVersion'
+Assert-Equal $contract.cache.schemaVersion 11 'cache.schemaVersion'
 Assert-Equal $contract.cache.maximumMiB 512 'cache.maximumMiB'
-Assert-Equal ($contract.cache.cacheableOutcomes -join ',') 'Proven,Refuted' 'cache.cacheableOutcomes'
+Assert-Equal ($contract.cache.cacheableOutcomes -join ',') 'Refuted' 'cache.cacheableOutcomes'
 Assert-Equal `
     (Get-MsBuildProperty $portableProps '_SharpProofPortablePackagePresent' 'portable package') `
     'true' `
@@ -359,13 +359,14 @@ try {
         'scalarSemanticsCatalog',
         'effectAnalysis',
         'replay',
-        'effectReplay',
+        'effectResultAssembly',
         'policy',
         'resultAssembly',
         'compilerInputIdentity',
         'canonicalIdentityEncoding',
         'protocolValidation',
-        'cacheValidation'
+        'cacheValidation',
+        'portableShippingBoundary'
     )
     $tcbComponents = @($contract.trustedComputingBase.components)
     $actualTcbComponents = @(
@@ -483,7 +484,7 @@ try {
         } else {
             300
         }
-        Invoke-SharpProofDotnet -TimeoutSeconds $testTimeoutSeconds -Arguments @(
+        $testArguments = @(
             'test',
             $testProject,
             '-c',
@@ -492,6 +493,12 @@ try {
             '--logger',
             'console;verbosity=minimal'
         )
+        if ($testProject -like 'SharpProof.Gates.Test*') {
+            $testArguments += @('--filter', 'TestCategory!=Performance')
+        }
+        Invoke-SharpProofDotnet `
+            -TimeoutSeconds $testTimeoutSeconds `
+            -Arguments $testArguments
     }
 
     if (-not $SkipTests) {

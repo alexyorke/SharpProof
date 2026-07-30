@@ -592,7 +592,7 @@ public sealed class ContractForValidatorGeneratorTests
     }
 
     [Test]
-    public void BodyDiscoveryDoesNotRequireTheContractClauseApi()
+    public void SourceDefinedContractForAttributeIsRejected()
     {
         var compilation =
             GeneratorTestHost.CreateCompilationWithoutAttributes(
@@ -619,7 +619,49 @@ public sealed class ContractForValidatorGeneratorTests
                 }
                 """));
 
-        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+        var diagnostic = AssertSingle(
+            GeneratorTestHost.Run(compilation),
+            "SPCF0001");
+        Assert.That(
+            diagnostic.GetMessage(
+                System.Globalization.CultureInfo.InvariantCulture),
+            Does.Contain("TargetContracts"));
+    }
+
+    [Test]
+    public void ProjectShadowedContractForAttributeIsRejected()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Subject.cs",
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            namespace SharpProof.Attributes {
+                [AttributeUsage(AttributeTargets.Class)]
+                public sealed class ContractForAttribute(Type target)
+                    : Attribute {
+                }
+            }
+
+            public interface ITarget {
+                void Invoke();
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Invoke(ITarget receiver) {
+                }
+            }
+            """));
+
+        var diagnostic = AssertSingle(
+            GeneratorTestHost.Run(compilation),
+            "SPCF0001");
+        Assert.That(
+            diagnostic.GetMessage(
+                System.Globalization.CultureInfo.InvariantCulture),
+            Does.Contain("TargetContracts"));
     }
 
     [Test]

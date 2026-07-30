@@ -3,7 +3,10 @@
     <_SharpProofPortablePackagePresent>true</_SharpProofPortablePackagePresent>
     <SharpProofAnalyzerDirectory Condition="'$(SharpProofAnalyzerDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/analyzers/dotnet/cs'))</SharpProofAnalyzerDirectory>
     <_SharpProofAnalyzerDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>
-    <SharpProofContractForGeneratorPath Condition="'$(SharpProofContractForGeneratorPath)' == ''">$(_SharpProofAnalyzerDirectory)/SharpProof.ContractForGenerator.dll</SharpProofContractForGeneratorPath>
+    <SharpProofPortableAnalyzerPath Condition="'$(SharpProofPortableAnalyzerPath)' == ''">$(_SharpProofAnalyzerDirectory)/SharpProof.PortableAnalyzer.dll</SharpProofPortableAnalyzerPath>
+    <SharpProofCollectorDirectory Condition="'$(SharpProofCollectorDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/collector'))</SharpProofCollectorDirectory>
+    <_SharpProofCollectorDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofCollectorDirectory)'))</_SharpProofCollectorDirectory>
+    <SharpProofCompilerCollectorPath Condition="'$(SharpProofCompilerCollectorPath)' == ''">$(_SharpProofCollectorDirectory)/SharpProof.CompilerCollector.dll</SharpProofCompilerCollectorPath>
   </PropertyGroup>
   <ItemGroup>
     <CompilerVisibleProperty Include="SharpProofProfile" />

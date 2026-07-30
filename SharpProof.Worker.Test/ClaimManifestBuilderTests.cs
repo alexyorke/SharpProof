@@ -295,6 +295,86 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void NestedOnlyClausesDoNotSelectTheirContainingMethod()
+    {
+        var result = Build((
+            "Subject.cs",
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long Outer(long value) {
+                    long Local(long item) {
+                        Contract.Ensures(
+                            Contract.Result<long>() == item);
+                        return item;
+                    }
+                    return Local(value);
+                }
+            }
+            """));
+
+        var target = result.Targets.Values.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                target.Method.MethodKind,
+                Is.EqualTo(MethodKind.LocalFunction));
+            Assert.That(result.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(result.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(
+                result.Manifest.Callables.Any(static callable =>
+                    callable.CallableId.Contains(
+                        "Outer",
+                        StringComparison.Ordinal) &&
+                    !callable.CallableId.Contains(
+                        "Local",
+                        StringComparison.Ordinal)),
+                Is.False);
+        }
+    }
+
+    [Test]
+    public void MalformedCompanionSelectionFailsClosed()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public sealed class Subject {
+                public long Identity(long value) => value;
+            }
+            [ContractFor(typeof(Subject))]
+            public static class SubjectContracts {
+                public static long Identity(
+                    Subject receiver,
+                    string unexpected) {
+                    Contract.Ensures(true);
+                    return unexpected.Length;
+                }
+            }
+            """;
+        var compilation = GetCompilation(("Subject.cs", source));
+        var result = new ClaimManifestBuilder(compilation).Build();
+        var target = result.Targets.Values.Single();
+        var binding = new ContractBinder(
+            compilation,
+            new SharpProof.Ir.IrFactory()).Bind(
+                target.Method);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                target.Entry.SelectedFeatures,
+                Is.EqualTo([WorkerSelectedFeature.Contracts]));
+            Assert.That(target.Claims, Is.Empty);
+            Assert.That(target.Entry.Assumptions, Is.Empty);
+            Assert.That(
+                binding.Failure,
+                Is.EqualTo(
+                    ContractBindingFailure.CompanionSignatureMismatch));
+        }
+    }
+
+    [Test]
     public void DirectClausesOwnTheEntireContractSource()
     {
         var result = Build((
@@ -657,6 +737,50 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void RejectedReturnAttributeCannotProveManifestEffectTransitively()
+    {
+        var result = Build((
+            "Subject.cs",
+            """
+            using SharpProof.Attributes;
+
+            namespace SharpProof.Attributes {
+                [System.AttributeUsage(
+                    System.AttributeTargets.ReturnValue)]
+                public sealed class NotNullAttribute :
+                    System.Attribute {
+                }
+            }
+
+            public static class Subject {
+                [return: SharpProof.Attributes.NotNull]
+                private static string MaybeNull(bool condition) {
+                    return condition ? "" : null!;
+                }
+
+                [DoesNotThrow]
+                public static int Call(bool condition) {
+                    return MaybeNull(condition).Length;
+                }
+            }
+            """));
+
+        var target = result.Targets.Values.Single(static candidate =>
+            candidate.Method.Name == "Call");
+        var evidence = target.EffectClaims.Single().Evidence;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(target.Method.Name, Is.EqualTo("Call"));
+            Assert.That(evidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence.Reason,
+                Is.EqualTo(WorkerClaimReason.EffectContractNotEstablished));
+            Assert.That(evidence.Evidence, Does.Contain("NullReferenceException"));
+        }
+    }
+
+    [Test]
     public void SuppressionAloneDoesNotSelectCallable()
     {
         var result = Build((
@@ -745,7 +869,7 @@ public sealed class ClaimManifestBuilderTests
             using SharpProof.Attributes;
             public static class Subject {
                 [EffectContract(
-                    SharpProofEffect.Throws,
+                    SharpProofEffect.Throws | SharpProofEffect.Allocates,
                     ThrownExceptions = new[] { typeof(Exception) },
                     Complete = true)]
                 public static void ThrowDerived() =>
@@ -772,6 +896,404 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void EffectEvidenceAccountsForCalleePreconditions()
+    {
+        var discovery = Build((
+            "Subject.cs",
+            """
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                private static void Restricted(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                [DoesNotThrow]
+                public static void Proven(int value) {
+                    Contract.Requires(value > 0);
+                    Restricted(value);
+                }
+
+                [DoesNotThrow]
+                public static void Unknown(int value) =>
+                    Restricted(value);
+
+                private static int Divide(
+                    int denominator,
+                    int ignored) {
+                    Contract.Requires(denominator > 0);
+                    return 1 / denominator;
+                }
+
+                [DoesNotThrow]
+                public static int MutatingArgument() {
+                    var value = 0;
+                    return Divide(value, value = 1);
+                }
+
+                private static void RequireZero(
+                    int value) {
+                    Contract.Requires(value == 0);
+                    if (value != 0) {
+                        throw new System.InvalidOperationException();
+                    }
+                }
+
+                [DoesNotThrow]
+                public static void SelfMutatingArgument() {
+                    var value = 1;
+                    RequireZero(value + (value = 0));
+                }
+
+                private static void RequireNull(
+                    params string?[] values) {
+                    Contract.Requires(values == null);
+                    if (values != null) {
+                        throw new System.InvalidOperationException();
+                    }
+                }
+
+                [DoesNotThrow]
+                public static void ExpandedParamsArgument() =>
+                    RequireNull((string?)null);
+
+                private static void FreeParams(
+                    params string?[] values) {
+                }
+
+                [ZeroAllocations]
+                public static void ExpandedParamsAllocation() =>
+                    FreeParams((string?)null);
+            }
+            """));
+        var evidence = discovery.Targets.Values
+            .Where(static target =>
+                !target.EffectClaims.IsDefaultOrEmpty)
+            .ToDictionary(
+                static target => target.Method.Name,
+                static target =>
+                    target.EffectClaims.Single().Evidence,
+                StringComparer.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                evidence["Proven"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                evidence["Proven"].Reason,
+                Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                evidence["Unknown"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence["Unknown"].Reason,
+                Is.EqualTo(
+                    WorkerClaimReason
+                        .EffectSummaryIncomplete));
+            Assert.That(
+                evidence["Unknown"].Certainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty
+                        .IncompleteMayEffectSummary));
+            Assert.That(
+                evidence["Unknown"].Evidence,
+                Does.Contain(
+                    "CallPreconditionNotProven"));
+            Assert.That(
+                evidence["MutatingArgument"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence["MutatingArgument"].Reason,
+                Is.EqualTo(
+                    WorkerClaimReason
+                        .EffectSummaryIncomplete));
+            Assert.That(
+                evidence["MutatingArgument"].Evidence,
+                Does.Contain(
+                    "CallPreconditionNotProven"));
+            Assert.That(
+                evidence["SelfMutatingArgument"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence["SelfMutatingArgument"].Reason,
+                Is.EqualTo(
+                    WorkerClaimReason
+                        .EffectSummaryIncomplete));
+            Assert.That(
+                evidence["SelfMutatingArgument"].Evidence,
+                Does.Contain(
+                    "CallPreconditionNotProven"));
+            Assert.That(
+                evidence["ExpandedParamsArgument"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence["ExpandedParamsArgument"].Reason,
+                Is.EqualTo(
+                    WorkerClaimReason
+                        .EffectSummaryIncomplete));
+            Assert.That(
+                evidence["ExpandedParamsAllocation"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence["ExpandedParamsAllocation"].Reason,
+                Is.EqualTo(
+                    WorkerClaimReason
+                        .EffectSummaryIncomplete));
+        }
+    }
+
+    [Test]
+    public void TypeInitializationSuppressesOnlyTheDefiniteAllocationWitness()
+    {
+        var discovery = Build((
+            "Subject.cs",
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class PlainAllocation {
+                public PlainAllocation() {
+                }
+            }
+
+            public sealed class ThrowingInitialization {
+                static ThrowingInitialization() {
+                    throw new InvalidOperationException();
+                }
+
+                public ThrowingInitialization() {
+                }
+            }
+
+            public static class Subject {
+                [ZeroAllocations]
+                public static object FrameworkObject() =>
+                    new object();
+
+                [ZeroAllocations]
+                public static PlainAllocation PlainSourceType() =>
+                    new PlainAllocation();
+
+                [ZeroAllocations]
+                public static ThrowingInitialization BlockedByTypeInitializer() =>
+                    new ThrowingInitialization();
+            }
+            """));
+        var evidence = discovery.Targets.Values
+            .Where(static target => !target.EffectClaims.IsDefaultOrEmpty)
+            .ToDictionary(
+                static target => target.Method.Name,
+                static target => target.EffectClaims.Single().Evidence,
+                StringComparer.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                evidence["FrameworkObject"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(
+                evidence["FrameworkObject"].Certainty,
+                Is.EqualTo(WorkerEffectEvidenceCertainty.DefiniteViolation));
+            Assert.That(
+                evidence["FrameworkObject"].Witness?.Kind,
+                Is.EqualTo("managed-allocation"));
+            Assert.That(
+                evidence["PlainSourceType"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(
+                evidence["PlainSourceType"].Certainty,
+                Is.EqualTo(WorkerEffectEvidenceCertainty.DefiniteViolation));
+            Assert.That(
+                evidence["PlainSourceType"].Witness?.Kind,
+                Is.EqualTo("managed-allocation"));
+            Assert.That(
+                evidence["BlockedByTypeInitializer"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence["BlockedByTypeInitializer"].Reason,
+                Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
+            Assert.That(
+                evidence["BlockedByTypeInitializer"].Certainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary));
+            Assert.That(
+                evidence["BlockedByTypeInitializer"].Witness,
+                Is.Null);
+            Assert.That(
+                evidence["BlockedByTypeInitializer"].Evidence,
+                Does.Contain("actual.allocation=Unknown")
+                    .And.Contain("UnmodeledCall"));
+        }
+    }
+
+    [Test]
+    public void ExceptionConstructorEvidenceRequiresAnExactApprovedSpec()
+    {
+        var discovery = Build((
+            "Subject.cs",
+            """
+            using System;
+            using System.Collections.Generic;
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                [DoesNotThrow]
+                public static InvalidOperationException SafeConstruction() =>
+                    new InvalidOperationException("message");
+
+                [DoesNotThrow]
+                public static AggregateException UnmodeledConstruction() =>
+                    new AggregateException(
+                        (IEnumerable<Exception>)null!);
+
+                [AllowedExceptions(typeof(ArgumentException))]
+                public static void DefiniteWrongThrow() =>
+                    throw new InvalidOperationException();
+
+                [AllowedExceptions(typeof(ArgumentException))]
+                public static void UnmodeledThrow() =>
+                    throw new AggregateException(
+                        (IEnumerable<Exception>)null!);
+            }
+            """));
+        var evidence = discovery.Targets.Values.ToDictionary(
+            static target => target.Method.Name,
+            static target => target.EffectClaims.Single().Evidence,
+            StringComparer.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                evidence["SafeConstruction"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                evidence["UnmodeledConstruction"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence["UnmodeledConstruction"].Reason,
+                Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
+            Assert.That(
+                evidence["UnmodeledConstruction"].Evidence,
+                Does.Contain("UnmodeledCall"));
+            Assert.That(
+                evidence["UnmodeledConstruction"].Witness,
+                Is.Null);
+            Assert.That(
+                evidence["DefiniteWrongThrow"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(
+                evidence["DefiniteWrongThrow"].Witness?.Kind,
+                Is.EqualTo("explicit-throw"));
+            Assert.That(
+                evidence["UnmodeledThrow"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(evidence["UnmodeledThrow"].Witness, Is.Null);
+        }
+    }
+
+    [Test]
+    public void ConstructedGenericExceptionClaimsRemainExact()
+    {
+        var discovery = Build((
+            "Subject.cs",
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public class GenericException<T> : Exception {
+            }
+
+            public sealed class DerivedStringException
+                : GenericException<string> {
+            }
+
+            public static class Subject {
+                [AllowedExceptions(typeof(GenericException<int>))]
+                public static void WrongAllowed(
+                    [NotNull] GenericException<string> exception) =>
+                    throw exception;
+
+                [AllowedExceptions(typeof(GenericException<string>))]
+                public static void ExactAllowed(
+                    [NotNull] GenericException<string> exception) =>
+                    throw exception;
+
+                [AllowedExceptions(typeof(GenericException<string>))]
+                public static void DerivedAllowed(
+                    [NotNull] DerivedStringException exception) =>
+                    throw exception;
+
+                [DoesNotThrow]
+                public static void WrongCatch(
+                    [NotNull] GenericException<string> exception) {
+                    try {
+                        throw exception;
+                    }
+                    catch (GenericException<int>) {
+                    }
+                }
+
+                [DoesNotThrow]
+                public static void ExactCatch(
+                    [NotNull] GenericException<string> exception) {
+                    try {
+                        throw exception;
+                    }
+                    catch (GenericException<string>) {
+                    }
+                }
+            }
+            """));
+        var targets = discovery.Targets.Values.ToDictionary(
+            static target => target.Method.Name,
+            StringComparer.Ordinal);
+        var wrongAllowed = targets["WrongAllowed"].EffectClaims.Single().Evidence;
+        var exactAllowed = targets["ExactAllowed"].EffectClaims.Single().Evidence;
+        var derivedAllowed = targets["DerivedAllowed"].EffectClaims.Single().Evidence;
+        var wrongCatch = targets["WrongCatch"].EffectClaims.Single().Evidence;
+        var exactCatch = targets["ExactCatch"].EffectClaims.Single().Evidence;
+        var thrownStringType = (INamedTypeSymbol)targets["WrongAllowed"]
+            .Method.Parameters[0].Type;
+        var integerIdentity = wrongAllowed.Constraint
+            .AllowedExceptionTypes.Single();
+        var stringIdentity = CompilerExceptionTypeIdentity.Encode(
+            thrownStringType);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(integerIdentity, Is.Not.EqualTo(stringIdentity));
+            Assert.That(
+                wrongAllowed.Constraint.AllowedExceptionTypes,
+                Is.EqualTo([integerIdentity]));
+            Assert.That(
+                wrongAllowed.Evidence,
+                Does.Contain(integerIdentity).And.Contain(stringIdentity));
+            Assert.That(
+                wrongAllowed.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                wrongAllowed.Reason,
+                Is.EqualTo(WorkerClaimReason.EffectContractNotEstablished));
+            Assert.That(
+                exactAllowed.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                derivedAllowed.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                wrongCatch.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                wrongCatch.Reason,
+                Is.EqualTo(WorkerClaimReason.EffectContractNotEstablished));
+            Assert.That(
+                exactCatch.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+        }
+    }
+
+    [Test]
     public void RepeatableEffectAttributesEachReceiveAStableClaim()
     {
         const string source =
@@ -782,11 +1304,11 @@ public sealed class ClaimManifestBuilderTests
                 [AllowedExceptions(typeof(Exception))]
                 [AllowedExceptions(typeof(InvalidOperationException))]
                 [EffectContract(
-                    SharpProofEffect.Throws,
+                    SharpProofEffect.Throws | SharpProofEffect.Allocates,
                     ThrownExceptions = new[] { typeof(Exception) },
                     Complete = true)]
                 [EffectContract(
-                    SharpProofEffect.Throws,
+                    SharpProofEffect.Throws | SharpProofEffect.Allocates,
                     ThrownExceptions = new[] { typeof(Exception) },
                     Complete = true)]
                 public static void Throw() =>

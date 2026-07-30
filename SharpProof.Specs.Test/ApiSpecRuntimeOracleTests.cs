@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Immutable;
+using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using NUnit.Framework;
@@ -11,8 +12,17 @@ namespace SharpProof.Specs.Test;
 [TestFixture]
 public sealed partial class ApiSpecRuntimeOracleTests
 {
+    private static readonly Action<Exception> CallExceptionConstructor =
+        CreateParameterlessConstructorInvoker<Exception>();
+    private static readonly Action<Exception, string?> CallExceptionStringConstructor =
+        CreateStringConstructorInvoker<Exception>();
+    private static readonly Action<InvalidOperationException> CallInvalidOperationExceptionConstructor =
+        CreateParameterlessConstructorInvoker<InvalidOperationException>();
+    private static readonly Action<InvalidOperationException, string?>
+        CallInvalidOperationExceptionStringConstructor =
+            CreateStringConstructorInvoker<InvalidOperationException>();
     private static readonly Action<object> CallObjectConstructor =
-        CreateObjectConstructorInvoker();
+        CreateParameterlessConstructorInvoker<object>();
     private static readonly object ListItem = new();
     private static readonly string ConcatLeft = new(['l', 'e', 'f', 't']);
     private static readonly string ConcatRight = new(['r', 'i', 'g', 'h', 't']);
@@ -22,6 +32,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
     private static readonly ImmutableDictionary<string, RowWitness> Witnesses =
         CreateWitnesses();
 
+    private static Exception s_exceptionConstructorReceiver =
+        CreateUninitializedException<Exception>();
+    private static InvalidOperationException s_invalidOperationExceptionConstructorReceiver =
+        CreateUninitializedException<InvalidOperationException>();
     private static object s_objectConstructorReceiver = new();
     private static GhostProbe s_ghostProbe = new();
     private static string? s_stringSink;
@@ -231,6 +245,74 @@ public sealed partial class ApiSpecRuntimeOracleTests
             ]);
     }
 
+    private static RowWitness CreateBclExceptionCtorWitness()
+    {
+        return ConstructorRow(
+            "an already allocated Exception receiver, excluding newobj",
+            ObserveExceptionConstructorEffect,
+            SpecEffect.None,
+            PrepareExceptionConstructorReceiver,
+            InvokePreparedExceptionConstructor);
+    }
+
+    private static RowWitness CreateBclExceptionCtorStringWitness()
+    {
+        return ConstructorRow(
+            "an already allocated Exception receiver and null/non-null messages, excluding newobj",
+            ObserveExceptionStringConstructorEffect,
+            SpecEffect.None,
+            [
+                new AllocationEdge(
+                    PrepareExceptionConstructorReceiver,
+                    InvokePreparedExceptionStringConstructor),
+                new AllocationEdge(
+                    PrepareExceptionConstructorReceiver,
+                    InvokePreparedExceptionNullStringConstructor)
+            ],
+            [
+                new ThrowEdge(
+                    PrepareExceptionConstructorReceiver,
+                    InvokePreparedExceptionStringConstructor),
+                new ThrowEdge(
+                    PrepareExceptionConstructorReceiver,
+                    InvokePreparedExceptionNullStringConstructor)
+            ]);
+    }
+
+    private static RowWitness CreateBclInvalidOperationExceptionCtorWitness()
+    {
+        return ConstructorRow(
+            "an already allocated InvalidOperationException receiver, excluding newobj",
+            ObserveInvalidOperationExceptionConstructorEffect,
+            SpecEffect.None,
+            PrepareInvalidOperationExceptionConstructorReceiver,
+            InvokePreparedInvalidOperationExceptionConstructor);
+    }
+
+    private static RowWitness CreateBclInvalidOperationExceptionCtorStringWitness()
+    {
+        return ConstructorRow(
+            "an already allocated InvalidOperationException receiver and null/non-null messages, excluding newobj",
+            ObserveInvalidOperationExceptionStringConstructorEffect,
+            SpecEffect.None,
+            [
+                new AllocationEdge(
+                    PrepareInvalidOperationExceptionConstructorReceiver,
+                    InvokePreparedInvalidOperationExceptionStringConstructor),
+                new AllocationEdge(
+                    PrepareInvalidOperationExceptionConstructorReceiver,
+                    InvokePreparedInvalidOperationExceptionNullStringConstructor)
+            ],
+            [
+                new ThrowEdge(
+                    PrepareInvalidOperationExceptionConstructorReceiver,
+                    InvokePreparedInvalidOperationExceptionStringConstructor),
+                new ThrowEdge(
+                    PrepareInvalidOperationExceptionConstructorReceiver,
+                    InvokePreparedInvalidOperationExceptionNullStringConstructor)
+            ]);
+    }
+
     private static RowWitness CreateBclObjectCtorWitness()
     {
         return Row(
@@ -253,7 +335,15 @@ public sealed partial class ApiSpecRuntimeOracleTests
                         PrepareObjectConstructorReceiver,
                         InvokePreparedObjectConstructor)
                 ],
-                DoesNotThrowMutation));
+                DoesNotThrowMutation),
+            termination: Termination(
+                "an already allocated receiver",
+                [
+                    new ThrowEdge(
+                        PrepareObjectConstructorReceiver,
+                        InvokePreparedObjectConstructor)
+                ],
+                SpecTerminationBehavior.Unknown));
     }
 
     private static RowWitness CreateBclStringConcatStringStringWitness()
@@ -449,9 +539,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
         IFacetWitness? throws = null,
         IFacetWitness? nullness = null,
         IFacetWitness? cardinality = null,
+        IFacetWitness? termination = null,
         ImmutableArray<PostconditionWitness> postconditions = default)
     {
-        var facets = ImmutableArray.CreateBuilder<IFacetWitness>(5);
+        var facets = ImmutableArray.CreateBuilder<IFacetWitness>(6);
         if (effects != null)
         {
             facets.Add(effects);
@@ -477,6 +568,11 @@ public sealed partial class ApiSpecRuntimeOracleTests
             facets.Add(cardinality);
         }
 
+        if (termination != null)
+        {
+            facets.Add(termination);
+        }
+
         return new RowWitness(
             facets.ToImmutable(),
             postconditions.IsDefault ? [] : postconditions);
@@ -493,6 +589,47 @@ public sealed partial class ApiSpecRuntimeOracleTests
             static template => template.Facets.Effects.Effects,
             claim => observe() == claim,
             mutation);
+    }
+
+    private static RowWitness ConstructorRow(
+        string edgeInputs,
+        Func<SpecEffect> observeEffect,
+        SpecEffect effectMutation,
+        Action prepare,
+        Action invoke)
+    {
+        return ConstructorRow(
+            edgeInputs,
+            observeEffect,
+            effectMutation,
+            [new AllocationEdge(prepare, invoke)],
+            [new ThrowEdge(prepare, invoke)]);
+    }
+
+    private static RowWitness ConstructorRow(
+        string edgeInputs,
+        Func<SpecEffect> observeEffect,
+        SpecEffect effectMutation,
+        ImmutableArray<AllocationEdge> allocationEdges,
+        ImmutableArray<ThrowEdge> throwEdges)
+    {
+        return Row(
+            effects: Effect(
+                edgeInputs,
+                observeEffect,
+                effectMutation),
+            allocation: Allocation(
+                edgeInputs,
+                allocationEdges,
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                edgeInputs,
+                throwEdges,
+                DoesNotThrowMutation),
+            termination: Termination(
+                edgeInputs,
+                throwEdges,
+                SpecTerminationBehavior.Unknown));
     }
 
     private static FacetWitness<SpecAllocationBehavior> Allocation(
@@ -536,6 +673,19 @@ public sealed partial class ApiSpecRuntimeOracleTests
             mutation);
     }
 
+    private static FacetWitness<SpecTerminationBehavior> Termination(
+        string edgeInputs,
+        ImmutableArray<ThrowEdge> edges,
+        SpecTerminationBehavior mutation)
+    {
+        return new(
+            FacetKind.Termination,
+            edgeInputs,
+            static template => template.Facets.Termination!.Behavior,
+            claim => ObserveTermination(edges) == claim,
+            mutation);
+    }
+
     private static FacetWitness<SpecCardinality> Cardinality(
         string edgeInputs,
         Func<SpecCardinality> observe,
@@ -559,7 +709,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static ImmutableArray<FacetKind> ExpectedFacets(ApiSpecTemplate template)
     {
-        var facets = ImmutableArray.CreateBuilder<FacetKind>(5);
+        var facets = ImmutableArray.CreateBuilder<FacetKind>(6);
         if (template.Facets.Effects.Effects != SpecEffect.Unknown)
         {
             facets.Add(FacetKind.Effects);
@@ -587,6 +737,12 @@ public sealed partial class ApiSpecRuntimeOracleTests
             facets.Add(FacetKind.Cardinality);
         }
 
+        if (template.Facets.Termination?.Behavior is
+            SpecTerminationBehavior.Terminates)
+        {
+            facets.Add(FacetKind.Termination);
+        }
+
         return facets.ToImmutable();
     }
 
@@ -598,6 +754,96 @@ public sealed partial class ApiSpecRuntimeOracleTests
     private static SpecEffect ObserveObjectConstructorEffect()
     {
         return ObserveNoEffects(ObjectConstructorEdge);
+    }
+
+    private static SpecEffect ObserveExceptionConstructorEffect()
+    {
+        return ObserveReceiverWrites(
+            static () => ConstructorWritesReceiver(
+                PrepareExceptionConstructorReceiver,
+                static () => s_exceptionConstructorReceiver,
+                InvokePreparedExceptionConstructor));
+    }
+
+    private static SpecEffect ObserveExceptionStringConstructorEffect()
+    {
+        return ObserveReceiverWrites(
+            static () => ConstructorWritesReceiver(
+                PrepareExceptionConstructorReceiver,
+                static () => s_exceptionConstructorReceiver,
+                InvokePreparedExceptionStringConstructor),
+            static () => ConstructorWritesReceiver(
+                PrepareExceptionConstructorReceiver,
+                static () => s_exceptionConstructorReceiver,
+                InvokePreparedExceptionNullStringConstructor));
+    }
+
+    private static SpecEffect ObserveInvalidOperationExceptionConstructorEffect()
+    {
+        return ObserveReceiverWrites(
+            static () => ConstructorWritesReceiver(
+                PrepareInvalidOperationExceptionConstructorReceiver,
+                static () => s_invalidOperationExceptionConstructorReceiver,
+                InvokePreparedInvalidOperationExceptionConstructor));
+    }
+
+    private static SpecEffect ObserveInvalidOperationExceptionStringConstructorEffect()
+    {
+        return ObserveReceiverWrites(
+            static () => ConstructorWritesReceiver(
+                PrepareInvalidOperationExceptionConstructorReceiver,
+                static () => s_invalidOperationExceptionConstructorReceiver,
+                InvokePreparedInvalidOperationExceptionStringConstructor),
+            static () => ConstructorWritesReceiver(
+                PrepareInvalidOperationExceptionConstructorReceiver,
+                static () => s_invalidOperationExceptionConstructorReceiver,
+                InvokePreparedInvalidOperationExceptionNullStringConstructor));
+    }
+
+    private static SpecEffect ObserveReceiverWrites(
+        params Func<bool>[] edges)
+    {
+        return edges.All(static edge => edge())
+            ? SpecEffect.WritesReceiverState
+            : SpecEffect.Unknown;
+    }
+
+    private static bool ConstructorWritesReceiver(
+        Action prepare,
+        Func<Exception> receiver,
+        Action invoke)
+    {
+        prepare();
+        var target = receiver();
+        var fields = InstanceFields(target.GetType());
+        var before = fields.Select(field => field.GetValue(target)).ToArray();
+        invoke();
+        for (var index = 0; index < fields.Length; index++)
+        {
+            if (!Equals(before[index], fields[index].GetValue(target)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static ImmutableArray<FieldInfo> InstanceFields(Type type)
+    {
+        var fields = ImmutableArray.CreateBuilder<FieldInfo>();
+        for (var current = type;
+             current != null;
+             current = current.BaseType)
+        {
+            fields.AddRange(current.GetFields(
+                BindingFlags.Instance |
+                BindingFlags.Public |
+                BindingFlags.NonPublic |
+                BindingFlags.DeclaredOnly));
+        }
+
+        return fields.ToImmutable();
     }
 
     private static SpecEffect ObserveContractAssumeEffect()
@@ -716,6 +962,29 @@ public sealed partial class ApiSpecRuntimeOracleTests
             edges.Length,
             normalCompletions,
             exceptionTypes.ToImmutable());
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "The runtime oracle classifies every exceptional constructor exit as non-terminating evidence.")]
+    private static SpecTerminationBehavior ObserveTermination(
+        ImmutableArray<ThrowEdge> edges)
+    {
+        foreach (var edge in edges)
+        {
+            edge.Prepare();
+            try
+            {
+                edge.Invoke();
+            }
+            catch (Exception)
+            {
+                return SpecTerminationBehavior.Unknown;
+            }
+        }
+
+        return SpecTerminationBehavior.Terminates;
     }
 
     private static bool MatchesThrowClaim(
@@ -964,22 +1233,105 @@ public sealed partial class ApiSpecRuntimeOracleTests
         return receiver.GetType() == typeof(object);
     }
 
-    private static Action<object> CreateObjectConstructorInvoker()
+    private static Action<TReceiver> CreateParameterlessConstructorInvoker<TReceiver>()
+        where TReceiver : class
     {
         var method = new DynamicMethod(
-            "SharpProof_ObjectConstructorWitness",
+            "SharpProof_" + typeof(TReceiver).Name + "_ConstructorWitness",
             typeof(void),
-            [typeof(object)],
+            [typeof(TReceiver)],
             typeof(ApiSpecRuntimeOracleTests).Module,
             true);
         var generator = method.GetILGenerator();
         generator.Emit(OpCodes.Ldarg_0);
         generator.Emit(
             OpCodes.Call,
-            typeof(object).GetConstructor(Type.EmptyTypes) ??
-            throw new AssertionException("System.Object constructor was unavailable."));
+            typeof(TReceiver).GetConstructor(Type.EmptyTypes) ??
+            throw new AssertionException(
+                typeof(TReceiver).FullName + " constructor was unavailable."));
         generator.Emit(OpCodes.Ret);
-        return method.CreateDelegate<Action<object>>();
+        return method.CreateDelegate<Action<TReceiver>>();
+    }
+
+    private static Action<TReceiver, string?> CreateStringConstructorInvoker<TReceiver>()
+        where TReceiver : class
+    {
+        var method = new DynamicMethod(
+            "SharpProof_" + typeof(TReceiver).Name + "_StringConstructorWitness",
+            typeof(void),
+            [typeof(TReceiver), typeof(string)],
+            typeof(ApiSpecRuntimeOracleTests).Module,
+            true);
+        var generator = method.GetILGenerator();
+        generator.Emit(OpCodes.Ldarg_0);
+        generator.Emit(OpCodes.Ldarg_1);
+        generator.Emit(
+            OpCodes.Call,
+            typeof(TReceiver).GetConstructor([typeof(string)]) ??
+            throw new AssertionException(
+                typeof(TReceiver).FullName + " string constructor was unavailable."));
+        generator.Emit(OpCodes.Ret);
+        return method.CreateDelegate<Action<TReceiver, string?>>();
+    }
+
+    private static void PrepareExceptionConstructorReceiver()
+    {
+        s_exceptionConstructorReceiver =
+            CreateUninitializedException<Exception>();
+    }
+
+    private static TException CreateUninitializedException<TException>()
+        where TException : Exception
+    {
+        return (TException)RuntimeHelpers.GetUninitializedObject(
+            typeof(TException));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void InvokePreparedExceptionConstructor()
+    {
+        CallExceptionConstructor(s_exceptionConstructorReceiver);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void InvokePreparedExceptionStringConstructor()
+    {
+        CallExceptionStringConstructor(s_exceptionConstructorReceiver, "after");
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void InvokePreparedExceptionNullStringConstructor()
+    {
+        CallExceptionStringConstructor(s_exceptionConstructorReceiver, null);
+    }
+
+    private static void PrepareInvalidOperationExceptionConstructorReceiver()
+    {
+        s_invalidOperationExceptionConstructorReceiver =
+            CreateUninitializedException<InvalidOperationException>();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void InvokePreparedInvalidOperationExceptionConstructor()
+    {
+        CallInvalidOperationExceptionConstructor(
+            s_invalidOperationExceptionConstructorReceiver);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void InvokePreparedInvalidOperationExceptionStringConstructor()
+    {
+        CallInvalidOperationExceptionStringConstructor(
+            s_invalidOperationExceptionConstructorReceiver,
+            "after");
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void InvokePreparedInvalidOperationExceptionNullStringConstructor()
+    {
+        CallInvalidOperationExceptionStringConstructor(
+            s_invalidOperationExceptionConstructorReceiver,
+            null);
     }
 
     private static void PrepareObjectConstructorReceiver()
@@ -1314,7 +1666,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
         Allocation,
         Throws,
         Nullness,
-        Cardinality
+        Cardinality,
+        Termination
     }
 
     private interface IFacetWitness

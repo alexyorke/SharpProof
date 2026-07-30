@@ -113,6 +113,7 @@
       "rows": [
         ["Proven","None","CompleteMayEffectSummary"],
         ["Proven","None","TrustedCompleteBoundary"],
+        ["Proven","None","VacuousEntry"],
         ["Refuted","None","DefiniteViolation"],
         ["Unknown","EffectSummaryIncomplete","IncompleteMayEffectSummary"],
         ["Unknown","EffectContractNotEstablished","CompleteMayEffectSummary"],
@@ -129,7 +130,8 @@
       "rows": [
         ["*","*","None"],
         ["Postcondition","Proven","ContradictoryPreconditions"],
-        ["Postcondition","Proven","NoModeledNormalReturn"]
+        ["Postcondition","Proven","NoModeledNormalReturn"],
+        ["Effect","Proven","ContradictoryPreconditions"]
       ]
     },
     {
@@ -291,6 +293,9 @@
         {"code":"response.proof_core","condition":{"op":"distinctNonblank","property":"ProofCore"}},
         {"code":"response.model","condition":{"op":"validModel","property":"Model"}},
         {"code":"response.assumptions","condition":{"op":"validAssumptions","property":"Assumptions"}},
+        {"code":"response.vacuity_evidence","condition":{"op":"implies",
+          "if":{"op":"notEqualsMember","property":"Vacuity","member":"WorkerVacuityKind.None"},
+          "then":{"op":"hasItems","property":"ProofCore"}}},
         {"code":"response.claim_payload","condition":{"op":"stateTable","table":"ClaimPayload","arguments":[
           {"op":"property","property":"Outcome"},
           {"op":"hasItems","property":"ProofCore"},
@@ -407,8 +412,8 @@
     ]
   },
   "declarations": [
-    {"kind":"staticClass","name":"WorkerProtocolVersions","constants":[{"name":"Current","type":"string","value":"8"},{"name":"EmptySha256","type":"string","value":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}]},
-    {"kind":"staticClass","name":"WorkerCacheVersions","constants":[{"name":"Current","type":"int","value":9}]},
+    {"kind":"staticClass","name":"WorkerProtocolVersions","constants":[{"name":"Current","type":"string","value":"9"},{"name":"EmptySha256","type":"string","value":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}]},
+    {"kind":"staticClass","name":"WorkerCacheVersions","constants":[{"name":"Current","type":"int","value":11}]},
     {"kind":"staticClass","name":"WorkerManifestVersions","constants":[{"name":"Current","type":"int","value":4}]},
     {"kind":"staticClass","name":"WorkerLauncherDefaults","constants":[{"name":"TerminationGraceMilliseconds","type":"int","value":1000}]},
     {"kind":"class","name":"WorkerVerifyRequest","properties":[{"name":"ProtocolVersion","jsonName":"protocolVersion","order":0,"type":"string","set":true,"default":{"kind":"member","value":"WorkerProtocolVersions.Current"}},{"name":"CompilerManifest","jsonName":"compilerManifest","order":1,"type":"WorkerFileReference","set":true,"default":{"kind":"new"}},{"name":"Budgets","jsonName":"budgets","order":2,"type":"WorkerBudgets","set":true,"default":{"kind":"new"}},{"name":"Cache","jsonName":"cache","order":3,"type":"WorkerCacheOptions","set":true,"default":{"kind":"new"}},{"name":"VerifyPolicy","jsonName":"verifyPolicy","order":4,"type":"WorkerVerifyPolicy","set":true,"default":{"kind":"member","value":"WorkerVerifyPolicy.Advisory"}},{"name":"AssumptionPolicy","jsonName":"assumptionPolicy","order":5,"type":"WorkerAssumptionPolicy","set":true,"default":{"kind":"member","value":"WorkerAssumptionPolicy.Allow"}}]},
@@ -432,7 +437,7 @@
     {"kind":"enum","name":"WorkerCallableCoverage","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"Complete","value":1},{"name":"Incomplete","value":2}]},
     {"kind":"enum","name":"WorkerCallableCoverageReason","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"None","value":1},{"name":"UnsupportedCallable","value":2},{"name":"UnsupportedContract","value":3},{"name":"SemanticUnknown","value":4},{"name":"MissingClaimResult","value":5},{"name":"MethodTimeout","value":6},{"name":"ProjectTimeout","value":7},{"name":"Canceled","value":8},{"name":"InfrastructureFailure","value":9}]},
     {"kind":"enum","name":"WorkerClaimOutcome","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"Proven","value":1},{"name":"Refuted","value":2},{"name":"Unknown","value":3}]},
-    {"kind":"enum","name":"WorkerEffectEvidenceCertainty","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"IncompleteMayEffectSummary","value":1},{"name":"CompleteMayEffectSummary","value":2},{"name":"TrustedCompleteBoundary","value":3},{"name":"DefiniteViolation","value":4},{"name":"Unavailable","value":5}]},
+    {"kind":"enum","name":"WorkerEffectEvidenceCertainty","underlyingType":"int","flags":false,"members":[{"name":"Unspecified","value":0},{"name":"IncompleteMayEffectSummary","value":1},{"name":"CompleteMayEffectSummary","value":2},{"name":"TrustedCompleteBoundary","value":3},{"name":"DefiniteViolation","value":4},{"name":"Unavailable","value":5},{"name":"VacuousEntry","value":6}]},
     {"kind":"enum","name":"WorkerEffectSet","underlyingType":"long","flags":true,"members":[{"name":"None","value":0},{"name":"ReadsReceiverState","value":1},{"name":"ReadsArgumentState","value":2},{"name":"ReadsCapturedState","value":4},{"name":"ReadsStaticState","value":8},{"name":"ReadsAmbientState","value":16},{"name":"WritesReceiverState","value":32},{"name":"WritesArgumentState","value":64},{"name":"WritesCapturedState","value":128},{"name":"WritesStaticState","value":256},{"name":"WritesAmbientState","value":512},{"name":"Allocates","value":1024},{"name":"Throws","value":2048},{"name":"Synchronizes","value":4096},{"name":"UsesNondeterminism","value":8192},{"name":"UsesNativeCode","value":16384},{"name":"UsesReflection","value":32768},{"name":"AllKnown","value":65535}]},
     {"kind":"enum","name":"WorkerEffectCapabilitySet","underlyingType":"int","flags":true,"members":[{"name":"None","value":0},{"name":"IO","value":1},{"name":"FileRead","value":2},{"name":"FileWrite","value":4},{"name":"Network","value":8},{"name":"Console","value":16},{"name":"Process","value":32},{"name":"Environment","value":64},{"name":"Registry","value":128},{"name":"Clock","value":256},{"name":"Randomness","value":512},{"name":"Reflection","value":1024},{"name":"Synchronization","value":2048},{"name":"NativeInterop","value":4096},{"name":"AllKnown","value":8191}]},
     {"kind":"enum","name":"WorkerVacuityKind","underlyingType":"int","flags":false,"members":[{"name":"None","value":0},{"name":"ContradictoryPreconditions","value":1},{"name":"NoModeledNormalReturn","value":2}]},

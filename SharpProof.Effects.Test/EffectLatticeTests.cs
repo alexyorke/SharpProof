@@ -59,6 +59,62 @@ public sealed class EffectLatticeTests
         }
     }
 
+    [Test]
+    public void ThrowSetsCanonicalizeConstructedGenericTypesIndependentlyOfInsertionOrder()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class GenericException<T> : System.Exception {
+            }
+
+            public static class Subject {
+                public static void Compare(
+                    GenericException<int> first,
+                    GenericException<string> second) {
+                }
+            }
+            """);
+        var method = EffectTestHost.RequireMethod(
+            compilation,
+            "Subject",
+            "Compare");
+        var integerException = (INamedTypeSymbol)method.Parameters[0].Type;
+        var stringException = (INamedTypeSymbol)method.Parameters[1].Type;
+        var forward = EffectThrowSet.Create([
+            integerException,
+            stringException
+        ]);
+        var reverse = EffectThrowSet.Create([
+            stringException,
+            integerException
+        ]);
+        var forwardUnion = EffectThrowSet.Create([integerException])
+            .Union(EffectThrowSet.Create([stringException]));
+        var reverseUnion = EffectThrowSet.Create([stringException])
+            .Union(EffectThrowSet.Create([integerException]));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                EffectSymbolComparer<INamedTypeSymbol>.Instance.Compare(
+                    integerException,
+                    stringException),
+                Is.Not.Zero);
+            Assert.That(reverse, Is.EqualTo(forward));
+            Assert.That(
+                reverse.GetHashCode(),
+                Is.EqualTo(forward.GetHashCode()));
+            Assert.That(reverseUnion, Is.EqualTo(forwardUnion));
+            Assert.That(
+                reverseUnion.GetHashCode(),
+                Is.EqualTo(forwardUnion.GetHashCode()));
+            Assert.That(
+                reverse.Types,
+                Is.EqualTo(forward.Types)
+                    .Using<INamedTypeSymbol>(SymbolEqualityComparer.Default));
+        }
+    }
+
     private static ImmutableArray<EffectSummary> CreateSamples()
     {
         var compilation = EffectTestHost.CreateCompilation("public sealed class Sample { }");

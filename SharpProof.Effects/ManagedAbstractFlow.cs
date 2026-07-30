@@ -19,6 +19,7 @@ internal sealed class ManagedAbstractFlow
     private readonly INamedTypeSymbol? _inRangeAttribute;
     private readonly INamedTypeSymbol? _notNullAttribute;
     private readonly INamedTypeSymbol? _positiveAttribute;
+    private readonly TrustedBoundaryPolicy _trustedBoundaries;
 
     private ManagedAbstractFlow(Compilation compilation)
         : this(compilation, new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation))
@@ -35,10 +36,13 @@ internal sealed class ManagedAbstractFlow
         }
 
         _apiSpecs = apiSpecs ?? throw new ArgumentNullException(nameof(apiSpecs));
-        _contractApi = compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract");
-        _notNullAttribute = compilation.GetTypeByMetadataName("SharpProof.Attributes.NotNullAttribute");
-        _positiveAttribute = compilation.GetTypeByMetadataName("SharpProof.Attributes.PositiveAttribute");
-        _inRangeAttribute = compilation.GetTypeByMetadataName("SharpProof.Attributes.InRangeAttribute");
+        var contractApi = ContractApiIdentityResolver.ForCompilation(compilation);
+        _contractApi = contractApi.Contract;
+        _notNullAttribute = contractApi.ResolveAttribute(ContractApiMetadata.NotNull);
+        _positiveAttribute = contractApi.ResolveAttribute(ContractApiMetadata.Positive);
+        _inRangeAttribute = contractApi.ResolveAttribute(ContractApiMetadata.InRange);
+        _trustedBoundaries =
+            TrustedBoundaryPolicy.ForCompilation(compilation);
     }
 
     internal static ManagedAbstractFlow ForCompilation(Compilation compilation)
@@ -275,14 +279,22 @@ internal sealed class ManagedAbstractFlow
     private ManagedFlowState AssumeComparison(
         ManagedFlowState state, IOperation left, IOperation right, BinaryOperatorKind @operator, bool expected)
     {
-        if (TryStorage(left, out var storage))
+        var hasLeftStorage = TryStorage(left, out var leftStorage);
+        var hasRightStorage = TryStorage(right, out var rightStorage);
+        var leftValue = EvaluateCore(left, state);
+        var rightValue = EvaluateCore(right, state);
+        if (hasLeftStorage)
         {
-            return Refine(state, storage, @operator, EvaluateCore(right, state), expected);
+            state = Refine(state, leftStorage, @operator, rightValue, expected);
         }
 
-        return TryStorage(right, out storage)
-            ? Refine(state, storage, ManagedAbstractValue.Reverse(@operator),
-                EvaluateCore(left, state), expected)
+        return hasRightStorage
+            ? Refine(
+                state,
+                rightStorage,
+                ManagedAbstractValue.Reverse(@operator),
+                leftValue,
+                expected)
             : state;
     }
 
@@ -306,9 +318,12 @@ internal sealed class ManagedAbstractFlow
         ManagedFlowState state, object storage, BinaryOperatorKind @operator, ManagedAbstractValue value, bool expected)
     {
         var current = state.Get(storage);
-        if (value.TryGetInteger(out var integer) && integer.IsSingleton)
+        if (value.TryGetInteger(out var integer))
         {
-            return state.Set(storage, RefineInteger(current, @operator, integer.SingletonValue, expected));
+            var integerRefined = integer.IsSingleton
+                ? RefineInteger(current, @operator, integer.SingletonValue, expected)
+                : RefineInteger(current, @operator, integer, expected);
+            return state.Set(storage, integerRefined);
         }
 
         if (value.TryGetBoolean(out var boolean) && current.IsBoolean &&
@@ -366,6 +381,59 @@ internal sealed class ManagedAbstractFlow
                 current.ExcludesZero || normalized == BinaryOperatorKind.NotEquals && constant == 0);
     }
 
+    private static ManagedAbstractValue RefineInteger(
+        ManagedAbstractValue current,
+        BinaryOperatorKind @operator,
+        IntervalValue value,
+        bool expected)
+    {
+        if (!current.TryGetInteger(out var interval))
+        {
+            return current;
+        }
+
+        var normalized = expected ? @operator : ManagedAbstractValue.Negate(@operator);
+        var domain = IntervalDomain.Instance;
+        var refined = interval;
+        if (normalized == BinaryOperatorKind.Equals)
+        {
+            if (value.LowerBound.HasValue)
+            {
+                refined = domain.AssumeAtLeast(refined, value.LowerBound.Value);
+            }
+            if (value.UpperBound.HasValue)
+            {
+                refined = domain.AssumeAtMost(refined, value.UpperBound.Value);
+            }
+        }
+        else if (normalized == BinaryOperatorKind.LessThan &&
+                 value.UpperBound is > long.MinValue)
+        {
+            refined = domain.AssumeAtMost(refined, value.UpperBound.Value - 1);
+        }
+        else if (normalized == BinaryOperatorKind.LessThanOrEqual &&
+                 value.UpperBound.HasValue)
+        {
+            refined = domain.AssumeAtMost(refined, value.UpperBound.Value);
+        }
+        else if (normalized == BinaryOperatorKind.GreaterThan &&
+                 value.LowerBound is < long.MaxValue)
+        {
+            refined = domain.AssumeAtLeast(refined, value.LowerBound.Value + 1);
+        }
+        else if (normalized == BinaryOperatorKind.GreaterThanOrEqual &&
+                 value.LowerBound.HasValue)
+        {
+            refined = domain.AssumeAtLeast(refined, value.LowerBound.Value);
+        }
+
+        return refined.IsBottom
+            ? ManagedAbstractValue.Bottom
+            : ManagedAbstractValue.Integer(
+                refined,
+                current.ExcludesZero || !refined.Contains(0));
+    }
+
     private ManagedAbstractValue EvaluateCore(IOperation operation, ManagedFlowState state)
     {
         operation = Unwrap(operation);
@@ -411,16 +479,17 @@ internal sealed class ManagedAbstractFlow
 
     private ManagedAbstractValue EvaluateProperty(IPropertyReferenceOperation property, ManagedFlowState state)
     {
-        if (property.Instance != null && property.Property.Name is "Length" or "LongLength")
+        if (CompilerIdentityBridge.IsIntrinsicSequenceLength(property))
         {
-            var receiver = EvaluateCore(property.Instance, state);
+            var instance = property.Instance!;
+            var receiver = EvaluateCore(instance, state);
             if (receiver.TryGetCardinality(out var length))
             {
                 return ManagedAbstractValue.Integer(length);
             }
 
-            if (property.Instance.Type is IArrayTypeSymbol ||
-                property.Instance.Type?.SpecialType == SpecialType.System_String)
+            if (instance.Type is IArrayTypeSymbol ||
+                instance.Type?.SpecialType == SpecialType.System_String)
             {
                 return ManagedAbstractValue.Integer(IntervalValue.Range(
                     0, property.Type?.SpecialType == SpecialType.System_Int64 ? long.MaxValue : int.MaxValue));
@@ -431,11 +500,14 @@ internal sealed class ManagedAbstractFlow
 
     private ManagedAbstractValue ReturnValue(IMethodSymbol? method, ITypeSymbol? type)
     {
-        var value = method == null
-            ? ManagedAbstractValue.TopForType(type)
-            : ApplyAttributes(
+        var value = ManagedAbstractValue.TopForType(type);
+        if (method != null &&
+            _trustedBoundaries.AuthorizesDeclaredContracts(method))
+        {
+            value = ApplyAttributes(
                 ManagedAbstractValue.TopForType(type),
                 method.GetReturnTypeAttributes());
+        }
         if (method == null ||
             !_apiSpecs.TryGet(method, out var spec) ||
             !value.TryGetNullness(out var nullness))
@@ -966,7 +1038,37 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
 
     internal bool TryEvaluate(IOperation origin, IOperation value, out ManagedAbstractValue result)
     {
-        if (TryGetState(value, out var state) || TryGetState(origin, out state))
+        if (!HasMutation(value) &&
+            (TryGetState(value, out var state) ||
+             TryGetState(origin, out state)))
+        {
+            result = flow.Evaluate(value, state);
+            return true;
+        }
+
+        var unwrapped =
+            DefiniteOperationFacts.UnwrapHarmlessValue(value);
+        if (unwrapped is ISimpleAssignmentOperation assignment &&
+            !HasMutation(assignment.Value) &&
+            TryGetState(assignment.Value, out var valueState))
+        {
+            result = flow.Evaluate(
+                assignment.Value,
+                valueState);
+            return true;
+        }
+
+        result = ManagedAbstractValue.Unknown;
+        return false;
+    }
+
+    internal bool TryEvaluateAtOrigin(
+        IOperation origin,
+        IOperation value,
+        out ManagedAbstractValue result)
+    {
+        if (!HasMutation(value) &&
+            TryGetState(origin, out var state))
         {
             result = flow.Evaluate(value, state);
             return true;
@@ -1535,7 +1637,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 {
     private readonly HashSet<IMethodSymbol> _activeMethods = [];
     private readonly INamedTypeSymbol? _contractApi =
-        compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract");
+        ContractApiIdentityResolver.ForCompilation(compilation).Contract;
 
     internal bool CompletesNormally(IOperation? operation)
     {

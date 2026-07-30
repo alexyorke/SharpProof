@@ -123,6 +123,13 @@ configuration as `off`.
 Tree-local attempts to set this compilation-global option are also invalid
 unless they exactly match the global value.
 
+SharpProof also reports SP0025 and disables analysis when the reserved
+`SHARPPROOF_CONTRACTS` preprocessor symbol is active. That symbol changes ghost
+contract calls into runtime calls, so continuing analysis would make the
+verified body differ from the emitted program. Package builds reject an exact
+`DefineConstants` entry before compilation; compiler validation also covers
+source-local directives and generated trees.
+
 <a id="sp0027"></a>
 ## SP0027 - precondition violated
 
@@ -196,6 +203,11 @@ This includes selected abstract, interface, and `extern` declarations that have
 no operation body. Unannotated or explicitly suppressed unsupported methods
 remain silent.
 
+SP0047 also reports `ContractApiIdentityRejected` when a clause or annotation
+binds to a source/project lookalike, a mismatched `SharpProof.Attributes`
+assembly, or a malformed non-elided contract API. The rejected symbol supplies
+no proof fact.
+
 The verifier launcher also emits SP0047 when one or more selected callables
 have incomplete coverage or an `Unknown` claim. Its severity comes from
 `SharpProofVerifyPolicy`: `advisory` is information,
@@ -223,7 +235,7 @@ artifact lowering, serialization, or write failure. The diagnostic is an error
 because the required closed compiler evidence is missing. It is an
 infrastructure failure, never a contract or proof outcome.
 
-Compiler artifact schema version 5 includes the sealed selected-claim manifest,
+Compiler artifact schema version 8 includes the sealed selected-claim manifest,
 compiler diagnostics, source/generated-tree hashes and parse evidence, and,
 for each supported selected callable, bound contract/spec metadata plus
 portable whole-body lowered CFG/IR. It contains no source text. The worker

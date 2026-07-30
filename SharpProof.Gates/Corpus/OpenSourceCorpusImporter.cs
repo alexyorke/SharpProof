@@ -121,6 +121,7 @@ internal static class OpenSourceCorpusImporter
 
         var corpusDirectory =
             OpenSourceCorpusCatalog.GetCorpusDirectory(repositoryRoot);
+        var existingSupport = LoadExistingSupport(corpusDirectory);
         var licenseTargetPath = Path.GetFullPath(
             Path.Combine(corpusDirectory, LicenseRelativePath));
         EnsureContained(corpusDirectory, licenseTargetPath);
@@ -152,10 +153,15 @@ internal static class OpenSourceCorpusImporter
             .Select((candidate, index) =>
                 candidate.ToMethod(
                     $"OSS{index + 1:D4}",
-                    CorpusVerdict.SilentUnknown))
+                    CorpusVerdict.SilentUnknown,
+                    existingSupport.TryGetValue(
+                        candidate.DeclarationSha256,
+                        out var support)
+                        ? support
+                        : CorpusSupport.Unspecified))
             .ToImmutableArray();
         var provisionalDocument = new OpenSourceCorpusDocument(
-            1,
+            2,
             [source],
             files,
             provisionalMethods);
@@ -187,7 +193,38 @@ internal static class OpenSourceCorpusImporter
                 new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
                 cancellationToken)
             .ConfigureAwait(false);
+        var unreviewedMethods = methods
+            .Where(static method =>
+                method.Support == CorpusSupport.Unspecified)
+            .Select(static method => method.Id)
+            .ToArray();
+        if (unreviewedMethods.Length != 0)
+        {
+            throw new InvalidDataException(
+                "The imported corpus contains methods without a reviewed " +
+                "support classification. Set each generated support field " +
+                $"before updating the snapshot: {string.Join(", ", unreviewedMethods)}");
+        }
         _ = OpenSourceCorpusCatalog.Load(repositoryRoot);
+    }
+
+    private static ImmutableDictionary<string, CorpusSupport>
+        LoadExistingSupport(string corpusDirectory)
+    {
+        var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
+        if (!File.Exists(manifestPath))
+        {
+            return ImmutableDictionary<string, CorpusSupport>.Empty;
+        }
+
+        var existing = JsonSerializer.Deserialize<OpenSourceCorpusDocument>(
+            File.ReadAllText(manifestPath),
+            JsonOptions) ?? throw new InvalidDataException(
+            "The existing OSS corpus manifest is empty.");
+        return existing.Methods.ToImmutableDictionary(
+            static method => method.DeclarationSha256,
+            static method => method.Support,
+            StringComparer.Ordinal);
     }
 
     private static (
@@ -410,7 +447,8 @@ internal static class OpenSourceCorpusImporter
     {
         internal OpenSourceCorpusMethod ToMethod(
             string id,
-            CorpusVerdict verdict)
+            CorpusVerdict verdict,
+            CorpusSupport support)
         {
             return new(
                 id,
@@ -421,7 +459,8 @@ internal static class OpenSourceCorpusImporter
                 DeclarationSha256,
                 MethodName,
                 "effects",
-                verdict);
+                verdict,
+                support);
         }
     }
 }

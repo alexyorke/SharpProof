@@ -1,3 +1,4 @@
+// This lowerer runs only in the build-time compiler collector.
 namespace SharpProof.CompilerArtifact;
 
 internal sealed class CompilerCallableLowerer
@@ -62,15 +63,25 @@ internal sealed class CompilerCallableLowerer
                 clause.Kind == BoundContractKind.Assume ? userAssumptions[assumptionOrdinal++].Id : null))];
         ImmutableArray<CompilerCanonicalVariable> variables = [.. contracts.Variables.Select(
             variable => CreateVariable(variable, contracts))];
-        if (target.Claims.IsDefaultOrEmpty)
+        var requiresBodyAdmission =
+            !target.Claims.IsDefaultOrEmpty ||
+            !contracts.Clauses.IsDefaultOrEmpty;
+        if (!requiresBodyAdmission)
         {
             return Success(target, clauses, variables, body: null);
         }
 
         var preparedBody = PrepareBody(target, contracts, cancellationToken, out var failure);
-        return failure == WorkerClaimReason.None
-            ? Success(target, clauses, variables, preparedBody)
-            : Fail(target, failure, clauses, variables);
+        if (failure != WorkerClaimReason.None)
+        {
+            return Fail(target, failure, clauses, variables);
+        }
+
+        return Success(
+            target,
+            clauses,
+            variables,
+            target.Claims.IsDefaultOrEmpty ? null : preparedBody);
     }
 
     private CompilerPreparedBody? PrepareBody(ManifestCallableTarget target, BoundMethodContracts contracts,

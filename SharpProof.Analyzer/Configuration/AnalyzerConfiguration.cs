@@ -70,9 +70,9 @@ internal sealed class AnalyzerConfiguration
             return builder.ToImmutable();
         }
 
-        var legacyOption = AnalyzerConfigurationOptionRegistry.All[2];
-        var hasProfile = TryGet(options, AnalyzerConfigurationOptionRegistry.All[0], out var profile);
-        var hasFeatures = TryGet(options, AnalyzerConfigurationOptionRegistry.All[1], out var features);
+        var legacyOption = AnalyzerConfigurationOptionRegistry.LegacyMode;
+        var hasProfile = TryGet(options, AnalyzerConfigurationOptionRegistry.Profile, out var profile);
+        var hasFeatures = TryGet(options, AnalyzerConfigurationOptionRegistry.Features, out var features);
         if (TryGet(options, legacyOption, out var legacy) &&
             (hasProfile || hasFeatures) &&
             !IsLegacyEquivalent(

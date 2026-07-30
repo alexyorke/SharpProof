@@ -619,8 +619,7 @@ internal static class WorkerPerformanceProbe
         {
             var tree = CSharpSyntaxTree.ParseText(
                 source,
-                new CSharpParseOptions(LanguageVersion.CSharp12,
-                    preprocessorSymbols: [Contract.ConditionalSymbol]),
+                new CSharpParseOptions(LanguageVersion.CSharp12),
                 sourcePath);
             var compilation = CSharpCompilation.Create(
                 assemblyName,

@@ -10,13 +10,13 @@ namespace SharpProof.Worker.Protocol;
 
 public static class WorkerProtocolVersions
 {
-    public const string Current = "8";
+    public const string Current = "9";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 public static class WorkerCacheVersions
 {
-    public const int Current = 9;
+    public const int Current = 11;
 }
 
 public static class WorkerManifestVersions
@@ -235,7 +235,8 @@ public enum WorkerEffectEvidenceCertainty
     CompleteMayEffectSummary = 2,
     TrustedCompleteBoundary = 3,
     DefiniteViolation = 4,
-    Unavailable = 5
+    Unavailable = 5,
+    VacuousEntry = 6
 }
 
 [Flags]
@@ -494,6 +495,7 @@ internal static class WorkerProtocolMetadata
         WorkerEffectEvidenceCertainty.Unspecified, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary,
         WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary,
         WorkerEffectEvidenceCertainty.DefiniteViolation, WorkerEffectEvidenceCertainty.Unavailable,
+        WorkerEffectEvidenceCertainty.VacuousEntry,
         WorkerAssumptionKind.Unspecified, WorkerAssumptionKind.Precondition, WorkerAssumptionKind.UserAssume,
         WorkerAssumptionKind.TrustedBoundary, WorkerAssumptionKind.ApiSpecification, WorkerAssumptionKind.SourceDomain,
         WorkerAssumptionKind.NormalCompletion,
@@ -586,6 +588,7 @@ internal static class WorkerProtocolMetadata
         (outcome, reason, certainty) is
             (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary)
             or (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
+            or (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.VacuousEntry)
             or (WorkerClaimOutcome.Refuted, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.DefiniteViolation)
             or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)
             or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary)
@@ -594,7 +597,8 @@ internal static class WorkerProtocolMetadata
         (kind, outcome, vacuity) is
             (_, _, WorkerVacuityKind.None)
             or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Proven, WorkerVacuityKind.ContradictoryPreconditions)
-            or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Proven, WorkerVacuityKind.NoModeledNormalReturn);
+            or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Proven, WorkerVacuityKind.NoModeledNormalReturn)
+            or (WorkerClaimKind.Effect, WorkerClaimOutcome.Proven, WorkerVacuityKind.ContradictoryPreconditions);
     internal static bool MatchesRunFailure(WorkerRunStatus status, WorkerRunFailureReason reason) =>
         status switch
         {
@@ -674,6 +678,9 @@ internal static class WorkerProtocolMetadata
         new("response.proof_core", static value => WorkerProtocolJson.AreDistinctNonblank(value.ProofCore)),
         new("response.model", static value => WorkerProtocolJson.AreValidModel(value.Model)),
         new("response.assumptions", static value => WorkerProtocolJson.AreValidAssumptions(value.Assumptions)),
+        new("response.vacuity_evidence", static value =>
+            (!(value.Vacuity != WorkerVacuityKind.None)
+            || (value.ProofCore is { Length: > 0 }))),
         new("response.claim_payload", static value =>
             WorkerProtocolMetadata.MatchesClaimPayload(value.Outcome, value.ProofCore is { Length: > 0 }, value.Model is { Length: > 0 })),
     ];

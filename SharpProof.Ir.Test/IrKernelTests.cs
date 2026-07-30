@@ -267,6 +267,69 @@ public sealed class IrKernelTests
     }
 
     [Test]
+    public void FactoryRejectsInvalidPublicArgumentsAndOperators()
+    {
+        var factory = new IrFactory();
+        var referenceType = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(),
+            "Reference");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.Throws<ArgumentNullException>(
+                (Action)(() => factory.InternExternalIdentity<object>(
+                    null!,
+                    EqualityComparer<object>.Default)));
+            Assert.Throws<ArgumentNullException>(
+                (Action)(() => factory.InternExternalIdentity(
+                    new object(),
+                    (IEqualityComparer<object>)null!)));
+            Assert.Throws<ArgumentNullException>(
+                (Action)(() => factory.InternString(null!)));
+            Assert.Throws<ArgumentNullException>(
+                (Action)(() => factory.CreateStringValue(null!)));
+            Assert.Throws<ArgumentNullException>(
+                (Action)(() =>
+                    factory.CreateReferenceValue(referenceType, null!)));
+            Assert.Throws<ArgumentException>(
+                (Action)(() =>
+                    factory.CreateReferenceValue(
+                        factory.IntegerType,
+                        new object())));
+            Assert.Throws<ArgumentNullException>(
+                (Action)(() => factory.CreateSequenceValue(
+                    factory.GetOrCreateSequenceType(factory.IntegerType),
+                    null!)));
+            Assert.Throws<ArgumentException>(
+                (Action)(() =>
+                    factory.CreateSequenceValue(factory.IntegerType, [])));
+            Assert.Throws<ArgumentOutOfRangeException>(
+                (Action)(() => factory.Unary(
+                    (IrUnaryOperator)int.MaxValue,
+                    factory.Boolean(true))));
+            Assert.Throws<ArgumentOutOfRangeException>(
+                (Action)(() => factory.Binary(
+                    (IrBinaryOperator)int.MaxValue,
+                    factory.Integer(1),
+                    factory.Integer(2))));
+            Assert.Throws<ArgumentNullException>(
+                (Action)(() => factory.Unary(
+                    IrUnaryOperator.Not,
+                    null!)));
+            Assert.Throws<ArgumentNullException>(
+                (Action)(() => factory.Binary(
+                    IrBinaryOperator.Add,
+                    null!,
+                    factory.Integer(1))));
+            Assert.Throws<ArgumentNullException>(
+                (Action)(() => factory.Binary(
+                    IrBinaryOperator.Add,
+                    factory.Integer(1),
+                    null!)));
+        }
+    }
+
+    [Test]
     public void InstanceMembersRejectMismatchedReceiverTypesEverywhere()
     {
         var factory = new IrFactory();

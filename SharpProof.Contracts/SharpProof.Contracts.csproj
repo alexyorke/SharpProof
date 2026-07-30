@@ -16,7 +16,6 @@
     <ProjectReference Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\SharpProof.Specs\SharpProof.Specs.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.CompilerArtifact" />

@@ -39,6 +39,36 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task UnannotatedCallerStillChecksExternalClosedPreconditions()
+    {
+        var external = AnalyzerTestHost.EmitReference(
+            """
+            using SharpProof.Attributes;
+
+            public static class ExternalFixture {
+                public static void Positive([Positive] int value) {
+                }
+            }
+            """,
+            "ExternalClosedPrecondition");
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            public static class Fixture {
+                public static void Call() {
+                    ExternalFixture.Positive(-1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"],
+            additionalReferences: [external]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
     public async Task UnsupportedEffectsSyntaxDoesNotHideConcretePreconditionViolation()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
@@ -233,6 +263,42 @@ public sealed class RequiresAndControlTests
                 Does.StartWith(
                     "Call to 'FirstMustBeOne' violates precondition "));
         }
+    }
+
+    [Test]
+    public async Task AssignmentArgumentUsesItsRightHandEvaluationPoint()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void RequireTwo(int value) {
+                    Contract.Requires(value == 2);
+                }
+
+                private static void RequireOne(int value) {
+                    Contract.Requires(value == 1);
+                }
+
+                public static void Call() {
+                    var value = 1;
+                    RequireTwo(value = value + 1);
+                    value = 1;
+                    RequireOne(value = value + 1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+        Assert.That(
+            diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+            Does.StartWith(
+                "Call to 'RequireOne' violates precondition "));
     }
 
     [Test]
@@ -728,6 +794,129 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task ReducedExtensionCallsMapReceiverAndNamedArguments()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public static class Extensions {
+                public static void Positive(
+                    this string receiver,
+                    int ignored,
+                    int value) {
+                    Contract.Requires(receiver != null);
+                    Contract.Requires(value > 0);
+                }
+            }
+
+            public static class Fixture {
+                public static void Valid() {
+                    "value".Positive(0, 1);
+                }
+
+                public static void InvalidValue() {
+                    "value".Positive(value: -1, ignored: 0);
+                }
+
+                public static void InvalidReceiver() {
+                    ((string)null!).Positive(0, 1);
+                }
+
+                public static void ThrowingReceiverPrefix() {
+                    ((string)null!).ToString().Positive(0, -1);
+                }
+
+                public static void ThrowingArgumentPrefix() {
+                    "value".Positive(((string)null!).Length, -1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027", "SP0027"]));
+        Assert.That(
+            diagnostics.Select(diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Has.All.Contain("Positive"));
+    }
+
+    [Test]
+    public async Task ReducedExtensionCallsUseBranchRefinedReceiverAndArguments()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public static class Extensions {
+                public static void Positive(
+                    this string receiver,
+                    int value) {
+                    Contract.Requires(receiver != null);
+                    Contract.Requires(value > 0);
+                }
+            }
+
+            public static class Fixture {
+                public static void InvalidValue(bool condition) {
+                    int value;
+                    if (condition) {
+                        value = -2;
+                    }
+                    else {
+                        value = -1;
+                    }
+                    "value".Positive(value);
+                }
+
+                public static void ValidValue(bool condition) {
+                    int value;
+                    if (condition) {
+                        value = 1;
+                    }
+                    else {
+                        value = 2;
+                    }
+                    "value".Positive(value);
+                }
+
+                public static void InvalidReceiver(bool condition) {
+                    string? value;
+                    if (condition) {
+                        value = null;
+                    }
+                    else {
+                        value = null;
+                    }
+                    value!.Positive(1);
+                }
+
+                public static void UnknownReceiver(bool condition) {
+                    string? value;
+                    if (condition) {
+                        value = null;
+                    }
+                    else {
+                        value = "value";
+                    }
+                    value!.Positive(1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027", "SP0027"]));
+    }
+
+    [Test]
     public async Task DirectClauseSourceDoesNotMixInCompanionPreconditions()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
@@ -844,6 +1033,70 @@ public sealed class RequiresAndControlTests
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(Enumerable.Repeat("SP0024", 4)));
+    }
+
+    [Test]
+    public async Task ClosedContractValidationPrecedesCallableAbstention()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static void PositiveOut(
+                    [Positive] out int value) {
+                    value = 1;
+                }
+
+                public static void NotNullOut(
+                    [NotNull] out string value) {
+                    value = "";
+                }
+
+                public static void Unconstrained<T>(
+                    [NotNull] T value) {
+                }
+
+                public static void ReferenceConstrained<T>(
+                    [NotNull] T value)
+                    where T : class {
+                }
+            }
+            """,
+            "contracts",
+            ["SP0024", "SP0047"]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Count(static diagnostic =>
+                    diagnostic.Id == "SP0024"),
+                Is.EqualTo(3));
+            Assert.That(
+                diagnostics.Count(static diagnostic =>
+                    diagnostic.Id == "SP0047"),
+                Is.EqualTo(4));
+        }
+        var malformed = diagnostics
+            .Where(static diagnostic => diagnostic.Id == "SP0024")
+            .Select(diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture))
+            .ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                malformed.Count(static message =>
+                    message.Contains(
+                        "out parameters have no entry value",
+                        StringComparison.Ordinal)),
+                Is.EqualTo(2));
+            Assert.That(
+                malformed.Count(static message =>
+                    message.Contains(
+                        "definitely reference-capable",
+                        StringComparison.Ordinal)),
+                Is.EqualTo(1));
+        }
     }
 
     [Test]
@@ -1060,6 +1313,91 @@ public sealed class RequiresAndControlTests
             diagnostics.Select(diagnostic =>
                 diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Has.Some.Contain("Contract.Assume"));
+    }
+
+    [Test]
+    public async Task NestedOnlyContractsDoNotSelectTheirContainingMethod()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System.Threading.Tasks;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static async Task Outer() {
+                    void Local() {
+                        Contract.Requires(true);
+                    }
+                    Local();
+                    await Task.Yield();
+                }
+            }
+            """,
+            "contracts",
+            ["SP0047"]);
+
+        Assert.That(
+            diagnostics.Select(diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Has.None.Contain("'Outer'"));
+    }
+
+    [Test]
+    public async Task CompanionSelectionMakesUnsupportedTargetsVisibleAndFailsClosed()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class ValidSubject {
+                public int SelectedByCompanion() {
+                    Func<int> value = () => 1;
+                    return value();
+                }
+            }
+
+            [ContractFor(typeof(ValidSubject))]
+            public static class ValidSubjectContracts {
+                public static int SelectedByCompanion(
+                    ValidSubject receiver) {
+                    Contract.Ensures(true);
+                    return 1;
+                }
+            }
+
+            public sealed class MalformedSubject {
+                public int SelectedByMalformedCompanion() {
+                    Func<int> value = () => 1;
+                    return value();
+                }
+            }
+
+            [ContractFor(typeof(MalformedSubject))]
+            public static class MalformedSubjectContracts {
+                public static int SelectedByMalformedCompanion(
+                    MalformedSubject receiver,
+                    int unexpected) {
+                    Contract.Ensures(true);
+                    return unexpected;
+                }
+            }
+            """,
+            "contracts",
+            ["SP0047"]);
+
+        var messages = diagnostics.Select(diagnostic =>
+            diagnostic.GetMessage(CultureInfo.InvariantCulture)).ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(messages, Has.Length.EqualTo(2));
+            Assert.That(
+                messages,
+                Has.Some.Contain("'SelectedByCompanion'"));
+            Assert.That(
+                messages,
+                Has.Some.Contain("'SelectedByMalformedCompanion'"));
+        }
     }
 
     [Test]

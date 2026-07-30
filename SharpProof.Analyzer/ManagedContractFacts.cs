@@ -33,6 +33,41 @@ internal static class ManagedContractFacts
     internal static ManagedAbstractValue Evaluate(
         IrTerm term, IReadOnlyDictionary<IrVarId, ManagedAbstractValue> variables)
     {
+        return Evaluate(term, variables, []);
+    }
+
+    internal static bool ContainsPotentiallyFailingCast(IrTerm term)
+    {
+        var pending = new Stack<IrTerm>();
+        var visited = new HashSet<IrId>();
+        pending.Push(term);
+        while (pending.Count != 0)
+        {
+            var current = pending.Pop();
+            if (!visited.Add(current.Id))
+            {
+                continue;
+            }
+
+            if (current is IrCastTerm)
+            {
+                return true;
+            }
+
+            foreach (var child in IrTraversal.GetChildren(current))
+            {
+                pending.Push(child);
+            }
+        }
+
+        return false;
+    }
+
+    internal static ManagedAbstractValue Evaluate(
+        IrTerm term,
+        IReadOnlyDictionary<IrVarId, ManagedAbstractValue> variables,
+        IReadOnlyCollection<IrVarId> definitelyStrings)
+    {
         return term switch
         {
             IrBooleanTerm boolean => ManagedAbstractValue.Boolean(boolean.Value),
@@ -43,19 +78,52 @@ internal static class ManagedContractFacts
                 ? value
                 : ManagedAbstractValue.Unknown,
             IrUnaryTerm { Operator: IrUnaryOperator.Not } unary =>
-                ManagedAbstractValue.NegateBoolean(Evaluate(unary.Operand, variables)),
+                ManagedAbstractValue.NegateBoolean(
+                    Evaluate(unary.Operand, variables, definitelyStrings)),
             IrBinaryTerm binary => ManagedAbstractValue.Binary(
                 Map(binary.Operator),
-                Evaluate(binary.Left, variables),
-                Evaluate(binary.Right, variables)),
-            IrConditionalTerm conditional => Evaluate(conditional.Condition, variables).TryGetBoolean(out var condition)
-                ? Evaluate(condition ? conditional.WhenTrue : conditional.WhenFalse, variables)
+                Evaluate(binary.Left, variables, definitelyStrings),
+                Evaluate(binary.Right, variables, definitelyStrings)),
+            IrConditionalTerm conditional => Evaluate(
+                    conditional.Condition,
+                    variables,
+                    definitelyStrings).TryGetBoolean(out var condition)
+                ? Evaluate(
+                    condition ? conditional.WhenTrue : conditional.WhenFalse,
+                    variables,
+                    definitelyStrings)
                 : ManagedAbstractValue.Join(
-                    Evaluate(conditional.WhenTrue, variables),
-                    Evaluate(conditional.WhenFalse, variables)),
-            IrCastTerm cast => Evaluate(cast.Operand, variables),
+                    Evaluate(
+                        conditional.WhenTrue,
+                        variables,
+                        definitelyStrings),
+                    Evaluate(
+                        conditional.WhenFalse,
+                        variables,
+                        definitelyStrings)),
+            IrCastTerm cast => EvaluateCast(
+                cast,
+                variables,
+                definitelyStrings),
             _ => ManagedAbstractValue.Unknown
         };
+    }
+
+    private static ManagedAbstractValue EvaluateCast(
+        IrCastTerm cast,
+        IReadOnlyDictionary<IrVarId, ManagedAbstractValue> variables,
+        IReadOnlyCollection<IrVarId> definitelyStrings)
+    {
+        var operand = Evaluate(cast.Operand, variables, definitelyStrings);
+        if (operand.IsDefinitelyNull ||
+            cast.Operand is IrVariableTerm variable &&
+            definitelyStrings.Contains(variable.Variable) ||
+            cast.Operand is IrStringTerm)
+        {
+            return operand;
+        }
+
+        return ManagedAbstractValue.Unknown;
     }
 
     private static ManagedFlowState Assume(

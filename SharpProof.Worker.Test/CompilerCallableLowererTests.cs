@@ -5,6 +5,7 @@ using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
+using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
@@ -170,6 +171,168 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
+    public async Task RequiresOnlySupportedBodyIsAdmittedAndComplete()
+    {
+        var preparation = Prepare(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Identity(int value) {
+                    Contract.Requires(value >= 0);
+                    return value;
+                }
+            }
+            """,
+            "Identity");
+
+        var verification = await VerifyCoverageAsync(preparation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(preparation.IsSuccess, Is.True);
+            Assert.That(preparation.FailureReason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(preparation.Entry.ClaimIds, Is.Empty);
+            Assert.That(preparation.Body, Is.Null);
+            Assert.That(
+                verification.Callable.Coverage,
+                Is.EqualTo(WorkerCallableCoverage.Complete));
+            Assert.That(
+                verification.Callable.Reason,
+                Is.EqualTo(WorkerCallableCoverageReason.None));
+            Assert.That(verification.Claims, Is.Empty);
+        }
+    }
+
+    [TestCase(
+        "while (value > 0) { value--; }\nreturn value;",
+        TestName = "RequiresOnlyLoopIsTypedIncomplete")]
+    [TestCase(
+        "return UnsupportedCall(value);",
+        TestName = "RequiresOnlyUnsupportedCallIsTypedIncomplete")]
+    [TestCase(
+        "return new[] { value }[0];",
+        TestName = "RequiresOnlyHeapAccessIsTypedIncomplete")]
+    public async Task RequiresOnlyUnsupportedBodyIsTypedIncomplete(
+        string body)
+    {
+        var preparation = Prepare(
+            $$"""
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Verify(int value) {
+                    Contract.Requires(value >= 0);
+                    {{body}}
+                }
+
+                private static int UnsupportedCall(int value) => value;
+            }
+            """,
+            "Verify");
+
+        var verification = await VerifyCoverageAsync(preparation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(preparation.IsSuccess, Is.False);
+            Assert.That(
+                preparation.FailureReason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(preparation.Entry.ClaimIds, Is.Empty);
+            Assert.That(
+                verification.Callable.Coverage,
+                Is.EqualTo(WorkerCallableCoverage.Incomplete));
+            Assert.That(
+                verification.Callable.Reason,
+                Is.EqualTo(WorkerCallableCoverageReason.SemanticUnknown));
+            Assert.That(verification.Claims, Is.Empty);
+        }
+    }
+
+    [Test]
+    public async Task MixedEffectAndRequiresUnsupportedBodyIsTypedIncomplete()
+    {
+        var preparation = Prepare(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [DoesNotThrow]
+                internal static void Verify(int value) {
+                    Contract.Requires(value >= 0);
+                    while (value > 0) {
+                        value--;
+                    }
+                }
+            }
+            """,
+            "Verify");
+
+        var verification = await VerifyCoverageAsync(preparation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(preparation.IsSuccess, Is.False);
+            Assert.That(
+                preparation.FailureReason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(preparation.Entry.ClaimIds, Has.Length.EqualTo(1));
+            Assert.That(
+                verification.Callable.Coverage,
+                Is.EqualTo(WorkerCallableCoverage.Incomplete));
+            Assert.That(
+                verification.Callable.Reason,
+                Is.EqualTo(WorkerCallableCoverageReason.SemanticUnknown));
+            Assert.That(verification.Claims, Has.Length.EqualTo(1));
+            Assert.That(
+                verification.Claims[0].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                verification.Claims[0].Reason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        }
+    }
+
+    [Test]
+    public async Task EffectOnlyUnsupportedSymbolicBodyDoesNotTriggerAdmission()
+    {
+        var preparation = Prepare(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [DoesNotThrow]
+                internal static void Verify(int value) {
+                    while (value > 0) {
+                        value--;
+                    }
+                }
+            }
+            """,
+            "Verify");
+
+        var verification = await VerifyCoverageAsync(preparation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(preparation.IsSuccess, Is.True);
+            Assert.That(preparation.FailureReason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(preparation.Entry.ClaimIds, Has.Length.EqualTo(1));
+            Assert.That(preparation.Body, Is.Null);
+            Assert.That(
+                verification.Callable.Coverage,
+                Is.EqualTo(WorkerCallableCoverage.Complete));
+            Assert.That(
+                verification.Callable.Reason,
+                Is.EqualTo(WorkerCallableCoverageReason.None));
+            Assert.That(verification.Claims, Has.Length.EqualTo(1));
+            Assert.That(
+                verification.Claims[0].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                verification.Claims[0].Reason,
+                Is.EqualTo(WorkerClaimReason.None));
+        }
+    }
+
+    [Test]
     public void ManifestClaimAndAssumptionDriftFailsClosed()
     {
         var (compilation, target, factory) = CreateTarget(
@@ -230,7 +393,29 @@ public sealed class CompilerCallableLowererTests
         string methodName)
     {
         var (compilation, target, factory) = CreateTarget(source, methodName);
-        return new CompilerCallableLowerer(compilation, factory).Prepare(target);
+        return new CompilerCallableLowerer(compilation, factory).Prepare(target) with
+        {
+            EffectClaims = [.. target.EffectClaims.Select(static claim => claim.Evidence)]
+        };
+    }
+
+    private static async Task<CallableVerificationResult> VerifyCoverageAsync(
+        CompilerCallablePreparation preparation)
+    {
+        var backend = new UnexpectedBackend();
+        using var projectBoundary = new CancellationTokenSource();
+        var verification = await CallableVerificationPolicy.VerifyTargetAsync(
+            new CallableVerifier(
+                backend,
+                WorkerBudgets.DefaultMaximumExpressionDepth),
+            preparation,
+            new WorkerBudgets(),
+            null,
+            WorkerBudgets.DefaultMethodWallTimeMilliseconds,
+            projectBoundary,
+            CancellationToken.None);
+        Assert.That(backend.CallCount, Is.Zero);
+        return verification;
     }
 
     private static (
@@ -272,5 +457,21 @@ public sealed class CompilerCallableLowererTests
             string.Join(Environment.NewLine, errors.Select(static error =>
                 error.ToString())));
         return compilation;
+    }
+
+    private sealed class UnexpectedBackend : ISmtBackend
+    {
+        private int _callCount;
+
+        internal int CallCount => Volatile.Read(ref _callCount);
+
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _callCount);
+            throw new AssertionException(
+                "A zero-claim callable reached the SMT backend.");
+        }
     }
 }

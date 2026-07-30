@@ -12,7 +12,18 @@ contributes build tooling and a Windows x64 worker, not an application API.
 contiguous prologue clauses. They are compiler-elided unless
 `SHARPPROOF_CONTRACTS` is defined. `Contract.Result<T>()` and
 `Contract.Old<T>(T)` are expressions for use inside postconditions; executing
-either placeholder directly throws.
+either placeholder directly throws. SharpProof analysis rejects the reserved
+conditional symbol so a proof cannot silently assume compiler-elided ghost
+expressions that execute in the emitted program.
+
+Analyzer-side binding requires the referenced API assembly version and public
+key to match the analyzer payload. The `Contract` type must have the exact
+supported signatures, and each clause method must carry exactly one real
+`Conditional("SHARPPROOF_CONTRACTS")` attribute. Source/project shadows,
+mismatched assemblies, and malformed lookalikes are not compatibility
+substitutes: they contribute no evidence, including compiler-bound ghost API
+specifications, and produce SP0047. A rejected `ContractForAttribute`
+lookalike produces SPCF0001.
 
 `ContractForAttribute` associates a static companion class with a target
 interface or class. The generator validates the association and member
@@ -44,9 +55,11 @@ The supported effect attributes are:
 - `EffectContractAttribute`
 
 `SharpProofEffect` and `SharpProofCapability` are closed flag enums. Unknown
-bits are invalid contract data. A complete `EffectContractAttribute` can
-describe a reviewed external boundary; `SharpProofTrustedAttribute` alone does
-not supply an effect fact. The attribute defaults are conservative:
+bits are invalid contract data, and each declared effect flag is independent:
+for example, `Throws` does not imply `Allocates`. A complete
+`EffectContractAttribute` can describe a reviewed external boundary;
+`SharpProofTrustedAttribute` alone does not supply an effect fact. The
+attribute defaults are conservative:
 `Capabilities=None`, `ThrownExceptions=[]`, `IsDeterministic=false`, and
 `Complete=false`. Every stronger boundary fact must be written explicitly.
 

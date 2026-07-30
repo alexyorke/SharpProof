@@ -23,7 +23,7 @@ public sealed class ProtocolJsonTests
     ];
 
     [Test]
-    public void VersionEightRequestCarriesOnlyArtifactAndRuntimeControls()
+    public void VersionNineRequestCarriesOnlyArtifactAndRuntimeControls()
     {
         var request = CreateRequest();
         var json = WorkerProtocolJson.SerializeRequest(request);
@@ -32,8 +32,8 @@ public sealed class ProtocolJsonTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("8"));
-            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(9));
+            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("9"));
+            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(11));
             Assert.That(WorkerManifestVersions.Current, Is.EqualTo(4));
             Assert.That(
                 document.RootElement.EnumerateObject()
@@ -116,8 +116,8 @@ public sealed class ProtocolJsonTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(roundTrip.SchemaVersion, Is.EqualTo(5));
-            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("8"));
+            Assert.That(roundTrip.SchemaVersion, Is.EqualTo(8));
+            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("9"));
             Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(manifest.Hash));
             Assert.That(roundTrip.Manifest.Callables[0].Assumptions, Has.Length.EqualTo(2));
             Assert.That(
@@ -377,19 +377,61 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
-    public void VacuityEvidenceIsLimitedToProvenPostconditions()
+    public void VacuityEvidenceIsClosedAndRequiresProofCore()
     {
         var response = CreateResponse(CreateManifest());
         response.ClaimResults[0].Vacuity =
             WorkerVacuityKind.ContradictoryPreconditions;
+        response.ClaimResults[0].ProofCore = ["requires:0"];
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
 
         SetUnknown(response, WorkerClaimReason.UnsupportedBody);
+        response.ClaimResults[0].ProofCore = [];
         response.CallableResults[0].Coverage =
             WorkerCallableCoverage.Incomplete;
         response.CallableResults[0].Reason =
             WorkerCallableCoverageReason.SemanticUnknown;
         response.Summary = CreateSummary(response);
+        Assert.That(
+            WorkerProtocolJson.Validate(response).Errors
+                .Select(static error => error.Code),
+            Does.Contain("response.vacuity"));
+
+        var effectManifest = CreateManifest();
+        effectManifest.Callables[0].SelectedFeatures = [
+            WorkerSelectedFeature.Effects
+        ];
+        effectManifest.Callables[0].SelectionReasons = [
+            WorkerSelectionReason.ExplicitAnnotation
+        ];
+        effectManifest.Claims[0].Kind =
+            WorkerClaimKind.Effect;
+        effectManifest.Claims[0].Evidence =
+            WorkerClaimEvidence.Attribute;
+        effectManifest.Claims[0].EffectContractKind =
+            WorkerEffectContractKind.DoesNotThrow;
+        WorkerProtocolJson.SealManifest(effectManifest);
+        response = CreateResponse(effectManifest);
+        response.ClaimResults[0].EffectCertainty =
+            WorkerEffectEvidenceCertainty.VacuousEntry;
+        response.ClaimResults[0].Vacuity =
+            WorkerVacuityKind.ContradictoryPreconditions;
+        response.ClaimResults[0].ProofCore = ["requires:0"];
+        Assert.That(
+            WorkerProtocolJson.Validate(response).IsValid,
+            Is.True);
+
+        response.ClaimResults[0].ProofCore = [];
+        Assert.That(
+            WorkerProtocolJson.Validate(response).Errors
+                .Select(static error => error.Code),
+            Does.Contain("response.vacuity_evidence"));
+
+        response.ClaimResults[0].ProofCore = [
+            "body:normal-completion"
+        ];
+        response.ClaimResults[0].Vacuity =
+            WorkerVacuityKind.NoModeledNormalReturn;
         Assert.That(
             WorkerProtocolJson.Validate(response).Errors
                 .Select(static error => error.Code),
@@ -698,8 +740,7 @@ public sealed class ProtocolJsonTests
             }
             """,
             new CSharpParseOptions(
-                LanguageVersion.CSharp12,
-                preprocessorSymbols: [Contract.ConditionalSymbol]),
+                LanguageVersion.CSharp12),
             path);
         var trusted = ((string)AppContext.GetData(
                 "TRUSTED_PLATFORM_ASSEMBLIES")!)

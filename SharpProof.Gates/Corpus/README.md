@@ -14,12 +14,13 @@ toward the 200-method release floor.
 
 `oss-methods.json` contains the exact upstream text of every C# file needed to
 compile those two projects together. Each file has a SHA-256 hash. Each selected
-method records its upstream path, one-based line range, name, and a SHA-256 hash
-of the declaration. The importer selects 200 distinct declarations round-robin
-across source files; the checked-in selection currently spans 87 files. The
-gate requires 200-500 methods, at least 25 source files, unique source
-locations, unique declaration hashes, a full Git commit, and a matching
-checked-in license hash.
+method records its upstream path, one-based line range, name, a SHA-256 hash of
+the declaration, expected verdict, and explicit reviewed support
+classification. Support is not derived from the expected verdict. The importer
+selects 200 distinct declarations round-robin across source files; the
+checked-in selection currently spans 87 files. The gate requires 200-500
+methods, at least 25 source files, unique source locations, unique declaration
+hashes, a full Git commit, and a matching checked-in license hash.
 
 The source bundle is intentionally plain JSON rather than a binary archive so
 reviewers can inspect and diff the vendored code. It is under 1 MiB. The
@@ -40,7 +41,10 @@ with `[EnforcePure]`, unsupported methods can now carry SP0047 while remaining
 explicit `Abstained` semantic entries; they are never omitted or counted as
 proofs. The separate silent-Unknown metric still covers unannotated/internal
 cases. Gate output reports explicit Unknown, silent Unknown, and their combined
-semantic Unknown count and rate. These are visibility metrics, not thresholds.
+semantic Unknown count and rate. The checked-in ratchet requires at least 171
+supported cases overall and one supported OSS method, while capping total and
+per-reason Unknown counts. These starting floors expose the current narrow OSS
+coverage and can only move upward as support expands.
 
 Corpus compilation uses the current advisory profile with effect features.
 Strict worker claim-accountability is covered by worker/package integration
@@ -63,6 +67,9 @@ git -C C:\work\C-Sharp-Algorithms checkout `
 The command regenerates the source/provenance manifest, copied license, reviewed
 semantic expectations, and canonical analyzer snapshot using LF without a BOM.
 Updating to another upstream commit is deliberate: check out that commit, run
-the same importer, review the manifest/snapshot diff, and update this document's
-pin. A normal `corpus-update` without the importer updates only observations; it
-does not silently replace the upstream source lock.
+the same importer, review the manifest/snapshot diff, explicitly classify every
+new declaration whose support is `Unspecified`, and update this document's pin.
+The importer preserves support by declaration hash and refuses to complete
+while any new method remains unclassified. A normal `corpus-update` without the
+importer updates only observations; it does not silently replace the upstream
+source lock.

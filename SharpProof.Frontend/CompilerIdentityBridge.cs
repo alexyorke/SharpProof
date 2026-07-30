@@ -61,6 +61,53 @@ public static class CompilerIdentityBridge
             OperationReferenceComparer.Instance);
     }
 
+    internal static bool IsIntrinsicSequenceLength(
+        IPropertyReferenceOperation property)
+    {
+        if (property.Instance == null ||
+            !property.Arguments.IsDefaultOrEmpty)
+        {
+            return false;
+        }
+
+        var definition = property.Property.OriginalDefinition;
+        if (definition is
+            {
+                IsStatic: false,
+                IsIndexer: false,
+                GetMethod: not null,
+                SetMethod: null,
+                Parameters.IsEmpty: true
+            } &&
+            property.Instance.Type?.SpecialType ==
+                SpecialType.System_String)
+        {
+            return definition.ContainingType.SpecialType ==
+                    SpecialType.System_String &&
+                definition.MetadataName == "Length" &&
+                definition.Type.SpecialType == SpecialType.System_Int32;
+        }
+
+        if (property.Instance.Type is not IArrayTypeSymbol)
+        {
+            return false;
+        }
+
+        return definition is
+        {
+            IsStatic: false,
+            IsIndexer: false,
+            GetMethod: not null,
+            SetMethod: null,
+            Parameters.IsEmpty: true,
+            ContainingType.SpecialType: SpecialType.System_Array
+        } &&
+            (definition.MetadataName == "Length" &&
+             definition.Type.SpecialType == SpecialType.System_Int32 ||
+             definition.MetadataName == "LongLength" &&
+             definition.Type.SpecialType == SpecialType.System_Int64);
+    }
+
     private static readonly IEqualityComparer<OperationSemanticIdentity>
         OperationSemanticIdentityComparer =
             EqualityComparer<OperationSemanticIdentity>.Default;

@@ -8,6 +8,7 @@ internal static class PostconditionObligationBuilder
         IrFactory factory, ImmutableArray<CompilerCanonicalVariable> variables, ImmutableArray<SymbolicReturn> returns,
         ImmutableDictionary<IrVarId, SpecResultProjection> projections,
         ImmutableArray<Assumption>.Builder assumptions,
+        ImmutableArray<Assumption>.Builder entryDomainAssumptions,
         Dictionary<ProofJustification, string> assumptionLabels)
     {
         var seenPredicates = assumptions.Select(static assumption => assumption.Predicate.Id).ToHashSet();
@@ -57,7 +58,14 @@ internal static class PostconditionObligationBuilder
             var label = Domain(variable).Label;
             ProofJustification justification =
                 new LoweredJustification(factory.CreateOperation("source-" + label));
-            assumptions.Add(new Assumption(factory, predicate, justification));
+            var assumption = new Assumption(factory, predicate, justification);
+            assumptions.Add(assumption);
+            if (variable.Role is
+                CompilerVariableRole.Receiver or
+                CompilerVariableRole.Parameter)
+            {
+                entryDomainAssumptions.Add(assumption);
+            }
             assumptionLabels.Add(justification, label);
         }
     }
@@ -70,17 +78,10 @@ internal static class PostconditionObligationBuilder
         var completions = ImmutableArray.CreateBuilder<IrTerm>(returns.Length);
         foreach (var path in returns)
         {
-            var completion = path.ReturnTerm is
-                null or
-                IrBooleanTerm or
-                IrIntegerTerm or
-                IrStringTerm or
-                IrNullTerm or
-                IrVariableTerm
-                ? path.Predicate
-                : factory.Binary(
-                    IrBinaryOperator.AndAlso, path.Predicate,
-                    factory.Binary(IrBinaryOperator.Equal, path.ReturnTerm, path.ReturnTerm));
+            var completion = ConstrainSuccessfulEvaluation(
+                factory,
+                path.Predicate,
+                path.ReturnTerm);
             completions.Add(SpecResultDomainProjection.Rewrite(factory, completion, projections));
         }
         var predicate = Disjoin(factory, completions);

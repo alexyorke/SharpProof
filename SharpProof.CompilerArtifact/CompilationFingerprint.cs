@@ -4,6 +4,9 @@ namespace SharpProof.CompilerArtifact;
 
 internal static class CompilationFingerprint
 {
+    private const string RuntimeContractEvaluationSymbol =
+        "SHARPPROOF_CONTRACTS";
+
     internal static string ComputeSha256(CompilerCompilationSnapshot snapshot)
     {
         if (snapshot == null)
@@ -14,7 +17,7 @@ internal static class CompilationFingerprint
         using var hash = new CanonicalHashWriter();
         hash.Add(
             "SharpProof.CompilerCompilationSnapshot",
-            4,
+            5,
             JsonSerializer.Serialize(snapshot, WorkerProtocolJson.Options));
         return hash.Finish();
     }
@@ -47,28 +50,15 @@ internal static class CompilationFingerprint
     private static bool ValidOptions(CompilerCompilationOptionsSnapshot? value)
     {
         return value != null &&
-        value.OutputKind is
-            "ConsoleApplication" or
-            "WindowsApplication" or
-            "DynamicallyLinkedLibrary" or
-            "NetModule" or
-            "WindowsRuntimeMetadata" or
-            "WindowsRuntimeApplication" &&
-        value.OptimizationLevel is "Debug" or "Release" &&
-        value.Platform is
-            "AnyCpu" or
-            "AnyCpu32BitPreferred" or
-            "Arm" or
-            "Arm64" or
-            "Itanium" or
-            "X64" or
-            "X86" &&
-        value.NullableContext is "Disable" or "Warnings" or "Annotations" or "Enable" &&
-        value.MetadataImportOptions is "Public" or "Internal" or "All" &&
+        Enum.IsDefined(typeof(CompilerOutputKind), value.OutputKind) &&
+        Enum.IsDefined(typeof(CompilerOptimizationLevel), value.OptimizationLevel) &&
+        Enum.IsDefined(typeof(CompilerPlatform), value.Platform) &&
+        Enum.IsDefined(typeof(CompilerNullableContext), value.NullableContext) &&
+        Enum.IsDefined(typeof(CompilerMetadataImportOptions), value.MetadataImportOptions) &&
         !value.ReferencesSupersedeLowerVersions &&
-        value.AssemblyIdentityComparer is "Default" or "Desktop" &&
+        Enum.IsDefined(typeof(CompilerAssemblyIdentityComparer), value.AssemblyIdentityComparer) &&
         All(value.Usings, HasText) &&
-        value.ResolverPolicy == "EvidenceOnly";
+        value.ResolverPolicy == CompilerResolverPolicy.EvidenceOnly;
     }
 
     private static bool ValidTree(CompilerSyntaxTreeSnapshot? value)
@@ -79,6 +69,10 @@ internal static class CompilationFingerprint
         value.DocumentationMode is "None" or "Parse" or "Diagnose" &&
         value.Kind is "Regular" or "Script" &&
         All(value.PreprocessorSymbols, HasText) &&
+        All(value.EffectivePreprocessorSymbols, HasText) &&
+        !value.EffectivePreprocessorSymbols.Contains(
+            RuntimeContractEvaluationSymbol,
+            StringComparer.Ordinal) &&
         All(value.Features, ValidFeature);
     }
 

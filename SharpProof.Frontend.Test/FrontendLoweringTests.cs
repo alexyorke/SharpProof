@@ -88,6 +88,34 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void LookalikeAndHiddenLengthMembersAreNeverIntrinsic()
+    {
+        AssertClassification(
+            """
+            public sealed class Lookalike {
+                public long LongLength => 1L;
+            }
+            public static long Target(Lookalike value) =>
+                value.LongLength;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedMemberAccess);
+        AssertClassification(
+            """
+            public class Base {
+                public int Length => 1;
+            }
+            public sealed class Derived : Base {
+                public new int Length => 2;
+            }
+            public static long Target(Derived value) =>
+                value.Length;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedMemberAccess);
+    }
+
+    [Test]
     public void InterpreterPreservesLeftToRightAndShortCircuitEvaluation()
     {
         using var order = CompiledMethod.Create(
@@ -671,6 +699,43 @@ public sealed class FrontendLoweringTests
             snapshotHash,
             Is.EqualTo(
                 "4C2849F3D16A580C09BBB46C9526EBC1404405C9FA54A4056D631269AE2BC736"));
+    }
+
+    [Test]
+    public void StageSpecificOperationClassifiersMatchTheClosedCatalog()
+    {
+        var kinds = OperationSubsetClassifier.GetKnownOperationKinds();
+        foreach (var stage in Enum.GetValues<OperationSupportStage>())
+        {
+            foreach (var kind in kinds)
+            {
+                var classification =
+                    OperationSubsetClassifier.Classify(stage, kind);
+                Assert.That(
+                    classification.IsExact,
+                    Is.EqualTo(
+                        OperationSupportCatalog.IsSupported(stage, kind)),
+                    $"{stage}:{kind}");
+            }
+
+            Assert.That(
+                OperationSubsetClassifier.Classify(
+                    stage,
+                    (OperationKind)int.MaxValue).Abstention,
+                Is.EqualTo(FrontendAbstention.UnknownOperationKind),
+                stage.ToString());
+        }
+
+        Assert.That(
+            OperationSubsetClassifier.Classify(
+                OperationSupportStage.EffectDiscovery,
+                OperationKind.CaughtException).IsExact,
+            Is.True);
+        Assert.That(
+            OperationSubsetClassifier.Classify(
+                OperationSupportStage.EffectDiscovery,
+                OperationKind.InterpolatedString).Abstention,
+            Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
     }
 
     private static void AssertClassification(

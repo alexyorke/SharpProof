@@ -13,8 +13,8 @@ Attributes
 Ir
 Dataflow
 Specs                 -> Ir
-Frontend              -> Ir
-Contracts             -> Frontend, Ir, Specs
+Frontend              -> Attributes (build-only payload identity), Ir
+Contracts             -> Frontend, Ir
 Effects               -> Dataflow, Frontend, Specs
 Verify                -> Ir, Specs
 Smt                   -> Ir, Verify
@@ -28,8 +28,11 @@ Worker                -> CompilerArtifact, Dataflow, Ir, Smt, Specs, Verify,
 Worker.Launcher       -> CompilerArtifact, Ir, Specs, Worker.Protocol
 ```
 
-Build-only references to `SharpProof.Meta.Analyzers` are omitted. The
-architecture suite compares every direct project reference against this graph.
+Build-only references to `SharpProof.Meta.Analyzers` are omitted. Frontend's
+listed Attributes edge has `ReferenceOutputAssembly=false`; it establishes
+build order so the exact Attributes DLL SHA-256 can be embedded without adding
+a runtime assembly dependency. The architecture suite compares every direct
+project reference against this graph.
 
 The Roslyn analyzer has no verifier, SMT, Z3, or native dependency. Z3 is
 allowed only in `SharpProof.Smt`, which is packaged below
@@ -86,6 +89,11 @@ exact IR; every unsupported case returns a typed opaque term or program
 abstention. There are no `TryLower(..., out ...)` branches, syntax reparsing,
 speculative semantic models, or display-string identity.
 
+Compiler-facing stages share a closed operation-support catalog, with separate
+decisions for contract-expression lowering and effect discovery. Stage-owned
+shape and type validation remains independent, so sharing the inventory cannot
+widen a stage's semantics. Unknown future Roslyn operation kinds fail closed.
+
 `SharpProof.Dataflow` supplies deterministic fixpoint evaluation, partial
 orders, joins, widening, havoc, and interval/congruence, sequence-cardinality,
 and nullness domains. Source method effects are solved by stable SCC order.
@@ -100,6 +108,16 @@ eligible resolved `ApiSpec` rows into exact witness metadata; the worker
 revalidates those witnesses against its matching table. Unmodeled or untrusted
 metadata is unknown; there is no IL interpreter.
 
+Importing a source or metadata effect summary is also conditional on the
+callee's entry contract. Analyzer and compiler-artifact runs use the exact
+contract binder plus call-site abstract facts to establish every `Requires`
+and closed parameter precondition. Standalone effect analysis conservatively
+detects direct clauses, closed attributes, and companion intent and marks the
+summary incomplete when it cannot prove the obligation. Invalidly placed
+clauses cannot refine a call into a complete effect proof. Both policies and
+their summary-incompleteness propagation are declared parts of the
+`effectAnalysis` trusted computing base.
+
 ## Contracts and modular verification
 
 `Contract.Requires`, `Ensures`, `Assume`, `Result`, and `Old` bind as normal C#
@@ -113,7 +131,8 @@ compiler-bound `ApiSpec` rows within its admitted call boundary. This is not
 general source-callee modular assume/guarantee verification. The analyzer
 combines exact compiler-bound replay with a managed CFG abstract interpreter
 over Boolean, nullness, integer-interval, sequence-cardinality, and effect
-facts. It reports a `Requires` violation only at a definitely executed call
+facts. Comparison edges refine both scalar operands and retain only joined facts
+valid on every incoming path. It reports a `Requires` violation only at a definitely executed call
 whose receiver/argument prefix completes normally and whose instantiated
 condition is definitely false. The worker checks only the bounded `Ensures`
 subset supported by its admitted acyclic CFG executor; deep or otherwise
@@ -138,7 +157,7 @@ indices. Formula construction, worklists, specs, proof cores, diagnostics, and
 serialized responses are stably ordered. Z3 uses resource limits; wall time is
 an outer process kill boundary.
 
-Protocol version 8 binds each request to a compiler-produced closed artifact.
+Protocol version 9 binds each request to a compiler-produced closed artifact.
 Stable semantic IDs identify selected callables, postcondition/effect claims, and
 user/trusted evidence independently of formatting. The protocol separates run
 status, callable coverage, and per-claim outcome. Central validation requires
@@ -160,31 +179,36 @@ a stale successful result associated with a partly updated evidence set. The
 content-addressed cache includes semantic, protocol, tool, compilation,
 reference, option, target-framework, canonical packaged worker runtime-closure,
 and spec-content identity.
-Cache schema version 9
-stores only the validated semantic payload. A hit is accepted only when its
-manifest hash and complete result set match the current manifest. Only
-complete callables whose claims are hygienic `Proven` or replay-validated
-`Refuted` are cacheable.
+Cache schema version 11 stores only complete, postcondition-only, all-refuted
+semantic payloads. A hit is accepted only when its manifest hash and complete
+result set match the current manifest and every canonical Boolean/integer model
+can be reconstructed against the hydrated callable. The worker rechecks entry
+assumptions and source ranges, then independently executes the whole body and
+postcondition before reuse. Proven claims, effect claims, and unsupported
+models are not cacheable.
 
 During Windows verification, the production analyzer observes the final
 post-generator Roslyn `Compilation` and atomically emits compiler artifact
-schema version 5. The compiler owns selection, contract/spec binding, effect
+schema version 8. The compiler owns selection, contract/spec binding, effect
 evaluation, and body
 lowering. Every selected callable has either a typed failure record or a
 portable graph containing its bound clauses, canonical variables, whole-body
 CFG/IR, body start, initial environment, parameter mappings, and exact
 API-spec witness metadata. Every selected effect-attribute occurrence also has
-one compiler-sealed `Proven`, `Refuted`, or typed `Unknown` evidence record.
-Repeated attributes retain distinct claim IDs while sharing their effective
-combined constraint/evidence. A `Refuted` effect record requires a structured
-unconditional direct witness that the worker independently validates against
-the sealed constraint. Callable IDs, claim ownership, and user-assumption IDs
-remain tied to the sealed manifest.
+one compiler-sealed `Proven`, candidate `Refuted`, or typed `Unknown` evidence
+record. Repeated attributes retain distinct claim IDs while sharing their
+effective combined constraint/evidence. Because the artifact does not yet
+carry an independently executable effect path, the worker fails every compiler
+candidate `Refuted` closed as `Unknown(CounterexampleReplayFailed)` rather than
+publishing an effect refutation. Callable IDs, claim ownership, and
+user-assumption IDs remain tied to the sealed manifest.
 
 The artifact also contains compiler error diagnostics with mapped locations,
-handwritten and generated tree hashes and parse settings, the bounded
-proof-relevant compilation-option set, assembly and target identity, and
-compiler/reference provenance. It intentionally contains no source text.
+handwritten and generated tree hashes, raw and effective per-tree preprocessor
+symbols, parse settings, the bounded proof-relevant compilation-option set,
+assembly and target identity, and compiler/reference provenance. An effective
+`SHARPPROOF_CONTRACTS` symbol invalidates the artifact before worker
+verification. It intentionally contains no source text.
 Readable file-backed references are required while the compiler records their
 path, image hash, identity, kind, embed flag, and aliases. Resolver-dependent
 `#r`/`#load`, missing-assembly resolver mode, reference supersession, and custom
@@ -231,6 +255,42 @@ compilation-global `sharpproof_profile` and `sharpproof_features` keys. The
 session. Unsupported unannotated analyzer callables are silent, while
 unsupported explicitly selected callables report SP0047.
 
+The advisory analyzer has a conservative compilation-start fast path for
+contract-free, unselected source. It retains configuration validation and
+`SHARPPROOF_CONTRACTS` rejection while skipping semantic-session construction
+and per-method callbacks. Final compiler-artifact collection is a separate
+build-only analyzer and is not loaded by ordinary advisory builds. Strict mode
+never takes the fast path. The activation probe is part of the declared
+discovery trusted computing base; new selection or implicit-call syntax must
+extend the probe and its regressions in the same change.
+
+The advisory activation probe distinguishes contract/attribute candidates
+from ordinary call-bearing code. A candidate compilation retains method
+attribute, clause-placement, intrinsic, rejection, suppression, subset, and
+effect processing. For otherwise contract-free source, the probe reads
+portable-executable custom-attribute metadata without populating Roslyn symbol
+caches. It registers operation-block precondition screening only when a
+referenced assembly contains a closed SharpProof parameter or return contract;
+compilation references receive the equivalent symbol check. Thus external
+closed preconditions remain visible to unannotated callers, while ordinary
+source and BCL calls create no semantic session. Contract inventories,
+companion resolution, binders, API specifications, and effect analysis are
+independently lazy and are created only on first demand.
+
+Before allocating a precondition CFG, a sound negative screen walks calls
+owned by that callable and uses the same cached binder as full analysis. It
+skips the CFG only when every target binds successfully with zero entry
+clauses. Operation-root or binding failure, a possible entry clause, and
+relevant static initialization all retain full fail-closed analysis. The
+activation probe, lazy compilation model, pipeline, screen, and binder-owning
+session are part of the declared effect-analysis trusted computing base.
+When the containing operation tree has a relevant nested owner, the pass
+creates the root CFG once and follows Roslyn local-function and anonymous-
+function child graphs recursively. Each callable is deduplicated by compiler
+symbol, analyzed under its own flow state, and records its own outcome.
+Expression-tree lambdas are treated as quoted code and remain unknown rather
+than producing an execution diagnostic.
+
 The verifier is optional in advisory builds and mandatory in strict builds;
 explicitly setting `SharpProofVerify=false` with `strict` is a configuration
 error. `SharpProofVerifyPolicy` controls incomplete selected analysis;
@@ -254,15 +314,19 @@ The current gate includes:
 - worker/package consumer smoke checks;
 - fixed-seed fuzzing and performance budgets.
 
-Off-profile latency samples alternate real baseline and SharpProof-imported
-MSBuild rebuilds. A separate loaded-but-off analyzer canary covers session
-creation and retained state, while the package policy proves that
-`SharpProofProfile=off` omits analyzer items and verifier invocation. The
-worker is isolated in `SharpProof.Verifier.Win-x64`; the portable `SharpProof`
-package contains only analyzer/generator assets and depends exactly on
-`SharpProof.Attributes`. Each package has a portable-PDB symbol package with
-SourceLink, and the package workflow records exact SHA-256 hashes, an SPDX
-SBOM, and GitHub provenance/SBOM attestations. The corpus reports explicit,
-silent, and total semantic Unknown rates as metrics; none is a release gate.
+Unannotated advisory latency samples alternate real compiler-only and
+SharpProof-imported MSBuild rebuilds under the repository-selected SDK. The
+fixture contains ordinary source and BCL calls, so it exercises the
+no-precondition callable screen rather than only the compilation-start fast
+path. The package policy separately proves that `SharpProofProfile=off` omits
+analyzer items and verifier invocation, while retained-memory checks exercise
+the call-free unannotated advisory analyzer driver and its no-session fast
+path. The worker is isolated in
+`SharpProof.Verifier.Win-x64`; the portable `SharpProof` package contains only
+analyzer/generator assets and depends exactly on `SharpProof.Attributes`. Each
+package has a portable-PDB symbol package with SourceLink, and the package
+workflow records exact SHA-256 hashes, an SPDX SBOM, and GitHub
+provenance/SBOM attestations. The corpus reports explicit, silent, and total
+semantic Unknown rates as metrics; none is a release gate.
 
 The active contract is `eng/acceptance`.

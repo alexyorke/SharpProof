@@ -55,11 +55,13 @@ public sealed class ContractClauseInventory
     internal ContractClauseInventory(
         IMethodSymbol callable,
         bool contractApiAvailable,
+        bool hasRejectedContractApiUsage,
         IOperation? implementationBody,
         ImmutableArray<ContractClauseOccurrence> clauses)
     {
         Callable = callable;
         ContractApiAvailable = contractApiAvailable;
+        HasRejectedContractApiUsage = hasRejectedContractApiUsage;
         ImplementationBody = implementationBody;
         Clauses = clauses;
     }
@@ -69,6 +71,10 @@ public sealed class ContractClauseInventory
         get;
     }
     public bool ContractApiAvailable
+    {
+        get;
+    }
+    public bool HasRejectedContractApiUsage
     {
         get;
     }

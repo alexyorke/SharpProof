@@ -4,33 +4,34 @@ public static class OperationSubsetClassifier
 {
     public static FrontendSubsetClassification Classify(OperationKind kind)
     {
+        return Classify(
+            OperationSupportStage.ContractExpressionLowering,
+            kind);
+    }
+
+    internal static FrontendSubsetClassification Classify(
+        OperationSupportStage stage,
+        OperationKind kind)
+    {
         if (!Enum.IsDefined(typeof(OperationKind), kind))
         {
             return FrontendSubsetClassification.Abstain(
                 FrontendAbstention.UnknownOperationKind);
         }
 
-        return kind switch
+        if (OperationSupportCatalog.IsSupported(
+                stage,
+                kind))
         {
-            OperationKind.Literal or
-            OperationKind.LocalReference or
-            OperationKind.ParameterReference or
-            OperationKind.InstanceReference or
-            OperationKind.DefaultValue or
-            OperationKind.UnaryOperator or
-            OperationKind.BinaryOperator or
-            OperationKind.Conversion or
-            OperationKind.Conditional or
-            OperationKind.IsNull or
-            OperationKind.PropertyReference or
-            OperationKind.ArrayElementReference =>
-                FrontendSubsetClassification.Exact,
-            OperationKind.Invalid or OperationKind.None =>
+            return FrontendSubsetClassification.Exact;
+        }
+
+        return kind is OperationKind.Invalid or OperationKind.None
+            ?
                 FrontendSubsetClassification.Abstain(
-                    FrontendAbstention.InvalidOperation),
-            _ => FrontendSubsetClassification.Abstain(
-                FrontendAbstention.UnsupportedOperationKind)
-        };
+                    FrontendAbstention.InvalidOperation)
+            : FrontendSubsetClassification.Abstain(
+                    FrontendAbstention.UnsupportedOperationKind);
     }
 
     public static ImmutableArray<OperationKind> GetKnownOperationKinds()

@@ -8,23 +8,36 @@ internal static class ClosedContractDiagnostics
         foreach (var parameter in method.Parameters)
         {
             ValidateValue(
-                parameter.Type, parameter.GetAttributes(),
+                parameter.Type,
+                parameter.RefKind,
+                parameter.GetAttributes(),
                 parameter.Locations.FirstOrDefault() ?? Location.None);
         }
 
         if (!method.ReturnsVoid)
         {
             ValidateValue(
-                method.ReturnType, method.GetReturnTypeAttributes(),
+                method.ReturnType,
+                RefKind.None,
+                method.GetReturnTypeAttributes(),
                 method.Locations.FirstOrDefault() ?? Location.None);
         }
 
-        void ValidateValue(ITypeSymbol type, ImmutableArray<AttributeData> attributes, Location fallback)
+        void ValidateValue(
+            ITypeSymbol type,
+            RefKind refKind,
+            ImmutableArray<AttributeData> attributes,
+            Location fallback)
         {
             foreach (var attribute in attributes)
             {
-                var error = GetError(type, attribute, session.Attributes);
-                if (!error.HasValue ||
+                var validation = ClosedContractAttributeValidator.Validate(
+                    attribute,
+                    type,
+                    refKind,
+                    session.Attributes);
+                if (!validation.IsRecognized ||
+                    validation.IsValid ||
                     !session.TryMarkAttributeValidated(attribute))
                 {
                     continue;
@@ -32,33 +45,12 @@ internal static class ClosedContractDiagnostics
 
                 var reference = attribute.ApplicationSyntaxReference;
                 reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
-                    error.Value.Name, type.Name, error.Value.Reason,
+                    validation.AttributeName,
+                    type.Name,
+                    validation.InvalidReason!,
                     reference?.SyntaxTree.GetLocation(reference.Span) ??
                     fallback));
             }
         }
-    }
-
-    private static (string Name, string Reason)? GetError(ITypeSymbol type, AttributeData attribute, ContractSelectionInventory symbols)
-    {
-        return ContractSelectionInventory.Is(attribute, symbols.NotNull) &&
-        type.IsValueType
-            ? ("[NotNull]", "expected a reference-capable value")
-            : ContractSelectionInventory.Is(attribute, symbols.Positive) &&
-              !IsSupportedInteger(type)
-                ? ("[Positive]", "expected a supported integral value")
-                : ContractSelectionInventory.Is(attribute, symbols.InRange) &&
-                  (!IsSupportedInteger(type) ||
-                   attribute.ConstructorArguments.Length != 2 ||
-                   attribute.ConstructorArguments[0].Value is not long minimum ||
-                   attribute.ConstructorArguments[1].Value is not long maximum ||
-                   minimum > maximum)
-                    ? ("[InRange]", "expected a supported integral value and ordered bounds")
-                    : null;
-    }
-
-    private static bool IsSupportedInteger(ITypeSymbol type)
-    {
-        return CSharpScalarSemantics.IsSupportedInteger(type.SpecialType);
     }
 }

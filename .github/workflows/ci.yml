@@ -26,7 +26,10 @@ jobs:
 
       - name: Restore dependencies
         shell: pwsh
-        run: .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
+        run: >-
+          .\scripts\Invoke-SharpProofDotnet.ps1
+          restore SharpProof.sln
+          --locked-mode
 
       - name: Verify standard C# formatting
         shell: pwsh
@@ -72,4 +75,17 @@ jobs:
           test SharpProof.Dev.Tests.slnf
           -c Release
           --no-build
+          --filter 'TestCategory!=Performance'
+          --logger 'console;verbosity=minimal'
+
+      - name: Run isolated release performance contract
+        shell: pwsh
+        run: >-
+          .\scripts\Invoke-SharpProofDotnet.ps1
+          -MemoryLimitMb 8192
+          -TimeoutSeconds 600
+          test SharpProof.Gates.Test\SharpProof.Gates.Test.csproj
+          -c Release
+          --no-build
+          --filter 'TestCategory=Performance'
           --logger 'console;verbosity=minimal'

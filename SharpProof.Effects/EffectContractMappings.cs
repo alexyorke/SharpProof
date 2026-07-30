@@ -147,7 +147,9 @@ internal static class EffectContractMappings
             EffectAnalysisIncompleteReason reason when
                 (reason & ~(EffectAnalysisIncompleteReason.BlockBudgetExceeded |
                             EffectAnalysisIncompleteReason.OperationBudgetExceeded |
-                            EffectAnalysisIncompleteReason.CyclicControlFlow)) == 0 => reason.ToString(),
+                            EffectAnalysisIncompleteReason.CyclicControlFlow |
+                            EffectAnalysisIncompleteReason
+                                .CallPreconditionNotProven)) == 0 => reason.ToString(),
             EffectUncertainty uncertainty when
                 (uncertainty & ~EffectUncertainty.Unknown) == 0 => uncertainty.ToString(),
             _ => throw new ArgumentOutOfRangeException(nameof(value))
@@ -173,7 +175,7 @@ internal static class EffectContractMappings
         var actualProjection = EffectSummaryProjector.Project(actual);
         var declaredProjection = EffectSummaryProjector.Project(declared);
         return actualProjection.IsComplete &&
-            (actualProjection.Effects & ~AllowedEffects(declaredProjection.Effects)) == 0 &&
+            (actualProjection.Effects & ~declaredProjection.Effects) == 0 &&
             (actualProjection.Capabilities & ~declaredProjection.Capabilities) == 0 &&
             ExceptionsCovered(actual.Throws, declared.Throws);
     }
@@ -181,17 +183,10 @@ internal static class EffectContractMappings
     internal static bool Violates(EffectDirectWitness witness, EffectSummary declared)
     {
         var projection = EffectSummaryProjector.Project(declared);
-        return (witness.Effects & ~AllowedEffects(projection.Effects)) != 0 ||
+        return (witness.Effects & ~projection.Effects) != 0 ||
             (witness.Capabilities & ~projection.Capabilities) != 0 ||
             witness.ExceptionType != null &&
             !ExceptionsCovered(EffectThrowSet.Create([witness.ExceptionType]), declared.Throws);
-    }
-
-    private static EffectContractKind AllowedEffects(EffectContractKind declared)
-    {
-        return (declared & EffectContractKind.Throws) == 0
-            ? declared
-            : declared | EffectContractKind.Allocates;
     }
 
     private static bool ExceptionsCovered(EffectThrowSet actual, EffectThrowSet declared)

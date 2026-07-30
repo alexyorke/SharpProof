@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Analyzer.Test;
@@ -26,10 +27,10 @@ public sealed class FinalCompilationCollectorTests
         using var workspace = new CollectorWorkspace();
         var compilation = CreateCompilation();
 
-        var withoutPath = await AnalyzerTestHost.AnalyzeAsync(
+        var withoutPath = await AnalyzeCollectorAsync(
             compilation,
             Options(path: null));
-        var off = await AnalyzerTestHost.AnalyzeAsync(
+        var off = await AnalyzeCollectorAsync(
             compilation,
             Options(workspace.SealPath("off"), profile: "off"));
 
@@ -38,6 +39,42 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(withoutPath, Is.Empty);
             Assert.That(off, Is.Empty);
             Assert.That(Directory.EnumerateFiles(workspace.Path), Is.Empty);
+        }
+    }
+
+    [Test]
+    public async Task RuntimeEnabledGhostContractsPreventArtifactEmission()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("runtime-contracts");
+        var compilation = CreateCompilation(
+            """
+            #define SHARPPROOF_CONTRACTS
+            using SharpProof.Attributes;
+
+            internal static class Subject {
+                internal static int Identity(int value) {
+                    Contract.Ensures(
+                        Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """);
+
+        var collectorDiagnostics = await AnalyzeCollectorAsync(
+            compilation,
+            Options(path));
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            Options(path));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(collectorDiagnostics, Is.Empty);
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0025"]));
+            Assert.That(File.Exists(path), Is.False);
         }
     }
 
@@ -67,12 +104,12 @@ public sealed class FinalCompilationCollectorTests
             new MemoryAdditionalText("proof.inputs", "value=1"));
         var path = workspace.SealPath("canonical");
 
-        var firstDiagnostics = await AnalyzerTestHost.AnalyzeAsync(
+        var firstDiagnostics = await AnalyzeCollectorAsync(
             compilation,
             Options(path),
             additional);
         var first = await File.ReadAllBytesAsync(path);
-        var secondDiagnostics = await AnalyzerTestHost.AnalyzeAsync(
+        var secondDiagnostics = await AnalyzeCollectorAsync(
             compilation,
             Options(path),
             additional);
@@ -88,8 +125,8 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(first.Take(3), Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
             Assert.That(first, Does.Not.Contain((byte)'\r'));
             Assert.That(artifact.Schema, Is.EqualTo("SharpProof.CompilerManifest"));
-            Assert.That(artifact.SchemaVersion, Is.EqualTo(5));
-            Assert.That(artifact.ProtocolVersion, Is.EqualTo("8"));
+            Assert.That(artifact.SchemaVersion, Is.EqualTo(8));
+            Assert.That(artifact.ProtocolVersion, Is.EqualTo("9"));
             Assert.That(artifact.Compilation.TargetFramework, Is.EqualTo("net9.0"));
             Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.All));
             Assert.That(
@@ -177,7 +214,7 @@ public sealed class FinalCompilationCollectorTests
     {
         using var workspace = new CollectorWorkspace();
 
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+        var diagnostics = await AnalyzeCollectorAsync(
             CreateCompilation(),
             Options(workspace.Path));
 
@@ -196,7 +233,7 @@ public sealed class FinalCompilationCollectorTests
     {
         using var workspace = new CollectorWorkspace();
 
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+        var diagnostics = await AnalyzeCollectorAsync(
             CreateCompilation(),
             Options(
                 workspace.SealPath("invalid-depth"),
@@ -218,7 +255,7 @@ public sealed class FinalCompilationCollectorTests
         var image = await File.ReadAllBytesAsync(reference.FilePath!);
         var inMemory = MetadataReference.CreateFromImage(image);
 
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+        var diagnostics = await AnalyzeCollectorAsync(
             compilation.ReplaceReference(reference, inMemory),
             Options(workspace.SealPath("in-memory")));
 
@@ -235,7 +272,7 @@ public sealed class FinalCompilationCollectorTests
         string assumptionPolicy = "allow",
         string features = "all")
     {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+        var diagnostics = await AnalyzeCollectorAsync(
             compilation,
             Options(
                 path,
@@ -257,6 +294,18 @@ public sealed class FinalCompilationCollectorTests
                 Has.Length.EqualTo(64));
         }
         return artifact.CompilationSha256;
+    }
+
+    private static Task<ImmutableArray<Diagnostic>> AnalyzeCollectorAsync(
+        CSharpCompilation compilation,
+        IReadOnlyDictionary<string, string> values,
+        ImmutableArray<AdditionalText> additionalFiles = default)
+    {
+        return AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            values,
+            additionalFiles,
+            new FinalCompilationCollectorAnalyzer());
     }
 
     private static CSharpCompilation CreateCompilation(

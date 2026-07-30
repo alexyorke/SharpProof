@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IsRoslynAnalyzer>true</IsRoslynAnalyzer>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <LangVersion>12.0</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);RS2002;RS2003</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="System.Collections.Immutable" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\SharpProof.Specs\Polyfills\IsExternalInit.cs"
+             Link="Polyfills\IsExternalInit.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" />
+    <ProjectReference Include="..\SharpProof.CompilerArtifact\SharpProof.CompilerArtifact.csproj" />
+    <ProjectReference Include="..\SharpProof.Contracts\SharpProof.Contracts.csproj" />
+    <ProjectReference Include="..\SharpProof.Effects\SharpProof.Effects.csproj" />
+    <ProjectReference Include="..\SharpProof.Frontend\SharpProof.Frontend.csproj" />
+    <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
+    <ProjectReference Include="..\SharpProof.Specs\SharpProof.Specs.csproj" />
+    <ProjectReference Include="..\SharpProof.Worker.Protocol\SharpProof.Worker.Protocol.csproj" />
+    <ProjectReference
+      Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj"
+      OutputItemType="Analyzer"
+      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>
