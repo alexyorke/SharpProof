@@ -668,8 +668,22 @@ public sealed class ArchitectureTests
                 Does.Contain("SharpProof.Dev.Tests.slnf"));
             Assert.That(
                 collector,
+                Does.Contain("SharpProof.Managed.runsettings"));
+            Assert.That(
+                collector,
                 Does.Contain("SharpProof.Gates.runsettings"));
         }
+
+        var managedSettings = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "coverage",
+            "SharpProof.Managed.runsettings"));
+        Assert.That(
+            managedSettings,
+            Does.Contain(
+                "<CollectFromChildProcesses>False" +
+                "</CollectFromChildProcesses>"));
 
         var gateSettings = File.ReadAllText(Path.Combine(
             root,

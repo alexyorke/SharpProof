@@ -130,7 +130,9 @@ A postcondition is established only when its bound C# expression is both
 defined and true on every normal return; a possible exception while evaluating
 the postcondition produces `Unknown`. Verification assumptions include the
 lowered body's normal-completion condition, so throwing executions are not
-mistaken for normal-return counterexamples.
+mistaken for normal-return counterexamples. Successful evaluation of every
+executed assignment right-hand side contributes to that condition even when
+the assigned value is never read.
 
 `Contract.Assume` is explicit user evidence and must remain visible as
 `Justification.UserAssumed`. A diagnostic suppression changes reporting only; it

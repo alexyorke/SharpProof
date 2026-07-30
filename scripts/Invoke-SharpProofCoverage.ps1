@@ -51,12 +51,17 @@ New-Item `
 $dotnetWrapper = Join-Path `
     $repositoryRoot `
     'scripts\Invoke-SharpProofDotnet.ps1'
+$managedSettings = Join-Path `
+    $repositoryRoot `
+    'eng\coverage\SharpProof.Managed.runsettings'
 
 # The Microsoft collector observes managed execution without rewriting the
 # payload files that SharpProof deliberately authenticates by SHA-256. The
 # Coverlet collector cannot be used here because its on-disk instrumentation
 # turns the trusted Attributes assembly into a different, correctly rejected
-# compiler input while the tests are running.
+# compiler input while the tests are running. Child collection is disabled so
+# concurrently tested package payloads cannot merge a second build of the same
+# assembly and PDB into the project coverage universe.
 & $dotnetWrapper `
     -MemoryLimitMb $MemoryLimitMb `
     -TimeoutSeconds $TimeoutSeconds `
@@ -64,6 +69,7 @@ $dotnetWrapper = Join-Path `
     -c Release `
     --no-build `
     --filter 'TestCategory!=Performance&TestCategory!=Coverage' `
+    --settings $managedSettings `
     --collect 'Code Coverage;Format=Cobertura' `
     --results-directory $resolvedResultsDirectory
 if ($LASTEXITCODE -ne 0) {

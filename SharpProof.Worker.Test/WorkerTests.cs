@@ -2371,6 +2371,39 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task UnusedAssignmentDefinednessConstrainsNormalCompletion()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long Divide(long divisor) {
+                    Contract.Ensures(divisor != 0L);
+                    var unused = 1L / divisor;
+                    return 7L;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        var record = response.ClaimResults.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
+            Assert.That(record.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(record.Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(record.Vacuity, Is.EqualTo(WorkerVacuityKind.None));
+            Assert.That(record.ProofCore, Does.Contain("body:normal-completion"));
+            Assert.That(record.Model, Is.Empty);
+        }
+    }
+
+    [Test]
     public async Task UndefinedPostconditionProducesTypedNonfatalUnknown()
     {
         using var project = TestProject.Create(

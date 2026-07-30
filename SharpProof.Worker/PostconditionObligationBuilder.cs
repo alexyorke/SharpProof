@@ -78,17 +78,10 @@ internal static class PostconditionObligationBuilder
         var completions = ImmutableArray.CreateBuilder<IrTerm>(returns.Length);
         foreach (var path in returns)
         {
-            var completion = path.ReturnTerm is
-                null or
-                IrBooleanTerm or
-                IrIntegerTerm or
-                IrStringTerm or
-                IrNullTerm or
-                IrVariableTerm
-                ? path.Predicate
-                : factory.Binary(
-                    IrBinaryOperator.AndAlso, path.Predicate,
-                    factory.Binary(IrBinaryOperator.Equal, path.ReturnTerm, path.ReturnTerm));
+            var completion = ConstrainSuccessfulEvaluation(
+                factory,
+                path.Predicate,
+                path.ReturnTerm);
             completions.Add(SpecResultDomainProjection.Rewrite(factory, completion, projections));
         }
         var predicate = Disjoin(factory, completions);

@@ -216,6 +216,55 @@ public sealed class AcyclicBlockPredicateExecutorTests
         Assert.That(execution.Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
     }
 
+    [Test]
+    public void AssignmentDefinednessConsumesDeterministicSymbolicOperationBudget()
+    {
+        var factory = new IrFactory();
+        var divisor = factory.CreateVariable("divisor", factory.IntegerType);
+        var unused = factory.CreateVariable("unused", factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        builder.Assign(
+            entry,
+            factory.CreateOperation(),
+            unused,
+            factory.Binary(
+                IrBinaryOperator.Divide,
+                factory.Integer(1),
+                factory.Variable(divisor)));
+        builder.Return(entry, factory.CreateOperation(), factory.Integer(7));
+        var program = builder.Build();
+        var environment = ImmutableDictionary<IrVarId, IrTerm>.Empty.Add(
+            divisor,
+            factory.Variable(divisor));
+
+        var limited = new AcyclicBlockPredicateExecutor(
+            WorkerBudgets.DefaultMaximumExpressionDepth,
+            maximumSymbolicOperations: 4).Execute(
+            [],
+            factory,
+            program,
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+            environment,
+            ImmutableDictionary<IrVarId, IrVarId>.Empty);
+        var exact = new AcyclicBlockPredicateExecutor(
+            WorkerBudgets.DefaultMaximumExpressionDepth,
+            maximumSymbolicOperations: 6).Execute(
+            [],
+            factory,
+            program,
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+            environment,
+            ImmutableDictionary<IrVarId, IrVarId>.Empty);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(limited.Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
+            Assert.That(exact.IsSuccess, Is.True);
+            Assert.That(exact.Returns, Has.Length.EqualTo(1));
+        }
+    }
+
     private static SymbolicBodyExecution Execute(
         IrFactory factory,
         IrProgram program,

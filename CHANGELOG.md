@@ -81,7 +81,8 @@ contain documented breaking changes.
 - Coverage collection uses the managed Microsoft collector so the exact
   trusted contract-API payload remains unchanged while tests run. Coverage
   instrumentation can no longer turn payload-identity checks into unrelated
-  test failures, and the redundant Coverlet dependency has been removed.
+  test failures, duplicate child-process builds cannot distort the coverage
+  universe, and the redundant Coverlet dependency has been removed.
 - Call-site precondition analysis now follows Roslyn child CFGs for executable
   local functions, lambdas, and anonymous methods. Each nested callable is
   analyzed once under its own flow state and outcome; quoted expression-tree
@@ -134,6 +135,10 @@ contain documented breaking changes.
 
 ### Fixed
 
+- Symbolic body execution now carries assignment right-hand-side definedness
+  into the evolving normal-completion predicate. An unused division, overflow,
+  or other throwing expression can no longer yield a spurious counterexample
+  that disagrees with whole-body replay.
 - Explicit `ref`, `in`, and `ref readonly` precondition arguments now read
   aliased local or parameter storage at call-entry state after later argument
   side effects, while implicit readonly-reference rvalues retain their
