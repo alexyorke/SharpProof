@@ -50,9 +50,12 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 CallableEntryFeasibility.Feasible);
         }
 
-        var entryFeasibility = await EvaluateEntryFeasibilityAsync(
+        var entryFeasibility =
+            await CallableEntryFeasibilityEvaluator.EvaluateAsync(
                 target,
                 resourceBudget,
+                _kernel,
+                _maximumExpressionDepth,
                 cancellationToken)
             .ConfigureAwait(false);
         var postconditions = await VerifyPostconditionsAsync(
@@ -152,7 +155,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             noModeledNormalReturn = completionOutcome is ProvenOutcome;
             if (completionOutcome is ProvenOutcome proven)
             {
-                normalCompletionProofCore = CreateProofCore(
+                normalCompletionProofCore = CallableProofCore.Create(
                     proven,
                     assumptionLabels);
                 if (normalCompletionProofCore.IsDefaultOrEmpty)
@@ -249,7 +252,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 vacuity);
             if (record.Outcome == WorkerClaimOutcome.Proven)
             {
-                record.ProofCore = MergeProofCore(
+                record.ProofCore = CallableProofCore.Merge(
                     record.ProofCore,
                     vacuity switch
                     {
@@ -285,84 +288,6 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
         return records.ToImmutable();
     }
 
-    private async Task<CallableEntryFeasibility>
-        EvaluateEntryFeasibilityAsync(
-            CompilerCallablePreparation target,
-            MethodResourceBudget resourceBudget,
-            CancellationToken cancellationToken)
-    {
-        var build = CallableEvidenceBuilder.BuildEntry(
-            target,
-            _maximumExpressionDepth);
-        if (!build.IsSuccess)
-        {
-            return CallableEntryFeasibility.Unknown(
-                build.FailureReason);
-        }
-
-        var evidence = build.Evidence!;
-        var literalContradiction = evidence.Assumptions.FirstOrDefault(
-            static assumption =>
-                assumption.Predicate is
-                    IrBooleanTerm { Value: false });
-        if (literalContradiction != null)
-        {
-            return CallableEntryFeasibility.Contradictory(
-                [evidence.Labels[literalContradiction.Justification]],
-                AssumptionIds(
-                    [literalContradiction.Justification],
-                    evidence.AssumptionIds));
-        }
-
-        if (!evidence.HasNontrivialPrecondition)
-        {
-            return CallableEntryFeasibility.Feasible;
-        }
-
-        if (!resourceBudget.TryStartQuery())
-        {
-            return CallableEntryFeasibility.Unknown(
-                WorkerClaimReason.ResourceLimit);
-        }
-
-        var factory = target.Factory;
-        var query = new VerificationQuery(
-            factory,
-            evidence.Assumptions,
-            new Goal(
-                factory,
-                factory.Boolean(false),
-                ProofDiagnosticKind.InternalConsistency,
-                new SourceLocationId(0)),
-            evidence.ReplayVariables);
-        var outcome = await _kernel.VerifyAsync(
-                query,
-                cancellationToken)
-            .ConfigureAwait(false);
-        if (resourceBudget.IsExceeded)
-        {
-            return CallableEntryFeasibility.Unknown(
-                WorkerClaimReason.ResourceLimit);
-        }
-
-        return outcome switch
-        {
-            ProvenOutcome proven =>
-                CallableEntryFeasibility.Contradictory(
-                    CreateProofCore(proven, evidence.Labels),
-                    AssumptionIds(
-                        proven.Core,
-                        evidence.AssumptionIds)),
-            RefutedOutcome => CallableEntryFeasibility.Feasible,
-            UnknownOutcome unknown =>
-                CallableEntryFeasibility.Unknown(
-                    CallableClaimResultAssembler.MapAbstention(
-                        unknown.Reason)),
-            _ => CallableEntryFeasibility.Unknown(
-                WorkerClaimReason.MalformedBackendResult)
-        };
-    }
-
     private async Task<ProofOutcome?> ProbeSatisfiabilityAsync(
         IrFactory factory,
         IEnumerable<Assumption> evidence,
@@ -387,52 +312,6 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
         var outcome = await _kernel.VerifyAsync(query, cancellationToken)
             .ConfigureAwait(false);
         return resourceBudget.IsExceeded ? null : outcome;
-    }
-
-    private static ImmutableArray<string> CreateProofCore(
-        ProvenOutcome outcome,
-        IReadOnlyDictionary<ProofJustification, string> labels)
-    {
-        var result = ImmutableArray.CreateBuilder<string>(
-            outcome.Core.Length);
-        foreach (var justification in outcome.Core)
-        {
-            if (!labels.TryGetValue(justification, out var label))
-            {
-                return [];
-            }
-
-            result.Add(label);
-        }
-
-        return [.. result
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(static label => label, StringComparer.Ordinal)];
-    }
-
-    private static string[] MergeProofCore(
-        IEnumerable<string> left,
-        IEnumerable<string> right)
-    {
-        return [.. left
-            .Concat(right)
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(static label => label, StringComparer.Ordinal)];
-    }
-
-    private static IEnumerable<string> AssumptionIds(
-        IEnumerable<ProofJustification> proofCore,
-        IReadOnlyDictionary<ProofJustification, string>
-            assumptionIds)
-    {
-        return proofCore
-            .Select(justification =>
-                assumptionIds.TryGetValue(
-                    justification,
-                    out var assumptionId)
-                    ? assumptionId
-                    : null)
-            .OfType<string>();
     }
 
     private static SymbolicBodyExecution TrivialBody(IrFactory factory)
