@@ -65,7 +65,7 @@ $mutations = @(
         Name = 'untrusted-return-annotation'
         File = 'SharpProof.Effects\ManagedAbstractFlow.cs'
         Original = "_trustedBoundaries.AuthorizesDeclaredContracts(method))"
-        Mutated = 'method.ContainingAssembly != null)'
+        Mutated = '(_trustedBoundaries.AuthorizesDeclaredContracts(method) || method.ContainingAssembly != null))'
         Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
         Filter = 'FullyQualifiedName~UnverifiedReturnAnnotationsCannotDischargeRuntimeExceptions'
     },
