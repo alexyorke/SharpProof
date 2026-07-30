@@ -171,7 +171,7 @@ $mutations = @(
         Name = 'effect-vacuity-used-assumption-core'
         File = 'SharpProof.Worker\CallableClaimResultAssembler.cs'
         Original = 'usedAssumptionIds.Contains(evidence.Id)'
-        Mutated = 'evidence.Kind == WorkerAssumptionKind.Precondition'
+        Mutated = 'usedAssumptionIds.Contains(evidence.Id) || evidence.Kind == WorkerAssumptionKind.Precondition'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~LiteralEffectVacuityMarksOnlyItsContradictoryPreconditionUsed'
     },
