@@ -67,10 +67,17 @@ contain documented breaking changes.
 - The unannotated advisory performance gate now pins temporary builds to the
   repository SDK, retains raw paired timing evidence, and uses adjacent
   opposite-order geometric ratios with a conventional median. It applies no
-  retries or outlier removal. Advisory compilations that conservatively contain
-  no analysis trigger avoid constructing the heavyweight semantic session;
-  configuration checks, runtime-contract rejection, and compiler-artifact
-  collection still run, and strict mode never takes this fast path.
+  retries or outlier removal. Its package fixture contains ordinary source and
+  BCL calls so the measured analyzer run exercises no-precondition screening.
+  Advisory compilations that conservatively contain no analysis trigger avoid
+  constructing the heavyweight semantic session; configuration checks,
+  runtime-contract rejection, and compiler-artifact collection still run, and
+  strict mode never takes this fast path.
+- Active advisory sessions classify the supported subset and run effect
+  analysis only for explicitly selected methods. Call-site precondition
+  analysis builds a CFG only when the cached contract binder finds an entry
+  clause or cannot establish that none exists; malformed bindings and static
+  initialization remain fail-closed.
 - Source and metadata effect summaries are imported only after their callee
   `Requires` and closed parameter preconditions are established. Unproven or
   invalidly placed entry contracts now produce typed incomplete effect

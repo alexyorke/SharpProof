@@ -21,6 +21,7 @@ internal sealed record PerformanceGateResult(
     ImmutableArray<PackageBuildSample> PackageBuildSamples,
     ImmutableArray<double> OrderBalancedRatios,
     int UnannotatedAdvisoryAnalyzerDriverRunCount,
+    int UnannotatedAdvisoryAnalysisSessionCreateCount,
     double OrderBalancedMedianRatio,
     double RawMedianRatio,
     double BaselineFirstMedianRatio,
@@ -50,19 +51,30 @@ internal static class PerformanceGate
     {
         var contract = AcceptancePerformanceContract.Load(repositoryRoot);
         ValidateContract(contract);
-        var source = CreateUnannotatedAdvisorySource(320);
+        var callBearingSource =
+            CreateCallBearingUnannotatedAdvisorySource(320);
+        var callFreeSource =
+            CreateCallFreeUnannotatedAdvisorySource(320);
         ValidateAdvisoryPackagePolicy(repositoryRoot);
         var configurationProbe = MeasureUnannotatedAdvisoryAnalyzerBatch(
-            source,
+            callBearingSource,
             "UnannotatedAdvisoryConfigurationProbe",
             iterations: 1,
             cancellationToken);
         var unannotatedAdvisoryAnalyzerDriverRuns =
             configurationProbe.AnalyzerDriverRunCount;
+        var unannotatedAdvisoryAnalysisSessionCreates =
+            configurationProbe.AnalysisSessionCreateCount;
+        if (unannotatedAdvisoryAnalysisSessionCreates != 1)
+        {
+            throw new InvalidOperationException(
+                "The call-bearing advisory performance probe must create " +
+                "exactly one semantic analysis session.");
+        }
         var packageBuildTiming =
             await MeasureUnannotatedAdvisoryPackageBuildsAsync(
                     repositoryRoot,
-                    source,
+                    callBearingSource,
                     contract.Warmups,
                     contract.Samples,
                     cancellationToken)
@@ -74,16 +86,16 @@ internal static class PerformanceGate
         var p95Ratio = packageBuildStatistics.P95Ratio;
 
         WarmRetentionPaths(
-            source,
+            callFreeSource,
             contract.Warmups,
             cancellationToken);
         var baselineRetained = MeasureCompilerOnlyRetainedBytes(
-            source,
+            callFreeSource,
             "Baseline",
             cancellationToken);
         var unannotatedAdvisoryRetained =
             MeasureUnannotatedAdvisoryAnalyzerRetainedBytes(
-            source,
+            callFreeSource,
             "UnannotatedAdvisory",
             cancellationToken);
         var retainedRatio = Ratio(
@@ -177,6 +189,7 @@ internal static class PerformanceGate
             packageBuildTiming.Samples,
             packageBuildStatistics.OrderBalancedRatios,
             unannotatedAdvisoryAnalyzerDriverRuns,
+            unannotatedAdvisoryAnalysisSessionCreates,
             medianRatio,
             packageBuildStatistics.RawMedianRatio,
             packageBuildStatistics.BaselineFirstMedianRatio,
@@ -223,11 +236,10 @@ internal static class PerformanceGate
                 cancellationToken);
         }
         stopwatch.Stop();
-        if (diagnosticCount != 0 || sessionFactory.CreateCount != 0)
+        if (diagnosticCount != 0)
         {
             throw new InvalidOperationException(
-                "Unannotated call-free advisory analysis must stay quiet " +
-                "and avoid analysis-session construction.");
+                "Unannotated advisory analysis must stay quiet.");
         }
 
         return new UnannotatedAdvisoryBatchMeasurement(
@@ -845,7 +857,30 @@ internal static class PerformanceGate
             $"{duplicateCount}.");
     }
 
-    private static string CreateUnannotatedAdvisorySource(int methodCount)
+    internal static string CreateCallBearingUnannotatedAdvisorySource(
+        int methodCount)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine(
+            "public static class UnannotatedAdvisoryFixture {");
+        builder.AppendLine(
+            "    private static int Normalize(int value) => value;");
+        for (var index = 0; index < methodCount; index++)
+        {
+            builder.Append("    public static int M")
+                .Append(index.ToString(CultureInfo.InvariantCulture))
+                .Append(
+                    "(int value) => System.Math.Max(Normalize(value), ")
+                .Append(index.ToString(CultureInfo.InvariantCulture))
+                .AppendLine(");");
+        }
+
+        builder.AppendLine("}");
+        return builder.ToString();
+    }
+
+    private static string CreateCallFreeUnannotatedAdvisorySource(
+        int methodCount)
     {
         var builder = new StringBuilder();
         builder.AppendLine(

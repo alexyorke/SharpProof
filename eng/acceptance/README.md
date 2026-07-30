@@ -101,8 +101,10 @@ repository under the bounded Job Object wrapper and runs
 every current architecture, semantic, corpus, fuzz, worker, package,
 cancellation, and performance gate. Unannotated advisory performance compares
 paired, order-interleaved compiler-only and SharpProof-imported MSBuild
-rebuilds under the repository-selected SDK. It separately checks the advisory
-analyzer retention boundary. The full acceptance job currently runs on
+rebuilds of contract-free code with ordinary source and BCL calls under the
+repository-selected SDK. This exercises the cached no-precondition callable
+screen. It separately checks the call-free advisory analyzer retention and
+no-session boundary. The full acceptance job currently runs on
 Windows x64. Separate package-consumer CI restores the exact same three-package
 artifacts and exercises the portable analyzer on Windows x64, Linux x64, macOS
 x64, and macOS ARM64. Packaged worker execution remains Windows x64 only;

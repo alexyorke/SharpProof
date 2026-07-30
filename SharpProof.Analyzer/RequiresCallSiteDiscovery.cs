@@ -6,6 +6,47 @@ internal sealed class RequiresCallSiteDiscovery(
     SemanticModel semanticModel,
     CancellationToken cancellationToken)
 {
+    internal bool HasPotentialCallSite(
+        Func<IMethodSymbol, bool> hasPotentialPreconditions)
+    {
+        if (hasPotentialPreconditions == null)
+        {
+            throw new ArgumentNullException(
+                nameof(hasPotentialPreconditions));
+        }
+
+        if (!TryGetOperationRoot(out var operationRoot))
+        {
+            return true;
+        }
+
+        foreach (var operation in
+                 operationRoot.DescendantsAndSelf())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var call = GetCall(operation);
+            if (call == null ||
+                !SymbolEqualityComparer.Default.Equals(
+                    semanticModel.GetEnclosingSymbol(
+                        operation.Syntax.SpanStart,
+                        cancellationToken),
+                    caller))
+            {
+                continue;
+            }
+
+            var target =
+                call.Value.TargetMethod.ReducedFrom ??
+                call.Value.TargetMethod;
+            if (hasPotentialPreconditions(target))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     internal ImmutableArray<RequiresCallSiteCandidate>? Get(
         BoundMethodContracts? callerContracts)
     {
@@ -94,17 +135,14 @@ internal sealed class RequiresCallSiteDiscovery(
         out IOperation? operationRoot,
         out ControlFlowGraph graph)
     {
+        if (!TryGetOperationRoot(out operationRoot))
+        {
+            graph = null!;
+            return false;
+        }
+
         try
         {
-            var flowSyntax = GetPropertyExpression(declaration) ?? declaration;
-            operationRoot = semanticModel.GetOperation(
-                flowSyntax,
-                cancellationToken);
-            while (operationRoot?.Parent != null)
-            {
-                operationRoot = operationRoot.Parent;
-            }
-
             var created = operationRoot switch
             {
                 IMethodBodyOperation method =>
@@ -129,8 +167,35 @@ internal sealed class RequiresCallSiteDiscovery(
         catch (Exception exception) when (
             exception is ArgumentException or InvalidOperationException)
         {
-            operationRoot = null;
             graph = null!;
+            return false;
+        }
+    }
+
+    private bool TryGetOperationRoot(
+        out IOperation operationRoot)
+    {
+        try
+        {
+            var flowSyntax =
+                GetPropertyExpression(declaration) ??
+                declaration;
+            var operation = semanticModel.GetOperation(
+                flowSyntax,
+                cancellationToken);
+            while (operation?.Parent != null)
+            {
+                operation = operation.Parent;
+            }
+
+            operationRoot = operation!;
+            return operation != null;
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or
+                InvalidOperationException)
+        {
+            operationRoot = null!;
             return false;
         }
     }

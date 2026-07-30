@@ -123,7 +123,7 @@ internal static class AnalyzerFeaturePipeline
             context.Compilation, declaration.SyntaxTree);
         var outcome = AnalyzerSemanticOutcome.NotApplicable;
         var subsetIncompleteReported = false;
-        var classifySubset = session.Configuration.EffectsEnabled || selection.Contracts;
+        var classifySubset = selection.Any;
         var subset = classifySubset
             ? LanguageSubsetGate.ClassifyEffects(
                 method,
@@ -150,7 +150,7 @@ internal static class AnalyzerFeaturePipeline
             outcome = AnalyzerSemanticOutcomes.Combine(
                 outcome, AnalyzerSemanticOutcome.Abstained);
         }
-        else if (session.Configuration.EffectsEnabled)
+        else if (selection.Effects)
         {
             outcome = AnalyzerSemanticOutcomes.Combine(
                 outcome,

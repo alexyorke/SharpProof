@@ -263,6 +263,17 @@ never takes this path. The activation probe is part of the declared discovery
 trusted computing base; new selection or implicit-call syntax must extend the
 probe and its regressions in the same change.
 
+Once a semantic session is active, every source callable still receives
+attribute, clause-placement, intrinsic, rejection, suppression, and call-site
+precondition validation. Supported-subset classification and effect analysis
+run only for a callable selected by an effective contract. Before allocating a
+precondition CFG, a sound negative screen walks calls owned by that callable
+and uses the same cached binder as full analysis. It skips the CFG only when
+every target binds successfully with zero entry clauses. Operation-root or
+binding failure, a possible entry clause, and relevant static initialization
+all retain full fail-closed analysis. The pipeline, screen, and binder-owning
+session are part of the declared effect-analysis trusted computing base.
+
 The verifier is optional in advisory builds and mandatory in strict builds;
 explicitly setting `SharpProofVerify=false` with `strict` is a configuration
 error. `SharpProofVerifyPolicy` controls incomplete selected analysis;
@@ -288,10 +299,12 @@ The current gate includes:
 
 Unannotated advisory latency samples alternate real compiler-only and
 SharpProof-imported MSBuild rebuilds under the repository-selected SDK. The
-package policy separately proves that `SharpProofProfile=off` omits analyzer
-items and verifier invocation, while retained-memory checks exercise the
-unannotated advisory analyzer driver and its no-session fast path. The worker
-is isolated in
+fixture contains ordinary source and BCL calls, so it exercises the
+no-precondition callable screen rather than only the compilation-start fast
+path. The package policy separately proves that `SharpProofProfile=off` omits
+analyzer items and verifier invocation, while retained-memory checks exercise
+the call-free unannotated advisory analyzer driver and its no-session fast
+path. The worker is isolated in
 `SharpProof.Verifier.Win-x64`; the portable `SharpProof` package contains only
 analyzer/generator assets and depends exactly on `SharpProof.Attributes`. Each
 package has a portable-PDB symbol package with SourceLink, and the package

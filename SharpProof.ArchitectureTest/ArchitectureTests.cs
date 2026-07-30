@@ -437,11 +437,14 @@ public sealed class ArchitectureTests
                 "SharpProof.Frontend/CSharpScalarSemantics.generated.cs"
             ],
             ["effectAnalysis"] = [
+                "SharpProof.Analyzer/AnalyzerFeaturePipeline.cs",
+                "SharpProof.Analyzer/AnalyzerSession.cs",
                 "SharpProof.Analyzer/CallArgumentAliasPolicy.cs",
                 "SharpProof.Analyzer/EffectCallPreconditionPolicy.cs",
                 "SharpProof.Analyzer/EffectContractDiagnostics.cs",
-                "SharpProof.Analyzer/AnalyzerSession.cs",
                 "SharpProof.Analyzer/ManagedContractFacts.cs",
+                "SharpProof.Analyzer/RequiresCallSiteAnalyzer.cs",
+                "SharpProof.Analyzer/RequiresCallSiteDiscovery.cs",
                 "SharpProof.Contracts/ContractSelectionInventory.cs",
                 "SharpProof.Effects/EffectAnalysisSession.cs",
                 "SharpProof.Effects/EffectCallPreconditionPolicy.cs",

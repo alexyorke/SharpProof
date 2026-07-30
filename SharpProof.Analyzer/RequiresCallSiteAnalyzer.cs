@@ -27,6 +27,12 @@ internal static class RequiresCallSiteAnalyzer
 
         internal AnalyzerSemanticOutcome Run()
         {
+            if (!_discovery.HasPotentialCallSite(
+                    session.HasPotentialCallPreconditions))
+            {
+                return AnalyzerSemanticOutcome.NotApplicable;
+            }
+
             var binding = session.BindRequires(caller);
             var callSites = _discovery.Get(
                 binding.IsSuccess ? binding.Contracts : null);

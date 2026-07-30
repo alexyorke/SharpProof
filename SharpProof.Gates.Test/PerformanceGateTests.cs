@@ -308,6 +308,35 @@ public sealed class PerformanceGateTests
     }
 
     [Test]
+    public void CallBearingAdvisoryMeasurementExercisesSemanticScreening()
+    {
+        var source =
+            PerformanceGate.CreateCallBearingUnannotatedAdvisorySource(
+                methodCount: 3);
+        var measurement =
+            PerformanceGate.MeasureUnannotatedAdvisoryAnalyzerBatch(
+                source,
+                "CallBearingUnannotatedAdvisoryProbe",
+                iterations: 2);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(source, Does.Contain("Normalize(value)"));
+            Assert.That(source, Does.Contain("System.Math.Max"));
+            Assert.That(
+                source,
+                Does.Not.Contain("SharpProof.Attributes"));
+            Assert.That(
+                measurement.AnalyzerDriverRunCount,
+                Is.EqualTo(2));
+            Assert.That(measurement.DiagnosticCount, Is.Zero);
+            Assert.That(
+                measurement.AnalysisSessionCreateCount,
+                Is.EqualTo(2));
+        }
+    }
+
+    [Test]
     public void AdvisoryPackagePolicyRunsAnalyzerAndOmitsVerifierWork()
     {
         PerformanceGate.ValidateAdvisoryPackagePolicy(
@@ -440,6 +469,9 @@ public sealed class PerformanceGateTests
             Assert.That(result.Passed, Is.True);
             Assert.That(
                 result.UnannotatedAdvisoryAnalyzerDriverRunCount,
+                Is.EqualTo(1));
+            Assert.That(
+                result.UnannotatedAdvisoryAnalysisSessionCreateCount,
                 Is.EqualTo(1));
             Assert.That(result.BaselineRetainedBytes, Is.GreaterThan(0));
             Assert.That(

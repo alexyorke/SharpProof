@@ -33,6 +33,8 @@ internal sealed class AnalyzerSession
     private readonly ContractBinder _contractBinder;
     private readonly ContractIntrinsicValidator _contractIntrinsics;
     private readonly ResolvedApiSpecTable _apiSpecs;
+    private readonly ConservativeEffectCallPreconditionPolicy
+        _callPreconditions;
     private readonly Action<IMethodSymbol, AnalyzerSemanticOutcome>? _outcomeObserver;
     private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
         _validatedAttributes = new();
@@ -58,7 +60,7 @@ internal sealed class AnalyzerSession
         _contractBinder = new ContractBinder(compilation, IrFactory);
         _contractIntrinsics = new ContractIntrinsicValidator(compilation);
         _apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
-        var fallback =
+        _callPreconditions =
             new ConservativeEffectCallPreconditionPolicy(
                 compilation);
         _effects = new EffectAnalysisSession(
@@ -67,7 +69,7 @@ internal sealed class AnalyzerSession
             new AnalyzerEffectCallPreconditionPolicy(
                 _contractBinder,
                 _contractClauses,
-                fallback));
+                _callPreconditions));
     }
 
     internal Compilation Compilation
@@ -101,6 +103,30 @@ internal sealed class AnalyzerSession
     internal ContractBindingResult BindRequires(IMethodSymbol method)
     {
         return _contractBinder.BindRequires(method);
+    }
+
+    internal bool HasPotentialCallPreconditions(
+        IMethodSymbol method)
+    {
+        method = EffectAnalysisSession.NormalizeMethod(method);
+        if (_callPreconditions.HasPotentialPreconditions(
+                method))
+        {
+            return true;
+        }
+
+        if ((method.IsStatic ||
+             method.MethodKind == MethodKind.Constructor) &&
+            method.ContainingType.StaticConstructors.Length != 0)
+        {
+            return true;
+        }
+
+        var binding = BindRequires(method);
+        return !binding.IsSuccess ||
+            binding.Contracts == null ||
+            binding.Contracts.Clauses.Any(static clause =>
+                clause.Kind == BoundContractKind.Requires);
     }
 
     internal ImmutableArray<ContractIntrinsicViolation> GetContractIntrinsicViolations(
