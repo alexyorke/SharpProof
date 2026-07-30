@@ -142,16 +142,26 @@ public sealed class ReleaseCoverageBaselineTests
                 Does.Contain("ancestor of release commit"));
         }
 
-        var headParent = await RunAsync(
+        var releaseAncestor = await RunAsync(
             root,
             "git",
-            "rev-parse",
-            "HEAD^");
-        Assert.That(headParent.ExitCode, Is.Zero, headParent.Error);
+            "rev-list",
+            "--ancestry-path",
+            "--reverse",
+            FirstPreviewBaseline + "..HEAD");
+        Assert.That(
+            releaseAncestor.ExitCode,
+            Is.Zero,
+            releaseAncestor.Error);
+        var nonHeadReleaseCommit = releaseAncestor.Output
+            .Split(
+                ['\r', '\n'],
+                StringSplitOptions.RemoveEmptyEntries)
+            .First(commit => commit != headCommit);
         var wrongCheckout = await RunResolverAsync(
             root,
             "v1.0.0-preview.1",
-            headParent.Output.Trim());
+            nonHeadReleaseCommit);
         Assert.That(wrongCheckout.ExitCode, Is.Not.Zero);
         Assert.That(
             wrongCheckout.Error,
