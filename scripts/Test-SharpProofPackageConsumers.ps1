@@ -313,6 +313,15 @@ function Test-SharpProofFrameworkConsumers {
             "    <add key=`"SharpProofLocal`" value=`"$escapedSource`" />"
             "    <add key=`"FrameworkOffline`" value=`"$escapedFrameworkSource`" />"
             '  </packageSources>'
+            '  <packageSourceMapping>'
+            '    <packageSource key="SharpProofLocal">'
+            '      <package pattern="SharpProof*" />'
+            '    </packageSource>'
+            '    <packageSource key="FrameworkOffline">'
+            '      <package pattern="NETStandard.Library" />'
+            '      <package pattern="Microsoft.NETCore.Platforms" />'
+            '    </packageSource>'
+            '  </packageSourceMapping>'
             '</configuration>'
         )
         [IO.File]::WriteAllText(

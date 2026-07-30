@@ -56,12 +56,16 @@ public sealed class ReleaseCoverageBaselineTests
             Assert.That(
                 workflow,
                 Does.Contain(
-                    "releaseCommit = $env:SHARPPROOF_RELEASE_COMMIT"));
+                    "$releaseCommit = [string]$selection.releaseCommit"));
             Assert.That(
                 workflow,
                 Does.Contain(
-                    "coverageBaselineCommit = " +
-                    "$env:SHARPPROOF_COVERAGE_BASELINE"));
+                    "$coverageBaseline = " +
+                    "[string]$selection.coverageBaselineCommit"));
+            Assert.That(
+                workflow,
+                Does.Contain(
+                    "SHARPPROOF_RELEASE_COMMIT=$releaseCommit"));
         }
     }
 

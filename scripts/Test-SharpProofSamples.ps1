@@ -159,6 +159,33 @@ function Get-ForwardSlashPath {
     return [IO.Path]::GetFullPath($Path).Replace('\', '/')
 }
 
+function New-IsolatedNuGetConfig {
+    param([Parameter(Mandatory)][string]$Source)
+
+    $path = Join-Path $temporaryRoot 'NuGet.Config'
+    $escapedSource = [Security.SecurityElement]::Escape(
+        (Get-ForwardSlashPath $Source))
+    $content = @"
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="SharpProofLocal" value="$escapedSource" />
+  </packageSources>
+  <packageSourceMapping>
+    <packageSource key="SharpProofLocal">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
+</configuration>
+"@
+    [IO.File]::WriteAllText(
+        $path,
+        $content.Replace("`r`n", "`n"),
+        [Text.UTF8Encoding]::new($false))
+    return $path
+}
+
 function Test-SampleProjectInventory {
     $projectFiles = @(
         Get-ChildItem -LiteralPath $samplesRoot -Filter '*.csproj' -Recurse |
@@ -272,8 +299,8 @@ function Invoke-SampleBuild {
         @(
             'restore',
             $projectPath,
-            '--source',
-            $script:resolvedPackageSource,
+            '--configfile',
+            $script:nugetConfig,
             '--packages',
             $packageCache,
             '--no-http-cache',
@@ -312,6 +339,8 @@ try {
     }
     $script:resolvedPackageSource = (
         Resolve-Path -LiteralPath $PackageSource -ErrorAction Stop).Path
+    $script:nugetConfig =
+        New-IsolatedNuGetConfig $script:resolvedPackageSource
     & (Join-Path $PSScriptRoot 'Test-SharpProofPackageConsumers.ps1') `
         -PackageSource $script:resolvedPackageSource `
         -ValidatePackageSourceOnly

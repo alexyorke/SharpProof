@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.IO.Compression;
-using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
 
@@ -17,7 +15,25 @@ public sealed class ReleasePublicationScriptTests
     ];
 
     [Test]
-    public async Task OfflinePlanIsOrderedAndRequiresExactRemotePayloads()
+    public async Task PublisherNeverSkipsExistingRemoteArtifacts()
+    {
+        var script = await File.ReadAllTextAsync(
+            Path.Combine(
+                FindRepositoryRoot(),
+                "scripts",
+                "Publish-SharpProofRelease.ps1"));
+
+        Assert.That(script, Does.Not.Contain("--skip-duplicate"));
+        Assert.That(
+            script,
+            Does.Contain("Remote main package already exists"));
+        Assert.That(
+            script,
+            Does.Contain("Remote symbol package already exists"));
+    }
+
+    [Test]
+    public async Task OfflinePlanIsOrderedAndRejectsEveryExistingArtifact()
     {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PublicationWorkspace.Create();
@@ -52,46 +68,39 @@ public sealed class ReleasePublicationScriptTests
                 action: "Push");
         }
 
-        foreach (var package in feed.Packages)
-        {
-            var localPath = Path.Combine(
-                workspace.PackageSource,
-                Path.GetFileName(package.Path));
-            CreateRemotePackage(
-                localPath,
-                Path.Combine(
-                    workspace.RemoteSource,
-                    Path.GetFileName(package.Path)),
-                addUnexpectedPayload: false);
-        }
+        var mainPackage = feed.Packages[0];
+        var remoteMainPath = Path.Combine(
+            workspace.RemoteSource,
+            Path.GetFileName(mainPackage.Path));
+        File.Copy(mainPackage.Path, remoteMainPath);
+        var existingMain = await RunPublicationScriptAsync(
+            workspace,
+            Path.Combine(workspace.Root, "existing-main-plan.json"));
+        Assert.That(
+            existingMain.ExitCode,
+            Is.Not.Zero,
+            existingMain.Output);
+        Assert.That(
+            existingMain.Output,
+            Does.Contain("Remote main package already exists"));
+        File.Delete(remoteMainPath);
 
-        using (var matchingPlan = await RunPlanAsync(workspace))
-        {
-            AssertPlan(
-                matchingPlan.RootElement,
-                remoteState: "Matching",
-                action: "PushWithVerifiedSkipDuplicate");
-        }
-
-        var verifier = feed.GetPackage(
-            PackagedProductFeed.VerifierPackageId);
-        var verifierLocalPath = Path.Combine(
-            workspace.PackageSource,
-            Path.GetFileName(verifier.Path));
-        CreateRemotePackage(
-            verifierLocalPath,
+        var symbolPackage = feed.SymbolPackages[0];
+        File.Copy(
+            symbolPackage.Path,
             Path.Combine(
                 workspace.RemoteSource,
-                Path.GetFileName(verifier.Path)),
-            addUnexpectedPayload: true);
-        var mismatch = await RunPublicationScriptAsync(
+                Path.GetFileName(symbolPackage.Path)));
+        var existingSymbols = await RunPublicationScriptAsync(
             workspace,
-            Path.Combine(workspace.Root, "mismatch-plan.json"));
-        Assert.That(mismatch.ExitCode, Is.Not.Zero, mismatch.Output);
+            Path.Combine(workspace.Root, "existing-symbols-plan.json"));
         Assert.That(
-            mismatch.Output,
-            Does.Contain(
-                "Remote package payload does not match the tested local package"));
+            existingSymbols.ExitCode,
+            Is.Not.Zero,
+            existingSymbols.Output);
+        Assert.That(
+            existingSymbols.Output,
+            Does.Contain("Remote symbol package already exists"));
     }
 
     private static void AssertPlan(
@@ -161,57 +170,6 @@ public sealed class ReleasePublicationScriptTests
             planPath,
             "-DotNetPath",
             "dotnet-must-not-run-in-plan-only");
-    }
-
-    private static void CreateRemotePackage(
-        string sourcePath,
-        string destinationPath,
-        bool addUnexpectedPayload)
-    {
-        if (File.Exists(destinationPath))
-        {
-            File.Delete(destinationPath);
-        }
-
-        using var source = ZipFile.OpenRead(sourcePath);
-        using var destination = ZipFile.Open(
-            destinationPath,
-            ZipArchiveMode.Create);
-        foreach (var sourceEntry in source.Entries)
-        {
-            if (string.Equals(
-                    sourceEntry.FullName,
-                    ".signature.p7s",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            var destinationEntry = destination.CreateEntry(
-                sourceEntry.FullName,
-                CompressionLevel.Optimal);
-            using var sourceStream = sourceEntry.Open();
-            using var destinationStream = destinationEntry.Open();
-            sourceStream.CopyTo(destinationStream);
-        }
-        var signature = destination.CreateEntry(
-            ".signature.p7s",
-            CompressionLevel.NoCompression);
-        using (var signatureStream = signature.Open())
-        {
-            signatureStream.Write(
-                Encoding.ASCII.GetBytes("repository signature"));
-        }
-        if (!addUnexpectedPayload)
-        {
-            return;
-        }
-
-        var unexpected = destination.CreateEntry(
-            "unexpected.txt",
-            CompressionLevel.NoCompression);
-        using var unexpectedStream = unexpected.Open();
-        unexpectedStream.Write(Encoding.ASCII.GetBytes("different"));
     }
 
     private static async Task<ProcessResult> RunProcessAsync(

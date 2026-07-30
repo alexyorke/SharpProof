@@ -25,7 +25,7 @@ jobs:
       - name: Restore and run the full acceptance cycle
         shell: pwsh
         run: |
-          .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
+          .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln --locked-mode
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           .\eng\acceptance\Verify.ps1 -Configuration Release
 

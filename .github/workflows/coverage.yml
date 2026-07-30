@@ -27,7 +27,7 @@ jobs:
       - name: Restore and build
         shell: pwsh
         run: |
-          .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
+          .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln --locked-mode
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           .\scripts\Invoke-SharpProofDotnet.ps1 `
             -MemoryLimitMb 8192 `

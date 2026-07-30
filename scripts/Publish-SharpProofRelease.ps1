@@ -326,76 +326,6 @@ function Get-ValidatedRelease {
     }
 }
 
-function Get-ZipPayloadInventory {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path
-    )
-
-    $archive = [IO.Compression.ZipFile]::OpenRead($Path)
-    try {
-        $allNames = [Collections.Generic.HashSet[string]]::new(
-            [StringComparer]::OrdinalIgnoreCase)
-        $inventory = [Collections.Generic.Dictionary[string, object]]::new(
-            [StringComparer]::Ordinal)
-        foreach ($entry in $archive.Entries) {
-            if (-not $allNames.Add($entry.FullName)) {
-                throw "Package '$Path' has duplicate ZIP entry names."
-            }
-            if ([string]::Equals(
-                    $entry.FullName,
-                    '.signature.p7s',
-                    [StringComparison]::OrdinalIgnoreCase)) {
-                continue
-            }
-            $stream = $entry.Open()
-            $algorithm = [Security.Cryptography.SHA256]::Create()
-            try {
-                $hash = [Convert]::ToHexString(
-                    $algorithm.ComputeHash($stream)).ToLowerInvariant()
-            }
-            finally {
-                $algorithm.Dispose()
-                $stream.Dispose()
-            }
-            $inventory.Add(
-                $entry.FullName,
-                [pscustomobject][ordered]@{
-                    length = [int64]$entry.Length
-                    sha256 = $hash
-                })
-        }
-        return $inventory
-    }
-    finally {
-        $archive.Dispose()
-    }
-}
-
-function Test-ZipPayloadEquality {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$LocalPath,
-
-        [Parameter(Mandatory = $true)]
-        [string]$RemotePath
-    )
-
-    $local = Get-ZipPayloadInventory -Path $LocalPath
-    $remote = Get-ZipPayloadInventory -Path $RemotePath
-    if ($local.Count -ne $remote.Count) {
-        return $false
-    }
-    foreach ($name in $local.Keys) {
-        if (-not $remote.ContainsKey($name) -or
-            $local[$name].length -ne $remote[$name].length -or
-            $local[$name].sha256 -ne $remote[$name].sha256) {
-            return $false
-        }
-    }
-    return $true
-}
-
 function Invoke-V3Get {
     param(
         [Parameter(Mandatory = $true)]
@@ -516,23 +446,27 @@ function Get-RemotePackageState {
     )
 
     if (-not [string]::IsNullOrWhiteSpace($FixtureDirectory)) {
-        $remotePath = Join-Path $FixtureDirectory $Package.mainFileName
-        if (-not (Test-Path -LiteralPath $remotePath -PathType Leaf)) {
-            return [pscustomobject][ordered]@{
-                state = 'Absent'
-                remoteUrl = $null
-            }
-        }
-        if (-not (Test-ZipPayloadEquality `
-                -LocalPath $Package.mainPath `
-                -RemotePath $remotePath)) {
+        $remoteMainPath = Join-Path `
+            $FixtureDirectory `
+            $Package.mainFileName
+        if (Test-Path -LiteralPath $remoteMainPath -PathType Leaf) {
             throw (
-                "Remote package payload does not match the tested local " +
-                "package: $($Package.packageId) $($Package.version).")
+                "Remote main package already exists; publication is " +
+                "non-overwriting: $($Package.packageId) " +
+                "$($Package.version).")
+        }
+        $remoteSymbolsPath = Join-Path `
+            $FixtureDirectory `
+            $Package.symbolsFileName
+        if (Test-Path -LiteralPath $remoteSymbolsPath -PathType Leaf) {
+            throw (
+                "Remote symbol package already exists; publication is " +
+                "non-overwriting: $($Package.packageId) " +
+                "$($Package.version).")
         }
         return [pscustomobject][ordered]@{
-            state = 'Matching'
-            remoteUrl = $remotePath
+            state = 'Absent'
+            remoteUrl = $null
         }
     }
 
@@ -558,17 +492,9 @@ function Get-RemotePackageState {
                 "NuGet PackageBaseAddress returned HTTP $status for " +
                 "$($Package.packageId) $($Package.version).")
         }
-        if (-not (Test-ZipPayloadEquality `
-                -LocalPath $Package.mainPath `
-                -RemotePath $temporaryPath)) {
-            throw (
-                "Remote package payload does not match the tested local " +
-                "package: $($Package.packageId) $($Package.version).")
-        }
-        return [pscustomobject][ordered]@{
-            state = 'Matching'
-            remoteUrl = $remoteUrl
-        }
+        throw (
+            "Remote main package already exists; publication is " +
+            "non-overwriting: $($Package.packageId) $($Package.version).")
     }
     finally {
         if ([IO.File]::Exists($temporaryPath)) {
@@ -589,10 +515,7 @@ function Invoke-NuGetPush {
         [string]$Key,
 
         [Parameter(Mandatory = $true)]
-        [bool]$NoSymbols,
-
-        [Parameter(Mandatory = $true)]
-        [bool]$SkipDuplicate
+        [bool]$NoSymbols
     )
 
     $arguments = [Collections.Generic.List[string]]::new()
@@ -610,9 +533,6 @@ function Invoke-NuGetPush {
     }
     if ($NoSymbols) {
         $arguments.Add('--no-symbols')
-    }
-    if ($SkipDuplicate) {
-        $arguments.Add('--skip-duplicate')
     }
     & $DotNetPath @arguments
     if ($LASTEXITCODE -ne 0) {
@@ -704,7 +624,6 @@ foreach ($package in $release.packages) {
             -BaseAddress $baseAddress `
             -FixtureDirectory $resolvedRemoteDirectory
     }
-    $verifiedDuplicate = $remote.state -eq 'Matching'
     $entries.Add([pscustomobject][ordered]@{
         packageId = $package.packageId
         version = $package.version
@@ -712,19 +631,13 @@ foreach ($package in $release.packages) {
         symbolsFileName = $package.symbolsFileName
         remoteState = $remote.state
         remoteUrl = $remote.remoteUrl
-        mainAction = if ($verifiedDuplicate) {
-            'PushWithVerifiedSkipDuplicate'
-        }
-        elseif ($remote.state -eq 'Absent') {
+        mainAction = if ($remote.state -eq 'Absent') {
             'Push'
         }
         else {
             'PreflightThenPush'
         }
-        symbolsAction = if ($verifiedDuplicate) {
-            'PushWithVerifiedSkipDuplicate'
-        }
-        elseif ($remote.state -eq 'Absent') {
+        symbolsAction = if ($remote.state -eq 'Absent') {
             'Push'
         }
         else {
@@ -765,8 +678,6 @@ else {
 }
 for ($index = 0; $index -lt $release.packages.Count; $index++) {
     $package = $release.packages[$index]
-    $entry = $entries[$index]
-    $verifiedDuplicate = $entry.remoteState -eq 'Matching'
     Write-Host (
         "Publishing $($package.packageId) $($package.version) " +
         "main package.")
@@ -774,8 +685,7 @@ for ($index = 0; $index -lt $release.packages.Count; $index++) {
         -Path $package.mainPath `
         -Destination $Source `
         -Key $ApiKey `
-        -NoSymbols $true `
-        -SkipDuplicate $verifiedDuplicate
+        -NoSymbols $true
     Write-Host (
         "Publishing $($package.packageId) $($package.version) " +
         "symbol package.")
@@ -783,7 +693,6 @@ for ($index = 0; $index -lt $release.packages.Count; $index++) {
         -Path $package.symbolsPath `
         -Destination $effectiveSymbolSource `
         -Key $effectiveSymbolApiKey `
-        -NoSymbols $false `
-        -SkipDuplicate $verifiedDuplicate
+        -NoSymbols $false
 }
 Write-PublicationPlan -Plan $plan

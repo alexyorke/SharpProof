@@ -9,6 +9,8 @@
     <NuGetAudit>true</NuGetAudit>
     <NuGetAuditMode>all</NuGetAuditMode>
     <NuGetAuditLevel>low</NuGetAuditLevel>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(ContinuousIntegrationBuild)' == 'true'">true</RestoreLockedMode>
     <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
     <ImplicitUsings Condition="'$(ImplicitUsings)' == ''">enable</ImplicitUsings>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
@@ -24,6 +26,7 @@
     <SharpProofProductionProject Condition="
       '$(MSBuildProjectName)' == 'SharpProof.Analyzer' Or
       '$(MSBuildProjectName)' == 'SharpProof.Attributes' Or
+      '$(MSBuildProjectName)' == 'SharpProof.CompilerCollector' Or
       '$(MSBuildProjectName)' == 'SharpProof.ContractForGenerator' Or
       '$(MSBuildProjectName)' == 'SharpProof.CompilerArtifact' Or
       '$(MSBuildProjectName)' == 'SharpProof.Contracts' Or
@@ -32,6 +35,7 @@
       '$(MSBuildProjectName)' == 'SharpProof.Frontend' Or
       '$(MSBuildProjectName)' == 'SharpProof.Ir' Or
       '$(MSBuildProjectName)' == 'SharpProof.Meta.Analyzers' Or
+      '$(MSBuildProjectName)' == 'SharpProof.PortableAnalyzer' Or
       '$(MSBuildProjectName)' == 'SharpProof.Smt' Or
       '$(MSBuildProjectName)' == 'SharpProof.Specs' Or
       '$(MSBuildProjectName)' == 'SharpProof.Verify' Or

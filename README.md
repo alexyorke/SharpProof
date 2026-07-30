@@ -561,23 +561,21 @@ and temporary OIDC credentials. Both paths download, revalidate, and promote
 the exact package bytes that passed the cross-platform consumer matrix.
 Before any write, the publisher validates `SharpProof.release.json` and every
 artifact hash, then queries the feed's V3 `PackageBaseAddress` for all three
-IDs. An existing package is reusable only when its exact ZIP entry names and
-uncompressed payloads match the tested local package; only the repository
-signature entry `.signature.p7s` may differ. The publisher then sends main and
+IDs and rejects any existing main package. The publisher then sends main and
 symbol packages separately in dependency order: Attributes, SharpProof, then
-the verifier. `--skip-duplicate` is used only after that remote main-package
-match, so an interrupted main/symbol publication can resume without accepting
-unknown remote bytes. A mismatched payload or an unverified publication race
-fails closed before it can be skipped.
+the verifier. Publication is intentionally non-overwriting, and no push uses
+`--skip-duplicate`, so an existing symbol package or publication race also
+fails the release. An interrupted publication must use a new package version
+rather than treating remote bytes as reusable.
 Repository owners must configure `NUGET_PRIVATE_SOURCE` and
 `NUGET_PRIVATE_API_KEY` in the private-preview environment, and `NUGET_USER`
 plus a matching NuGet trusted-publishing policy in the public environment.
 The private source must be an HTTPS NuGet V3 service index, and its API key
 must permit V3 package reads plus package and symbol publication. NuGet V3 has
-no corresponding symbol-package download resource, so retry safety anchors on
-the exact downloadable main package and resubmits the tested `.snupkg`
-separately. The workflow contains no feed credential values. An offline plan
-and local remote-payload simulation are available through:
+no corresponding symbol-package download resource, so symbol-package
+nonexistence is enforced by a push without duplicate skipping. The workflow
+contains no feed credential values. An offline plan and local remote-presence
+simulation are available through:
 
 ```powershell
 .\scripts\Publish-SharpProofRelease.ps1 `

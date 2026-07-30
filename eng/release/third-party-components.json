@@ -7,12 +7,12 @@
         "version": "10.0.10",
         "license": "MIT",
         "entries": [
-          "tools/analyzers/dotnet/cs/Microsoft.Bcl.AsyncInterfaces.dll"
+          "tools/collector/Microsoft.Bcl.AsyncInterfaces.dll"
         ]
       },
       {
         "id": "System.Buffers",
-        "version": "4.6.1",
+        "version": "4.5.1",
         "license": "MIT",
         "entries": [
           "tools/analyzers/dotnet/cs/System.Buffers.dll"
@@ -31,12 +31,12 @@
         "version": "10.0.10",
         "license": "MIT",
         "entries": [
-          "tools/analyzers/dotnet/cs/System.IO.Pipelines.dll"
+          "tools/collector/System.IO.Pipelines.dll"
         ]
       },
       {
         "id": "System.Memory",
-        "version": "4.6.3",
+        "version": "4.5.5",
         "license": "MIT",
         "entries": [
           "tools/analyzers/dotnet/cs/System.Memory.dll"
@@ -44,7 +44,7 @@
       },
       {
         "id": "System.Numerics.Vectors",
-        "version": "4.6.1",
+        "version": "4.5.0",
         "license": "MIT",
         "entries": [
           "tools/analyzers/dotnet/cs/System.Numerics.Vectors.dll"
@@ -60,7 +60,7 @@
       },
       {
         "id": "System.Runtime.CompilerServices.Unsafe",
-        "version": "6.1.2",
+        "version": "6.0.0",
         "license": "MIT",
         "entries": [
           "tools/analyzers/dotnet/cs/System.Runtime.CompilerServices.Unsafe.dll"
@@ -79,7 +79,7 @@
         "version": "10.0.10",
         "license": "MIT",
         "entries": [
-          "tools/analyzers/dotnet/cs/System.Text.Encodings.Web.dll"
+          "tools/collector/System.Text.Encodings.Web.dll"
         ]
       },
       {
@@ -87,12 +87,12 @@
         "version": "10.0.10",
         "license": "MIT",
         "entries": [
-          "tools/analyzers/dotnet/cs/System.Text.Json.dll"
+          "tools/collector/System.Text.Json.dll"
         ]
       },
       {
         "id": "System.Threading.Tasks.Extensions",
-        "version": "4.6.3",
+        "version": "4.5.4",
         "license": "MIT",
         "entries": [
           "tools/analyzers/dotnet/cs/System.Threading.Tasks.Extensions.dll"

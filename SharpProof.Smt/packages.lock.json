@@ -1,0 +1,88 @@
+{
+  "version": 2,
+  "dependencies": {
+    ".NETStandard,Version=v2.0": {
+      "Microsoft.CodeAnalysis.BannedApiAnalyzers": {
+        "type": "Direct",
+        "requested": "[5.6.0, )",
+        "resolved": "5.6.0",
+        "contentHash": "Kcobt3pnOdO0A+6CKiMHZdTEluJpsfxiV20axtZdmfBQnDmiWTKPJADlgAfdTuKNAnVarrkJa0UEGwuOo91muw=="
+      },
+      "Microsoft.Z3": {
+        "type": "Direct",
+        "requested": "[4.12.2, )",
+        "resolved": "4.12.2",
+        "contentHash": "dOV/D1K+OH2Ris7HcXHM2OIyHaFc6t3twNg9d8xqRKs3JZBvWgTp+OmzVfNGPn+Yz/wQDAHeWgecJly5aHGYAw=="
+      },
+      "NETStandard.Library": {
+        "type": "Direct",
+        "requested": "[2.0.3, )",
+        "resolved": "2.0.3",
+        "contentHash": "st47PosZSHrjECdjeIzZQbzivYBJFv6P2nv4cj2ypdI204DO+vZ7l5raGMiX4eXMJ53RfOIg+/s4DHVZ54Nu2A==",
+        "dependencies": {
+          "Microsoft.NETCore.Platforms": "1.1.0"
+        }
+      },
+      "System.Collections.Immutable": {
+        "type": "Direct",
+        "requested": "[9.0.18, )",
+        "resolved": "9.0.18",
+        "contentHash": "5V1SJde+JzfcFzU5YCB2aDrua2tPuVv1pt75FtS00j68HUmQEJaxDm54DE9ZXlSgNPcEY+QFlRQ3xFwDg/gHew==",
+        "dependencies": {
+          "System.Memory": "4.5.5",
+          "System.Runtime.CompilerServices.Unsafe": "6.0.0"
+        }
+      },
+      "Microsoft.NETCore.Platforms": {
+        "type": "Transitive",
+        "resolved": "1.1.0",
+        "contentHash": "kz0PEW2lhqygehI/d6XsPCQzD7ff7gUJaVGPVETX611eadGsA3A877GdSlU0LRVMCTH/+P3o2iDTak+S08V2+A=="
+      },
+      "System.Buffers": {
+        "type": "Transitive",
+        "resolved": "4.5.1",
+        "contentHash": "Rw7ijyl1qqRS0YQD/WycNst8hUUMgrMH4FCn1nNm27M4VxchZ1js3fVjQaANHO5f3sN4isvP4a+Met9Y4YomAg=="
+      },
+      "System.Memory": {
+        "type": "Transitive",
+        "resolved": "4.5.5",
+        "contentHash": "XIWiDvKPXaTveaB7HVganDlOCRoj03l+jrwNvcge/t8vhGYKvqV+dMv6G4SAX2NoNmN0wZfVPTAlFwZcZvVOUw==",
+        "dependencies": {
+          "System.Buffers": "4.5.1",
+          "System.Numerics.Vectors": "4.4.0",
+          "System.Runtime.CompilerServices.Unsafe": "4.5.3"
+        }
+      },
+      "System.Numerics.Vectors": {
+        "type": "Transitive",
+        "resolved": "4.4.0",
+        "contentHash": "UiLzLW+Lw6HLed1Hcg+8jSRttrbuXv7DANVj0DkL9g6EnnzbL75EB7EWsw5uRbhxd/4YdG8li5XizGWepmG3PQ=="
+      },
+      "System.Runtime.CompilerServices.Unsafe": {
+        "type": "Transitive",
+        "resolved": "6.0.0",
+        "contentHash": "/iUeP3tq1S0XdNNoMz5C9twLSrM/TH+qElHkXWaPvuNOt+99G75NrV0OS2EqHx5wMN7popYjpc8oTjC1y16DLg=="
+      },
+      "sharpproof.ir": {
+        "type": "Project",
+        "dependencies": {
+          "System.Collections.Immutable": "[9.0.18, )"
+        }
+      },
+      "sharpproof.specs": {
+        "type": "Project",
+        "dependencies": {
+          "SharpProof.Ir": "[1.0.0-preview.1, )"
+        }
+      },
+      "sharpproof.verify": {
+        "type": "Project",
+        "dependencies": {
+          "SharpProof.Ir": "[1.0.0-preview.1, )",
+          "SharpProof.Specs": "[1.0.0-preview.1, )",
+          "System.Collections.Immutable": "[9.0.18, )"
+        }
+      }
+    }
+  }
+}
