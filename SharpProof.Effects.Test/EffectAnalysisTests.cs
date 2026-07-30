@@ -56,6 +56,8 @@ public sealed class EffectAnalysisTests
                 public static string Constant() => "sharp" + "proof";
                 public static string Interpolated(int value) =>
                     $"value: {value}";
+                public static string InterpolatedString(string value) =>
+                    $"{value}";
                 public static string InterpolatedConstant() => $"sharp";
             }
             """);
@@ -64,6 +66,8 @@ public sealed class EffectAnalysisTests
         var runtime = session.Analyze(Method(compilation, "Runtime"));
         var constant = session.Analyze(Method(compilation, "Constant"));
         var interpolated = session.Analyze(Method(compilation, "Interpolated"));
+        var interpolatedString = session.Analyze(
+            Method(compilation, "InterpolatedString"));
         var interpolatedConstant = session.Analyze(
             Method(compilation, "InterpolatedConstant"));
 
@@ -81,6 +85,15 @@ public sealed class EffectAnalysisTests
             Is.EqualTo(EffectAllocationKind.Unknown));
         Assert.That(interpolated.Summary.Throws.IncludesUnknown, Is.True);
         Assert.That(interpolated.Projection.IsComplete, Is.False);
+        Assert.That(
+            interpolatedString.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Unknown));
+        Assert.That(
+            interpolatedString.Summary.Throws.IncludesUnknown,
+            Is.True);
+        Assert.That(
+            interpolatedString.Projection.IsComplete,
+            Is.False);
         Assert.That(
             interpolatedConstant.Summary.Allocation,
             Is.EqualTo(EffectAllocationKind.None));
@@ -2184,6 +2197,48 @@ public sealed class EffectAnalysisTests
                 session.Analyze(Method(compilation, "NonReturningFinally"))
                     .Summary.Throws.IsEmpty,
                 Is.True);
+        }
+    }
+
+    [Test]
+    public void CatchVariableFlowUsesTheEffectDiscoveryCatalog()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Sample {
+                public static Exception Capture() {
+                    try {
+                        throw new Exception();
+                    }
+                    catch (Exception caught) {
+                        return caught;
+                    }
+                }
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation)
+            .Analyze(Method(compilation, "Capture"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Uncertainty &
+                EffectUncertainty.UnsupportedOperation,
+                Is.EqualTo(EffectUncertainty.None));
+            Assert.That(
+                result.Summary.AnalysisIncompleteReason,
+                Is.EqualTo(EffectAnalysisIncompleteReason.None));
+            Assert.That(
+                result.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(result.Summary.Throws.IsEmpty, Is.True);
+            Assert.That(result.Projection.IsComplete, Is.True);
         }
     }
 

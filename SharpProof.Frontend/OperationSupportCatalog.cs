@@ -84,7 +84,6 @@ internal static class OperationSupportCatalog
             OperationKind.Parenthesized or
             OperationKind.ConditionalAccess or
             OperationKind.ConditionalAccessInstance or
-            OperationKind.InterpolatedString or
             OperationKind.ObjectOrCollectionInitializer or
             OperationKind.MemberInitializer or
             OperationKind.NameOf or

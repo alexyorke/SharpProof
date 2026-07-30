@@ -701,6 +701,43 @@ public sealed class FrontendLoweringTests
                 "4C2849F3D16A580C09BBB46C9526EBC1404405C9FA54A4056D631269AE2BC736"));
     }
 
+    [Test]
+    public void StageSpecificOperationClassifiersMatchTheClosedCatalog()
+    {
+        var kinds = OperationSubsetClassifier.GetKnownOperationKinds();
+        foreach (var stage in Enum.GetValues<OperationSupportStage>())
+        {
+            foreach (var kind in kinds)
+            {
+                var classification =
+                    OperationSubsetClassifier.Classify(stage, kind);
+                Assert.That(
+                    classification.IsExact,
+                    Is.EqualTo(
+                        OperationSupportCatalog.IsSupported(stage, kind)),
+                    $"{stage}:{kind}");
+            }
+
+            Assert.That(
+                OperationSubsetClassifier.Classify(
+                    stage,
+                    (OperationKind)int.MaxValue).Abstention,
+                Is.EqualTo(FrontendAbstention.UnknownOperationKind),
+                stage.ToString());
+        }
+
+        Assert.That(
+            OperationSubsetClassifier.Classify(
+                OperationSupportStage.EffectDiscovery,
+                OperationKind.CaughtException).IsExact,
+            Is.True);
+        Assert.That(
+            OperationSubsetClassifier.Classify(
+                OperationSupportStage.EffectDiscovery,
+                OperationKind.InterpolatedString).Abstention,
+            Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
+    }
+
     private static void AssertClassification(
         string members,
         FrontendSubsetDecision decision,

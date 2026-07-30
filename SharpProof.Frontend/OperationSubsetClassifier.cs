@@ -4,6 +4,15 @@ public static class OperationSubsetClassifier
 {
     public static FrontendSubsetClassification Classify(OperationKind kind)
     {
+        return Classify(
+            OperationSupportStage.ContractExpressionLowering,
+            kind);
+    }
+
+    internal static FrontendSubsetClassification Classify(
+        OperationSupportStage stage,
+        OperationKind kind)
+    {
         if (!Enum.IsDefined(typeof(OperationKind), kind))
         {
             return FrontendSubsetClassification.Abstain(
@@ -11,7 +20,7 @@ public static class OperationSubsetClassifier
         }
 
         if (OperationSupportCatalog.IsSupported(
-                OperationSupportStage.ContractExpressionLowering,
+                stage,
                 kind))
         {
             return FrontendSubsetClassification.Exact;

@@ -608,7 +608,9 @@ internal sealed class OperationEffectScanner
 
     private EffectSummary ScanDefault(IOperation operation)
     {
-        var classification = OperationSubsetClassifier.Classify(operation.Kind);
+        var classification = OperationSubsetClassifier.Classify(
+            OperationSupportStage.EffectDiscovery,
+            operation.Kind);
         var children = ScanChildren(operation);
         return classification.IsExact || IsEffectNeutralContainer(operation)
             ? children

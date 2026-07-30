@@ -72,6 +72,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~UnverifiedReturnAnnotationsCannotDischargeRuntimeExceptions'
     },
     [pscustomobject]@{
+        Name = 'effect-discovery-operation-stage'
+        File = 'SharpProof.Effects\OperationEffectScanner.cs'
+        Original = '            OperationSupportStage.EffectDiscovery,'
+        Mutated = '            OperationSupportStage.ContractExpressionLowering,'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~CatchVariableFlowUsesTheEffectDiscoveryCatalog'
+    },
+    [pscustomobject]@{
+        Name = 'runtime-interpolation-fails-closed'
+        File = 'SharpProof.Frontend\OperationSupportCatalog.cs'
+        Original = "            OperationKind.ConditionalAccessInstance or`n            OperationKind.ObjectOrCollectionInitializer or"
+        Mutated = "            OperationKind.ConditionalAccessInstance or`n            OperationKind.InterpolatedString or`n            OperationKind.ObjectOrCollectionInitializer or"
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~StringConstructionDistinguishesKnownAndUnknownAllocation'
+    },
+    [pscustomobject]@{
         Name = 'advisory-contract-candidate-detection'
         File = 'SharpProof.Frontend\ContractApiMetadata.cs'
         Original = '        EnsuresMethodName,'
@@ -102,6 +118,14 @@ $mutations = @(
         Mutated = '            "NotNullAttribute" or'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~UnannotatedCallerStillChecksExternalClosedPreconditions'
+    },
+    [pscustomobject]@{
+        Name = 'compilation-reference-model-owner'
+        File = 'SharpProof.Frontend\CompilationModelProvider.cs'
+        Original = '        return owner.GetSemanticModel(tree, ignoreAccessibility: false);'
+        Mutated = '        return compilation.GetSemanticModel(tree, ignoreAccessibility: false);'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~CompilationReferenceNestedParameterContractActivatesCallAnalysis'
     },
     [pscustomobject]@{
         Name = 'generated-selected-analysis-accountability'
