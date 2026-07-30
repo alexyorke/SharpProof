@@ -3121,6 +3121,35 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task RehashedCacheSealedForDifferentManifestMissesAndRecomputes()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        var backend = new SpuriousModelBackend();
+        using var worker = new SharpProofWorker(backend);
+        var first = await worker.VerifyAsync(request);
+        await RewriteCachedPayloadAsync(
+            project,
+            payload => payload["manifestHash"] = new string('c', 64));
+
+        var second = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                first.Summary.CacheStatus,
+                Is.EqualTo(WorkerCacheStatus.Written));
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(
+                second.Summary.CacheStatus,
+                Is.EqualTo(WorkerCacheStatus.Written));
+            Assert.That(
+                second.ClaimResults.Single().Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
+        }
+    }
+
+    [Test]
     public async Task RehashedCacheWithInvalidScalarModelMissesAndRecomputes()
     {
         using var project = TestProject.Create(RefutationSource);
@@ -3736,13 +3765,21 @@ public sealed class WorkerTests
         TestProject project,
         Action<JsonObject> mutate)
     {
+        await RewriteCachedPayloadAsync(
+            project,
+            payload => mutate(payload["claimResults"]![0]!.AsObject()));
+    }
+
+    private static async Task RewriteCachedPayloadAsync(
+        TestProject project,
+        Action<JsonObject> mutate)
+    {
         var path = CacheFiles(project).Single();
         var envelope = JsonNode.Parse(
             await File.ReadAllTextAsync(path))!.AsObject();
         var payload = JsonNode.Parse(
             envelope["payload"]!.GetValue<string>())!.AsObject();
-        var claim = payload["claimResults"]![0]!.AsObject();
-        mutate(claim);
+        mutate(payload);
         var payloadJson = payload.ToJsonString(
             WorkerProtocolJson.Options);
         envelope["payload"] = payloadJson;

@@ -62,6 +62,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~ResolverRejectsATypeFromAnUnapprovedAssemblyIdentity'
     },
     [pscustomobject]@{
+        Name = 'untrusted-return-annotation'
+        File = 'SharpProof.Effects\ManagedAbstractFlow.cs'
+        Original = "_trustedBoundaries.AuthorizesDeclaredContracts(method))"
+        Mutated = 'method.ContainingAssembly != null)'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~UnverifiedReturnAnnotationsCannotDischargeRuntimeExceptions'
+    },
+    [pscustomobject]@{
+        Name = 'trusted-boundary-nonblank-reason'
+        File = 'SharpProof.Effects\TrustedBoundaryPolicy.cs'
+        Original = '!string.IsNullOrWhiteSpace(reason));'
+        Mutated = 'reason != "\0");'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~UnverifiedReturnAnnotationsCannotDischargeRuntimeExceptions'
+    },
+    [pscustomobject]@{
         Name = 'counterexample-replay-polarity'
         File = 'SharpProof.Worker\CallableCounterexampleReplayer.cs'
         Original = 'evaluated.Value is { Kind: IrValueKind.Boolean, Boolean: false }'
@@ -107,7 +123,7 @@ $mutations = @(
         Original = '!string.Equals(payload.ManifestHash, manifest.Hash, StringComparison.Ordinal) ||'
         Mutated = 'false ||'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
-        Filter = 'FullyQualifiedName~CacheRejectsPayloadSealedForADifferentManifest'
+        Filter = 'FullyQualifiedName~RehashedCacheSealedForDifferentManifestMissesAndRecomputes'
     },
     [pscustomobject]@{
         Name = 'protocol-manifest-result-equality'
@@ -127,7 +143,7 @@ $mutations = @(
     }
 )
 
-$mutationRoot = Join-Path $repositoryRoot 'artifacts\mutation'
+$mutationRoot = Join-Path ([IO.Path]::GetTempPath()) 'SharpProof-mutation'
 $workspace = Join-Path $mutationRoot (
     'workspace-' + [Guid]::NewGuid().ToString('N'))
 $sourceRoot = Join-Path $workspace 'source'
