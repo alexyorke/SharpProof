@@ -190,6 +190,28 @@ public sealed class FinalCompilationProbeTests
     }
 
     [Test]
+    public async Task PackedCollectorEmitsManifestBeforeUnsupportedHostRejection()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = ProbeWorkspace.Create();
+        workspace.WritePackedConsumer(feed.Version);
+
+        var restore = await workspace.RestoreAsync(feed.Source);
+        Assert.That(restore.ExitCode, Is.Zero, restore.Output);
+
+        var build = await workspace.RebuildAsync(
+            forceUnsupportedWorkerHost: true);
+        Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+        Assert.That(
+            build.Output,
+            Does.Contain(
+                "SharpProof out-of-process verification is supported only on Windows x64"));
+        _ = await ProbeArtifact.ReadAsync(workspace.PackedProbeArtifactPath);
+        _ = await CompilerManifestArtifact.ReadAsync(
+            workspace.CompilerManifestPath);
+    }
+
+    [Test]
     public async Task GeneratedRefutationTraversesArtifactReplayAndCache()
     {
         if (!IsSupportedWorkerHost)
@@ -666,9 +688,10 @@ public sealed class FinalCompilationProbeTests
             ]);
         }
 
-        internal Task<ProcessResult> RebuildAsync()
+        internal Task<ProcessResult> RebuildAsync(
+            bool forceUnsupportedWorkerHost = false)
         {
-            return RunDotNetAsync([
+            var arguments = new List<string> {
                 "build",
                 ProjectPath,
                 "-t:Rebuild",
@@ -678,7 +701,13 @@ public sealed class FinalCompilationProbeTests
                 "--nologo",
                 "/nodeReuse:false",
                 "-p:UseSharedCompilation=false"
-            ]);
+            };
+            if (forceUnsupportedWorkerHost)
+            {
+                arguments.Add("-p:_SharpProofVerifierHostSupported=false");
+            }
+
+            return RunDotNetAsync([.. arguments]);
         }
 
         internal Task<ProcessResult> VerifyPackedArtifactAsync()
@@ -873,6 +902,7 @@ public sealed class FinalCompilationProbeTests
                     <SharpProofVerifyRequestFile>{Escape(Path.Combine(_root, "published", "request.json"))}</SharpProofVerifyRequestFile>
                     <SharpProofVerifyResultFile>{Escape(VerifyResultPath)}</SharpProofVerifyResultFile>
                     <SharpProofCompilerManifestFile>{Escape(CompilerManifestPath)}</SharpProofCompilerManifestFile>
+                    <_SharpProofCompilerManifestPath>{Escape(CompilerManifestPath)}</_SharpProofCompilerManifestPath>
                     <SharpProofVerifyCacheDirectory>{Escape(Path.Combine(_root, "published", "cache"))}</SharpProofVerifyCacheDirectory>
                     <_SharpProofCompilationTargetFramework>$(TargetFramework)</_SharpProofCompilationTargetFramework>
                     <_SharpProofProjectDirectory>$(MSBuildProjectDirectory)</_SharpProofProjectDirectory>
