@@ -256,6 +256,62 @@ function Invoke-ConsumerDotNet {
     }
 }
 
+function Assert-SharpProofPortableAnalyzerItem {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Output,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Framework
+    )
+
+    try {
+        $evaluation = $Output | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        throw (
+            "The $Framework package consumer returned malformed evaluated " +
+            "MSBuild analyzer items: $($_.Exception.Message)")
+    }
+
+    $analyzerItems = @($evaluation.Items.Analyzer)
+    $sharpProofItems = @(
+        $analyzerItems |
+            Where-Object {
+                ([string]$_.Identity) -match
+                    '[/\\]SharpProof\.[^/\\]+\.dll$'
+            }
+    )
+    $entryPoints = @(
+        $sharpProofItems |
+            Where-Object {
+                $_.SharpProofAnalyzerRole -eq 'EntryPoint'
+            }
+    )
+    $entryPointNames = @(
+        $entryPoints |
+            ForEach-Object {
+                (([string]$_.Identity) -replace '\\', '/') -split '/' |
+                    Select-Object -Last 1
+            }
+    )
+    $legacyEntryPoints = @(
+        $sharpProofItems |
+            Where-Object {
+                (([string]$_.Identity) -replace '\\', '/') -match
+                    '/SharpProof\.(Analyzer|ContractForGenerator)\.dll$'
+            }
+    )
+
+    if ($entryPointNames.Count -ne 1 -or
+        $entryPointNames[0] -ne 'SharpProof.PortableAnalyzer.dll' -or
+        $legacyEntryPoints.Count -ne 0) {
+        throw (
+            "The $Framework package consumer must load exactly the portable " +
+            'SharpProof analyzer entry point and no legacy split entry points.')
+    }
+}
+
 function Test-SharpProofFrameworkConsumers {
     param(
         [Parameter(Mandatory = $true)]
@@ -415,13 +471,9 @@ function Test-SharpProofFrameworkConsumers {
                     '--nologo') `
                 -RepositoryRoot $RepositoryRoot `
                 -WindowsHost $WindowsHost
-            if ($analyzers -notmatch 'SharpProof\.Analyzer\.dll' -or
-                $analyzers -notmatch
-                    'SharpProof\.ContractForGenerator\.dll') {
-                throw (
-                    "The $framework package consumer did not load both " +
-                    'SharpProof analyzer entry points.')
-            }
+            Assert-SharpProofPortableAnalyzerItem `
+                -Output $analyzers `
+                -Framework $framework
             Invoke-ConsumerDotNet `
                 -WorkingDirectory $consumer `
                 -Arguments @(
