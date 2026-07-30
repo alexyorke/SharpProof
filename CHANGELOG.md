@@ -22,8 +22,8 @@ contain documented breaking changes.
 - Central package versions, dependency auditing, coverage baselines,
   changed-TCB coverage enforcement, retained/rotating fuzz campaigns, and
   scheduled security and acceptance workflows.
-- Immutable tag/package/version/hash, master-ancestry, and predecessor-order
-  validation plus an owner-gated NuGet
+- Immutable tag/package/version/hash, master-ancestry, predecessor-order, and
+  full-release-delta coverage validation plus an owner-gated NuGet
   promotion workflow that sends `1.0.0-preview.1` to a protected private feed,
   then uses trusted publishing for public `preview.2`, `rc.1`, and `1.0.0`
   while promoting the already-tested bytes. Existing V3 packages must match

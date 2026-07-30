@@ -55,27 +55,9 @@ jobs:
             if ($LASTEXITCODE -ne 0) {
               throw 'Release tags must identify a commit contained in origin/master.'
             }
-            $previousTag = switch ($env:GITHUB_REF_NAME) {
-              'v1.0.0-preview.1' { $null }
-              'v1.0.0-preview.2' { 'v1.0.0-preview.1' }
-              'v1.0.0-rc.1' { 'v1.0.0-preview.2' }
-              'v1.0.0' { 'v1.0.0-rc.1' }
-              default {
-                throw "Release tag '$($env:GITHUB_REF_NAME)' is not allowlisted."
-              }
-            }
-            if ($null -ne $previousTag) {
-              & git rev-parse --verify "$previousTag^{commit}"
-              if ($LASTEXITCODE -ne 0) {
-                throw "Required predecessor tag '$previousTag' does not exist."
-              }
-              & git merge-base --is-ancestor $previousTag $env:GITHUB_SHA
-              if ($LASTEXITCODE -ne 0) {
-                throw (
-                  "Required predecessor tag '$previousTag' is not an " +
-                  'ancestor of this release.')
-              }
-            }
+            $null = .\scripts\Resolve-SharpProofReleaseCoverageBaseline.ps1 `
+              -Tag $env:GITHUB_REF_NAME `
+              -ReleaseCommit $env:GITHUB_SHA
           }
           "SHARPPROOF_RELEASE_VERSION=$version" >> $env:GITHUB_ENV
 
@@ -305,6 +287,19 @@ jobs:
           dotnet-version: "8.0.x"
           global-json-file: global.json
 
+      - name: Resolve the immutable release coverage baseline
+        shell: pwsh
+        run: |
+          $selectionJson = `
+            .\scripts\Resolve-SharpProofReleaseCoverageBaseline.ps1 `
+              -Tag $env:GITHUB_REF_NAME `
+              -ReleaseCommit $env:GITHUB_SHA
+          $selection = $selectionJson | ConvertFrom-Json
+          $coverageBaseline = [string]$selection.coverageBaselineCommit
+          $releaseCommit = [string]$selection.releaseCommit
+          "SHARPPROOF_COVERAGE_BASELINE=$coverageBaseline" >> $env:GITHUB_ENV
+          "SHARPPROOF_RELEASE_COMMIT=$releaseCommit" >> $env:GITHUB_ENV
+
       - name: Restore the exact tagged source
         shell: pwsh
         run: .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
@@ -350,7 +345,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           .\scripts\Test-SharpProofCoverage.ps1 `
             -CoverageRoot artifacts/release-qualification/coverage `
-            -ComparisonRef HEAD^ `
+            -ComparisonRef $env:SHARPPROOF_COVERAGE_BASELINE `
             -SummaryPath artifacts/release-qualification/coverage.json
 
       - name: Audit the exact release dependency graph
@@ -373,9 +368,10 @@ jobs:
         shell: pwsh
         run: |
           $evidence = [pscustomobject][ordered]@{
-            schemaVersion = 1
+            schemaVersion = 2
             tag = $env:GITHUB_REF_NAME
-            commit = $env:GITHUB_SHA
+            releaseCommit = $env:SHARPPROOF_RELEASE_COMMIT
+            coverageBaselineCommit = $env:SHARPPROOF_COVERAGE_BASELINE
             acceptance = 'passed'
             corpus = 'passed'
             performance = 'passed'

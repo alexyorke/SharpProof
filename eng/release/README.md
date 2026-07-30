@@ -5,8 +5,14 @@ performance, security, provenance, and exact-SHA gates. It cannot manufacture
 pilot-library history, independent human review, or GitHub repository
 protection settings.
 
-The preview and RC tags run the automated exact-SHA qualification job. Before
-creating `v1.0.0`, the repository owner must copy
+The preview and RC tags run the automated exact-SHA qualification job. Coverage
+is measured across the complete release delta: `preview.1` is anchored to the
+checked-in pre-hardening commit, and each later release is anchored to the
+resolved commit of its allowlisted predecessor tag. The qualification evidence
+records both immutable commit SHAs, and the job rejects a missing, equal, or
+non-ancestor baseline.
+
+Before creating `v1.0.0`, the repository owner must copy
 `human-gates.template.json` to the intentionally untracked-by-default evidence
 path `human-gates.json`, replace every placeholder with real evidence for the
 exact release commit, and commit that file. The final publication job validates:
