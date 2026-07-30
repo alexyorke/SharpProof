@@ -57,7 +57,10 @@ public sealed class ArchitectureTests
             ["SharpProof.ContractForGenerator"] = ["SharpProof.Contracts"],
             ["SharpProof.Specs"] = ["SharpProof.Ir"],
             ["SharpProof.Dataflow"] = [],
-            ["SharpProof.Frontend"] = ["SharpProof.Ir"],
+            ["SharpProof.Frontend"] = [
+                "SharpProof.Attributes",
+                "SharpProof.Ir"
+            ],
             ["SharpProof.Contracts"] = [
                 "SharpProof.Frontend",
                 "SharpProof.Ir"
@@ -376,6 +379,7 @@ public sealed class ArchitectureTests
             StringComparer.Ordinal)
         {
             ["discovery"] = [
+                "SharpProof.Analyzer/SharpProofAnalyzer.cs",
                 "SharpProof.Analyzer/ContractRuntimePolicy.cs",
                 "SharpProof.Analyzer/FinalCompilationCollector.cs",
                 "SharpProof.Analyzer/CompilerArtifact/ClaimManifestBuilder.cs",
@@ -384,7 +388,8 @@ public sealed class ArchitectureTests
                 "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
                 "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
                 "SharpProof.Frontend/ContractApiIdentityResolver.cs",
-                "SharpProof.Frontend/ContractApiMetadata.cs"
+                "SharpProof.Frontend/ContractApiMetadata.cs",
+                "SharpProof.Frontend/SharpProof.Frontend.csproj"
             ],
             ["lowering"] = [
                 "SharpProof.Analyzer/CompilerArtifact/CompilerCallableLowerer.cs",
@@ -432,10 +437,15 @@ public sealed class ArchitectureTests
                 "SharpProof.Frontend/CSharpScalarSemantics.generated.cs"
             ],
             ["effectAnalysis"] = [
+                "SharpProof.Analyzer/CallArgumentAliasPolicy.cs",
+                "SharpProof.Analyzer/EffectCallPreconditionPolicy.cs",
                 "SharpProof.Analyzer/EffectContractDiagnostics.cs",
                 "SharpProof.Analyzer/AnalyzerSession.cs",
+                "SharpProof.Analyzer/ManagedContractFacts.cs",
                 "SharpProof.Contracts/ContractSelectionInventory.cs",
                 "SharpProof.Effects/EffectAnalysisSession.cs",
+                "SharpProof.Effects/EffectCallPreconditionPolicy.cs",
+                "SharpProof.Effects/EffectCallSiteResolver.cs",
                 "SharpProof.Effects/EffectCallGraph.cs",
                 "SharpProof.Effects/EffectMethodNodeBuilder.cs",
                 "SharpProof.Effects/EffectContractMappings.cs",
@@ -626,10 +636,7 @@ public sealed class ArchitectureTests
             "SharpProof.Frontend",
             "ContractApiMetadata.cs"));
         var violations = ProductionProjects
-            .SelectMany(project => Directory.EnumerateFiles(
-                Path.Combine(root, project),
-                "*.cs",
-                SearchOption.AllDirectories))
+            .SelectMany(ProductionSourceFiles)
             .Where(path => !string.Equals(
                 Path.GetFullPath(path),
                 catalog,

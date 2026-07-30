@@ -236,6 +236,42 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task AssignmentArgumentUsesItsRightHandEvaluationPoint()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void RequireTwo(int value) {
+                    Contract.Requires(value == 2);
+                }
+
+                private static void RequireOne(int value) {
+                    Contract.Requires(value == 1);
+                }
+
+                public static void Call() {
+                    var value = 1;
+                    RequireTwo(value = value + 1);
+                    value = 1;
+                    RequireOne(value = value + 1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+        Assert.That(
+            diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+            Does.StartWith(
+                "Call to 'RequireOne' violates precondition "));
+    }
+
+    [Test]
     public async Task DefinitelyNonThrowingSourcePrefixPreservesRefutation()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

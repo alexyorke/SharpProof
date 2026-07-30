@@ -48,12 +48,102 @@ public sealed class AnalyzerModeAndEffectTests
     [Test]
     public async Task DefaultAdvisoryAllKeepsUnannotatedCodeQuiet()
     {
+        var factory = new ThrowingSessionFactory();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             "public static class Fixture { public static int Add(int x) => x + 1; }",
             mode: null,
-            []);
+            [],
+            new SharpProofAnalyzer(factory));
 
         Assert.That(diagnostics, Is.Empty);
+        Assert.That(factory.CreateCount, Is.Zero);
+    }
+
+    [Test]
+    public async Task StrictProfileDoesNotUseTheAdvisoryFastPath()
+    {
+        var factory = new SpecReuseSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            "public static class Fixture { public static int Add(int x) => x + 1; }",
+            mode: null,
+            [],
+            new SharpProofAnalyzer(factory),
+            profile: "strict");
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(factory.Session, Is.Not.Null);
+    }
+
+    [TestCase(
+        "using System; public static class Fixture { " +
+        "[Obsolete] public static int Read() => 1; }")]
+    [TestCase(
+        "public static class Fixture { " +
+        "public static int Read(int value) => System.Math.Abs(value); }")]
+    [TestCase(
+        "public static class Fixture { " +
+        "public static object Create() => new object(); }")]
+    [TestCase(
+        "public class Base { } public sealed class Derived : Base { }")]
+    [TestCase(
+        "public static class Fixture { " +
+        "public static int Read() { return 1; } }")]
+    public async Task AdvisoryPotentialWorkDoesNotUseTheFastPath(
+        string source)
+    {
+        var factory = new SpecReuseSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            source,
+            mode: null,
+            [],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(factory.Session, Is.Not.Null);
+    }
+
+    [Test]
+    public async Task OrdinaryAssemblyMetadataDoesNotDefeatTheFastPath()
+    {
+        var factory = new ThrowingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+
+            [assembly: CLSCompliant(true)]
+
+            public static class Fixture {
+                public static int Read(int value) => value + 1;
+            }
+            """,
+            mode: null,
+            [],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(factory.CreateCount, Is.Zero);
+    }
+
+    [Test]
+    public async Task SharpProofAssemblyMetadataDefeatsTheFastPath()
+    {
+        var factory = new SpecReuseSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            [assembly: SharpProofTrusted("reviewed")]
+
+            public static class Fixture {
+                public static int Read(int value) => value + 1;
+            }
+            """,
+            mode: null,
+            [],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(factory.Session, Is.Not.Null);
     }
 
     [Test]
@@ -301,6 +391,535 @@ public sealed class AnalyzerModeAndEffectTests
             ["SP0016", "SP0046"]);
 
         Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task EffectProofRequiresEstablishedCalleePreconditions()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void Restricted(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                [DoesNotThrow]
+                public static void Proven(int value) {
+                    Contract.Requires(value > 0);
+                    Restricted(value);
+                }
+
+                [DoesNotThrow]
+                public static void Unknown(int value) =>
+                    Restricted(value);
+            }
+            """,
+            "effects",
+            ["SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(
+                static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0047"]));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics[0].GetMessage(
+                    CultureInfo.InvariantCulture),
+                Does.Contain(
+                    "CallPreconditionNotProven"));
+            Assert.That(
+                factory.Outcomes["Proven"],
+                Is.EqualTo(
+                    AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["Unknown"],
+                Is.EqualTo(
+                    AnalyzerSemanticOutcome.Unknown));
+        }
+    }
+
+    [Test]
+    public async Task LaterArgumentMutationCannotProveEarlierCalleeArgument()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Divide(
+                    int denominator,
+                    int ignored) {
+                    Contract.Requires(denominator > 0);
+                    return 1 / denominator;
+                }
+
+                [DoesNotThrow]
+                public static int Call() {
+                    var value = 0;
+                    return Divide(value, value = 1);
+                }
+            }
+            """,
+            "effects",
+            ["SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(
+                static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0047"]));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics[0].GetMessage(
+                    CultureInfo.InvariantCulture),
+                Does.Contain(
+                    "CallPreconditionNotProven"));
+            Assert.That(
+                factory.Outcomes["Call"],
+                Is.EqualTo(
+                    AnalyzerSemanticOutcome.Unknown));
+        }
+    }
+
+    [Test]
+    public async Task MutationInsideAnArgumentCannotProveCalleePreconditions()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void RequireZero(int value) {
+                    Contract.Requires(value == 0);
+                    if (value != 0) {
+                        throw new InvalidOperationException();
+                    }
+                }
+
+                [DoesNotThrow]
+                public static void Call() {
+                    var value = 1;
+                    RequireZero(value + (value = 0));
+                }
+            }
+            """,
+            "effects",
+            ["SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(
+                static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0047"]));
+        Assert.That(
+            diagnostics[0].GetMessage(
+                CultureInfo.InvariantCulture),
+            Does.Contain(
+                "CallPreconditionNotProven"));
+        Assert.That(
+            factory.Outcomes["Call"],
+            Is.EqualTo(
+                AnalyzerSemanticOutcome.Unknown));
+    }
+
+    [Test]
+    public async Task ExpandedParamsCallsRemainIncompleteAndAccountForTheArray()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void RequireNull(
+                    params string?[] values) {
+                    Contract.Requires(values == null);
+                    if (values != null) {
+                        throw new InvalidOperationException();
+                    }
+                }
+
+                private static void Free(
+                    params string?[] values) {
+                }
+
+                [DoesNotThrow]
+                public static void ExceptionClaim() =>
+                    RequireNull((string?)null);
+
+                [ZeroAllocations]
+                public static void AllocationClaim() =>
+                    Free((string?)null);
+            }
+            """,
+            "effects",
+            ["SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(diagnostics, Is.Not.Empty);
+        Assert.That(
+            diagnostics.Select(
+                static diagnostic => diagnostic.Id),
+            Has.All.EqualTo("SP0047"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                factory.Outcomes["ExceptionClaim"],
+                Is.Not.EqualTo(
+                    AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["AllocationClaim"],
+                Is.Not.EqualTo(
+                    AnalyzerSemanticOutcome.Proven));
+        }
+    }
+
+    [Test]
+    public async Task ComputedPropertySetterPreconditionsDoNotUseAnOperandAsTheStoredValue()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Fixture {
+                private int _value;
+
+                private int Restricted {
+                    [return: Positive]
+                    get => _value;
+                    set {
+                        Contract.Requires(value > 0);
+                        _value = value;
+                    }
+                }
+
+                [DoesNotThrow]
+                public void Add(int rhs) {
+                    Contract.Requires(rhs > 0);
+                    Restricted += rhs;
+                }
+
+                [DoesNotThrow]
+                public void Increment() =>
+                    Restricted++;
+            }
+            """,
+            "effects",
+            ["SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(
+                static diagnostic => diagnostic.Id),
+            Is.EqualTo([
+                "SP0047",
+                "SP0047"
+            ]));
+        Assert.That(
+            diagnostics.Select(diagnostic =>
+                diagnostic.GetMessage(
+                    CultureInfo.InvariantCulture)),
+            Has.All.Contain(
+                "CallPreconditionNotProven"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                factory.Outcomes["Add"],
+                Is.EqualTo(
+                    AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["Increment"],
+                Is.EqualTo(
+                    AnalyzerSemanticOutcome.Unknown));
+        }
+    }
+
+    [Test]
+    public async Task InArgumentEffectsFailClosedAtTheCurrentSubsetBoundary()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Divide(
+                    in int denominator,
+                    int ignored) {
+                    Contract.Requires(denominator > 0);
+                    return 1 / denominator;
+                }
+
+                [DoesNotThrow]
+                public static int RvalueSnapshot() {
+                    var value = 0;
+                    return Divide(value + 0, value = 1);
+                }
+
+                [DoesNotThrow]
+                public static int ExplicitAlias() {
+                    var value = 1;
+                    return Divide(in value, value = 0);
+                }
+            }
+            """,
+            "effects",
+            ["SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(
+                static diagnostic => diagnostic.Id),
+            Is.EqualTo([
+                "SP0047",
+                "SP0047"
+            ]));
+        Assert.That(
+            diagnostics.Select(diagnostic =>
+                diagnostic.GetMessage(
+                    CultureInfo.InvariantCulture)),
+            Has.All.Contain(
+                "UnsupportedOperationShape"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                factory.Outcomes["RvalueSnapshot"],
+                Is.EqualTo(
+                    AnalyzerSemanticOutcome.Abstained));
+            Assert.That(
+                factory.Outcomes["ExplicitAlias"],
+                Is.EqualTo(
+                    AnalyzerSemanticOutcome.Abstained));
+        }
+    }
+
+    [Test]
+    public async Task ExternalClosedPreconditionMustAlsoBeEstablished()
+    {
+        var external = AnalyzerTestHost.EmitReference(
+            """
+            using SharpProof.Attributes;
+
+            public static class ExternalFixture {
+                [SharpProofTrusted("reviewed external implementation")]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    IsDeterministic = true,
+                    Complete = true)]
+                public static void Restricted(
+                    [Positive] int value) {
+                }
+            }
+            """,
+            "ExternalPreconditionFixture");
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [DoesNotThrow]
+                public static void Proven() =>
+                    ExternalFixture.Restricted(1);
+
+                [DoesNotThrow]
+                public static void Unknown(int value) =>
+                    ExternalFixture.Restricted(value);
+            }
+            """,
+            "effects",
+            ["SP0047"],
+            new SharpProofAnalyzer(factory),
+            additionalReferences: [external]);
+
+        Assert.That(
+            diagnostics.Select(
+                static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0047"]));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics[0].GetMessage(
+                    CultureInfo.InvariantCulture),
+                Does.Contain(
+                    "CallPreconditionNotProven"));
+            Assert.That(
+                factory.Outcomes["Proven"],
+                Is.EqualTo(
+                    AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["Unknown"],
+                Is.EqualTo(
+                    AnalyzerSemanticOutcome.Unknown));
+        }
+    }
+
+    [Test]
+    public async Task InvalidlyPlacedCallerRequiresCannotCleanEffectSummary()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void Restricted(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                [DoesNotThrow]
+                public static void CallAfterLateRequires(
+                    int value) {
+                    _ = value;
+                    Contract.Requires(value > 0);
+                    Restricted(value);
+                }
+
+                [DoesNotThrow]
+                public static void CallAfterConditionalRequires(
+                    int value) {
+                    if (value > 0) {
+                        Contract.Requires(value > 0);
+                    }
+                    Restricted(value);
+                }
+
+                [DoesNotThrow]
+                public static void CallAfterMixedRequires(
+                    int value) {
+                    Contract.Requires(value != 0);
+                    _ = value;
+                    Contract.Requires(value > 0);
+                    Restricted(value);
+                }
+            }
+            """,
+            "effects",
+            ["SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(
+                static diagnostic => diagnostic.Id),
+            Is.EqualTo([
+                "SP0047",
+                "SP0047",
+                "SP0047"
+            ]));
+        Assert.That(
+            diagnostics.Select(diagnostic =>
+                diagnostic.GetMessage(
+                    CultureInfo.InvariantCulture)),
+            Has.All.Contain(
+                "CallPreconditionNotProven"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                factory.Outcomes[
+                    "CallAfterLateRequires"],
+                Is.EqualTo(
+                    AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes[
+                    "CallAfterConditionalRequires"],
+                Is.EqualTo(
+                    AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes[
+                    "CallAfterMixedRequires"],
+                Is.EqualTo(
+                    AnalyzerSemanticOutcome.Unknown));
+        }
+    }
+
+    [Test]
+    public async Task CompanionPreconditionDoesNotContaminateOtherMember()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public sealed class Service {
+                public void Restricted(int value) {
+                }
+
+                public void Free() {
+                }
+            }
+
+            [ContractFor(typeof(Service))]
+            public static class ServiceContracts {
+                public static void Restricted(
+                    Service receiver,
+                    int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Free(
+                    Service receiver) {
+                }
+            }
+
+            public static class Fixture {
+                [DoesNotThrow]
+                public static void CallFree(
+                    [NotNull] Service service) =>
+                    service.Free();
+            }
+            """,
+            "effects",
+            ["SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(
+            factory.Outcomes["CallFree"],
+            Is.EqualTo(
+                AnalyzerSemanticOutcome.Proven));
+    }
+
+    [Test]
+    public async Task LateEnsuresDoesNotContaminateEntryPreconditionEvidence()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void Free() {
+                }
+
+                [DoesNotThrow]
+                public static void CallFree() {
+                    _ = 0;
+                    Contract.Ensures(true);
+                    Free();
+                }
+            }
+            """,
+            "effects",
+            ["SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(
+            factory.Outcomes["CallFree"],
+            Is.EqualTo(
+                AnalyzerSemanticOutcome.Proven));
     }
 
     [Test]

@@ -1,11 +1,17 @@
 using System.Collections.Concurrent;
+using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Security;
+using System.Security.Cryptography;
 
 namespace SharpProof.Frontend;
 
 internal sealed class ContractApiIdentityResolver
 {
     private const string AttributesAssemblyName = "SharpProof.Attributes";
+    private static readonly ImmutableArray<byte>
+        AttributesAssemblyPayloadSha256 =
+            ReadExpectedPayloadSha256();
     private static readonly Version AttributesAssemblyVersion =
         typeof(ContractApiIdentityResolver).Assembly.GetName().Version ??
         throw new InvalidOperationException(
@@ -50,6 +56,8 @@ internal sealed class ContractApiIdentityResolver
         Contract = IsTrustedReferenceType(
                 candidate,
                 ContractApiMetadata.Contract) &&
+            HasTrustedAttributesPayload(
+                candidate!.ContainingAssembly) &&
             HasValidContractShape(candidate!)
                 ? candidate
                 : null;
@@ -126,7 +134,12 @@ internal sealed class ContractApiIdentityResolver
     private AttributeResolution ResolveAttributeCore(string metadataName)
     {
         var candidate = _compilation.GetTypeByMetadataName(metadataName);
-        return new AttributeResolution(IsTrustedReferenceType(candidate, metadataName) &&
+        return new AttributeResolution(
+            Contract is { } contract &&
+            IsTrustedReferenceType(candidate, metadataName) &&
+            SymbolEqualityComparer.Default.Equals(
+                candidate!.ContainingAssembly,
+                contract.ContainingAssembly) &&
             IsAttribute(candidate!)
                 ? candidate
                 : null);
@@ -166,6 +179,113 @@ internal sealed class ContractApiIdentityResolver
             SymbolEqualityComparer.Default.Equals(
                 assembly,
                 referenced));
+    }
+
+    private bool HasTrustedAttributesPayload(
+        IAssemblySymbol assembly)
+    {
+        if (AttributesAssemblyPayloadSha256.IsDefaultOrEmpty)
+        {
+            return false;
+        }
+
+        var matches = _compilation.References
+            .Where(reference =>
+                SymbolEqualityComparer.Default.Equals(
+                    assembly,
+                    _compilation.GetAssemblyOrModuleSymbol(
+                        reference)))
+            .ToImmutableArray();
+        if (matches.Length != 1 ||
+            matches[0] is not
+                PortableExecutableReference matched ||
+            string.IsNullOrEmpty(matched.FilePath))
+        {
+            return false;
+        }
+
+        return matched.FilePath is { } path &&
+            HasExpectedPayloadHash(path);
+    }
+
+    private static bool HasExpectedPayloadHash(string path)
+    {
+        try
+        {
+            using var stream = File.Open(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read);
+            using var algorithm = SHA256.Create();
+            return algorithm.ComputeHash(stream).SequenceEqual(
+                AttributesAssemblyPayloadSha256);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (NotSupportedException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+        catch (SecurityException)
+        {
+            return false;
+        }
+        catch (CryptographicException)
+        {
+            return false;
+        }
+    }
+
+    private static ImmutableArray<byte>
+        ReadExpectedPayloadSha256()
+    {
+        var values = typeof(ContractApiIdentityResolver)
+            .Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .Where(static attribute => string.Equals(
+                attribute.Key,
+                ContractApiMetadata
+                    .AttributesPayloadSha256MetadataKey,
+                StringComparison.Ordinal))
+            .Select(static attribute => attribute.Value)
+            .Distinct(StringComparer.Ordinal)
+            .ToImmutableArray();
+        if (values.Length != 1 ||
+            values[0] is not
+            {
+                Length: 64
+            } value)
+        {
+            return [];
+        }
+
+        var result = ImmutableArray.CreateBuilder<byte>(32);
+        for (var index = 0; index < value.Length; index += 2)
+        {
+            if (!byte.TryParse(
+                    value.Substring(index, 2),
+                    NumberStyles.HexNumber,
+                    CultureInfo.InvariantCulture,
+                    out var parsed))
+            {
+                return [];
+            }
+
+            result.Add(parsed);
+        }
+
+        return result.MoveToImmutable();
     }
 
     private bool IsAttribute(INamedTypeSymbol candidate)

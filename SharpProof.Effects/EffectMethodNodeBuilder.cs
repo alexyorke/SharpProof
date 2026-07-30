@@ -65,6 +65,7 @@ internal sealed class EffectMethodNodeBuilder
 
         localSummary = EffectSummaryOperations.Join(
             localSummary,
+            _session.ResolveEntryPreconditions(method),
             scanner.ScanLexicalControlEffects(root),
             ScanConstructorMemberInitializers(method, scanner, cancellationToken),
             CanTriggerOwnTypeInitialization(method) &&

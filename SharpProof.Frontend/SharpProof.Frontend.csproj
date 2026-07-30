@@ -11,6 +11,8 @@
     <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj"
+                      ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
     <ProjectReference Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj"
                       OutputItemType="Analyzer"
@@ -21,4 +23,57 @@
     <InternalsVisibleTo Include="SharpProof.CompilerArtifact" />
     <InternalsVisibleTo Include="SharpProof.Effects" />
   </ItemGroup>
+  <Target Name="GenerateSharpProofAttributesPayloadIdentity"
+          BeforeTargets="CoreCompile"
+          DependsOnTargets="ResolveProjectReferences">
+    <PropertyGroup>
+      <_SharpProofAttributesPayloadIdentitySource>$(IntermediateOutputPath)SharpProof.Attributes.PayloadIdentity.g.cs</_SharpProofAttributesPayloadIdentitySource>
+      <_SharpProofAttributesPayloadIdentityTemporary>$(IntermediateOutputPath)SharpProof.Attributes.PayloadIdentity.tmp.cs</_SharpProofAttributesPayloadIdentityTemporary>
+    </PropertyGroup>
+    <MSBuild Projects="..\SharpProof.Attributes\SharpProof.Attributes.csproj"
+             Targets="GetTargetPath"
+             BuildInParallel="$(BuildInParallel)"
+             Properties="Configuration=$(Configuration);Platform=$(Platform);TargetFramework=netstandard2.0">
+      <Output TaskParameter="TargetOutputs"
+              ItemName="_SharpProofAttributesTargetPath" />
+    </MSBuild>
+    <Error Condition="'@(_SharpProofAttributesTargetPath)' == ''"
+           Text="SharpProof.Attributes target path was not resolved." />
+    <GetFileHash Files="@(_SharpProofAttributesTargetPath)"
+                 Algorithm="SHA256">
+      <Output TaskParameter="Items"
+              ItemName="_SharpProofAttributesHashed" />
+    </GetFileHash>
+    <ItemGroup>
+      <_SharpProofAttributesPayloadIdentity
+          Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>SharpProof.Attributes.SHA256</_Parameter1>
+        <_Parameter2>%(_SharpProofAttributesHashed.FileHash)</_Parameter2>
+      </_SharpProofAttributesPayloadIdentity>
+    </ItemGroup>
+    <WriteCodeFragment Language="C#"
+                       OutputFile="$(_SharpProofAttributesPayloadIdentityTemporary)"
+                       AssemblyAttributes="@(_SharpProofAttributesPayloadIdentity)" />
+    <GetFileHash Files="$(_SharpProofAttributesPayloadIdentityTemporary)"
+                 Algorithm="SHA256">
+      <Output TaskParameter="Items"
+              ItemName="_SharpProofAttributesPayloadIdentityTemporaryHash" />
+    </GetFileHash>
+    <GetFileHash Files="$(_SharpProofAttributesPayloadIdentitySource)"
+                 Algorithm="SHA256"
+                 Condition="Exists('$(_SharpProofAttributesPayloadIdentitySource)')">
+      <Output TaskParameter="Items"
+              ItemName="_SharpProofAttributesPayloadIdentitySourceHash" />
+    </GetFileHash>
+    <PropertyGroup>
+      <_SharpProofAttributesPayloadIdentityTemporaryHashValue>@(_SharpProofAttributesPayloadIdentityTemporaryHash->'%(FileHash)')</_SharpProofAttributesPayloadIdentityTemporaryHashValue>
+      <_SharpProofAttributesPayloadIdentitySourceHashValue>@(_SharpProofAttributesPayloadIdentitySourceHash->'%(FileHash)')</_SharpProofAttributesPayloadIdentitySourceHashValue>
+    </PropertyGroup>
+    <Copy SourceFiles="$(_SharpProofAttributesPayloadIdentityTemporary)"
+          DestinationFiles="$(_SharpProofAttributesPayloadIdentitySource)"
+          Condition="'$(_SharpProofAttributesPayloadIdentityTemporaryHashValue)' != '$(_SharpProofAttributesPayloadIdentitySourceHashValue)'" />
+    <ItemGroup>
+      <Compile Include="$(_SharpProofAttributesPayloadIdentitySource)" />
+    </ItemGroup>
+  </Target>
 </Project>

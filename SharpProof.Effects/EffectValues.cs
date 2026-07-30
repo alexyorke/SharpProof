@@ -91,7 +91,8 @@ internal enum EffectAnalysisIncompleteReason
     None = 0,
     BlockBudgetExceeded = 1 << 0,
     OperationBudgetExceeded = 1 << 1,
-    CyclicControlFlow = 1 << 2
+    CyclicControlFlow = 1 << 2,
+    CallPreconditionNotProven = 1 << 3
 }
 
 internal sealed class EffectDirectWitness(

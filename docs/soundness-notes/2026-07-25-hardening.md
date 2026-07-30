@@ -23,10 +23,10 @@ been completed.
   no alternate target can invoke the verifier core. The integration test omits
   `SharpProofVerify` entirely and supplies missing worker paths, so a successful
   build proves the default target did not execute.
-- Default-off timing now compares real baseline and SharpProof-imported MSBuild
-  rebuilds. A separate loaded-but-off analyzer canary asserts that no analysis
-  session or diagnostics are created. Retained-memory checks exercise the same
-  loaded-but-off boundary.
+- Unannotated advisory timing compares real baseline and
+  SharpProof-imported MSBuild rebuilds. A separate explicit-off package canary
+  asserts that no analyzer item is contributed. Retained-memory checks exercise
+  the unannotated advisory boundary and require quiet diagnostics.
 - Cache writes require a response accepted by
   `VerificationCache.IsCacheable`, containing only validated canonical
   terminal outcomes. Cache reads revalidate that payload; `Unknown`, malformed,
@@ -76,8 +76,9 @@ been completed.
   tests passed with one expected unsupported-host skip; all 1,000 fuzz cases
   agreed with zero abstentions.
 - The 480-case corpus, cache replay, concurrent replay, cancellation, package,
-  architecture, and performance gates passed. Default-off package rebuild
-  ratios were 1.004 median and 1.029 p95 in the final exact-code run.
+  architecture, and performance gates passed. Unannotated advisory package
+  rebuild ratios under the then-current estimator were 1.004 median and 1.029
+  p95 in the final exact-code run.
 - `scripts/Generate-Readme.ps1 -Verify`, `git diff --check`, and the changed-file
   LF/no-BOM scan passed.
 

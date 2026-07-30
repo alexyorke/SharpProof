@@ -737,6 +737,50 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void RejectedReturnAttributeCannotProveManifestEffectTransitively()
+    {
+        var result = Build((
+            "Subject.cs",
+            """
+            using SharpProof.Attributes;
+
+            namespace SharpProof.Attributes {
+                [System.AttributeUsage(
+                    System.AttributeTargets.ReturnValue)]
+                public sealed class NotNullAttribute :
+                    System.Attribute {
+                }
+            }
+
+            public static class Subject {
+                [return: SharpProof.Attributes.NotNull]
+                private static string MaybeNull(bool condition) {
+                    return condition ? "" : null!;
+                }
+
+                [DoesNotThrow]
+                public static int Call(bool condition) {
+                    return MaybeNull(condition).Length;
+                }
+            }
+            """));
+
+        var target = result.Targets.Values.Single(static candidate =>
+            candidate.Method.Name == "Call");
+        var evidence = target.EffectClaims.Single().Evidence;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(target.Method.Name, Is.EqualTo("Call"));
+            Assert.That(evidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence.Reason,
+                Is.EqualTo(WorkerClaimReason.EffectContractNotEstablished));
+            Assert.That(evidence.Evidence, Does.Contain("NullReferenceException"));
+        }
+    }
+
+    [Test]
     public void SuppressionAloneDoesNotSelectCallable()
     {
         var result = Build((
@@ -848,6 +892,154 @@ public sealed class ClaimManifestBuilderTests
             Assert.That(evidence.EvidenceSha256, Does.Match("^[0-9a-f]{64}$"));
             Assert.That(second.Manifest.Claims.Single().ClaimId,
                 Is.EqualTo(claim.ClaimId));
+        }
+    }
+
+    [Test]
+    public void EffectEvidenceAccountsForCalleePreconditions()
+    {
+        var discovery = Build((
+            "Subject.cs",
+            """
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                private static void Restricted(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                [DoesNotThrow]
+                public static void Proven(int value) {
+                    Contract.Requires(value > 0);
+                    Restricted(value);
+                }
+
+                [DoesNotThrow]
+                public static void Unknown(int value) =>
+                    Restricted(value);
+
+                private static int Divide(
+                    int denominator,
+                    int ignored) {
+                    Contract.Requires(denominator > 0);
+                    return 1 / denominator;
+                }
+
+                [DoesNotThrow]
+                public static int MutatingArgument() {
+                    var value = 0;
+                    return Divide(value, value = 1);
+                }
+
+                private static void RequireZero(
+                    int value) {
+                    Contract.Requires(value == 0);
+                    if (value != 0) {
+                        throw new System.InvalidOperationException();
+                    }
+                }
+
+                [DoesNotThrow]
+                public static void SelfMutatingArgument() {
+                    var value = 1;
+                    RequireZero(value + (value = 0));
+                }
+
+                private static void RequireNull(
+                    params string?[] values) {
+                    Contract.Requires(values == null);
+                    if (values != null) {
+                        throw new System.InvalidOperationException();
+                    }
+                }
+
+                [DoesNotThrow]
+                public static void ExpandedParamsArgument() =>
+                    RequireNull((string?)null);
+
+                private static void FreeParams(
+                    params string?[] values) {
+                }
+
+                [ZeroAllocations]
+                public static void ExpandedParamsAllocation() =>
+                    FreeParams((string?)null);
+            }
+            """));
+        var evidence = discovery.Targets.Values
+            .Where(static target =>
+                !target.EffectClaims.IsDefaultOrEmpty)
+            .ToDictionary(
+                static target => target.Method.Name,
+                static target =>
+                    target.EffectClaims.Single().Evidence,
+                StringComparer.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                evidence["Proven"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                evidence["Proven"].Reason,
+                Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                evidence["Unknown"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence["Unknown"].Reason,
+                Is.EqualTo(
+                    WorkerClaimReason
+                        .EffectSummaryIncomplete));
+            Assert.That(
+                evidence["Unknown"].Certainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty
+                        .IncompleteMayEffectSummary));
+            Assert.That(
+                evidence["Unknown"].Evidence,
+                Does.Contain(
+                    "CallPreconditionNotProven"));
+            Assert.That(
+                evidence["MutatingArgument"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence["MutatingArgument"].Reason,
+                Is.EqualTo(
+                    WorkerClaimReason
+                        .EffectSummaryIncomplete));
+            Assert.That(
+                evidence["MutatingArgument"].Evidence,
+                Does.Contain(
+                    "CallPreconditionNotProven"));
+            Assert.That(
+                evidence["SelfMutatingArgument"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence["SelfMutatingArgument"].Reason,
+                Is.EqualTo(
+                    WorkerClaimReason
+                        .EffectSummaryIncomplete));
+            Assert.That(
+                evidence["SelfMutatingArgument"].Evidence,
+                Does.Contain(
+                    "CallPreconditionNotProven"));
+            Assert.That(
+                evidence["ExpandedParamsArgument"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence["ExpandedParamsArgument"].Reason,
+                Is.EqualTo(
+                    WorkerClaimReason
+                        .EffectSummaryIncomplete));
+            Assert.That(
+                evidence["ExpandedParamsAllocation"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence["ExpandedParamsAllocation"].Reason,
+                Is.EqualTo(
+                    WorkerClaimReason
+                        .EffectSummaryIncomplete));
         }
     }
 

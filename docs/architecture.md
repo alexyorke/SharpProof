@@ -13,7 +13,7 @@ Attributes
 Ir
 Dataflow
 Specs                 -> Ir
-Frontend              -> Ir
+Frontend              -> Attributes (build-only payload identity), Ir
 Contracts             -> Frontend, Ir
 Effects               -> Dataflow, Frontend, Specs
 Verify                -> Ir, Specs
@@ -28,8 +28,11 @@ Worker                -> CompilerArtifact, Dataflow, Ir, Smt, Specs, Verify,
 Worker.Launcher       -> CompilerArtifact, Ir, Specs, Worker.Protocol
 ```
 
-Build-only references to `SharpProof.Meta.Analyzers` are omitted. The
-architecture suite compares every direct project reference against this graph.
+Build-only references to `SharpProof.Meta.Analyzers` are omitted. Frontend's
+listed Attributes edge has `ReferenceOutputAssembly=false`; it establishes
+build order so the exact Attributes DLL SHA-256 can be embedded without adding
+a runtime assembly dependency. The architecture suite compares every direct
+project reference against this graph.
 
 The Roslyn analyzer has no verifier, SMT, Z3, or native dependency. Z3 is
 allowed only in `SharpProof.Smt`, which is packaged below
@@ -104,6 +107,16 @@ trusted, complete effect contract. Compiler-side callable lowering binds only
 eligible resolved `ApiSpec` rows into exact witness metadata; the worker
 revalidates those witnesses against its matching table. Unmodeled or untrusted
 metadata is unknown; there is no IL interpreter.
+
+Importing a source or metadata effect summary is also conditional on the
+callee's entry contract. Analyzer and compiler-artifact runs use the exact
+contract binder plus call-site abstract facts to establish every `Requires`
+and closed parameter precondition. Standalone effect analysis conservatively
+detects direct clauses, closed attributes, and companion intent and marks the
+summary incomplete when it cannot prove the obligation. Invalidly placed
+clauses cannot refine a call into a complete effect proof. Both policies and
+their summary-incompleteness propagation are declared parts of the
+`effectAnalysis` trusted computing base.
 
 ## Contracts and modular verification
 
@@ -242,6 +255,14 @@ compilation-global `sharpproof_profile` and `sharpproof_features` keys. The
 session. Unsupported unannotated analyzer callables are silent, while
 unsupported explicitly selected callables report SP0047.
 
+The advisory analyzer has a conservative compilation-start fast path for
+call-free, unselected source. It retains configuration validation,
+`SHARPPROOF_CONTRACTS` rejection, and final compiler-artifact collection while
+skipping semantic-session construction and per-method callbacks. Strict mode
+never takes this path. The activation probe is part of the declared discovery
+trusted computing base; new selection or implicit-call syntax must extend the
+probe and its regressions in the same change.
+
 The verifier is optional in advisory builds and mandatory in strict builds;
 explicitly setting `SharpProofVerify=false` with `strict` is a configuration
 error. `SharpProofVerifyPolicy` controls incomplete selected analysis;
@@ -265,15 +286,17 @@ The current gate includes:
 - worker/package consumer smoke checks;
 - fixed-seed fuzzing and performance budgets.
 
-Off-profile latency samples alternate real baseline and SharpProof-imported
-MSBuild rebuilds. A separate loaded-but-off analyzer canary covers session
-creation and retained state, while the package policy proves that
-`SharpProofProfile=off` omits analyzer items and verifier invocation. The
-worker is isolated in `SharpProof.Verifier.Win-x64`; the portable `SharpProof`
-package contains only analyzer/generator assets and depends exactly on
-`SharpProof.Attributes`. Each package has a portable-PDB symbol package with
-SourceLink, and the package workflow records exact SHA-256 hashes, an SPDX
-SBOM, and GitHub provenance/SBOM attestations. The corpus reports explicit,
-silent, and total semantic Unknown rates as metrics; none is a release gate.
+Unannotated advisory latency samples alternate real compiler-only and
+SharpProof-imported MSBuild rebuilds under the repository-selected SDK. The
+package policy separately proves that `SharpProofProfile=off` omits analyzer
+items and verifier invocation, while retained-memory checks exercise the
+unannotated advisory analyzer driver and its no-session fast path. The worker
+is isolated in
+`SharpProof.Verifier.Win-x64`; the portable `SharpProof` package contains only
+analyzer/generator assets and depends exactly on `SharpProof.Attributes`. Each
+package has a portable-PDB symbol package with SourceLink, and the package
+workflow records exact SHA-256 hashes, an SPDX SBOM, and GitHub
+provenance/SBOM attestations. The corpus reports explicit, silent, and total
+semantic Unknown rates as metrics; none is a release gate.
 
 The active contract is `eng/acceptance`.

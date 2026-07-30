@@ -252,6 +252,208 @@ public sealed class ManagedAbstractFlowTests
         Assert.That(boolean, Is.False);
     }
 
+    [Test]
+    public void SourceShadowedContractClauseDoesNotRefineScalarFacts()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            namespace SharpProof.Attributes {
+                public static class Contract {
+                    public static void Requires(bool condition) {
+                    }
+                }
+            }
+
+            public static class Sample {
+                private static void Sink(int value) {
+                }
+
+                public static void Calls(int value) {
+                    SharpProof.Attributes.Contract.Requires(value > 0);
+                    Sink(value);
+                }
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Calls");
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var sink = root.Descendants().OfType<IInvocationOperation>()
+            .Single(static invocation =>
+                invocation.TargetMethod.Name == "Sink");
+
+        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
+            .Analyze(method, ControlFlowGraph.Create(root), null, default);
+
+        Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
+        Assert.That(
+            analysis.Result!.TryEvaluate(
+                sink,
+                sink.Arguments[0].Value,
+                out var value),
+            Is.True);
+        Assert.That(value.TryGetInteger(out var interval), Is.True);
+        Assert.That(
+            interval,
+            Is.EqualTo(IntervalValue.Range(int.MinValue, int.MaxValue)));
+    }
+
+    [Test]
+    public void SourceShadowedContractClauseDoesNotBypassCompletionChecks()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            namespace SharpProof.Attributes {
+                public static class Contract {
+                    public static void Requires(bool condition) {
+                        throw new System.InvalidOperationException();
+                    }
+                }
+            }
+
+            public static class Sample {
+                public static void Calls() {
+                    SharpProof.Attributes.Contract.Requires(true);
+                }
+            }
+            """);
+        var invocation = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<InvocationExpressionSyntax>()
+            .Single();
+        var model = compilation.GetSemanticModel(invocation.SyntaxTree);
+        var operation = (IInvocationOperation)model.GetOperation(invocation)!;
+
+        var facts = new DefiniteOperationFacts(compilation, default);
+
+        Assert.That(facts.CompletesNormally(operation), Is.False);
+    }
+
+    [Test]
+    public void SourceShadowedClosedAttributesDoNotRefineEntryFacts()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            namespace SharpProof.Attributes {
+                [System.AttributeUsage(System.AttributeTargets.Parameter)]
+                public sealed class NotNullAttribute :
+                    System.Attribute {
+                }
+
+                [System.AttributeUsage(System.AttributeTargets.Parameter)]
+                public sealed class PositiveAttribute :
+                    System.Attribute {
+                }
+
+                [System.AttributeUsage(System.AttributeTargets.Parameter)]
+                public sealed class InRangeAttribute :
+                    System.Attribute {
+                    public InRangeAttribute(long minimum, long maximum) {
+                    }
+                }
+            }
+
+            public static class Sample {
+                private static void Sink(
+                    string text,
+                    int positive,
+                    int range) {
+                }
+
+                public static void Calls(
+                    [SharpProof.Attributes.NotNull] string text,
+                    [SharpProof.Attributes.Positive] int positive,
+                    [SharpProof.Attributes.InRange(1, 5)] int range) {
+                    Sink(text, positive, range);
+                }
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Calls");
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var sink = root.Descendants().OfType<IInvocationOperation>().Single();
+        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
+            .Analyze(method, ControlFlowGraph.Create(root), null, default);
+
+        Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
+        Assert.That(
+            analysis.Result!.TryEvaluate(
+                sink,
+                sink.Arguments[0].Value,
+                out var text),
+            Is.True);
+        Assert.That(
+            analysis.Result.TryEvaluate(
+                sink,
+                sink.Arguments[1].Value,
+                out var positive),
+            Is.True);
+        Assert.That(
+            analysis.Result.TryEvaluate(
+                sink,
+                sink.Arguments[2].Value,
+                out var range),
+            Is.True);
+        Assert.That(text.TryGetNullness(out var nullness), Is.True);
+        Assert.That(nullness, Is.EqualTo(NullnessValue.MaybeNull));
+        Assert.That(positive.TryGetInteger(out var positiveInterval), Is.True);
+        Assert.That(range.TryGetInteger(out var rangeInterval), Is.True);
+        Assert.That(
+            positiveInterval,
+            Is.EqualTo(IntervalValue.Range(int.MinValue, int.MaxValue)));
+        Assert.That(
+            rangeInterval,
+            Is.EqualTo(IntervalValue.Range(int.MinValue, int.MaxValue)));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void UnapprovedContractPackageCannotRefineClosedFacts(
+        bool validContractShape)
+    {
+        var contractReference =
+            EffectTestHost.EmitUnapprovedContractApiReference(
+                validContractShape);
+        var compilation =
+            EffectTestHost.CreateCompilationWithoutContractPackage(
+                """
+                public static class Sample {
+                    private static void Sink(string? text) {
+                    }
+
+                    public static void Calls(
+                        [SharpProof.Attributes.NotNull] string? text) {
+                        Sink(text);
+                    }
+                }
+                """,
+                contractReference);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Calls");
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var sink = root.Descendants().OfType<IInvocationOperation>().Single();
+
+        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
+            .Analyze(method, ControlFlowGraph.Create(root), null, default);
+
+        Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
+        Assert.That(
+            analysis.Result!.TryEvaluate(
+                sink,
+                sink.Arguments[0].Value,
+                out var text),
+            Is.True);
+        Assert.That(text.TryGetNullness(out var nullness), Is.True);
+        Assert.That(nullness, Is.EqualTo(NullnessValue.MaybeNull));
+    }
+
     private static (ManagedFlowAnalysis Analysis, IInvocationOperation Call)
         AnalyzeSingleCall(string source)
     {

@@ -50,6 +50,7 @@
       {
         "name": "discovery",
         "paths": [
+          "SharpProof.Analyzer/SharpProofAnalyzer.cs",
           "SharpProof.Analyzer/ContractRuntimePolicy.cs",
           "SharpProof.Analyzer/FinalCompilationCollector.cs",
           "SharpProof.Analyzer/CompilerArtifact/ClaimManifestBuilder.cs",
@@ -58,7 +59,8 @@
           "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
           "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
           "SharpProof.Frontend/ContractApiIdentityResolver.cs",
-          "SharpProof.Frontend/ContractApiMetadata.cs"
+          "SharpProof.Frontend/ContractApiMetadata.cs",
+          "SharpProof.Frontend/SharpProof.Frontend.csproj"
         ]
       },
       {
@@ -135,10 +137,15 @@
       {
         "name": "effectAnalysis",
         "paths": [
+          "SharpProof.Analyzer/CallArgumentAliasPolicy.cs",
+          "SharpProof.Analyzer/EffectCallPreconditionPolicy.cs",
           "SharpProof.Analyzer/EffectContractDiagnostics.cs",
           "SharpProof.Analyzer/AnalyzerSession.cs",
+          "SharpProof.Analyzer/ManagedContractFacts.cs",
           "SharpProof.Contracts/ContractSelectionInventory.cs",
           "SharpProof.Effects/EffectAnalysisSession.cs",
+          "SharpProof.Effects/EffectCallPreconditionPolicy.cs",
+          "SharpProof.Effects/EffectCallSiteResolver.cs",
           "SharpProof.Effects/EffectCallGraph.cs",
           "SharpProof.Effects/EffectMethodNodeBuilder.cs",
           "SharpProof.Effects/EffectContractMappings.cs",

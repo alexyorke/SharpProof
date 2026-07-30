@@ -315,7 +315,7 @@ public sealed class ApiSpecTests
     }
 
     [Test]
-    public void SharpProofPackageSpecsAcceptMatchingIdentityAndContractShape()
+    public void SharpProofPackageSpecsRejectMatchingIdentityAndContractShapeFromAnotherPayload()
     {
         var package = CreateSharpProofPackageReference(
             CreateContractSource(
@@ -329,8 +329,12 @@ public sealed class ApiSpecTests
 
             Assert.Multiple(() =>
             {
-                Assert.That(resolved.Failures, Is.Empty);
-                Assert.That(resolved.Specs, Has.Length.EqualTo(1));
+                Assert.That(resolved.Specs, Is.Empty);
+                Assert.That(
+                    resolved.Failures.Single().Kind,
+                    Is.EqualTo(
+                        ApiSpecResolutionFailureKind
+                            .UnapprovedReferenceFamily));
             });
         }
         finally

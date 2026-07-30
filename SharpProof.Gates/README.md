@@ -77,12 +77,29 @@ is not exactly five warmups, 30 samples, and 200 IDE edits.
 
 The package smoke gate separately proves that `SharpProofProfile=off`
 contributes no analyzer items and that advisory/strict profiles contribute both
-the analyzer and contract generator. The off-profile performance path can
-therefore compare two equivalent analyzer-free Roslyn compilations. Samples
-are interleaved and each contains 50 compilation/diagnostic runs to suppress
-timer quantization and scheduler noise. Managed retained memory holds 40
-distinct compilation graphs live after a full collection. Relative and
-absolute retained-memory limits are enforced independently.
+the analyzer and contract generator. The performance path compares an
+unannotated advisory package build with its compiler-only baseline. The
+analyzer still runs in the advisory build, while the absence of selected
+contracts keeps its output quiet. A conservative activation probe avoids the
+heavyweight semantic session for this call-free source while retaining
+configuration, runtime-contract, and compiler-artifact checks.
+
+The gate copies the repository `global.json` above both temporary projects,
+requires the temporary root to resolve the same SDK as the repository, and
+records the configured version, roll-forward policy, resolved version, and
+`global.json` SHA-256 in its JSON evidence. Five warmup pairs and 30 measured
+pairs alternate which build runs first. Enforcement uses each pair's advisory
+to baseline ratio. Each adjacent baseline-first/advisory-first ratio pair is
+reduced by geometric mean to cancel multiplicative order bias, and the enforced
+median is the conventional median of those balanced ratios. The p95 remains
+the conservative nearest-rank percentile of all raw paired ratios. No retries
+or outlier removal occur. The estimator version, raw elapsed times, raw ratios,
+balanced ratios, raw and order-specific medians, and execution order for all
+measured samples remain in the JSON result.
+
+Managed retained memory holds 40 distinct compilation graphs live after a full
+collection. Relative and absolute retained-memory limits are enforced
+independently.
 
 An independent enabled-analyzer retention probe analyzes 40 distinct
 effects-enabled compilations. Each compilation is created in a non-inlined
@@ -93,8 +110,8 @@ bounds the process-retained managed-memory increase.
 The IDE gate applies and analyzes 200 single-token edits with effects enabled.
 It enforces p95 and maximum latency. A separate 30-sample worker-core gate
 measures cancel-to-exit latency, while a real launcher process test measures
-the forced-termination deadline independently. The off-profile and IDE
-analyzer performance paths reference neither SMT nor Z3.
+the forced-termination deadline independently. The unannotated advisory and
+IDE analyzer performance paths reference neither SMT nor Z3.
 
 Worker/package tests also exercise protocol version 9 manifest equality,
 stable claim IDs, policy-controlled SP0047/SP0048 output, cache validation

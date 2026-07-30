@@ -64,6 +64,17 @@ contain documented breaking changes.
   longer blocks a result.
 - Effect analysis builds and caches only the requested reachable source-call
   graph while retaining deterministic exhaustive analysis.
+- The unannotated advisory performance gate now pins temporary builds to the
+  repository SDK, retains raw paired timing evidence, and uses adjacent
+  opposite-order geometric ratios with a conventional median. It applies no
+  retries or outlier removal. Advisory compilations that conservatively contain
+  no analysis trigger avoid constructing the heavyweight semantic session;
+  configuration checks, runtime-contract rejection, and compiler-artifact
+  collection still run, and strict mode never takes this fast path.
+- Source and metadata effect summaries are imported only after their callee
+  `Requires` and closed parameter preconditions are established. Unproven or
+  invalidly placed entry contracts now produce typed incomplete effect
+  evidence instead of a false `Proven` result.
 - Every repeatable effect-attribute occurrence has its own stable manifest
   claim and dense ordinal while sharing the effective combined constraint.
 - Cache identity now binds the canonical packaged worker runtime closure,
@@ -108,20 +119,28 @@ contain documented breaking changes.
 
 ### Fixed
 
-- Explicit `ref` and `in` precondition arguments now read aliased local or
-  parameter storage at call-entry state after later argument side effects;
-  unsupported aliases remain `Unknown`.
+- Explicit `ref`, `in`, and `ref readonly` precondition arguments now read
+  aliased local or parameter storage at call-entry state after later argument
+  side effects, while implicit readonly-reference rvalues retain their
+  evaluation-time snapshot; unsupported aliases remain `Unknown`.
 - Synthesized `ref` and `in` extension receivers use the same call-entry alias
   semantics as explicit arguments, while nonlocal aliases remain `Unknown`.
+- Compound assignments and increments no longer substitute an operand or the
+  old property target for the setter's computed `value`; setter preconditions
+  remain visibly incomplete until the computed value is modeled exactly.
 - Contract-selected methods whose precondition call-site analysis is unknown
   now emit one SP0047; unselected advisory callers remain quiet.
 - Concrete precondition replay preserves potentially failing object-to-string
   casts and proves them only from definite string runtime-type evidence.
 - Contract discovery and compiler-bound ghost specification resolution now
   admit the contract API only from the matching `SharpProof.Attributes`
-  assembly identity and exact compiler-elision shape. Source, project,
-  version, key, and malformed API lookalikes produce visible incomplete
-  analysis and contribute no proof facts.
+  assembly identity, exact built-DLL SHA-256 payload, and compiler-elision
+  shape. Source, project, version, key, payload, and malformed API lookalikes
+  produce visible incomplete analysis and contribute no proof facts.
+- Mutation-bearing argument expressions and expanded `params` elements no
+  longer lend a recomputed scalar or element value to callee preconditions.
+  These calls remain visibly incomplete until evaluation-time composite
+  values and synthesized parameter arrays are modeled exactly.
 - Unsupported value-type defaults and unary-plus expressions no longer acquire
   exact reference-shaped IR; they abstain with `UnsupportedType`.
 - Analyzer, binder, and manifest discovery now share one effective contract

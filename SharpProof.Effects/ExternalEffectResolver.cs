@@ -33,9 +33,12 @@ internal sealed class ExternalEffectResolver
     internal ExternalEffectResolver(Compilation compilation, ResolvedApiSpecTable apiSpecs)
     {
         _compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
-        _effectContractAttribute = compilation.GetTypeByMetadataName(EffectContractMetadata.AttributeMetadataName);
+        var contractApi = ContractApiIdentityResolver.ForCompilation(compilation);
+        _effectContractAttribute = contractApi.ResolveAttribute(
+            EffectContractMetadata.AttributeMetadataName);
         _exceptionType = compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
-        _trustedAttribute = compilation.GetTypeByMetadataName(EffectContractMetadata.TrustedAttributeMetadataName);
+        _trustedAttribute = contractApi.ResolveAttribute(
+            EffectContractMetadata.TrustedAttributeMetadataName);
         _specs = apiSpecs ?? throw new ArgumentNullException(nameof(apiSpecs));
     }
 

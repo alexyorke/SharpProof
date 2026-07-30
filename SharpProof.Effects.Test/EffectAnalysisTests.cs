@@ -679,6 +679,155 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void UnprovenSourceRequiresMakeImportedEffectsIncomplete()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            public static class Sample {
+                private static void Restricted(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                private static void Unrestricted(int value) {
+                }
+
+                public static void InvokeRestricted(int value) =>
+                    Restricted(value);
+
+                public static void InvokeUnrestricted(int value) =>
+                    Unrestricted(value);
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        var restricted = session.Analyze(
+            Method(compilation, "InvokeRestricted"));
+        var unrestricted = session.Analyze(
+            Method(compilation, "InvokeUnrestricted"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                restricted.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(
+                restricted.Summary.AnalysisIncompleteReason,
+                Is.EqualTo(
+                    EffectAnalysisIncompleteReason
+                        .CallPreconditionNotProven));
+            Assert.That(
+                restricted.Projection.IsComplete,
+                Is.False);
+            Assert.That(
+                unrestricted.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(
+                unrestricted.Projection.IsComplete,
+                Is.True);
+        }
+    }
+
+    [Test]
+    public void UnprovenExternalClosedPreconditionMakesTrustedSummaryIncomplete()
+    {
+        var externalReference = EffectTestHost.EmitReference(
+            """
+            using SharpProof.Attributes;
+
+            public static class ExternalFixture {
+                [SharpProofTrusted("reviewed external implementation")]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    IsDeterministic = true,
+                    Complete = true)]
+                public static void Restricted(
+                    [Positive] int value) {
+                }
+            }
+            """,
+            "ExternalPreconditionAssembly");
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static void Invoke(int value) =>
+                    ExternalFixture.Restricted(value);
+            }
+            """,
+            externalReference);
+
+        var result = new EffectAnalysisSession(
+            compilation).Analyze(
+            Method(compilation, "Invoke"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(
+                result.Summary.AnalysisIncompleteReason,
+                Is.EqualTo(
+                    EffectAnalysisIncompleteReason
+                        .CallPreconditionNotProven));
+            Assert.That(
+                result.Projection.IsComplete,
+                Is.False);
+        }
+    }
+
+    [Test]
+    public void StandaloneCompanionPreconditionIntentFailsClosed()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public sealed class Service {
+                public void Restricted(int value) {
+                }
+            }
+
+            [ContractFor(typeof(Service))]
+            public static class ServiceContracts {
+                public static void Restricted(
+                    Service receiver,
+                    int value) {
+                    Contract.Requires(value > 0);
+                }
+            }
+
+            public static class Sample {
+                public static void Invoke(
+                    Service service,
+                    int value) =>
+                    service.Restricted(value);
+            }
+            """);
+
+        var result = new EffectAnalysisSession(
+            compilation).Analyze(
+            Method(compilation, "Invoke"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(
+                result.Summary.AnalysisIncompleteReason,
+                Is.EqualTo(
+                    EffectAnalysisIncompleteReason
+                        .CallPreconditionNotProven));
+            Assert.That(
+                result.Projection.IsComplete,
+                Is.False);
+        }
+    }
+
+    [Test]
     public void TrustedCompleteBodylessSourceContractIsResolved()
     {
         var compilation = EffectTestHost.CreateCompilation(
@@ -701,6 +850,128 @@ public sealed class EffectAnalysisTests
         Assert.That(result.Summary.Reads.IsEmpty, Is.True);
         Assert.That(result.Summary.Writes.IsEmpty, Is.True);
         Assert.That(result.Summary.Throws.IsEmpty, Is.True);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void UnapprovedContractPackageCannotLendTrustedEffectEvidence(
+        bool validContractShape)
+    {
+        var contractReference =
+            EffectTestHost.EmitUnapprovedContractApiReference(
+                validContractShape);
+        var compilation =
+            EffectTestHost.CreateCompilationWithoutContractPackage(
+                """
+                public static class Sample {
+                    [SharpProof.Attributes.SharpProofTrusted(
+                        "reviewed native implementation")]
+                    [SharpProof.Attributes.EffectContract(
+                        SharpProof.Attributes.SharpProofEffect.None,
+                        Complete = true)]
+                    public static extern void Boundary();
+
+                    public static void Invoke() => Boundary();
+                }
+                """,
+                contractReference);
+        var boundary = Method(compilation, "Boundary");
+
+        var resolution = new ExternalEffectResolver(
+            compilation,
+            ApiSpecTable.Default).ResolveContract(boundary);
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Invoke"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                resolution.Kind,
+                Is.EqualTo(EffectContractResolutionKind.Missing));
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(result.Summary.Reads.IsUnknown, Is.True);
+            Assert.That(result.Summary.Writes.IsUnknown, Is.True);
+            Assert.That(result.Summary.Throws.IncludesUnknown, Is.True);
+            Assert.That(result.Projection.IsComplete, Is.False);
+        }
+    }
+
+    [Test]
+    public void SourceShadowedExternalEffectEvidenceIsRejected()
+    {
+        var fakeContract = EffectTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            namespace SharpProof.Attributes {
+                [System.AttributeUsage(System.AttributeTargets.Method)]
+                public sealed class EffectContractAttribute :
+                    System.Attribute {
+                    public EffectContractAttribute(
+                        SharpProofEffect effects) {
+                    }
+
+                    public bool Complete {
+                        get;
+                        set;
+                    }
+                }
+            }
+
+            public static class ExternalFixture {
+                [SharpProofTrusted("reviewed external implementation")]
+                [EffectContract(SharpProofEffect.None, Complete = true)]
+                public static void Boundary() {
+                }
+            }
+            """);
+        var fakeTrust = EffectTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            namespace SharpProof.Attributes {
+                [System.AttributeUsage(System.AttributeTargets.Method)]
+                public sealed class SharpProofTrustedAttribute :
+                    System.Attribute {
+                    public SharpProofTrustedAttribute(string reason) {
+                    }
+                }
+            }
+
+            public static class ExternalFixture {
+                [SharpProofTrusted("reviewed external implementation")]
+                [EffectContract(SharpProofEffect.None, Complete = true)]
+                public static void Boundary() {
+                }
+            }
+            """);
+
+        var rejectedContract = new ExternalEffectResolver(
+            fakeContract,
+            ApiSpecTable.Default).ResolveContract(
+                EffectTestHost.RequireMethod(
+                    fakeContract,
+                    "ExternalFixture",
+                    "Boundary"));
+        var rejectedTrust = new ExternalEffectResolver(
+            fakeTrust,
+            ApiSpecTable.Default).ResolveContract(
+                EffectTestHost.RequireMethod(
+                    fakeTrust,
+                    "ExternalFixture",
+                    "Boundary"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                rejectedContract.Kind,
+                Is.EqualTo(EffectContractResolutionKind.Missing));
+            Assert.That(
+                rejectedTrust.Kind,
+                Is.EqualTo(EffectContractResolutionKind.Untrusted));
+        }
     }
 
     [Test]

@@ -166,8 +166,8 @@ release gates, not end-user MSBuild defaults.
 | Forced termination | At most 1,000 ms |
 | Performance warmups | 5 |
 | Performance samples | 30 |
-| Off-profile median ratio | At most 1.10 |
-| Off-profile p95 ratio | At most 1.20 |
+| Unannotated advisory order-balanced median ratio | At most 1.10 |
+| Unannotated advisory paired p95 ratio | At most 1.20 |
 | Retained-memory ratio | At most 1.05 |
 | Retained-memory absolute increase | At most 32 MiB |
 | Enabled analyzer retained compilations | 0 |

@@ -128,8 +128,8 @@ internal static class RequiresCallSiteAnalyzer
 
                 var alias = GetAliasEvaluation(candidate, variable, actual);
                 ManagedAbstractValue value;
-                if (alias == AliasEvaluation.Unsupported ||
-                    !(alias == AliasEvaluation.CallEntry
+                if (alias == CallArgumentEvaluation.Unsupported ||
+                    !(alias == CallArgumentEvaluation.CallEntry
                         ? candidate.Flow.TryEvaluateAtOrigin(
                             candidate.Operation,
                             actual,
@@ -289,23 +289,19 @@ internal static class RequiresCallSiteAnalyzer
                 when isReducedExtension && variable.Ordinal == 0 =>
                 callSite.Instance,
             BoundContractVariableRole.Parameter =>
-                callSite.Arguments.FirstOrDefault(argument =>
-                    argument.Parameter?.Ordinal ==
-                    (isReducedExtension
-                        ? variable.Ordinal - 1
-                        : variable.Ordinal))?.Value,
+                GetArgument(callSite, variable)?.Value,
             _ => null
         };
     }
 
-    private static AliasEvaluation GetAliasEvaluation(
+    private static CallArgumentEvaluation GetAliasEvaluation(
         RequiresCallSiteCandidate callSite,
         BoundContractVariable variable,
         IOperation actual)
     {
         if (variable.Role != BoundContractVariableRole.Parameter)
         {
-            return AliasEvaluation.Snapshot;
+            return CallArgumentEvaluation.Snapshot;
         }
 
         var isReducedExtension = callSite.TargetMethod.ReducedFrom != null;
@@ -313,66 +309,66 @@ internal static class RequiresCallSiteAnalyzer
         {
             var receiverKind =
                 callSite.TargetMethod.ReducedFrom!.Parameters[0].RefKind;
-            return receiverKind is RefKind.Ref or RefKind.In
-                ? IsLocalAlias(actual)
-                    ? AliasEvaluation.CallEntry
-                    : AliasEvaluation.Unsupported
-                : AliasEvaluation.Snapshot;
+            return CallArgumentAliasPolicy.Classify(
+                receiverKind,
+                actual,
+                argumentSyntax: null,
+                isSyntheticReceiver: true);
         }
 
-        var argument = callSite.Arguments.FirstOrDefault(candidate =>
-            candidate.Parameter?.Ordinal ==
-            (isReducedExtension
-                ? variable.Ordinal - 1
-                : variable.Ordinal));
-        if (argument == null ||
-            argument.Parameter?.RefKind is not (RefKind.Ref or RefKind.In))
+        var argument = GetArgument(callSite, variable);
+        if (argument?.Parameter == null)
         {
-            return AliasEvaluation.Snapshot;
+            return CallArgumentEvaluation.Unsupported;
         }
 
-        if (callSite.TargetMethod.IsExtensionMethod &&
+        var isSyntheticReceiver =
+            callSite.TargetMethod.IsExtensionMethod &&
             callSite.TargetMethod.ReducedFrom == null &&
             callSite.Instance == null &&
             variable.Ordinal == 0 &&
-            argument.Syntax is not ArgumentSyntax)
-        {
-            return IsLocalAlias(actual)
-                ? AliasEvaluation.CallEntry
-                : AliasEvaluation.Unsupported;
-        }
-
-        if (argument.Syntax is not ArgumentSyntax syntax ||
-            syntax.RefKindKeyword.Kind() is not (
-                SyntaxKind.RefKeyword or SyntaxKind.InKeyword))
-        {
-            return AliasEvaluation.Snapshot;
-        }
-
-        return IsLocalAlias(actual)
-            ? AliasEvaluation.CallEntry
-            : AliasEvaluation.Unsupported;
+            argument.Syntax is not ArgumentSyntax;
+        return CallArgumentAliasPolicy.Classify(
+            argument.Parameter.RefKind,
+            actual,
+            argument.Syntax,
+            isSyntheticReceiver);
     }
 
-    private static bool IsLocalAlias(IOperation operation)
+    private static IArgumentOperation? GetArgument(
+        RequiresCallSiteCandidate callSite,
+        BoundContractVariable variable)
     {
-        operation = DefiniteOperationFacts.UnwrapHarmlessValue(operation);
-        return operation is
-            ILocalReferenceOperation or
-            IParameterReferenceOperation;
+        var isReducedExtension =
+            callSite.TargetMethod.ReducedFrom != null;
+        var ordinal = isReducedExtension
+            ? variable.Ordinal - 1
+            : variable.Ordinal;
+        IArgumentOperation? result = null;
+        foreach (var argument in callSite.Arguments)
+        {
+            if (argument.Parameter?.Ordinal != ordinal)
+            {
+                continue;
+            }
+
+            if (argument.ArgumentKind ==
+                    ArgumentKind.ParamArray ||
+                result != null)
+            {
+                return null;
+            }
+
+            result = argument;
+        }
+
+        return result;
     }
 
     private static bool IsDefinitelyString(IOperation operation)
     {
         return DefiniteOperationFacts.UnwrapHarmlessValue(operation)
             .Type?.SpecialType == SpecialType.System_String;
-    }
-
-    private enum AliasEvaluation
-    {
-        Snapshot,
-        CallEntry,
-        Unsupported
     }
 
     private readonly record struct ClauseEvaluation(bool? Value, IrTerm Condition);

@@ -297,6 +297,119 @@ public sealed class RequiresReplaySoundnessTests
     }
 
     [Test]
+    public async Task InRvaluesSnapshotButReadonlyAliasesUseCallEntryState()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void RequireZero(
+                    in int first,
+                    int ignored) {
+                    Contract.Requires(first == 0);
+                }
+
+                private static void RequireZeroReadonly(
+                    ref readonly int first,
+                    int ignored) {
+                    Contract.Requires(first == 0);
+                }
+
+                public static void InRvalueSnapshot() {
+                    var value = 0;
+                    RequireZero(value + 0, value = 1);
+                }
+
+                public static void ExplicitInAlias() {
+                    var value = 1;
+                    RequireZero(in value, value = 0);
+                }
+
+                public static void ExplicitReadonlyAlias() {
+                    var value = 1;
+                    RequireZeroReadonly(in value, value = 0);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(diagnostics, Is.Empty);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                factory.Outcomes["InRvalueSnapshot"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["ExplicitInAlias"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["ExplicitReadonlyAlias"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+        }
+    }
+
+    [Test]
+    public async Task MutationBearingArgumentSnapshotCannotBeRecomputed()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void RequireZero(int value) {
+                    Contract.Requires(value == 0);
+                }
+
+                public static void Call() {
+                    var value = 1;
+                    RequireZero(value + (value = 0));
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(
+            factory.Outcomes["Call"],
+            Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+    }
+
+    [Test]
+    public async Task ExpandedParamsElementsCannotStandInForTheArray()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void RequireNull(
+                    params string?[] values) {
+                    Contract.Requires(values == null);
+                }
+
+                public static void Call() =>
+                    RequireNull((string?)null);
+            }
+            """,
+            "contracts",
+            ["SP0027"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(
+            factory.Outcomes["Call"],
+            Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+    }
+
+    [Test]
     public async Task StringDowncastRequiresUsesOnlyDefiniteRuntimeTypeEvidence()
     {
         var factory = new RecordingSessionFactory();

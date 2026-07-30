@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using SharpProof.Gates.Performance;
+using System.Security.Cryptography;
 using System.Xml.Linq;
 
 namespace SharpProof.Gates.Test;
@@ -30,6 +31,200 @@ public sealed class PerformanceGateTests
             Assert.That(contract.IdeEditMaximumMilliseconds, Is.EqualTo(250));
             Assert.That(contract.CancellationP95Milliseconds, Is.EqualTo(250));
             Assert.That(contract.ForcedTerminationMilliseconds, Is.EqualTo(1000));
+        }
+    }
+
+    [Test]
+    public void PackageBuildMedianAveragesTheMiddleEvenSamples()
+    {
+        var median = PackageBuildEstimator.Median([1, 9, 3, 5]);
+
+        Assert.That(median, Is.EqualTo(4));
+    }
+
+    [Test]
+    public void PackageBuildEstimatorUsesPairedRatiosAndBalancesOrder()
+    {
+        PackageBuildSample[] samples =
+        [
+            new(0, false, 100, 110),
+            new(1, true, 10, 20),
+            new(2, false, 10, 11),
+            new(3, true, 100, 200)
+        ];
+
+        var statistics = PackageBuildEstimator.Estimate(samples);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                statistics.BaselineFirstMedianRatio,
+                Is.EqualTo(1.1).Within(0.000_001));
+            Assert.That(
+                statistics.UnannotatedAdvisoryFirstMedianRatio,
+                Is.EqualTo(2).Within(0.000_001));
+            Assert.That(
+                statistics.OrderBalancedMedianRatio,
+                Is.EqualTo(Math.Sqrt(2.2)).Within(0.000_001));
+            Assert.That(
+                statistics.RawMedianRatio,
+                Is.EqualTo(1.55).Within(0.000_001));
+            Assert.That(
+                statistics.P95Ratio,
+                Is.EqualTo(2).Within(0.000_001));
+            Assert.That(
+                samples[0].Ratio,
+                Is.EqualTo(1.1).Within(0.000_001));
+            Assert.That(samples[1].Ratio, Is.EqualTo(2));
+            Assert.That(
+                samples[2].Ratio,
+                Is.EqualTo(1.1).Within(0.000_001));
+            Assert.That(samples[3].Ratio, Is.EqualTo(2));
+        }
+    }
+
+    [Test]
+    public void PackageBuildEstimatorCancelsReciprocalOrderBias()
+    {
+        PackageBuildSample[] samples =
+        [
+            new(0, false, 1, 0.6),
+            new(1, true, 1, 2.4),
+            new(2, false, 1, 0.6),
+            new(3, true, 1, 2.4)
+        ];
+
+        var statistics = PackageBuildEstimator.Estimate(samples);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                statistics.OrderBalancedRatios.Length,
+                Is.EqualTo(2));
+            Assert.That(
+                statistics.OrderBalancedRatios[0],
+                Is.EqualTo(1.2).Within(0.000_001));
+            Assert.That(
+                statistics.OrderBalancedRatios[1],
+                Is.EqualTo(1.2).Within(0.000_001));
+            Assert.That(
+                statistics.OrderBalancedMedianRatio,
+                Is.EqualTo(1.2).Within(0.000_001));
+            Assert.That(
+                statistics.RawMedianRatio,
+                Is.EqualTo(1.5).Within(0.000_001));
+        }
+    }
+
+    [Test]
+    public void PackageBuildEstimatorRetainsRawAndBalancedEvidence()
+    {
+        PackageBuildSample[] samples =
+        [
+            new(0, false, 1, 1),
+            new(1, true, 1, 3),
+            new(2, false, 1, 2),
+            new(3, true, 1, 4),
+            new(4, false, 1, 100),
+            new(5, true, 1, 5)
+        ];
+
+        var statistics = PackageBuildEstimator.Estimate(samples);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                statistics.OrderBalancedMedianRatio,
+                Is.EqualTo(Math.Sqrt(8)).Within(0.000_001));
+            Assert.That(
+                statistics.RawMedianRatio,
+                Is.EqualTo(3.5));
+            Assert.That(
+                statistics.OrderBalancedRatios.Length,
+                Is.EqualTo(3));
+            Assert.That(
+                statistics.OrderBalancedRatios[0],
+                Is.EqualTo(Math.Sqrt(3)).Within(0.000_001));
+            Assert.That(
+                statistics.OrderBalancedRatios[1],
+                Is.EqualTo(Math.Sqrt(8)).Within(0.000_001));
+            Assert.That(
+                statistics.OrderBalancedRatios[2],
+                Is.EqualTo(Math.Sqrt(500)).Within(0.000_001));
+        }
+    }
+
+    [Test]
+    public void PackageBuildEstimatorRejectsUnbalancedExecutionOrders()
+    {
+        PackageBuildSample[] samples =
+        [
+            new(0, false, 1, 1),
+            new(1, false, 1, 1)
+        ];
+
+        var exception = Assert.Throws<ArgumentException>(
+            (Action)(() =>
+                _ = PackageBuildEstimator.Estimate(samples)));
+
+        Assert.That(exception!.Message, Does.Contain("balance"));
+    }
+
+    [Test]
+    public void PackageBuildEstimatorRejectsNonAlternatingAdjacentOrders()
+    {
+        PackageBuildSample[] samples =
+        [
+            new(0, false, 1, 1),
+            new(1, false, 1, 1),
+            new(2, true, 1, 1),
+            new(3, true, 1, 1)
+        ];
+
+        var exception = Assert.Throws<ArgumentException>(
+            (Action)(() =>
+                _ = PackageBuildEstimator.Estimate(samples)));
+
+        Assert.That(exception!.Message, Does.Contain("opposite"));
+    }
+
+    [Test]
+    public async Task PackageBuildSdkPinRetainsRepositoryIdentity()
+    {
+        var repositoryRoot = RepositoryLayout.FindRoot();
+        var probeRoot = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Gates.Test",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(probeRoot);
+        try
+        {
+            var identity = await PackageBuildSdkPin.PinAndValidateAsync(
+                repositoryRoot,
+                probeRoot,
+                CancellationToken.None);
+            var repositoryGlobalJson = await File.ReadAllBytesAsync(
+                Path.Combine(repositoryRoot, "global.json"));
+            var probeGlobalJson = await File.ReadAllBytesAsync(
+                Path.Combine(probeRoot, "global.json"));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    probeGlobalJson,
+                    Is.EqualTo(repositoryGlobalJson));
+                Assert.That(identity.ConfiguredVersion, Is.Not.Empty);
+                Assert.That(identity.RollForward, Is.Not.Empty);
+                Assert.That(identity.ResolvedVersion, Is.Not.Empty);
+                Assert.That(
+                    identity.GlobalJsonSha256,
+                    Is.EqualTo(Convert.ToHexString(
+                        SHA256.HashData(repositoryGlobalJson))));
+            }
+        }
+        finally
+        {
+            Directory.Delete(probeRoot, recursive: true);
         }
     }
 
@@ -97,9 +292,10 @@ public sealed class PerformanceGateTests
     [Test]
     public void AdvisoryMeasurementRunsTheAnalyzerAndStaysQuiet()
     {
-        var measurement = PerformanceGate.MeasureDefaultOffAnalyzerBatch(
+        var measurement =
+            PerformanceGate.MeasureUnannotatedAdvisoryAnalyzerBatch(
             "public static class Subject { public static int M() => 1; }",
-            "DefaultOffProbe",
+            "UnannotatedAdvisoryProbe",
             iterations: 3);
 
         using (Assert.EnterMultipleScope())
@@ -107,7 +303,7 @@ public sealed class PerformanceGateTests
             Assert.That(measurement.MeanMilliseconds, Is.GreaterThan(0));
             Assert.That(measurement.AnalyzerDriverRunCount, Is.EqualTo(3));
             Assert.That(measurement.DiagnosticCount, Is.Zero);
-            Assert.That(measurement.AnalysisSessionCreateCount, Is.EqualTo(3));
+            Assert.That(measurement.AnalysisSessionCreateCount, Is.Zero);
         }
     }
 
@@ -208,6 +404,7 @@ public sealed class PerformanceGateTests
 
     [Test]
     [Category("Performance")]
+    [NonParallelizable]
     public async Task ForcedTerminationDeadlineIsStableAcrossLaunches()
     {
         var root = RepositoryLayout.FindRoot();
@@ -228,6 +425,7 @@ public sealed class PerformanceGateTests
 
     [Test]
     [Category("Performance")]
+    [NonParallelizable]
     public async Task ReleasePerformanceContractPasses()
     {
         var result = await PerformanceGate.RunAsync(
@@ -241,10 +439,31 @@ public sealed class PerformanceGateTests
         {
             Assert.That(result.Passed, Is.True);
             Assert.That(
-                result.DefaultOffAnalyzerDriverRunCount,
+                result.UnannotatedAdvisoryAnalyzerDriverRunCount,
                 Is.EqualTo(1));
             Assert.That(result.BaselineRetainedBytes, Is.GreaterThan(0));
-            Assert.That(result.DefaultOffRetainedBytes, Is.GreaterThan(0));
+            Assert.That(
+                result.UnannotatedAdvisoryRetainedBytes,
+                Is.GreaterThan(0));
+            Assert.That(
+                result.PackageBuildEstimatorVersion,
+                Is.EqualTo(PackageBuildEstimator.Version));
+            Assert.That(
+                result.PackageBuildSamples.Length,
+                Is.EqualTo(30));
+            Assert.That(
+                result.OrderBalancedRatios.Length,
+                Is.EqualTo(15));
+            Assert.That(
+                result.PackageBuildSamples.Count(
+                    static sample => sample.UnannotatedAdvisoryFirst),
+                Is.EqualTo(15));
+            Assert.That(
+                result.PackageBuildSdk.ResolvedVersion,
+                Is.Not.Empty);
+            Assert.That(
+                result.PackageBuildSdk.GlobalJsonSha256,
+                Has.Length.EqualTo(64));
             Assert.That(result.EnabledRetainedCompilationCount, Is.Zero);
             Assert.That(
                 result.EnabledRetainedMemoryIncreaseMiB,

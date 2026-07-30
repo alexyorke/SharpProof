@@ -147,7 +147,9 @@ internal static class EffectContractMappings
             EffectAnalysisIncompleteReason reason when
                 (reason & ~(EffectAnalysisIncompleteReason.BlockBudgetExceeded |
                             EffectAnalysisIncompleteReason.OperationBudgetExceeded |
-                            EffectAnalysisIncompleteReason.CyclicControlFlow)) == 0 => reason.ToString(),
+                            EffectAnalysisIncompleteReason.CyclicControlFlow |
+                            EffectAnalysisIncompleteReason
+                                .CallPreconditionNotProven)) == 0 => reason.ToString(),
             EffectUncertainty uncertainty when
                 (uncertainty & ~EffectUncertainty.Unknown) == 0 => uncertainty.ToString(),
             _ => throw new ArgumentOutOfRangeException(nameof(value))

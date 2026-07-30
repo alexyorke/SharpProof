@@ -12,6 +12,8 @@ internal static class ContractApiMetadata
     internal const string ConditionalAttribute =
         "System.Diagnostics.ConditionalAttribute";
     internal const string ConditionalSymbol = "SHARPPROOF_CONTRACTS";
+    internal const string AttributesPayloadSha256MetadataKey =
+        Namespace + "SHA256";
     internal const string Contract = Namespace + "Contract";
     internal const string ContractFor = Namespace + "ContractForAttribute";
     internal const string EnforcePure = Namespace + "EnforcePureAttribute";

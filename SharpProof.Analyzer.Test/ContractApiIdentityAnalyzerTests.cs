@@ -127,6 +127,58 @@ public sealed class ContractApiIdentityAnalyzerTests
         Assert.That(diagnostics, Is.Empty);
     }
 
+    [Test]
+    public async Task RejectedReturnAttributeCannotProveCallerEffectTransitively()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+
+            namespace SharpProof.Attributes {
+                [System.AttributeUsage(
+                    System.AttributeTargets.ReturnValue)]
+                public sealed class NotNullAttribute :
+                    System.Attribute {
+                }
+            }
+
+            public static class Subject {
+                [return: SharpProof.Attributes.NotNull]
+                private static string MaybeNull(bool condition) {
+                    return condition ? "" : null!;
+                }
+
+                [DoesNotThrow]
+                public static int Call(bool condition) {
+                    return MaybeNull(condition).Length;
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            source,
+            mode: null,
+            enabledIds: ["SP0046", "SP0047"],
+            profile: "advisory",
+            features: "all");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EquivalentTo(["SP0046", "SP0047"]));
+        Assert.That(
+            diagnostics.Single(static diagnostic =>
+                diagnostic.Id == "SP0047")
+                .GetMessage(System.Globalization.CultureInfo.InvariantCulture),
+            Does.Contain("MaybeNull")
+                .And.Contain("ContractApiIdentityRejected"));
+        Assert.That(
+            diagnostics.Single(static diagnostic =>
+                diagnostic.Id == "SP0046")
+                .GetMessage(System.Globalization.CultureInfo.InvariantCulture),
+            Does.Contain("Call")
+                .And.Contain("NullReferenceException"));
+    }
+
     private static Task<ImmutableArray<Diagnostic>> Analyze(
         string source,
         string features = "contracts")

@@ -99,10 +99,11 @@ ratchets. Expression nodes, decision points, and declarations are release
 gates; physical and nonblank lines are informational only. It then builds the
 repository under the bounded Job Object wrapper and runs
 every current architecture, semantic, corpus, fuzz, worker, package,
-cancellation, and performance gate. Off-profile performance compares real
-baseline and SharpProof-imported MSBuild rebuilds and separately checks the
-loaded-but-off analyzer retention boundary. The full acceptance job currently
-runs on Windows x64. Separate package-consumer CI restores the exact same three-package
+cancellation, and performance gate. Unannotated advisory performance compares
+paired, order-interleaved compiler-only and SharpProof-imported MSBuild
+rebuilds under the repository-selected SDK. It separately checks the advisory
+analyzer retention boundary. The full acceptance job currently runs on
+Windows x64. Separate package-consumer CI restores the exact same three-package
 artifacts and exercises the portable analyzer on Windows x64, Linux x64, macOS
 x64, and macOS ARM64. Packaged worker execution remains Windows x64 only;
 unsupported matrix hosts assert the explicit verification rejection.

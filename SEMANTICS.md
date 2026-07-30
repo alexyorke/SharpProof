@@ -147,12 +147,13 @@ throw `InvalidOperationException`; their effect specs describe that direct-call
 behavior.
 
 Contract clauses and annotations are evidence only when their symbols resolve
-to the `SharpProof.Attributes` assembly identity matching the analyzer and the
-`Contract` type has the exact supported shape. Each clause method must carry
-exactly one real `Conditional("SHARPPROOF_CONTRACTS")` attribute. A source,
-project, identity, or shape lookalike is selected only for accountable
-abstention; it contributes no assumption, postcondition, effect, suppression,
-trust fact, or compiler-bound ghost specification.
+to the `SharpProof.Attributes` assembly identity and built-DLL SHA-256 payload
+matching the analyzer, and the `Contract` type has the exact supported shape.
+Each clause method must carry exactly one real
+`Conditional("SHARPPROOF_CONTRACTS")` attribute. A source, project, identity,
+payload, or shape lookalike is selected only for accountable abstention; it
+contributes no assumption, postcondition, effect, suppression, trust fact, or
+compiler-bound ghost specification.
 
 Callee postconditions may be assumed only after verification or explicit trust.
 
@@ -170,7 +171,9 @@ observable purity. They are not compatible with `[ZeroAllocations]`.
 
 Compile-time constant and enum-member references are values, not static-state
 reads. Built-in compound assignments and increments over properties include
-the effects of both the getter and setter.
+the effects of both the getter and setter. Until the computed stored value is
+represented explicitly, a setter entry precondition on that value makes the
+computed write incomplete rather than borrowing an operand as false evidence.
 
 An operation that may throw and is not discharged by the analysis makes
 `[DoesNotThrow]` unknown. This includes implicit exceptions from dereferences,
@@ -214,6 +217,17 @@ The analyzer's definitive SP0013, SP0015, and SP0030 diagnostics remain
 reserved; direct violations are accountable through worker claim results and
 SARIF.
 
+An imported callee effect summary is complete only when the call has no entry
+preconditions or every compiler-bound `Requires` and closed parameter
+precondition is established at that call site. An unproven or invalidly placed
+callee precondition produces
+`Unknown(EffectSummaryIncomplete)` with
+`CallPreconditionNotProven` evidence. Standalone effect analysis uses a
+conservative contract-intent check and therefore also fails closed.
+Mutation-bearing value arguments are not recomputed from post-mutation state,
+and expanded `params` calls are incomplete until the synthesized array and its
+allocation are represented explicitly.
+
 ## Analyzer activation and language boundary
 
 Analyzer behavior is selected through the compilation-global
@@ -230,6 +244,14 @@ Analyzer behavior is selected through the compilation-global
 - feature value `effects` enables effect contracts, `contracts` enables
   call-site contract analysis, and `all` (the default) enables both. The
   package carries the same selection into the compiler artifact and its manifest.
+
+Advisory compilation startup may omit the heavyweight semantic session only
+after a conservative syntax and assembly-attribute probe finds no current
+selection or call-site trigger. Configuration validation, runtime-contract
+rejection, and compiler-artifact collection still execute. Strict mode never
+uses this fast path. Adding a new source form that can select analysis or
+surface an analyzed call site therefore also requires extending this
+discovery policy and its tests.
 
 Effect and incomplete-proof diagnostics are enabled informational diagnostics
 by default. A concretely replayed false precondition is SP0027 at Warning.

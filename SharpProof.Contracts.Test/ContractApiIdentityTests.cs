@@ -29,7 +29,7 @@ public sealed class ContractApiIdentityTests
         Assert.That(inventory.Clauses, Has.Length.EqualTo(1));
     }
 
-    [TestCase("1.0.0.0", true, false)]
+    [TestCase("1.0.0.0", true, true)]
     [TestCase("2.0.0.0", true, true)]
     [TestCase("1.0.0.0", false, true)]
     public void ReferencedContractApiRequiresMatchingIdentityAndElisionMetadata(

@@ -42,6 +42,8 @@ public sealed class EffectAnalysisSession
     private readonly INamedTypeSymbol? _conditionalAttribute;
     private readonly Dictionary<SyntaxTree, ImmutableHashSet<string>> _definedPreprocessorSymbols = [];
     private readonly ExternalEffectResolver _external;
+    private readonly IEffectCallPreconditionPolicy
+        _callPreconditions;
     private readonly EffectMethodNodeBuilder _nodeBuilder;
     private readonly object _gate = new();
     private readonly Dictionary<IMethodSymbol, EffectMethodNode> _nodes = new(SymbolEqualityComparer.Default);
@@ -52,16 +54,24 @@ public sealed class EffectAnalysisSession
         : this(
             compilation,
             new ApiSpecResolver(apiSpecs ?? ApiSpecTable.Default)
-                .Resolve(compilation ?? throw new ArgumentNullException(nameof(compilation))))
+                .Resolve(compilation ?? throw new ArgumentNullException(nameof(compilation))),
+            callPreconditions: null)
     {
     }
 
-    internal EffectAnalysisSession(Compilation compilation, ResolvedApiSpecTable apiSpecs)
+    internal EffectAnalysisSession(
+        Compilation compilation,
+        ResolvedApiSpecTable apiSpecs,
+        IEffectCallPreconditionPolicy? callPreconditions = null)
     {
         _compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
         _conditionalAttribute = compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.ConditionalAttribute);
         _external = new ExternalEffectResolver(compilation,
             apiSpecs ?? throw new ArgumentNullException(nameof(apiSpecs)));
+        _callPreconditions =
+            callPreconditions ??
+            new ConservativeEffectCallPreconditionPolicy(
+                compilation);
         _nodeBuilder = new EffectMethodNodeBuilder(
             this,
             compilation,
@@ -117,19 +127,40 @@ public sealed class EffectAnalysisSession
     internal int AnalyzedSourceMethodCount => _summaries.Count;
 
     internal EffectSummary ResolveCall(
-        IMethodSymbol target, EffectRegionSet receiver,
+        IMethodSymbol caller, IMethodSymbol target,
+        EffectRegionSet receiver,
         ImmutableArray<EffectRegionSet> arguments, bool dispatchUncertain,
-        List<EffectCallSite> sourceCalls, IOperation origin)
+        List<EffectCallSite> sourceCalls, IOperation origin,
+        IOperation? instance,
+        ImmutableArray<IOperation?> actualArguments,
+        ManagedFlowResult? flow)
     {
         if (target.ReducedFrom != null)
         {
+            actualArguments = [instance, .. actualArguments];
+            instance = null;
             arguments = [receiver, .. arguments];
             receiver = EffectRegionSet.Empty;
         }
         var normalized = NormalizeMethod(target);
+        var preconditions = _callPreconditions.Assess(
+            new EffectCallPreconditionContext(
+                caller,
+                normalized,
+                instance,
+                actualArguments,
+                flow,
+                origin));
+        var preconditionEvidence =
+            preconditions == EffectCallPreconditionStatus.NotProven
+                ? EffectSummaryOperations.IncompleteAnalysis(
+                    EffectAnalysisIncompleteReason
+                        .CallPreconditionNotProven)
+                : EffectSummary.Empty;
         if (dispatchUncertain)
         {
             return EffectSummaryOperations.Join(
+                preconditionEvidence,
                 EffectSummaryOperations.DirectCall(),
                 EffectSummaryOperations.UnknownBoundary(
                     EffectUncertainty.DirectCall |
@@ -139,11 +170,26 @@ public sealed class EffectAnalysisSession
         if (IsSourceMethod(normalized))
         {
             sourceCalls.Add(new EffectCallSite(normalized, receiver, arguments, origin));
-            return EffectSummaryOperations.DirectCall();
+            return EffectSummaryOperations.Join(
+                preconditionEvidence,
+                EffectSummaryOperations.DirectCall());
         }
         return EffectSummaryOperations.Join(
+            preconditionEvidence,
             EffectSummaryOperations.DirectCall(),
             EffectSummaryOperations.Remap(_external.Resolve(normalized), receiver, arguments));
+    }
+
+    internal EffectSummary ResolveEntryPreconditions(
+        IMethodSymbol method)
+    {
+        return _callPreconditions.AssessEntry(
+                NormalizeMethod(method)) ==
+            EffectCallPreconditionStatus.NotProven
+                ? EffectSummaryOperations.IncompleteAnalysis(
+                    EffectAnalysisIncompleteReason
+                        .CallPreconditionNotProven)
+                : EffectSummary.Empty;
     }
 
     internal EffectThrowSet ResolveExceptionSet(params string[] metadataNames)

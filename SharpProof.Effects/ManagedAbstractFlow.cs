@@ -35,10 +35,11 @@ internal sealed class ManagedAbstractFlow
         }
 
         _apiSpecs = apiSpecs ?? throw new ArgumentNullException(nameof(apiSpecs));
-        _contractApi = compilation.GetTypeByMetadataName(ContractApiMetadata.Contract);
-        _notNullAttribute = compilation.GetTypeByMetadataName(ContractApiMetadata.NotNull);
-        _positiveAttribute = compilation.GetTypeByMetadataName(ContractApiMetadata.Positive);
-        _inRangeAttribute = compilation.GetTypeByMetadataName(ContractApiMetadata.InRange);
+        var contractApi = ContractApiIdentityResolver.ForCompilation(compilation);
+        _contractApi = contractApi.Contract;
+        _notNullAttribute = contractApi.ResolveAttribute(ContractApiMetadata.NotNull);
+        _positiveAttribute = contractApi.ResolveAttribute(ContractApiMetadata.Positive);
+        _inRangeAttribute = contractApi.ResolveAttribute(ContractApiMetadata.InRange);
     }
 
     internal static ManagedAbstractFlow ForCompilation(Compilation compilation)
@@ -1030,11 +1031,26 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
 
     internal bool TryEvaluate(IOperation origin, IOperation value, out ManagedAbstractValue result)
     {
-        if (TryGetState(value, out var state) || TryGetState(origin, out state))
+        if (!HasMutation(value) &&
+            (TryGetState(value, out var state) ||
+             TryGetState(origin, out state)))
         {
             result = flow.Evaluate(value, state);
             return true;
         }
+
+        var unwrapped =
+            DefiniteOperationFacts.UnwrapHarmlessValue(value);
+        if (unwrapped is ISimpleAssignmentOperation assignment &&
+            !HasMutation(assignment.Value) &&
+            TryGetState(assignment.Value, out var valueState))
+        {
+            result = flow.Evaluate(
+                assignment.Value,
+                valueState);
+            return true;
+        }
+
         result = ManagedAbstractValue.Unknown;
         return false;
     }
@@ -1044,7 +1060,8 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
         IOperation value,
         out ManagedAbstractValue result)
     {
-        if (TryGetState(origin, out var state))
+        if (!HasMutation(value) &&
+            TryGetState(origin, out var state))
         {
             result = flow.Evaluate(value, state);
             return true;
@@ -1613,7 +1630,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 {
     private readonly HashSet<IMethodSymbol> _activeMethods = [];
     private readonly INamedTypeSymbol? _contractApi =
-        compilation.GetTypeByMetadataName(ContractApiMetadata.Contract);
+        ContractApiIdentityResolver.ForCompilation(compilation).Contract;
 
     internal bool CompletesNormally(IOperation? operation)
     {

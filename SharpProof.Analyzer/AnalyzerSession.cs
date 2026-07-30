@@ -58,7 +58,16 @@ internal sealed class AnalyzerSession
         _contractBinder = new ContractBinder(compilation, IrFactory);
         _contractIntrinsics = new ContractIntrinsicValidator(compilation);
         _apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
-        _effects = new EffectAnalysisSession(compilation, _apiSpecs);
+        var fallback =
+            new ConservativeEffectCallPreconditionPolicy(
+                compilation);
+        _effects = new EffectAnalysisSession(
+            compilation,
+            _apiSpecs,
+            new AnalyzerEffectCallPreconditionPolicy(
+                _contractBinder,
+                _contractClauses,
+                fallback));
     }
 
     internal Compilation Compilation

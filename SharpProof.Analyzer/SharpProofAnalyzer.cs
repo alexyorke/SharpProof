@@ -55,6 +55,19 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        context.RegisterCompilationEndAction(endContext =>
+        {
+            ReportInvalidConfiguration(endContext, configuration);
+            FinalCompilationCollector.Collect(endContext, configuration);
+        });
+        if (configuration.Profile == SharpProofProfile.Advisory &&
+            !RequiresSemanticAnalysis(
+                context.Compilation,
+                context.CancellationToken))
+        {
+            return;
+        }
+
         var session = _sessionFactory.Create(
             context.Compilation,
             configuration,
@@ -64,11 +77,72 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
             SymbolKind.Method);
         context.RegisterOperationBlockAction(operationContext =>
             AnalyzerFeaturePipeline.AnalyzeOperationBlock(operationContext, session));
-        context.RegisterCompilationEndAction(endContext =>
+    }
+
+    private static bool RequiresSemanticAnalysis(
+        Compilation compilation,
+        CancellationToken cancellationToken)
+    {
+        foreach (var tree in compilation.SyntaxTrees)
         {
-            ReportInvalidConfiguration(endContext, configuration);
-            FinalCompilationCollector.Collect(endContext, configuration);
-        });
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (var node in tree.GetRoot(cancellationToken)
+                         .DescendantNodes())
+            {
+                if (node is ArgumentListSyntax or
+                    BaseObjectCreationExpressionSyntax or
+                    BaseListSyntax or
+                    ConstructorDeclarationSyntax or
+                    StatementSyntax or
+                    QueryExpressionSyntax or
+                    AwaitExpressionSyntax or
+                    InterpolatedStringExpressionSyntax or
+                    WithExpressionSyntax or
+                    CollectionExpressionSyntax or
+                    RecursivePatternSyntax)
+                {
+                    return true;
+                }
+
+                if (node is AttributeSyntax attribute &&
+                    !IsAssemblyOrModuleAttribute(attribute))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return compilation.Assembly.GetAttributes().Any(
+            static attribute =>
+                IsSharpProofAttributesNamespace(
+                    attribute.AttributeClass?.ContainingNamespace));
+    }
+
+    private static bool IsSharpProofAttributesNamespace(
+        INamespaceSymbol? @namespace)
+    {
+        return @namespace is
+        {
+            Name: "Attributes",
+            ContainingNamespace:
+            {
+                Name: "SharpProof",
+                ContainingNamespace:
+                {
+                    IsGlobalNamespace: true
+                }
+            }
+        };
+    }
+
+    private static bool IsAssemblyOrModuleAttribute(
+        AttributeSyntax attribute)
+    {
+        var target = (attribute.Parent as AttributeListSyntax)?
+            .Target?.Identifier.Kind() ?? SyntaxKind.None;
+        return target is
+            SyntaxKind.AssemblyKeyword or
+            SyntaxKind.ModuleKeyword;
     }
 
     private static void ReportInvalidConfiguration(

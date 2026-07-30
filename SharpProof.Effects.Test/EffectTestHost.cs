@@ -47,6 +47,124 @@ internal static class EffectTestHost
         return EmitImage(source, assemblyName).Reference;
     }
 
+    internal static CSharpCompilation CreateCompilationWithoutContractPackage(
+        string source,
+        params MetadataReference[] additionalReferences)
+    {
+        var compilation = CSharpCompilation.Create(
+            "EffectsTest",
+            [CSharpSyntaxTree.ParseText(
+                source,
+                CSharpParseOptions.Default.WithLanguageVersion(
+                    LanguageVersion.CSharp12),
+                path: "EffectsTest.cs")],
+            PlatformReferences.AddRange(additionalReferences),
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release,
+                nullableContextOptions: NullableContextOptions.Enable,
+                deterministic: true));
+        RequireNoErrors(compilation);
+        return compilation;
+    }
+
+    internal static PortableExecutableReference EmitReferenceWithoutContractPackage(
+        string source,
+        string assemblyName)
+    {
+        var compilation = CSharpCompilation.Create(
+            assemblyName,
+            [CSharpSyntaxTree.ParseText(
+                source,
+                CSharpParseOptions.Default.WithLanguageVersion(
+                    LanguageVersion.CSharp12),
+                path: assemblyName + ".cs")],
+            PlatformReferences,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release,
+                nullableContextOptions: NullableContextOptions.Enable,
+                deterministic: true));
+        RequireNoErrors(compilation);
+        return EmitImage(compilation).Reference;
+    }
+
+    internal static PortableExecutableReference
+        EmitUnapprovedContractApiReference(
+            bool validContractShape)
+    {
+        var version =
+            typeof(EffectContractAttribute).Assembly
+                .GetName().Version ??
+            throw new InvalidOperationException(
+                "SharpProof.Attributes has no assembly version.");
+        var conditional = validContractShape
+            ? """
+              [System.Diagnostics.Conditional(
+                  ConditionalSymbol)]
+              """
+            : string.Empty;
+        return EmitReferenceWithoutContractPackage(
+            $$"""
+            using System.Reflection;
+
+            [assembly: AssemblyVersion("{{version}}")]
+
+            namespace SharpProof.Attributes {
+                public static class Contract {
+                    public const string ConditionalSymbol =
+                        "SHARPPROOF_CONTRACTS";
+
+                    {{conditional}}
+                    public static void Requires(bool condition) {
+                    }
+
+                    {{conditional}}
+                    public static void Ensures(bool condition) {
+                    }
+
+                    {{conditional}}
+                    public static void Assume(bool condition) {
+                    }
+
+                    public static T Result<T>() => default!;
+                    public static T Old<T>(T value) => value;
+                }
+
+                public enum SharpProofEffect {
+                    None = 0
+                }
+
+                [System.AttributeUsage(
+                    System.AttributeTargets.Parameter |
+                    System.AttributeTargets.ReturnValue)]
+                public sealed class NotNullAttribute : System.Attribute {
+                }
+
+                [System.AttributeUsage(System.AttributeTargets.Method)]
+                public sealed class EffectContractAttribute :
+                    System.Attribute {
+                    public EffectContractAttribute(
+                        SharpProofEffect effects) {
+                    }
+
+                    public bool Complete {
+                        get;
+                        set;
+                    }
+                }
+
+                [System.AttributeUsage(System.AttributeTargets.Method)]
+                public sealed class SharpProofTrustedAttribute :
+                    System.Attribute {
+                    public SharpProofTrustedAttribute(string reason) {
+                    }
+                }
+            }
+            """,
+            "SharpProof.Attributes");
+    }
+
     internal static EmittedAssemblyImage EmitImage(
         string source,
         string assemblyName)
