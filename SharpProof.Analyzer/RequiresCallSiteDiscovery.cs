@@ -4,10 +4,25 @@ internal sealed class RequiresCallSiteDiscovery(
     IMethodSymbol caller,
     SyntaxNode declaration,
     SemanticModel semanticModel,
-    CancellationToken cancellationToken)
+    CancellationToken cancellationToken,
+    ControlFlowGraph? suppliedGraph = null,
+    IOperation? suppliedOperationRoot = null)
 {
     internal bool HasPotentialCallSite(
         Func<IMethodSymbol, bool> hasPotentialPreconditions)
+    {
+        var owners = GetPotentialCallOwners(
+            hasPotentialPreconditions);
+        return owners == null ||
+            owners.Contains(
+                ContractClauseInventoryBuilder
+                    .NormalizeCallable(caller));
+    }
+
+    internal ImmutableHashSet<IMethodSymbol>?
+        GetPotentialCallOwners(
+            Func<IMethodSymbol, bool>
+                hasPotentialPreconditions)
     {
         if (hasPotentialPreconditions == null)
         {
@@ -17,20 +32,18 @@ internal sealed class RequiresCallSiteDiscovery(
 
         if (!TryGetOperationRoot(out var operationRoot))
         {
-            return true;
+            return null;
         }
 
+        var owners = ImmutableHashSet.CreateBuilder<
+            IMethodSymbol>(
+            SymbolEqualityComparer.Default);
         foreach (var operation in
                  operationRoot.DescendantsAndSelf())
         {
             cancellationToken.ThrowIfCancellationRequested();
             var call = GetCall(operation);
-            if (call == null ||
-                !SymbolEqualityComparer.Default.Equals(
-                    semanticModel.GetEnclosingSymbol(
-                        operation.Syntax.SpanStart,
-                        cancellationToken),
-                    caller))
+            if (call == null)
             {
                 continue;
             }
@@ -40,11 +53,21 @@ internal sealed class RequiresCallSiteDiscovery(
                 call.Value.TargetMethod;
             if (hasPotentialPreconditions(target))
             {
-                return true;
+                var owner = semanticModel.GetEnclosingSymbol(
+                    operation.Syntax.SpanStart,
+                    cancellationToken) as IMethodSymbol;
+                if (owner == null)
+                {
+                    return null;
+                }
+
+                owners.Add(
+                    ContractClauseInventoryBuilder
+                        .NormalizeCallable(owner));
             }
         }
 
-        return false;
+        return owners.ToImmutable();
     }
 
     internal ImmutableArray<RequiresCallSiteCandidate>? Get(
@@ -91,7 +114,12 @@ internal sealed class RequiresCallSiteDiscovery(
                          static root => root.DescendantsAndSelf()))
             {
                 var call = GetCall(operation);
-                if (call == null)
+                if (call == null ||
+                    !SymbolEqualityComparer.Default.Equals(
+                        semanticModel.GetEnclosingSymbol(
+                            operation.Syntax.SpanStart,
+                            cancellationToken),
+                        caller))
                 {
                     continue;
                 }
@@ -131,10 +159,19 @@ internal sealed class RequiresCallSiteDiscovery(
         ];
     }
 
-    private bool TryCreateGraph(
+    internal bool TryCreateGraph(
         out IOperation? operationRoot,
         out ControlFlowGraph graph)
     {
+        if (suppliedGraph != null)
+        {
+            operationRoot =
+                suppliedOperationRoot ??
+                suppliedGraph.OriginalOperation;
+            graph = suppliedGraph;
+            return true;
+        }
+
         if (!TryGetOperationRoot(out operationRoot))
         {
             graph = null!;
@@ -175,6 +212,12 @@ internal sealed class RequiresCallSiteDiscovery(
     private bool TryGetOperationRoot(
         out IOperation operationRoot)
     {
+        if (suppliedOperationRoot != null)
+        {
+            operationRoot = suppliedOperationRoot;
+            return true;
+        }
+
         try
         {
             var flowSyntax =
@@ -204,26 +247,12 @@ internal sealed class RequiresCallSiteDiscovery(
         IOperation callSite,
         DefiniteOperationFacts operationFacts)
     {
-        if (declaration is BaseMethodDeclarationSyntax
-            {
-                ExpressionBody.Expression: { } expressionBody
-            })
+        var body =
+            ContractClauseInventoryBuilder.GetBody(
+                declaration);
+        if (body is ExpressionSyntax expression)
         {
-            return expressionBody.Span == callSite.Syntax.Span;
-        }
-
-        if (declaration is AccessorDeclarationSyntax
-            {
-                ExpressionBody.Expression: { } accessorExpression
-            })
-        {
-            return accessorExpression.Span == callSite.Syntax.Span;
-        }
-
-        var propertyExpression = GetPropertyExpression(declaration);
-        if (propertyExpression != null)
-        {
-            return propertyExpression.Span == callSite.Syntax.Span;
+            return expression.Span == callSite.Syntax.Span;
         }
 
         if (declaration is ConstructorDeclarationSyntax constructor &&
@@ -233,13 +262,7 @@ internal sealed class RequiresCallSiteDiscovery(
             return true;
         }
 
-        var body = declaration switch
-        {
-            BaseMethodDeclarationSyntax method => method.Body,
-            AccessorDeclarationSyntax accessor => accessor.Body,
-            _ => null
-        };
-        if (body == null)
+        if (body is not BlockSyntax block)
         {
             return false;
         }
@@ -248,13 +271,13 @@ internal sealed class RequiresCallSiteDiscovery(
             .OfType<StatementSyntax>()
             .FirstOrDefault(candidate => ReferenceEquals(
                 candidate.Parent,
-                body));
+                block));
         return statement != null &&
                IsDirectReplayableStatement(
                    statement,
                    callSite,
                    operationFacts) &&
-               body.Statements
+               block.Statements
                    .TakeWhile(candidate => !ReferenceEquals(
                        candidate,
                        statement))

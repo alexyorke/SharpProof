@@ -273,6 +273,12 @@ every target binds successfully with zero entry clauses. Operation-root or
 binding failure, a possible entry clause, and relevant static initialization
 all retain full fail-closed analysis. The pipeline, screen, and binder-owning
 session are part of the declared effect-analysis trusted computing base.
+When the containing operation tree has a relevant nested owner, the pass
+creates the root CFG once and follows Roslyn local-function and anonymous-
+function child graphs recursively. Each callable is deduplicated by compiler
+symbol, analyzed under its own flow state, and records its own outcome.
+Expression-tree lambdas are treated as quoted code and remain unknown rather
+than producing an execution diagnostic.
 
 The verifier is optional in advisory builds and mandatory in strict builds;
 explicitly setting `SharpProofVerify=false` with `strict` is a configuration

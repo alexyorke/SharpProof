@@ -217,6 +217,13 @@ methods report SP0047; unsupported unannotated methods remain silent. A closed
 constructed generic API call is admitted only when its exact specification
 resolves.
 
+That subset boundary applies to selected effect and verifier-body analysis.
+The lighter call-site precondition pass also follows executable local-function,
+lambda, and anonymous-method CFGs so a definite bad nested call still reports
+SP0027. It assigns each result to the nested callable, treats captured facts
+conservatively, and does not treat quoted expression-tree lambdas as executing
+delegates.
+
 ## Call-site preconditions
 
 Contracts are normal C# expressions bound by compiler symbol identity:
@@ -243,6 +250,12 @@ analysis refines both scalar operands on comparison edges and propagates caller
 `Requires` clauses and parameter attributes, so it
 can establish non-null, division, bounds, range, and overflow facts without
 running Z3 in the live analyzer.
+
+Executable local functions, lambdas, and anonymous methods are checked through
+their Roslyn child CFGs exactly once. Their outcomes are not folded into the
+containing method. Captured values that cannot be established at the nested
+entry remain `Unknown`; expression-tree lambdas are quoted code and are not
+reported as executing call sites.
 
 A violation is emitted only when the receiver and argument prefix is known to
 complete normally and the instantiated precondition is definitely false.

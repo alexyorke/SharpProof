@@ -43,6 +43,9 @@ internal sealed class AnalyzerSession
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
         _reportedRejectedContractApis =
             new(SymbolEqualityComparer.Default);
+    private readonly ConcurrentDictionary<IMethodSymbol, byte>
+        _requiresCallSiteAnalyses =
+            new(SymbolEqualityComparer.Default);
 
     internal AnalyzerSession(
         Compilation compilation,
@@ -127,6 +130,15 @@ internal sealed class AnalyzerSession
             binding.Contracts == null ||
             binding.Contracts.Clauses.Any(static clause =>
                 clause.Kind == BoundContractKind.Requires);
+    }
+
+    internal bool TryBeginRequiresCallSiteAnalysis(
+        IMethodSymbol method)
+    {
+        return _requiresCallSiteAnalyses.TryAdd(
+            ContractClauseInventoryBuilder.NormalizeCallable(
+                method),
+            0);
     }
 
     internal ImmutableArray<ContractIntrinsicViolation> GetContractIntrinsicViolations(

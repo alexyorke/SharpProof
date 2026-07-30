@@ -445,6 +445,7 @@ public sealed class ArchitectureTests
                 "SharpProof.Analyzer/ManagedContractFacts.cs",
                 "SharpProof.Analyzer/RequiresCallSiteAnalyzer.cs",
                 "SharpProof.Analyzer/RequiresCallSiteDiscovery.cs",
+                "SharpProof.Analyzer/RequiresCallSiteTreeAnalyzer.cs",
                 "SharpProof.Contracts/ContractSelectionInventory.cs",
                 "SharpProof.Effects/EffectAnalysisSession.cs",
                 "SharpProof.Effects/EffectCallPreconditionPolicy.cs",

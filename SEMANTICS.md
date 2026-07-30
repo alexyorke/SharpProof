@@ -281,6 +281,14 @@ and primary constructors. A closed constructed generic API call is accepted only
 when a specification resolves for that exact call. Every Roslyn `OperationKind`
 is classified by a checked-in decision table; an unknown future kind is rejected.
 
+That rejection defines selected effect admission, not whether the contracts
+feature can inspect a call site. Call-site precondition analysis recursively
+follows Roslyn child CFGs for executable local functions, lambdas, and anonymous
+methods. Each callable is analyzed once under its own entry and flow state, and
+its outcome is not combined with the containing callable. Unavailable captured
+facts remain unknown. An expression-tree lambda is quoted code and is not
+treated as an executing call site.
+
 The packaged verifier consumes compiler artifact schema version 8 produced
 from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed

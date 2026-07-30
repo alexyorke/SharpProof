@@ -78,6 +78,10 @@ contain documented breaking changes.
   analysis builds a CFG only when the cached contract binder finds an entry
   clause or cannot establish that none exists; malformed bindings and static
   initialization remain fail-closed.
+- Call-site precondition analysis now follows Roslyn child CFGs for executable
+  local functions, lambdas, and anonymous methods. Each nested callable is
+  analyzed once under its own flow state and outcome; quoted expression-tree
+  lambdas remain conservative and do not produce execution diagnostics.
 - Source and metadata effect summaries are imported only after their callee
   `Requires` and closed parameter preconditions are established. Unproven or
   invalidly placed entry contracts now produce typed incomplete effect

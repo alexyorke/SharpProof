@@ -152,6 +152,13 @@ forms currently remain outside worker execution and produce
 `UnsupportedCallable`; nested clauses are assigned only to their owning
 callable.
 
+The portable call-site precondition pass is narrower than worker execution but
+does traverse executable local-function, lambda, and anonymous-method child
+CFGs. It analyzes each nested body once with its own scalar flow state and
+keeps its outcome separate from the containing method. Captured entry values
+that cannot be established remain unknown. Quoted expression-tree lambdas are
+not treated as executing delegates.
+
 ## Acceptance-only thresholds
 
 These values come from `eng/acceptance/contract.json`. They are repository

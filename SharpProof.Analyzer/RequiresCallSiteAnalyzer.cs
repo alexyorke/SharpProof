@@ -10,7 +10,36 @@ internal static class RequiresCallSiteAnalyzer
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
-        return new Analysis(caller, declaration, semanticModel, session, reportDiagnostic, cancellationToken).Run();
+        return RequiresCallSiteTreeAnalyzer.Analyze(
+            caller,
+            declaration,
+            semanticModel,
+            session,
+            reportDiagnostic,
+            cancellationToken);
+    }
+
+    internal static AnalyzerSemanticOutcome AnalyzeCallable(
+        IMethodSymbol caller,
+        SyntaxNode declaration,
+        SemanticModel semanticModel,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        ControlFlowGraph? graph,
+        IOperation? operationRoot,
+        bool screenForPotentialCalls,
+        CancellationToken cancellationToken)
+    {
+        return new Analysis(
+                caller,
+                declaration,
+                semanticModel,
+                session,
+                reportDiagnostic,
+                graph,
+                operationRoot,
+                cancellationToken)
+            .Run(screenForPotentialCalls);
     }
 
     private sealed class Analysis(
@@ -19,15 +48,25 @@ internal static class RequiresCallSiteAnalyzer
         SemanticModel semanticModel,
         AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic,
+        ControlFlowGraph? graph,
+        IOperation? operationRoot,
         CancellationToken cancellationToken)
     {
         private readonly IrFactory _factory = session.IrFactory;
         private readonly RequiresCallSiteDiscovery _discovery =
-            new(caller, declaration, semanticModel, cancellationToken);
+            new(
+                caller,
+                declaration,
+                semanticModel,
+                cancellationToken,
+                graph,
+                operationRoot);
 
-        internal AnalyzerSemanticOutcome Run()
+        internal AnalyzerSemanticOutcome Run(
+            bool screenForPotentialCalls)
         {
-            if (!_discovery.HasPotentialCallSite(
+            if (screenForPotentialCalls &&
+                !_discovery.HasPotentialCallSite(
                     session.HasPotentialCallPreconditions))
             {
                 return AnalyzerSemanticOutcome.NotApplicable;
