@@ -494,7 +494,10 @@ try {
             'console;verbosity=minimal'
         )
         if ($testProject -like 'SharpProof.Gates.Test*') {
-            $testArguments += @('--filter', 'TestCategory!=Performance')
+            $testArguments += @(
+                '--filter',
+                'TestCategory!=Performance&TestCategory!=Coverage'
+            )
         }
         Invoke-SharpProofDotnet `
             -TimeoutSeconds $testTimeoutSeconds `

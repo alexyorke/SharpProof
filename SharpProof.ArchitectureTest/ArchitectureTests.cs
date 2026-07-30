@@ -721,12 +721,50 @@ public sealed class ArchitectureTests
             ".github",
             "workflows",
             "ci.yml"));
+        var performanceIndex = fastWorkflow.IndexOf(
+            "Invoke-SharpProofGateEvidence.ps1",
+            StringComparison.Ordinal);
+        var broadTestsIndex = fastWorkflow.IndexOf(
+            "test SharpProof.Dev.Tests.slnf",
+            StringComparison.Ordinal);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                fastWorkflow,
+                Does.Contain(
+                    "TestCategory!=Performance&TestCategory!=Coverage"));
+            Assert.That(
+                fastWorkflow,
+                Does.Not.Contain("TestCategory=Performance"));
+            Assert.That(
+                fastWorkflow,
+                Does.Contain(
+                    "FullyQualifiedName~" +
+                    "ForcedTerminationDeadlineIsStableAcrossLaunches"));
+            Assert.That(
+                fastWorkflow,
+                Does.Contain(
+                    "-OutputPath artifacts/ci/performance.json"));
+            Assert.That(
+                fastWorkflow,
+                Does.Contain(
+                    "fast-pr-performance-${{ github.sha }}-" +
+                    "${{ github.run_attempt }}"));
+            Assert.That(performanceIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(
+                broadTestsIndex,
+                Is.GreaterThan(performanceIndex));
+        }
+
+        var acceptance = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "acceptance",
+            "Verify.ps1"));
         Assert.That(
-            fastWorkflow,
-            Does.Contain("TestCategory!=Performance"));
-        Assert.That(
-            fastWorkflow,
-            Does.Contain("TestCategory=Performance"));
+            acceptance,
+            Does.Contain(
+                "TestCategory!=Performance&TestCategory!=Coverage"));
 
         var coverageCollector = File.ReadAllText(Path.Combine(
             root,
