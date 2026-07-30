@@ -441,7 +441,7 @@ public sealed partial class HumanReleaseGateScriptTests
         AssertOutputContains(
             """
             #< CLIXML
-            <Objs Version="1.1.0.1" xmlns="http://schemas.microsoft.com/powershell/2004/04"><S S="Error">_x001B_[31;1mPilot artifact does not_x000A_</S><S S="Error">_x001B_[31;1mexactly match the declared evidence._x001B_[0m</S></Objs>
+            <Objs Version="1.1.0.1" xmlns="http://schemas.microsoft.com/powershell/2004/04"><S S="Error">_x001B_[31;1mPilot artifact does not_x000A_</S><S S="Error">_x001B_[31;1m     | exactly match the declared evidence._x001B_[0m</S></Objs>
             """,
             "Pilot artifact does not exactly match");
     }
@@ -1943,9 +1943,15 @@ public sealed partial class HumanReleaseGateScriptTests
             string.Empty);
         return string.Join(
             " ",
-            normalized.Split(
-                (char[]?)null,
-                StringSplitOptions.RemoveEmptyEntries));
+            normalized
+                .Split(
+                    (char[]?)null,
+                    StringSplitOptions.RemoveEmptyEntries)
+                .Where(token =>
+                    !string.Equals(
+                        token,
+                        "|",
+                        StringComparison.Ordinal)));
     }
 
     [GeneratedRegex(
