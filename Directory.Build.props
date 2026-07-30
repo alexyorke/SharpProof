@@ -51,12 +51,6 @@
     <WarningsAsErrors>$(WarningsAsErrors);RS0030</WarningsAsErrors>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(SharpProofTestProject)' == 'true'">
-    <PackageReference Include="coverlet.collector"
-                      PrivateAssets="all"
-                      IncludeAssets="runtime;build;native;contentfiles;analyzers;buildtransitive" />
-  </ItemGroup>
-
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Attributes'">
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers"
                       PrivateAssets="all" />

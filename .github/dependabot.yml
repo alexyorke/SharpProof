@@ -17,7 +17,6 @@ updates:
           - "Microsoft.NET.Test.Sdk"
           - "NUnit"
           - "NUnit3TestAdapter"
-          - "coverlet.collector"
     # Analyzer binaries must remain loadable by the documented Roslyn 4.14
     # host. Allow patch servicing, but require an intentional compatibility
     # migration before raising compiler-facing runtime dependency lines.

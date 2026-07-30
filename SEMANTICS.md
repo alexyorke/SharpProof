@@ -272,6 +272,12 @@ direct calls, object and array creation, `if`, `for`, `while`, `do`, constant
 `switch`, `try`/`catch`/`finally`, `using`, `lock`, conditional access, and
 ordinary interpolation.
 
+Effect exception flow evaluates catches in source order. A selected handler
+can consume an exception or let a rethrow escape, but an exception thrown or
+rethrown from that handler is never offered to later sibling catches.
+Nonconstant filters and uncertain runtime subtypes retain every feasible
+escape path.
+
 It rejects async and iterator bodies, `foreach`, closures, local functions,
 delegates, ref parameters or locals, ref returns, ref-like types, open type
 parameters, dynamic binding, unsafe and pointer constructs, function pointers,

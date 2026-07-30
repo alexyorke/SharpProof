@@ -78,6 +78,10 @@ contain documented breaking changes.
   analysis builds a CFG only when the cached contract binder finds an entry
   clause or cannot establish that none exists; malformed bindings and static
   initialization remain fail-closed.
+- Coverage collection uses the managed Microsoft collector so the exact
+  trusted contract-API payload remains unchanged while tests run. Coverage
+  instrumentation can no longer turn payload-identity checks into unrelated
+  test failures, and the redundant Coverlet dependency has been removed.
 - Call-site precondition analysis now follows Roslyn child CFGs for executable
   local functions, lambdas, and anonymous methods. Each nested callable is
   analyzed once under its own flow state and outcome; quoted expression-tree
@@ -176,6 +180,9 @@ contain documented breaking changes.
 - Constructed generic exception types remain distinct in catch, allowed-
   exception, effect-set, manifest, and replay evidence; unbound generic
   exception contracts are rejected.
+- Catch handlers are evaluated in source order. An exception rethrown by an
+  earlier handler can no longer be consumed by a later sibling catch, and
+  filtered, runtime-subtype, and unknown exception paths remain fail-closed.
 - `SharpProofEffect.Throws` no longer implicitly permits managed allocation;
   every declared effect flag is enforced independently.
 - Throwing a possibly null exception expression now includes the possible

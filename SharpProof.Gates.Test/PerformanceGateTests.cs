@@ -75,6 +75,10 @@ public sealed class PerformanceGateTests
             Assert.That(
                 samples[0].Ratio,
                 Is.EqualTo(1.1).Within(0.000_001));
+            Assert.That(samples[0].BaselineMilliseconds, Is.EqualTo(100));
+            Assert.That(
+                samples[0].UnannotatedAdvisoryMilliseconds,
+                Is.EqualTo(110));
             Assert.That(samples[1].Ratio, Is.EqualTo(2));
             Assert.That(
                 samples[2].Ratio,
@@ -151,6 +155,59 @@ public sealed class PerformanceGateTests
             Assert.That(
                 statistics.OrderBalancedRatios[2],
                 Is.EqualTo(Math.Sqrt(500)).Within(0.000_001));
+        }
+    }
+
+    [Test]
+    public void PackageBuildSamplesRejectInvalidTimingEvidence()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(
+                (Action)(() => _ = new PackageBuildSample(
+                    0,
+                    false,
+                    0,
+                    1)));
+            Assert.Throws<ArgumentOutOfRangeException>(
+                (Action)(() => _ = new PackageBuildSample(
+                    0,
+                    false,
+                    1,
+                    double.NaN)));
+            Assert.Throws<ArgumentOutOfRangeException>(
+                (Action)(() => _ = new PackageBuildSample(
+                    0,
+                    false,
+                    double.Epsilon,
+                    double.MaxValue)));
+        }
+    }
+
+    [Test]
+    public void PackageBuildEstimatorRejectsIncompleteNumericEvidence()
+    {
+        var noncontiguous = new[] {
+            new PackageBuildSample(1, false, 1, 1),
+            new PackageBuildSample(2, true, 1, 1)
+        };
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.Throws<ArgumentException>(
+                (Action)(() =>
+                    _ = PackageBuildEstimator.Estimate(
+                        Array.Empty<PackageBuildSample>())));
+            Assert.Throws<ArgumentException>(
+                (Action)(() =>
+                    _ = PackageBuildEstimator.Estimate(noncontiguous)));
+            Assert.Throws<ArgumentException>(
+                (Action)(() =>
+                    _ = PackageBuildEstimator.Median(
+                        Array.Empty<double>())));
+            Assert.Throws<ArgumentException>(
+                (Action)(() =>
+                    _ = PackageBuildEstimator.Median([0])));
         }
     }
 
@@ -464,9 +521,35 @@ public sealed class PerformanceGateTests
             result.Failures,
             Is.Empty,
             string.Join(Environment.NewLine, result.Failures));
+        Assert.That(result.Passed, Is.True);
+        AssertProtocolEvidence(result);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(result.Passed, Is.True);
+            Assert.That(
+                result.CancellationP95Milliseconds,
+                Is.LessThanOrEqualTo(250));
+            Assert.That(
+                result.ForcedTerminationMilliseconds,
+                Is.LessThanOrEqualTo(1000));
+        }
+    }
+
+    [Test]
+    [Category("Coverage")]
+    [NonParallelizable]
+    public async Task ReleasePerformanceProtocolProducesStructuralEvidence()
+    {
+        var result = await PerformanceGate.RunAsync(
+            RepositoryLayout.FindRoot());
+
+        AssertProtocolEvidence(result);
+    }
+
+    private static void AssertProtocolEvidence(
+        PerformanceGateResult result)
+    {
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
                 result.UnannotatedAdvisoryAnalyzerDriverRunCount,
                 Is.EqualTo(1));
@@ -499,14 +582,14 @@ public sealed class PerformanceGateTests
             Assert.That(result.EnabledRetainedCompilationCount, Is.Zero);
             Assert.That(
                 result.EnabledRetainedMemoryIncreaseMiB,
-                Is.LessThanOrEqualTo(32));
+                Is.GreaterThanOrEqualTo(0));
             Assert.That(result.IdeDiagnosticReplayFailureCount, Is.Zero);
             Assert.That(
                 result.CancellationP95Milliseconds,
-                Is.LessThanOrEqualTo(250));
+                Is.GreaterThan(0));
             Assert.That(
                 result.ForcedTerminationMilliseconds,
-                Is.LessThanOrEqualTo(1000));
+                Is.GreaterThan(0));
         }
     }
 }

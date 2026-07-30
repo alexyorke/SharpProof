@@ -62,12 +62,12 @@ $reports = @(
     Get-ChildItem `
         -LiteralPath $resolvedCoverageRoot `
         -Recurse `
-        -Filter 'coverage.cobertura.xml' `
+        -Filter '*.cobertura.xml' `
         -File |
         Sort-Object FullName
 )
 if ($reports.Count -eq 0) {
-    throw "No coverage.cobertura.xml reports were found under $resolvedCoverageRoot."
+    throw "No Cobertura XML reports were found under $resolvedCoverageRoot."
 }
 
 $lineHits = [Collections.Generic.Dictionary[string,
@@ -80,6 +80,7 @@ function Resolve-CoverageSourcePath {
         [string]$FileName,
 
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
         [string[]]$SourceRoots
     )
 

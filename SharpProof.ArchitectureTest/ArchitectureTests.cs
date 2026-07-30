@@ -608,8 +608,29 @@ public sealed class ArchitectureTests
             performanceTests.Split("[Category(\"Performance\")]", StringSplitOptions.None),
             Has.Length.EqualTo(3));
 
+        var fastWorkflow = File.ReadAllText(Path.Combine(
+            root,
+            ".github",
+            "workflows",
+            "ci.yml"));
+        Assert.That(
+            fastWorkflow,
+            Does.Contain("TestCategory!=Performance"));
+        Assert.That(
+            fastWorkflow,
+            Does.Contain("TestCategory=Performance"));
+
+        var coverageCollector = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofCoverage.ps1"));
+        Assert.That(
+            coverageCollector,
+            Does.Contain("TestCategory!=Performance"));
+        Assert.That(
+            coverageCollector,
+            Does.Contain("TestCategory=Coverage"));
         foreach (var workflow in new[] {
-                     ".github/workflows/ci.yml",
                      ".github/workflows/coverage.yml",
                      ".github/workflows/package-consumers.yml"
                  })
@@ -619,16 +640,57 @@ public sealed class ArchitectureTests
                 workflow.Replace('/', Path.DirectorySeparatorChar)));
             Assert.That(
                 contents,
-                Does.Contain("TestCategory!=Performance"),
+                Does.Contain("Invoke-SharpProofCoverage.ps1"),
                 workflow);
         }
+    }
 
-        var fastWorkflow = File.ReadAllText(Path.Combine(
+    [Test]
+    public void CoverageCollectionPreservesTrustedContractPayloadIdentity()
+    {
+        var root = RepositoryRoot();
+        var collector = File.ReadAllText(Path.Combine(
             root,
-            ".github",
-            "workflows",
-            "ci.yml"));
-        Assert.That(fastWorkflow, Does.Contain("TestCategory=Performance"));
+            "scripts",
+            "Invoke-SharpProofCoverage.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                collector,
+                Does.Contain(
+                    "Code Coverage;Format=Cobertura"));
+            Assert.That(
+                collector,
+                Does.Not.Contain("XPlat Code Coverage"));
+            Assert.That(
+                collector,
+                Does.Contain("SharpProof.Dev.Tests.slnf"));
+            Assert.That(
+                collector,
+                Does.Contain("SharpProof.Gates.runsettings"));
+        }
+
+        var gateSettings = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "coverage",
+            "SharpProof.Gates.runsettings"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                gateSettings,
+                Does.Contain(
+                    ".*SharpProof\\.Gates\\.dll$"));
+            Assert.That(
+                gateSettings,
+                Does.Contain(
+                    "<CollectFromChildProcesses>False" +
+                    "</CollectFromChildProcesses>"));
+            Assert.That(
+                gateSettings,
+                Does.Not.Contain("SharpProof.Attributes"));
+        }
     }
 
     [Test]

@@ -343,15 +343,10 @@ jobs:
       - name: Collect and enforce release coverage
         shell: pwsh
         run: |
-          .\scripts\Invoke-SharpProofDotnet.ps1 `
+          .\scripts\Invoke-SharpProofCoverage.ps1 `
             -MemoryLimitMb 12288 `
             -TimeoutSeconds 1200 `
-            test SharpProof.Dev.Tests.slnf `
-            -c Release `
-            --no-build `
-            --filter 'TestCategory!=Performance' `
-            --collect "XPlat Code Coverage" `
-            --results-directory artifacts/release-qualification/coverage
+            -ResultsDirectory artifacts/release-qualification/coverage
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           .\scripts\Test-SharpProofCoverage.ps1 `
             -CoverageRoot artifacts/release-qualification/coverage `

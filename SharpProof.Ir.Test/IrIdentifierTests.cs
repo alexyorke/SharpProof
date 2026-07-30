@@ -46,6 +46,9 @@ public sealed class IrIdentifierTests
             Assert.That(
                 stringId.ToString(),
                 Is.EqualTo("s" + stringId.Value));
+            Assert.That(
+                stringId.GetHashCode(),
+                Is.EqualTo(factory.InternString("identifier").GetHashCode()));
             Assert.That(operation.IsDefault, Is.False);
             Assert.That(
                 operation.ToString(),

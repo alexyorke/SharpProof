@@ -1963,6 +1963,43 @@ public sealed class EffectAnalysisTests
                     }
                 }
 
+                public static void SiblingCatchAfterRethrow(
+                    InvalidOperationException exception) {
+                    try {
+                        ThrowInvalid(exception);
+                    }
+                    catch (InvalidOperationException) {
+                        throw;
+                    }
+                    catch (Exception) {
+                    }
+                }
+
+                public static void FilteredSiblingCatchAfterRethrow(
+                    InvalidOperationException exception,
+                    bool rethrow) {
+                    try {
+                        ThrowInvalid(exception);
+                    }
+                    catch (InvalidOperationException) when (rethrow) {
+                        throw;
+                    }
+                    catch (InvalidOperationException) {
+                    }
+                }
+
+                public static void RuntimeSubtypeSiblingCatchAfterRethrow(
+                    [NotNull] Exception exception) {
+                    try {
+                        throw exception;
+                    }
+                    catch (InvalidOperationException) {
+                        throw;
+                    }
+                    catch (Exception) {
+                    }
+                }
+
                 public static void ThrowingFilter(
                     InvalidOperationException exception,
                     ApplicationException filterException) {
@@ -2058,6 +2095,15 @@ public sealed class EffectAnalysisTests
                 session.Analyze(Method(compilation, "Rethrow")).Summary,
                 "System.InvalidOperationException");
             AssertThrows(
+                session.Analyze(Method(compilation, "SiblingCatchAfterRethrow")).Summary,
+                "System.InvalidOperationException");
+            AssertThrows(
+                session.Analyze(Method(compilation, "FilteredSiblingCatchAfterRethrow")).Summary,
+                "System.InvalidOperationException");
+            AssertThrows(
+                session.Analyze(Method(compilation, "RuntimeSubtypeSiblingCatchAfterRethrow")).Summary,
+                "System.Exception");
+            AssertThrows(
                 session.Analyze(Method(compilation, "ThrowingFilter")).Summary,
                 "System.InvalidOperationException");
             Assert.That(
@@ -2116,12 +2162,34 @@ public sealed class EffectAnalysisTests
                     }
                 }
 
+                public static void MaybeFiltered(
+                    IExternal external,
+                    bool handle) {
+                    try {
+                        external.Run();
+                    }
+                    catch (Exception) when (handle) {
+                    }
+                }
+
                 public static void Rethrow(IExternal external) {
                     try {
                         external.Run();
                     }
                     catch (Exception) {
                         throw;
+                    }
+                }
+
+                public static void SiblingCatchAfterRethrow(
+                    IExternal external) {
+                    try {
+                        external.Run();
+                    }
+                    catch (InvalidOperationException) {
+                        throw;
+                    }
+                    catch (Exception) {
                     }
                 }
 
@@ -2148,10 +2216,18 @@ public sealed class EffectAnalysisTests
                 Is.True);
             Assert.That(
                 session.Analyze(Method(compilation, "Filtered"))
+                    .Summary.Throws.IsEmpty,
+                Is.True);
+            Assert.That(
+                session.Analyze(Method(compilation, "MaybeFiltered"))
                     .Summary.Throws.IncludesUnknown,
                 Is.True);
             Assert.That(
                 session.Analyze(Method(compilation, "Rethrow"))
+                    .Summary.Throws.IncludesUnknown,
+                Is.True);
+            Assert.That(
+                session.Analyze(Method(compilation, "SiblingCatchAfterRethrow"))
                     .Summary.Throws.IncludesUnknown,
                 Is.True);
             Assert.That(

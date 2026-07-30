@@ -38,15 +38,10 @@ jobs:
       - name: Collect aggregate coverage
         shell: pwsh
         run: |
-          .\scripts\Invoke-SharpProofDotnet.ps1 `
+          .\scripts\Invoke-SharpProofCoverage.ps1 `
             -MemoryLimitMb 12288 `
             -TimeoutSeconds 1200 `
-            test SharpProof.Dev.Tests.slnf `
-            -c Release `
-            --no-build `
-            --filter 'TestCategory!=Performance' `
-            --collect "XPlat Code Coverage" `
-            --results-directory artifacts/coverage
+            -ResultsDirectory artifacts/coverage
 
       - name: Enforce project and changed C# TCB coverage
         shell: pwsh

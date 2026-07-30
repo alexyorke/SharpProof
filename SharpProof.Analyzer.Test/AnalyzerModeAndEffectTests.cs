@@ -1871,6 +1871,42 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task LaterSiblingCatchDoesNotConsumeRethrow()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [DoesNotThrow]
+                public static void RethrowBeforeSiblingCatch() {
+                    try {
+                        throw new InvalidOperationException();
+                    }
+                    catch (InvalidOperationException) {
+                        throw;
+                    }
+                    catch (Exception) {
+                    }
+                }
+            }
+            """,
+            mode: null,
+            ["SP0046"],
+            new SharpProofAnalyzer(factory),
+            features: "effects");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0046"]));
+        Assert.That(
+            factory.Outcomes["RethrowBeforeSiblingCatch"],
+            Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+    }
+
+    [Test]
     public async Task ExceptionConstructorContractsUseOnlyExactApprovedSpecs()
     {
         var factory = new RecordingSessionFactory();
