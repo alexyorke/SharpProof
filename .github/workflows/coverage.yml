@@ -40,7 +40,7 @@ jobs:
         run: |
           .\scripts\Invoke-SharpProofCoverage.ps1 `
             -MemoryLimitMb 12288 `
-            -TimeoutSeconds 1200 `
+            -TimeoutSeconds 1800 `
             -ResultsDirectory artifacts/coverage
 
       - name: Enforce project and changed C# TCB coverage

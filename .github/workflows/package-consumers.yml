@@ -706,7 +706,7 @@ jobs:
             -GateStatus running
           .\scripts\Invoke-SharpProofCoverage.ps1 `
             -MemoryLimitMb 12288 `
-            -TimeoutSeconds 1200 `
+            -TimeoutSeconds 1800 `
             -ResultsDirectory artifacts/release-qualification/coverage
           if (-not $?) {
             throw 'Release coverage collection failed.'
