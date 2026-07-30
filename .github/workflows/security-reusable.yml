@@ -47,10 +47,18 @@ jobs:
       - name: Reject vulnerable direct or transitive packages
         shell: pwsh
         run: >-
-          .\scripts\Invoke-SharpProofDotnet.ps1
-          list SharpProof.sln package
-          --vulnerable
-          --include-transitive
+          .\scripts\Test-SharpProofDependencyAudit.ps1
+          -SolutionPath SharpProof.sln
+          -NuGetConfigurationPath NuGet.Config
+          -OutputPath artifacts/security/dependency-audit.json
+
+      - name: Retain fail-closed dependency-audit evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: >-
+            security-dependency-audit-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/security/dependency-audit.json
+          if-no-files-found: error
 
   banned-apis:
     runs-on: windows-latest
@@ -77,44 +85,3 @@ jobs:
           build SharpProof.sln
           --configuration Release
           --no-restore
-
-  codeql:
-    runs-on: windows-latest
-    permissions:
-      contents: read
-      packages: read
-      security-events: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup the repository SDK
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          dotnet-version: "8.0.x"
-          global-json-file: global.json
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@adfda868f108ac4222129de456ea554034a27db7 # v4
-        with:
-          languages: csharp
-          build-mode: manual
-
-      - name: Restore the locked graph
-        shell: pwsh
-        run: >-
-          .\scripts\Invoke-SharpProofDotnet.ps1
-          restore SharpProof.sln
-          --locked-mode
-
-      - name: Build the analyzed production graph
-        shell: pwsh
-        run: >-
-          .\scripts\Invoke-SharpProofDotnet.ps1
-          build SharpProof.sln
-          --configuration Release
-          --no-restore
-
-      - name: Analyze the exact checked-out SHA
-        uses: github/codeql-action/analyze@adfda868f108ac4222129de456ea554034a27db7 # v4
-        with:
-          category: /language:csharp

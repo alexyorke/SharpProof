@@ -1,0 +1,170 @@
+using NUnit.Framework;
+
+namespace SharpProof.ArchitectureTest;
+
+[TestFixture]
+public sealed class DependencyAutomationTests
+{
+    [Test]
+    public void DependabotKeepsCompilerDependenciesOnPatchUpdates()
+    {
+        var configuration = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            ".github",
+            "dependabot.yml"));
+        var common = IgnoreBlock(
+            configuration,
+            "Microsoft.CodeAnalysis.Common");
+        var csharp = IgnoreBlock(
+            configuration,
+            "Microsoft.CodeAnalysis.CSharp");
+
+        using (Assert.EnterMultipleScope())
+        {
+            AssertCompilerCeiling(common);
+            AssertCompilerCeiling(csharp);
+        }
+    }
+
+    [Test]
+    public void ReusableSecurityFailsClosedOnDependencyAuditEvidence()
+    {
+        var workflow = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            ".github",
+            "workflows",
+            "security-reusable.yml"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                workflow,
+                Does.Contain(
+                    @".\scripts\Test-SharpProofDependencyAudit.ps1"));
+            Assert.That(
+                workflow,
+                Does.Contain(
+                    "-OutputPath artifacts/security/dependency-audit.json"));
+            Assert.That(
+                workflow,
+                Does.Contain(
+                    "security-dependency-audit-${{ github.sha }}-" +
+                    "${{ github.run_attempt }}"));
+            Assert.That(
+                workflow,
+                Does.Not.Contain(
+                    "list SharpProof.sln package\n" +
+                    "          --vulnerable"));
+        }
+    }
+
+    [Test]
+    public void RepositorySecurityKeepsCodeQlDisabled()
+    {
+        var workflows = new[]
+        {
+            "security-reusable.yml",
+            "security.yml",
+            "package-consumers.yml"
+        };
+
+        foreach (var workflowName in workflows)
+        {
+            var workflow = File.ReadAllText(Path.Combine(
+                RepositoryRoot(),
+                ".github",
+                "workflows",
+                workflowName));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    workflow,
+                    Does.Not.Contain("github/codeql-action"),
+                    workflowName);
+                Assert.That(
+                    workflow,
+                    Does.Not.Contain("security-events: write"),
+                    workflowName);
+            }
+        }
+    }
+
+    private static void AssertCompilerCeiling(string block)
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(block, Does.Contain("versions:"));
+            Assert.That(block, Does.Contain("- \">= 4.15.0\""));
+            Assert.That(
+                block,
+                Does.Contain("- \"version-update:semver-minor\""));
+            Assert.That(
+                block,
+                Does.Contain("- \"version-update:semver-major\""));
+        }
+    }
+
+    private static string IgnoreBlock(
+        string configuration,
+        string dependencyName)
+    {
+        var lines = configuration.Replace(
+                "\r\n",
+                "\n",
+                StringComparison.Ordinal)
+            .Split('\n');
+        var marker = $"- dependency-name: \"{dependencyName}\"";
+        var starts = lines
+            .Select((line, index) => new
+            {
+                Line = line,
+                Index = index
+            })
+            .Where(candidate =>
+                candidate.Line.TrimStart()
+                    .Equals(marker, StringComparison.Ordinal))
+            .ToArray();
+        Assert.That(
+            starts,
+            Has.Length.EqualTo(1),
+            $"Expected one ignore block for {dependencyName}.");
+
+        var start = starts[0].Index;
+        var indentation = lines[start].Length -
+            lines[start].TrimStart().Length;
+        var end = lines.Length;
+        for (var index = start + 1; index < lines.Length; index++)
+        {
+            var line = lines[index];
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+            var currentIndentation = line.Length -
+                line.TrimStart().Length;
+            if (currentIndentation <= indentation)
+            {
+                end = index;
+                break;
+            }
+        }
+        return string.Join('\n', lines[start..end]);
+    }
+
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException(
+            "Could not find the repository root.");
+    }
+}

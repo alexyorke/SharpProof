@@ -66,7 +66,7 @@ the current coverage inventory or normative semantics.
 ## Known production gaps
 
 During Windows verification, the production analyzer emits a deterministic
-schema-4 artifact from the final post-generator Roslyn `Compilation`. It
+schema-8 compiler artifact from the final post-generator Roslyn `Compilation`. It
 contains the selected-claim manifest and portable lowered whole-body CFG/IR for
 supported selected callables, plus bound contract/spec metadata, compiler
 diagnostics, generated-tree hashes, bounded options, mapped locations, and
@@ -79,10 +79,12 @@ before cache or backend work. Compiler and reference identities are provenance,
 not a runtime Roslyn-build gate. The compiler reconstruction portion of
 production-plan Step 4 is complete for the bounded verifier subset.
 
-Independent whole-body counterexample replay is implemented for the admitted
-program subset. The proof kernel checks exact model closure and the lowered
-assumptions/goal before the worker independently executes the compiler-produced
-whole-body CFG. The three-package split, portable SourceLink symbols, package
+Independent whole-body postcondition-counterexample replay is implemented for
+the admitted scalar program subset. The proof kernel checks exact model closure
+and the lowered assumptions/goal before the worker independently executes the
+compiler-produced whole-body CFG. Effect violations remain fail-closed until
+the compiler artifact carries an independently replayable effect trace. The
+three-package split, portable SourceLink symbols, package
 validation, deterministic hashes, SPDX 2.3 package/component SBOM generation,
 separately permissioned GitHub build/SBOM attestations, immutable tagged-byte
 validation, trusted-publishing workflow,
@@ -90,11 +92,12 @@ package-backed sample matrix, and exact public API XML coverage are
 implemented. The tag workflow requires checked-in version equality, master
 ancestry, and predecessor-tag order, then allowlists private `preview.1`,
 public `preview.2`, public `rc.1`, and stable `1.0.0` promotion of the
-already-tested bytes. Existing V3 packages are accepted only after exact
-entry-payload comparison, and verified retries publish main and symbol
-packages separately in dependency order. Deterministic SARIF 2.1.0 projection
-is available as an opt-in verifier output. Owner configuration of protected
-release environments and tags, pilot-library evidence, the first
+already-tested bytes. Publication preflights every main package and fails if
+the version already exists; duplicate skipping is never used. Main and symbol
+packages are then pushed separately in dependency order. A symbol collision or
+partial publication requires a new version. Deterministic SARIF 2.1.0
+projection is available as an opt-in verifier output. Owner configuration of
+protected release environments and tags, pilot-library evidence, the first
 private/public NuGet publications, and the remaining release reviews are
 future work. Current behavior and limits are recorded in
 [Coverage and limits](coverage-and-limits.md#closed-compiler-artifact-and-remaining-limits).

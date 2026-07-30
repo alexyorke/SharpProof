@@ -19,7 +19,6 @@ jobs:
     permissions:
       contents: read
       packages: read
-      security-events: write
 
   package:
     name: Pack exact release artifacts
@@ -131,7 +130,7 @@ jobs:
       - name: Upload exact NuGet artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: nuget-packages
+          name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
           path: nupkgs/*
           if-no-files-found: error
 
@@ -153,7 +152,7 @@ jobs:
       - name: Download exact NuGet artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: nuget-packages
+          name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
           path: nupkgs
 
       - name: Attest build provenance
@@ -213,7 +212,7 @@ jobs:
       - name: Download exact NuGet artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: nuget-packages
+          name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
           path: nupkgs
 
       - name: Run consumers against the downloaded local feed
@@ -258,7 +257,7 @@ jobs:
       - name: Download exact NuGet artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: nuget-packages
+          name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
           path: nupkgs
 
       - name: Build package-backed framework consumers with SDK 9.0.300
@@ -275,6 +274,7 @@ jobs:
   release-qualification:
     name: Qualify the exact release SHA
     if: >-
+      always() &&
       github.event_name == 'push' &&
       startsWith(github.ref, 'refs/tags/v') &&
       github.repository == 'alexyorke/SharpProof'
@@ -283,13 +283,127 @@ jobs:
       - package-consumer
       - minimum-sdk-consumer
       - security
+      - attest
     runs-on: windows-latest
     permissions:
+      actions: read
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+
+      - name: Initialize honest release qualification status
+        shell: pwsh
+        run: |
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:GITHUB_SHA
+
+      - name: Require an annotated immutable release tag
+        shell: pwsh
+        run: |
+          $tagRef = "refs/tags/$env:GITHUB_REF_NAME"
+          $objectType = (& git cat-file -t $tagRef).Trim()
+          if ($LASTEXITCODE -ne 0 -or $objectType -cne 'tag') {
+            throw (
+              "Release tag '$env:GITHUB_REF_NAME' must be annotated.")
+          }
+          $tagCommit = (& git rev-parse "${tagRef}^{commit}").Trim()
+          if ($LASTEXITCODE -ne 0 -or
+              $tagCommit -cne $env:GITHUB_SHA) {
+            throw (
+              "Release tag '$env:GITHUB_REF_NAME' does not resolve to " +
+              'the exact workflow commit.')
+          }
+
+      - name: Import upstream release qualification gates
+        shell: pwsh
+        run: |
+          $gateEvidenceDirectory =
+            'artifacts/release-qualification/gate-evidence'
+          New-Item `
+            -ItemType Directory `
+            -Force `
+            -Path $gateEvidenceDirectory |
+            Out-Null
+          $upstreamGates = [ordered]@{
+            package = [pscustomobject]@{
+              job = 'package'
+              result = '${{ needs.package.result }}'
+            }
+            packageConsumers = [pscustomobject]@{
+              job = 'package-consumer'
+              result = '${{ needs.package-consumer.result }}'
+            }
+            minimumSdkConsumer = [pscustomobject]@{
+              job = 'minimum-sdk-consumer'
+              result = '${{ needs.minimum-sdk-consumer.result }}'
+            }
+            security = [pscustomobject]@{
+              job = 'security'
+              result = '${{ needs.security.result }}'
+            }
+            attestation = [pscustomobject]@{
+              job = 'attest'
+              result = '${{ needs.attest.result }}'
+            }
+          }
+          foreach ($entry in $upstreamGates.GetEnumerator()) {
+            .\scripts\Write-SharpProofReleaseQualification.ps1 `
+              -Status running `
+              -Tag $env:GITHUB_REF_NAME `
+              -ReleaseCommit $env:GITHUB_SHA `
+              -Gate $entry.Key `
+              -GateStatus running
+            if ($entry.Value.result -ne 'success') {
+              .\scripts\Write-SharpProofReleaseQualification.ps1 `
+                -Status failed `
+                -Tag $env:GITHUB_REF_NAME `
+                -ReleaseCommit $env:GITHUB_SHA `
+                -FailureKind `
+                  "upstream-$($entry.Key)-$($entry.Value.result)"
+              throw (
+                "Release prerequisite '$($entry.Key)' finished as " +
+                "'$($entry.Value.result)'.")
+            }
+            $evidencePath = Join-Path `
+              $gateEvidenceDirectory `
+              "$($entry.Key).json"
+            $evidence = [pscustomobject][ordered]@{
+              schemaVersion = 1
+              gate = $entry.Key
+              sourceJob = $entry.Value.job
+              result = $entry.Value.result
+              repository = $env:GITHUB_REPOSITORY
+              runId = $env:GITHUB_RUN_ID
+              runAttempt = $env:GITHUB_RUN_ATTEMPT
+              releaseCommit = $env:GITHUB_SHA
+            }
+            $json = $evidence |
+              ConvertTo-Json
+            [IO.File]::WriteAllText(
+              $evidencePath,
+              $json + "`n",
+              [Text.UTF8Encoding]::new($false))
+            .\scripts\Write-SharpProofReleaseQualification.ps1 `
+              -Status running `
+              -Tag $env:GITHUB_REF_NAME `
+              -ReleaseCommit $env:GITHUB_SHA `
+              -Gate $entry.Key `
+              -GateStatus passed `
+              -GateEvidencePath $evidencePath
+          }
+
+      - name: Seal upstream release gate receipts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: >-
+            release-gate-receipts-upstream-${{ github.sha }}-${{ github.run_attempt }}
+          path: >-
+            artifacts/release-qualification/qualification-receipts/*.json
+          if-no-files-found: error
 
       - name: Setup required .NET SDKs
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -297,98 +411,384 @@ jobs:
           dotnet-version: "8.0.x"
           global-json-file: global.json
 
-      - name: Initialize honest release qualification status
-        shell: pwsh
-        run: >-
-          .\scripts\Write-SharpProofReleaseQualification.ps1
-          -Status running
-          -Tag $env:GITHUB_REF_NAME
-          -ReleaseCommit $env:GITHUB_SHA
-
       - name: Resolve the immutable release coverage baseline
         shell: pwsh
         run: |
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:GITHUB_SHA `
+            -Gate coverageBaseline `
+            -GateStatus running
           $selectionJson = `
             .\scripts\Resolve-SharpProofReleaseCoverageBaseline.ps1 `
               -Tag $env:GITHUB_REF_NAME `
               -ReleaseCommit $env:GITHUB_SHA
+          if (-not $?) {
+            throw 'Resolving the release coverage baseline failed.'
+          }
+          $coverageEvidence =
+            'artifacts/release-qualification/coverage-baseline.json'
+          [IO.File]::WriteAllText(
+            $coverageEvidence,
+            ($selectionJson -join "`n") + "`n",
+            [Text.UTF8Encoding]::new($false))
           $selection = $selectionJson | ConvertFrom-Json
           $coverageBaseline = [string]$selection.coverageBaselineCommit
           $releaseCommit = [string]$selection.releaseCommit
           "SHARPPROOF_COVERAGE_BASELINE=$coverageBaseline" >> $env:GITHUB_ENV
           "SHARPPROOF_RELEASE_COMMIT=$releaseCommit" >> $env:GITHUB_ENV
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $releaseCommit `
+            -CoverageBaselineCommit $coverageBaseline `
+            -Gate coverageBaseline `
+            -GateStatus passed `
+            -GateEvidencePath $coverageEvidence
+
+      - name: Seal coverage-baseline gate receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: >-
+            release-gate-receipts-coverage-baseline-${{ github.sha }}-${{ github.run_attempt }}
+          path: >-
+            artifacts/release-qualification/qualification-receipts/coverageBaseline.json
+          if-no-files-found: error
 
       - name: Restore the exact tagged source
         shell: pwsh
-        run: >-
-          .\scripts\Invoke-SharpProofDotnet.ps1
-          restore SharpProof.sln
-          --locked-mode
+        run: |
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -CoverageBaselineCommit $env:SHARPPROOF_COVERAGE_BASELINE `
+            -Gate lockedRestore `
+            -GateStatus running
+          .\scripts\Invoke-SharpProofDotnet.ps1 `
+            restore SharpProof.sln `
+            --locked-mode
+          if (-not $?) {
+            throw 'Locked restore failed.'
+          }
+          $lockedRestoreEvidence =
+            'artifacts/release-qualification/locked-restore.json'
+          $lockFiles = @(
+            & git ls-files -- '*packages.lock.json' |
+              Sort-Object
+          )
+          if ($LASTEXITCODE -ne 0 -or $lockFiles.Count -eq 0) {
+            throw 'No tracked lock files were available for restore evidence.'
+          }
+          $lockEvidence = @(
+            foreach ($lockFile in $lockFiles) {
+              [pscustomobject][ordered]@{
+                path = $lockFile
+                sha256 = (Get-FileHash `
+                    -LiteralPath $lockFile `
+                    -Algorithm SHA256).Hash.ToLowerInvariant()
+              }
+            }
+          )
+          $restoreEvidence = [pscustomobject][ordered]@{
+            schemaVersion = 1
+            gate = 'lockedRestore'
+            releaseCommit = $env:SHARPPROOF_RELEASE_COMMIT
+            locks = $lockEvidence
+          }
+          [IO.File]::WriteAllText(
+            $lockedRestoreEvidence,
+            (($restoreEvidence | ConvertTo-Json -Depth 4) + "`n"),
+            [Text.UTF8Encoding]::new($false))
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -Gate lockedRestore `
+            -GateStatus passed `
+            -GateEvidencePath $lockedRestoreEvidence
+
+      - name: Seal locked-restore gate receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: >-
+            release-gate-receipts-locked-restore-${{ github.sha }}-${{ github.run_attempt }}
+          path: >-
+            artifacts/release-qualification/qualification-receipts/lockedRestore.json
+          if-no-files-found: error
 
       - name: Run full weekly-equivalent acceptance
         shell: pwsh
         run: |
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -Gate acceptance `
+            -GateStatus running
           .\scripts\Generate-Readme.ps1 -Verify
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not $?) {
+            throw 'Generated documentation verification failed.'
+          }
           .\eng\acceptance\Verify.ps1 -Configuration Release
+          if (-not $?) {
+            throw 'Release acceptance failed.'
+          }
+          $acceptanceEvidence =
+            'artifacts/release-qualification/acceptance.json'
+          $acceptanceInputs = @(
+            'eng/acceptance/contract.json',
+            'scripts/package-projects.json'
+          )
+          $acceptance = [pscustomobject][ordered]@{
+            schemaVersion = 1
+            gate = 'acceptance'
+            releaseCommit = $env:SHARPPROOF_RELEASE_COMMIT
+            inputs = @(
+              foreach ($inputPath in $acceptanceInputs) {
+                [pscustomobject][ordered]@{
+                  path = $inputPath
+                  sha256 = (Get-FileHash `
+                      -LiteralPath $inputPath `
+                      -Algorithm SHA256).Hash.ToLowerInvariant()
+                }
+              }
+            )
+          }
+          [IO.File]::WriteAllText(
+            $acceptanceEvidence,
+            (($acceptance | ConvertTo-Json -Depth 4) + "`n"),
+            [Text.UTF8Encoding]::new($false))
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -Gate acceptance `
+            -GateStatus passed `
+            -GateEvidencePath $acceptanceEvidence
+
+      - name: Seal acceptance gate receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: >-
+            release-gate-receipts-acceptance-${{ github.sha }}-${{ github.run_attempt }}
+          path: >-
+            artifacts/release-qualification/qualification-receipts/acceptance.json
+          if-no-files-found: error
 
       - name: Run nightly supported-domain fuzzing
         shell: pwsh
-        run: >-
-          .\scripts\Invoke-SharpProofFuzzCampaign.ps1
-          -OutputDirectory artifacts/release-qualification/fuzz
+        run: |
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -Gate fuzz `
+            -GateStatus running
+          .\scripts\Invoke-SharpProofFuzzCampaign.ps1 `
+            -OutputDirectory artifacts/release-qualification/fuzz
+          if (-not $?) {
+            throw 'Release fuzz campaign failed.'
+          }
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -Gate fuzz `
+            -GateStatus passed `
+            -GateEvidencePath `
+              artifacts/release-qualification/fuzz/campaign.json
+
+      - name: Seal fuzz gate receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: >-
+            release-gate-receipts-fuzz-${{ github.sha }}-${{ github.run_attempt }}
+          path: >-
+            artifacts/release-qualification/qualification-receipts/fuzz.json
+          if-no-files-found: error
 
       - name: Kill trusted-boundary mutations
         shell: pwsh
-        run: >-
-          .\scripts\Test-SharpProofTrustedMutations.ps1
-          -Configuration Release
-          -OutputPath artifacts/release-qualification/mutations.json
+        run: |
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -Gate mutations `
+            -GateStatus running
+          .\scripts\Test-SharpProofTrustedMutations.ps1 `
+            -Configuration Release `
+            -OutputPath artifacts/release-qualification/mutations.json
+          if (-not $?) {
+            throw 'Trusted-boundary mutation testing failed.'
+          }
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -Gate mutations `
+            -GateStatus passed `
+            -GateEvidencePath `
+              artifacts/release-qualification/mutations.json
+
+      - name: Seal mutation gate receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: >-
+            release-gate-receipts-mutations-${{ github.sha }}-${{ github.run_attempt }}
+          path: >-
+            artifacts/release-qualification/qualification-receipts/mutations.json
+          if-no-files-found: error
 
       - name: Retain exact corpus and performance outcomes
         shell: pwsh
         run: |
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -Gate corpus `
+            -GateStatus running
           .\scripts\Invoke-SharpProofGateEvidence.ps1 `
             -Gate corpus `
             -OutputPath artifacts/release-qualification/corpus.json
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not $?) {
+            throw 'Release corpus evidence failed.'
+          }
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -Gate corpus `
+            -GateStatus passed `
+            -GateEvidencePath artifacts/release-qualification/corpus.json
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -Gate performance `
+            -GateStatus running
           .\scripts\Invoke-SharpProofGateEvidence.ps1 `
             -Gate performance `
             -OutputPath artifacts/release-qualification/performance.json
+          if (-not $?) {
+            throw 'Release performance evidence failed.'
+          }
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -Gate performance `
+            -GateStatus passed `
+            -GateEvidencePath `
+              artifacts/release-qualification/performance.json
+
+      - name: Seal corpus and performance gate receipts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: >-
+            release-gate-receipts-corpus-performance-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            artifacts/release-qualification/qualification-receipts/corpus.json
+            artifacts/release-qualification/qualification-receipts/performance.json
+          if-no-files-found: error
 
       - name: Collect and enforce release coverage
         shell: pwsh
         run: |
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -Gate coverage `
+            -GateStatus running
           .\scripts\Invoke-SharpProofCoverage.ps1 `
             -MemoryLimitMb 12288 `
             -TimeoutSeconds 1200 `
             -ResultsDirectory artifacts/release-qualification/coverage
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not $?) {
+            throw 'Release coverage collection failed.'
+          }
           .\scripts\Test-SharpProofCoverage.ps1 `
             -CoverageRoot artifacts/release-qualification/coverage `
             -ComparisonRef $env:SHARPPROOF_COVERAGE_BASELINE `
             -SummaryPath artifacts/release-qualification/coverage.json
+          if (-not $?) {
+            throw 'Release coverage enforcement failed.'
+          }
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -Gate coverage `
+            -GateStatus passed `
+            -GateEvidencePath `
+              artifacts/release-qualification/coverage.json
+
+      - name: Seal coverage gate receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: >-
+            release-gate-receipts-coverage-${{ github.sha }}-${{ github.run_attempt }}
+          path: >-
+            artifacts/release-qualification/qualification-receipts/coverage.json
+          if-no-files-found: error
 
       - name: Audit the exact release dependency graph
         shell: pwsh
         run: |
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -Gate dependencyAudit `
+            -GateStatus running
           New-Item `
             -ItemType Directory `
             -Force `
             -Path artifacts/release-qualification |
             Out-Null
-          .\scripts\Invoke-SharpProofDotnet.ps1 `
-            list SharpProof.sln package `
-            --vulnerable `
-            --include-transitive |
-            Tee-Object `
-              -FilePath artifacts/release-qualification/dependency-audit.txt
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\scripts\Test-SharpProofDependencyAudit.ps1 `
+            -SolutionPath SharpProof.sln `
+            -NuGetConfigurationPath NuGet.Config `
+            -OutputPath `
+              artifacts/release-qualification/dependency-audit.json
+          if (-not $?) {
+            throw 'Release dependency audit failed.'
+          }
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -Gate dependencyAudit `
+            -GateStatus passed `
+            -GateEvidencePath `
+              artifacts/release-qualification/dependency-audit.json
+
+      - name: Seal dependency-audit gate receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: >-
+            release-gate-receipts-dependency-audit-${{ github.sha }}-${{ github.run_attempt }}
+          path: >-
+            artifacts/release-qualification/qualification-receipts/dependencyAudit.json
+          if-no-files-found: error
 
       - name: Validate externally tagged owner-controlled final 1.0 gates
         if: github.ref_name == 'v1.0.0'
         shell: pwsh
+        env:
+          SHARPPROOF_GITHUB_TOKEN: >-
+            ${{ secrets.SHARPPROOF_PILOT_EVIDENCE_TOKEN || github.token }}
         run: |
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -Gate humanEvidence `
+            -GateStatus running
           $evidenceRepository =
             "https://github.com/$env:GITHUB_REPOSITORY.git"
           .\scripts\Test-SharpProofHumanReleaseGates.ps1 `
@@ -396,49 +796,179 @@ jobs:
             -EvidenceRepository $evidenceRepository `
             -EvidenceRef refs/tags/evidence/v1.0.0 `
             -OutputPath artifacts/release-qualification/human-gates.json
+          if (-not $?) {
+            throw 'Final human-evidence validation failed.'
+          }
+          .\scripts\Write-SharpProofReleaseQualification.ps1 `
+            -Status running `
+            -Tag $env:GITHUB_REF_NAME `
+            -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT `
+            -Gate humanEvidence `
+            -GateStatus passed `
+            -HumanEvidencePath `
+              artifacts/release-qualification/human-gates.json `
+            -GateEvidencePath `
+              artifacts/release-qualification/human-gates.json
+
+      - name: Seal final human-evidence gate receipt
+        if: github.ref_name == 'v1.0.0'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: >-
+            release-gate-receipts-human-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: >-
+            artifacts/release-qualification/qualification-receipts/humanEvidence.json
+          if-no-files-found: error
+
+      - name: Download immutable release gate receipts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: >-
+            release-gate-receipts-*-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/release-qualification/immutable-receipts
+          merge-multiple: true
 
       - name: Record successful release qualification
         shell: pwsh
-        run: >-
-          .\scripts\Write-SharpProofReleaseQualification.ps1
-          -Status passed
-          -Tag $env:GITHUB_REF_NAME
-          -ReleaseCommit $env:SHARPPROOF_RELEASE_COMMIT
-          -CoverageBaselineCommit $env:SHARPPROOF_COVERAGE_BASELINE
-          -HumanEvidencePath
-          artifacts/release-qualification/human-gates.json
+        env:
+          SHARPPROOF_GITHUB_TOKEN: >-
+            ${{ github.ref_name == 'v1.0.0' && secrets.SHARPPROOF_PILOT_EVIDENCE_TOKEN || github.token }}
+        run: |
+          $arguments = @(
+            '-Status', 'passed',
+            '-Tag', $env:GITHUB_REF_NAME,
+            '-ReleaseCommit', $env:SHARPPROOF_RELEASE_COMMIT,
+            '-CoverageBaselineCommit', $env:SHARPPROOF_COVERAGE_BASELINE,
+            '-ImmutableReceiptDirectory',
+            'artifacts/release-qualification/immutable-receipts'
+          )
+          if ($env:GITHUB_REF_NAME -eq 'v1.0.0') {
+            $arguments += @(
+              '-HumanEvidencePath',
+              'artifacts/release-qualification/human-gates.json',
+              '-HumanEvidenceRepository',
+              "https://github.com/$env:GITHUB_REPOSITORY.git"
+            )
+          }
+          .\scripts\Write-SharpProofReleaseQualification.ps1 @arguments
 
-      - name: Record failed release qualification
-        if: ${{ failure() }}
+      - name: Record unsuccessful release qualification
+        if: ${{ failure() || cancelled() }}
         shell: pwsh
-        run: >-
-          .\scripts\Write-SharpProofReleaseQualification.ps1
-          -Status failed
-          -Tag $env:GITHUB_REF_NAME
-          -ReleaseCommit $env:GITHUB_SHA
-          -CoverageBaselineCommit $env:SHARPPROOF_COVERAGE_BASELINE
-          -HumanEvidencePath
-          artifacts/release-qualification/human-gates.json
-          -FailureKind workflow-failed
-
-      - name: Record canceled release qualification
-        if: ${{ cancelled() }}
-        shell: pwsh
-        run: >-
-          .\scripts\Write-SharpProofReleaseQualification.ps1
-          -Status failed
-          -Tag $env:GITHUB_REF_NAME
-          -ReleaseCommit $env:GITHUB_SHA
-          -CoverageBaselineCommit $env:SHARPPROOF_COVERAGE_BASELINE
-          -HumanEvidencePath
-          artifacts/release-qualification/human-gates.json
-          -FailureKind canceled
+        run: |
+          $jobStatus = '${{ job.status }}'
+          $failureKind = if ($jobStatus -eq 'cancelled') {
+            'canceled'
+          }
+          else {
+            'workflow-failed'
+          }
+          $qualificationScript =
+            '.\scripts\Write-SharpProofReleaseQualification.ps1'
+          $recorded = $false
+          $qualificationScriptAvailable = Test-Path `
+            -LiteralPath $qualificationScript `
+            -PathType Leaf
+          if ($qualificationScriptAvailable) {
+            try {
+              & $qualificationScript `
+                -Status failed `
+                -Tag $env:GITHUB_REF_NAME `
+                -ReleaseCommit $env:GITHUB_SHA `
+                -FailureKind $failureKind
+              $recorded = $?
+            }
+            catch {
+              Write-Warning (
+                'The qualification writer failed while recording the ' +
+                "unsuccessful run: $($_.Exception.Message)")
+            }
+          }
+          if (-not $recorded) {
+            $directory = 'artifacts/release-qualification'
+            New-Item -ItemType Directory -Force -Path $directory |
+              Out-Null
+            $gateNames = @(
+              'package',
+              'packageConsumers',
+              'minimumSdkConsumer',
+              'security',
+              'attestation',
+              'coverageBaseline',
+              'lockedRestore',
+              'acceptance',
+              'fuzz',
+              'mutations',
+              'corpus',
+              'performance',
+              'coverage',
+              'dependencyAudit',
+              'humanEvidence'
+            )
+            $gates = [ordered]@{}
+            foreach ($gateName in $gateNames) {
+              $gates[$gateName] = if (
+                $gateName -eq 'humanEvidence' -and
+                $env:GITHUB_REF_NAME -ne 'v1.0.0') {
+                'not-required'
+              }
+              else {
+                'not-run'
+              }
+            }
+            $humanStatus = $gates['humanEvidence']
+            $gateReceipts = [ordered]@{}
+            foreach ($gateName in $gateNames) {
+              $gateReceipts[$gateName] = $null
+            }
+            $qualification = [pscustomobject][ordered]@{
+              schemaVersion = 5
+              status = 'failed'
+              failureKind = if ($qualificationScriptAvailable) {
+                "qualification-writer-$failureKind"
+              }
+              else {
+                "checkout-$failureKind"
+              }
+              tag = $env:GITHUB_REF_NAME
+              releaseCommit = $env:GITHUB_SHA
+              run = [pscustomobject][ordered]@{
+                provider = 'github-actions'
+                repository = $env:GITHUB_REPOSITORY
+                runId = $env:GITHUB_RUN_ID
+                runAttempt = $env:GITHUB_RUN_ATTEMPT
+                workflowRef = $env:GITHUB_WORKFLOW_REF
+                job = $env:GITHUB_JOB
+                ref = $env:GITHUB_REF
+                sha = $env:GITHUB_SHA
+              }
+              coverageBaselineCommit = $null
+              humanEvidence = [pscustomobject][ordered]@{
+                status = $humanStatus
+                ref = $null
+                tagObject = $null
+                commit = $null
+                documentSha256 = $null
+                qualifiedRc = $null
+                stableCandidate = $null
+              }
+              gates = [pscustomobject]$gates
+              gateReceipts = [pscustomobject]$gateReceipts
+            }
+            $json = $qualification |
+              ConvertTo-Json -Depth 8
+            [IO.File]::WriteAllText(
+              (Join-Path $directory 'qualification.json'),
+              $json + "`n",
+              [Text.UTF8Encoding]::new($false))
+          }
 
       - name: Upload exact-SHA release qualification evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: release-qualification-${{ github.sha }}
+          name: >-
+            release-qualification-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/release-qualification
           if-no-files-found: error
           retention-days: 90
@@ -474,7 +1004,7 @@ jobs:
       - name: Download the tested private-preview bytes
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: nuget-packages
+          name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
           path: nupkgs
 
       - name: Validate immutable tag, hashes, SBOM, and provenance identity
@@ -534,7 +1064,7 @@ jobs:
       - name: Download the tested release bytes
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: nuget-packages
+          name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
           path: nupkgs
 
       - name: Validate immutable tag, hashes, SBOM, and provenance identity
