@@ -74,8 +74,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'advisory-contract-candidate-detection'
         File = 'SharpProof.Frontend\ContractApiMetadata.cs'
-        Original = '            EnsuresMethodName or'
-        Mutated = '            RequiresMethodName or'
+        Original = '        EnsuresMethodName,'
+        Mutated = '        RequiresMethodName,'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~ContractCandidateActivationRunsClausePlacementValidation'
     },
@@ -97,11 +97,11 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'external-precondition-screening'
-        File = 'SharpProof.Analyzer\EffectCallPreconditionPolicy.cs'
-        Original = 'return requires.All(clause =>'
-        Mutated = 'return true || requires.All(clause =>'
+        File = 'SharpProof.Analyzer\SharpProofAnalyzer.cs'
+        Original = '            "PositiveAttribute" or'
+        Mutated = '            "NotNullAttribute" or'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
-        Filter = 'FullyQualifiedName~ExternalClosedPreconditionMustAlsoBeEstablished'
+        Filter = 'FullyQualifiedName~UnannotatedCallerStillChecksExternalClosedPreconditions'
     },
     [pscustomobject]@{
         Name = 'generated-selected-analysis-accountability'
