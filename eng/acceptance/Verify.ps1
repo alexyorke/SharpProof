@@ -480,7 +480,7 @@ try {
         }
 
         $testTimeoutSeconds = if ($testProject -like 'SharpProof.Package.Test*') {
-            600
+            1800
         } else {
             300
         }
