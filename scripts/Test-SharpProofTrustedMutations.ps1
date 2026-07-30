@@ -70,6 +70,30 @@ $mutations = @(
         Filter = 'FullyQualifiedName~TrivialNormalCompletionRequiresItsPostconditionToBeFalse'
     },
     [pscustomobject]@{
+        Name = 'modeled-call-flow-definedness'
+        File = 'SharpProof.Worker\AcyclicBlockPredicateExecutor.cs'
+        Original = 'predicate = application.Predicate;'
+        Mutated = 'predicate = factory.Boolean(true);'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~SpecCallArgumentDefinednessConstrainsSubsequentFlow'
+    },
+    [pscustomobject]@{
+        Name = 'modeled-call-receiver-definedness'
+        File = 'SharpProof.Worker\AcyclicBlockPredicateExecutor.cs'
+        Original = 'guard = receiverGuard;'
+        Mutated = 'guard = factory.Boolean(true);'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~SpecCallReceiverDefinednessConstrainsSubsequentFlow'
+    },
+    [pscustomobject]@{
+        Name = 'modeled-call-argument-definedness'
+        File = 'SharpProof.Worker\AcyclicBlockPredicateExecutor.cs'
+        Original = 'guard = argumentGuard;'
+        Mutated = 'guard = factory.Boolean(true);'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~SpecCallArgumentDefinednessConstrainsSubsequentFlow'
+    },
+    [pscustomobject]@{
         Name = 'effect-refutation-fail-closed'
         File = 'SharpProof.Worker\EffectClaimResultAssembler.cs'
         Original = 'if (evidence.Outcome == WorkerClaimOutcome.Refuted)'
