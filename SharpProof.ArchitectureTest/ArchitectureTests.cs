@@ -761,10 +761,35 @@ public sealed class ArchitectureTests
             "eng",
             "acceptance",
             "Verify.ps1"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                acceptance,
+                Does.Contain(
+                    "TestCategory!=Performance&TestCategory!=Coverage"));
+            Assert.That(
+                acceptance,
+                Does.Contain(
+                    "contract.automation.solutionBuildWallSeconds"));
+            Assert.That(
+                acceptance,
+                Does.Not.Contain(
+                    "-TimeoutSeconds " +
+                    "([int]$contract.worker.maximumProjectWallSeconds)"));
+        }
+
+        using var acceptanceContract = JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(
+                root,
+                "eng",
+                "acceptance",
+                "contract.json")));
         Assert.That(
-            acceptance,
-            Does.Contain(
-                "TestCategory!=Performance&TestCategory!=Coverage"));
+            acceptanceContract.RootElement
+                .GetProperty("automation")
+                .GetProperty("solutionBuildWallSeconds")
+                .GetInt32(),
+            Is.EqualTo(600));
 
         var coverageCollector = File.ReadAllText(Path.Combine(
             root,

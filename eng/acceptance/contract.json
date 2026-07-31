@@ -17,6 +17,9 @@
     "unsupportedUnannotatedCallableBehavior": "silent",
     "unsupportedSelectedCallableDiagnostic": "SP0047"
   },
+  "automation": {
+    "solutionBuildWallSeconds": 600
+  },
   "worker": {
     "protocolVersion": 9,
     "manifestSchemaVersion": 4,

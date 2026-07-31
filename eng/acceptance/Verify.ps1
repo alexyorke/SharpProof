@@ -217,6 +217,7 @@ Assert-Equal $contract.analyzer.defaultDiagnosticSeverity 'Info' 'analyzer.defau
 Assert-Equal $contract.analyzer.diagnosticsEnabledByDefault $true 'analyzer.diagnosticsEnabledByDefault'
 Assert-Equal $contract.analyzer.unsupportedUnannotatedCallableBehavior 'silent' 'analyzer.unsupportedUnannotatedCallableBehavior'
 Assert-Equal $contract.analyzer.unsupportedSelectedCallableDiagnostic 'SP0047' 'analyzer.unsupportedSelectedCallableDiagnostic'
+Assert-Equal $contract.automation.solutionBuildWallSeconds 600 'automation.solutionBuildWallSeconds'
 Assert-Equal `
     (Get-MsBuildDefault $portableTargets 'SharpProofProfile' 'portable package') `
     $contract.analyzer.defaultProfile `
@@ -446,7 +447,7 @@ try {
     if (-not $SkipBuild) {
         Invoke-SharpProofDotnet `
             -Arguments @('build', 'SharpProof.sln', '-c', $Configuration, '--no-restore') `
-            -TimeoutSeconds ([int]$contract.worker.maximumProjectWallSeconds)
+            -TimeoutSeconds ([int]$contract.automation.solutionBuildWallSeconds)
     }
 
     $testProjects = @(
