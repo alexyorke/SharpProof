@@ -22,19 +22,17 @@ updates:
     # migration before raising compiler-facing runtime dependency lines.
     ignore:
       - dependency-name: "Microsoft.CodeAnalysis.Common"
-        update-types:
-          - "version-update:semver-minor"
-          - "version-update:semver-major"
-      - dependency-name: "Microsoft.CodeAnalysis.Common"
         versions:
-          - "[5.0.0,)"
-      - dependency-name: "Microsoft.CodeAnalysis.CSharp"
+          - ">= 4.15.0"
         update-types:
           - "version-update:semver-minor"
           - "version-update:semver-major"
       - dependency-name: "Microsoft.CodeAnalysis.CSharp"
         versions:
-          - "[5.0.0,)"
+          - ">= 4.15.0"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-major"
       - dependency-name: "System.Collections.Immutable"
         update-types:
           - "version-update:semver-minor"

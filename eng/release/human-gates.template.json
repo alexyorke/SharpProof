@@ -1,14 +1,65 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "releaseTag": "v1.0.0",
   "productCommit": "0000000000000000000000000000000000000000",
   "evidenceRef": "refs/tags/evidence/v1.0.0",
+  "qualification": {
+    "qualifiedRc": {
+      "releaseTag": "v1.0.0-rc.1",
+      "productCommit": "0000000000000000000000000000000000000000",
+      "packageVersion": "1.0.0-rc.1",
+      "productionDigestSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "trustedComputingBaseDigestSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "qualifiedAtUtc": "2000-01-01T00:00:00Z",
+      "package": {
+        "releaseManifestSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "artifacts": [
+          {
+            "id": "SharpProof.Attributes",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          {
+            "id": "SharpProof",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          {
+            "id": "SharpProof.Verifier.Win-x64",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      },
+      "workflow": {
+        "provider": "github-actions",
+        "repository": "alexyorke/SharpProof",
+        "name": "Cross-platform package consumers",
+        "path": ".github/workflows/package-consumers.yml",
+        "event": "push",
+        "runId": 1,
+        "runAttempt": 1,
+        "evidenceUrl": "https://github.com/alexyorke/SharpProof/actions/runs/1/attempts/1",
+        "qualificationArtifactSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "qualificationRecordSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "packageArtifactSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "stableCandidate": {
+      "productCommit": "0000000000000000000000000000000000000000",
+      "packageVersion": "1.0.0",
+      "productionDigestSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "trustedComputingBaseDigestSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "approvedMetadataDifferences": [
+        "version",
+        "changelog",
+        "release-metadata"
+      ]
+    }
+  },
   "pilots": [
     {
       "id": "pilot-library-a",
       "selectedClaims": 50,
       "package": {
-        "version": "1.0.0",
+        "version": "1.0.0-rc.1",
         "releaseManifestSha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "artifacts": [
           {
@@ -34,11 +85,13 @@
       },
       "tool": {
         "productCommit": "0000000000000000000000000000000000000000",
-        "workerVersion": "1.0.0",
+        "workerVersion": "1.0.0-rc.1",
         "protocolVersion": "9",
         "manifestSchemaVersion": 4,
         "compilerArtifactSchemaVersion": 8,
-        "workerBinarySha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        "workerAssemblySha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "runtimeClosureSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "specificationCatalogSha256": "0000000000000000000000000000000000000000000000000000000000000000"
       },
       "policy": {
         "profile": "strict",
@@ -55,22 +108,39 @@
             "refuted": 0,
             "unknown": 0,
             "assumptions": 0,
-            "infrastructureFailures": 0
+            "trustedEvidence": 0,
+            "infrastructureFailures": 0,
+            "reasonCounts": [
+              {
+                "reason": "None",
+                "count": 50
+              }
+            ]
+          },
+          "evidenceUse": {
+            "assumptions": [],
+            "trustedEvidence": []
           },
           "result": {
             "format": "SharpProof.WorkerVerifyResponse",
             "runStatus": "Complete",
             "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000"
+            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "inputSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "claimManifestSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           },
           "workflow": {
             "provider": "github-actions",
             "repository": "owner/pilot-library-a",
             "name": "SharpProof strict weekly",
+            "path": ".github/workflows/sharpproof-strict-weekly.yml",
+            "event": "workflow_dispatch",
             "runId": 1,
             "runAttempt": 1,
             "sourceCommit": "0000000000000000000000000000000000000000",
-            "evidenceUrl": "https://example.invalid/pilot-a/week-1"
+            "evidenceUrl": "https://example.invalid/pilot-a/week-1",
+            "artifactSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "recordSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           }
         },
         {
@@ -81,22 +151,39 @@
             "refuted": 0,
             "unknown": 0,
             "assumptions": 0,
-            "infrastructureFailures": 0
+            "trustedEvidence": 0,
+            "infrastructureFailures": 0,
+            "reasonCounts": [
+              {
+                "reason": "None",
+                "count": 50
+              }
+            ]
+          },
+          "evidenceUse": {
+            "assumptions": [],
+            "trustedEvidence": []
           },
           "result": {
             "format": "SharpProof.WorkerVerifyResponse",
             "runStatus": "Complete",
             "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000"
+            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "inputSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "claimManifestSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           },
           "workflow": {
             "provider": "github-actions",
             "repository": "owner/pilot-library-a",
             "name": "SharpProof strict weekly",
+            "path": ".github/workflows/sharpproof-strict-weekly.yml",
+            "event": "workflow_dispatch",
             "runId": 2,
             "runAttempt": 1,
             "sourceCommit": "0000000000000000000000000000000000000000",
-            "evidenceUrl": "https://example.invalid/pilot-a/week-2"
+            "evidenceUrl": "https://example.invalid/pilot-a/week-2",
+            "artifactSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "recordSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           }
         },
         {
@@ -107,22 +194,39 @@
             "refuted": 0,
             "unknown": 0,
             "assumptions": 0,
-            "infrastructureFailures": 0
+            "trustedEvidence": 0,
+            "infrastructureFailures": 0,
+            "reasonCounts": [
+              {
+                "reason": "None",
+                "count": 50
+              }
+            ]
+          },
+          "evidenceUse": {
+            "assumptions": [],
+            "trustedEvidence": []
           },
           "result": {
             "format": "SharpProof.WorkerVerifyResponse",
             "runStatus": "Complete",
             "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000"
+            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "inputSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "claimManifestSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           },
           "workflow": {
             "provider": "github-actions",
             "repository": "owner/pilot-library-a",
             "name": "SharpProof strict weekly",
+            "path": ".github/workflows/sharpproof-strict-weekly.yml",
+            "event": "workflow_dispatch",
             "runId": 3,
             "runAttempt": 1,
             "sourceCommit": "0000000000000000000000000000000000000000",
-            "evidenceUrl": "https://example.invalid/pilot-a/week-3"
+            "evidenceUrl": "https://example.invalid/pilot-a/week-3",
+            "artifactSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "recordSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           }
         },
         {
@@ -133,22 +237,39 @@
             "refuted": 0,
             "unknown": 0,
             "assumptions": 0,
-            "infrastructureFailures": 0
+            "trustedEvidence": 0,
+            "infrastructureFailures": 0,
+            "reasonCounts": [
+              {
+                "reason": "None",
+                "count": 50
+              }
+            ]
+          },
+          "evidenceUse": {
+            "assumptions": [],
+            "trustedEvidence": []
           },
           "result": {
             "format": "SharpProof.WorkerVerifyResponse",
             "runStatus": "Complete",
             "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000"
+            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "inputSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "claimManifestSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           },
           "workflow": {
             "provider": "github-actions",
             "repository": "owner/pilot-library-a",
             "name": "SharpProof strict weekly",
+            "path": ".github/workflows/sharpproof-strict-weekly.yml",
+            "event": "workflow_dispatch",
             "runId": 4,
             "runAttempt": 1,
             "sourceCommit": "0000000000000000000000000000000000000000",
-            "evidenceUrl": "https://example.invalid/pilot-a/week-4"
+            "evidenceUrl": "https://example.invalid/pilot-a/week-4",
+            "artifactSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "recordSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           }
         }
       ]
@@ -157,7 +278,7 @@
       "id": "pilot-library-b",
       "selectedClaims": 50,
       "package": {
-        "version": "1.0.0",
+        "version": "1.0.0-rc.1",
         "releaseManifestSha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "artifacts": [
           {
@@ -183,11 +304,13 @@
       },
       "tool": {
         "productCommit": "0000000000000000000000000000000000000000",
-        "workerVersion": "1.0.0",
+        "workerVersion": "1.0.0-rc.1",
         "protocolVersion": "9",
         "manifestSchemaVersion": 4,
         "compilerArtifactSchemaVersion": 8,
-        "workerBinarySha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        "workerAssemblySha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "runtimeClosureSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "specificationCatalogSha256": "0000000000000000000000000000000000000000000000000000000000000000"
       },
       "policy": {
         "profile": "strict",
@@ -204,22 +327,39 @@
             "refuted": 0,
             "unknown": 0,
             "assumptions": 0,
-            "infrastructureFailures": 0
+            "trustedEvidence": 0,
+            "infrastructureFailures": 0,
+            "reasonCounts": [
+              {
+                "reason": "None",
+                "count": 50
+              }
+            ]
+          },
+          "evidenceUse": {
+            "assumptions": [],
+            "trustedEvidence": []
           },
           "result": {
             "format": "SharpProof.WorkerVerifyResponse",
             "runStatus": "Complete",
             "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000"
+            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "inputSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "claimManifestSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           },
           "workflow": {
             "provider": "github-actions",
             "repository": "owner/pilot-library-b",
             "name": "SharpProof strict weekly",
+            "path": ".github/workflows/sharpproof-strict-weekly.yml",
+            "event": "workflow_dispatch",
             "runId": 1,
             "runAttempt": 1,
             "sourceCommit": "0000000000000000000000000000000000000000",
-            "evidenceUrl": "https://example.invalid/pilot-b/week-1"
+            "evidenceUrl": "https://example.invalid/pilot-b/week-1",
+            "artifactSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "recordSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           }
         },
         {
@@ -230,22 +370,39 @@
             "refuted": 0,
             "unknown": 0,
             "assumptions": 0,
-            "infrastructureFailures": 0
+            "trustedEvidence": 0,
+            "infrastructureFailures": 0,
+            "reasonCounts": [
+              {
+                "reason": "None",
+                "count": 50
+              }
+            ]
+          },
+          "evidenceUse": {
+            "assumptions": [],
+            "trustedEvidence": []
           },
           "result": {
             "format": "SharpProof.WorkerVerifyResponse",
             "runStatus": "Complete",
             "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000"
+            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "inputSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "claimManifestSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           },
           "workflow": {
             "provider": "github-actions",
             "repository": "owner/pilot-library-b",
             "name": "SharpProof strict weekly",
+            "path": ".github/workflows/sharpproof-strict-weekly.yml",
+            "event": "workflow_dispatch",
             "runId": 2,
             "runAttempt": 1,
             "sourceCommit": "0000000000000000000000000000000000000000",
-            "evidenceUrl": "https://example.invalid/pilot-b/week-2"
+            "evidenceUrl": "https://example.invalid/pilot-b/week-2",
+            "artifactSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "recordSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           }
         },
         {
@@ -256,22 +413,39 @@
             "refuted": 0,
             "unknown": 0,
             "assumptions": 0,
-            "infrastructureFailures": 0
+            "trustedEvidence": 0,
+            "infrastructureFailures": 0,
+            "reasonCounts": [
+              {
+                "reason": "None",
+                "count": 50
+              }
+            ]
+          },
+          "evidenceUse": {
+            "assumptions": [],
+            "trustedEvidence": []
           },
           "result": {
             "format": "SharpProof.WorkerVerifyResponse",
             "runStatus": "Complete",
             "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000"
+            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "inputSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "claimManifestSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           },
           "workflow": {
             "provider": "github-actions",
             "repository": "owner/pilot-library-b",
             "name": "SharpProof strict weekly",
+            "path": ".github/workflows/sharpproof-strict-weekly.yml",
+            "event": "workflow_dispatch",
             "runId": 3,
             "runAttempt": 1,
             "sourceCommit": "0000000000000000000000000000000000000000",
-            "evidenceUrl": "https://example.invalid/pilot-b/week-3"
+            "evidenceUrl": "https://example.invalid/pilot-b/week-3",
+            "artifactSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "recordSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           }
         },
         {
@@ -282,22 +456,39 @@
             "refuted": 0,
             "unknown": 0,
             "assumptions": 0,
-            "infrastructureFailures": 0
+            "trustedEvidence": 0,
+            "infrastructureFailures": 0,
+            "reasonCounts": [
+              {
+                "reason": "None",
+                "count": 50
+              }
+            ]
+          },
+          "evidenceUse": {
+            "assumptions": [],
+            "trustedEvidence": []
           },
           "result": {
             "format": "SharpProof.WorkerVerifyResponse",
             "runStatus": "Complete",
             "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000"
+            "requestHash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "inputSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "claimManifestSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           },
           "workflow": {
             "provider": "github-actions",
             "repository": "owner/pilot-library-b",
             "name": "SharpProof strict weekly",
+            "path": ".github/workflows/sharpproof-strict-weekly.yml",
+            "event": "workflow_dispatch",
             "runId": 4,
             "runAttempt": 1,
             "sourceCommit": "0000000000000000000000000000000000000000",
-            "evidenceUrl": "https://example.invalid/pilot-b/week-4"
+            "evidenceUrl": "https://example.invalid/pilot-b/week-4",
+            "artifactSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "recordSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           }
         }
       ]

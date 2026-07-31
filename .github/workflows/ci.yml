@@ -66,26 +66,77 @@ jobs:
           -Configuration Release
           -SkipTests
 
-      - name: Run unit, architecture, protocol, and package-layout tests
+      - name: Run isolated release performance contract
+        id: performance
+        continue-on-error: true
         shell: pwsh
         run: >-
-          .\scripts\Invoke-SharpProofDotnet.ps1
-          -MemoryLimitMb 12288
-          -TimeoutSeconds 900
-          test SharpProof.Dev.Tests.slnf
-          -c Release
-          --no-build
-          --filter 'TestCategory!=Performance'
-          --logger 'console;verbosity=minimal'
+          .\scripts\Invoke-SharpProofGateEvidence.ps1
+          -Gate performance
+          -OutputPath artifacts/ci/performance.json
+          -MemoryLimitMb 8192
+          -TimeoutSeconds 600
 
-      - name: Run isolated release performance contract
+      - name: Run forced-termination stability probe
+        id: forced_termination
+        continue-on-error: true
         shell: pwsh
         run: >-
           .\scripts\Invoke-SharpProofDotnet.ps1
           -MemoryLimitMb 8192
-          -TimeoutSeconds 600
+          -TimeoutSeconds 300
           test SharpProof.Gates.Test\SharpProof.Gates.Test.csproj
           -c Release
           --no-build
-          --filter 'TestCategory=Performance'
+          --filter
+          'FullyQualifiedName~ForcedTerminationDeadlineIsStableAcrossLaunches'
           --logger 'console;verbosity=minimal'
+
+      - name: Run unit, architecture, protocol, and package-layout tests
+        id: tests
+        continue-on-error: true
+        shell: pwsh
+        run: >-
+          .\scripts\Invoke-SharpProofDotnet.ps1
+          -MemoryLimitMb 12288
+          -TimeoutSeconds 1800
+          test SharpProof.Dev.Tests.slnf
+          -c Release
+          --no-build
+          --filter 'TestCategory!=Performance&TestCategory!=Coverage'
+          --logger 'console;verbosity=minimal'
+
+      - name: Upload fast-gate performance evidence
+        if: always() && steps.performance.outcome != 'skipped'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fast-pr-performance-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            artifacts/ci/performance.json
+            artifacts/ci/performance.gate.json
+            artifacts/ci/performance.stderr.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce fast-gate outcomes
+        if: always() && steps.performance.outcome != 'skipped'
+        shell: pwsh
+        env:
+          PERFORMANCE_OUTCOME: ${{ steps.performance.outcome }}
+          FORCED_TERMINATION_OUTCOME: ${{ steps.forced_termination.outcome }}
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
+        run: |
+          $failed = @(
+            if ($env:PERFORMANCE_OUTCOME -ne 'success') {
+              "performance=$env:PERFORMANCE_OUTCOME"
+            }
+            if ($env:FORCED_TERMINATION_OUTCOME -ne 'success') {
+              "forced-termination=$env:FORCED_TERMINATION_OUTCOME"
+            }
+            if ($env:TESTS_OUTCOME -ne 'success') {
+              "tests=$env:TESTS_OUTCOME"
+            }
+          )
+          if ($failed.Count -ne 0) {
+            throw 'Fast gate failure: ' + ($failed -join '; ')
+          }

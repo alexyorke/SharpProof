@@ -292,14 +292,15 @@ host qualification. Deterministic SARIF 2.1.0 is available as an opt-in
 projection of the validated worker response. The workflow already promotes
 only the tested bytes after revalidating tag, version, master ancestry,
 predecessor-tag order, hashes, SBOM, repository identity, and package
-inventory. Before publication, all existing V3 main-package payloads must
-match the tested ZIP entries byte-for-byte, excluding only the repository
-signature. Verified retries publish main and symbol packages separately in
-dependency order and use duplicate skipping only after that match. The symbol
-service has no symmetric V3 download surface, so exact retry preflight applies
-to the main package; the tested `.snupkg` is resubmitted separately. These
-limits are not worker-side compilation reconstruction, counterexample replay,
-package separation, SARIF, or release-artifact provenance work.
+inventory. Before publication, each of the three target V3 main-package
+identities at the release version must be absent. Main and symbol packages are
+published separately in dependency order without duplicate skipping. The
+symbol service has no symmetric V3 download surface, so a symbol-package
+collision is detected by the push and fails the release. Any partial or
+conflicting publication requires a new version. These limits are not
+worker-side compilation reconstruction, postcondition-counterexample replay,
+package separation, SARIF, or release-artifact provenance work. Independently
+replayable effect traces remain an explicit preview.2 blocker.
 
 See [Typed abstention reasons](unknown-reasons.md) for the exact enums and
 [Analysis limits](analysis-limits.md) for configured budgets.

@@ -52,21 +52,23 @@ hosts reject requested verification explicitly.
 The worker receives compiler artifact schema version 8 with portable lowered
 CFG/IR. It does not construct a Roslyn compilation, parse source, or reread
 reference files; compiler and reference identities are provenance only.
-Independent whole-body counterexample replay and immutable tagged-byte
-promotion through a trusted-publishing workflow are implemented for the
-admitted program subset. Tags must match the checked-in version, belong to
+Independent whole-body postcondition-counterexample replay and immutable
+tagged-byte promotion through a trusted-publishing workflow are implemented
+for the admitted scalar subset. Effect refutations remain fail-closed pending
+an independently replayable compiler artifact trace. Tags must match the
+checked-in version, belong to
 `master`, and follow the predecessor-tag sequence. The publication helper
-validates the release manifest and hashes, preflights every existing V3
-main-package payload by exact ZIP-entry payload equality while excluding only
-NuGet's `.signature.p7s`, and publishes
+validates the release manifest and hashes, preflights each of the three target
+V3 main-package identities at the release version for absence, and publishes
 `SharpProof.Attributes -> SharpProof -> SharpProof.Verifier.Win-x64`.
-Main and symbol packages are pushed separately. Duplicate skipping is enabled
-only after a matching remote main package is proven, which permits a retry to
-complete a missing symbol push without trusting an unknown main package. The
-V3 symbol API has no matching symbol-download resource, so the tested
-`.snupkg` is resubmitted rather than compared remotely. `-PlanOnly` validates
-and emits the ordered plan without network or publication, and
-`-RemotePackageDirectory` supplies offline remote-payload fixtures.
+Main and symbol packages are pushed separately. Publication fails closed if
+any main package already exists, and no push uses duplicate skipping. Because
+the V3 protocol does not provide an equivalent symbol-package existence
+query, a symbol collision also fails the push and leaves the version
+unreusable; a partial or conflicting publication therefore requires a new
+version. `-PlanOnly` validates and emits the ordered plan without network or
+publication, and `-RemotePackageDirectory` supplies offline remote-payload
+fixtures.
 Optional deterministic SARIF 2.1.0 projects validated worker responses. Owner
 configuration of an HTTPS read/push-capable private V3 source, the protected
 private/public NuGet environments and tag policy, plus the first publications,

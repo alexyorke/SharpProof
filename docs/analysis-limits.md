@@ -99,7 +99,7 @@ process boundary.
 
 `SharpProofVerifyMaximumExpressionDepth` is also a compiler-visible property.
 The collector parses it, enforces the 1-through-256 range, and seals it into the
-schema-4 artifact. The launcher supplies the same property as the worker request
+schema-8 compiler artifact. The launcher supplies the same property as the worker request
 budget. A mismatch is `CompilerManifestMismatch` and stops before cache lookup
 or backend creation; neither side may silently use a different depth.
 

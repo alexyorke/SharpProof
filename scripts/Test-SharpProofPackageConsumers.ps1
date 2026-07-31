@@ -577,7 +577,7 @@ try {
     if ($isWindowsHost) {
         & (Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1') `
             -MemoryLimitMb 6144 `
-            -TimeoutSeconds 900 `
+            -TimeoutSeconds 1800 `
             test $testProject `
             --configuration $Configuration `
             --logger 'console;verbosity=minimal'

@@ -721,12 +721,75 @@ public sealed class ArchitectureTests
             ".github",
             "workflows",
             "ci.yml"));
+        var performanceIndex = fastWorkflow.IndexOf(
+            "Invoke-SharpProofGateEvidence.ps1",
+            StringComparison.Ordinal);
+        var broadTestsIndex = fastWorkflow.IndexOf(
+            "test SharpProof.Dev.Tests.slnf",
+            StringComparison.Ordinal);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                fastWorkflow,
+                Does.Contain(
+                    "TestCategory!=Performance&TestCategory!=Coverage"));
+            Assert.That(
+                fastWorkflow,
+                Does.Not.Contain("TestCategory=Performance"));
+            Assert.That(
+                fastWorkflow,
+                Does.Contain(
+                    "FullyQualifiedName~" +
+                    "ForcedTerminationDeadlineIsStableAcrossLaunches"));
+            Assert.That(
+                fastWorkflow,
+                Does.Contain(
+                    "-OutputPath artifacts/ci/performance.json"));
+            Assert.That(
+                fastWorkflow,
+                Does.Contain(
+                    "fast-pr-performance-${{ github.sha }}-" +
+                    "${{ github.run_attempt }}"));
+            Assert.That(performanceIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(
+                broadTestsIndex,
+                Is.GreaterThan(performanceIndex));
+        }
+
+        var acceptance = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "acceptance",
+            "Verify.ps1"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                acceptance,
+                Does.Contain(
+                    "TestCategory!=Performance&TestCategory!=Coverage"));
+            Assert.That(
+                acceptance,
+                Does.Contain(
+                    "contract.automation.solutionBuildWallSeconds"));
+            Assert.That(
+                acceptance,
+                Does.Not.Contain(
+                    "-TimeoutSeconds " +
+                    "([int]$contract.worker.maximumProjectWallSeconds)"));
+        }
+
+        using var acceptanceContract = JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(
+                root,
+                "eng",
+                "acceptance",
+                "contract.json")));
         Assert.That(
-            fastWorkflow,
-            Does.Contain("TestCategory!=Performance"));
-        Assert.That(
-            fastWorkflow,
-            Does.Contain("TestCategory=Performance"));
+            acceptanceContract.RootElement
+                .GetProperty("automation")
+                .GetProperty("solutionBuildWallSeconds")
+                .GetInt32(),
+            Is.EqualTo(600));
 
         var coverageCollector = File.ReadAllText(Path.Combine(
             root,

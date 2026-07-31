@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 
 namespace SharpProof.Package.Test;
@@ -30,6 +31,57 @@ public sealed class ReleasePublicationScriptTests
         Assert.That(
             script,
             Does.Contain("Remote symbol package already exists"));
+    }
+
+    [Test]
+    public async Task PublicationDocumentationDescribesFailClosedDuplicates()
+    {
+        var root = FindRepositoryRoot();
+        var documentationPaths = new[]
+        {
+            Path.Combine(root, "README.md"),
+            Path.Combine(root, "docs", "README.md"),
+            Path.Combine(root, "docs", "coverage-and-limits.md"),
+            Path.Combine(root, "docs", "native-smt-packaging.md")
+        };
+        foreach (var path in documentationPaths)
+        {
+            var documentation = await File.ReadAllTextAsync(path);
+            var normalized = Normalize(documentation);
+            var policy = PublicationPolicy(documentation);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    normalized,
+                    Does.Not.Contain("USE DUPLICATE SKIPPING"),
+                    path);
+                Assert.That(
+                    normalized,
+                    Does.Not.Contain("DUPLICATE SKIPPING IS ENABLED"),
+                    path);
+                Assert.That(
+                    normalized,
+                    Does.Not.Contain("EXISTING V3 PACKAGES ARE ACCEPTED"),
+                    path);
+                Assert.That(
+                    normalized,
+                    Does.Not.Contain("VERIFIED RETRIES"),
+                    path);
+                Assert.That(
+                    DescribesAbsentMainPackages(policy),
+                    Is.True,
+                    path);
+                Assert.That(
+                    DescribesNoDuplicateSkipping(policy),
+                    Is.True,
+                    path);
+                Assert.That(
+                    DescribesNewVersionAfterPartialPublication(policy),
+                    Is.True,
+                    path);
+            }
+        }
     }
 
     [Test]
@@ -68,39 +120,122 @@ public sealed class ReleasePublicationScriptTests
                 action: "Push");
         }
 
-        var mainPackage = feed.Packages[0];
-        var remoteMainPath = Path.Combine(
-            workspace.RemoteSource,
-            Path.GetFileName(mainPackage.Path));
-        File.Copy(mainPackage.Path, remoteMainPath);
-        var existingMain = await RunPublicationScriptAsync(
-            workspace,
-            Path.Combine(workspace.Root, "existing-main-plan.json"));
-        Assert.That(
-            existingMain.ExitCode,
-            Is.Not.Zero,
-            existingMain.Output);
-        Assert.That(
-            existingMain.Output,
-            Does.Contain("Remote main package already exists"));
-        File.Delete(remoteMainPath);
-
-        var symbolPackage = feed.SymbolPackages[0];
-        File.Copy(
-            symbolPackage.Path,
-            Path.Combine(
+        var fixtures = feed.Packages
+            .Select(static package => (Package: package, Kind: "main"))
+            .Concat(feed.SymbolPackages.Select(static package =>
+                (Package: package, Kind: "symbol")));
+        foreach (var fixture in fixtures)
+        {
+            var remotePath = Path.Combine(
                 workspace.RemoteSource,
-                Path.GetFileName(symbolPackage.Path)));
-        var existingSymbols = await RunPublicationScriptAsync(
-            workspace,
-            Path.Combine(workspace.Root, "existing-symbols-plan.json"));
+                Path.GetFileName(fixture.Package.Path));
+            File.Copy(fixture.Package.Path, remotePath);
+            try
+            {
+                var existing = await RunPublicationScriptAsync(
+                    workspace,
+                    Path.Combine(
+                        workspace.Root,
+                        "existing-" + fixture.Kind + "-" +
+                        fixture.Package.Id + "-plan.json"));
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(
+                        existing.ExitCode,
+                        Is.Not.Zero,
+                        existing.Output);
+                    Assert.That(
+                        existing.Output,
+                        Does.Contain(
+                            fixture.Kind == "main"
+                                ? "Remote main package already exists"
+                                : "Remote symbol package already exists"));
+                    Assert.That(
+                        existing.Output,
+                        Does.Contain(fixture.Package.Id));
+                    Assert.That(
+                        existing.Output,
+                        Does.Contain(fixture.Package.Version));
+                }
+            }
+            finally
+            {
+                File.Delete(remotePath);
+            }
+        }
+    }
+
+    private static string PublicationPolicy(string documentation)
+    {
+        var paragraphs = Regex.Split(
+                documentation,
+                @"(?:\r?\n)[ \t]*(?:\r?\n)")
+            .Where(paragraph =>
+                paragraph.Contains(
+                    "--skip-duplicate",
+                    StringComparison.OrdinalIgnoreCase) ||
+                paragraph.Contains(
+                    "duplicate skipping",
+                    StringComparison.OrdinalIgnoreCase))
+            .ToArray();
         Assert.That(
-            existingSymbols.ExitCode,
-            Is.Not.Zero,
-            existingSymbols.Output);
-        Assert.That(
-            existingSymbols.Output,
-            Does.Contain("Remote symbol package already exists"));
+            paragraphs,
+            Is.Not.Empty,
+            "Publication documentation has no duplicate policy.");
+        return Normalize(string.Join(" ", paragraphs));
+    }
+
+    private static string Normalize(string value)
+    {
+        return Regex.Replace(
+                value.Replace("`", string.Empty, StringComparison.Ordinal),
+                @"\s+",
+                " ")
+            .ToUpperInvariant();
+    }
+
+    private static bool DescribesAbsentMainPackages(string policy)
+    {
+        return (policy.Contains(
+                    "MAIN PACKAGE",
+                    StringComparison.Ordinal) ||
+                policy.Contains(
+                    "MAIN-PACKAGE",
+                    StringComparison.Ordinal)) &&
+            (policy.Contains("REJECT", StringComparison.Ordinal) ||
+             policy.Contains("FAIL", StringComparison.Ordinal) ||
+             policy.Contains("ABSENT", StringComparison.Ordinal) ||
+             policy.Contains("ABSENCE", StringComparison.Ordinal));
+    }
+
+    private static bool DescribesNoDuplicateSkipping(string policy)
+    {
+        return policy.Contains(
+                "WITHOUT DUPLICATE SKIPPING",
+                StringComparison.Ordinal) ||
+            policy.Contains(
+                "DUPLICATE SKIPPING IS NEVER USED",
+                StringComparison.Ordinal) ||
+            policy.Contains("NO PUSH USES", StringComparison.Ordinal) &&
+            (policy.Contains(
+                    "DUPLICATE SKIPPING",
+                    StringComparison.Ordinal) ||
+                policy.Contains(
+                    "--skip-duplicate",
+                    StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool DescribesNewVersionAfterPartialPublication(
+        string policy)
+    {
+        return (policy.Contains("PARTIAL", StringComparison.Ordinal) ||
+                policy.Contains("INTERRUPTED", StringComparison.Ordinal) ||
+                policy.Contains("CONFLICTING", StringComparison.Ordinal) ||
+                policy.Contains("COLLISION", StringComparison.Ordinal)) &&
+            (policy.Contains("NEW VERSION", StringComparison.Ordinal) ||
+             policy.Contains(
+                 "NEW PACKAGE VERSION",
+                 StringComparison.Ordinal));
     }
 
     private static void AssertPlan(
