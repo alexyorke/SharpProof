@@ -59,6 +59,111 @@ public sealed class DependencyAutomationTests
     }
 
     [Test]
+    public void NightlyFailsClosedOnRetainedDependencyAuditEvidence()
+    {
+        var workflow = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            ".github",
+            "workflows",
+            "nightly.yml"));
+        var uploadIndex = workflow.IndexOf(
+            "- name: Upload nightly evidence",
+            StringComparison.Ordinal);
+        var upload = uploadIndex >= 0
+            ? workflow[uploadIndex..]
+            : string.Empty;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                workflow,
+                Does.Contain(
+                    @".\scripts\Test-SharpProofDependencyAudit.ps1"));
+            Assert.That(
+                workflow,
+                Does.Contain("-SolutionPath SharpProof.sln"));
+            Assert.That(
+                workflow,
+                Does.Contain(
+                    "-NuGetConfigurationPath NuGet.Config"));
+            Assert.That(
+                workflow,
+                Does.Contain(
+                    "-OutputPath " +
+                    "artifacts/nightly/dependency-audit.json"));
+            Assert.That(
+                workflow,
+                Does.Not.Contain(
+                    "list SharpProof.sln package"));
+            Assert.That(
+                workflow,
+                Does.Not.Contain("--vulnerable"));
+            Assert.That(uploadIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(
+                upload,
+                Does.Contain("artifacts/nightly"));
+        }
+    }
+
+    [Test]
+    public void ArchitectureDocumentsCollectorSplitAndCorpusRatchets()
+    {
+        var architecture = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "docs",
+            "architecture.md"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                architecture,
+                Does.Contain(
+                    "CompilerArtifact      -> Ir, Worker.Protocol"));
+            Assert.That(
+                architecture,
+                Does.Contain(
+                    "Analyzer              -> Contracts, Effects, " +
+                    "Frontend, Ir, Specs"));
+            Assert.That(
+                architecture,
+                Does.Contain(
+                    "CompilerCollector     -> Analyzer, CompilerArtifact, " +
+                    "Contracts, Effects,"));
+            Assert.That(
+                architecture,
+                Does.Contain(
+                    "PortableAnalyzer      -> Attributes " +
+                    "(build-only payload identity)"));
+            Assert.That(
+                architecture,
+                Does.Contain(
+                    "ordinary live analyzer has no static dependency on " +
+                    "the\ncompiler-artifact model or worker protocol"));
+            Assert.That(
+                architecture,
+                Does.Contain(
+                    "build-only compiler collector observes the\nfinal " +
+                    "post-generator Roslyn `Compilation`"));
+            Assert.That(
+                architecture,
+                Does.Contain(
+                    "A `Supported` case producing `Unknown` or\n" +
+                    "`SilentUnknown` fails with zero tolerance."));
+            Assert.That(
+                architecture,
+                Does.Contain(
+                    "per-reason Unknown counts\nfor " +
+                    "`IntentionallyUnsupported` cases cannot exceed the " +
+                    "checked-in ratchet."));
+            Assert.That(
+                architecture,
+                Does.Not.Contain(
+                    "semantic Unknown rates as metrics; none is a " +
+                    "release gate."));
+        }
+    }
+
+    [Test]
     public void RepositorySecurityKeepsCodeQlDisabled()
     {
         var workflows = new[]

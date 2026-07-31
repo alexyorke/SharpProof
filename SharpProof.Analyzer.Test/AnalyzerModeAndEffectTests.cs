@@ -1395,6 +1395,80 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task DirectLockReceiverCompletionControlsRefutation()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class ThrowingGate {
+                public ThrowingGate() {
+                    throw new InvalidOperationException();
+                }
+            }
+
+            public static class Fixture {
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static void SafeObject() {
+                    lock ((object)new object()) {
+                    }
+                }
+
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static void SafeArray() {
+                    lock (new object[1]) {
+                    }
+                }
+
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static void ThrowingConstructor() {
+                    lock (new ThrowingGate()) {
+                    }
+                }
+
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static void WrappedThrowingConstructor() {
+                    lock ((object)(new ThrowingGate())) {
+                    }
+                }
+
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static void DynamicArrayLength(int length) {
+                    lock (new object[length]) {
+                    }
+                }
+            }
+            """,
+            "effects",
+            ["SP0016"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0016", 5)));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                factory.Outcomes["SafeObject"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
+            Assert.That(
+                factory.Outcomes["SafeArray"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
+            Assert.That(
+                factory.Outcomes["ThrowingConstructor"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["WrappedThrowingConstructor"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["DynamicArrayLength"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+        }
+    }
+
+    [Test]
     public async Task CompilerBoundGhostContractsHaveNoRuntimeEffects()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

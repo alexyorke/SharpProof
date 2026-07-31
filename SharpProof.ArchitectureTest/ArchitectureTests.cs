@@ -360,6 +360,32 @@ public sealed class ArchitectureTests
     }
 
     [Test]
+    public void EffectArrayCardinalityRequiresCompilerBoundSymbolIdentity()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "SharpProof.Effects",
+            "OperationEffectScanner.cs"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                source,
+                Does.Contain(
+                    "property.Instance?.Type is IArrayTypeSymbol &&"));
+            Assert.That(
+                source,
+                Does.Contain(
+                    "CompilerIdentityBridge." +
+                    "IsIntrinsicSequenceLength(property);"));
+            Assert.That(
+                source,
+                Does.Not.Contain(
+                    "property.Property.Name is \"Length\" or \"LongLength\""));
+        }
+    }
+
+    [Test]
     public void FrontendUsesOnlyTotalCompilerBoundLowering()
     {
         var source = ReadProductionSources("SharpProof.Frontend");

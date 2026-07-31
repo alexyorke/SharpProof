@@ -693,12 +693,8 @@ internal sealed class OperationEffectScanner
             case IObjectCreationOperation creation:
                 _ = RecordAllocation(creation);
                 break;
-            case IArrayCreationOperation array when
-                array.DimensionSizes.All(static size =>
-                    size.ConstantValue is { HasValue: true, Value: int length } && length >= 0) &&
-                array.Initializer?.ElementValues.All(DefiniteOperationFacts.IsHarmlessValue) != false:
-                AddWitness(EffectContractKind.Allocates,
-                    "managed-array-allocation", Symbol(array.Type), array);
+            case IArrayCreationOperation array:
+                _ = RecordArrayAllocation(array);
                 break;
             case IThrowOperation { Exception: { } exception } thrown when
                 DefiniteOperationFacts.UnwrapHarmlessValue(exception) is IObjectCreationOperation
@@ -728,15 +724,30 @@ internal sealed class OperationEffectScanner
 
     private void RecordDirectLock(ILockOperation @lock)
     {
-        if (!DefiniteOperationFacts.IsDefinitelyNonNull(@lock.LockedValue) ||
-            @lock.Body is not IBlockOperation { Operations.Length: 0 } ||
-            @lock.LockedValue is IObjectCreationOperation creation && !RecordAllocation(creation))
+        if (@lock.Body is not IBlockOperation { Operations.Length: 0 } ||
+            !RecordDirectLockReceiver(@lock.LockedValue))
         {
             return;
         }
 
         AddSynchronization(
             "synchronization-lock", FrameworkTypeMetadataNames.Monitor, @lock);
+    }
+
+    private bool RecordDirectLockReceiver(IOperation value)
+    {
+        var receiver = DefiniteOperationFacts.UnwrapHarmlessValue(value);
+        return receiver switch
+        {
+            IObjectCreationOperation creation =>
+                RecordAllocation(creation) &&
+                HasNonThrowingConstructorSpec(creation),
+            IArrayCreationOperation array => RecordArrayAllocation(array),
+            IInstanceReferenceOperation or
+                IConditionalAccessInstanceOperation or
+                ITypeOfOperation => true,
+            _ => receiver.ConstantValue is { HasValue: true, Value: not null }
+        };
     }
 
     private bool IsDirectSyntax(IOperation operation)
@@ -761,6 +772,18 @@ internal sealed class OperationEffectScanner
 
         AddWitness(EffectContractKind.Allocates, "managed-allocation",
             Symbol(creation.Constructor ?? (ISymbol?)creation.Type), creation);
+        return true;
+    }
+
+    private bool RecordArrayAllocation(IArrayCreationOperation array)
+    {
+        if (!DefiniteOperationFacts.IsDirectArrayCreationComplete(array))
+        {
+            return false;
+        }
+
+        AddWitness(EffectContractKind.Allocates,
+            "managed-array-allocation", Symbol(array.Type), array);
         return true;
     }
 
@@ -1047,10 +1070,8 @@ internal sealed class OperationEffectScanner
     private static bool IsIntrinsicArrayCardinalityProperty(
         IPropertyReferenceOperation property)
     {
-        return property.Arguments.IsDefaultOrEmpty &&
-        property.Instance != null &&
-        property.Property.Name is "Length" or "LongLength" &&
-        property.Instance.Type is IArrayTypeSymbol;
+        return property.Instance?.Type is IArrayTypeSymbol &&
+        CompilerIdentityBridge.IsIntrinsicSequenceLength(property);
     }
 
     private static bool IsIntegral(ITypeSymbol? type)

@@ -1744,6 +1744,15 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         };
     }
 
+    internal static bool IsDirectArrayCreationComplete(
+        IArrayCreationOperation creation)
+    {
+        return creation.DimensionSizes.All(static size =>
+            size.ConstantValue is { HasValue: true, Value: int length } &&
+            length >= 0) &&
+        creation.Initializer?.ElementValues.All(IsHarmlessValue) != false;
+    }
+
     internal static IOperation UnwrapHarmlessValue(IOperation operation)
     {
         return operation switch
