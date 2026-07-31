@@ -64,6 +64,7 @@ $roots = @(
     'SharpProof.Attributes/',
     'SharpProof.Analyzer/',
     'SharpProof.CompilerArtifact/',
+    'SharpProof.CompilerCollector/',
     'SharpProof.ContractForGenerator/',
     'SharpProof.Contracts/',
     'SharpProof.Dataflow/',
