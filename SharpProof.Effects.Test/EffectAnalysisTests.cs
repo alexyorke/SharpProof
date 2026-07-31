@@ -2903,6 +2903,143 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void DirectLockWitnessesRequireReceiverEvaluationToComplete()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class ThrowingLockReceiver {
+                public ThrowingLockReceiver() =>
+                    throw new InvalidOperationException();
+            }
+
+            public sealed class Sample {
+                private static readonly int NegativeLength = -1;
+
+                private static int GetLength() =>
+                    throw new InvalidOperationException();
+
+                private static object GetElement() =>
+                    throw new InvalidOperationException();
+
+                public void ObjectReceiver() {
+                    lock (new object()) {
+                    }
+                }
+
+                public void UpcastObjectReceiver() {
+                    lock ((object)(new object())) {
+                    }
+                }
+
+                public void ThrowingObjectReceiver() {
+                    lock (new ThrowingLockReceiver()) {
+                    }
+                }
+
+                public void UpcastThrowingObjectReceiver() {
+                    lock ((object)(new ThrowingLockReceiver())) {
+                    }
+                }
+
+                public void ArrayReceiver() {
+                    lock (new object[1]) {
+                    }
+                }
+
+                public void HarmlessArrayInitializerReceiver() {
+                    lock (new object[] { null! }) {
+                    }
+                }
+
+                public void ThrowingArrayInitializerReceiver() {
+                    lock (new object[] { GetElement() }) {
+                    }
+                }
+
+                public void NegativeArrayReceiver() {
+                    lock (new object[NegativeLength]) {
+                    }
+                }
+
+                public void ParameterArrayReceiver(int length) {
+                    lock (new object[length]) {
+                    }
+                }
+
+                public void ThrowingArrayReceiver() {
+                    lock (new object[GetLength()]) {
+                    }
+                }
+
+                public void ThisReceiver() {
+                    lock (this) {
+                    }
+                }
+
+                public void TypeReceiver() {
+                    lock (typeof(Sample)) {
+                    }
+                }
+
+                public void ConstantReceiver() {
+                    lock ("gate") {
+                    }
+                }
+
+                public void BoxingReceiver() {
+                    lock ((object)1) {
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        AssertKinds(
+            "ObjectReceiver",
+            "managed-allocation",
+            "synchronization-lock");
+        AssertKinds(
+            "UpcastObjectReceiver",
+            "managed-allocation",
+            "synchronization-lock");
+        AssertKinds(
+            "ThrowingObjectReceiver",
+            "managed-allocation");
+        AssertKinds(
+            "UpcastThrowingObjectReceiver",
+            "managed-allocation");
+        AssertKinds(
+            "ArrayReceiver",
+            "managed-array-allocation",
+            "synchronization-lock");
+        AssertKinds(
+            "HarmlessArrayInitializerReceiver",
+            "managed-array-allocation",
+            "synchronization-lock");
+        AssertKinds("ThrowingArrayInitializerReceiver");
+        AssertKinds("NegativeArrayReceiver");
+        AssertKinds("ParameterArrayReceiver");
+        AssertKinds("ThrowingArrayReceiver");
+        AssertKinds("ThisReceiver", "synchronization-lock");
+        AssertKinds("TypeReceiver", "synchronization-lock");
+        AssertKinds("ConstantReceiver", "synchronization-lock");
+        AssertKinds("BoxingReceiver");
+        return;
+
+        void AssertKinds(string name, params string[] expected)
+        {
+            Assert.That(
+                session.Analyze(Method(compilation, name))
+                    .DirectWitnesses
+                    .Select(static witness => witness.Kind),
+                Is.EqualTo(expected),
+                name);
+        }
+    }
+
+    [Test]
     public void ExceptionConstructorsRequireExactSpecsAndGateThrowWitnesses()
     {
         var compilation = EffectTestHost.CreateCompilation(

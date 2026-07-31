@@ -80,6 +80,38 @@ $mutations = @(
         Filter = 'FullyQualifiedName~CatchVariableFlowUsesTheEffectDiscoveryCatalog'
     },
     [pscustomobject]@{
+        Name = 'effect-lock-constructor-completion'
+        File = 'SharpProof.Effects\OperationEffectScanner.cs'
+        Original = "                RecordAllocation(creation) &&`n                HasNonThrowingConstructorSpec(creation),"
+        Mutated = '                RecordAllocation(creation),'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~DirectLockWitnessesRequireReceiverEvaluationToComplete'
+    },
+    [pscustomobject]@{
+        Name = 'effect-lock-array-admission'
+        File = 'SharpProof.Effects\OperationEffectScanner.cs'
+        Original = '            IArrayCreationOperation array => RecordArrayAllocation(array),'
+        Mutated = '            IArrayCreationOperation => true,'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~DirectLockWitnessesRequireReceiverEvaluationToComplete'
+    },
+    [pscustomobject]@{
+        Name = 'effect-lock-harmless-receiver-unwrapping'
+        File = 'SharpProof.Effects\OperationEffectScanner.cs'
+        Original = '        var receiver = DefiniteOperationFacts.UnwrapHarmlessValue(value);'
+        Mutated = '        var receiver = value;'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~DirectLockWitnessesRequireReceiverEvaluationToComplete'
+    },
+    [pscustomobject]@{
+        Name = 'effect-array-length-symbol-identity'
+        File = 'SharpProof.Effects\OperationEffectScanner.cs'
+        Original = '        CompilerIdentityBridge.IsIntrinsicSequenceLength(property);'
+        Mutated = '        property.Property.Name is "Length" or "LongLength";'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~EffectArrayCardinalityRequiresCompilerBoundSymbolIdentity'
+    },
+    [pscustomobject]@{
         Name = 'runtime-interpolation-fails-closed'
         File = 'SharpProof.Frontend\OperationSupportCatalog.cs'
         Original = "            OperationKind.ConditionalAccessInstance or`n            OperationKind.ObjectOrCollectionInitializer or"

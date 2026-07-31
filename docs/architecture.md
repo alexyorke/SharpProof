@@ -18,10 +18,12 @@ Contracts             -> Frontend, Ir
 Effects               -> Dataflow, Frontend, Specs
 Verify                -> Ir, Specs
 Smt                   -> Ir, Verify
-CompilerArtifact      -> Contracts, Frontend, Ir, Specs, Worker.Protocol
+CompilerArtifact      -> Ir, Worker.Protocol
 ContractForGenerator  -> Contracts
-Analyzer              -> CompilerArtifact, Contracts, Effects, Frontend, Ir,
-                         Specs
+Analyzer              -> Contracts, Effects, Frontend, Ir, Specs
+CompilerCollector     -> Analyzer, CompilerArtifact, Contracts, Effects,
+                         Frontend, Ir, Specs, Worker.Protocol
+PortableAnalyzer      -> Attributes (build-only payload identity)
 Worker.Protocol
 Worker                -> CompilerArtifact, Dataflow, Ir, Smt, Specs, Verify,
                          Worker.Protocol
@@ -29,10 +31,13 @@ Worker.Launcher       -> CompilerArtifact, Ir, Specs, Worker.Protocol
 ```
 
 Build-only references to `SharpProof.Meta.Analyzers` are omitted. Frontend's
-listed Attributes edge has `ReferenceOutputAssembly=false`; it establishes
-build order so the exact Attributes DLL SHA-256 can be embedded without adding
-a runtime assembly dependency. The architecture suite compares every direct
-project reference against this graph.
+and PortableAnalyzer's listed Attributes edges have
+`ReferenceOutputAssembly=false`; they establish build order so the exact
+Attributes DLL SHA-256 can be embedded without adding a runtime assembly
+dependency. The architecture suite compares every direct project reference
+against this graph. The ordinary live analyzer has no static dependency on the
+compiler-artifact model or worker protocol; those dependencies belong only to
+the build-only compiler collector.
 
 The Roslyn analyzer has no verifier, SMT, Z3, or native dependency. Z3 is
 allowed only in `SharpProof.Smt`, which is packaged below
@@ -187,21 +192,21 @@ assumptions and source ranges, then independently executes the whole body and
 postcondition before reuse. Proven claims, effect claims, and unsupported
 models are not cacheable.
 
-During Windows verification, the production analyzer observes the final
-post-generator Roslyn `Compilation` and atomically emits compiler artifact
-schema version 8. The compiler owns selection, contract/spec binding, effect
-evaluation, and body
-lowering. Every selected callable has either a typed failure record or a
-portable graph containing its bound clauses, canonical variables, whole-body
-CFG/IR, body start, initial environment, parameter mappings, and exact
-API-spec witness metadata. Every selected effect-attribute occurrence also has
-one compiler-sealed `Proven`, candidate `Refuted`, or typed `Unknown` evidence
-record. Repeated attributes retain distinct claim IDs while sharing their
-effective combined constraint/evidence. Because the artifact does not yet
-carry an independently executable effect path, the worker fails every compiler
-candidate `Refuted` closed as `Unknown(CounterexampleReplayFailed)` rather than
-publishing an effect refutation. Callable IDs, claim ownership, and
-user-assumption IDs remain tied to the sealed manifest.
+During Windows verification, the build-only compiler collector observes the
+final post-generator Roslyn `Compilation` and atomically emits compiler
+artifact schema version 8. The compiler owns selection, contract/spec binding,
+effect evaluation, and body lowering. Every selected callable has either a
+typed failure record or a portable graph containing its bound clauses,
+canonical variables, whole-body CFG/IR, body start, initial environment,
+parameter mappings, and exact API-spec witness metadata. Every selected
+effect-attribute occurrence also has one compiler-sealed `Proven`, candidate
+`Refuted`, or typed `Unknown` evidence record. Repeated attributes retain
+distinct claim IDs while sharing their effective combined
+constraint/evidence. Because the artifact does not yet carry an independently
+executable effect path, the worker fails every compiler candidate `Refuted`
+closed as `Unknown(CounterexampleReplayFailed)` rather than publishing an
+effect refutation. Callable IDs, claim ownership, and user-assumption IDs
+remain tied to the sealed manifest.
 
 The artifact also contains compiler error diagnostics with mapped locations,
 handwritten and generated tree hashes, raw and effective per-tree preprocessor
@@ -327,6 +332,9 @@ analyzer/generator assets and depends exactly on `SharpProof.Attributes`. Each
 package has a portable-PDB symbol package with SourceLink, and the package
 workflow records exact SHA-256 hashes, an SPDX SBOM, and GitHub
 provenance/SBOM attestations. The corpus reports explicit, silent, and total
-semantic Unknown rates as metrics; none is a release gate.
+semantic Unknown rates. A `Supported` case producing `Unknown` or
+`SilentUnknown` fails with zero tolerance. The supported-case and supported
+OSS-method floors cannot decrease, while total and per-reason Unknown counts
+for `IntentionallyUnsupported` cases cannot exceed the checked-in ratchet.
 
 The active contract is `eng/acceptance`.

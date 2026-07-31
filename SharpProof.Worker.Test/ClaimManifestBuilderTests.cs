@@ -1128,6 +1128,88 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void DirectLockReceiverCompletionControlsEffectEvidence()
+    {
+        var discovery = Build((
+            "Subject.cs",
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class ThrowingGate {
+                public ThrowingGate() {
+                    throw new InvalidOperationException();
+                }
+            }
+
+            public static class Subject {
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static void SafeObject() {
+                    lock ((object)new object()) {
+                    }
+                }
+
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static void SafeArray() {
+                    lock (new object[1]) {
+                    }
+                }
+
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static void ThrowingConstructor() {
+                    lock (new ThrowingGate()) {
+                    }
+                }
+
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static void WrappedThrowingConstructor() {
+                    lock ((object)(new ThrowingGate())) {
+                    }
+                }
+
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static void DynamicArrayLength(int length) {
+                    lock (new object[length]) {
+                    }
+                }
+            }
+            """));
+        var evidence = discovery.Targets.Values
+            .Where(static target => !target.EffectClaims.IsDefaultOrEmpty)
+            .ToDictionary(
+                static target => target.Method.Name,
+                static target => target.EffectClaims.Single().Evidence,
+                StringComparer.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            AssertDefiniteSynchronizationViolation(evidence["SafeObject"]);
+            AssertDefiniteSynchronizationViolation(evidence["SafeArray"]);
+            AssertUnknownWithoutWitness(evidence["ThrowingConstructor"]);
+            AssertUnknownWithoutWitness(evidence["WrappedThrowingConstructor"]);
+            AssertUnknownWithoutWitness(evidence["DynamicArrayLength"]);
+        }
+        return;
+
+        static void AssertDefiniteSynchronizationViolation(
+            CompilerEffectClaimArtifact value)
+        {
+            Assert.That(value.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(
+                value.Certainty,
+                Is.EqualTo(WorkerEffectEvidenceCertainty.DefiniteViolation));
+            Assert.That(value.Witness?.Kind, Is.EqualTo("synchronization-lock"));
+        }
+
+        static void AssertUnknownWithoutWitness(
+            CompilerEffectClaimArtifact value)
+        {
+            Assert.That(value.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(value.Witness, Is.Null);
+        }
+    }
+
+    [Test]
     public void ExceptionConstructorEvidenceRequiresAnExactApprovedSpec()
     {
         var discovery = Build((
