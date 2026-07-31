@@ -74,7 +74,25 @@ public sealed class CompilerArtifactModelSchemaTests
             Assert.That(
                 evidence.GetProperty("domain").GetString(),
                 Is.EqualTo("SharpProof.CompilerEffectClaimEvidence"));
-            Assert.That(evidence.GetProperty("version").GetInt32(), Is.EqualTo(7));
+            Assert.That(evidence.GetProperty("version").GetInt32(), Is.EqualTo(8));
+            Assert.That(
+                evidence.GetProperty("replay")
+                    .GetProperty("pathKind").GetString(),
+                Is.EqualTo(nameof(CompilerEffectReplayPathKind.Unconditional)));
+            Assert.That(
+                evidence.GetProperty("replay")
+                    .GetProperty("maximumEvents").GetInt32(),
+                Is.EqualTo(256));
+            Assert.That(
+                evidence.GetProperty("replay")
+                    .GetProperty("supportedEventKinds")
+                    .EnumerateArray()
+                    .Select(static value => value.GetString()),
+                Is.EqualTo(new[]
+                {
+                    nameof(CompilerEffectReplayEventKind.ManagedObjectAllocation),
+                    nameof(CompilerEffectReplayEventKind.ManagedArrayAllocation)
+                }));
         }
 
         var codec = typeof(PortableIrGraphCodec);

@@ -95,20 +95,64 @@ internal enum EffectAnalysisIncompleteReason
     CallPreconditionNotProven = 1 << 3
 }
 
+internal enum EffectDirectEventKind
+{
+    ManagedObjectAllocation,
+    ManagedArrayAllocation,
+    ExplicitThrow,
+    ReceiverFieldRead,
+    ReceiverFieldWrite,
+    MonitorCall,
+    EmptyLock,
+    VolatileFieldAccess
+}
+
 internal sealed class EffectDirectWitness(
     EffectContractKind effects,
     EffectContractCapabilityKind capabilities,
     INamedTypeSymbol? exceptionType,
     string kind,
     string detail,
-    Location location)
+    IOperation origin)
 {
+    internal EffectDirectEventKind EventKind { get; } =
+        EffectDirectEventKinds.FromWireName(kind);
     internal EffectContractKind Effects { get; } = effects;
     internal EffectContractCapabilityKind Capabilities { get; } = capabilities;
     internal INamedTypeSymbol? ExceptionType { get; } = exceptionType;
     internal string Kind { get; } = kind;
     internal string Detail { get; } = detail;
-    internal Location Location { get; } = location;
+    internal IOperation Origin { get; } =
+        origin ?? throw new ArgumentNullException(nameof(origin));
+    internal Location Location { get; } = origin.Syntax.GetLocation();
+}
+
+internal static class EffectDirectEventKinds
+{
+    internal static EffectDirectEventKind FromWireName(string kind)
+    {
+        return kind switch
+        {
+            "managed-allocation" =>
+                EffectDirectEventKind.ManagedObjectAllocation,
+            "managed-array-allocation" =>
+                EffectDirectEventKind.ManagedArrayAllocation,
+            "explicit-throw" =>
+                EffectDirectEventKind.ExplicitThrow,
+            "direct-field-read" =>
+                EffectDirectEventKind.ReceiverFieldRead,
+            "direct-field-write" =>
+                EffectDirectEventKind.ReceiverFieldWrite,
+            "synchronization-call" =>
+                EffectDirectEventKind.MonitorCall,
+            "synchronization-lock" =>
+                EffectDirectEventKind.EmptyLock,
+            "volatile-field-access" =>
+                EffectDirectEventKind.VolatileFieldAccess,
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(kind))
+        };
+    }
 }
 
 [Flags]

@@ -49,14 +49,18 @@ consumer checks. Only Windows x64 additionally enables verification, launches
 the packaged worker, and validates its versioned JSON result; unsupported
 hosts reject requested verification explicitly.
 
-The worker receives compiler artifact schema version 8 with portable lowered
+The worker receives compiler artifact schema version 9 with portable lowered
 CFG/IR. It does not construct a Roslyn compilation, parse source, or reread
 reference files; compiler and reference identities are provenance only.
 Independent whole-body postcondition-counterexample replay and immutable
 tagged-byte promotion through a trusted-publishing workflow are implemented
-for the admitted scalar subset. Effect refutations remain fail-closed pending
-an independently replayable compiler artifact trace. Tags must match the
-checked-in version, belong to
+for the admitted scalar subset. Schema 9 also carries the compiler-neutral
+unconditional managed object/array allocation event used by the worker's
+independent effect replayer. It can refute `ZeroAllocations` or an
+`EffectContract` excluding `Allocates`; other effect events remain fail-closed
+as typed `Unknown`. Effect results remain noncacheable. The worker protocol
+remains 9 and the cache schema remains 11. Tags must match the checked-in
+version, belong to
 `master`, and follow the predecessor-tag sequence. The publication helper
 validates the release manifest and hashes, preflights each of the three target
 V3 main-package identities at the release version for absence, and publishes

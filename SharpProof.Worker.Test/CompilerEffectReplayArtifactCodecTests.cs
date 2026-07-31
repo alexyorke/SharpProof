@@ -1,0 +1,212 @@
+using NUnit.Framework;
+using SharpProof.CompilerArtifact;
+using SharpProof.Worker.Protocol;
+
+namespace SharpProof.Worker.Test;
+
+[TestFixture]
+public sealed class CompilerEffectReplayArtifactCodecTests
+{
+    [Test]
+    public void CanonicalHashesBindConstraintSemanticsAndEveryOperationField()
+    {
+        var constraint = new CompilerEffectConstraintArtifact
+        {
+            AllowedEffects = WorkerEffectSet.Throws,
+            AllowedCapabilities = WorkerEffectCapabilitySet.IO,
+            AllowedExceptionTypes = ["type-b", "type-a"]
+        };
+        var reordered = new CompilerEffectConstraintArtifact
+        {
+            AllowedEffects = constraint.AllowedEffects,
+            AllowedCapabilities = constraint.AllowedCapabilities,
+            AllowedExceptionTypes = ["type-a", "type-b"]
+        };
+        var constraintHash =
+            CompilerEffectClaimArtifactCodec.ComputeConstraintSha256(
+                WorkerEffectContractKind.EffectContract,
+                constraint);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                CompilerEffectClaimArtifactCodec.ComputeConstraintSha256(
+                    WorkerEffectContractKind.EffectContract,
+                    reordered),
+                Is.EqualTo(constraintHash));
+            Assert.That(
+                CompilerEffectClaimArtifactCodec.ComputeConstraintSha256(
+                    WorkerEffectContractKind.AllowedExceptions,
+                    reordered),
+                Is.Not.EqualTo(constraintHash));
+        }
+
+        var baseline = ReplayEvent();
+        var operationHash =
+            CompilerEffectClaimArtifactCodec.ComputeReplayOperationSha256(
+                baseline);
+        Action<CompilerEffectReplayEventArtifact>[] mutations =
+        [
+            value => value.Kind =
+                CompilerEffectReplayEventKind.ManagedArrayAllocation,
+            value => value.SyntaxTreeOrdinal++,
+            value => value.SyntaxTreeSha256 = new string('b', 64),
+            value => value.SyntaxStart++,
+            value => value.SyntaxLength++,
+            value => value.MemberIdentity += "-changed",
+            value => value.MemberDocumentationId = "M:Changed",
+            value => value.TypeIdentity += "-changed",
+            value => value.TypeDocumentationId = "T:Changed",
+            value => value.SpecWitnessIdentifier = "spec",
+            value => value.ScalarOperands = [1],
+            value => value.ExactExceptionTypeHierarchy = ["exception"],
+            value => value.Location.Path = "Mapped.cs",
+            value => value.Location.Start++,
+            value => value.Location.Length++,
+            value => value.Location.Line++,
+            value => value.Location.Column++
+        ];
+
+        foreach (var mutate in mutations)
+        {
+            var changed = ReplayEvent();
+            mutate(changed);
+            Assert.That(
+                CompilerEffectClaimArtifactCodec
+                    .ComputeReplayOperationSha256(changed),
+                Is.Not.EqualTo(operationHash));
+        }
+    }
+
+    [Test]
+    public void CodecRequiresSealedUnconditionalAllocationReplayForRefutation()
+    {
+        var evidence = RefutedEvidence();
+
+        Assert.DoesNotThrow(
+            (Action)(() =>
+                CompilerEffectClaimArtifactCodec.Validate(evidence)));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                evidence.Replay!.ConstraintSha256,
+                Is.EqualTo(
+                    CompilerEffectClaimArtifactCodec.ComputeConstraintSha256(
+                        evidence.ContractKind,
+                        evidence.Constraint)));
+            Assert.That(
+                evidence.Replay.Events[0].OperationIdentitySha256,
+                Is.EqualTo(
+                    CompilerEffectClaimArtifactCodec
+                        .ComputeReplayOperationSha256(
+                            evidence.Replay.Events[0])));
+        }
+
+        AssertRejected(static value => value.Replay = null);
+        AssertRejected(static value =>
+            value.Replay!.PathKind =
+                CompilerEffectReplayPathKind.Unspecified);
+        AssertRejected(static value =>
+            value.Replay!.Events[0].Kind =
+                CompilerEffectReplayEventKind.ExplicitThrow);
+        AssertRejected(static value =>
+            value.Replay!.Events[0].SyntaxLength = 0);
+        AssertRejected(static value =>
+            value.Replay!.Events[0].ScalarOperands = [1]);
+        AssertRejected(static value =>
+            value.Replay!.Events[0].ExactExceptionTypeHierarchy =
+                ["exception"]);
+        AssertRejected(static value =>
+            value.Replay!.Events[0].Ordinal = 1);
+        AssertRejected(static value =>
+        {
+            value.Outcome = WorkerClaimOutcome.Proven;
+            value.Certainty =
+                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
+            value.Witness = null;
+        });
+        AssertRejected(static value =>
+        {
+            value.Outcome = WorkerClaimOutcome.Unknown;
+            value.Reason =
+                WorkerClaimReason.CounterexampleNotReplayable;
+            value.Certainty =
+                WorkerEffectEvidenceCertainty.Unavailable;
+            value.Witness = null;
+        });
+    }
+
+    private static void AssertRejected(
+        Action<CompilerEffectClaimArtifact> mutate)
+    {
+        var evidence = RefutedEvidence();
+        mutate(evidence);
+        CompilerEffectClaimArtifactCodec.Seal(evidence);
+
+        Assert.Throws<InvalidDataException>(
+            (Action)(() =>
+                CompilerEffectClaimArtifactCodec.Validate(evidence)));
+    }
+
+    private static CompilerEffectClaimArtifact RefutedEvidence()
+    {
+        var effectEvent = ReplayEvent();
+        var evidence = new CompilerEffectClaimArtifact
+        {
+            ClaimId = "effect-allocation",
+            ContractKind = WorkerEffectContractKind.ZeroAllocations,
+            Outcome = WorkerClaimOutcome.Refuted,
+            Reason = WorkerClaimReason.None,
+            Certainty =
+                WorkerEffectEvidenceCertainty.DefiniteViolation,
+            Constraint = new CompilerEffectConstraintArtifact(),
+            Witness = new WorkerEffectViolationWitness
+            {
+                Kind = "managed-object-allocation",
+                Detail = effectEvent.MemberDocumentationId!,
+                Effects = WorkerEffectSet.Allocates,
+                Location = Location()
+            },
+            Replay = new CompilerEffectReplayArtifact
+            {
+                PathKind =
+                    CompilerEffectReplayPathKind.Unconditional,
+                Events = [effectEvent]
+            },
+            Evidence = "unconditional-allocation"
+        };
+        CompilerEffectClaimArtifactCodec.Seal(evidence);
+        return evidence;
+    }
+
+    private static CompilerEffectReplayEventArtifact ReplayEvent()
+    {
+        return new CompilerEffectReplayEventArtifact
+        {
+            Ordinal = 0,
+            Kind =
+                CompilerEffectReplayEventKind.ManagedObjectAllocation,
+            SyntaxTreeOrdinal = 0,
+            SyntaxTreeSha256 = new string('a', 64),
+            SyntaxStart = 10,
+            SyntaxLength = 12,
+            MemberIdentity = "assembly::M:System.Object.#ctor",
+            MemberDocumentationId = "M:System.Object.#ctor",
+            TypeIdentity = "assembly::T:System.Object",
+            TypeDocumentationId = "T:System.Object",
+            Location = Location()
+        };
+    }
+
+    private static WorkerSourceLocation Location()
+    {
+        return new WorkerSourceLocation
+        {
+            Path = "Subject.cs",
+            Start = 10,
+            Length = 12,
+            Line = 1,
+            Column = 1
+        };
+    }
+}

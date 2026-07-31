@@ -13,7 +13,7 @@ unsupported expressions, approximate facts, and exhausted budgets remain
 
 | Surface | Runs where | Implemented behavior | Current boundary |
 |---|---|---|---|
-| Effect contracts | Analyzer with `SharpProofFeatures=effects` or `all` | Runs a bounded acyclic scalar CFG pass, then computes conservative may summaries for reads, writes, allocation, capabilities, exceptions, termination, and completeness; checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, `[AllowedExceptions]`, and `[EffectContract]`; emits one accountable worker claim per selected attribute | Impossible refined branches are excluded. A loop disables scalar refinement but the conservative all-block scan can still prove effect absence. Possible effects, exhausted budgets, and unresolved boundaries remain typed `Unknown`. Compiler violation candidates also remain `Unknown(CounterexampleReplayFailed)` until an executable lowered-body effect trace can be replayed |
+| Effect contracts | Analyzer with `SharpProofFeatures=effects` or `all`; independent replay in the opt-in Windows x64 worker | Runs a bounded acyclic scalar CFG pass, then computes conservative may summaries for reads, writes, allocation, capabilities, exceptions, termination, and completeness; checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, `[AllowedExceptions]`, and `[EffectContract]`; emits one accountable worker claim per selected attribute; independently replays unconditional definite managed object/array allocation events | Impossible refined branches are excluded. A loop disables scalar refinement but the conservative all-block scan can still prove effect absence. Replayed allocation can refute `ZeroAllocations` or an `EffectContract` that excludes `Allocates`; observable purity permits fresh allocation. Other definite candidates become `CounterexampleNotReplayable`; possible effects, exhausted budgets, and unresolved boundaries remain typed `Unknown` |
 | Call-site preconditions | Analyzer with `SharpProofFeatures=contracts` or `all` | Binds source `Contract.Requires` clauses and closed parameter attributes with compiler symbols for ordinary calls and object creation; follows executable local-function, lambda, and anonymous-method child CFGs exactly once; combines exact IR replay with compilation-scoped Boolean, nullness, interval, cardinality, explicitly trusted return-annotation, approved API-spec result, and effect facts at definite call sites | Unknown or captured values, possible throws, cycles, quoted expression-tree lambdas, and exhausted analysis budgets do not become violations or proofs; unsupported explicitly selected methods report SP0047 |
 | Postconditions | Optional Windows x64 worker with `SharpProofFeatures=contracts` or `all`; strict enables the worker by default | Manifests `Contract.Ensures` and return attributes, including directly owned local-function, lambda, anonymous-method, and top-level claims, then proves admitted bounded obligations over normal-return paths with Boolean logic, bounded integer comparisons, checked `long` arithmetic, and replay-gated counterexamples | The additional callable forms are currently visible as `UnsupportedCallable`; `effects` excludes postcondition claims; this is bounded `Ensures` verification, not arbitrary deep, recursive, looping, heap, or sequence verification |
 | Worker body execution | Compiler collector plus opt-in Windows x64 worker | The compiler emits portable whole-body CFG/IR; the worker executes its bounded acyclic subset with locals, reassignment, branches, multiple returns, entry-state `Old`, supported expressions, and eligible resolved API specs | Loops, stateful instructions outside the narrow admitted model, unresolved calls, unsupported mutation, and exceeded bounds abstain |
@@ -176,10 +176,8 @@ ghost specification evidence.
 
 - `Proven` requires a hygienic core containing only lowered facts, resolved
   specs, verified contracts, or explicit user assumptions.
-- `Refuted` requires executable replay of a postcondition candidate model.
-  Compiler-produced effect evidence is not independently executable and
-  therefore cannot produce an effect refutation.
-  The proof kernel first checks exact backend-model closure and re-evaluates
+- `Refuted` requires independent replay. For a postcondition candidate, the
+  proof kernel first checks exact backend-model closure and re-evaluates
   the lowered assumptions and goal. The worker then independently executes the
   compiler-produced whole-body program along the concrete CFG path and
   evaluates the original postcondition over the reconstructed post-state.
@@ -191,6 +189,13 @@ ghost specification evidence.
   state is a fatal `CounterexampleReplayFailed`; one on an unselected path
   does not block the refutation. Result models expose only canonical user
   variables.
+  For an effect candidate, compiler artifact schema 9 currently admits one
+  unconditional definite managed object/array allocation event. The worker
+  recomputes its constraint and operation identities, checks its source-tree
+  identity/span and sealed witness, and independently derives `Allocates`.
+  This can refute `ZeroAllocations` or an `EffectContract` whose allowed
+  effects exclude `Allocates`; it cannot refute observable `EnforcePure`,
+  which permits fresh allocation.
 - `Unknown` covers unsupported, unresolved, approximate, method-time-limited,
   or resource-exhausted claim analysis. Unsupported unannotated analyzer
   callables are silent; unsupported selected callables produce SP0047.
@@ -208,12 +213,15 @@ ghost specification evidence.
   trusted complete boundaries, definite direct violations, and unavailable
   evidence. A disallowed effect in a may-effect summary is not a replayed
   counterexample, so it remains `Unknown(EffectContractNotEstablished)`.
-  A compiler `DefiniteViolation` candidate is also insufficient because its
-  effect operation and path are not lowered for independent worker replay.
-  The worker maps such a compiler `Refuted` candidate to the fatal typed result
-  `Unknown(CounterexampleReplayFailed)` with unavailable certainty and no
-  published witness. Conditional, static-initialization-sensitive, and
-  may-only conflicts remain `Unknown(EffectContractNotEstablished)`.
+  Definite explicit-throw, receiver-field, empty-lock, `Monitor`,
+  static-initialization-sensitive allocation, and other unsupported direct
+  candidates are not published as refutations; they become
+  `Unknown(CounterexampleNotReplayable)`. Conditional, path-dependent, and
+  may-only conflicts without definite replay evidence remain
+  `Unknown(EffectContractNotEstablished)`. Structural replay-artifact tamper
+  is malformed compiler evidence and fails as `CompilerManifestMismatch`; a
+  semantic disagreement during an otherwise valid replay becomes the fatal
+  `Unknown(CounterexampleReplayFailed)`.
 - Proven postconditions expose `ContradictoryPreconditions` or
   `NoModeledNormalReturn` vacuity evidence in JSON and SARIF. Proven claims are
   not disk-cache entries.
@@ -233,7 +241,7 @@ ghost specification evidence.
 ## Closed compiler artifact and remaining limits
 
 During Windows verification, the production analyzer captures compiler
-artifact schema version 8 from the post-generator compilation. The artifact
+artifact schema version 9 from the post-generator compilation. The artifact
 contains:
 
 - the feature-selected, sealed claim manifest;
@@ -241,6 +249,9 @@ contains:
   or portable whole-body CFG/IR with bound contract clauses, canonical
   variables, body-entry state, parameter mappings, and exact API-spec witness
   metadata;
+- compiler-neutral ordered replay evidence for the admitted unconditional
+  managed object/array allocation, including the selected-constraint and
+  semantic-operation hashes plus source-tree identity and span;
 - compiler error diagnostics with mapped locations;
 - handwritten and generated tree hashes with language version, documentation
   mode, source kind, preprocessor symbols, and parse features;
@@ -299,8 +310,10 @@ symbol service has no symmetric V3 download surface, so a symbol-package
 collision is detected by the push and fails the release. Any partial or
 conflicting publication requires a new version. These limits are not
 worker-side compilation reconstruction, postcondition-counterexample replay,
-package separation, SARIF, or release-artifact provenance work. Independently
-replayable effect traces remain an explicit preview.2 blocker.
+the admitted allocation-effect replay, package separation, SARIF, or
+release-artifact provenance work. Replay support for throw, field,
+synchronization, conditional, and other effect events remains an explicit
+preview.2 blocker.
 
 See [Typed abstention reasons](unknown-reasons.md) for the exact enums and
 [Analysis limits](analysis-limits.md) for configured budgets.

@@ -1662,8 +1662,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 increment.OperatorMethod == null && !increment.IsChecked &&
                 increment.Target is ILocalReferenceOperation or IParameterReferenceOperation,
             IConversionOperation conversion =>
-                HarmlessConversion(conversion) && !conversion.IsChecked && !conversion.Conversion.IsUserDefined &&
-                (conversion.Conversion.IsIdentity || conversion.Conversion.IsImplicit) &&
+                HarmlessConversion(conversion) &&
                 CompletesNormally(conversion.Operand),
             IBlockOperation or IExpressionStatementOperation or IReturnOperation or
                 IVariableDeclarationGroupOperation or IVariableDeclarationOperation or
@@ -1789,6 +1788,12 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     private static bool HarmlessConversion(IConversionOperation conversion)
     {
         return conversion.OperatorMethod == null &&
+        !conversion.IsChecked &&
+        !conversion.Conversion.IsUserDefined &&
+        (conversion.Conversion.IsIdentity ||
+         conversion.Conversion.IsImplicit) &&
+        conversion.Operand.Type?.TypeKind != TypeKind.Dynamic &&
+        conversion.Type?.TypeKind != TypeKind.Dynamic &&
         !(conversion.Operand.Type?.IsValueType == true && conversion.Type?.IsReferenceType == true);
     }
 

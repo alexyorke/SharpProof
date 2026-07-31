@@ -208,9 +208,9 @@ Every manifest claim has exactly one non-`Unspecified` outcome.
 | `BackendUnavailable` | Z3/backend loading or availability failed |
 | `InfrastructureFailure` | Non-semantic worker infrastructure failed |
 | `MalformedBackendResult` | The backend result cannot pass structural/kernel validation |
-| `CounterexampleReplayFailed` | Exact term/whole-body replay disagreed with a postcondition candidate, or a compiler-only effect violation lacks an independently executable trace; the assembled run fails |
+| `CounterexampleReplayFailed` | Exact term/whole-body postcondition replay or structurally valid effect-event replay disagreed with its candidate; the assembled run fails |
 | `PostconditionMayBeUndefined` | Evaluating the postcondition can throw for a candidate input, so its Boolean truth value is not defined on every modeled normal-return state |
-| `CounterexampleNotReplayable` | The candidate model depends on a modeled call that the independent whole-body interpreter intentionally does not execute |
+| `CounterexampleNotReplayable` | A postcondition candidate depends on an executed modeled call, or a definite effect candidate is outside the admitted allocation-event replay subset |
 | `EffectSummaryIncomplete` | The compiler-produced effect summary has an unknown facet or is otherwise incomplete |
 | `EffectContractNotEstablished` | A complete may-effect summary does not establish the selected effect contract and no definite replayable violation witness is available |
 
@@ -221,22 +221,34 @@ Effect claim records have an additional closed certainty field:
 - `TrustedCompleteBoundary` means a complete bodyless contract was accepted as
   an explicit trusted boundary;
 - `DefiniteViolation` is compiler evidence that a simple unconditional direct
-  effect has a source-located structured witness; it is not independently
-  replayable by the worker; and
+  effect has a source-located structured witness. The worker independently
+  replays only the admitted managed object/array allocation form; and
 - `Unavailable` means infrastructure or invalid contract evidence prevented a
   semantic effect result.
 
 A may-effect summary is suitable for proving the absence of a disallowed
 effect, but the presence of a may-effect is not itself a concrete trace.
 Consequently a complete summary that does not establish the contract remains
-`Unknown(EffectContractNotEstablished)`. A compiler `DefiniteViolation`
-candidate is also not enough: the current artifact does not lower an
-independently executable effect path. The worker therefore maps every compiler
-candidate `Refuted` to the fatal typed result
-`Unknown(CounterexampleReplayFailed)` with unavailable certainty and no
-published witness. The worker emits no effect `Refuted` result today.
-Conditional, path-dependent, static-initialization-sensitive, and may-only
-conflicts remain `Unknown(EffectContractNotEstablished)`.
+`Unknown(EffectContractNotEstablished)`. Compiler artifact schema 9 can seal
+one unconditional definite managed object/array allocation event for
+independent worker replay. The worker validates its order, source-tree
+identity/span, selected-constraint and semantic-operation hashes, and sealed
+witness, then derives `Allocates` itself. A match can refute
+`ZeroAllocations` or an `EffectContract` that excludes `Allocates`.
+`EnforcePure` remains observable purity and permits fresh allocation.
+The operation hash checks canonical agreement among compiler-produced event
+fields; source discovery, analysis, and event lowering remain trusted rather
+than being independently reconstructed by the worker.
+
+Definite explicit-throw, receiver-field, empty-lock, exact-`Monitor`,
+static-initialization-sensitive allocation, and other unsupported direct
+candidates become `Unknown(CounterexampleNotReplayable)`.
+Conditional/path-dependent and may-only conflicts without a definite replay
+candidate remain `Unknown(EffectContractNotEstablished)`. Invalid replay
+structure is malformed compiler evidence and fails as
+`CompilerManifestMismatch`; a structurally valid replay that disagrees
+semantically becomes the fatal
+`Unknown(CounterexampleReplayFailed)`. Effect results remain noncacheable.
 Analyzer evidence preserves the more specific
 `ManagedAbstractFlow:BlockBudgetExceeded`,
 or `ManagedAbstractFlow:OperationBudgetExceeded` detail through JSON, SARIF,
@@ -258,13 +270,14 @@ proof `UnsupportedOperation`, `ApproximationTouchedGoal`,
 `UnsupportedContract`, `UnsupportedExpression`, or `UnsupportedCallable`
 according to their closed failure kind.
 
-Whole-body replay executes only the concrete path selected by the model.
-Executed modeled calls produce `CounterexampleNotReplayable`; other unsupported
-IR operations or inconsistent replay state produce `CounterexampleReplayFailed`.
-The same instructions on unselected paths do not block replay. Contract-only
-ordinary `void` methods use exact zero-step replay. Constructor postconditions
-are `UnsupportedBody` until base-constructor and field-initializer semantics are
-lowered. Successful refutations expose only canonical user-model variables.
+Postcondition whole-body replay executes only the concrete path selected by the
+model. Executed modeled calls produce `CounterexampleNotReplayable`; other
+unsupported IR operations or inconsistent replay state produce
+`CounterexampleReplayFailed`. The same instructions on unselected paths do not
+block replay. Contract-only ordinary `void` methods use exact zero-step replay.
+Constructor postconditions are `UnsupportedBody` until base-constructor and
+field-initializer semantics are lowered. Successful postcondition refutations
+expose only canonical user-model variables.
 
 The callable record prevents a zero-claim selected method from disappearing.
 The sealed manifest and response must have exact callable/result and

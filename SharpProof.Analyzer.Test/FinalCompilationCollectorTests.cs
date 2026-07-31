@@ -125,7 +125,7 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(first.Take(3), Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
             Assert.That(first, Does.Not.Contain((byte)'\r'));
             Assert.That(artifact.Schema, Is.EqualTo("SharpProof.CompilerManifest"));
-            Assert.That(artifact.SchemaVersion, Is.EqualTo(8));
+            Assert.That(artifact.SchemaVersion, Is.EqualTo(9));
             Assert.That(artifact.ProtocolVersion, Is.EqualTo("9"));
             Assert.That(artifact.Compilation.TargetFramework, Is.EqualTo("net9.0"));
             Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.All));
@@ -135,6 +135,11 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(artifact.CompilerDiagnostics, Is.Empty);
             Assert.That(artifact.Callables, Has.Length.EqualTo(1));
             Assert.That(artifact.CompilationSha256, Has.Length.EqualTo(64));
+            Assert.That(
+                artifact.Compilation.SyntaxTrees
+                    .Select(static tree => tree.TextLength),
+                Is.EqualTo(compilation.SyntaxTrees.Select(
+                    static tree => tree.GetText().Length)));
             Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
             Assert.That(
                 artifact.Manifest.Callables.Single().Assumptions,

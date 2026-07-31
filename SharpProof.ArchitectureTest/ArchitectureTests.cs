@@ -508,6 +508,7 @@ public sealed class ArchitectureTests
                 "SharpProof.CompilerCollector/FinalCompilationCollectorAnalyzer.cs",
                 "SharpProof.CompilerCollector/FinalCompilationCollector.cs",
                 "SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs",
+                "SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs",
                 "SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectEvaluationWireMappings.cs",
                 "SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs",
                 "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
@@ -605,7 +606,8 @@ public sealed class ArchitectureTests
                 "SharpProof.Verify/ProofKernel.cs",
                 "SharpProof.Ir/IrInterpreter.cs",
                 "SharpProof.Ir/IrProgramInterpreter.cs",
-                "SharpProof.Worker/CallableCounterexampleReplayer.cs"
+                "SharpProof.Worker/CallableCounterexampleReplayer.cs",
+                "SharpProof.Worker/EffectCounterexampleReplayer.cs"
             ],
             ["effectResultAssembly"] = [
                 "SharpProof.Worker/EffectClaimResultAssembler.cs"

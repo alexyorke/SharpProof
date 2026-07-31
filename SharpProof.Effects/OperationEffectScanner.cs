@@ -701,8 +701,8 @@ internal sealed class OperationEffectScanner
                 {
                     Type: INamedTypeSymbol exceptionType
                 } creation &&
-                RecordAllocation(creation) &&
                 HasNonThrowingConstructorSpec(creation):
+                _ = RecordAllocation(creation);
                 var exact = IsFrameworkException(exceptionType);
                 AddWitness(EffectContractKind.Throws, "explicit-throw",
                     Symbol(exceptionType) + (exact ? ";exact-type=true" : ";exact-type=false"),
@@ -763,7 +763,10 @@ internal sealed class OperationEffectScanner
     {
         if (creation.Type is not INamedTypeSymbol type ||
             !type.IsReferenceType ||
-            EffectMethodNodeBuilder.HasPotentialStaticInitialization(type) ||
+            EffectMethodNodeBuilder
+                .HasPotentialConstructionInitialization(
+                    type,
+                    _session.ApiSpecs) ||
             creation.Initializer != null ||
             !creation.Arguments.All(argument => DefiniteOperationFacts.IsHarmlessValue(argument.Value)))
         {
@@ -846,7 +849,7 @@ internal sealed class OperationEffectScanner
         EffectContractCapabilityKind capabilities = EffectContractCapabilityKind.None)
     {
         _directWitnesses.Add(new EffectDirectWitness(
-            effects, capabilities, exceptionType, kind, detail, operation.Syntax.GetLocation()));
+            effects, capabilities, exceptionType, kind, detail, operation));
     }
 
     private void AddSynchronization(string kind, string detail, IOperation operation)

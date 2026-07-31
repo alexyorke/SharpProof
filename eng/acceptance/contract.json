@@ -23,7 +23,7 @@
   "worker": {
     "protocolVersion": 9,
     "manifestSchemaVersion": 4,
-    "compilerArtifactSchemaVersion": 8,
+    "compilerArtifactSchemaVersion": 9,
     "maximumParallelism": 4,
     "maximumMemoryMiB": 2048,
     "queryRlimit": 3000000,
@@ -58,6 +58,7 @@
           "SharpProof.CompilerCollector/FinalCompilationCollectorAnalyzer.cs",
           "SharpProof.CompilerCollector/FinalCompilationCollector.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectEvaluationWireMappings.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs",
           "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
@@ -187,7 +188,8 @@
           "SharpProof.Verify/ProofKernel.cs",
           "SharpProof.Ir/IrInterpreter.cs",
           "SharpProof.Ir/IrProgramInterpreter.cs",
-          "SharpProof.Worker/CallableCounterexampleReplayer.cs"
+          "SharpProof.Worker/CallableCounterexampleReplayer.cs",
+          "SharpProof.Worker/EffectCounterexampleReplayer.cs"
         ]
       },
       {

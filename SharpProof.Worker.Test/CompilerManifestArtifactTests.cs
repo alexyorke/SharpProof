@@ -62,6 +62,7 @@ public sealed class CompilerManifestArtifactTests
                 tree.Sha256,
                 Is.EqualTo(WorkerProtocolJson.ComputeSha256(
                     Encoding.UTF8.GetBytes(source))));
+            Assert.That(tree.TextLength, Is.EqualTo(source.Length));
             Assert.That(
                 tree.Features.Select(static feature =>
                     new KeyValuePair<string, string>(
@@ -104,6 +105,7 @@ public sealed class CompilerManifestArtifactTests
             snapshot => snapshot.Options.Usings = [string.Empty],
             snapshot => snapshot.SyntaxTrees[0].Features = null!,
             snapshot => snapshot.SyntaxTrees[0].Sha256 = "invalid",
+            snapshot => snapshot.SyntaxTrees[0].TextLength = -1,
             snapshot => snapshot.References[0].Aliases = null!,
             snapshot => snapshot.References[0].Kind = "invalid"
         ];
@@ -303,7 +305,7 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
-    public void DefiniteEffectViolationCarriesSealedSourceWitness()
+    public void UnsupportedDefiniteEffectViolationFailsClosedWithoutReplay()
     {
         var artifact = CreateContractArtifact(
             """
@@ -321,24 +323,161 @@ public sealed class CompilerManifestArtifactTests
         {
             Assert.That(
                 evidence.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Refuted));
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence.Reason,
+                Is.EqualTo(
+                    WorkerClaimReason.CounterexampleNotReplayable));
             Assert.That(
                 evidence.Certainty,
                 Is.EqualTo(
-                    WorkerEffectEvidenceCertainty.DefiniteViolation));
-            Assert.That(evidence.Witness, Is.Not.Null);
-            Assert.That(evidence.Witness!.Kind, Is.EqualTo("explicit-throw"));
-            Assert.That(evidence.Witness.Location.Path, Does.EndWith(".cs"));
+                    WorkerEffectEvidenceCertainty.Unavailable));
+            Assert.That(evidence.Witness, Is.Null);
+            Assert.That(evidence.Replay, Is.Null);
             Assert.That(
                 CompilerManifestArtifactJson.DecodeCallables(artifact)
-                    .Single().EffectClaims.Single().Witness!.Detail,
-                Does.Contain("InvalidOperationException"));
+                    .Single().EffectClaims.Single().Reason,
+                Is.EqualTo(
+                    WorkerClaimReason.CounterexampleNotReplayable));
         }
+    }
 
-        evidence.Witness = null;
-        CompilerEffectClaimArtifactCodec.Seal(evidence);
-        Assert.Throws<InvalidDataException>((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(artifact)));
+    [Test]
+    public void AllocationEffectReplayRoundTripsCompilerEvidence()
+    {
+        const string expression = "new object()";
+        const string source =
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [ZeroAllocations]
+                internal static object Allocate() =>
+                    new object();
+            }
+            """;
+        var artifact = CreateContractArtifact(source);
+        var json = CompilerManifestArtifactJson.Serialize(artifact);
+        var roundTrip =
+            CompilerManifestArtifactJson.Deserialize(json);
+        var decodedTarget = CompilerManifestArtifactJson
+            .DecodeCallables(roundTrip)
+            .Single();
+        var evidence = decodedTarget.EffectClaims.Single();
+        var replay = evidence.Replay;
+        var @event = replay?.Events.Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                evidence.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(
+                evidence.Reason,
+                Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                evidence.Certainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty
+                        .DefiniteViolation));
+            Assert.That(evidence.Witness, Is.Not.Null);
+            Assert.That(
+                decodedTarget.Compilation,
+                Is.SameAs(roundTrip.Compilation));
+            Assert.That(replay, Is.Not.Null);
+            Assert.That(
+                replay?.PathKind,
+                Is.EqualTo(
+                    CompilerEffectReplayPathKind.Unconditional));
+            Assert.That(replay?.Events, Has.Length.EqualTo(1));
+            Assert.That(
+                replay?.ConstraintSha256,
+                Is.EqualTo(
+                    CompilerEffectClaimArtifactCodec
+                        .ComputeConstraintSha256(
+                            evidence.ContractKind,
+                            evidence.Constraint)));
+            Assert.That(
+                @event?.Kind,
+                Is.EqualTo(
+                    CompilerEffectReplayEventKind
+                        .ManagedObjectAllocation));
+            Assert.That(@event?.Ordinal, Is.Zero);
+            Assert.That(@event?.SyntaxTreeOrdinal, Is.Zero);
+            Assert.That(
+                @event?.SyntaxTreeSha256,
+                Is.EqualTo(
+                    roundTrip.Compilation.SyntaxTrees[0]
+                        .Sha256));
+            Assert.That(
+                @event?.SyntaxStart,
+                Is.EqualTo(
+                    source.IndexOf(
+                        expression,
+                        StringComparison.Ordinal)));
+            Assert.That(
+                @event?.SyntaxLength,
+                Is.EqualTo(expression.Length));
+            Assert.That(
+                @event?.OperationIdentitySha256,
+                Is.EqualTo(
+                    CompilerEffectClaimArtifactCodec
+                        .ComputeReplayOperationSha256(
+                            @event!)));
+            Assert.That(@event?.MemberIdentity, Is.Not.Empty);
+            Assert.That(
+                @event?.MemberDocumentationId,
+                Is.Not.Null.And.Not.Empty);
+            Assert.That(@event?.TypeIdentity, Is.Not.Empty);
+            Assert.That(
+                @event?.TypeDocumentationId,
+                Is.Not.Null.And.Not.Empty);
+            Assert.That(@event?.ScalarOperands, Is.Empty);
+            Assert.That(
+                @event?.ExactExceptionTypeHierarchy,
+                Is.Empty);
+            Assert.That(
+                evidence.Witness?.Detail,
+                Is.EqualTo(@event?.MemberDocumentationId));
+            Assert.That(json, Does.Not.Contain(expression));
+        }
+    }
+
+    [Test]
+    public void AllocationReplayRejectsResealedInvalidSourceSpans()
+    {
+        AssertRejected(static (_, _) => 0);
+        AssertRejected(static (treeLength, start) =>
+            treeLength - start + 1);
+        return;
+
+        static void AssertRejected(
+            Func<int, int, int> chooseLength)
+        {
+            var artifact = CreateContractArtifact(
+                """
+                using SharpProof.Attributes;
+                internal static class Subject {
+                    [ZeroAllocations]
+                    internal static object Allocate() =>
+                        new object();
+                }
+                """);
+            var evidence =
+                artifact.Callables.Single().EffectClaims.Single();
+            var @event = evidence.Replay!.Events.Single();
+            var length = chooseLength(
+                artifact.Compilation.SyntaxTrees[0].TextLength,
+                @event.SyntaxStart);
+            @event.SyntaxLength = length;
+            @event.Location.Length = length;
+            evidence.Witness!.Location.Length = length;
+            CompilerEffectClaimArtifactCodec.Seal(evidence);
+
+            Assert.Throws<JsonException>(
+                (Action)(() =>
+                    CompilerManifestArtifactJson.Serialize(
+                        artifact)));
+        }
     }
 
     [Test]

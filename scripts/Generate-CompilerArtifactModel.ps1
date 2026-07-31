@@ -495,8 +495,8 @@ foreach ($declaration in $declarations) {
 $envelope = Get-RequiredMember $schema 'artifactEnvelope' 'schema'
 if ([string](Get-RequiredMember $envelope 'schema' 'artifact envelope') -ne
         'SharpProof.CompilerManifest' -or
-    [int](Get-RequiredMember $envelope 'version' 'artifact envelope') -ne 8) {
-    throw 'The compiler-artifact envelope must remain schema version 8.'
+    [int](Get-RequiredMember $envelope 'version' 'artifact envelope') -ne 9) {
+    throw 'The compiler-artifact envelope must remain schema version 9.'
 }
 
 $catalogs = @(Get-RequiredMember $schema 'wireEnumCatalogs' 'schema')
@@ -543,8 +543,8 @@ $evidence = Get-RequiredMember $schema 'effectEvidence' 'schema'
 $domain = [string](Get-RequiredMember $evidence 'domain' 'effect evidence')
 $evidenceVersion = [int](Get-RequiredMember $evidence 'version' 'effect evidence')
 if ($domain -ne 'SharpProof.CompilerEffectClaimEvidence' -or
-    $evidenceVersion -ne 7) {
-    throw 'Compiler effect evidence must preserve domain version 7.'
+    $evidenceVersion -ne 8) {
+    throw 'Compiler effect evidence must preserve domain version 8.'
 }
 $unknownReasons = @(Get-RequiredMember `
     $evidence 'unknownReasons' 'effect evidence')
@@ -565,6 +565,23 @@ $combinedKind = [string](
 foreach ($kind in $capabilitiesKind, $exceptionsKind, $combinedKind) {
     Assert-Identifier $kind 'Effect evidence constraint kind'
 }
+$replay = Get-RequiredMember $evidence 'replay' 'effect evidence'
+$replayPathKind = [string](
+    Get-RequiredMember $replay 'pathKind' 'effect replay')
+Assert-Identifier $replayPathKind 'Effect replay path kind'
+$maximumReplayEvents = [int](
+    Get-RequiredMember $replay 'maximumEvents' 'effect replay')
+if ($maximumReplayEvents -ne 256) {
+    throw 'Compiler effect replay must preserve its 256-event bound.'
+}
+$supportedReplayEventKinds = @(
+    Get-RequiredMember $replay 'supportedEventKinds' 'effect replay')
+if ($supportedReplayEventKinds.Count -eq 0) {
+    throw 'Compiler effect replay must define supported event kinds.'
+}
+foreach ($kind in $supportedReplayEventKinds) {
+    Assert-Identifier ([string]$kind) 'Supported effect replay event kind'
+}
 if (-not [bool](Get-RequiredMember `
         $evidence 'sortAllowedExceptionTypes' 'effect evidence') -or
     -not [bool](Get-RequiredMember `
@@ -574,8 +591,16 @@ if (-not [bool](Get-RequiredMember `
 
 $modelLines.Add('')
 $modelLines.Add('internal static class CompilerEffectClaimArtifactCodec {')
-$modelLines.Add('    internal static void Seal(CompilerEffectClaimArtifact value) =>')
+$modelLines.Add('    internal static void Seal(CompilerEffectClaimArtifact value) {')
+$modelLines.Add('        if (value.Replay is { } replay) {')
+$modelLines.Add(
+    '            replay.ConstraintSha256 = ComputeConstraintSha256(value.ContractKind, value.Constraint);')
+$modelLines.Add('            foreach (var effectEvent in replay.Events ?? [])')
+$modelLines.Add(
+    '                effectEvent.OperationIdentitySha256 = ComputeReplayOperationSha256(effectEvent);')
+$modelLines.Add('        }')
 $modelLines.Add('        value.EvidenceSha256 = ComputeSha256(value);')
+$modelLines.Add('    }')
 $modelLines.Add('')
 $modelLines.Add('    internal static void Validate(CompilerEffectClaimArtifact value) {')
 $modelLines.Add('        if (value == null || string.IsNullOrWhiteSpace(value.ClaimId) ||')
@@ -588,6 +613,7 @@ $modelLines.Add(
     '            !WorkerProtocolJson.IsDefined(value.Certainty, WorkerEffectEvidenceCertainty.Unspecified) ||')
 $modelLines.Add(
     '            !HasValidConstraint(value.ContractKind, value.Constraint) ||')
+$modelLines.Add('            !HasValidReplay(value) ||')
 $modelLines.Add('            !HasValidOutcome(value) ||')
 $modelLines.Add('            value.EvidenceSha256 != ComputeSha256(value))')
 $modelLines.Add(
@@ -598,12 +624,12 @@ $modelLines.Add('    private static bool HasValidOutcome(CompilerEffectClaimArti
 $modelLines.Add(
     '        WorkerProtocolJson.HasValidEffectCertainty(value.Outcome, value.Reason, value.Certainty) &&')
 $modelLines.Add(
-    '        (value.Outcome, value.Reason, value.Certainty, value.Witness) switch {')
+    '        (value.Outcome, value.Reason, value.Certainty, value.Witness, value.Replay) switch {')
 $modelLines.Add(
-    '            (WorkerClaimOutcome.Proven, WorkerClaimReason.None, _, null) => true,')
+    '            (WorkerClaimOutcome.Proven, WorkerClaimReason.None, _, null, null) => true,')
 $modelLines.Add('            (WorkerClaimOutcome.Refuted, WorkerClaimReason.None,')
 $modelLines.Add(
-    '                _, { } witness) => WorkerProtocolJson.HasValidEffectWitness(witness) &&')
+    '                _, { } witness, { }) => WorkerProtocolJson.HasValidEffectWitness(witness) &&')
 $modelLines.Add(
     '                    WorkerProtocolJson.HasValidLocation(witness.Location),')
 $modelLines.Add('            (WorkerClaimOutcome.Unknown,')
@@ -612,7 +638,7 @@ for ($index = 0; $index -lt $unknownReasons.Count; $index++) {
     $suffix = if ($index -lt $unknownReasons.Count - 1) { ' or' } else { ',' }
     $modelLines.Add("                WorkerClaimReason.$reason$suffix")
 }
-$modelLines.Add('                _, null) => true,')
+$modelLines.Add('                _, null, null) => true,')
 $modelLines.Add('            _ => false')
 $modelLines.Add('        };')
 $modelLines.Add('')
@@ -645,6 +671,111 @@ $modelLines.Add('        };')
 $modelLines.Add('    }')
 $modelLines.Add('')
 $modelLines.Add(
+    '    private static bool HasValidReplay(CompilerEffectClaimArtifact value) {')
+$modelLines.Add('        var replay = value.Replay;')
+$modelLines.Add('        if (replay == null)')
+$modelLines.Add('            return value.Outcome != WorkerClaimOutcome.Refuted;')
+$modelLines.Add('        if (value.Outcome != WorkerClaimOutcome.Refuted ||')
+$modelLines.Add(
+    "            replay.PathKind != CompilerEffectReplayPathKind.$replayPathKind ||")
+$modelLines.Add(
+    "            replay.Events is not { Length: > 0 and <= $maximumReplayEvents } ||")
+$modelLines.Add(
+    '            replay.ConstraintSha256 != ComputeConstraintSha256(value.ContractKind, value.Constraint))')
+$modelLines.Add('            return false;')
+$modelLines.Add('        return replay.Events.Select((item, index) =>')
+$modelLines.Add('                HasValidReplayEvent(item, index)).All(static valid => valid);')
+$modelLines.Add('    }')
+$modelLines.Add('')
+$modelLines.Add(
+    '    private static bool HasValidReplayEvent(CompilerEffectReplayEventArtifact? value, int ordinal) {')
+$supportedKindExpression = ($supportedReplayEventKinds |
+    ForEach-Object { "CompilerEffectReplayEventKind.$_" }) -join ' or '
+$modelLines.Add('        if (value == null || value.Ordinal != ordinal ||')
+$modelLines.Add("            value.Kind is not ($supportedKindExpression) ||")
+$modelLines.Add('            value.SyntaxTreeOrdinal < 0 ||')
+$modelLines.Add(
+    '            !WorkerProtocolJson.IsSha256(value.SyntaxTreeSha256) ||')
+$modelLines.Add('            value.SyntaxStart < 0 || value.SyntaxLength <= 0 ||')
+$modelLines.Add(
+    '            value.SyntaxStart > int.MaxValue - value.SyntaxLength ||')
+$modelLines.Add(
+    '            value.OperationIdentitySha256 != ComputeReplayOperationSha256(value) ||')
+$modelLines.Add('            string.IsNullOrWhiteSpace(value.TypeIdentity) ||')
+$modelLines.Add(
+    '            !HasOptionalText(value.MemberDocumentationId) ||')
+$modelLines.Add(
+    '            !HasOptionalText(value.TypeDocumentationId) ||')
+$modelLines.Add(
+    '            !HasOptionalText(value.SpecWitnessIdentifier) ||')
+$modelLines.Add('            value.ScalarOperands is not { Length: 0 } ||')
+$modelLines.Add(
+    '            value.ExactExceptionTypeHierarchy is not { Length: 0 } ||')
+$modelLines.Add(
+    '            !WorkerProtocolJson.HasValidLocation(value.Location) ||')
+$modelLines.Add('            value.Location.Start != value.SyntaxStart ||')
+$modelLines.Add('            value.Location.Length != value.SyntaxLength)')
+$modelLines.Add('            return false;')
+$modelLines.Add('        return value.Kind switch {')
+$modelLines.Add(
+    '            CompilerEffectReplayEventKind.ManagedObjectAllocation =>')
+$modelLines.Add('                !string.IsNullOrWhiteSpace(value.MemberIdentity) &&')
+$modelLines.Add('                value.SpecWitnessIdentifier == null,')
+$modelLines.Add(
+    '            CompilerEffectReplayEventKind.ManagedArrayAllocation =>')
+$modelLines.Add('                string.IsNullOrEmpty(value.MemberIdentity) &&')
+$modelLines.Add('                value.MemberDocumentationId == null &&')
+$modelLines.Add('                value.SpecWitnessIdentifier == null,')
+$modelLines.Add('            _ => false')
+$modelLines.Add('        };')
+$modelLines.Add('    }')
+$modelLines.Add('')
+$modelLines.Add('    private static bool HasOptionalText(string? value) =>')
+$modelLines.Add('        value == null || !string.IsNullOrWhiteSpace(value);')
+$modelLines.Add('')
+$modelLines.Add('    internal static string ComputeConstraintSha256(')
+$modelLines.Add('        WorkerEffectContractKind kind,')
+$modelLines.Add('        CompilerEffectConstraintArtifact constraint) {')
+$modelLines.Add('        if (constraint == null)')
+$modelLines.Add('            throw new ArgumentNullException(nameof(constraint));')
+$modelLines.Add('        using var hash = new CanonicalHashWriter();')
+$modelLines.Add(
+    '        hash.Add("SharpProof.CompilerEffectReplayConstraint", 1, kind,')
+$modelLines.Add(
+    '            constraint.AllowedEffects, constraint.AllowedCapabilities);')
+$modelLines.Add('        foreach (var type in (constraint.AllowedExceptionTypes ?? [])')
+$modelLines.Add(
+    '                     .OrderBy(static item => item, StringComparer.Ordinal))')
+$modelLines.Add('            hash.Add(type);')
+$modelLines.Add('        return hash.Finish();')
+$modelLines.Add('    }')
+$modelLines.Add('')
+$modelLines.Add('    internal static string ComputeReplayOperationSha256(')
+$modelLines.Add('        CompilerEffectReplayEventArtifact value) {')
+$modelLines.Add('        if (value == null)')
+$modelLines.Add('            throw new ArgumentNullException(nameof(value));')
+$modelLines.Add('        var location = value.Location;')
+$modelLines.Add('        using var hash = new CanonicalHashWriter();')
+$modelLines.Add(
+    '        hash.Add("SharpProof.CompilerEffectReplayOperation", 1, value.Kind,')
+$modelLines.Add(
+    '            value.SyntaxTreeOrdinal, value.SyntaxTreeSha256, value.SyntaxStart,')
+$modelLines.Add(
+    '            value.SyntaxLength, value.MemberIdentity, value.MemberDocumentationId,')
+$modelLines.Add(
+    '            value.TypeIdentity, value.TypeDocumentationId, value.SpecWitnessIdentifier);')
+$modelLines.Add('        hash.Add((value.ScalarOperands ?? []).Length);')
+$modelLines.Add('        foreach (var operand in value.ScalarOperands ?? [])')
+$modelLines.Add('            hash.Add(operand);')
+$modelLines.Add('        hash.Add((value.ExactExceptionTypeHierarchy ?? []).Length);')
+$modelLines.Add('        foreach (var type in value.ExactExceptionTypeHierarchy ?? [])')
+$modelLines.Add('            hash.Add(type);')
+$modelLines.Add('        return hash.Add(location?.Path, location?.Start ?? -1,')
+$modelLines.Add('            location?.Length ?? -1, location?.Line ?? -1,')
+$modelLines.Add('            location?.Column ?? -1).Finish();')
+$modelLines.Add('    }')
+$modelLines.Add('')
+$modelLines.Add(
     '    private static string ComputeSha256(CompilerEffectClaimArtifact value) {')
 $modelLines.Add('        var witness = value.Witness;')
 $modelLines.Add('        var constraint = value.Constraint;')
@@ -669,6 +800,37 @@ $modelLines.Add(
 $modelLines.Add(
     '                     .OrderBy(static item => item, StringComparer.Ordinal))')
 $modelLines.Add('            hash.Add(type);')
+$modelLines.Add('        var replay = value.Replay;')
+$modelLines.Add('        hash.Add(replay != null,')
+$modelLines.Add(
+    '            replay?.PathKind ?? CompilerEffectReplayPathKind.Unspecified,')
+$modelLines.Add('            replay?.ConstraintSha256, replay?.Events?.Length ?? -1);')
+$modelLines.Add('        foreach (var effectEvent in replay?.Events ?? []) {')
+$modelLines.Add('            hash.Add(effectEvent.Ordinal, effectEvent.Kind,')
+$modelLines.Add(
+    '                effectEvent.SyntaxTreeOrdinal, effectEvent.SyntaxTreeSha256,')
+$modelLines.Add(
+    '                effectEvent.SyntaxStart, effectEvent.SyntaxLength,')
+$modelLines.Add(
+    '                effectEvent.OperationIdentitySha256, effectEvent.MemberIdentity,')
+$modelLines.Add(
+    '                effectEvent.MemberDocumentationId, effectEvent.TypeIdentity,')
+$modelLines.Add(
+    '                effectEvent.TypeDocumentationId, effectEvent.SpecWitnessIdentifier);')
+$modelLines.Add('            hash.Add((effectEvent.ScalarOperands ?? []).Length);')
+$modelLines.Add('            foreach (var operand in effectEvent.ScalarOperands ?? [])')
+$modelLines.Add('                hash.Add(operand);')
+$modelLines.Add(
+    '            hash.Add((effectEvent.ExactExceptionTypeHierarchy ?? []).Length);')
+$modelLines.Add(
+    '            foreach (var type in effectEvent.ExactExceptionTypeHierarchy ?? [])')
+$modelLines.Add('                hash.Add(type);')
+$modelLines.Add('            hash.Add(effectEvent.Location?.Path,')
+$modelLines.Add('                effectEvent.Location?.Start ?? -1,')
+$modelLines.Add('                effectEvent.Location?.Length ?? -1,')
+$modelLines.Add('                effectEvent.Location?.Line ?? -1,')
+$modelLines.Add('                effectEvent.Location?.Column ?? -1);')
+$modelLines.Add('        }')
 $modelLines.Add(
     '        return hash.Add(witness?.Location.Path, witness?.Location.Start ?? -1,')
 $modelLines.Add(

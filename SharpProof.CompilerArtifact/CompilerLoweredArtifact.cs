@@ -91,11 +91,18 @@ internal static class CompilerLoweredArtifact
         return artifact;
     }
     internal static ImmutableArray<CompilerCallablePreparation> Decode(
-        CompilerCallableArtifact[] artifacts, WorkerClaimManifest manifest)
+        CompilerCallableArtifact[] artifacts,
+        WorkerClaimManifest manifest,
+        CompilerCompilationSnapshot compilation)
     {
         if (artifacts == null)
         {
             throw new InvalidDataException("The lowered callable payload is missing.");
+        }
+
+        if (compilation == null)
+        {
+            throw new InvalidDataException("The compiler compilation evidence is missing.");
         }
 
         var callables = manifest.Callables.ToDictionary(static item => item.CallableId, StringComparer.Ordinal);
@@ -120,14 +127,15 @@ internal static class CompilerLoweredArtifact
                 throw new InvalidDataException("A lowered callable claim list does not equal the manifest.");
             }
 
-            result.Add(Decode(artifact, entry, targetClaims));
+            result.Add(Decode(artifact, entry, targetClaims, compilation));
         }
         return result.MoveToImmutable();
     }
     private static CompilerCallablePreparation Decode(
         CompilerCallableArtifact artifact,
         WorkerCallableManifestEntry entry,
-        ImmutableArray<WorkerClaimManifestEntry> claims)
+        ImmutableArray<WorkerClaimManifestEntry> claims,
+        CompilerCompilationSnapshot compilation)
     {
         if (!Enum.IsDefined(typeof(WorkerClaimReason), artifact.FailureReason) ||
             artifact.FailureReason == WorkerClaimReason.Unspecified)
@@ -146,7 +154,8 @@ internal static class CompilerLoweredArtifact
             return new CompilerCallablePreparation(
                 new IrFactory(), entry, [], [], artifact.FailureReason, null)
             {
-                EffectClaims = DecodeEffects(artifact, claims)
+                EffectClaims = DecodeEffects(artifact, claims),
+                Compilation = compilation
             };
         }
         if (artifact.Graph == null || artifact.Clauses == null || artifact.Variables == null)
@@ -237,7 +246,8 @@ internal static class CompilerLoweredArtifact
         return new CompilerCallablePreparation(
             decoded.Factory, entry, clauses, variables, WorkerClaimReason.None, body)
         {
-            EffectClaims = DecodeEffects(artifact, claims)
+            EffectClaims = DecodeEffects(artifact, claims),
+            Compilation = compilation
         };
     }
     private static ImmutableArray<CompilerEffectClaimArtifact> DecodeEffects(

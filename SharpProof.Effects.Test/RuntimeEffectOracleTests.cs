@@ -433,7 +433,7 @@ public sealed class RuntimeEffectOracleTests
                 Is.EqualTo(EffectUncertainty.UnmodeledCall));
             Assert.That(
                 result.DirectWitnesses.Select(static witness => witness.Kind),
-                Is.EqualTo(["managed-allocation"]));
+                Is.Empty);
         }
     }
 

@@ -55,6 +55,7 @@ The implementation remains the authority for enumerated surfaces:
 | [Acceptance contract](../eng/acceptance/README.md) | Active | Defines the release checks for the 1.0 preview. |
 | [Release gates](../SharpProof.Gates/README.md) | Active | Documents the corpus, metamorphic, performance, and cancellation runners. |
 | [Open-source corpus](../SharpProof.Gates/Corpus/README.md) | Active | Records corpus provenance, licensing, instrumentation, and update procedure. |
+| [2026-07-30 allocation effect replay](soundness-notes/2026-07-30-allocation-effect-replay.md) | Dated evidence | Records the independently interpreted allocation-effect refutation boundary and executable evidence. |
 | [2026-07-29 formatting-neutral source metrics](soundness-notes/2026-07-29-formatting-neutral-source-metrics.md) | Dated evidence | Records removal of compression-oriented formatting and LOC gates. |
 | [2026-07-27 product bug sweep](soundness-notes/2026-07-27-product-sweep.md) | Dated evidence | Records analyzer, contract, effect, and worker adversarial fixes plus exact validation evidence. |
 | [2026-07-25 hardening audit](soundness-notes/2026-07-25-hardening.md) | Dated evidence | Records one completed hardening tranche and its remaining checkpoints. |
@@ -66,11 +67,11 @@ the current coverage inventory or normative semantics.
 ## Known production gaps
 
 During Windows verification, the production analyzer emits a deterministic
-schema-8 compiler artifact from the final post-generator Roslyn `Compilation`. It
-contains the selected-claim manifest and portable lowered whole-body CFG/IR for
-supported selected callables, plus bound contract/spec metadata, compiler
-diagnostics, generated-tree hashes, bounded options, mapped locations, and
-identity/provenance evidence. It contains no source text.
+schema-9 compiler artifact from the final post-generator Roslyn
+`Compilation`. It contains the selected-claim manifest and portable lowered
+whole-body CFG/IR for supported selected callables, plus bound contract/spec
+metadata, compiler diagnostics, generated-tree hashes, bounded options, mapped
+locations, and identity/provenance evidence. It contains no source text.
 
 The worker validates and hydrates that closed artifact without constructing a
 Roslyn compilation or rereading reference files. Exact manifest/lowered
@@ -82,21 +83,24 @@ production-plan Step 4 is complete for the bounded verifier subset.
 Independent whole-body postcondition-counterexample replay is implemented for
 the admitted scalar program subset. The proof kernel checks exact model closure
 and the lowered assumptions/goal before the worker independently executes the
-compiler-produced whole-body CFG. Effect violations remain fail-closed until
-the compiler artifact carries an independently replayable effect trace. The
-three-package split, portable SourceLink symbols, package
-validation, deterministic hashes, SPDX 2.3 package/component SBOM generation,
-separately permissioned GitHub build/SBOM attestations, immutable tagged-byte
-validation, trusted-publishing workflow,
-package-backed sample matrix, and exact public API XML coverage are
-implemented. The tag workflow requires checked-in version equality, master
-ancestry, and predecessor-tag order, then allowlists private `preview.1`,
-public `preview.2`, public `rc.1`, and stable `1.0.0` promotion of the
-already-tested bytes. Publication preflights every main package and fails if
-the version already exists; duplicate skipping is never used. Main and symbol
-packages are then pushed separately in dependency order. A symbol collision or
-partial publication requires a new version. Deterministic SARIF 2.1.0
-projection is available as an opt-in verifier output. Owner configuration of
+compiler-produced whole-body CFG. Schema 9 also carries an independently
+replayable event for an unconditional definite managed object/array allocation.
+The worker can use it to refute `ZeroAllocations` or an `EffectContract`
+excluding `Allocates`; other effect candidates still fail closed as typed
+`Unknown`. Effect results remain noncacheable, and worker protocol 9 and cache
+schema 11 are unchanged. The three-package split, portable SourceLink symbols,
+package validation, deterministic hashes, SPDX 2.3 package/component SBOM
+generation, separately permissioned GitHub build/SBOM attestations, immutable
+tagged-byte validation, trusted-publishing workflow, package-backed sample
+matrix, and exact public API XML coverage are implemented. The tag workflow
+requires checked-in version equality, master ancestry, and predecessor-tag
+order, then allowlists private `preview.1`, public `preview.2`, public `rc.1`,
+and stable `1.0.0` promotion of the already-tested bytes. Publication
+preflights every main package and fails if the version already exists;
+duplicate skipping is never used. Main and symbol packages are then pushed
+separately in dependency order. A symbol collision or partial publication
+requires a new version. Deterministic SARIF 2.1.0 projection is available as an
+opt-in verifier output. Owner configuration of
 protected release environments and tags, pilot-library evidence, the first
 private/public NuGet publications, and the remaining release reviews are
 future work. Current behavior and limits are recorded in

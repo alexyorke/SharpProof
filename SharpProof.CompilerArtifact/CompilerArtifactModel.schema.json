@@ -4,7 +4,7 @@
   "jsonNamingPolicy": "camelCase",
   "artifactEnvelope": {
     "schema": "SharpProof.CompilerManifest",
-    "version": 8
+    "version": 9
   },
   "declarations": [
     {
@@ -21,7 +21,7 @@
           "accessibility": "internal",
           "name": "Current",
           "type": "int",
-          "value": 8
+          "value": 9
         }
       ]
     },
@@ -144,6 +144,16 @@
           "set": "init",
           "default": {
             "kind": "emptyArray"
+          }
+        },
+        {
+          "kind": "property",
+          "accessibility": "internal",
+          "name": "Compilation",
+          "type": "CompilerCompilationSnapshot",
+          "set": "init",
+          "default": {
+            "kind": "new"
           }
         }
       ]
@@ -1298,6 +1308,16 @@
           }
         },
         {
+          "name": "Replay",
+          "jsonName": "replay",
+          "type": "CompilerEffectReplayArtifact?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
           "name": "Evidence",
           "jsonName": "evidence",
           "type": "string",
@@ -1351,6 +1371,254 @@
           "set": "set",
           "default": {
             "kind": "emptyArray"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "CompilerEffectReplayPathKind",
+      "members": [
+        {
+          "name": "Unspecified",
+          "value": 0
+        },
+        {
+          "name": "Unconditional",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "CompilerEffectReplayEventKind",
+      "members": [
+        {
+          "name": "Unspecified",
+          "value": 0
+        },
+        {
+          "name": "ManagedObjectAllocation",
+          "value": 1
+        },
+        {
+          "name": "ManagedArrayAllocation",
+          "value": 2
+        },
+        {
+          "name": "ExplicitThrow",
+          "value": 3
+        },
+        {
+          "name": "ReceiverFieldRead",
+          "value": 4
+        },
+        {
+          "name": "ReceiverFieldWrite",
+          "value": 5
+        },
+        {
+          "name": "MonitorCall",
+          "value": 6
+        },
+        {
+          "name": "EmptyLock",
+          "value": 7
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerEffectReplayArtifact",
+      "properties": [
+        {
+          "name": "PathKind",
+          "jsonName": "pathKind",
+          "type": "CompilerEffectReplayPathKind",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "ConstraintSha256",
+          "jsonName": "constraintSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Events",
+          "jsonName": "events",
+          "type": "CompilerEffectReplayEventArtifact[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerEffectReplayEventArtifact",
+      "properties": [
+        {
+          "name": "Ordinal",
+          "jsonName": "ordinal",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "Kind",
+          "jsonName": "kind",
+          "type": "CompilerEffectReplayEventKind",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "SyntaxTreeOrdinal",
+          "jsonName": "syntaxTreeOrdinal",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "SyntaxTreeSha256",
+          "jsonName": "syntaxTreeSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "SyntaxStart",
+          "jsonName": "syntaxStart",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "SyntaxLength",
+          "jsonName": "syntaxLength",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "OperationIdentitySha256",
+          "jsonName": "operationIdentitySha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "MemberIdentity",
+          "jsonName": "memberIdentity",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "MemberDocumentationId",
+          "jsonName": "memberDocumentationId",
+          "type": "string?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "TypeIdentity",
+          "jsonName": "typeIdentity",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "TypeDocumentationId",
+          "jsonName": "typeDocumentationId",
+          "type": "string?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "SpecWitnessIdentifier",
+          "jsonName": "specWitnessIdentifier",
+          "type": "string?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "ScalarOperands",
+          "jsonName": "scalarOperands",
+          "type": "long[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "ExactExceptionTypeHierarchy",
+          "jsonName": "exactExceptionTypeHierarchy",
+          "type": "string[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "Location",
+          "jsonName": "location",
+          "type": "WorkerSourceLocation",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "new"
           }
         }
       ]
@@ -1982,6 +2250,16 @@
           }
         },
         {
+          "name": "TextLength",
+          "jsonName": "textLength",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
           "name": "LanguageVersion",
           "jsonName": "languageVersion",
           "type": "string",
@@ -2357,9 +2635,10 @@
   ],
   "effectEvidence": {
     "domain": "SharpProof.CompilerEffectClaimEvidence",
-    "version": 7,
+    "version": 8,
     "unknownReasons": [
       "UnsupportedContract",
+      "CounterexampleNotReplayable",
       "EffectSummaryIncomplete",
       "EffectContractNotEstablished"
     ],
@@ -2367,6 +2646,14 @@
       "capabilities": "AllowedCapabilities",
       "exceptions": "AllowedExceptions",
       "combined": "EffectContract"
+    },
+    "replay": {
+      "pathKind": "Unconditional",
+      "maximumEvents": 256,
+      "supportedEventKinds": [
+        "ManagedObjectAllocation",
+        "ManagedArrayAllocation"
+      ]
     },
     "sortAllowedExceptionTypes": true,
     "sortWitnessExceptionHierarchy": true

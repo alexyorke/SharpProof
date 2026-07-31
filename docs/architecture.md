@@ -194,7 +194,7 @@ models are not cacheable.
 
 During Windows verification, the build-only compiler collector observes the
 final post-generator Roslyn `Compilation` and atomically emits compiler
-artifact schema version 8. The compiler owns selection, contract/spec binding,
+artifact schema version 9. The compiler owns selection, contract/spec binding,
 effect evaluation, and body lowering. Every selected callable has either a
 typed failure record or a portable graph containing its bound clauses,
 canonical variables, whole-body CFG/IR, body start, initial environment,
@@ -202,11 +202,17 @@ parameter mappings, and exact API-spec witness metadata. Every selected
 effect-attribute occurrence also has one compiler-sealed `Proven`, candidate
 `Refuted`, or typed `Unknown` evidence record. Repeated attributes retain
 distinct claim IDs while sharing their effective combined
-constraint/evidence. Because the artifact does not yet carry an independently
-executable effect path, the worker fails every compiler candidate `Refuted`
-closed as `Unknown(CounterexampleReplayFailed)` rather than publishing an
-effect refutation. Callable IDs, claim ownership, and user-assumption IDs
+constraint/evidence. Schema 9 additionally carries an ordered,
+compiler-neutral replay event for an unconditional definite managed object or
+array allocation. It seals the selected-constraint hash, semantic-operation
+hash, exact compiler tree/span identity, type/member identity, mapped location,
+and expected witness. Callable IDs, claim ownership, and user-assumption IDs
 remain tied to the sealed manifest.
+The semantic-operation hash is a canonical consistency check over those
+compiler-produced event fields, not an independent source binding. Compiler
+contract discovery, effect analysis, and event lowering are therefore
+explicit trusted-computing-base components; the worker independently owns
+event interpretation and constraint comparison.
 
 The artifact also contains compiler error diagnostics with mapped locations,
 handwritten and generated tree hashes, raw and effective per-tree preprocessor
@@ -227,7 +233,10 @@ expression depth to equal the request budget, and decodes the portable graph.
 Exact manifest/lowered-callable equality, claim lists, assumption declarations,
 and graph indices are checked before cache lookup or backend creation.
 Compiler diagnostics fail as `CompilationFailure`; malformed lowered evidence
-or option mismatch fails as `CompilerManifestMismatch`.
+or option mismatch fails as `CompilerManifestMismatch`. That structural gate
+also rejects a changed effect-event order, source tree/span, event or
+constraint hash, identity field, or witness relationship before semantic
+replay.
 
 The worker project contains no direct Roslyn dependency and performs no
 compiler reconstruction or source parsing. It does not reread reference files.
@@ -240,15 +249,31 @@ generated output is covered by its tree hashes, manifest entries, and lowered
 callables.
 
 This closes both the compiler-to-worker lowered-artifact cutover and the
-independent whole-body replay gate for the bounded verifier subset. Replay
-executes only the concrete CFG path selected by the model, so unsupported
-operations or spec-modeled calls on other paths do not block a refutation. If
-a modeled call is executed, the candidate becomes `Unknown` with
-`CounterexampleNotReplayable`; other unsupported or inconsistent replay state
-is a fatal `CounterexampleReplayFailed`. Result JSON includes only canonical
-user-model variables, not temporary lowered variables. Optional deterministic
-SARIF 2.1.0 projects the validated response under the same atomic publication
-boundary and does not participate in semantic verification.
+independent whole-body postcondition-replay gate for the bounded verifier
+subset. Postcondition replay executes only the concrete CFG path selected by
+the model, so unsupported operations or spec-modeled calls on other paths do
+not block a refutation. If a modeled call is executed, the candidate becomes
+`Unknown` with `CounterexampleNotReplayable`; other unsupported or
+inconsistent replay state is a fatal `CounterexampleReplayFailed`. Result JSON
+includes only canonical user-model variables, not temporary lowered variables.
+
+Effect replay is a separate worker-owned interpreter and does not invoke SMT
+or execute user code. It currently derives only `Allocates` from the admitted
+unconditional object/array event, then compares that observation against the
+selected constraint and sealed witness. It can refute `ZeroAllocations` and an
+`EffectContract` excluding `Allocates`; observable `EnforcePure` permits fresh
+allocation. Explicit throw, receiver field access, empty `lock`, exact
+`Monitor`, static-initialization-sensitive allocation, and other unsupported
+direct candidates become `Unknown(CounterexampleNotReplayable)`.
+Conditional/path-dependent and may-only conflicts remain
+`Unknown(EffectContractNotEstablished)`. A semantic replay disagreement
+becomes `Unknown(CounterexampleReplayFailed)` and fails the run. Effect results
+remain noncacheable. Worker protocol version 9 and cache schema version 11 did
+not change with artifact schema 9.
+
+Optional deterministic SARIF 2.1.0 projects the validated response under the
+same atomic publication boundary and does not participate in semantic
+verification.
 
 ## Activation and release gates
 

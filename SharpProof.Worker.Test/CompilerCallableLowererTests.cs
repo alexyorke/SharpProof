@@ -140,7 +140,7 @@ public sealed class CompilerCallableLowererTests
             Assert.That(byReference.IsSuccess, Is.False);
             Assert.That(
                 byReference.FailureReason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+                Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
         }
     }
 

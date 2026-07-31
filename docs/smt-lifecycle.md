@@ -45,6 +45,18 @@ build under every policy.
 Project timeout and caller cancellation use the separate `TimedOut` and
 `Canceled` run statuses.
 
+Effect refutation replay is independent of this SMT lifecycle. Compiler
+artifact schema 9 can carry one unconditional definite managed object/array
+allocation event. A worker-owned interpreter validates the event identity,
+source-tree span, selected constraint, and sealed witness, then derives
+`Allocates` without trusting compiler effect bits or executing user code. That
+evidence can refute `ZeroAllocations` or an `EffectContract` excluding
+`Allocates`; observable `EnforcePure` permits fresh allocation. Unsupported
+definite effect candidates become `CounterexampleNotReplayable`, while an
+otherwise valid semantic replay disagreement becomes the fatal
+`CounterexampleReplayFailed`. Effect results remain outside cache schema 11.
+Protocol version 9 is unchanged.
+
 `SharpProofVerifyPolicy` controls whether otherwise valid incomplete selected
 analysis is informational, warning, or error SP0047 output.
 `SharpProofAssumptionPolicy` similarly controls SP0048 for declared user or

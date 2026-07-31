@@ -158,13 +158,13 @@ public sealed class ExceptionIdentityReplayTests
             Assert.That(aliasedEvidence.Witness, Is.Null);
             Assert.That(
                 frameworkEvidence.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(frameworkEvidence.Witness, Is.Not.Null);
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
-                frameworkEvidence.Witness!.ExactExceptionTypeHierarchy,
-                Is.Not.Empty.And.All.Contains("Version=")
-                    .And.All.Contains("Culture=")
-                    .And.All.Contains("PublicKeyToken="));
+                frameworkEvidence.Reason,
+                Is.EqualTo(
+                    WorkerClaimReason.CounterexampleNotReplayable));
+            Assert.That(frameworkEvidence.Witness, Is.Null);
+            Assert.That(frameworkEvidence.Replay, Is.Null);
         }
 
         const string claimId = "effect-exception-identity";
@@ -172,30 +172,15 @@ public sealed class ExceptionIdentityReplayTests
         {
             ClaimId = claimId,
             ContractKind = WorkerEffectContractKind.AllowedExceptions,
-            Outcome = WorkerClaimOutcome.Refuted,
-            Reason = WorkerClaimReason.None,
-            Certainty = WorkerEffectEvidenceCertainty.DefiniteViolation,
+            Outcome = WorkerClaimOutcome.Unknown,
+            Reason = WorkerClaimReason.CounterexampleNotReplayable,
+            Certainty = WorkerEffectEvidenceCertainty.Unavailable,
             Constraint = new CompilerEffectConstraintArtifact
             {
                 AllowedExceptionTypes = [allowedIdentity]
             },
-            Witness = new WorkerEffectViolationWitness
-            {
-                Kind = "explicit-throw",
-                Detail = thrownIdentity,
-                Effects = WorkerEffectSet.Throws,
-                ExactExceptionTypeHierarchy =
-                    CompilerExceptionTypeIdentity.EncodeHierarchy(thrown),
-                Location = new WorkerSourceLocation
-                {
-                    Path = "Subject.cs",
-                    Start = 0,
-                    Length = 1,
-                    Line = 1,
-                    Column = 1
-                }
-            },
-            Evidence = "canonical-exception-identity"
+            Evidence =
+                "canonical-exception-identity:" + thrownIdentity
         };
         CompilerEffectClaimArtifactCodec.Seal(evidence);
         var target = new CompilerCallablePreparation(
@@ -221,14 +206,18 @@ public sealed class ExceptionIdentityReplayTests
             Assert.That(
                 result.Reason,
                 Is.EqualTo(
-                    WorkerClaimReason.CounterexampleReplayFailed));
+                    WorkerClaimReason.CounterexampleNotReplayable));
             Assert.That(
                 result.EffectCertainty,
                 Is.EqualTo(WorkerEffectEvidenceCertainty.Unavailable));
             Assert.That(result.EffectWitness, Is.Null);
             Assert.That(
-                evidence.Witness!.ExactExceptionTypeHierarchy,
-                Does.Contain(thrownIdentity).And.Not.Contain(allowedIdentity));
+                evidence.Constraint.AllowedExceptionTypes,
+                Does.Contain(allowedIdentity)
+                    .And.Not.Contain(thrownIdentity));
+            Assert.That(
+                evidence.Evidence,
+                Does.Contain(thrownIdentity));
             Assert.That(result.Model, Is.Empty);
         }
     }
@@ -279,13 +268,15 @@ public sealed class ExceptionIdentityReplayTests
                 Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 mismatched.Reason,
-                Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
+                Is.EqualTo(
+                    WorkerClaimReason.CounterexampleNotReplayable));
             Assert.That(
                 matched.Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 matched.Reason,
-                Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
+                Is.EqualTo(
+                    WorkerClaimReason.CounterexampleNotReplayable));
         }
 
         WorkerClaimResult Replay(string allowedExceptionType)
@@ -295,30 +286,17 @@ public sealed class ExceptionIdentityReplayTests
             {
                 ClaimId = claimId,
                 ContractKind = WorkerEffectContractKind.AllowedExceptions,
-                Outcome = WorkerClaimOutcome.Refuted,
-                Reason = WorkerClaimReason.None,
-                Certainty = WorkerEffectEvidenceCertainty.DefiniteViolation,
+                Outcome = WorkerClaimOutcome.Unknown,
+                Reason = WorkerClaimReason.CounterexampleNotReplayable,
+                Certainty =
+                    WorkerEffectEvidenceCertainty.Unavailable,
                 Constraint = new CompilerEffectConstraintArtifact
                 {
                     AllowedExceptionTypes = [allowedExceptionType]
                 },
-                Witness = new WorkerEffectViolationWitness
-                {
-                    Kind = "explicit-throw",
-                    Detail = thrownIdentity,
-                    Effects = WorkerEffectSet.Throws,
-                    ExactExceptionTypeHierarchy =
-                        CompilerExceptionTypeIdentity.EncodeHierarchy(thrown),
-                    Location = new WorkerSourceLocation
-                    {
-                        Path = "Subject.cs",
-                        Start = 0,
-                        Length = 1,
-                        Line = 1,
-                        Column = 1
-                    }
-                },
-                Evidence = "constructed-generic-exception"
+                Evidence =
+                    "constructed-generic-exception:" +
+                    thrownIdentity
             };
             CompilerEffectClaimArtifactCodec.Seal(evidence);
             var target = new CompilerCallablePreparation(

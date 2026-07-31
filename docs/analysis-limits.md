@@ -99,9 +99,10 @@ process boundary.
 
 `SharpProofVerifyMaximumExpressionDepth` is also a compiler-visible property.
 The collector parses it, enforces the 1-through-256 range, and seals it into the
-schema-8 compiler artifact. The launcher supplies the same property as the worker request
-budget. A mismatch is `CompilerManifestMismatch` and stops before cache lookup
-or backend creation; neither side may silently use a different depth.
+schema-9 compiler artifact. The launcher supplies the same property as the
+worker request budget. A mismatch is `CompilerManifestMismatch` and stops
+before cache lookup or backend creation; neither side may silently use a
+different depth.
 
 Every budget and every artifact byte participates in worker input and cache
 identity. The artifact contains portable lowered callables plus a bounded
@@ -189,7 +190,7 @@ is the observed runner total rather than the requested budget.
 | IDE edit maximum | At most 250 ms |
 
 The active contract also fixes protocol version 9, cache schema version 11,
-claim-manifest schema version 4, and compiler artifact schema version 8, along
+claim-manifest schema version 4, and compiler artifact schema version 9, along
 with exact proof-kernel and component TCB path inventories, formatting-neutral
 Roslyn complexity ratchets, and the reference surfaces `netstandard2.0`,
 `net8.0`, and `net472`.
@@ -212,9 +213,18 @@ claims are all replay-validated `Refuted` can enter the semantic cache. Every
 cache hit reconstructs its scalar models and repeats whole-body replay. See
 [Typed abstention reasons](unknown-reasons.md) for exact reason values.
 
-Replay validation has two layers: exact backend-model and lowered-term checks
-in the proof kernel, followed by independent execution of the compiler-produced
-whole-body CFG in the worker. Executed spec calls become typed
-`CounterexampleNotReplayable`; other unsupported or inconsistent replay state
-fails the run as `CounterexampleReplayFailed`. Instructions on unselected
-paths do not block a concrete replay.
+Postcondition replay validation has two layers: exact backend-model and
+lowered-term checks in the proof kernel, followed by independent execution of
+the compiler-produced whole-body CFG in the worker. Executed spec calls become
+typed `CounterexampleNotReplayable`; other unsupported or inconsistent replay
+state fails the run as `CounterexampleReplayFailed`. Instructions on
+unselected paths do not block a concrete replay.
+
+Effect replay uses a separate compiler-neutral event interpreter rather than
+SMT or user-code execution. It admits only an unconditional definite managed
+object/array allocation with completed operands and no unmodeled static
+initialization. Other definite effect candidates become
+`CounterexampleNotReplayable`; may-only conflicts remain
+`EffectContractNotEstablished`. Structural artifact tamper is a
+`CompilerManifestMismatch`, while semantic replay disagreement is the fatal
+`CounterexampleReplayFailed`. Effect results are not cacheable.

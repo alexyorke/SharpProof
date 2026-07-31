@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.CodeAnalysis.Text;
 // This capture runs only in the build-time compiler collector.
 namespace SharpProof.CompilerArtifact;
 #pragma warning disable RS1035 // Build-only compiler evidence must hash final reference images.
@@ -72,10 +73,12 @@ internal static class CompilerCompilationCapture
     {
         cancellationToken.ThrowIfCancellationRequested();
         var parse = (CSharpParseOptions)tree.Options;
+        var text = tree.GetText(cancellationToken);
         return new CompilerSyntaxTreeSnapshot
         {
             Path = tree.FilePath ?? string.Empty,
-            Sha256 = Hash(Encoding.UTF8.GetBytes(tree.GetText(cancellationToken).ToString())),
+            Sha256 = ComputeTextSha256(text),
+            TextLength = text.Length,
             LanguageVersion = parse.LanguageVersion.ToString(),
             DocumentationMode = parse.DocumentationMode.ToString(),
             Kind = parse.Kind.ToString(),
@@ -116,9 +119,20 @@ internal static class CompilerCompilationCapture
         return new CompilerAdditionalFileSnapshot
         {
             Path = NormalizePath(path),
-            Sha256 = Hash(Encoding.UTF8.GetBytes(text.ToString()))
+            Sha256 = ComputeTextSha256(text)
         };
     }
+
+    internal static string ComputeTextSha256(SourceText text)
+    {
+        if (text == null)
+        {
+            throw new ArgumentNullException(nameof(text));
+        }
+
+        return Hash(Encoding.UTF8.GetBytes(text.ToString()));
+    }
+
     private static string Identity(CSharpCompilation compilation, MetadataReference reference)
     {
         return compilation.GetAssemblyOrModuleSymbol(reference) switch

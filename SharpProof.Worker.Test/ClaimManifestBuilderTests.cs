@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -488,8 +489,220 @@ public sealed class ClaimManifestBuilderTests
         Assert.That(
             result.Manifest.Callables.Single(callable =>
                 callable.SelectedFeatures.Contains(
-                    WorkerSelectedFeature.Effects)).SelectedFeatures,
+                WorkerSelectedFeature.Effects)).SelectedFeatures,
             Does.Contain(WorkerSelectedFeature.Effects));
+    }
+
+    [Test]
+    public void UnsupportedEffectCallablesCannotCarryConcreteEvidence()
+    {
+        var result = Build((
+            "Subject.cs",
+            """
+            using System;
+            using System.Threading.Tasks;
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                [ZeroAllocations]
+                public static object Generic<T>() =>
+                    new object();
+
+                [ZeroAllocations]
+                public static async Task<object> Async() {
+                    await Task.Yield();
+                    return new object();
+                }
+
+                [ZeroAllocations]
+                public static object DelegateCall(
+                    Func<object> factory) =>
+                    new object();
+            }
+            """));
+        var targets = result.Targets.Values.ToDictionary(
+            static target => target.Method.Name,
+            StringComparer.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(targets, Has.Count.EqualTo(3));
+            Assert.That(targets, Does.ContainKey("Async"));
+            Assert.That(targets, Does.ContainKey("DelegateCall"));
+            Assert.That(targets, Does.ContainKey("Generic"));
+            Assert.That(
+                targets.Values.All(static target =>
+                    !target.IsVerifierSupported),
+                Is.True);
+            Assert.That(
+                targets.Values.SelectMany(static target =>
+                    target.EffectClaims).Select(static claim =>
+                    claim.Evidence.Outcome),
+                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                targets.Values.SelectMany(static target =>
+                    target.EffectClaims).Select(static claim =>
+                    claim.Evidence.Reason),
+                Is.All.EqualTo(
+                    WorkerClaimReason.UnsupportedContract));
+            Assert.That(
+                targets.Values.SelectMany(static target =>
+                    target.EffectClaims).All(static claim =>
+                    claim.Evidence.Witness == null &&
+                    claim.Evidence.Replay == null),
+                Is.True);
+        }
+    }
+
+    [Test]
+    public void UnsupportedContractCallablesUseTheSharedSubsetGate()
+    {
+        var result = Build((
+            "Subject.cs",
+            """
+            using System.Threading.Tasks;
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                public static int Generic<T>() {
+                    Contract.Ensures(
+                        Contract.Result<int>() == 1);
+                    return 1;
+                }
+
+                public static async Task<int> Async() {
+                    Contract.Ensures(true);
+                    await Task.Yield();
+                    return 1;
+                }
+            }
+            """));
+        var targets = result.Targets.Values.ToDictionary(
+            static target => target.Method.Name,
+            StringComparer.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(targets, Has.Count.EqualTo(2));
+            Assert.That(targets, Does.ContainKey("Async"));
+            Assert.That(targets, Does.ContainKey("Generic"));
+            Assert.That(
+                targets.Values.All(static target =>
+                    !target.IsVerifierSupported),
+                Is.True);
+            Assert.That(
+                targets.Values.SelectMany(static target =>
+                    target.Claims).Count(),
+                Is.EqualTo(2));
+        }
+    }
+
+    [Test]
+    public void UnsupportedEffectCallableShapesCannotCarryReplayEvidence()
+    {
+        var result = Build((
+            "Subject.cs",
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Subject {
+                private static object _value = null!;
+
+                [ZeroAllocations]
+                static Subject() =>
+                    _value = new object();
+
+                public static object Value {
+                    [ZeroAllocations]
+                    get => new object();
+                }
+            }
+            """));
+        var targets = result.Targets.Values.ToDictionary(
+            static target => target.Method.Name,
+            StringComparer.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(targets, Has.Count.EqualTo(2));
+            Assert.That(targets, Does.ContainKey(".cctor"));
+            Assert.That(targets, Does.ContainKey("get_Value"));
+            Assert.That(
+                targets.Values.All(static target =>
+                    !target.IsVerifierSupported),
+                Is.True);
+            Assert.That(
+                targets.Values.SelectMany(static target =>
+                    target.EffectClaims).Select(static claim =>
+                    claim.Evidence.Outcome),
+                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                targets.Values.SelectMany(static target =>
+                    target.EffectClaims).Select(static claim =>
+                    claim.Evidence.Reason),
+                Is.All.EqualTo(
+                    WorkerClaimReason.UnsupportedContract));
+            Assert.That(
+                targets.Values.SelectMany(static target =>
+                    target.EffectClaims).All(static claim =>
+                    claim.Evidence.Witness == null &&
+                    claim.Evidence.Replay == null),
+                Is.True);
+        }
+    }
+
+    [Test]
+    public void BodylessEffectAdmissionMatchesTheAnalyzerException()
+    {
+        var result = Build((
+            "Subject.cs",
+            """
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                [SharpProofTrusted("Reviewed native implementation.")]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    Complete = true)]
+                public static extern int Accepted();
+
+                [return: Positive]
+                [SharpProofTrusted("Reviewed native implementation.")]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    Complete = true)]
+                public static extern int ContractSelected();
+            }
+            """));
+        var targets = result.Targets.Values.ToDictionary(
+            static target => target.Method.Name,
+            StringComparer.Ordinal);
+        var accepted = targets["Accepted"];
+        var rejected = targets["ContractSelected"];
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(accepted.IsVerifierSupported, Is.True);
+            Assert.That(
+                accepted.EffectClaims.Single().Evidence.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                accepted.EffectClaims.Single().Evidence.Certainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty
+                        .TrustedCompleteBoundary));
+            Assert.That(rejected.IsVerifierSupported, Is.False);
+            Assert.That(
+                rejected.EffectClaims.Single().Evidence.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                rejected.EffectClaims.Single().Evidence.Reason,
+                Is.EqualTo(
+                    WorkerClaimReason.UnsupportedContract));
+            Assert.That(
+                rejected.EffectClaims.Single().Evidence.Replay,
+                Is.Null);
+        }
     }
 
     [Test]
@@ -1128,6 +1341,283 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void AllocationViolationsCarrySealedUnconditionalReplayEvidence()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Box {
+            }
+
+            public class InitializedBase {
+                static InitializedBase() {
+                    throw new System.InvalidOperationException();
+                }
+            }
+
+            public sealed class DerivedBox : InitializedBase {
+            }
+
+            public static class InitializedSubject {
+                static InitializedSubject() {
+                    throw new System.InvalidOperationException();
+                }
+
+                [ZeroAllocations]
+                public static object CallerInitializationCanPreemptAllocation() =>
+                    new object();
+            }
+
+            public sealed class ConstructorSubject {
+                private object _value = null!;
+
+                [ZeroAllocations]
+                public ConstructorSubject() =>
+                    _value = new object();
+            }
+
+            public static class Subject {
+                [ZeroAllocations]
+                public static object ObjectAllocation() =>
+                    new object();
+
+                [ZeroAllocations]
+                public static object[] ArrayAllocation() =>
+                    new object[1];
+
+                [EffectContract(
+                    SharpProofEffect.None,
+                    Complete = true)]
+                public static Box EffectAllocation() =>
+                    new Box();
+
+                [ZeroAllocations]
+                public static DerivedBox BaseInitializationCanPreemptAllocation() =>
+                    new DerivedBox();
+            }
+            """;
+        var discovery = Build(("Allocations.cs", source));
+        var evidence = discovery.Targets.Values.ToDictionary(
+            static target => target.Method.Name,
+            static target => target.EffectClaims.Single().Evidence,
+            StringComparer.Ordinal);
+        var treeSha256 = WorkerProtocolJson.ComputeSha256(
+            Encoding.UTF8.GetBytes(source));
+
+        AssertAllocation(
+            evidence["ObjectAllocation"],
+            CompilerEffectReplayEventKind.ManagedObjectAllocation,
+            "ObjectAllocation",
+            "new object()",
+            expectMember: true);
+        AssertAllocation(
+            evidence["ArrayAllocation"],
+            CompilerEffectReplayEventKind.ManagedArrayAllocation,
+            "ArrayAllocation",
+            "new object[1]",
+            expectMember: false);
+        AssertAllocation(
+            evidence["EffectAllocation"],
+            CompilerEffectReplayEventKind.ManagedObjectAllocation,
+            "EffectAllocation",
+            "new Box()",
+            expectMember: true);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                evidence["BaseInitializationCanPreemptAllocation"]
+                    .Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence["BaseInitializationCanPreemptAllocation"]
+                    .Witness,
+                Is.Null);
+            Assert.That(
+                evidence["BaseInitializationCanPreemptAllocation"]
+                    .Replay,
+                Is.Null);
+            Assert.That(
+                evidence["CallerInitializationCanPreemptAllocation"]
+                    .Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                evidence["CallerInitializationCanPreemptAllocation"]
+                    .Replay,
+                Is.Null);
+            Assert.That(
+                evidence[".ctor"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(evidence[".ctor"].Replay, Is.Null);
+        }
+        return;
+
+        void AssertAllocation(
+            CompilerEffectClaimArtifact value,
+            CompilerEffectReplayEventKind expectedKind,
+            string methodName,
+            string expression,
+            bool expectMember)
+        {
+            var replay = value.Replay;
+            var @event = replay?.Events.Single();
+            var start = source.IndexOf(
+                expression,
+                source.IndexOf(methodName, StringComparison.Ordinal),
+                StringComparison.Ordinal);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    value.Outcome,
+                    Is.EqualTo(WorkerClaimOutcome.Refuted));
+                Assert.That(
+                    value.Reason,
+                    Is.EqualTo(WorkerClaimReason.None));
+                Assert.That(
+                    value.Certainty,
+                    Is.EqualTo(
+                        WorkerEffectEvidenceCertainty
+                            .DefiniteViolation));
+                Assert.That(value.Witness, Is.Not.Null);
+                Assert.That(value.Replay, Is.Not.Null);
+                Assert.That(
+                    value.EvidenceSha256,
+                    Does.Match("^[0-9a-f]{64}$"));
+                Assert.That(
+                    replay?.ConstraintSha256,
+                    Is.EqualTo(
+                        CompilerEffectClaimArtifactCodec
+                            .ComputeConstraintSha256(
+                                value.ContractKind,
+                                value.Constraint)));
+                Assert.That(
+                    replay?.PathKind,
+                    Is.EqualTo(
+                        CompilerEffectReplayPathKind
+                            .Unconditional));
+                Assert.That(replay?.Events, Has.Length.EqualTo(1));
+                Assert.That(@event?.Ordinal, Is.Zero);
+                Assert.That(@event?.Kind, Is.EqualTo(expectedKind));
+                Assert.That(@event?.SyntaxTreeOrdinal, Is.Zero);
+                Assert.That(
+                    @event?.SyntaxTreeSha256,
+                    Is.EqualTo(treeSha256));
+                Assert.That(@event?.SyntaxStart, Is.EqualTo(start));
+                Assert.That(
+                    @event?.SyntaxLength,
+                    Is.EqualTo(expression.Length));
+                Assert.That(
+                    @event?.OperationIdentitySha256,
+                    Is.EqualTo(
+                        CompilerEffectClaimArtifactCodec
+                            .ComputeReplayOperationSha256(
+                                @event!)));
+                Assert.That(@event?.TypeIdentity, Is.Not.Empty);
+                Assert.That(
+                    @event?.TypeDocumentationId,
+                    Is.Not.Null.And.Not.Empty);
+                Assert.That(@event?.SpecWitnessIdentifier, Is.Null);
+                Assert.That(@event?.ScalarOperands, Is.Empty);
+                Assert.That(
+                    @event?.ExactExceptionTypeHierarchy,
+                    Is.Empty);
+                Assert.That(
+                    @event?.Location.Path,
+                    Is.EqualTo("Allocations.cs"));
+                Assert.That(@event?.Location.Start, Is.EqualTo(start));
+                Assert.That(
+                    @event?.Location.Length,
+                    Is.EqualTo(expression.Length));
+                Assert.That(
+                    value.Witness?.Location.Start,
+                    Is.EqualTo(@event?.Location.Start));
+                Assert.That(
+                    value.Witness?.Location.Length,
+                    Is.EqualTo(@event?.Location.Length));
+            }
+
+            if (expectMember)
+            {
+                Assert.That(@event!.MemberIdentity, Is.Not.Empty);
+                Assert.That(
+                    @event.MemberDocumentationId,
+                    Is.Not.Null.And.Not.Empty);
+                Assert.That(
+                    value.Witness!.Detail,
+                    Is.EqualTo(@event.MemberDocumentationId));
+            }
+            else
+            {
+                Assert.That(@event!.MemberIdentity, Is.Empty);
+                Assert.That(@event.MemberDocumentationId, Is.Null);
+                Assert.That(
+                    value.Witness!.Detail,
+                    Is.EqualTo(@event.TypeDocumentationId));
+            }
+
+            Assert.DoesNotThrow(
+                (Action)(() =>
+                    CompilerEffectClaimArtifactCodec.Validate(
+                        value)));
+        }
+    }
+
+    [Test]
+    public void MalformedBaseTypesCannotProduceAllocationReplayEvidence()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Subject : MissingBase {
+            }
+
+            public static class Factory {
+                [ZeroAllocations]
+                public static Subject Allocate() =>
+                    new Subject();
+            }
+            """;
+        var tree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(
+                LanguageVersion.CSharp12,
+                preprocessorSymbols: [
+                    Contract.ConditionalSymbol
+                ]),
+            "Subject.cs");
+        var compilation = CSharpCompilation.Create(
+            "MalformedBaseTypeTests",
+            [tree],
+            GetReferences(),
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions:
+                    NullableContextOptions.Enable));
+        Assert.That(
+            compilation.GetDiagnostics().Any(static diagnostic =>
+                diagnostic.Severity ==
+                DiagnosticSeverity.Error),
+            Is.True);
+
+        var discovery = new ClaimManifestBuilder(
+            compilation).Build();
+        var evidence = discovery.Targets.Values.Single(
+            static target =>
+                target.Method.Name == "Allocate")
+            .EffectClaims.Single().Evidence;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                evidence.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(evidence.Witness, Is.Null);
+            Assert.That(evidence.Replay, Is.Null);
+        }
+    }
+
+    [Test]
     public void DirectLockReceiverCompletionControlsEffectEvidence()
     {
         var discovery = Build((
@@ -1183,22 +1673,28 @@ public sealed class ClaimManifestBuilderTests
 
         using (Assert.EnterMultipleScope())
         {
-            AssertDefiniteSynchronizationViolation(evidence["SafeObject"]);
-            AssertDefiniteSynchronizationViolation(evidence["SafeArray"]);
+            AssertUnsupportedDirectCandidate(evidence["SafeObject"]);
+            AssertUnsupportedDirectCandidate(evidence["SafeArray"]);
             AssertUnknownWithoutWitness(evidence["ThrowingConstructor"]);
             AssertUnknownWithoutWitness(evidence["WrappedThrowingConstructor"]);
             AssertUnknownWithoutWitness(evidence["DynamicArrayLength"]);
         }
         return;
 
-        static void AssertDefiniteSynchronizationViolation(
+        static void AssertUnsupportedDirectCandidate(
             CompilerEffectClaimArtifact value)
         {
-            Assert.That(value.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(value.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                value.Reason,
+                Is.EqualTo(
+                    WorkerClaimReason.CounterexampleNotReplayable));
             Assert.That(
                 value.Certainty,
-                Is.EqualTo(WorkerEffectEvidenceCertainty.DefiniteViolation));
-            Assert.That(value.Witness?.Kind, Is.EqualTo("synchronization-lock"));
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.Unavailable));
+            Assert.That(value.Witness, Is.Null);
+            Assert.That(value.Replay, Is.Null);
         }
 
         static void AssertUnknownWithoutWitness(
@@ -1263,10 +1759,21 @@ public sealed class ClaimManifestBuilderTests
                 Is.Null);
             Assert.That(
                 evidence["DefiniteWrongThrow"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Refuted));
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
-                evidence["DefiniteWrongThrow"].Witness?.Kind,
-                Is.EqualTo("explicit-throw"));
+                evidence["DefiniteWrongThrow"].Reason,
+                Is.EqualTo(
+                    WorkerClaimReason.CounterexampleNotReplayable));
+            Assert.That(
+                evidence["DefiniteWrongThrow"].Certainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.Unavailable));
+            Assert.That(
+                evidence["DefiniteWrongThrow"].Witness,
+                Is.Null);
+            Assert.That(
+                evidence["DefiniteWrongThrow"].Replay,
+                Is.Null);
             Assert.That(
                 evidence["UnmodeledThrow"].Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Unknown));

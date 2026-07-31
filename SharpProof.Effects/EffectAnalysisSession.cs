@@ -269,7 +269,9 @@ public sealed class EffectAnalysisSession
         var isSourceType = SymbolEqualityComparer.Default.Equals(
             normalizedTarget.ContainingAssembly, _compilation.Assembly);
         var mayInitialize = !isSourceType ||
-            EffectMethodNodeBuilder.HasPotentialStaticInitialization(normalizedTarget);
+            EffectMethodNodeBuilder.HasPotentialStaticInitialization(
+                normalizedTarget,
+                ApiSpecs);
         return mayInitialize
             ? EffectSummaryOperations.UnknownBoundary(EffectUncertainty.UnmodeledCall)
             : EffectSummary.Empty;

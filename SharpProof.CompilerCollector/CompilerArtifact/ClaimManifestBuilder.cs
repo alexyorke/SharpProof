@@ -63,12 +63,39 @@ internal sealed class ClaimManifestBuilder(
             return null;
         }
 
+        var analyzerSelection = _attributes.Select(
+            target,
+            resolution.HasSelectedContractIntent);
+        var analyzerContractsSelected =
+            ContractsEnabled &&
+            (analyzerSelection &
+             ContractSelectionFeatures.Contracts) != 0;
+        var analyzerEffectsSelected =
+            EffectsEnabled &&
+            (analyzerSelection &
+             ContractSelectionFeatures.Effects) != 0;
+        var selectedSubset =
+            analyzerContractsSelected ||
+            analyzerEffectsSelected
+            ? ClassifySelectedSubset(
+                seed,
+                analyzerContractsSelected,
+                analyzerEffectsSelected)
+            : LanguageSubsetDecision.Supported;
+        var supported =
+            seed.Declaration is
+                MethodDeclarationSyntax or
+                ConstructorDeclarationSyntax &&
+            target.MethodKind is
+                MethodKind.Ordinary or
+                MethodKind.Constructor &&
+            selectedSubset.IsSupported;
         var location = CallableLocation(target, seed.Declaration);
         var effects = EffectsEnabled
             ? CreateEffectClaims(
                 EffectContractDiagnostics.Evaluate(
                     target, location, _effectSession, static _ => { }, cancellationToken),
-                target, callableId, postconditions.Length)
+                target, callableId, postconditions.Length, supported)
             : [];
         var features = new HashSet<WorkerSelectedFeature>(selected);
         if (!postconditions.IsDefaultOrEmpty ||
@@ -105,10 +132,37 @@ internal sealed class ClaimManifestBuilder(
                 .. effects.Select(static claim => claim.Entry.ClaimId)],
             Assumptions = [.. assumptions]
         };
-        var supported = seed.Declaration is MethodDeclarationSyntax or ConstructorDeclarationSyntax &&
-            target.MethodKind is MethodKind.Ordinary or MethodKind.Constructor;
         return new ManifestCallableTarget(target, seed.Declaration, seed.Model,
             entry, postconditions, effects, supported);
+    }
+
+    private LanguageSubsetDecision ClassifySelectedSubset(
+        CallableSeed seed,
+        bool contractsSelected,
+        bool effectsSelected)
+    {
+        if ((seed.Method.IsAbstract || seed.Method.IsExtern) &&
+            effectsSelected &&
+            !contractsSelected &&
+            _effectSession.ResolveEffectContract(seed.Method).Kind ==
+            EffectContractResolutionKind.Valid)
+        {
+            return LanguageSubsetDecision.Supported;
+        }
+
+        if (seed.Declaration == null || seed.Model == null)
+        {
+            return LanguageSubsetDecision.Abstain(
+                LanguageSubsetAbstentionReason.UnsupportedCallable);
+        }
+
+        return LanguageSubsetGate.ClassifyEffects(
+            seed.Method,
+            seed.Declaration,
+            seed.Model,
+            [],
+            _effectSession.HasResolvedApiSpec,
+            cancellationToken);
     }
 
     private ImmutableArray<ManifestClaim> CreatePostconditions(
@@ -249,7 +303,8 @@ internal sealed class ClaimManifestBuilder(
         ImmutableArray<EffectClaimEvaluation> evaluations,
         IMethodSymbol method,
         string callableId,
-        int ordinalOffset)
+        int ordinalOffset,
+        bool isSupported)
     {
         var claims = ImmutableArray.CreateBuilder<ManifestEffectClaim>();
         var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -274,7 +329,8 @@ internal sealed class ClaimManifestBuilder(
                             evaluation.Kind),
                     Location = ToSourceLocation(AttributeLocation(attribute, method))
                 };
-                var evidence = CreateEffectEvidence(claimId, evaluation);
+                var evidence = CreateEffectEvidence(
+                    claimId, evaluation, isSupported);
                 CompilerEffectClaimArtifactCodec.Seal(evidence);
                 claims.Add(new ManifestEffectClaim(entry, evidence));
             }
@@ -283,11 +339,12 @@ internal sealed class ClaimManifestBuilder(
         return claims.ToImmutable();
     }
 
-    private static CompilerEffectClaimArtifact CreateEffectEvidence(
+    private CompilerEffectClaimArtifact CreateEffectEvidence(
         string claimId,
-        EffectClaimEvaluation evaluation)
+        EffectClaimEvaluation evaluation,
+        bool isSupported)
     {
-        return new()
+        var evidence = new CompilerEffectClaimArtifact
         {
             ClaimId = claimId,
             ContractKind =
@@ -311,21 +368,59 @@ internal sealed class ClaimManifestBuilder(
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(static value => value, StringComparer.Ordinal)]
             },
-            Witness = evaluation.Witness is not { } witness
-                ? null
-                : new WorkerEffectViolationWitness
-                {
-                    Kind = witness.Kind,
-                    Detail = witness.Detail,
-                    Effects = ToWorkerEffects(witness.Effects),
-                    Capabilities = ToWorkerCapabilities(witness.Capabilities),
-                    ExactExceptionTypeHierarchy =
-                        CompilerExceptionTypeIdentity.EncodeHierarchy(
-                            witness.ExceptionType),
-                    Location = ToSourceLocation(witness.Location)
-                },
             Evidence = evaluation.Evidence
         };
+        if (!isSupported)
+        {
+            evidence.Outcome = WorkerClaimOutcome.Unknown;
+            evidence.Reason = WorkerClaimReason.UnsupportedContract;
+            evidence.Certainty =
+                WorkerEffectEvidenceCertainty.Unavailable;
+            evidence.Witness = null;
+            evidence.Replay = null;
+            return evidence;
+        }
+
+        if (evidence.Outcome != WorkerClaimOutcome.Refuted)
+        {
+            return evidence;
+        }
+
+        if (evidence.Reason != WorkerClaimReason.None ||
+            evidence.Certainty !=
+            WorkerEffectEvidenceCertainty.DefiniteViolation ||
+            evaluation.Witness is not { } witness ||
+            !CompilerEffectReplayLowerer.TryCreate(
+                _compilation,
+                _effectSession.ApiSpecs,
+                witness,
+                ToSourceLocation(witness.Origin.Syntax.GetLocation()),
+                cancellationToken,
+                out var replay,
+                out var witnessDetail))
+        {
+            evidence.Outcome = WorkerClaimOutcome.Unknown;
+            evidence.Reason =
+                WorkerClaimReason.CounterexampleNotReplayable;
+            evidence.Certainty =
+                WorkerEffectEvidenceCertainty.Unavailable;
+            evidence.Witness = null;
+            evidence.Replay = null;
+            return evidence;
+        }
+
+        evidence.Witness = new WorkerEffectViolationWitness
+        {
+            Kind = witness.Kind,
+            Detail = witnessDetail,
+            Effects = ToWorkerEffects(witness.Effects),
+            Capabilities =
+                ToWorkerCapabilities(witness.Capabilities),
+            ExactExceptionTypeHierarchy = [],
+            Location = replay!.Events[0].Location
+        };
+        evidence.Replay = replay;
+        return evidence;
     }
 
     internal static WorkerEffectSet ToWorkerEffects(EffectContractKind source)
