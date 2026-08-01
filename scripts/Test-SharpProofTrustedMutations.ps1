@@ -650,6 +650,69 @@ function Invoke-IsolatedDotnet {
     }
 }
 
+function Read-TestEvidence {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$TrxPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$MutationName,
+
+        [switch]$RequireAssertionFailure
+    )
+
+    if (-not (Test-Path -LiteralPath $TrxPath -PathType Leaf)) {
+        throw "Test evidence for '$MutationName' was not produced: $TrxPath"
+    }
+
+    [xml]$document = [IO.File]::ReadAllText($TrxPath)
+    $results = @($document.SelectNodes(
+            "//*[local-name()='UnitTestResult']"))
+    if ($results.Count -eq 0) {
+        throw "No selected tests executed for '$MutationName'."
+    }
+
+    $counters = $document.SelectSingleNode(
+        "//*[local-name()='ResultSummary']/*[local-name()='Counters']")
+    if ($null -eq $counters) {
+        throw "TRX counters are missing for '$MutationName'."
+    }
+    foreach ($counterName in @('error', 'aborted', 'timeout')) {
+        if ([int]$counters.GetAttribute($counterName) -ne 0) {
+            throw (
+                "Mutation '$MutationName' had infrastructure counter " +
+                "'$counterName'; it was not killed by an assertion.")
+        }
+    }
+
+    $failedResults = @($results | Where-Object {
+            $_.GetAttribute('outcome') -eq 'Failed'
+        })
+    $assertionFailures = @($failedResults | Where-Object {
+            $errorInfo = $_.SelectSingleNode(
+                "*[local-name()='Output']/*[local-name()='ErrorInfo']")
+            $null -ne $errorInfo -and
+                $errorInfo.InnerText -match
+                    ('NUnit\.Framework\.' +
+                    '(AssertionException|MultipleAssertException)|' +
+                    '(?m)^\s*Assert\.(That|Fail|Multiple|Pass)\(')
+        })
+    if ($RequireAssertionFailure -and $assertionFailures.Count -eq 0) {
+        throw (
+            "Mutation '$MutationName' did not produce an assertion failure; " +
+            'crashes and infrastructure failures do not count as kills.')
+    }
+
+    return [pscustomobject]@{
+        executedCount = $results.Count
+        failedCount = $failedResults.Count
+        assertionFailureCount = $assertionFailures.Count
+        selectedTests = @($results | ForEach-Object {
+                $_.GetAttribute('testName')
+            })
+    }
+}
+
 function Assert-UniqueMutationTarget {
     param(
         [Parameter(Mandatory = $true)]
@@ -693,6 +756,9 @@ try {
     }
 
     foreach ($mutation in $mutations) {
+        $baselineTrxName = $mutation.Name + '-baseline.trx'
+        $baselineTrx = Join-Path $logs $baselineTrxName
+        Remove-Item -LiteralPath $baselineTrx -Force -ErrorAction SilentlyContinue
         $baselineExit = Invoke-IsolatedDotnet `
             -Arguments @(
                 'test',
@@ -703,12 +769,22 @@ try {
                 '--filter',
                 $mutation.Filter,
                 '--logger',
-                'console;verbosity=minimal') `
+                'console;verbosity=minimal',
+                '--logger',
+                "trx;LogFileName=$baselineTrxName",
+                '--results-directory',
+                $logs) `
             -LogName ($mutation.Name + '-baseline.log')
         if ($baselineExit -ne 0) {
             throw (
                 "Baseline for mutation '$($mutation.Name)' failed; see " +
                 "$logs\$($mutation.Name)-baseline.log.")
+        }
+        $baselineEvidence = Read-TestEvidence `
+            -TrxPath $baselineTrx `
+            -MutationName ($mutation.Name + ' baseline')
+        if ($baselineEvidence.failedCount -ne 0) {
+            throw "Baseline for mutation '$($mutation.Name)' contains failures."
         }
     }
 
@@ -742,6 +818,9 @@ try {
                     "Mutation '$($mutation.Name)' did not compile; see " +
                     "$logs\$($mutation.Name)-build.log.")
             }
+            $testTrxName = $mutation.Name + '-test.trx'
+            $testTrx = Join-Path $logs $testTrxName
+            Remove-Item -LiteralPath $testTrx -Force -ErrorAction SilentlyContinue
             $testExit = Invoke-IsolatedDotnet `
                 -Arguments @(
                     'test',
@@ -752,7 +831,11 @@ try {
                     '--filter',
                     $mutation.Filter,
                     '--logger',
-                    'console;verbosity=minimal') `
+                    'console;verbosity=minimal',
+                    '--logger',
+                    "trx;LogFileName=$testTrxName",
+                    '--results-directory',
+                    $logs) `
                 -LogName ($mutation.Name + '-test.log')
             if ($testExit -eq 0) {
                 throw (
@@ -764,11 +847,22 @@ try {
                     "Mutation '$($mutation.Name)' timed out instead of being " +
                     "killed by an assertion.")
             }
+            $testEvidence = Read-TestEvidence `
+                -TrxPath $testTrx `
+                -MutationName $mutation.Name `
+                -RequireAssertionFailure
             $results += [pscustomobject]@{
                 name = $mutation.Name
                 file = $mutation.File.Replace('\', '/')
                 test = $mutation.Filter
                 killed = $true
+                exitCode = $testExit
+                executedCount = $testEvidence.executedCount
+                failedCount = $testEvidence.failedCount
+                assertionFailureCount = $testEvidence.assertionFailureCount
+                selectedTests = $testEvidence.selectedTests
+                log = "mutation-logs/$($mutation.Name)-test.log"
+                trx = "mutation-logs/$testTrxName"
             }
         }
         finally {
@@ -783,7 +877,7 @@ try {
     New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
     $sha = (& git -C $repositoryRoot rev-parse HEAD).Trim()
     [pscustomobject]@{
-        schemaVersion = 1
+        schemaVersion = 2
         commit = $sha
         configuration = $Configuration
         mutationCount = $results.Count
