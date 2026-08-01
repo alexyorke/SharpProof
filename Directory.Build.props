@@ -79,6 +79,7 @@
   </ItemGroup>
 
   <PropertyGroup Condition="'$(SharpProofProductionProject)' == 'true'">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors>$(WarningsAsErrors);RS0030</WarningsAsErrors>
   </PropertyGroup>
 

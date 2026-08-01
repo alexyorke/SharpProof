@@ -86,14 +86,17 @@ public sealed class BoundaryEnforcementTests
                 .Single()
                 .Attribute("Include")?.Value,
             Does.EndWith("BannedSymbols.txt"));
-        var scopedWarnings = props
+        var productionProperties = props
             .Descendants("PropertyGroup")
             .Single(group =>
                 string.Equals(
                     (string?)group.Attribute("Condition"),
                     "'$(SharpProofProductionProject)' == 'true'",
-                    StringComparison.Ordinal))
-            .Element("WarningsAsErrors")?.Value;
+                    StringComparison.Ordinal));
+        Assert.That(
+            productionProperties.Element("TreatWarningsAsErrors")?.Value,
+            Is.EqualTo("true"));
+        var scopedWarnings = productionProperties.Element("WarningsAsErrors")?.Value;
         Assert.That(scopedWarnings, Does.Contain("RS0030"));
     }
 
