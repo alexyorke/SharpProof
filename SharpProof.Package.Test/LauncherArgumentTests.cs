@@ -106,15 +106,18 @@ public sealed class LauncherArgumentTests
     [Test]
     public void CompilerManifestByteLimitIsEnforcedBeforeAllocation()
     {
+        const int expectedLimit = 16 * 1024 * 1024;
         var path = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
             Guid.NewGuid().ToString("N") + ".json");
         try
         {
+            Assert.That(
+                LauncherArguments.MaximumCompilerManifestBytes,
+                Is.EqualTo(expectedLimit));
             using (var stream = File.Create(path))
             {
-                stream.SetLength(
-                    LauncherArguments.MaximumCompilerManifestBytes + 1L);
+                stream.SetLength(expectedLimit + 1L);
             }
 
             Assert.That(
