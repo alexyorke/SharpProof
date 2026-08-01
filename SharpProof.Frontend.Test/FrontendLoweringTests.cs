@@ -767,6 +767,68 @@ public sealed class FrontendLoweringTests
             Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
     }
 
+    [Test]
+    public void ConstantFoldingCannotBypassTheClosedOperationCatalog()
+    {
+        AssertClassification(
+            """
+            private const long Value = 7L;
+            public static long Target() => Value;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedOperationKind);
+        AssertClassification(
+            """
+            public static string Target() => nameof(Subject);
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedOperationKind);
+        AssertClassification(
+            """
+            public static int Target() => sizeof(int);
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedOperationKind);
+        AssertClassification(
+            """
+            public static string Target() => $"proof";
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedOperationKind);
+        AssertClassification(
+            """
+            public static string Target() =>
+                true ? nameof(Subject) : "other";
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedOperationKind);
+        AssertClassification(
+            """
+            private const long Value = 7L;
+            public static long Target(long input) => Value + input;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedOperationKind);
+        AssertClassification(
+            """
+            public static bool Target(string input) =>
+                nameof(Subject) == input;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedOperationKind);
+    }
+
+    [Test]
+    public void ConstantFoldingCannotBypassOperatorSemantics()
+    {
+        AssertClassification(
+            """
+            public static long Target() => unchecked(1L + 2L);
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UncheckedOverflowSemantics);
+    }
+
     private static void AssertClassification(
         string members,
         FrontendSubsetDecision decision,

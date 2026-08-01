@@ -4,6 +4,7 @@ public sealed class RoslynOperationLowerer
 {
     private readonly IrFactory _factory;
     private readonly Func<IMethodSymbol, bool> _isKnownPure;
+    private readonly bool _allowCompilerConstants;
     private readonly Dictionary<ISymbol, IrVarId> _variables =
         new(SymbolEqualityComparer.Default);
     private readonly Dictionary<ITypeSymbol, IrVarId> _instances =
@@ -16,10 +17,29 @@ public sealed class RoslynOperationLowerer
     public RoslynOperationLowerer(
         IrFactory factory,
         Func<IMethodSymbol, bool>? isKnownPure = null)
+        : this(factory, isKnownPure, allowCompilerConstants: false)
+    {
+    }
+
+    private RoslynOperationLowerer(
+        IrFactory factory,
+        Func<IMethodSymbol, bool>? isKnownPure,
+        bool allowCompilerConstants)
     {
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _isKnownPure = isKnownPure ?? (static _ => false);
+        _allowCompilerConstants = allowCompilerConstants;
         _visitor = new LoweringVisitor(this);
+    }
+
+    internal static RoslynOperationLowerer CreateForConcreteReplay(
+        IrFactory factory,
+        Func<IMethodSymbol, bool>? isKnownPure = null)
+    {
+        return new RoslynOperationLowerer(
+            factory,
+            isKnownPure,
+            allowCompilerConstants: true);
     }
 
     internal Func<ITypeSymbol?, ITypeSymbol?> TypeSpecializer { get; set; } = static type => type;
@@ -371,7 +391,8 @@ public sealed class RoslynOperationLowerer
                     : LoweredExpression.Exact(custom.Term);
             }
 
-            if (operation.ConstantValue.HasValue)
+            if (_owner._allowCompilerConstants &&
+                operation.ConstantValue.HasValue)
             {
                 return _owner.LowerConstant(operation);
             }
@@ -382,9 +403,17 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression DefaultVisit(
             IOperation operation, LoweringContext argument)
         {
-            return _owner.Opaque(operation, operation.Type?.TypeKind == TypeKind.Error
+            var abstention = operation.Type?.TypeKind == TypeKind.Error
                 ? FrontendAbstention.ErrorOperation
-                : FrontendAbstention.UnsupportedOperationKind);
+                : operation.ConstantValue.HasValue &&
+                    operation.Type is
+                    {
+                        IsValueType: true,
+                        SpecialType: SpecialType.None
+                    }
+                    ? FrontendAbstention.UnsupportedType
+                    : FrontendAbstention.UnsupportedOperationKind;
+            return _owner.Opaque(operation, abstention, arguments: []);
         }
 
         public override LoweredExpression VisitInvalid(
@@ -396,7 +425,7 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitLiteral(
             ILiteralOperation operation, LoweringContext argument)
         {
-            return _owner.Opaque(operation, FrontendAbstention.UnsupportedType);
+            return _owner.LowerConstant(operation);
         }
 
         public override LoweredExpression VisitLocalReference(

@@ -181,6 +181,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~OverflowAndConversionShapesAreExactOnlyWhenRepresentable'
     },
     [pscustomobject]@{
+        Name = 'lowering-global-constant-bypass'
+        File = 'SharpProof.Frontend\RoslynOperationLowerer.cs'
+        Original = "            if (_owner._allowCompilerConstants &&`n                operation.ConstantValue.HasValue)"
+        Mutated = '            if (operation.ConstantValue.HasValue)'
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~ConstantFoldingCannotBypassTheClosedOperationCatalog'
+    },
+    [pscustomobject]@{
+        Name = 'requires-concrete-compiler-constant-replay'
+        File = 'SharpProof.Analyzer\RequiresCallSiteAnalyzer.cs'
+        Original = "            var lowerer = RoslynOperationLowerer.CreateForConcreteReplay(`n                _factory,`n                session.IsKnownPure);"
+        Mutated = '            var lowerer = new RoslynOperationLowerer(_factory, session.IsKnownPure);'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~UncheckedOverflowFailsClosedButConcreteViolationsReport'
+    },
+    [pscustomobject]@{
         Name = 'smt-strict-less-than'
         File = 'SharpProof.Smt\IrSmtBackend.cs'
         Original = '_context.MkLt(Integer(left), Integer(right)),'

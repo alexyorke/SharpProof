@@ -317,8 +317,8 @@ public sealed class IrInterpreter(IrFactory factory)
             (IrValueKind.Sequence, IrValueKind.Sequence) => ReferenceEquals(left, right),
             _ => null
         };
-        return equal.HasValue
-            ? Boolean(negate ? !equal.Value : equal.Value)
+        return equal is bool established
+            ? Boolean(negate != established)
             : InvalidValue("Equality requires values with compatible runtime kinds.");
     }
 

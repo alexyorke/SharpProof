@@ -230,7 +230,9 @@ internal static partial class RequiresCallSiteAnalyzer
                 return null;
             }
 
-            var lowerer = new RoslynOperationLowerer(_factory, session.IsKnownPure);
+            var lowerer = RoslynOperationLowerer.CreateForConcreteReplay(
+                _factory,
+                session.IsKnownPure);
             var interpreter = new IrInterpreter(_factory);
             var substitutions = new Dictionary<IrVarId, IrTerm>();
             foreach (var variable in GetInputVariables(contracts))

@@ -342,14 +342,14 @@ internal sealed class ManagedAbstractFlow
             return state;
         }
 
-        var equals = @operator == BinaryOperatorKind.Equals ? expected
-            : @operator == BinaryOperatorKind.NotEquals ? !expected : (bool?)null;
-        if (!equals.HasValue)
+        if (@operator is not (
+            BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals))
         {
             return state;
         }
 
-        var refined = equals.Value ? NullnessDomain.Instance.AssumeNull(nullness)
+        var equals = expected == (@operator == BinaryOperatorKind.Equals);
+        var refined = equals ? NullnessDomain.Instance.AssumeNull(nullness)
             : NullnessDomain.Instance.AssumeNonNull(nullness);
         return state.Set(storage, ManagedAbstractValue.Reference(refined, current.Cardinality));
     }
@@ -1549,7 +1549,9 @@ internal readonly record struct ManagedAbstractValue(
                 equal = false;
             }
         }
-        return equal.HasValue ? Boolean(negate ? !equal.Value : equal.Value) : unknown;
+        return equal is bool established
+            ? Boolean(negate != established)
+            : unknown;
     }
 
     private static ManagedAbstractValue Compare(
