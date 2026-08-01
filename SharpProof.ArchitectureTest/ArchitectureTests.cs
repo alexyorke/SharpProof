@@ -532,6 +532,7 @@ public sealed class ArchitectureTests
                 "SharpProof.Contracts/ContractCanonicalization.cs",
                 "SharpProof.Contracts/ContractExpressionBinder.cs",
                 "SharpProof.Contracts/ContractIntrinsicValidator.cs",
+                "SharpProof.Contracts/ContractApiSymbols.cs",
                 "SharpProof.Frontend/OperationSupportCatalog.cs",
                 "SharpProof.Frontend/RoslynOperationLowerer.cs",
                 "SharpProof.Frontend/RoslynProgramLowerer.cs"
@@ -547,7 +548,10 @@ public sealed class ArchitectureTests
             ["obligationGeneration"] = [
                 "SharpProof.Worker/PostconditionObligationBuilder.cs"
             ],
-            ["encoding"] = ["SharpProof.Smt/IrSmtBackend.cs"],
+            ["encoding"] = [
+                "SharpProof.Smt/IrSmtBackend.cs",
+                "SharpProof.Verify/Backend.cs"
+            ],
             ["apiSpecifications"] = [
                 "SharpProof.Specs/ApiSpecTable.cs",
                 "SharpProof.Specs/ApiSpecTermValidator.cs",
@@ -571,7 +575,8 @@ public sealed class ArchitectureTests
             ["contractApiCatalog"] = [
                 "SharpProof.Frontend/ContractApi.catalog.json",
                 "scripts/Generate-ContractApiCatalog.ps1",
-                "SharpProof.Frontend/ContractApiMetadata.generated.cs"
+                "SharpProof.Frontend/ContractApiMetadata.generated.cs",
+                "SharpProof.Attributes/EffectContractAttribute.cs"
             ],
             ["analyzerDiagnosticCatalog"] = [
                 "SharpProof.Analyzer/AnalyzerDiagnostic.catalog.json",
@@ -690,6 +695,7 @@ public sealed class ArchitectureTests
             ],
             ["policy"] = [
                 "SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs",
+                "SharpProof.Analyzer/AnalyzerGeneratedCodePolicy.cs",
                 "SharpProof.Analyzer/LanguageSubsetGate.cs",
                 "SharpProof.Analyzer/SharpProofControlAttributePolicy.cs",
                 "SharpProof.Effects/TrustedBoundaryPolicy.cs",
@@ -796,7 +802,11 @@ public sealed class ArchitectureTests
                 .And.Contain("SharpProof.Frontend/OperationSubsetClassifier.cs")
                 .And.Contain("SharpProof.Frontend/FrontendSubset.cs")
                 .And.Contain("SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs")
-                .And.Contain("SharpProof.Analyzer/SharpProofControlAttributePolicy.cs"));
+                .And.Contain("SharpProof.Analyzer/SharpProofControlAttributePolicy.cs")
+                .And.Contain("SharpProof.Verify/Backend.cs")
+                .And.Contain("SharpProof.Contracts/ContractApiSymbols.cs")
+                .And.Contain("SharpProof.Analyzer/AnalyzerGeneratedCodePolicy.cs")
+                .And.Contain("SharpProof.Attributes/EffectContractAttribute.cs"));
         Assert.That(
             File.ReadAllText(Path.Combine(
                 RepositoryRoot(),
