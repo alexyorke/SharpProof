@@ -745,17 +745,37 @@ public sealed class PackageLayoutSmokeTests
                     .GetProperty("schemaVersion")
                     .GetInt32(),
                 Is.EqualTo(9));
-            var eventKinds = manifest.RootElement
+            var effectClaims = manifest.RootElement
                 .GetProperty("callables")
                 .EnumerateArray()
                 .SelectMany(static callable => callable
                     .GetProperty("effectClaims")
                     .EnumerateArray())
-                .Select(static claim => claim
-                    .GetProperty("replay")
-                    .GetProperty("events")[0]
-                    .GetProperty("kind")
-                    .GetString())
+                .ToArray();
+            Assert.That(effectClaims, Has.Length.EqualTo(2));
+            Assert.That(
+                effectClaims.Select(static claim => claim
+                    .GetProperty("claimId")
+                    .GetString()),
+                Is.Unique.And.All.Not.Empty);
+            var eventKinds = effectClaims
+                .Select(static claim =>
+                {
+                    var replay = claim.GetProperty("replay");
+                    Assert.That(
+                        replay.ValueKind,
+                        Is.EqualTo(JsonValueKind.Object),
+                        claim.GetRawText());
+                    var events = replay
+                        .GetProperty("events")
+                        .EnumerateArray()
+                        .ToArray();
+                    Assert.That(
+                        events,
+                        Has.Length.EqualTo(1),
+                        claim.GetProperty("claimId").GetString());
+                    return events[0].GetProperty("kind").GetString();
+                })
                 .OrderBy(static kind => kind, StringComparer.Ordinal)
                 .ToArray();
             Assert.That(

@@ -1135,6 +1135,11 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
         _states[key] = _states.TryGetValue(key, out var current) ? ManagedFlowState.Join(current, state) : state;
     }
 
+    internal static bool HasSameIdentity(IOperation operation, IOperation? candidate)
+    {
+        return candidate is not null && Key(operation).Equals(Key(candidate));
+    }
+
     private static (SyntaxTree, int, int, OperationKind) Key(IOperation operation)
     {
         return (operation.Syntax.SyntaxTree, operation.Syntax.SpanStart, operation.Syntax.Span.Length, operation.Kind);

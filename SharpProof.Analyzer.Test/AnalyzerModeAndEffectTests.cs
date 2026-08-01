@@ -1008,6 +1008,39 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task FreshAggregateBorrowedContentCannotProvePurity()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Box {
+                public int Value;
+            }
+
+            public static class Fixture {
+                [EnforcePure]
+                public static void Mutate(Box box) {
+                    var holder = new[] { box };
+                    var alias = holder[0];
+                    alias.Value = 1;
+                }
+            }
+            """,
+            "effects",
+            ["SP0002"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0002"]));
+        Assert.That(
+            factory.Outcomes["Mutate"],
+            Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+    }
+
+    [Test]
     public async Task ExactConstantAndPropertyIncrementEffectsSatisfyContracts()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

@@ -168,6 +168,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~CatchVariableFlowUsesTheEffectDiscoveryCatalog'
     },
     [pscustomobject]@{
+        Name = 'effect-fresh-field-content-provenance'
+        File = 'SharpProof.Effects\OperationEffectScanner.cs'
+        Original = '            IFieldReferenceOperation => EffectRegionSet.Unknown,'
+        Mutated = '            IFieldReferenceOperation field => ClassifyRegion(field.Instance, aliasSource),'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~FreshObjectContentsDoNotBecomeFreshOwnedAliases'
+    },
+    [pscustomobject]@{
+        Name = 'effect-fresh-array-content-provenance'
+        File = 'SharpProof.Effects\OperationEffectScanner.cs'
+        Original = '            IArrayElementReferenceOperation => EffectRegionSet.Unknown,'
+        Mutated = '            IArrayElementReferenceOperation element => ClassifyRegion(element.ArrayReference, aliasSource),'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~FreshArrayContentsDoNotBecomeFreshOwnedAliases'
+    },
+    [pscustomobject]@{
         Name = 'effect-region-contract-catalog'
         File = 'SharpProof.Effects\EffectContractMappings.generated.cs'
         Original = '        (EffectRegionKind.Receiver, EffectContractKind.ReadsReceiverState, EffectContractKind.WritesReceiverState, EffectRegionId.Receiver, false),'

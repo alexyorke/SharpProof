@@ -708,6 +708,143 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void FreshArrayContentsDoNotBecomeFreshOwnedAliases()
+    {
+        var result = Analyze(
+            """
+            public sealed class Box {
+                public int Value;
+            }
+
+            public static class Sample {
+                public static void Mutate(Box value) {
+                    var holder = new[] { value };
+                    var alias = holder[0];
+                    alias.Value = 1;
+                }
+            }
+            """,
+            "Sample",
+            "Mutate");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Summary.Writes.IsEmpty, Is.False);
+            Assert.That(
+                result.Summary.Writes.IsUnknown ||
+                result.Summary.Writes.Regions.Any(
+                    static region => region.Kind != EffectRegionKind.Fresh),
+                Is.True);
+            Assert.That(
+                EffectContractMappings.IsObservablePure(result.Summary),
+                Is.False);
+        }
+    }
+
+    [Test]
+    public void FreshObjectContentsDoNotBecomeFreshOwnedAliases()
+    {
+        var result = Analyze(
+            """
+            public sealed class Box {
+                public int Value;
+            }
+
+            public sealed class Holder {
+                public Box Child = null!;
+            }
+
+            public static class Sample {
+                public static void Mutate(Box value) {
+                    var holder = new Holder();
+                    holder.Child = value;
+                    var alias = holder.Child;
+                    alias.Value = 1;
+                }
+            }
+            """,
+            "Sample",
+            "Mutate");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Summary.Writes.IsEmpty, Is.False);
+            Assert.That(
+                result.Summary.Writes.IsUnknown ||
+                result.Summary.Writes.Regions.Any(
+                    static region => region.Kind != EffectRegionKind.Fresh),
+                Is.True);
+            Assert.That(
+                EffectContractMappings.IsObservablePure(result.Summary),
+                Is.False);
+        }
+    }
+
+    [Test]
+    public void NestedFreshContainerContentsDoNotBecomeFreshOwnedAliases()
+    {
+        var result = Analyze(
+            """
+            public sealed class Box {
+                public int Value;
+            }
+
+            public static class Sample {
+                public static void Mutate(Box value) {
+                    var inner = new[] { value };
+                    var outer = new[] { inner };
+                    outer[0][0].Value = 1;
+                }
+            }
+            """,
+            "Sample",
+            "Mutate");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Summary.Writes.IsEmpty, Is.False);
+            Assert.That(
+                result.Summary.Writes.IsUnknown ||
+                result.Summary.Writes.Regions.Any(
+                    static region => region.Kind != EffectRegionKind.Fresh),
+                Is.True);
+            Assert.That(
+                EffectContractMappings.IsObservablePure(result.Summary),
+                Is.False);
+        }
+    }
+
+    [Test]
+    public void FreshValueArrayStorageRemainsFreshOwned()
+    {
+        var result = Analyze(
+            """
+            public static class Sample {
+                public static void Mutate() {
+                    var values = new int[1];
+                    values[0] = 1;
+                }
+            }
+            """,
+            "Sample",
+            "Mutate");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Summary.Writes.IsUnknown, Is.False);
+            Assert.That(result.Summary.Writes.IsEmpty, Is.False);
+            Assert.That(
+                result.Summary.Writes.Regions,
+                Has.All.Property(nameof(EffectRegionId.Kind))
+                    .EqualTo(EffectRegionKind.Fresh));
+            Assert.That(result.Projection.IsComplete, Is.True);
+            Assert.That(
+                EffectContractMappings.IsObservablePure(result.Summary),
+                Is.True);
+        }
+    }
+
+    [Test]
     public void TrustedCompleteExternalContractIsTheCapabilityOverride()
     {
         var externalReference = EffectTestHost.EmitReference(
