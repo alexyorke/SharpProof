@@ -104,6 +104,29 @@ function ConvertTo-CSharpString {
     return '"' + $Value.Replace('\', '\\').Replace('"', '\"') + '"'
 }
 
+function Get-MetadataRowExpression {
+    param([string]$Role, [string]$Member)
+
+    switch ($Role) {
+        'direct' { return "value.$Member" }
+        'stringValue' { return "_factory.GetString(value.$Member)" }
+        'optionalStringValue' {
+            return (
+                "value.$Member.HasValue ? " +
+                "_factory.GetString(value.$Member.Value) : null")
+        }
+        'typeIndex' { return "TypeIndex(value.$Member)" }
+        'optionalTypeIndex' {
+            return (
+                "value.$Member.HasValue ? " +
+                "TypeIndex(value.$Member.Value) : -1")
+        }
+        'typeIndices' { return "[.. value.$Member.Select(TypeIndex)]" }
+        'identityIndex' { return "_identities.Add(value.$Member)" }
+        default { throw "Unsupported metadata-row projection role '$Role'." }
+    }
+}
+
 function New-GeneratedOutput {
     param([string]$OutputName)
 
@@ -677,6 +700,111 @@ foreach ($domain in $slotDomains) {
     }
     $portableLines.Add('    ];')
 }
+$portableLines.Add('}')
+
+$metadataRowMappings = @(
+    Get-RequiredMember $schema 'portableIrMetadataRowMappings' 'schema')
+$expectedMetadataRows = @(
+    [pscustomobject]@{
+        Method = 'TypeRow'
+        SourceType = 'IrTypeId'
+        RowType = 'PortableIrType'
+        InfoMethod = 'GetTypeInfo'
+        ArgumentCount = 3
+    },
+    [pscustomobject]@{
+        Method = 'VariableRow'
+        SourceType = 'IrVarId'
+        RowType = 'PortableIrVariable'
+        InfoMethod = 'GetVariableInfo'
+        ArgumentCount = 2
+    },
+    [pscustomobject]@{
+        Method = 'MemberRow'
+        SourceType = 'IrMemberId'
+        RowType = 'PortableIrMember'
+        InfoMethod = 'GetMemberInfo'
+        ArgumentCount = 6
+    },
+    [pscustomobject]@{
+        Method = 'OperationRow'
+        SourceType = 'OperationId'
+        RowType = 'PortableIrOperation'
+        InfoMethod = 'GetOperationInfo'
+        ArgumentCount = 1
+    })
+if ($metadataRowMappings.Count -ne $expectedMetadataRows.Count) {
+    throw (
+        'Portable IR metadata-row mappings must contain exactly ' +
+        "$($expectedMetadataRows.Count) rows.")
+}
+$metadataMethods = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal)
+$portableLines.Add('')
+$portableLines.Add('internal static partial class PortableIrGraphCodec')
+$portableLines.Add('{')
+$portableLines.Add('    private sealed partial class Encoder')
+$portableLines.Add('    {')
+for ($mappingIndex = 0;
+    $mappingIndex -lt $metadataRowMappings.Count;
+    $mappingIndex++) {
+    $mapping = $metadataRowMappings[$mappingIndex]
+    $expected = $expectedMetadataRows[$mappingIndex]
+    Assert-Properties `
+        -Object $mapping `
+        -Allowed @('method', 'sourceType', 'rowType', 'infoMethod', 'arguments') `
+        -Context 'portable IR metadata-row mapping'
+    $method = [string]$mapping.method
+    $sourceType = [string]$mapping.sourceType
+    $rowType = [string]$mapping.rowType
+    $infoMethod = [string]$mapping.infoMethod
+    foreach ($value in @($method, $sourceType, $rowType, $infoMethod)) {
+        Assert-Identifier $value 'Portable IR metadata-row identifier'
+    }
+    if (-not $metadataMethods.Add($method)) {
+        throw "Duplicate portable IR metadata-row method '$method'."
+    }
+    if ($method -cne $expected.Method -or
+        $sourceType -cne $expected.SourceType -or
+        $rowType -cne $expected.RowType -or
+        $infoMethod -cne $expected.InfoMethod) {
+        throw (
+            "Portable IR metadata-row mapping $mappingIndex must be " +
+            "'$($expected.Method)($($expected.SourceType)) -> " +
+            "$($expected.RowType)' using '$($expected.InfoMethod)'.")
+    }
+    $arguments = @($mapping.arguments)
+    if ($arguments.Count -ne $expected.ArgumentCount) {
+        throw (
+            "Portable IR metadata-row method '$method' must define " +
+            "$($expected.ArgumentCount) arguments.")
+    }
+    $expressions = [Collections.Generic.List[string]]::new()
+    foreach ($argument in $arguments) {
+        Assert-Properties `
+            -Object $argument `
+            -Allowed @('role', 'member') `
+            -Context "portable IR metadata-row method '$method' argument"
+        $role = [string]$argument.role
+        $member = [string]$argument.member
+        Assert-Identifier $member "Portable IR metadata-row method '$method' member"
+        $expressions.Add((Get-MetadataRowExpression $role $member))
+    }
+
+    $portableLines.Add('')
+    $portableLines.Add("        private $rowType $method($sourceType id)")
+    $portableLines.Add('        {')
+    $portableLines.Add("            var value = _factory.$infoMethod(id);")
+    $portableLines.Add('            return new(')
+    for ($argumentIndex = 0;
+        $argumentIndex -lt $expressions.Count;
+        $argumentIndex++) {
+        $suffix = if ($argumentIndex -lt $expressions.Count - 1) { ',' } else { ');' }
+        $portableLines.Add("                $($expressions[$argumentIndex])$suffix")
+    }
+    $portableLines.Add('        }')
+}
+$portableLines.Add('    }')
 $portableLines.Add('}')
 
 $portableProjectionSource = @'

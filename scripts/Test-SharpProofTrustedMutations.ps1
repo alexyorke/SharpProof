@@ -104,6 +104,38 @@ $mutations = @(
         Filter = 'FullyQualifiedName~DecoderRejectsNonCanonicalSlots'
     },
     [pscustomobject]@{
+        Name = 'portable-codec-metadata-optional-type-index'
+        File = 'SharpProof.CompilerArtifact\PortableIrModel.generated.cs'
+        Original = '                value.ElementType.HasValue ? TypeIndex(value.ElementType.Value) : -1);'
+        Mutated = '                -1);'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~MetadataRowsProjectEveryDeclaredValue'
+    },
+    [pscustomobject]@{
+        Name = 'portable-codec-metadata-member-identity'
+        File = 'SharpProof.CompilerArtifact\PortableIrModel.generated.cs'
+        Original = '                _identities.Add(value.Identity),'
+        Mutated = '                -1,'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~MetadataRowsProjectEveryDeclaredValue'
+    },
+    [pscustomobject]@{
+        Name = 'portable-codec-metadata-parameter-types'
+        File = 'SharpProof.CompilerArtifact\PortableIrModel.generated.cs'
+        Original = '                [.. value.ParameterTypes.Select(TypeIndex)]);'
+        Mutated = '                []);'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~MetadataRowsProjectEveryDeclaredValue'
+    },
+    [pscustomobject]@{
+        Name = 'portable-codec-metadata-operation-description'
+        File = 'SharpProof.CompilerArtifact\PortableIrModel.generated.cs'
+        Original = '                value.Description.HasValue ? _factory.GetString(value.Description.Value) : null);'
+        Mutated = '                null);'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~MetadataRowsProjectEveryDeclaredValue'
+    },
+    [pscustomobject]@{
         Name = 'collector-option-output-kind'
         File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerWireMappings.generated.cs'
         Original = '            OutputKind.ConsoleApplication => CompilerOutputKind.ConsoleApplication,'

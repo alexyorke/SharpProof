@@ -652,6 +652,7 @@ public sealed class ArchitectureTests
             ["compilerWireCatalog"] = [
                 "SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json",
                 "scripts/Generate-CompilerArtifactModel.ps1",
+                "scripts/Test-CompilerArtifactModelGenerator.ps1",
                 "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
                 "SharpProof.CompilerCollector/CompilerArtifact/CompilerWireMappings.generated.cs"
             ],

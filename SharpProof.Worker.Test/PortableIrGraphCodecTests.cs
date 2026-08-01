@@ -112,6 +112,67 @@ public sealed class PortableIrGraphCodecTests
     }
 
     [Test]
+    public void MetadataRowsProjectEveryDeclaredValue()
+    {
+        var factory = new IrFactory();
+        var sequenceType = factory.GetOrCreateSequenceType(
+            factory.CreateIdentity(),
+            factory.IntegerType,
+            "Numbers");
+        var items = factory.CreateVariable("items", sequenceType);
+        var member = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            factory.ObjectType,
+            "Transform",
+            factory.IntegerType,
+            isStatic: true,
+            sequenceType);
+        IrTerm[] roots = [
+            factory.ImpureOpaque(
+                factory.CreateOperation(),
+                member,
+                null,
+                factory.Variable(items)),
+            factory.ImpureOpaque(
+                factory.CreateOperation("described"),
+                member,
+                null,
+                factory.Variable(items))
+        ];
+
+        var graph = PortableIrGraphCodec.Encode(
+            factory,
+            program: null,
+            roots,
+            [items]).Graph;
+        var sequenceIndex = Array.FindIndex(
+            graph.Types,
+            static row => row.Name == "Numbers");
+        var integerIndex = Array.FindIndex(
+            graph.Types,
+            static row => row.Kind == IrTypeKind.Integer);
+        var variable = graph.Variables.Single(static row => row.Name == "items");
+        var memberRow = graph.Members.Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(sequenceIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(graph.Types[sequenceIndex].Kind, Is.EqualTo(IrTypeKind.Sequence));
+            Assert.That(graph.Types[sequenceIndex].Element, Is.EqualTo(integerIndex));
+            Assert.That(variable.Type, Is.EqualTo(sequenceIndex));
+            Assert.That(memberRow.Identity, Is.EqualTo(0));
+            Assert.That(memberRow.DeclaringType, Is.GreaterThanOrEqualTo(0));
+            Assert.That(memberRow.Name, Is.EqualTo("Transform"));
+            Assert.That(memberRow.ReturnType, Is.EqualTo(integerIndex));
+            Assert.That(memberRow.IsStatic, Is.True);
+            Assert.That(memberRow.ParameterTypes, Is.EqualTo([sequenceIndex]));
+            Assert.That(
+                graph.Operations.Select(static row => row.Description),
+                Is.EqualTo(new string?[] { null, "described" }));
+        }
+    }
+
+    [Test]
     public void RoundTripPreservesEveryWireEnumVariant()
     {
         var factory = new IrFactory();

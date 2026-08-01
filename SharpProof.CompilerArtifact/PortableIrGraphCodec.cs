@@ -170,7 +170,7 @@ internal static partial class PortableIrGraphCodec
         }
     }
 
-    private sealed class Encoder
+    private sealed partial class Encoder
     {
         private readonly IrFactory _factory;
         private readonly IrProgram? _program;
@@ -236,40 +236,6 @@ internal static partial class PortableIrGraphCodec
             };
             return new EncodedPortableIrGraph(
                 graph, _variables.Indices, _instructionIndices);
-        }
-
-        private PortableIrType TypeRow(IrTypeId id)
-        {
-            var value = _factory.GetTypeInfo(id);
-            return new(
-                value.Kind,
-                _factory.GetString(value.Name),
-                value.ElementType.HasValue ? TypeIndex(value.ElementType.Value) : -1);
-        }
-
-        private PortableIrVariable VariableRow(IrVarId id)
-        {
-            var value = _factory.GetVariableInfo(id);
-            return new(_factory.GetString(value.Name), TypeIndex(value.Type));
-        }
-
-        private PortableIrMember MemberRow(IrMemberId id)
-        {
-            var value = _factory.GetMemberInfo(id);
-            return new(
-                _identities.Add(value.Identity),
-                TypeIndex(value.DeclaringType),
-                _factory.GetString(value.Name),
-                TypeIndex(value.ReturnType),
-                value.IsStatic,
-                [.. value.ParameterTypes.Select(TypeIndex)]);
-        }
-
-        private PortableIrOperation OperationRow(OperationId id)
-        {
-            var value = _factory.GetOperationInfo(id);
-            return new(value.Description.HasValue ?
-                _factory.GetString(value.Description.Value) : null);
         }
 
         private PortableIrTerm TermRow(IrId id)

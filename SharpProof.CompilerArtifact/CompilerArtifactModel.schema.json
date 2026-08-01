@@ -2665,6 +2665,52 @@
       { "kind": "Return", "slots": ["optionalTermIndex", "unused", "unused", "unused", "empty", "unused"] }
     ]
   },
+  "portableIrMetadataRowMappings": [
+    {
+      "method": "TypeRow",
+      "sourceType": "IrTypeId",
+      "rowType": "PortableIrType",
+      "infoMethod": "GetTypeInfo",
+      "arguments": [
+        { "role": "direct", "member": "Kind" },
+        { "role": "stringValue", "member": "Name" },
+        { "role": "optionalTypeIndex", "member": "ElementType" }
+      ]
+    },
+    {
+      "method": "VariableRow",
+      "sourceType": "IrVarId",
+      "rowType": "PortableIrVariable",
+      "infoMethod": "GetVariableInfo",
+      "arguments": [
+        { "role": "stringValue", "member": "Name" },
+        { "role": "typeIndex", "member": "Type" }
+      ]
+    },
+    {
+      "method": "MemberRow",
+      "sourceType": "IrMemberId",
+      "rowType": "PortableIrMember",
+      "infoMethod": "GetMemberInfo",
+      "arguments": [
+        { "role": "identityIndex", "member": "Identity" },
+        { "role": "typeIndex", "member": "DeclaringType" },
+        { "role": "stringValue", "member": "Name" },
+        { "role": "typeIndex", "member": "ReturnType" },
+        { "role": "direct", "member": "IsStatic" },
+        { "role": "typeIndices", "member": "ParameterTypes" }
+      ]
+    },
+    {
+      "method": "OperationRow",
+      "sourceType": "OperationId",
+      "rowType": "PortableIrOperation",
+      "infoMethod": "GetOperationInfo",
+      "arguments": [
+        { "role": "optionalStringValue", "member": "Description" }
+      ]
+    }
+  ],
   "collectorWireMappings": [
     {
       "name": "OutputKind",
