@@ -558,6 +558,14 @@ $mutations = @(
         Mutated = 'MaximumBytes = 32 * 1024 * 1024;'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~CompilerManifestByteLimitIsEnforcedBeforeAllocation'
+    },
+    [pscustomobject]@{
+        Name = 'protocol-json-depth-limit'
+        File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
+        Original = 'MaximumJsonDepth = 32;'
+        Mutated = 'MaximumJsonDepth = 64;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~DeserializationRejectsDocumentsBeyondTheDeclaredDepth'
     }
 )
 

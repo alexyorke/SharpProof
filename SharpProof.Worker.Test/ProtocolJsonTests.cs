@@ -98,6 +98,31 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void DeserializationRejectsDocumentsBeyondTheDeclaredDepth()
+    {
+        var prefix = string.Concat(Enumerable.Repeat(
+            "{\"nested\":",
+            WorkerProtocolJson.MaximumJsonDepth + 1));
+        var json = prefix + "0" + new string(
+            '}',
+            WorkerProtocolJson.MaximumJsonDepth + 1);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                WorkerProtocolJson.Options.MaxDepth,
+                Is.EqualTo(WorkerProtocolJson.MaximumJsonDepth));
+            Assert.That(
+                (Action)(() => WorkerProtocolJson.DeserializeRequest(json)),
+                Throws.InstanceOf<JsonException>());
+            Assert.That(
+                (Action)(() =>
+                    CompilerManifestArtifactJson.Deserialize(json)),
+                Throws.InstanceOf<JsonException>());
+        }
+    }
+
+    [Test]
     public void CompilerManifestArtifactIsCanonicalAndCarriesAssumptions()
     {
         var compilation = CreateCompilation();

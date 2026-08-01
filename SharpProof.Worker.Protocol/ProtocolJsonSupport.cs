@@ -15,7 +15,9 @@ public static partial class WorkerProtocolJson
     {
         json = json ?? throw new ArgumentNullException(nameof(json));
 
-        using var document = JsonDocument.Parse(json);
+        using var document = JsonDocument.Parse(
+            json,
+            new JsonDocumentOptions { MaxDepth = MaximumJsonDepth });
         if (document.RootElement.ValueKind != JsonValueKind.Object)
         {
             throw new JsonException("A JSON object is required.");
@@ -66,6 +68,7 @@ public static partial class WorkerProtocolJson
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             PropertyNameCaseInsensitive = false,
             WriteIndented = false,
+            MaxDepth = MaximumJsonDepth,
             UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
         };
         options.Converters.Add(new JsonStringEnumConverter(
