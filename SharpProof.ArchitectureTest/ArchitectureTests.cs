@@ -23,7 +23,10 @@ public sealed class ArchitectureTests
         };
 
     private static readonly string[] ProductionProjects = [
+        "SharpProof.Analyzer",
+        "SharpProof.Attributes",
         "SharpProof.Ir",
+        "SharpProof.Meta.Analyzers",
         "SharpProof.PortableAnalyzer",
         "SharpProof.CompilerArtifact",
         "SharpProof.CompilerCollector",
