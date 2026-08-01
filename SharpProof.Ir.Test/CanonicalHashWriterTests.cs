@@ -69,6 +69,20 @@ public sealed class CanonicalHashWriterTests
     }
 
     [Test]
+    public void StreamFramesPreserveByteArrayIdentity()
+    {
+        byte[] bytes = [0, 1, 2, 3];
+        using var arrayWriter = new CanonicalHashWriter();
+        using var streamWriter = new CanonicalHashWriter();
+        using var stream = new MemoryStream(bytes, writable: false);
+        var expected = arrayWriter.Add(bytes).Finish();
+
+        Assert.That(
+            streamWriter.Add(stream).Finish(),
+            Is.EqualTo(expected));
+    }
+
+    [Test]
     public void FinishedWriterRejectsFurtherUse()
     {
         using var writer = new CanonicalHashWriter();

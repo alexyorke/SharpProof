@@ -37,6 +37,22 @@ internal static class CompilerArtifactInputHash
 
 internal static class WorkerBinaryIdentity
 {
+    internal const int MaximumComponentKeyCharacters = 256;
+    internal const int MaximumRuntimeComponents = 64;
+    internal const long MaximumComponentBytes = 32L * 1024 * 1024;
+    internal const long MaximumClosureBytes = 64L * 1024 * 1024;
+    internal const long MaximumDependenciesBytes = 1024L * 1024;
+    internal const long MaximumRuntimeConfigBytes = 64L * 1024;
+    private static readonly Dictionary<string, long>
+        s_componentLimitReductions = new Dictionary<string, long>(
+            StringComparer.Ordinal)
+        {
+            ["dependencies"] =
+                MaximumComponentBytes - MaximumDependenciesBytes,
+            ["runtimeConfig"] =
+                MaximumComponentBytes - MaximumRuntimeConfigBytes
+        };
+
     internal static string ComputeSha256(string workerPath)
     {
         var path = Path.GetFullPath(workerPath);
@@ -51,12 +67,52 @@ internal static class WorkerBinaryIdentity
 
         using var hash = new CanonicalHashWriter();
         hash.Add("SharpProof.WorkerBinarySet", 1);
-        foreach (var component in RuntimeComponents(path))
+        var components = RuntimeComponents(path);
+        ValidateComponentCount(components.Count);
+
+        long totalBytes = 0;
+        foreach (var component in components)
         {
-            hash.Add(component.Key).Add(File.ReadAllBytes(component.Value));
+            using var stream = OpenRead(component.Value);
+            var length = stream.Length;
+            ValidateComponentLength(component.Key, length, ref totalBytes);
+            hash.Add(component.Key).Add(stream);
         }
 
         return hash.Finish();
+    }
+
+    internal static void ValidateComponentCount(int count)
+    {
+        if (count > MaximumRuntimeComponents)
+        {
+            throw new InvalidDataException(
+                "The worker runtime closure contains too many components.");
+        }
+    }
+
+    internal static void ValidateComponentLength(
+        string key,
+        long length,
+        ref long totalBytes)
+    {
+        if (key.Length > MaximumComponentKeyCharacters)
+        {
+            throw new InvalidDataException(
+                "A worker runtime component identity is too long.");
+        }
+
+        s_componentLimitReductions.TryGetValue(key, out var reduction);
+        var excess = Math.Max(
+            length - (MaximumComponentBytes - reduction),
+            totalBytes - (MaximumClosureBytes - length));
+        if (excess > 0)
+        {
+            throw new InvalidDataException(
+                "The worker runtime closure exceeds its byte limits.");
+        }
+
+        totalBytes += length;
     }
 
     private static SortedDictionary<string, string> RuntimeComponents(string workerPath)
@@ -70,7 +126,15 @@ internal static class WorkerBinaryIdentity
             ["dependencies"] = dependencies,
             ["runtimeConfig"] = Path.ChangeExtension(workerPath, ".runtimeconfig.json")
         };
-        using var document = JsonDocument.Parse(File.ReadAllBytes(dependencies));
+        using var dependencyStream = OpenRead(dependencies);
+        long dependencyBytes = 0;
+        ValidateComponentLength(
+            "dependencies",
+            dependencyStream.Length,
+            ref dependencyBytes);
+        using var document = JsonDocument.Parse(
+            dependencyStream,
+            new JsonDocumentOptions { MaxDepth = 32 });
         var root = document.RootElement;
         var targetName = root.GetProperty("runtimeTarget").GetProperty("name").GetString() ??
             throw new InvalidDataException("The worker runtime target is unavailable.");
@@ -81,6 +145,15 @@ internal static class WorkerBinaryIdentity
         }
 
         return result;
+    }
+
+    private static FileStream OpenRead(string path)
+    {
+        return new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read);
     }
 
     private static void AddLibraryAssets(

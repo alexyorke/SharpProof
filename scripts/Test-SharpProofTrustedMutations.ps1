@@ -544,6 +544,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~StrictResponseValidationRequiresExactManifestAndResultSets'
     },
     [pscustomobject]@{
+        Name = 'worker-runtime-component-byte-limit'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = 'internal const long MaximumComponentBytes = 32L * 1024 * 1024;'
+        Mutated = 'internal const long MaximumComponentBytes = 64L * 1024 * 1024;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~RuntimeClosureLimitsFailClosedAtEveryBoundary'
+    },
+    [pscustomobject]@{
         Name = 'launcher-argument-query-budget-projection'
         File = 'SharpProof.Worker.Launcher\LauncherArguments.generated.cs'
         Original = 'QueryRlimit = Number("query-rlimit", WorkerBudgets.DefaultQueryRlimit),'
