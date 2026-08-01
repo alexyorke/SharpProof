@@ -114,7 +114,7 @@ $mutations = @(
         Original = "                row.A,`n                row.B,`n                row.C,`n                row.D,"
         Mutated = "                row.A,`n                -1,`n                row.C,`n                row.D,"
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
-        Filter = 'FullyQualifiedName~DecoderRejectsNonCanonicalSlots'
+        Filter = 'FullyQualifiedName~DecoderRejectsNonCanonicalSlotsAfterSerialization'
     },
     [pscustomobject]@{
         Name = 'portable-codec-metadata-optional-type-index'
