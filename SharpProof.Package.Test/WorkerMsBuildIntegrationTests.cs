@@ -106,17 +106,23 @@ public sealed class WorkerMsBuildIntegrationTests
                 "--pre-main-marker", marker],
             Path.GetDirectoryName(worker)!);
 
-        await Task.Delay(250);
-        Assert.That(File.Exists(marker), Is.False,
-            "A suspended worker must not execute its module initializer.");
+        try
+        {
+            await Task.Delay(250);
+            Assert.That(File.Exists(marker), Is.False,
+                "A suspended worker must not execute its module initializer.");
 
-        process.Resume();
-        Assert.That(
-            SpinWait.SpinUntil(() => File.Exists(marker), 5_000),
-            Is.True,
-            "The worker did not execute after resume.");
-        boundary.Terminate(124);
-        Assert.That(process.WaitForExit(5_000), Is.True);
+            process.Resume();
+            Assert.That(
+                SpinWait.SpinUntil(() => File.Exists(marker), 5_000),
+                Is.True,
+                "The worker did not execute after resume.");
+        }
+        finally
+        {
+            boundary.Terminate(124);
+            Assert.That(process.WaitForExit(5_000), Is.True);
+        }
     }
 
     [Test]
