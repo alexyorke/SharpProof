@@ -607,6 +607,10 @@ public sealed class ArchitectureTests
                 "scripts/Generate-LauncherArguments.ps1",
                 "SharpProof.Worker.Launcher/LauncherArguments.generated.cs"
             ],
+            ["generatedOutputPolicy"] = [
+                "eng/generated/approved-outputs.v1.json",
+                "scripts/Test-ProductionCSharpComplexity.ps1"
+            ],
             ["declarativeModelsCatalog"] = [
                 "SharpProof.DeclarativeModels.catalog.json",
                 "scripts/Generate-DeclarativeModels.ps1",

@@ -190,6 +190,13 @@
         ]
       },
       {
+        "name": "generatedOutputPolicy",
+        "paths": [
+          "eng/generated/approved-outputs.v1.json",
+          "scripts/Test-ProductionCSharpComplexity.ps1"
+        ]
+      },
+      {
         "name": "declarativeModelsCatalog",
         "paths": [
           "SharpProof.DeclarativeModels.catalog.json",
