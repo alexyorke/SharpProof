@@ -4,6 +4,7 @@ param(
     [Parameter()][Alias('OutputPath')][string]$ModelOutputPath,
     [Parameter()][string]$PortableOutputPath,
     [Parameter()][string]$CompilationOutputPath,
+    [Parameter()][string]$CollectorOutputPath,
     [Parameter()][Alias('Check')][switch]$Verify
 )
 
@@ -29,10 +30,15 @@ if ([string]::IsNullOrWhiteSpace($CompilationOutputPath)) {
     $CompilationOutputPath = Join-Path $repositoryRoot `
         'SharpProof.CompilerArtifact\CompilerCompilationModel.generated.cs'
 }
+if ([string]::IsNullOrWhiteSpace($CollectorOutputPath)) {
+    $CollectorOutputPath = Join-Path $repositoryRoot `
+        'SharpProof.CompilerCollector\CompilerArtifact\CompilerWireMappings.generated.cs'
+}
 $SchemaPath = [IO.Path]::GetFullPath($SchemaPath)
 $ModelOutputPath = [IO.Path]::GetFullPath($ModelOutputPath)
 $PortableOutputPath = [IO.Path]::GetFullPath($PortableOutputPath)
 $CompilationOutputPath = [IO.Path]::GetFullPath($CompilationOutputPath)
+$CollectorOutputPath = [IO.Path]::GetFullPath($CollectorOutputPath)
 if (-not [IO.File]::Exists($SchemaPath)) {
     throw "Compiler-artifact schema not found: $SchemaPath"
 }
@@ -55,6 +61,25 @@ function Get-MemberArray {
         return @()
     }
     return @($member.Value)
+}
+
+function Assert-Properties {
+    param(
+        [object]$Object,
+        [string[]]$Allowed,
+        [string]$Context)
+
+    $actual = @($Object.PSObject.Properties.Name)
+    foreach ($name in $actual) {
+        if ($name -notin $Allowed) {
+            throw "$Context contains unsupported property '$name'."
+        }
+    }
+    foreach ($name in $Allowed) {
+        if ($name -notin $actual) {
+            throw "$Context is missing required property '$name'."
+        }
+    }
 }
 
 function Assert-Identifier {
@@ -331,6 +356,7 @@ if ($namespace -ne 'SharpProof.CompilerArtifact') {
 $modelLines = New-GeneratedOutput 'CompilerArtifactModel.generated.cs'
 $portableLines = New-GeneratedOutput 'PortableIrModel.generated.cs'
 $compilationLines = New-GeneratedOutput 'CompilerCompilationModel.generated.cs'
+$collectorLines = New-GeneratedOutput 'CompilerWireMappings.generated.cs'
 
 foreach ($declaration in $declarations) {
     $kind = [string](Get-RequiredMember $declaration 'kind' 'declaration')
@@ -495,15 +521,15 @@ foreach ($declaration in $declarations) {
 $envelope = Get-RequiredMember $schema 'artifactEnvelope' 'schema'
 if ([string](Get-RequiredMember $envelope 'schema' 'artifact envelope') -ne
         'SharpProof.CompilerManifest' -or
-    [int](Get-RequiredMember $envelope 'version' 'artifact envelope') -ne 8) {
-    throw 'The compiler-artifact envelope must remain schema version 8.'
+    [int](Get-RequiredMember $envelope 'version' 'artifact envelope') -ne 9) {
+    throw 'The compiler-artifact envelope must remain schema version 9.'
 }
 
 $catalogs = @(Get-RequiredMember $schema 'wireEnumCatalogs' 'schema')
 $catalogFields = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)
 $portableLines.Add('')
-$portableLines.Add('internal static partial class PortableIrGraphCodec {')
+$portableLines.Add('internal static class PortableIrWireCatalog {')
 foreach ($catalog in $catalogs) {
     $field = [string](Get-RequiredMember $catalog 'field' 'wire enum catalog')
     $type = [string](Get-RequiredMember $catalog 'type' "wire catalog '$field'")
@@ -516,7 +542,7 @@ foreach ($catalog in $catalogs) {
     if ($members.Count -eq 0) {
         throw "Wire catalog '$field' cannot be empty."
     }
-    $portableLines.Add("    private static readonly $type[] $field = [")
+    $portableLines.Add("    internal static readonly $type[] $field = [")
     for ($index = 0; $index -lt $members.Count; $index++) {
         $member = [string]$members[$index]
         Assert-Identifier $member "Wire catalog '$field' member"
@@ -525,26 +551,734 @@ foreach ($catalog in $catalogs) {
     }
     $portableLines.Add('    ];')
 }
-$portableLines.Add('')
-$portableLines.Add('    internal static bool HasCompleteWireEnumCatalogs =>')
-for ($index = 0; $index -lt $catalogs.Count; $index++) {
-    $field = [string]$catalogs[$index].field
-    $ending = if ($index -lt $catalogs.Count - 1) { ' &&' } else { ';' }
-    $portableLines.Add("        IsComplete($field)$ending")
-}
-$portableLines.Add('')
-$portableLines.Add(
-    '    private static bool IsComplete<T>(T[] values) where T : struct, Enum =>')
-$portableLines.Add(
-    '        values.SequenceEqual(Enum.GetValues(typeof(T)).Cast<T>());')
 $portableLines.Add('}')
+
+$slotMappings = Get-RequiredMember $schema `
+    'portableIrSlotMappings' 'schema'
+$portableLines.Add('')
+$portableLines.Add('internal readonly struct PortableIrSlotMapping(')
+$portableLines.Add('    string kind,')
+$portableLines.Add('    string[] slots)')
+$portableLines.Add('{')
+$portableLines.Add('    internal string Kind { get; } = kind;')
+$portableLines.Add('    internal string[] Slots { get; } = slots;')
+$portableLines.Add('}')
+$slotDomains = @(
+    [pscustomobject]@{
+        Key = 'terms'
+        Name = 'Terms'
+        Enum = 'IrTermKind'
+        Kinds = @(
+            'Boolean', 'Integer', 'String', 'Null', 'Variable', 'Opaque',
+            'Unary', 'Binary', 'Conditional', 'Cast', 'Length', 'SequenceAccess')
+        Slots = @('a', 'b', 'c', 'd', 'number', 'text', 'items')
+    },
+    [pscustomobject]@{
+        Key = 'locations'
+        Name = 'Locations'
+        Enum = 'IrLocationKind'
+        Kinds = @('Member', 'Sequence')
+        Slots = @('a', 'b', 'c', 'd', 'items')
+    },
+    [pscustomobject]@{
+        Key = 'instructions'
+        Name = 'Instructions'
+        Enum = 'IrInstructionKind'
+        Kinds = @(
+            'Assign', 'Load', 'Store', 'Call', 'Assume', 'Assert', 'Havoc',
+            'Branch', 'Goto', 'Return')
+        Slots = @('a', 'b', 'c', 'd', 'items', 'location')
+    })
+$allowedSlotRoles = @(
+    'unused',
+    'empty',
+    'booleanValue',
+    'integerValue',
+    'stringValue',
+    'variableIndex',
+    'variableIndices',
+    'optionalVariableIndex',
+    'memberIndex',
+    'optionalTermIndex',
+    'termIndex',
+    'termIndices',
+    'operationWhenImpure',
+    'blockIndex',
+    'location',
+    'wire:OpaquePurities',
+    'wire:UnaryOperators',
+    'wire:BinaryOperators',
+    'wire:HavocKinds')
+$actualSlotDomains = @($slotMappings.PSObject.Properties.Name)
+foreach ($domainName in $actualSlotDomains) {
+    if ($domainName -notin $slotDomains.Key) {
+        throw "Portable IR slot mappings contain unsupported domain '$domainName'."
+    }
+}
+$slotDomainNames = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal)
+$portableLines.Add('internal static class PortableIrSlotCatalog {')
+foreach ($domain in $slotDomains) {
+    if (-not $slotDomainNames.Add($domain.Key)) {
+        throw "Duplicate portable IR slot domain '$($domain.Key)'."
+    }
+    $rows = @(Get-RequiredMember $slotMappings $domain.Key `
+        "portable IR slot domain '$($domain.Key)'")
+    if ($rows.Count -ne $domain.Kinds.Count) {
+        throw (
+            "Portable IR slot domain '$($domain.Key)' must contain " +
+            "$($domain.Kinds.Count) rows.")
+    }
+    $portableLines.Add('')
+    $portableLines.Add(
+        "    internal static readonly PortableIrSlotMapping[] $($domain.Name) = [")
+    for ($index = 0; $index -lt $rows.Count; $index++) {
+        $row = $rows[$index]
+        Assert-Properties `
+            -Object $row `
+            -Allowed @('kind', 'slots') `
+            -Context "portable IR slot mapping '$($domain.Key)'"
+        $kind = [string](Get-RequiredMember $row 'kind' `
+            "portable IR slot mapping '$($domain.Key)'")
+        if ($kind -ne $domain.Kinds[$index]) {
+            throw (
+                "Portable IR slot domain '$($domain.Key)' row $index " +
+                "must describe '$($domain.Kinds[$index])'.")
+        }
+        $slots = @($row.slots | ForEach-Object { [string]$_ })
+        if ($slots.Count -ne $domain.Slots.Count) {
+            throw (
+                "Portable IR slot mapping '$($domain.Key).$kind' must " +
+                "define $($domain.Slots.Count) slots.")
+        }
+        for ($slotIndex = 0; $slotIndex -lt $slots.Count; $slotIndex++) {
+            $role = $slots[$slotIndex]
+            if ($role -notin $allowedSlotRoles) {
+                throw (
+                    "Portable IR slot mapping '$($domain.Key).$kind' " +
+                    "has unsupported role '$role'.")
+            }
+            if ($role.StartsWith('wire:', [StringComparison]::Ordinal) -and
+                -not $catalogFields.Contains($role.Substring(5))) {
+                throw (
+                    "Portable IR slot mapping '$($domain.Key).$kind' " +
+                    "references missing wire catalog '$($role.Substring(5))'.")
+            }
+        }
+        $slotLiterals = $slots | ForEach-Object {
+            ConvertTo-CSharpString ([string]$_)
+        }
+        $portableLines.Add(
+            '    new(' +
+            (ConvertTo-CSharpString $kind) +
+            ', [' +
+            ($slotLiterals -join ', ') +
+            ']),')
+    }
+    $portableLines.Add('    ];')
+}
+$portableLines.Add('}')
+
+$portableProjectionSource = @'
+
+internal static class PortableIrGraphCodecProjections
+{
+    internal static PortableIrTerm EncodeTerm(
+        IrTerm term,
+        Func<IrTypeId, int> typeIndex,
+        Func<IrStringId, string> stringValue,
+        Func<IrVarId, int> variableIndex,
+        Func<IrTerm, int> termIndex,
+        Func<IrMemberId, int> memberIndex,
+        Func<OperationId, int> operationIndex,
+        Func<IrTerm?, int> optionalTermIndex,
+        Func<IEnumerable<IrTerm>, int[]> termIndices,
+        Func<IrOpaquePurity, int> opaquePurity,
+        Func<IrUnaryOperator, int> unaryOperator,
+        Func<IrBinaryOperator, int> binaryOperator,
+        Func<IrTerm, int, int, int, int, long, string?, int[]?, PortableIrTerm> row,
+        Func<Exception> invalid)
+    {
+        return term switch
+        {
+            IrBooleanTerm value => row(term, value.Value ? 1 : 0, -1, -1, -1, 0, null, null),
+            IrIntegerTerm value => row(term, -1, -1, -1, -1, value.Value, null, null),
+            IrStringTerm value => row(term, -1, -1, -1, -1, 0, stringValue(value.Value), null),
+            IrNullTerm => row(term, -1, -1, -1, -1, 0, null, null),
+            IrVariableTerm value => row(term, variableIndex(value.Variable), -1, -1, -1, 0, null, null),
+            IrOpaqueTerm value => row(
+                term,
+                memberIndex(value.Member),
+                optionalTermIndex(value.Receiver),
+                opaquePurity(value.Purity),
+                value.Purity == IrOpaquePurity.Pure ? -1 : operationIndex(value.Operation),
+                0,
+                null,
+                termIndices(value.Arguments)),
+            IrUnaryTerm value => row(
+                term,
+                unaryOperator(value.Operator),
+                termIndex(value.Operand),
+                -1,
+                -1,
+                0,
+                null,
+                null),
+            IrBinaryTerm value => row(
+                term,
+                binaryOperator(value.Operator),
+                termIndex(value.Left),
+                termIndex(value.Right),
+                -1,
+                0,
+                null,
+                null),
+            IrConditionalTerm value => row(
+                term,
+                termIndex(value.Condition),
+                termIndex(value.WhenTrue),
+                termIndex(value.WhenFalse),
+                -1,
+                0,
+                null,
+                null),
+            IrCastTerm value => row(term, termIndex(value.Operand), -1, -1, -1, 0, null, null),
+            IrLengthTerm value => row(term, termIndex(value.Value), -1, -1, -1, 0, null, null),
+            IrSequenceAccessTerm value => row(
+                term,
+                termIndex(value.Sequence),
+                termIndex(value.Index),
+                -1,
+                -1,
+                0,
+                null,
+                null),
+            _ => throw invalid()
+        };
+    }
+
+    internal static PortableIrLocation EncodeLocation(
+        IrLocation location,
+        Func<IrTypeId, int> typeIndex,
+        Func<IrMemberId, int> memberIndex,
+        Func<IrTerm?, int> optionalTermIndex,
+        Func<IrTerm, int> termIndex,
+        Func<IEnumerable<IrTerm>, int[]> termIndices,
+        Func<IrLocation, int, int, int[]?, PortableIrLocation> row,
+        Func<Exception> invalid)
+    {
+        return location switch
+        {
+            IrMemberLocation value => row(
+                location,
+                memberIndex(value.Member),
+                optionalTermIndex(value.Receiver),
+                termIndices(value.Arguments)),
+            IrSequenceLocation value => row(
+                location,
+                termIndex(value.Sequence),
+                termIndex(value.Index),
+                null),
+            _ => throw invalid()
+        };
+    }
+
+    internal static PortableIrInstruction EncodeInstruction(
+        IrInstruction instruction,
+        Func<OperationId, int> operationIndex,
+        Func<IrVarId, int> variableIndex,
+        Func<IrTerm, int> termIndex,
+        Func<IrVarId?, int> optionalVariableIndex,
+        Func<IrMemberId, int> memberIndex,
+        Func<IrTerm?, int> optionalTermIndex,
+        Func<IrHavocKind, int> havocKind,
+        Func<IrBlockId, int> blockIndex,
+        Func<IEnumerable<IrTerm>, int[]> termIndices,
+        Func<IEnumerable<IrVarId>, int[]> variableIndices,
+        Func<IrLocation, PortableIrLocation> location,
+        Func<IrInstruction, int, int, int, int, int[]?, PortableIrLocation?, PortableIrInstruction> row,
+        Func<Exception> invalid)
+    {
+        return instruction switch
+        {
+            IrAssignInstruction value => row(
+                instruction,
+                operationIndex(instruction.Operation),
+                variableIndex(value.Target),
+                termIndex(value.Value),
+                -1,
+                null,
+                null),
+            IrLoadInstruction value => row(
+                instruction,
+                operationIndex(instruction.Operation),
+                variableIndex(value.Target),
+                -1,
+                -1,
+                null,
+                location(value.Location)),
+            IrStoreInstruction value => row(
+                instruction,
+                operationIndex(instruction.Operation),
+                termIndex(value.Value),
+                -1,
+                -1,
+                null,
+                location(value.Location)),
+            IrCallInstruction value => row(
+                instruction,
+                operationIndex(instruction.Operation),
+                optionalVariableIndex(value.Target),
+                memberIndex(value.Member),
+                optionalTermIndex(value.Receiver),
+                termIndices(value.Arguments),
+                null),
+            IrAssumeInstruction value => row(
+                instruction,
+                operationIndex(instruction.Operation),
+                termIndex(value.Condition),
+                -1,
+                -1,
+                null,
+                null),
+            IrAssertInstruction value => row(
+                instruction,
+                operationIndex(instruction.Operation),
+                termIndex(value.Condition),
+                -1,
+                -1,
+                null,
+                null),
+            IrHavocInstruction value => row(
+                instruction,
+                operationIndex(instruction.Operation),
+                havocKind(value.HavocKind),
+                -1,
+                -1,
+                variableIndices(value.Variables),
+                null),
+            IrBranchInstruction value => row(
+                instruction,
+                operationIndex(instruction.Operation),
+                termIndex(value.Condition),
+                blockIndex(value.WhenTrue),
+                blockIndex(value.WhenFalse),
+                null,
+                null),
+            IrGotoInstruction value => row(
+                instruction,
+                operationIndex(instruction.Operation),
+                blockIndex(value.Target),
+                -1,
+                -1,
+                null,
+                null),
+            IrReturnInstruction value => row(
+                instruction,
+                operationIndex(instruction.Operation),
+                optionalTermIndex(value.Value),
+                -1,
+                -1,
+                null,
+                null),
+            _ => throw invalid()
+        };
+    }
+
+    internal static IrTerm DecodeTerm(
+        PortableIrTerm row,
+        IrFactory factory,
+        int depth,
+        Func<int, IrTypeId> type,
+        Func<int, int, IrTerm> term,
+        Func<int, int, IrTerm?> optionalTerm,
+        Func<int, IrVarId> variable,
+        Func<int, IrMemberId> member,
+        Func<int, OperationId> operation,
+        Func<int[], int, IrTerm[]> terms,
+        Func<int, IrOpaquePurity> opaquePurity,
+        Func<int, IrUnaryOperator> unaryOperator,
+        Func<int, IrBinaryOperator> binaryOperator,
+        Func<Exception> invalid)
+    {
+        return row.Kind switch
+        {
+            IrTermKind.Boolean when row.A is 0 or 1 => factory.Boolean(row.A == 1),
+            IrTermKind.Integer => factory.Integer(row.Number),
+            IrTermKind.String when row.Text != null => factory.String(row.Text),
+            IrTermKind.Null => factory.Null(type(row.Type)),
+            IrTermKind.Variable => factory.Variable(variable(row.A)),
+            IrTermKind.Opaque => DecodeOpaque(
+                row,
+                factory,
+                depth,
+                optionalTerm,
+                member,
+                operation,
+                terms,
+                opaquePurity,
+                invalid),
+            IrTermKind.Unary => factory.Unary(
+                unaryOperator(row.A),
+                term(row.B, depth + 1)),
+            IrTermKind.Binary => factory.Binary(
+                binaryOperator(row.A),
+                term(row.B, depth + 1),
+                term(row.C, depth + 1)),
+            IrTermKind.Conditional => factory.Conditional(
+                term(row.A, depth + 1),
+                term(row.B, depth + 1),
+                term(row.C, depth + 1)),
+            IrTermKind.Cast => factory.Cast(type(row.Type), term(row.A, depth + 1)),
+            IrTermKind.Length => factory.Length(term(row.A, depth + 1)),
+            IrTermKind.SequenceAccess => factory.SequenceAccess(
+                term(row.A, depth + 1),
+                term(row.B, depth + 1)),
+            _ => throw invalid()
+        };
+    }
+
+    private static IrTerm DecodeOpaque(
+        PortableIrTerm row,
+        IrFactory factory,
+        int depth,
+        Func<int, int, IrTerm?> optionalTerm,
+        Func<int, IrMemberId> member,
+        Func<int, OperationId> operation,
+        Func<int[], int, IrTerm[]> terms,
+        Func<int, IrOpaquePurity> opaquePurity,
+        Func<Exception> invalid)
+    {
+        var purity = opaquePurity(row.C);
+        var receiver = optionalTerm(row.B, depth);
+        var arguments = terms(row.Items, depth);
+        return purity switch
+        {
+            IrOpaquePurity.Pure when row.D == -1 =>
+                factory.PureOpaque(member(row.A), receiver, arguments),
+            IrOpaquePurity.Impure =>
+                factory.ImpureOpaque(operation(row.D), member(row.A), receiver, arguments),
+            _ => throw invalid()
+        };
+    }
+
+    internal static IrLocation DecodeLocation(
+        IrProgramBuilder builder,
+        PortableIrLocation row,
+        Func<int, IrMemberId> member,
+        Func<int, IrTerm?> optionalTerm,
+        Func<int, IrTerm> term,
+        Func<int[], IrTerm[]> terms,
+        Func<Exception> invalid)
+    {
+        return row.Kind switch
+        {
+            IrLocationKind.Member => builder.MemberLocation(
+                member(row.A),
+                optionalTerm(row.B),
+                terms(row.Items)),
+            IrLocationKind.Sequence => builder.SequenceLocation(
+                term(row.A),
+                term(row.B)),
+            _ => throw invalid()
+        };
+    }
+
+    internal static IrInstruction DecodeInstruction(
+        IrProgramBuilder builder,
+        IrBlockId block,
+        PortableIrInstruction row,
+        Func<int, OperationId> operation,
+        Func<int, IrVarId> variable,
+        Func<int, IrMemberId> member,
+        Func<int, IrTerm?> optionalTerm,
+        Func<int, IrTerm> term,
+        Func<int, IrVarId?> optionalVariable,
+        Func<int, IrHavocKind> havocKind,
+        Func<int, IrBlockId> blockAt,
+        Func<PortableIrLocation?, IrLocation> location,
+        Func<int[], IrTerm[]> terms,
+        Func<int[], IrVarId[]> variables,
+        Func<Exception> invalid)
+    {
+        return row.Kind switch
+        {
+            IrInstructionKind.Assign => builder.Assign(
+                block,
+                operation(row.Operation),
+                variable(row.A),
+                term(row.B)),
+            IrInstructionKind.Load => builder.Load(
+                block,
+                operation(row.Operation),
+                variable(row.A),
+                location(row.Location)),
+            IrInstructionKind.Store => builder.Store(
+                block,
+                operation(row.Operation),
+                location(row.Location),
+                term(row.A)),
+            IrInstructionKind.Call => builder.Call(
+                block,
+                operation(row.Operation),
+                optionalVariable(row.A),
+                member(row.B),
+                optionalTerm(row.C),
+                terms(row.Items)),
+            IrInstructionKind.Assume => builder.Assume(
+                block,
+                operation(row.Operation),
+                term(row.A)),
+            IrInstructionKind.Assert => builder.Assert(
+                block,
+                operation(row.Operation),
+                term(row.A)),
+            IrInstructionKind.Havoc => builder.Havoc(
+                block,
+                operation(row.Operation),
+                havocKind(row.A),
+                variables(row.Items)),
+            IrInstructionKind.Branch => builder.Branch(
+                block,
+                operation(row.Operation),
+                term(row.A),
+                blockAt(row.B),
+                blockAt(row.C)),
+            IrInstructionKind.Goto => builder.Goto(
+                block,
+                operation(row.Operation),
+                blockAt(row.A)),
+            IrInstructionKind.Return => builder.Return(
+                block,
+                operation(row.Operation),
+                optionalTerm(row.A)),
+            _ => throw invalid()
+        };
+    }
+}
+'@
+foreach ($line in ($portableProjectionSource -split "`r?`n")) {
+    $portableLines.Add($line)
+}
+
+$collectorMappings = @(
+    Get-RequiredMember $schema 'collectorWireMappings' 'schema')
+if ($collectorMappings.Count -eq 0) {
+    throw 'Collector wire catalog cannot be empty.'
+}
+$collectorMappingNames = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal)
+$collectorMappingOverloads = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal)
+foreach ($mapping in $collectorMappings) {
+    $name = [string](
+        Get-RequiredMember $mapping 'name' 'collector wire mapping')
+    $owner = [string](
+        Get-RequiredMember $mapping 'owner' "collector mapping '$name'")
+    $method = [string](
+        Get-RequiredMember $mapping 'method' "collector mapping '$name'")
+    $kind = [string](
+        Get-RequiredMember $mapping 'kind' "collector mapping '$name'")
+    $sourceType = [string](
+        Get-RequiredMember $mapping 'sourceType' "collector mapping '$name'")
+    $targetType = [string](
+        Get-RequiredMember $mapping 'targetType' "collector mapping '$name'")
+    $unknownException = [string](
+        Get-RequiredMember $mapping 'unknownException' "collector mapping '$name'")
+    foreach ($identifier in @(
+            $name,
+            $owner,
+            $method,
+            $sourceType,
+            $targetType,
+            $unknownException)) {
+        Assert-Identifier $identifier "Collector mapping '$name'"
+    }
+    if (-not $collectorMappingNames.Add($name)) {
+        throw "Duplicate collector wire mapping '$name'."
+    }
+    if (-not $collectorMappingOverloads.Add(
+            "$owner.$method($sourceType)")) {
+        throw (
+            "Duplicate collector wire overload '$owner.$method($sourceType)'.")
+    }
+    $validShape = switch ($owner) {
+        'CompilerOptionWireMappings' {
+            $method -eq 'Map' -and
+            $kind -in 'enum', 'referenceIdentity' -and
+            $unknownException -eq 'InvalidOperationException'
+        }
+        'CompilerEffectEvaluationWireMappings' {
+            $method -eq 'ToWorker' -and
+            $kind -eq 'enum' -and
+            $unknownException -eq 'ArgumentOutOfRangeException'
+        }
+        'CompilerLoweringWireMappings' {
+            $method -in 'ToCompiler', 'ToWorkerEvidence', 'ToWorkerFailure' -and
+            $kind -eq 'enum' -and
+            $unknownException -eq 'ArgumentOutOfRangeException'
+        }
+        'ClaimManifestBuilder' {
+            $method -in 'ToWorkerEffects', 'ToWorkerCapabilities' -and
+            $kind -eq 'flags' -and
+            $unknownException -eq 'ArgumentOutOfRangeException'
+        }
+        default { $false }
+    }
+    if (-not $validShape) {
+        throw "Collector mapping '$name' has an unsupported owner or shape."
+    }
+    $rows = @(Get-RequiredMember $mapping 'rows' "collector mapping '$name'")
+    if ($rows.Count -eq 0) {
+        throw "Collector mapping '$name' cannot be empty."
+    }
+    $sources = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    $targets = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    $allowTargetAliases = $false
+    if ($mapping.PSObject.Properties['allowTargetAliases']) {
+        $allowTargetAliases = [bool]$mapping.allowTargetAliases
+        if (-not $allowTargetAliases -or $kind -ne 'enum') {
+            throw "Collector mapping '$name' has an invalid target-alias setting."
+        }
+    }
+    foreach ($row in $rows) {
+        $source = [string](
+            Get-RequiredMember $row 'source' "collector mapping '$name' row")
+        $target = [string](
+            Get-RequiredMember $row 'target' "collector mapping '$name' row")
+        if ($kind -eq 'referenceIdentity') {
+            if ($source -notmatch
+                '^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$') {
+                throw (
+                    "Collector mapping '$name' has invalid source '$source'.")
+            }
+        }
+        else {
+            Assert-Identifier $source "Collector mapping '$name' source"
+        }
+        Assert-Identifier $target "Collector mapping '$name' target"
+        if (-not $sources.Add($source)) {
+            throw "Collector mapping '$name' repeats source '$source'."
+        }
+        if (-not $allowTargetAliases -and -not $targets.Add($target)) {
+            throw "Collector mapping '$name' repeats target '$target'."
+        }
+    }
+    if ($kind -eq 'flags') {
+        $sourceMask = [string](
+            Get-RequiredMember $mapping 'sourceMask' "collector mapping '$name'")
+        if ($sourceMask -notmatch
+            '^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$') {
+            throw "Collector mapping '$name' has an invalid source mask."
+        }
+        if ([string]$rows[0].source -ne 'None' -or
+            [string]$rows[0].target -ne 'None') {
+            throw "Collector flags mapping '$name' must begin with None -> None."
+        }
+    }
+    elseif ($mapping.PSObject.Properties['sourceMask']) {
+        throw "Non-flags collector mapping '$name' cannot define sourceMask."
+    }
+}
+
+$collectorOwners = @(
+    $collectorMappings |
+        ForEach-Object { [string]$_.owner } |
+        Select-Object -Unique)
+foreach ($owner in $collectorOwners) {
+    $ownerMappings = @(
+        $collectorMappings |
+            Where-Object { [string]$_.owner -eq $owner })
+    $collectorLines.Add('')
+    $declaration = if ($owner -eq 'ClaimManifestBuilder') {
+        'internal sealed partial class'
+    }
+    else {
+        'internal static partial class'
+    }
+    $collectorLines.Add("$declaration $owner {")
+    foreach ($mapping in $ownerMappings) {
+        $method = [string]$mapping.method
+        $kind = [string]$mapping.kind
+        $sourceType = [string]$mapping.sourceType
+        $targetType = [string]$mapping.targetType
+        $rows = @($mapping.rows)
+        $parameterName = if ($kind -eq 'flags') { 'source' } else { 'value' }
+        $collectorLines.Add(
+            "    internal static $targetType $method($sourceType $parameterName) {")
+        if ($kind -eq 'enum') {
+            $collectorLines.Add("        return $parameterName switch {")
+            foreach ($row in $rows) {
+                $collectorLines.Add(
+                    "            $sourceType.$($row.source) => " +
+                    "$targetType.$($row.target),")
+            }
+            $throw = if ([string]$mapping.unknownException -eq
+                'InvalidOperationException') {
+                "throw Unsupported(nameof($sourceType), $parameterName)"
+            }
+            else {
+                "throw new ArgumentOutOfRangeException(nameof($parameterName))"
+            }
+            $collectorLines.Add("            _ => $throw")
+            $collectorLines.Add('        };')
+        }
+        elseif ($kind -eq 'referenceIdentity') {
+            foreach ($row in $rows) {
+                $collectorLines.Add(
+                    "        if (ReferenceEquals($parameterName, $($row.source)))")
+                $collectorLines.Add(
+                    "            return $targetType.$($row.target);")
+            }
+            $collectorLines.Add('        throw new InvalidOperationException(')
+            $collectorLines.Add(
+                '            "A custom assembly identity comparer is unsupported.");')
+        }
+        elseif ($kind -eq 'flags') {
+            $collectorLines.Add(
+                "        if (($parameterName & ~$($mapping.sourceMask)) != 0)")
+            $collectorLines.Add(
+                "            throw new ArgumentOutOfRangeException(nameof($parameterName));")
+            $collectorLines.Add(
+                "        var result = $targetType.$($rows[0].target);")
+            for ($rowIndex = 1; $rowIndex -lt $rows.Count; $rowIndex++) {
+                $row = $rows[$rowIndex]
+                $collectorLines.Add(
+                    "        if (($parameterName & $sourceType.$($row.source)) != 0)")
+                $collectorLines.Add(
+                    "            result |= $targetType.$($row.target);")
+            }
+            $collectorLines.Add('        return result;')
+        }
+        else {
+            throw "Collector mapping '$($mapping.name)' has unsupported kind '$kind'."
+        }
+        $collectorLines.Add('    }')
+        $collectorLines.Add('')
+    }
+    if ($owner -eq 'CompilerOptionWireMappings') {
+        $collectorLines.Add('    private static InvalidOperationException Unsupported<T>(')
+        $collectorLines.Add('        string name,')
+        $collectorLines.Add('        T value)')
+        $collectorLines.Add('        where T : struct {')
+        $collectorLines.Add(
+            '        return new($"The compiler option ''{name}'' has unsupported value ''{value}''.");')
+        $collectorLines.Add('    }')
+    }
+    elseif ($collectorLines[$collectorLines.Count - 1] -eq '') {
+        $collectorLines.RemoveAt($collectorLines.Count - 1)
+    }
+    $collectorLines.Add('}')
+}
 
 $evidence = Get-RequiredMember $schema 'effectEvidence' 'schema'
 $domain = [string](Get-RequiredMember $evidence 'domain' 'effect evidence')
 $evidenceVersion = [int](Get-RequiredMember $evidence 'version' 'effect evidence')
 if ($domain -ne 'SharpProof.CompilerEffectClaimEvidence' -or
-    $evidenceVersion -ne 7) {
-    throw 'Compiler effect evidence must preserve domain version 7.'
+    $evidenceVersion -ne 8) {
+    throw 'Compiler effect evidence must preserve domain version 8.'
 }
 $unknownReasons = @(Get-RequiredMember `
     $evidence 'unknownReasons' 'effect evidence')
@@ -565,6 +1299,23 @@ $combinedKind = [string](
 foreach ($kind in $capabilitiesKind, $exceptionsKind, $combinedKind) {
     Assert-Identifier $kind 'Effect evidence constraint kind'
 }
+$replay = Get-RequiredMember $evidence 'replay' 'effect evidence'
+$replayPathKind = [string](
+    Get-RequiredMember $replay 'pathKind' 'effect replay')
+Assert-Identifier $replayPathKind 'Effect replay path kind'
+$maximumReplayEvents = [int](
+    Get-RequiredMember $replay 'maximumEvents' 'effect replay')
+if ($maximumReplayEvents -ne 256) {
+    throw 'Compiler effect replay must preserve its 256-event bound.'
+}
+$supportedReplayEventKinds = @(
+    Get-RequiredMember $replay 'supportedEventKinds' 'effect replay')
+if ($supportedReplayEventKinds.Count -eq 0) {
+    throw 'Compiler effect replay must define supported event kinds.'
+}
+foreach ($kind in $supportedReplayEventKinds) {
+    Assert-Identifier ([string]$kind) 'Supported effect replay event kind'
+}
 if (-not [bool](Get-RequiredMember `
         $evidence 'sortAllowedExceptionTypes' 'effect evidence') -or
     -not [bool](Get-RequiredMember `
@@ -572,116 +1323,64 @@ if (-not [bool](Get-RequiredMember `
     throw 'Compiler effect evidence must use canonical exception ordering.'
 }
 
+$constraintRuleKinds = @(
+    'EnforcePure',
+    'ZeroAllocations',
+    'AllowedCapabilities',
+    'DoesNotThrow',
+    'AllowedExceptions',
+    'EffectContract')
 $modelLines.Add('')
-$modelLines.Add('internal static class CompilerEffectClaimArtifactCodec {')
-$modelLines.Add('    internal static void Seal(CompilerEffectClaimArtifact value) =>')
-$modelLines.Add('        value.EvidenceSha256 = ComputeSha256(value);')
+$modelLines.Add('internal readonly struct CompilerEffectConstraintRule(')
+$modelLines.Add('    WorkerEffectContractKind kind,')
+$modelLines.Add('    bool effectsMustBeEmpty,')
+$modelLines.Add('    bool capabilitiesMustBeEmpty,')
+$modelLines.Add('    bool exceptionsMustBeEmpty)')
+$modelLines.Add('{')
+$modelLines.Add('    internal WorkerEffectContractKind Kind { get; } = kind;')
+$modelLines.Add('    internal bool EffectsMustBeEmpty { get; } = effectsMustBeEmpty;')
+$modelLines.Add('    internal bool CapabilitiesMustBeEmpty { get; } = capabilitiesMustBeEmpty;')
+$modelLines.Add('    internal bool ExceptionsMustBeEmpty { get; } = exceptionsMustBeEmpty;')
+$modelLines.Add('}')
 $modelLines.Add('')
-$modelLines.Add('    internal static void Validate(CompilerEffectClaimArtifact value) {')
-$modelLines.Add('        if (value == null || string.IsNullOrWhiteSpace(value.ClaimId) ||')
-$modelLines.Add('            string.IsNullOrWhiteSpace(value.Evidence) ||')
-$modelLines.Add(
-    '            !WorkerProtocolJson.IsDefined(value.ContractKind, WorkerEffectContractKind.Unspecified) ||')
-$modelLines.Add(
-    '            !Enum.IsDefined(typeof(WorkerClaimReason), value.Reason) ||')
-$modelLines.Add(
-    '            !WorkerProtocolJson.IsDefined(value.Certainty, WorkerEffectEvidenceCertainty.Unspecified) ||')
-$modelLines.Add(
-    '            !HasValidConstraint(value.ContractKind, value.Constraint) ||')
-$modelLines.Add('            !HasValidOutcome(value) ||')
-$modelLines.Add('            value.EvidenceSha256 != ComputeSha256(value))')
-$modelLines.Add(
-    '            throw new InvalidDataException("Compiler effect-claim evidence is invalid.");')
-$modelLines.Add('    }')
-$modelLines.Add('')
-$modelLines.Add('    private static bool HasValidOutcome(CompilerEffectClaimArtifact value) =>')
-$modelLines.Add(
-    '        WorkerProtocolJson.HasValidEffectCertainty(value.Outcome, value.Reason, value.Certainty) &&')
-$modelLines.Add(
-    '        (value.Outcome, value.Reason, value.Certainty, value.Witness) switch {')
-$modelLines.Add(
-    '            (WorkerClaimOutcome.Proven, WorkerClaimReason.None, _, null) => true,')
-$modelLines.Add('            (WorkerClaimOutcome.Refuted, WorkerClaimReason.None,')
-$modelLines.Add(
-    '                _, { } witness) => WorkerProtocolJson.HasValidEffectWitness(witness) &&')
-$modelLines.Add(
-    '                    WorkerProtocolJson.HasValidLocation(witness.Location),')
-$modelLines.Add('            (WorkerClaimOutcome.Unknown,')
-for ($index = 0; $index -lt $unknownReasons.Count; $index++) {
-    $reason = [string]$unknownReasons[$index]
-    $suffix = if ($index -lt $unknownReasons.Count - 1) { ' or' } else { ',' }
-    $modelLines.Add("                WorkerClaimReason.$reason$suffix")
+$modelLines.Add('internal static class CompilerEffectEvidenceCatalog {')
+$modelLines.Add('    internal const string ConstraintDomain = "SharpProof.CompilerEffectReplayConstraint";')
+$modelLines.Add('    internal const int ConstraintVersion = 1;')
+$modelLines.Add('    internal const string OperationDomain = "SharpProof.CompilerEffectReplayOperation";')
+$modelLines.Add('    internal const int OperationVersion = 1;')
+$modelLines.Add("    internal const string EvidenceDomain = $(ConvertTo-CSharpString $domain);")
+$modelLines.Add("    internal const int EvidenceVersion = $evidenceVersion;")
+$modelLines.Add('    internal const int MaximumReplayEvents = ' +
+    $maximumReplayEvents + ';')
+$modelLines.Add('    internal const CompilerEffectReplayPathKind ReplayPathKind =')
+$modelLines.Add("        CompilerEffectReplayPathKind.$replayPathKind;")
+$modelLines.Add('    internal static readonly WorkerClaimReason[] UnknownReasons = [')
+foreach ($reason in $unknownReasons) {
+    $modelLines.Add("        WorkerClaimReason.$reason,")
 }
-$modelLines.Add('                _, null) => true,')
-$modelLines.Add('            _ => false')
-$modelLines.Add('        };')
-$modelLines.Add('')
-$modelLines.Add('    private static bool HasValidConstraint(')
-$modelLines.Add('        WorkerEffectContractKind kind,')
-$modelLines.Add('        CompilerEffectConstraintArtifact? constraint) {')
-$modelLines.Add('        if (constraint == null ||')
-$modelLines.Add('            !WorkerProtocolJson.HasKnownEffects(')
-$modelLines.Add(
-    '                constraint.AllowedEffects, constraint.AllowedCapabilities) ||')
-$modelLines.Add(
-    '            !WorkerProtocolJson.AreDistinctNonblank(constraint.AllowedExceptionTypes))')
-$modelLines.Add('            return false;')
-$modelLines.Add('        return kind switch {')
-$modelLines.Add("            WorkerEffectContractKind.$capabilitiesKind =>")
-$modelLines.Add(
-    '                constraint.AllowedEffects == WorkerEffectSet.None &&')
-$modelLines.Add('                constraint.AllowedExceptionTypes.Length == 0,')
-$modelLines.Add("            WorkerEffectContractKind.$exceptionsKind =>")
-$modelLines.Add(
-    '                constraint.AllowedEffects == WorkerEffectSet.None &&')
-$modelLines.Add(
-    '                constraint.AllowedCapabilities == WorkerEffectCapabilitySet.None,')
-$modelLines.Add("            WorkerEffectContractKind.$combinedKind => true,")
-$modelLines.Add('            _ => constraint.AllowedEffects == WorkerEffectSet.None &&')
-$modelLines.Add(
-    '                constraint.AllowedCapabilities == WorkerEffectCapabilitySet.None &&')
-$modelLines.Add('                constraint.AllowedExceptionTypes.Length == 0')
-$modelLines.Add('        };')
-$modelLines.Add('    }')
-$modelLines.Add('')
-$modelLines.Add(
-    '    private static string ComputeSha256(CompilerEffectClaimArtifact value) {')
-$modelLines.Add('        var witness = value.Witness;')
-$modelLines.Add('        var constraint = value.Constraint;')
-$modelLines.Add('        using var hash = new CanonicalHashWriter();')
-$modelLines.Add(
-    "        hash.Add($(ConvertTo-CSharpString $domain), $evidenceVersion, value.ClaimId,")
-$modelLines.Add(
-    '            value.ContractKind, value.Outcome, value.Reason, value.Certainty,')
-$modelLines.Add(
-    '            constraint.AllowedEffects, constraint.AllowedCapabilities);')
-$modelLines.Add(
-    '        foreach (var type in constraint.AllowedExceptionTypes')
-$modelLines.Add(
-    '                     .OrderBy(static item => item, StringComparer.Ordinal))')
-$modelLines.Add('            hash.Add(type);')
-$modelLines.Add(
-    '        hash.Add(witness?.Kind, witness?.Detail, witness?.Effects ?? WorkerEffectSet.None,')
-$modelLines.Add(
-    '            witness?.Capabilities ?? WorkerEffectCapabilitySet.None);')
-$modelLines.Add(
-    '        foreach (var type in (witness?.ExactExceptionTypeHierarchy ?? [])')
-$modelLines.Add(
-    '                     .OrderBy(static item => item, StringComparer.Ordinal))')
-$modelLines.Add('            hash.Add(type);')
-$modelLines.Add(
-    '        return hash.Add(witness?.Location.Path, witness?.Location.Start ?? -1,')
-$modelLines.Add(
-    '            witness?.Location.Length ?? -1, witness?.Location.Line ?? -1,')
-$modelLines.Add(
-    '            witness?.Location.Column ?? -1, value.Evidence).Finish();')
-$modelLines.Add('    }')
+$modelLines.Add('    ];')
+$modelLines.Add('    internal static readonly CompilerEffectConstraintRule[] ConstraintRules = [')
+foreach ($kind in $constraintRuleKinds) {
+    $effectsEmpty = if ($kind -eq $combinedKind) { 'false' } else { 'true' }
+    $capabilitiesEmpty = if ($kind -in $capabilitiesKind, $combinedKind) { 'false' } else { 'true' }
+    $exceptionsEmpty = if ($kind -in $exceptionsKind, $combinedKind) { 'false' } else { 'true' }
+    $modelLines.Add(
+        "        new(WorkerEffectContractKind.$kind, $effectsEmpty, " +
+        "$capabilitiesEmpty, $exceptionsEmpty),")
+}
+$modelLines.Add('    ];')
+$modelLines.Add('    internal static readonly CompilerEffectReplayEventKind[] SupportedReplayEventKinds = [')
+foreach ($kind in $supportedReplayEventKinds) {
+    $modelLines.Add("        CompilerEffectReplayEventKind.$kind,")
+}
+$modelLines.Add('    ];')
 $modelLines.Add('}')
 
 $outputs = [ordered]@{
     $ModelOutputPath = $modelLines
     $PortableOutputPath = $portableLines
     $CompilationOutputPath = $compilationLines
+    $CollectorOutputPath = $collectorLines
 }
 foreach ($output in $outputs.GetEnumerator()) {
     [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($output.Key)) |

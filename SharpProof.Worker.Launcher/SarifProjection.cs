@@ -11,19 +11,26 @@ internal static class SarifProjection
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(response);
         WorkerProtocolJson.Canonicalize(response);
-        var claims = response.Manifest.Claims.ToDictionary(
+        var manifest = response.Manifest;
+        var summary = response.Summary;
+        var runStatus = response.RunStatus;
+        var failureReason = response.FailureReason;
+        var claimResults = response.ClaimResults;
+        var callableResults = response.CallableResults;
+        var errors = response.Errors;
+        var claims = manifest.Claims.ToDictionary(
             static claim => claim.ClaimId, StringComparer.Ordinal);
-        var callables = response.Manifest.Callables.ToDictionary(
+        var callables = manifest.Callables.ToDictionary(
             static callable => callable.CallableId, StringComparer.Ordinal);
-        var results = response.ClaimResults
+        var results = claimResults
             .Select(result => ClaimResult(request, result, claims[result.ClaimId]))
             .ToList();
-        results.AddRange(response.CallableResults
+        results.AddRange(callableResults
             .Where(static result => result.Coverage == WorkerCallableCoverage.Incomplete)
             .Select(result => IncompleteResult(request, result, callables[result.CallableId])));
-        var notifications = response.Errors.Select(
+        var notifications = errors.Select(
             static error => Notification(error.Code, error.Message)).ToList();
-        var assumptions = response.Summary.Assumptions;
+        var assumptions = summary.Assumptions;
         if (assumptions.User + assumptions.Trusted != 0)
         {
             notifications.Add(Notification(
@@ -34,13 +41,13 @@ internal static class SarifProjection
                 LauncherPresentation.Level(request.AssumptionPolicy, "note")));
         }
 
-        if (response.RunStatus != WorkerRunStatus.Complete &&
+        if (runStatus != WorkerRunStatus.Complete &&
             notifications.Count == 0)
         {
             notifications.Add(Notification(
-                "worker." + response.RunStatus,
-                "SharpProof worker run " + response.RunStatus +
-                    " (" + response.FailureReason + ")."));
+                "worker." + runStatus,
+                "SharpProof worker run " + runStatus +
+                    " (" + failureReason + ")."));
         }
 
         var run = new
@@ -51,20 +58,20 @@ internal static class SarifProjection
                 {
                     name = "SharpProof",
                     informationUri = "https://github.com/alexyorke/SharpProof",
-                    version = response.Summary.Versions.WorkerVersion
+                    version = summary.Versions.WorkerVersion
                 }
             },
             automationDetails = new
             {
-                id = response.Manifest.Hash
+                id = manifest.Hash
             },
             invocations = new[] { new {
-                executionSuccessful = response.RunStatus == WorkerRunStatus.Complete && response.Errors.Length == 0,
-                properties = new { response.RunStatus, response.FailureReason },
+                executionSuccessful = runStatus == WorkerRunStatus.Complete && errors.Length == 0,
+                properties = new { RunStatus = runStatus, FailureReason = failureReason },
                 toolExecutionNotifications = notifications
             }},
             results,
-            properties = response.Summary
+            properties = summary
         };
         var document = new Dictionary<string, object>
         {
@@ -79,22 +86,25 @@ internal static class SarifProjection
         WorkerVerifyRequest request, WorkerClaimResult result,
         WorkerClaimManifestEntry claim)
     {
-        var reason = result.Reason == WorkerClaimReason.None ? string.Empty : " (" + result.Reason + ")";
-        var witness = result.EffectWitness == null
+        var outcome = result.Outcome;
+        var reasonValue = result.Reason;
+        var effectWitness = result.EffectWitness;
+        var reason = reasonValue == WorkerClaimReason.None ? string.Empty : " (" + reasonValue + ")";
+        var witness = effectWitness == null
             ? string.Empty
-            : " [concrete " + result.EffectWitness.Kind + ": " + result.EffectWitness.Detail +
-                " at " + result.EffectWitness.Location.Path + ":" + result.EffectWitness.Location.Line +
-                ":" + result.EffectWitness.Location.Column + "]";
+            : " [concrete " + effectWitness.Kind + ": " + effectWitness.Detail +
+                " at " + effectWitness.Location.Path + ":" + effectWitness.Location.Line +
+                ":" + effectWitness.Location.Column + "]";
         return Result(
-            "SharpProof." + result.Outcome,
-            result.Outcome == WorkerClaimOutcome.Proven ? "pass" :
-                result.Outcome == WorkerClaimOutcome.Refuted ? "fail" : "review",
-            result.Outcome == WorkerClaimOutcome.Proven ? "none" :
-                result.Outcome == WorkerClaimOutcome.Refuted ? "error" :
+            "SharpProof." + outcome,
+            outcome == WorkerClaimOutcome.Proven ? "pass" :
+                outcome == WorkerClaimOutcome.Refuted ? "fail" : "review",
+            outcome == WorkerClaimOutcome.Proven ? "none" :
+                outcome == WorkerClaimOutcome.Refuted ? "error" :
                 LauncherPresentation.Level(request.VerifyPolicy, "note"),
-            result.Outcome + " " + LauncherPresentation.ClaimKind(claim) + " " +
+            outcome + " " + LauncherPresentation.ClaimKind(claim) + " " +
                 result.ClaimId + " for " + claim.CallableId + reason + witness,
-            result.EffectWitness?.Location ?? claim.Location,
+            effectWitness?.Location ?? claim.Location,
             result.ClaimId,
             new
             {
@@ -107,12 +117,14 @@ internal static class SarifProjection
         WorkerVerifyRequest request, WorkerCallableResult result,
         WorkerCallableManifestEntry callable)
     {
+        var callableId = result.CallableId;
+        var reason = result.Reason;
         return Result(
             "SP0047", "review",
             LauncherPresentation.Level(request.VerifyPolicy, "note"),
-            "Selected analysis is incomplete for " + result.CallableId +
-                " (" + result.Reason + ").",
-            callable.Location, result.CallableId,
+            "Selected analysis is incomplete for " + callableId +
+                " (" + reason + ").",
+            callable.Location, callableId,
             new
             {
                 callable,

@@ -30,7 +30,7 @@ public sealed class CompilerRuntimeSymbolArtifactTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(artifact.SchemaVersion, Is.EqualTo(8));
+                Assert.That(artifact.SchemaVersion, Is.EqualTo(9));
                 Assert.That(
                     tree.PreprocessorSymbols,
                     Does.Contain(Contract.ConditionalSymbol));

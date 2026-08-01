@@ -5,7 +5,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
     private readonly Context _context = new();
     private readonly object _gate = new();
     private readonly IrSmtBackendOptions _options =
-        options ?? throw new ArgumentNullException(nameof(options));
+        ArgumentNullGuard.NotNull(options, nameof(options));
     private long _consumedResourceCount;
     private long _lastObservedResourceCount;
     private bool _interrupted;
@@ -31,10 +31,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         VerificationQuery query,
         CancellationToken cancellationToken)
     {
-        if (query == null)
-        {
-            throw new ArgumentNullException(nameof(query));
-        }
+        ArgumentNullGuard.NotNull(query, nameof(query));
 
         cancellationToken.ThrowIfCancellationRequested();
         return Task.Run(() =>

@@ -1,3 +1,4 @@
+using SharpProof.Ir;
 using SharpProof.Specs;
 
 namespace SharpProof.Effects.Test;
@@ -2819,6 +2820,16 @@ public sealed class EffectAnalysisTests
                 }
             }
 
+            public class ThrowingBaseInitialization {
+                static ThrowingBaseInitialization() {
+                    throw new InvalidOperationException();
+                }
+            }
+
+            public sealed class DerivedInitialization
+                : ThrowingBaseInitialization {
+            }
+
             public sealed class Sample {
                 private int _field;
                 private volatile int _volatile;
@@ -2828,6 +2839,8 @@ public sealed class EffectAnalysisTests
                     new PlainAllocation();
                 public ThrowingInitialization AllocateBlockedByTypeInitializer() =>
                     new ThrowingInitialization();
+                public DerivedInitialization AllocateBlockedByBaseTypeInitializer() =>
+                    new DerivedInitialization();
                 public int[] AllocateArray() => new int[1];
                 public void Throw() => throw new InvalidOperationException();
                 public void ThrowUser() => throw new UserException();
@@ -2860,9 +2873,10 @@ public sealed class EffectAnalysisTests
         AssertKinds("Allocate", "managed-allocation");
         AssertKinds("AllocatePlain", "managed-allocation");
         AssertKinds("AllocateBlockedByTypeInitializer");
+        AssertKinds("AllocateBlockedByBaseTypeInitializer");
         AssertKinds("AllocateArray", "managed-array-allocation");
-        AssertKinds("Throw", "managed-allocation", "explicit-throw");
-        AssertKinds("ThrowUser", "managed-allocation");
+        AssertKinds("Throw", "explicit-throw");
+        AssertKinds("ThrowUser");
         AssertKinds("Write", "direct-field-write");
         AssertKinds("Read", "direct-field-read");
         AssertKinds("VolatileWrite", "direct-field-write", "volatile-field-access");
@@ -2875,7 +2889,7 @@ public sealed class EffectAnalysisTests
         var frameworkThrow = Witnesses("Throw");
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(frameworkThrow[1].ExceptionType?.MetadataName,
+            Assert.That(frameworkThrow[0].ExceptionType?.MetadataName,
                 Is.EqualTo(nameof(InvalidOperationException)));
             Assert.That(Witnesses("VolatileRead")[1].Capabilities,
                 Is.EqualTo(EffectContractCapabilityKind.Synchronization));
@@ -2885,6 +2899,13 @@ public sealed class EffectAnalysisTests
                 session.Analyze(Method(
                     compilation,
                     "AllocateBlockedByTypeInitializer")).Summary.Allocation &
+                EffectAllocationKind.Managed,
+                Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(
+                session.Analyze(Method(
+                    compilation,
+                    "AllocateBlockedByBaseTypeInitializer"))
+                    .Summary.Allocation &
                 EffectAllocationKind.Managed,
                 Is.EqualTo(EffectAllocationKind.Managed));
         }
@@ -2899,6 +2920,313 @@ public sealed class EffectAnalysisTests
         {
             Assert.That(Witnesses(name).Select(static witness => witness.Kind),
                 Is.EqualTo(expected), name);
+        }
+    }
+
+    [Test]
+    public void MetadataBaseInitializationBlocksDirectAllocationWitness()
+    {
+        var externalReference = EffectTestHost.EmitReference(
+            """
+            public class ExternalInitializedBase {
+                public static readonly object Value = new object();
+            }
+
+            public sealed class ExternalDerived
+                : ExternalInitializedBase {
+            }
+            """,
+            "ExternalAllocationAssembly");
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static ExternalDerived Allocate() =>
+                    new ExternalDerived();
+            }
+            """,
+            externalReference);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Allocate"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.DirectWitnesses, Is.Empty);
+            Assert.That(
+                result.Summary.Allocation &
+                EffectAllocationKind.Managed,
+                Is.EqualTo(EffectAllocationKind.Managed));
+        }
+    }
+
+    [Test]
+    public void SystemObjectAllocationRequiresApprovedFrameworkIdentity()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static object Allocate() =>
+                    new object();
+            }
+            """);
+        var approved = new ApiSpecResolver(
+            ApiSpecTable.Default).Resolve(compilation);
+        var unapproved = new ResolvedApiSpecTable(
+            ImmutableDictionary.Create<ISymbol, ResolvedApiSpec>(
+                SymbolEqualityComparer.Default),
+            []);
+        var objectType = compilation.GetSpecialType(
+            SpecialType.System_Object);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                EffectMethodNodeBuilder
+                    .HasPotentialStaticInitialization(
+                        objectType,
+                        approved),
+                Is.False);
+            Assert.That(
+                EffectMethodNodeBuilder
+                    .HasPotentialStaticInitialization(
+                        objectType,
+                        unapproved),
+                Is.True);
+            Assert.That(
+                EffectMethodNodeBuilder
+                    .HasPotentialConstructionInitialization(
+                        objectType,
+                        unapproved),
+                Is.True);
+        }
+    }
+
+    [Test]
+    public void ExcessiveBaseTypeDepthFailsClosedWithoutRecursion()
+    {
+        var declarations = Enumerable.Range(0, 260)
+            .Select(static index => index == 0
+                ? "public class Layer0 { }"
+                : "public class Layer" + index +
+                  " : Layer" + (index - 1) + " { }");
+        var compilation = EffectTestHost.CreateCompilation(
+            string.Join(Environment.NewLine, declarations) +
+            """
+
+            public static class Sample {
+                public static Layer259 Allocate() =>
+                    new Layer259();
+            }
+            """);
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Allocate"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.DirectWitnesses, Is.Empty);
+            Assert.That(
+                result.Summary.Allocation &
+                EffectAllocationKind.Managed,
+                Is.EqualTo(EffectAllocationKind.Managed));
+        }
+    }
+
+    [Test]
+    public void PreBodyExecutionBlocksDirectBodyWitnesses()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class StaticEntry {
+                static StaticEntry() =>
+                    throw new InvalidOperationException();
+
+                public static object Allocate() => new object();
+            }
+
+            public class ThrowingBaseConstructor {
+                protected ThrowingBaseConstructor() =>
+                    throw new InvalidOperationException();
+            }
+
+            public sealed class DerivedConstructor
+                : ThrowingBaseConstructor {
+                private object _value = null!;
+
+                public DerivedConstructor() =>
+                    _value = new object();
+            }
+
+            public sealed class InstanceInitializer {
+                private readonly object _before = Fail();
+                private object _value = null!;
+
+                public InstanceInitializer() =>
+                    _value = new object();
+
+                private static object Fail() =>
+                    throw new InvalidOperationException();
+            }
+
+            public sealed class StaticInitializer {
+                private static readonly object Before = Fail();
+                private static object s_value = null!;
+
+                static StaticInitializer() =>
+                    s_value = new object();
+
+                private static object Fail() =>
+                    throw new InvalidOperationException();
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var methods = new[]
+        {
+            EffectTestHost.RequireMethod(
+                compilation,
+                "StaticEntry",
+                "Allocate"),
+            ExplicitConstructor("DerivedConstructor"),
+            ExplicitConstructor("InstanceInitializer"),
+            EffectTestHost.RequireType(
+                    compilation,
+                    "StaticInitializer")
+                .StaticConstructors
+                .Single()
+        };
+
+        foreach (var method in methods)
+        {
+            Assert.That(
+                session.Analyze(method).DirectWitnesses,
+                Is.Empty,
+                method.ContainingType.Name);
+        }
+
+        return;
+
+        IMethodSymbol ExplicitConstructor(string typeName)
+        {
+            return EffectTestHost.RequireType(
+                    compilation,
+                    typeName)
+                .InstanceConstructors
+                .Single(static constructor =>
+                    !constructor.IsImplicitlyDeclared);
+        }
+    }
+
+    [Test]
+    public void DirectAllocationWitnessesRequireArgumentCompletion()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class IntegerBox {
+                public IntegerBox(int value) {
+                }
+            }
+
+            public sealed class StringBox {
+                public StringBox(string value) {
+                }
+            }
+
+            public sealed class Convertible {
+                public static implicit operator int(Convertible value) =>
+                    1;
+            }
+
+            public static class Sample {
+                public static IntegerBox SafeImplicit(short value) =>
+                    new IntegerBox(value);
+
+                public static IntegerBox FailingUnbox() =>
+                    new IntegerBox((int)(object)null!);
+
+                public static StringBox FailingReferenceCast() =>
+                    new StringBox((string)(object)new object());
+
+                public static IntegerBox FailingCheckedConversion(
+                    long value) =>
+                    new IntegerBox(checked((int)value));
+
+                public static IntegerBox UserConversion() =>
+                    new IntegerBox(new Convertible());
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        Assert.That(
+            WitnessKinds("SafeImplicit"),
+            Is.EqualTo(["managed-allocation"]));
+        foreach (var methodName in new[]
+                 {
+                     "FailingUnbox",
+                     "FailingReferenceCast",
+                     "FailingCheckedConversion",
+                     "UserConversion"
+                 })
+        {
+            Assert.That(
+                WitnessKinds(methodName),
+                Is.Empty,
+                methodName);
+        }
+
+        return;
+
+        IEnumerable<string> WitnessKinds(string methodName)
+        {
+            return session.Analyze(
+                    Method(compilation, methodName))
+                .DirectWitnesses
+                .Select(static witness => witness.Kind);
+        }
+    }
+
+    [Test]
+    public void DirectWitnessesRejectFailingPreEffectConversions()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            using System.Threading;
+
+            public sealed class Sample {
+                private int _field;
+
+                public void Write() =>
+                    _field = (int)(object)null!;
+
+                public void Lock() {
+                    lock ((string)(object)new object()) {
+                    }
+                }
+
+                public void MonitorCall() =>
+                    Monitor.Enter(
+                        (string)(object)new object());
+
+                public void Throw() =>
+                    throw (Exception)(object)"not-an-exception";
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[]
+                 {
+                     "Write",
+                     "Lock",
+                     "MonitorCall",
+                     "Throw"
+                 })
+        {
+            Assert.That(
+                session.Analyze(Method(compilation, methodName))
+                    .DirectWitnesses,
+                Is.Empty,
+                methodName);
         }
     }
 
@@ -3085,13 +3413,13 @@ public sealed class EffectAnalysisTests
                 Is.EqualTo(EffectUncertainty.UnmodeledCall));
             Assert.That(
                 safeThrow.DirectWitnesses.Select(static witness => witness.Kind),
-                Is.EqualTo(["managed-allocation", "explicit-throw"]));
+                Is.EqualTo(["explicit-throw"]));
             Assert.That(
-                safeThrow.DirectWitnesses[1].ExceptionType?.ToDisplayString(),
+                safeThrow.DirectWitnesses[0].ExceptionType?.ToDisplayString(),
                 Is.EqualTo("System.InvalidOperationException"));
             Assert.That(
                 unmodeledThrow.DirectWitnesses.Select(static witness => witness.Kind),
-                Is.EqualTo(["managed-allocation"]));
+                Is.Empty);
         }
     }
 
@@ -3126,8 +3454,8 @@ public sealed class EffectAnalysisTests
                     ".ctor",
                     false,
                     0,
-                    SpecValueType.Reference,
-                    [SpecValueType.Reference],
+                    IrTypeKind.Reference,
+                    [IrTypeKind.Reference],
                     null,
                     frameworkAssemblies),
                 new ApiSpecFacets(
@@ -3163,7 +3491,7 @@ public sealed class EffectAnalysisTests
                 Is.EqualTo(EffectTermination.Unknown));
             Assert.That(
                 result.DirectWitnesses.Select(static witness => witness.Kind),
-                Is.EqualTo(["managed-allocation"]));
+                Is.Empty);
         }
     }
 

@@ -36,13 +36,19 @@ internal readonly struct CSharpBinarySemantics(
     BinaryOperatorKind kind,
     IrBinaryOperator irOperator,
     bool isIntegerArithmetic = false,
-    bool requiresCheckedArithmetic = false)
+    bool requiresCheckedArithmetic = false,
+    BinaryOperatorKind? reverseKind = null,
+    BinaryOperatorKind? negatedKind = null)
 {
     internal BinaryOperatorKind Kind { get; } = kind;
     internal IrBinaryOperator IrOperator { get; } = irOperator;
     internal bool IsIntegerArithmetic { get; } = isIntegerArithmetic;
     internal bool RequiresCheckedArithmetic { get; } =
         requiresCheckedArithmetic;
+    internal BinaryOperatorKind ReverseKind { get; } =
+        reverseKind ?? kind;
+    internal BinaryOperatorKind NegatedKind { get; } =
+        negatedKind ?? kind;
 }
 
 internal readonly struct CSharpUnarySemantics(
@@ -93,12 +99,12 @@ internal static class CSharpScalarSemantics
         new(BinaryOperatorKind.Remainder, IrBinaryOperator.Remainder, true),
         new(BinaryOperatorKind.ConditionalAnd, IrBinaryOperator.AndAlso),
         new(BinaryOperatorKind.ConditionalOr, IrBinaryOperator.OrElse),
-        new(BinaryOperatorKind.Equals, IrBinaryOperator.Equal),
-        new(BinaryOperatorKind.NotEquals, IrBinaryOperator.NotEqual),
-        new(BinaryOperatorKind.LessThan, IrBinaryOperator.LessThan),
-        new(BinaryOperatorKind.LessThanOrEqual, IrBinaryOperator.LessThanOrEqual),
-        new(BinaryOperatorKind.GreaterThan, IrBinaryOperator.GreaterThan),
-        new(BinaryOperatorKind.GreaterThanOrEqual, IrBinaryOperator.GreaterThanOrEqual)
+        new(BinaryOperatorKind.Equals, IrBinaryOperator.Equal, negatedKind: BinaryOperatorKind.NotEquals),
+        new(BinaryOperatorKind.NotEquals, IrBinaryOperator.NotEqual, negatedKind: BinaryOperatorKind.Equals),
+        new(BinaryOperatorKind.LessThan, IrBinaryOperator.LessThan, reverseKind: BinaryOperatorKind.GreaterThan, negatedKind: BinaryOperatorKind.GreaterThanOrEqual),
+        new(BinaryOperatorKind.LessThanOrEqual, IrBinaryOperator.LessThanOrEqual, reverseKind: BinaryOperatorKind.GreaterThanOrEqual, negatedKind: BinaryOperatorKind.GreaterThan),
+        new(BinaryOperatorKind.GreaterThan, IrBinaryOperator.GreaterThan, reverseKind: BinaryOperatorKind.LessThan, negatedKind: BinaryOperatorKind.LessThanOrEqual),
+        new(BinaryOperatorKind.GreaterThanOrEqual, IrBinaryOperator.GreaterThanOrEqual, reverseKind: BinaryOperatorKind.LessThanOrEqual, negatedKind: BinaryOperatorKind.LessThan)
     ];
 
     private static readonly ImmutableArray<CSharpUnarySemantics>
@@ -123,6 +129,16 @@ internal static class CSharpScalarSemantics
 
     internal static bool IsSupportedInteger(SpecialType type) =>
         TryGetInteger(type, out _);
+
+    internal static IrTypeId? TryGetBuiltInType(
+        IrFactory factory, SpecialType type) =>
+        type switch
+        {
+            SpecialType.System_Boolean => factory.BooleanType,
+            SpecialType.System_String => factory.StringType,
+            SpecialType.System_Object => factory.ObjectType,
+            _ => null
+        };
 
     internal static bool TryGetInteger(
         SpecialType type,
@@ -149,6 +165,27 @@ internal static class CSharpScalarSemantics
             ? semantics.IrOperator
             : null;
     }
+
+    internal static BinaryOperatorKind MapBinaryToRoslyn(
+        IrBinaryOperator @operator)
+    {
+        foreach (var candidate in BinaryOperators)
+            if (candidate.IrOperator == @operator)
+                return candidate.Kind;
+        return BinaryOperatorKind.None;
+    }
+
+    internal static BinaryOperatorKind ReverseBinary(
+        BinaryOperatorKind kind) =>
+        TryGetBinary(kind, out var semantics)
+            ? semantics.ReverseKind
+            : kind;
+
+    internal static BinaryOperatorKind NegateBinary(
+        BinaryOperatorKind kind) =>
+        TryGetBinary(kind, out var semantics)
+            ? semantics.NegatedKind
+            : kind;
 
     internal static bool IsIntegerArithmetic(BinaryOperatorKind kind) =>
         TryGetBinary(kind, out var semantics) &&

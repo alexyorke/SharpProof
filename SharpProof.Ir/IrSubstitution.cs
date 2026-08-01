@@ -8,20 +8,9 @@ public static class IrSubstitution
         IrVarId variable,
         IrTerm replacement)
     {
-        if (factory == null)
-        {
-            throw new ArgumentNullException(nameof(factory));
-        }
-
-        if (root == null)
-        {
-            throw new ArgumentNullException(nameof(root));
-        }
-
-        if (replacement == null)
-        {
-            throw new ArgumentNullException(nameof(replacement));
-        }
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
+        ArgumentNullGuard.NotNull(root, nameof(root));
+        ArgumentNullGuard.NotNull(replacement, nameof(replacement));
 
         return Substitute(
             factory,
@@ -34,20 +23,9 @@ public static class IrSubstitution
         IrTerm root,
         IReadOnlyDictionary<IrVarId, IrTerm> replacements)
     {
-        if (factory == null)
-        {
-            throw new ArgumentNullException(nameof(factory));
-        }
-
-        if (root == null)
-        {
-            throw new ArgumentNullException(nameof(root));
-        }
-
-        if (replacements == null)
-        {
-            throw new ArgumentNullException(nameof(replacements));
-        }
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
+        ArgumentNullGuard.NotNull(root, nameof(root));
+        ArgumentNullGuard.NotNull(replacements, nameof(replacements));
 
         factory.EnsureTerm(root, nameof(root));
         foreach (var replacement in replacements)

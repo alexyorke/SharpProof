@@ -44,6 +44,41 @@ The implementation remains the authority for enumerated surfaces:
   is its checked-in compiled projection, while
   `CompilerManifestArtifact.cs` validates the closed compiler-evidence
   envelope.
+- `SharpProof.Frontend/ContractApi.catalog.json` is the authoritative contract
+  API vocabulary. `Generate-ContractApiCatalog.ps1` produces declarative
+  descriptors; `ContractApiMetadataRuntime.cs` contains the handwritten lookup
+  behavior.
+- `SharpProof.Analyzer/AnalyzerDiagnostic.catalog.json` owns finite diagnostic
+  wording projections for intrinsic and clause-placement failures.
+  `Generate-AnalyzerDiagnosticCatalog.ps1` produces the projection; diagnostic
+  selection and reporting remain handwritten.
+- `SharpProof.Projection.catalog.json` owns finite output, result, clause-label,
+  policy, operation-stage, and effect-wiring projections. `Generate-ProjectionCatalog.ps1` produces
+  checked-in tables; validation, replay, and analysis algorithms remain
+  handwritten.
+- `SharpProof.DeclarativeModels.catalog.json` is the shared declarative storage
+  catalog for cross-project result records and model containers.
+  `Generate-DeclarativeModels.ps1` produces checked-in storage projections;
+  validation, indexing, reconstruction, and fail-closed analysis algorithms
+  remain handwritten.
+- `SharpProof.Contracts/BoundContractModel.schema.json` is the authoritative
+  bound-contract model vocabulary. `Generate-BoundContractModel.ps1` produces
+  the data containers and enum projection; binding and failure construction
+  remain handwritten.
+- `SharpProof.Effects/EffectContractMappings.catalog.json` is the authoritative
+  effect-contract, region, direct-event, and reference-family vocabulary.
+  `Generate-EffectContractMappings.ps1` produces its declarative mapping
+  tables; effect projection and validation algorithms remain handwritten.
+- `SharpProof.Frontend/OperationSupport.catalog.json` is the authoritative
+  finite Roslyn operation vocabulary for contract-expression lowering and
+  effect discovery. `Generate-OperationSupportCatalog.ps1` produces its
+  declarative stage tables; support queries and stage-specific validation
+  remain handwritten.
+- `SharpProof.Ir/IrModel.schema.json` and the
+  `portableIrSlotMappings` section of the compiler-artifact schema own typed IR
+  model and wire vocabulary. Their generated outputs contain declarative tables
+  and wire projection adapters; indexing, validation, reconstruction, and
+  fail-closed algorithms remain handwritten.
 - `eng/acceptance/contract.json` declares release-gate budgets. Package
   defaults that are not release-gate fields live in the portable and verifier
   build-transitive props and targets.
@@ -55,6 +90,7 @@ The implementation remains the authority for enumerated surfaces:
 | [Acceptance contract](../eng/acceptance/README.md) | Active | Defines the release checks for the 1.0 preview. |
 | [Release gates](../SharpProof.Gates/README.md) | Active | Documents the corpus, metamorphic, performance, and cancellation runners. |
 | [Open-source corpus](../SharpProof.Gates/Corpus/README.md) | Active | Records corpus provenance, licensing, instrumentation, and update procedure. |
+| [2026-07-30 allocation effect replay](soundness-notes/2026-07-30-allocation-effect-replay.md) | Dated evidence | Records the independently interpreted allocation-effect refutation boundary and executable evidence. |
 | [2026-07-29 formatting-neutral source metrics](soundness-notes/2026-07-29-formatting-neutral-source-metrics.md) | Dated evidence | Records removal of compression-oriented formatting and LOC gates. |
 | [2026-07-27 product bug sweep](soundness-notes/2026-07-27-product-sweep.md) | Dated evidence | Records analyzer, contract, effect, and worker adversarial fixes plus exact validation evidence. |
 | [2026-07-25 hardening audit](soundness-notes/2026-07-25-hardening.md) | Dated evidence | Records one completed hardening tranche and its remaining checkpoints. |
@@ -66,11 +102,11 @@ the current coverage inventory or normative semantics.
 ## Known production gaps
 
 During Windows verification, the production analyzer emits a deterministic
-schema-8 compiler artifact from the final post-generator Roslyn `Compilation`. It
-contains the selected-claim manifest and portable lowered whole-body CFG/IR for
-supported selected callables, plus bound contract/spec metadata, compiler
-diagnostics, generated-tree hashes, bounded options, mapped locations, and
-identity/provenance evidence. It contains no source text.
+schema-9 compiler artifact from the final post-generator Roslyn
+`Compilation`. It contains the selected-claim manifest and portable lowered
+whole-body CFG/IR for supported selected callables, plus bound contract/spec
+metadata, compiler diagnostics, generated-tree hashes, bounded options, mapped
+locations, and identity/provenance evidence. It contains no source text.
 
 The worker validates and hydrates that closed artifact without constructing a
 Roslyn compilation or rereading reference files. Exact manifest/lowered
@@ -82,21 +118,24 @@ production-plan Step 4 is complete for the bounded verifier subset.
 Independent whole-body postcondition-counterexample replay is implemented for
 the admitted scalar program subset. The proof kernel checks exact model closure
 and the lowered assumptions/goal before the worker independently executes the
-compiler-produced whole-body CFG. Effect violations remain fail-closed until
-the compiler artifact carries an independently replayable effect trace. The
-three-package split, portable SourceLink symbols, package
-validation, deterministic hashes, SPDX 2.3 package/component SBOM generation,
-separately permissioned GitHub build/SBOM attestations, immutable tagged-byte
-validation, trusted-publishing workflow,
-package-backed sample matrix, and exact public API XML coverage are
-implemented. The tag workflow requires checked-in version equality, master
-ancestry, and predecessor-tag order, then allowlists private `preview.1`,
-public `preview.2`, public `rc.1`, and stable `1.0.0` promotion of the
-already-tested bytes. Publication preflights every main package and fails if
-the version already exists; duplicate skipping is never used. Main and symbol
-packages are then pushed separately in dependency order. A symbol collision or
-partial publication requires a new version. Deterministic SARIF 2.1.0
-projection is available as an opt-in verifier output. Owner configuration of
+compiler-produced whole-body CFG. Schema 9 also carries an independently
+replayable event for an unconditional definite managed object/array allocation.
+The worker can use it to refute `ZeroAllocations` or an `EffectContract`
+excluding `Allocates`; other effect candidates still fail closed as typed
+`Unknown`. Effect results remain noncacheable, and worker protocol 9 and cache
+schema 11 are unchanged. The three-package split, portable SourceLink symbols,
+package validation, deterministic hashes, SPDX 2.3 package/component SBOM
+generation, separately permissioned GitHub build/SBOM attestations, immutable
+tagged-byte validation, trusted-publishing workflow, package-backed sample
+matrix, and exact public API XML coverage are implemented. The tag workflow
+requires checked-in version equality, master ancestry, and predecessor-tag
+order, then allowlists private `preview.1`, public `preview.2`, public `rc.1`,
+and stable `1.0.0` promotion of the already-tested bytes. Publication
+preflights every main package and fails if the version already exists;
+duplicate skipping is never used. Main and symbol packages are then pushed
+separately in dependency order. A symbol collision or partial publication
+requires a new version. Deterministic SARIF 2.1.0 projection is available as an
+opt-in verifier output. Owner configuration of
 protected release environments and tags, pilot-library evidence, the first
 private/public NuGet publications, and the remaining release reviews are
 future work. Current behavior and limits are recorded in

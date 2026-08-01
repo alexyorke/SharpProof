@@ -57,10 +57,7 @@ internal static class ApiSpecTermValidator
 
                 return new(text.Type, true, true, null);
             case SpecNullDeclaration nullValue:
-                if (nullValue.Type is not (
-                    SpecValueType.String or
-                    SpecValueType.Reference or
-                    SpecValueType.Sequence))
+                if (!IrTermServices.IsNullable(nullValue.Type))
                 {
                     throw new ArgumentException(
                         "Null requires a nullable spec type.",
@@ -77,7 +74,7 @@ internal static class ApiSpecTermValidator
             case SpecLengthDeclaration length:
                 var value = Validate(length.Value, variables, facets);
                 if (value.Type is not (
-                    SpecValueType.String or SpecValueType.Sequence))
+                    IrTypeKind.String or IrTypeKind.Sequence))
                 {
                     throw new ArgumentException(
                         "Length requires a string or sequence.",
@@ -102,12 +99,7 @@ internal static class ApiSpecTermValidator
         ApiSpecFacets facets)
     {
         var operand = Validate(unary.Operand, variables, facets);
-        var expected = unary.Operator switch
-        {
-            SpecUnaryOperator.Not => SpecValueType.Boolean,
-            SpecUnaryOperator.Negate => SpecValueType.Integer,
-            _ => throw new ArgumentOutOfRangeException(nameof(unary))
-        };
+        var expected = IrOperatorCatalog.Get(unary.Operator).Operand;
         if (operand.Type != expected || unary.Type != expected)
         {
             throw new ArgumentException(
@@ -116,7 +108,7 @@ internal static class ApiSpecTermValidator
         }
 
         long? integer = null;
-        if (unary.Operator == SpecUnaryOperator.Negate &&
+        if (unary.Operator == IrUnaryOperator.Negate &&
             operand.Integer is { } value &&
             TryNegate(value, out var negated))
         {
@@ -125,7 +117,7 @@ internal static class ApiSpecTermValidator
 
         return new(
             expected,
-            unary.Operator == SpecUnaryOperator.Not
+            unary.Operator == IrUnaryOperator.Not
                 ? operand.IsTotal
                 : integer.HasValue,
             false,
@@ -139,51 +131,28 @@ internal static class ApiSpecTermValidator
     {
         var left = Validate(binary.Left, variables, facets);
         var right = Validate(binary.Right, variables, facets);
-        var resultType = binary.Operator switch
+        var shape = IrOperatorCatalog.Get(binary.Operator);
+        var operandTypesMatch = shape.Operand.HasValue
+            ? left.Type == shape.Operand.Value &&
+              right.Type == shape.Operand.Value
+            : left.Type == right.Type;
+        if (!operandTypesMatch)
         {
-            SpecBinaryOperator.Add or
-                SpecBinaryOperator.Subtract or
-                SpecBinaryOperator.Multiply or
-                SpecBinaryOperator.Divide or
-                SpecBinaryOperator.Remainder
-                when left.Type == SpecValueType.Integer &&
-                     right.Type == SpecValueType.Integer =>
-                SpecValueType.Integer,
-            SpecBinaryOperator.AndAlso or SpecBinaryOperator.OrElse
-                when left.Type == SpecValueType.Boolean &&
-                     right.Type == SpecValueType.Boolean =>
-                SpecValueType.Boolean,
-            SpecBinaryOperator.Equal or SpecBinaryOperator.NotEqual
-                when left.Type == right.Type =>
-                SpecValueType.Boolean,
-            SpecBinaryOperator.LessThan or
-                SpecBinaryOperator.LessThanOrEqual or
-                SpecBinaryOperator.GreaterThan or
-                SpecBinaryOperator.GreaterThanOrEqual
-                when left.Type == SpecValueType.Integer &&
-                     right.Type == SpecValueType.Integer =>
-                SpecValueType.Boolean,
-            SpecBinaryOperator.StringConcat
-                when left.Type == SpecValueType.String &&
-                     right.Type == SpecValueType.String =>
-                SpecValueType.String,
-            _ => throw new ArgumentException(
+            throw new ArgumentException(
                 "Invalid binary spec expression types.",
-                nameof(binary))
-        };
-        if (binary.Type != resultType)
+                nameof(binary));
+        }
+
+        if (binary.Type != shape.Result)
         {
             throw new ArgumentException(
                 "The binary spec result type is incorrect.",
                 nameof(binary));
         }
 
-        var arithmetic = binary.Operator is
-            SpecBinaryOperator.Add or
-            SpecBinaryOperator.Subtract or
-            SpecBinaryOperator.Multiply or
-            SpecBinaryOperator.Divide or
-            SpecBinaryOperator.Remainder;
+        var arithmetic =
+            shape.Operand == IrTypeKind.Integer &&
+            shape.Result == IrTypeKind.Integer;
         long? integer = null;
         if (arithmetic &&
             left.Integer is { } leftValue &&
@@ -194,9 +163,9 @@ internal static class ApiSpecTermValidator
         }
 
         return new(
-            resultType,
+            shape.Result,
             arithmetic ? integer.HasValue : left.IsTotal && right.IsTotal,
-            binary.Operator == SpecBinaryOperator.StringConcat,
+            binary.Operator == IrBinaryOperator.StringConcat,
             integer);
     }
 
@@ -208,7 +177,7 @@ internal static class ApiSpecTermValidator
         var condition = Validate(conditional.Condition, variables, facets);
         var whenTrue = Validate(conditional.WhenTrue, variables, facets);
         var whenFalse = Validate(conditional.WhenFalse, variables, facets);
-        if (condition.Type != SpecValueType.Boolean ||
+        if (condition.Type != IrTypeKind.Boolean ||
             whenTrue.Type != whenFalse.Type ||
             conditional.Type != whenTrue.Type)
         {
@@ -239,33 +208,18 @@ internal static class ApiSpecTermValidator
     }
 
     private static bool TryArithmetic(
-        SpecBinaryOperator @operator,
+        IrBinaryOperator @operator,
         long left,
         long right,
         out long result)
     {
-        try
-        {
-            result = @operator switch
-            {
-                SpecBinaryOperator.Add => checked(left + right),
-                SpecBinaryOperator.Subtract => checked(left - right),
-                SpecBinaryOperator.Multiply => checked(left * right),
-                SpecBinaryOperator.Divide => left / right,
-                SpecBinaryOperator.Remainder => left % right,
-                _ => throw new ArgumentOutOfRangeException(nameof(@operator))
-            };
-            return true;
-        }
-        catch (ArithmeticException)
-        {
-            result = 0;
-            return false;
-        }
+        var evaluated = IrScalarOperations.Evaluate(@operator, left, right);
+        result = evaluated.Value;
+        return evaluated.Kind == IrScalarResultKind.Integer;
     }
 
     internal readonly record struct TermFacts(
-        SpecValueType Type,
+        IrTypeKind Type,
         bool IsTotal,
         bool IsNonNull,
         long? Integer);

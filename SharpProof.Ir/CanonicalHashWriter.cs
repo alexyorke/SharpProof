@@ -46,7 +46,7 @@ internal sealed class CanonicalHashWriter : IDisposable
     {
         return AddFrame(
             ValueKind.Bytes,
-            bytes ?? throw new ArgumentNullException(nameof(bytes)));
+            ArgumentNullGuard.NotNull(bytes, nameof(bytes)));
     }
 
     private CanonicalHashWriter Add(Enum value)

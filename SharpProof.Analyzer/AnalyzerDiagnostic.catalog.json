@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "intrinsicDescriptions": [
+    {
+      "failure": "NestedOld",
+      "isOld": true,
+      "argument": "<nesting>",
+      "reason": "Contract.Old cannot be nested inside Contract.Old"
+    },
+    {
+      "failure": "InvalidIntrinsicSignature",
+      "isOld": true,
+      "argument": "<signature>",
+      "reason": "expected exactly one value argument"
+    },
+    {
+      "failure": "InvalidIntrinsicSignature",
+      "isOld": false,
+      "argument": "<signature>",
+      "reason": "expected a result type matching the callable return type"
+    }
+  ],
+  "placementDescriptions": [
+    {
+      "placement": "Conditional",
+      "description": "expected an unconditional prologue statement"
+    },
+    {
+      "placement": "Unreachable",
+      "description": "expected a reachable prologue statement"
+    },
+    {
+      "placement": "Late",
+      "description": "expected the clause before every non-contract statement"
+    }
+  ],
+  "intrinsicFallback": {
+    "argument": "<placement>",
+    "reason": "expected use inside Contract.Ensures"
+  },
+  "placementFallback": "expected a direct prologue statement"
+}

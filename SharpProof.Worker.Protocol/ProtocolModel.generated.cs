@@ -714,48 +714,92 @@ internal static class WorkerProtocolMetadata
         && !string.IsNullOrWhiteSpace(value.Message));
 }
 
-public static partial class WorkerProtocolJson
+internal enum WorkerManifestIdentityFieldKind
 {
-    private static string CreateManifestPayload(WorkerClaimManifest manifest)
+    String,
+    Int,
+    Enum,
+    Location,
+    EnumArray,
+    OrdinalStringArray,
+    AssumptionArray,
+}
+
+internal readonly struct WorkerManifestIdentityField
+{
+    internal WorkerManifestIdentityField(
+        string label, string property,
+        WorkerManifestIdentityFieldKind kind, string? defaultMember)
     {
-        var writer = new ManifestWriter().Add("SharpProof.Worker.ManifestHash")
-            .Add(WorkerManifestVersions.Current);
-        writer.Add("manifest.schemaVersion").Add(manifest.SchemaVersion);
-        writer.Add("manifest.callables").Add(manifest.Callables?.Length ?? -1);
-        foreach (var entry in (manifest.Callables ?? [])
-            .OrderBy(static value => value?.CallableId, StringComparer.Ordinal))
-        {
-            writer.Add("callable");
-            writer.Add("callable.id").Add(entry?.CallableId);
-            writer.AddItems("callable.selectedFeatures", entry?.SelectedFeatures,
-                SortManifestEnums(entry?.SelectedFeatures),
-                static (target, value) => target.Add(ManifestName(value)));
-            writer.AddItems("callable.selectionReasons", entry?.SelectionReasons,
-                SortManifestEnums(entry?.SelectionReasons),
-                static (target, value) => target.Add(ManifestName(value)));
-            writer.AddLocation("callable.location", entry?.Location);
-            writer.AddItems("callable.claimIds", entry?.ClaimIds,
-                (entry?.ClaimIds ?? []).OrderBy(static value => value, StringComparer.Ordinal),
-                static (target, value) => target.Add(value));
-            writer.AddItems("callable.assumptions", entry?.Assumptions,
-                CanonicalizeAssumptions(entry?.Assumptions),
-                static (target, value) => target.Add(value.Id).Add(ManifestName(value.Kind)));
-        }
-        writer.Add("manifest.claims").Add(manifest.Claims?.Length ?? -1);
-        foreach (var entry in (manifest.Claims ?? [])
-            .OrderBy(static value => value?.CallableId, StringComparer.Ordinal)
-            .ThenBy(static value => value?.Ordinal ?? int.MinValue)
-            .ThenBy(static value => value?.ClaimId, StringComparer.Ordinal))
-        {
-            writer.Add("claim");
-            writer.Add("claim.id").Add(entry?.ClaimId);
-            writer.Add("claim.callableId").Add(entry?.CallableId);
-            writer.Add("claim.ordinal").Add(entry?.Ordinal ?? -1);
-            writer.Add("claim.kind").Add(ManifestName(entry?.Kind ?? WorkerClaimKind.Unspecified));
-            writer.Add("claim.evidence").Add(ManifestName(entry?.Evidence ?? WorkerClaimEvidence.Unspecified));
-            writer.Add("claim.effectContractKind").Add(ManifestName(entry?.EffectContractKind ?? WorkerEffectContractKind.Unspecified));
-            writer.AddLocation("claim.location", entry?.Location);
-        }
-        return writer.ToString();
+        Label = label;
+        Property = property;
+        Kind = kind;
+        DefaultMember = defaultMember;
     }
+    internal string Label { get; }
+    internal string Property { get; }
+    internal WorkerManifestIdentityFieldKind Kind { get; }
+    internal string? DefaultMember { get; }
+}
+internal readonly struct WorkerManifestIdentityOrder
+{
+    internal WorkerManifestIdentityOrder(string property, string kind)
+    {
+        Property = property;
+        Kind = kind;
+    }
+    internal string Property { get; }
+    internal string Kind { get; }
+}
+internal readonly struct WorkerManifestIdentityCollection
+{
+    internal WorkerManifestIdentityCollection(
+        string property, string lengthLabel, string entryLabel,
+        WorkerManifestIdentityOrder[] order,
+        WorkerManifestIdentityField[] fields)
+    {
+        Property = property;
+        LengthLabel = lengthLabel;
+        EntryLabel = entryLabel;
+        Order = order;
+        Fields = fields;
+    }
+    internal string Property { get; }
+    internal string LengthLabel { get; }
+    internal string EntryLabel { get; }
+    internal WorkerManifestIdentityOrder[] Order { get; }
+    internal WorkerManifestIdentityField[] Fields { get; }
+}
+
+internal static class WorkerManifestIdentityCatalog
+{
+    internal const string Domain = "SharpProof.Worker.ManifestHash";
+    internal static readonly WorkerManifestIdentityField[] RootFields = [
+        new("manifest.schemaVersion", "SchemaVersion", WorkerManifestIdentityFieldKind.Int, null),
+    ];
+    internal static readonly WorkerManifestIdentityCollection[] Collections = [
+        new("Callables", "manifest.callables", "callable", [
+            new("CallableId", "ordinalString"),
+        ], [
+            new("callable.id", "CallableId", WorkerManifestIdentityFieldKind.String, null),
+            new("callable.selectedFeatures", "SelectedFeatures", WorkerManifestIdentityFieldKind.EnumArray, null),
+            new("callable.selectionReasons", "SelectionReasons", WorkerManifestIdentityFieldKind.EnumArray, null),
+            new("callable.location", "Location", WorkerManifestIdentityFieldKind.Location, null),
+            new("callable.claimIds", "ClaimIds", WorkerManifestIdentityFieldKind.OrdinalStringArray, null),
+            new("callable.assumptions", "Assumptions", WorkerManifestIdentityFieldKind.AssumptionArray, null),
+        ]),
+        new("Claims", "manifest.claims", "claim", [
+            new("CallableId", "ordinalString"),
+            new("Ordinal", "integer"),
+            new("ClaimId", "ordinalString"),
+        ], [
+            new("claim.id", "ClaimId", WorkerManifestIdentityFieldKind.String, null),
+            new("claim.callableId", "CallableId", WorkerManifestIdentityFieldKind.String, null),
+            new("claim.ordinal", "Ordinal", WorkerManifestIdentityFieldKind.Int, null),
+            new("claim.kind", "Kind", WorkerManifestIdentityFieldKind.Enum, "WorkerClaimKind.Unspecified"),
+            new("claim.evidence", "Evidence", WorkerManifestIdentityFieldKind.Enum, "WorkerClaimEvidence.Unspecified"),
+            new("claim.effectContractKind", "EffectContractKind", WorkerManifestIdentityFieldKind.Enum, "WorkerEffectContractKind.Unspecified"),
+            new("claim.location", "Location", WorkerManifestIdentityFieldKind.Location, null),
+        ]),
+    ];
 }

@@ -922,6 +922,120 @@ $manifestVersionMember = [string](
     Get-RequiredMember `
         $manifestIdentity 'versionMember' 'manifest identity')
 Assert-ValidationMember $manifestVersionMember 'Manifest identity'
+$manifestFieldKinds = [ordered]@{
+    string = 'String'
+    int = 'Int'
+    enum = 'Enum'
+    location = 'Location'
+    enumArray = 'EnumArray'
+    ordinalStringArray = 'OrdinalStringArray'
+    assumptionArray = 'AssumptionArray'
+}
+$lines.Add('')
+$lines.Add('internal enum WorkerManifestIdentityFieldKind {')
+foreach ($kind in $manifestFieldKinds.Values) {
+    $lines.Add("    $kind,")
+}
+$lines.Add('}')
+$lines.Add('')
+$lines.Add('internal readonly struct WorkerManifestIdentityField')
+$lines.Add('{')
+$lines.Add('    internal WorkerManifestIdentityField(')
+$lines.Add('        string label, string property,')
+$lines.Add('        WorkerManifestIdentityFieldKind kind, string? defaultMember)')
+$lines.Add('    {')
+$lines.Add('        Label = label;')
+$lines.Add('        Property = property;')
+$lines.Add('        Kind = kind;')
+$lines.Add('        DefaultMember = defaultMember;')
+$lines.Add('    }')
+$lines.Add('    internal string Label { get; }')
+$lines.Add('    internal string Property { get; }')
+$lines.Add('    internal WorkerManifestIdentityFieldKind Kind { get; }')
+$lines.Add('    internal string? DefaultMember { get; }')
+$lines.Add('}')
+$lines.Add('internal readonly struct WorkerManifestIdentityOrder')
+$lines.Add('{')
+$lines.Add('    internal WorkerManifestIdentityOrder(string property, string kind)')
+$lines.Add('    {')
+$lines.Add('        Property = property;')
+$lines.Add('        Kind = kind;')
+$lines.Add('    }')
+$lines.Add('    internal string Property { get; }')
+$lines.Add('    internal string Kind { get; }')
+$lines.Add('}')
+$lines.Add('internal readonly struct WorkerManifestIdentityCollection')
+$lines.Add('{')
+$lines.Add('    internal WorkerManifestIdentityCollection(')
+$lines.Add('        string property, string lengthLabel, string entryLabel,')
+$lines.Add('        WorkerManifestIdentityOrder[] order,')
+$lines.Add('        WorkerManifestIdentityField[] fields)')
+$lines.Add('    {')
+$lines.Add('        Property = property;')
+$lines.Add('        LengthLabel = lengthLabel;')
+$lines.Add('        EntryLabel = entryLabel;')
+$lines.Add('        Order = order;')
+$lines.Add('        Fields = fields;')
+$lines.Add('    }')
+$lines.Add('    internal string Property { get; }')
+$lines.Add('    internal string LengthLabel { get; }')
+$lines.Add('    internal string EntryLabel { get; }')
+$lines.Add('    internal WorkerManifestIdentityOrder[] Order { get; }')
+$lines.Add('    internal WorkerManifestIdentityField[] Fields { get; }')
+$lines.Add('}')
+$lines.Add('')
+$lines.Add('internal static class WorkerManifestIdentityCatalog {')
+$lines.Add("    internal const string Domain = $(ConvertTo-CSharpString $manifestDomain);")
+$lines.Add('    internal static readonly WorkerManifestIdentityField[] RootFields = [')
+foreach ($field in @(Get-RequiredMember `
+        $manifestIdentity 'rootFields' 'manifest identity')) {
+    $kind = [string](Get-RequiredMember $field 'kind' 'manifest root field')
+    if (-not $manifestFieldKinds.Contains($kind)) {
+        throw "Unsupported manifest field kind '$kind'."
+    }
+    $lines.Add(
+        '        new(' +
+        (ConvertTo-CSharpString ([string](Get-RequiredMember $field 'label' 'manifest root field'))) +
+        ', ' +
+        (ConvertTo-CSharpString ([string](Get-RequiredMember $field 'property' 'manifest root field'))) +
+        ", WorkerManifestIdentityFieldKind.$($manifestFieldKinds[$kind]), null),")
+}
+$lines.Add('    ];')
+$lines.Add('    internal static readonly WorkerManifestIdentityCollection[] Collections = [')
+foreach ($collection in @(Get-RequiredMember `
+        $manifestIdentity 'collections' 'manifest identity')) {
+    $property = [string](Get-RequiredMember $collection 'property' 'manifest collection')
+    $lines.Add('        new(' +
+        (ConvertTo-CSharpString $property) + ', ' +
+        (ConvertTo-CSharpString ([string](Get-RequiredMember $collection 'lengthLabel' 'manifest collection'))) + ', ' +
+        (ConvertTo-CSharpString ([string](Get-RequiredMember $collection 'entryLabel' 'manifest collection'))) + ', [')
+    foreach ($order in @(Get-RequiredMember $collection 'order' "manifest collection '$property'")) {
+        $lines.Add('            new(' +
+            (ConvertTo-CSharpString ([string](Get-RequiredMember $order 'property' 'manifest order'))) + ', ' +
+            (ConvertTo-CSharpString ([string](Get-RequiredMember $order 'kind' 'manifest order'))) + '),')
+    }
+    $lines.Add('        ], [')
+    foreach ($field in @(Get-RequiredMember $collection 'fields' "manifest collection '$property'")) {
+        $kind = [string](Get-RequiredMember $field 'kind' 'manifest field')
+        if (-not $manifestFieldKinds.Contains($kind)) {
+            throw "Unsupported manifest field kind '$kind'."
+        }
+        $defaultMember = if ($field.PSObject.Properties.Name -contains 'defaultMember') {
+            ConvertTo-CSharpString ([string]$field.defaultMember)
+        }
+        else {
+            'null'
+        }
+        $lines.Add('            new(' +
+            (ConvertTo-CSharpString ([string](Get-RequiredMember $field 'label' 'manifest field'))) + ', ' +
+            (ConvertTo-CSharpString ([string](Get-RequiredMember $field 'property' 'manifest field'))) +
+            ", WorkerManifestIdentityFieldKind.$($manifestFieldKinds[$kind]), $defaultMember),")
+    }
+    $lines.Add('        ]),')
+}
+$lines.Add('    ];')
+$lines.Add('}')
+if ($false) {
 $lines.Add('')
 $lines.Add('public static partial class WorkerProtocolJson {')
 $lines.Add(
@@ -1090,6 +1204,7 @@ foreach ($collection in @(
 $lines.Add('        return writer.ToString();')
 $lines.Add('    }')
 $lines.Add('}')
+}
 
 $versionMembers = Get-RequiredMember $schema 'versionMembers' 'schema'
 foreach ($role in $versionMembers.PSObject.Properties) {

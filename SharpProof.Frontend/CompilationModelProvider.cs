@@ -9,15 +9,8 @@ public static class CompilationModelProvider
         Compilation compilation,
         SyntaxTree tree)
     {
-        if (compilation == null)
-        {
-            throw new ArgumentNullException(nameof(compilation));
-        }
-
-        if (tree == null)
-        {
-            throw new ArgumentNullException(nameof(tree));
-        }
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        tree = ArgumentNullGuard.NotNull(tree, nameof(tree));
 
 #pragma warning disable RS0030 // Audited compiler-host boundary; all consumers route through this method.
         var owner = FindOwningCompilation(compilation, tree);

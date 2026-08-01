@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "namespace": "SharpProof.Attributes",
+  "contractType": "Contract",
+  "conditionalSymbol": "SHARPPROOF_CONTRACTS",
+  "methods": [
+    {
+      "id": "Requires",
+      "name": "Requires",
+      "shape": "Clause",
+      "clauseRole": "Requires"
+    },
+    {
+      "id": "Ensures",
+      "name": "Ensures",
+      "shape": "Clause",
+      "clauseRole": "Ensures"
+    },
+    {
+      "id": "Assume",
+      "name": "Assume",
+      "shape": "Clause",
+      "clauseRole": "Assume"
+    },
+    {
+      "id": "Old",
+      "name": "Old",
+      "shape": "Old",
+      "clauseRole": "None"
+    },
+    {
+      "id": "Result",
+      "name": "Result",
+      "shape": "Result",
+      "clauseRole": "None"
+    }
+  ],
+  "attributes": [
+    {
+      "id": "ContractFor",
+      "typeName": "ContractForAttribute",
+      "category": "Companion",
+      "selection": "None"
+    },
+    {
+      "id": "EnforcePure",
+      "typeName": "EnforcePureAttribute",
+      "category": "Effect",
+      "selection": "Effects"
+    },
+    {
+      "id": "ZeroAllocations",
+      "typeName": "ZeroAllocationsAttribute",
+      "category": "Effect",
+      "selection": "Effects"
+    },
+    {
+      "id": "AllowedCapabilities",
+      "typeName": "AllowedCapabilitiesAttribute",
+      "category": "Effect",
+      "selection": "Effects"
+    },
+    {
+      "id": "DoesNotThrow",
+      "typeName": "DoesNotThrowAttribute",
+      "category": "Effect",
+      "selection": "Effects"
+    },
+    {
+      "id": "AllowedExceptions",
+      "typeName": "AllowedExceptionsAttribute",
+      "category": "Effect",
+      "selection": "Effects"
+    },
+    {
+      "id": "EffectContract",
+      "typeName": "EffectContractAttribute",
+      "category": "Effect",
+      "selection": "Effects"
+    },
+    {
+      "id": "NotNull",
+      "typeName": "NotNullAttribute",
+      "category": "Closed",
+      "selection": "Contracts"
+    },
+    {
+      "id": "Positive",
+      "typeName": "PositiveAttribute",
+      "category": "Closed",
+      "selection": "Contracts"
+    },
+    {
+      "id": "InRange",
+      "typeName": "InRangeAttribute",
+      "category": "Closed",
+      "selection": "Contracts"
+    },
+    {
+      "id": "Suppress",
+      "typeName": "SharpProofSuppressAttribute",
+      "category": "Control",
+      "selection": "All"
+    },
+    {
+      "id": "Trusted",
+      "typeName": "SharpProofTrustedAttribute",
+      "category": "Control",
+      "selection": "All"
+    }
+  ]
+}

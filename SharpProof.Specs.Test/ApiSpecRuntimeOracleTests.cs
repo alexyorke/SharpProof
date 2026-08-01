@@ -5,6 +5,7 @@ using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using NUnit.Framework;
 using SharpProof.Attributes;
+using SharpProof.Ir;
 using SharpProof.Specs;
 
 namespace SharpProof.Specs.Test;
@@ -1153,8 +1154,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
     {
         return unary.Operator switch
         {
-            SpecUnaryOperator.Not => !AsBoolean(Evaluate(unary.Operand, bindings)),
-            SpecUnaryOperator.Negate => -AsInteger(Evaluate(unary.Operand, bindings)),
+            IrUnaryOperator.Not => !AsBoolean(Evaluate(unary.Operand, bindings)),
+            IrUnaryOperator.Negate => -AsInteger(Evaluate(unary.Operand, bindings)),
             _ => throw new AssertionException("Unknown unary spec operator.")
         };
     }
@@ -1167,20 +1168,20 @@ public sealed partial class ApiSpecRuntimeOracleTests
         var right = Evaluate(binary.Right, bindings);
         return binary.Operator switch
         {
-            SpecBinaryOperator.Add => AsInteger(left) + AsInteger(right),
-            SpecBinaryOperator.Subtract => AsInteger(left) - AsInteger(right),
-            SpecBinaryOperator.Multiply => AsInteger(left) * AsInteger(right),
-            SpecBinaryOperator.Divide => AsInteger(left) / AsInteger(right),
-            SpecBinaryOperator.Remainder => AsInteger(left) % AsInteger(right),
-            SpecBinaryOperator.AndAlso => AsBoolean(left) && AsBoolean(right),
-            SpecBinaryOperator.OrElse => AsBoolean(left) || AsBoolean(right),
-            SpecBinaryOperator.Equal => RuntimeEquals(left, right),
-            SpecBinaryOperator.NotEqual => !RuntimeEquals(left, right),
-            SpecBinaryOperator.LessThan => AsInteger(left) < AsInteger(right),
-            SpecBinaryOperator.LessThanOrEqual => AsInteger(left) <= AsInteger(right),
-            SpecBinaryOperator.GreaterThan => AsInteger(left) > AsInteger(right),
-            SpecBinaryOperator.GreaterThanOrEqual => AsInteger(left) >= AsInteger(right),
-            SpecBinaryOperator.StringConcat =>
+            IrBinaryOperator.Add => AsInteger(left) + AsInteger(right),
+            IrBinaryOperator.Subtract => AsInteger(left) - AsInteger(right),
+            IrBinaryOperator.Multiply => AsInteger(left) * AsInteger(right),
+            IrBinaryOperator.Divide => AsInteger(left) / AsInteger(right),
+            IrBinaryOperator.Remainder => AsInteger(left) % AsInteger(right),
+            IrBinaryOperator.AndAlso => AsBoolean(left) && AsBoolean(right),
+            IrBinaryOperator.OrElse => AsBoolean(left) || AsBoolean(right),
+            IrBinaryOperator.Equal => RuntimeEquals(left, right),
+            IrBinaryOperator.NotEqual => !RuntimeEquals(left, right),
+            IrBinaryOperator.LessThan => AsInteger(left) < AsInteger(right),
+            IrBinaryOperator.LessThanOrEqual => AsInteger(left) <= AsInteger(right),
+            IrBinaryOperator.GreaterThan => AsInteger(left) > AsInteger(right),
+            IrBinaryOperator.GreaterThanOrEqual => AsInteger(left) >= AsInteger(right),
+            IrBinaryOperator.StringConcat =>
                 string.Concat(left as string, right as string),
             _ => throw new AssertionException("Unknown binary spec operator.")
         };
@@ -1730,9 +1731,9 @@ public sealed partial class ApiSpecRuntimeOracleTests
         {
             var declared = template.Postconditions[Index].Condition;
             var mutation = new SpecUnaryDeclaration(
-                SpecUnaryOperator.Not,
+                IrUnaryOperator.Not,
                 declared,
-                SpecValueType.Boolean);
+                IrTypeKind.Boolean);
             return ValidatePostcondition(template, mutation, Edges);
         }
     }

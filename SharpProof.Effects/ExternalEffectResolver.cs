@@ -1,19 +1,5 @@
 namespace SharpProof.Effects;
 
-internal enum EffectContractResolutionKind
-{
-    Missing,
-    Untrusted,
-    Incomplete,
-    Invalid,
-    Valid
-}
-internal readonly record struct EffectContractResolution(
-    EffectContractResolutionKind Kind,
-    EffectSummary Summary,
-    AttributeData? InvalidAttribute = null,
-    string InvalidReason = "");
-
 internal sealed class ExternalEffectResolver
 {
     private readonly Compilation _compilation;
@@ -24,22 +10,22 @@ internal sealed class ExternalEffectResolver
 
     internal ExternalEffectResolver(Compilation compilation, ApiSpecTable apiSpecs)
         : this(
-            compilation,
-            new ApiSpecResolver(apiSpecs ?? throw new ArgumentNullException(nameof(apiSpecs)))
-                .Resolve(compilation ?? throw new ArgumentNullException(nameof(compilation))))
+            ArgumentNullGuard.NotNull(compilation, nameof(compilation)),
+            new ApiSpecResolver(ArgumentNullGuard.NotNull(apiSpecs, nameof(apiSpecs)))
+                .Resolve(compilation))
     {
     }
 
     internal ExternalEffectResolver(Compilation compilation, ResolvedApiSpecTable apiSpecs)
     {
-        _compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
+        _compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         var contractApi = ContractApiIdentityResolver.ForCompilation(compilation);
         _effectContractAttribute = contractApi.ResolveAttribute(
             EffectContractMetadata.AttributeMetadataName);
         _exceptionType = compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
         _trustedBoundaries =
             TrustedBoundaryPolicy.ForCompilation(compilation);
-        _specs = apiSpecs ?? throw new ArgumentNullException(nameof(apiSpecs));
+        _specs = ArgumentNullGuard.NotNull(apiSpecs, nameof(apiSpecs));
     }
 
     internal ResolvedApiSpecTable ApiSpecs => _specs;
@@ -290,26 +276,17 @@ internal sealed class ExternalEffectResolver
             }
         }
 
-        var allocation = spec.Facets.Allocation.Behavior switch
-        {
-            SpecAllocationBehavior.None => EffectAllocationKind.None,
-            SpecAllocationBehavior.MayAllocate => EffectAllocationKind.Managed,
-            SpecAllocationBehavior.Unknown => EffectAllocationKind.Unknown,
-            _ => EffectAllocationKind.Unknown
-        };
+        var allocation = EffectProjections.MapAllocation(
+            spec.Facets.Allocation.Behavior);
         if (allocation == EffectAllocationKind.Unknown)
         {
             completeness = EffectCompleteness.Incomplete;
         }
 
         var throwBehavior = spec.Facets.Throws.Behavior;
-        var exceptions = throwBehavior switch
-        {
-            SpecThrowBehavior.DoesNotThrow => EffectThrowSet.Empty,
-            SpecThrowBehavior.MayThrow => ResolveExceptionSet(
-                spec.Facets.Throws.ExceptionMetadataNames),
-            _ => EffectThrowSet.Unknown
-        };
+        var exceptions = throwBehavior == SpecThrowBehavior.MayThrow
+            ? ResolveExceptionSet(spec.Facets.Throws.ExceptionMetadataNames)
+            : EffectProjections.MapNonResolvedThrowBehavior(throwBehavior);
         if (throwBehavior != SpecThrowBehavior.DoesNotThrow &&
             (throwBehavior != SpecThrowBehavior.MayThrow ||
              exceptions.IsEmpty || exceptions.IncludesUnknown))
@@ -317,10 +294,8 @@ internal sealed class ExternalEffectResolver
             exceptions = EffectThrowSet.Unknown;
             completeness = EffectCompleteness.Incomplete;
         }
-        var termination = spec.Facets.Termination?.Behavior ==
-            SpecTerminationBehavior.Terminates
-                ? EffectTermination.Terminates
-                : EffectTermination.Unknown;
+        var termination = EffectProjections.MapTermination(
+            spec.Facets.Termination?.Behavior);
         return new EffectSummary(
             reads, writes, allocation, new EffectCapabilitySet(capabilities),
             exceptions, termination, completeness);

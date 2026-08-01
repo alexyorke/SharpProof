@@ -38,10 +38,10 @@ contain documented breaking changes.
   generator hosts, with a clear older-host rejection.
 - Opt-in deterministic SARIF 2.1.0 projection of validated claim, incomplete
   callable, assumption, and run-failure results.
-- Source-located structured compiler effect-violation candidates for the
-  narrow unconditional direct-operation subset. The worker reports these as
-  `Unknown(CounterexampleReplayFailed)` until it can replay an executable
-  lowered-body effect trace.
+- Compiler artifact schema 9 adds source-located, sealed effect replay events
+  for unconditional object and array allocations. The worker independently
+  interprets those events before reporting a `Refuted` allocation contract;
+  every other direct effect candidate remains a typed `Unknown`.
 
 ### Changed
 

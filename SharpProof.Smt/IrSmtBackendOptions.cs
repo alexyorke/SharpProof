@@ -6,12 +6,8 @@ public sealed class IrSmtBackendOptions
 
     public IrSmtBackendOptions(uint queryRlimit = DefaultQueryRlimit)
     {
-        if (queryRlimit == 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(queryRlimit));
-        }
-
-        QueryRlimit = queryRlimit;
+        QueryRlimit = ArgumentNullGuard.RequirePositive(
+            queryRlimit, nameof(queryRlimit));
     }
 
     public uint QueryRlimit

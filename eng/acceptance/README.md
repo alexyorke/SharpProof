@@ -37,9 +37,11 @@ is acceptable only when:
   every claim-bearing facet and postcondition has an executable runtime witness
   plus a deterministic mutation probe;
 - deterministic trusted-boundary mutations, including independent
-  postcondition replay and fail-closed effect-result assembly mutations, must
-  all compile and be killed by their designated tests; nightly and release
-  qualification retain the commit-bound evidence;
+  postcondition replay, compiler effect-candidate downgrade, allocation-event
+  lowering, worker-owned effect replay hashing, tree identity, constraint
+  application, and exact witness comparison, must all compile and be killed by
+  their designated tests; nightly and release qualification retain the
+  commit-bound evidence;
 - the analyzer payload has no dependency on SharpProof verification or Z3
   assemblies;
 - the build, test, package, corpus, fuzz, architecture, cancellation, and
@@ -63,7 +65,7 @@ effect-only artifacts exclude postcondition claims.
 under every policy. `SharpProofMode` is a deprecated preview compatibility
 alias.
 
-This acceptance contract covers compiler artifact schema version 8,
+This acceptance contract covers compiler artifact schema version 9,
 generated-tree accountability, portable whole-body lowered CFG/IR, exact
 manifest/lowered-callable/result equality, compiler-diagnostic propagation, and
 fail-closed option/provenance validation. The worker consumes that closed

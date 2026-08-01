@@ -4,7 +4,7 @@
   "jsonNamingPolicy": "camelCase",
   "artifactEnvelope": {
     "schema": "SharpProof.CompilerManifest",
-    "version": 8
+    "version": 9
   },
   "declarations": [
     {
@@ -21,7 +21,7 @@
           "accessibility": "internal",
           "name": "Current",
           "type": "int",
-          "value": 8
+          "value": 9
         }
       ]
     },
@@ -144,6 +144,16 @@
           "set": "init",
           "default": {
             "kind": "emptyArray"
+          }
+        },
+        {
+          "kind": "property",
+          "accessibility": "internal",
+          "name": "Compilation",
+          "type": "CompilerCompilationSnapshot",
+          "set": "init",
+          "default": {
+            "kind": "new"
           }
         }
       ]
@@ -1298,6 +1308,16 @@
           }
         },
         {
+          "name": "Replay",
+          "jsonName": "replay",
+          "type": "CompilerEffectReplayArtifact?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
           "name": "Evidence",
           "jsonName": "evidence",
           "type": "string",
@@ -1351,6 +1371,254 @@
           "set": "set",
           "default": {
             "kind": "emptyArray"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "CompilerEffectReplayPathKind",
+      "members": [
+        {
+          "name": "Unspecified",
+          "value": 0
+        },
+        {
+          "name": "Unconditional",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "CompilerEffectReplayEventKind",
+      "members": [
+        {
+          "name": "Unspecified",
+          "value": 0
+        },
+        {
+          "name": "ManagedObjectAllocation",
+          "value": 1
+        },
+        {
+          "name": "ManagedArrayAllocation",
+          "value": 2
+        },
+        {
+          "name": "ExplicitThrow",
+          "value": 3
+        },
+        {
+          "name": "ReceiverFieldRead",
+          "value": 4
+        },
+        {
+          "name": "ReceiverFieldWrite",
+          "value": 5
+        },
+        {
+          "name": "MonitorCall",
+          "value": 6
+        },
+        {
+          "name": "EmptyLock",
+          "value": 7
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerEffectReplayArtifact",
+      "properties": [
+        {
+          "name": "PathKind",
+          "jsonName": "pathKind",
+          "type": "CompilerEffectReplayPathKind",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "ConstraintSha256",
+          "jsonName": "constraintSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Events",
+          "jsonName": "events",
+          "type": "CompilerEffectReplayEventArtifact[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerEffectReplayEventArtifact",
+      "properties": [
+        {
+          "name": "Ordinal",
+          "jsonName": "ordinal",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "Kind",
+          "jsonName": "kind",
+          "type": "CompilerEffectReplayEventKind",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "SyntaxTreeOrdinal",
+          "jsonName": "syntaxTreeOrdinal",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "SyntaxTreeSha256",
+          "jsonName": "syntaxTreeSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "SyntaxStart",
+          "jsonName": "syntaxStart",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "SyntaxLength",
+          "jsonName": "syntaxLength",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "OperationIdentitySha256",
+          "jsonName": "operationIdentitySha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "MemberIdentity",
+          "jsonName": "memberIdentity",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "MemberDocumentationId",
+          "jsonName": "memberDocumentationId",
+          "type": "string?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "TypeIdentity",
+          "jsonName": "typeIdentity",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "TypeDocumentationId",
+          "jsonName": "typeDocumentationId",
+          "type": "string?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "SpecWitnessIdentifier",
+          "jsonName": "specWitnessIdentifier",
+          "type": "string?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "ScalarOperands",
+          "jsonName": "scalarOperands",
+          "type": "long[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "ExactExceptionTypeHierarchy",
+          "jsonName": "exactExceptionTypeHierarchy",
+          "type": "string[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "Location",
+          "jsonName": "location",
+          "type": "WorkerSourceLocation",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "new"
           }
         }
       ]
@@ -1982,6 +2250,16 @@
           }
         },
         {
+          "name": "TextLength",
+          "jsonName": "textLength",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
           "name": "LanguageVersion",
           "jsonName": "languageVersion",
           "type": "string",
@@ -2355,11 +2633,339 @@
       ]
     }
   ],
+  "portableIrSlotMappings": {
+    "terms": [
+      { "kind": "Boolean", "slots": ["booleanValue", "unused", "unused", "unused", "unused", "unused", "empty"] },
+      { "kind": "Integer", "slots": ["unused", "unused", "unused", "unused", "integerValue", "unused", "empty"] },
+      { "kind": "String", "slots": ["unused", "unused", "unused", "unused", "unused", "stringValue", "empty"] },
+      { "kind": "Null", "slots": ["unused", "unused", "unused", "unused", "unused", "unused", "empty"] },
+      { "kind": "Variable", "slots": ["variableIndex", "unused", "unused", "unused", "unused", "unused", "empty"] },
+      { "kind": "Opaque", "slots": ["memberIndex", "optionalTermIndex", "wire:OpaquePurities", "operationWhenImpure", "unused", "unused", "termIndices"] },
+      { "kind": "Unary", "slots": ["wire:UnaryOperators", "termIndex", "unused", "unused", "unused", "unused", "empty"] },
+      { "kind": "Binary", "slots": ["wire:BinaryOperators", "termIndex", "termIndex", "unused", "unused", "unused", "empty"] },
+      { "kind": "Conditional", "slots": ["termIndex", "termIndex", "termIndex", "unused", "unused", "unused", "empty"] },
+      { "kind": "Cast", "slots": ["termIndex", "unused", "unused", "unused", "unused", "unused", "empty"] },
+      { "kind": "Length", "slots": ["termIndex", "unused", "unused", "unused", "unused", "unused", "empty"] },
+      { "kind": "SequenceAccess", "slots": ["termIndex", "termIndex", "unused", "unused", "unused", "unused", "empty"] }
+    ],
+    "locations": [
+      { "kind": "Member", "slots": ["memberIndex", "optionalTermIndex", "unused", "unused", "termIndices"] },
+      { "kind": "Sequence", "slots": ["termIndex", "termIndex", "unused", "unused", "empty"] }
+    ],
+    "instructions": [
+      { "kind": "Assign", "slots": ["variableIndex", "termIndex", "unused", "unused", "empty", "unused"] },
+      { "kind": "Load", "slots": ["variableIndex", "unused", "unused", "unused", "empty", "location"] },
+      { "kind": "Store", "slots": ["termIndex", "unused", "unused", "unused", "empty", "location"] },
+      { "kind": "Call", "slots": ["optionalVariableIndex", "memberIndex", "optionalTermIndex", "unused", "termIndices", "unused"] },
+      { "kind": "Assume", "slots": ["termIndex", "unused", "unused", "unused", "empty", "unused"] },
+      { "kind": "Assert", "slots": ["termIndex", "unused", "unused", "unused", "empty", "unused"] },
+      { "kind": "Havoc", "slots": ["wire:HavocKinds", "unused", "unused", "unused", "variableIndices", "unused"] },
+      { "kind": "Branch", "slots": ["termIndex", "blockIndex", "blockIndex", "unused", "empty", "unused"] },
+      { "kind": "Goto", "slots": ["blockIndex", "unused", "unused", "unused", "empty", "unused"] },
+      { "kind": "Return", "slots": ["optionalTermIndex", "unused", "unused", "unused", "empty", "unused"] }
+    ]
+  },
+  "collectorWireMappings": [
+    {
+      "name": "OutputKind",
+      "owner": "CompilerOptionWireMappings",
+      "method": "Map",
+      "kind": "enum",
+      "sourceType": "OutputKind",
+      "targetType": "CompilerOutputKind",
+      "unknownException": "InvalidOperationException",
+      "rows": [
+        { "source": "ConsoleApplication", "target": "ConsoleApplication" },
+        { "source": "WindowsApplication", "target": "WindowsApplication" },
+        { "source": "DynamicallyLinkedLibrary", "target": "DynamicallyLinkedLibrary" },
+        { "source": "NetModule", "target": "NetModule" },
+        { "source": "WindowsRuntimeMetadata", "target": "WindowsRuntimeMetadata" },
+        { "source": "WindowsRuntimeApplication", "target": "WindowsRuntimeApplication" }
+      ]
+    },
+    {
+      "name": "OptimizationLevel",
+      "owner": "CompilerOptionWireMappings",
+      "method": "Map",
+      "kind": "enum",
+      "sourceType": "OptimizationLevel",
+      "targetType": "CompilerOptimizationLevel",
+      "unknownException": "InvalidOperationException",
+      "rows": [
+        { "source": "Debug", "target": "Debug" },
+        { "source": "Release", "target": "Release" }
+      ]
+    },
+    {
+      "name": "Platform",
+      "owner": "CompilerOptionWireMappings",
+      "method": "Map",
+      "kind": "enum",
+      "sourceType": "Platform",
+      "targetType": "CompilerPlatform",
+      "unknownException": "InvalidOperationException",
+      "rows": [
+        { "source": "AnyCpu", "target": "AnyCpu" },
+        { "source": "AnyCpu32BitPreferred", "target": "AnyCpu32BitPreferred" },
+        { "source": "Arm", "target": "Arm" },
+        { "source": "Arm64", "target": "Arm64" },
+        { "source": "Itanium", "target": "Itanium" },
+        { "source": "X64", "target": "X64" },
+        { "source": "X86", "target": "X86" }
+      ]
+    },
+    {
+      "name": "NullableContextOptions",
+      "owner": "CompilerOptionWireMappings",
+      "method": "Map",
+      "kind": "enum",
+      "sourceType": "NullableContextOptions",
+      "targetType": "CompilerNullableContext",
+      "unknownException": "InvalidOperationException",
+      "rows": [
+        { "source": "Disable", "target": "Disable" },
+        { "source": "Warnings", "target": "Warnings" },
+        { "source": "Annotations", "target": "Annotations" },
+        { "source": "Enable", "target": "Enable" }
+      ]
+    },
+    {
+      "name": "MetadataImportOptions",
+      "owner": "CompilerOptionWireMappings",
+      "method": "Map",
+      "kind": "enum",
+      "sourceType": "MetadataImportOptions",
+      "targetType": "CompilerMetadataImportOptions",
+      "unknownException": "InvalidOperationException",
+      "rows": [
+        { "source": "Public", "target": "Public" },
+        { "source": "Internal", "target": "Internal" },
+        { "source": "All", "target": "All" }
+      ]
+    },
+    {
+      "name": "AssemblyIdentityComparer",
+      "owner": "CompilerOptionWireMappings",
+      "method": "Map",
+      "kind": "referenceIdentity",
+      "sourceType": "AssemblyIdentityComparer",
+      "targetType": "CompilerAssemblyIdentityComparer",
+      "unknownException": "InvalidOperationException",
+      "rows": [
+        { "source": "AssemblyIdentityComparer.Default", "target": "Default" },
+        { "source": "DesktopAssemblyIdentityComparer.Default", "target": "Desktop" }
+      ]
+    },
+    {
+      "name": "EffectEvaluationContractKind",
+      "owner": "CompilerEffectEvaluationWireMappings",
+      "method": "ToWorker",
+      "kind": "enum",
+      "sourceType": "EffectEvaluationContractKind",
+      "targetType": "WorkerEffectContractKind",
+      "unknownException": "ArgumentOutOfRangeException",
+      "rows": [
+        { "source": "EnforcePure", "target": "EnforcePure" },
+        { "source": "ZeroAllocations", "target": "ZeroAllocations" },
+        { "source": "AllowedCapabilities", "target": "AllowedCapabilities" },
+        { "source": "DoesNotThrow", "target": "DoesNotThrow" },
+        { "source": "AllowedExceptions", "target": "AllowedExceptions" },
+        { "source": "EffectContract", "target": "EffectContract" }
+      ]
+    },
+    {
+      "name": "EffectEvaluationOutcome",
+      "owner": "CompilerEffectEvaluationWireMappings",
+      "method": "ToWorker",
+      "kind": "enum",
+      "sourceType": "EffectEvaluationOutcome",
+      "targetType": "WorkerClaimOutcome",
+      "unknownException": "ArgumentOutOfRangeException",
+      "rows": [
+        { "source": "Proven", "target": "Proven" },
+        { "source": "Refuted", "target": "Refuted" },
+        { "source": "Unknown", "target": "Unknown" }
+      ]
+    },
+    {
+      "name": "EffectEvaluationReason",
+      "owner": "CompilerEffectEvaluationWireMappings",
+      "method": "ToWorker",
+      "kind": "enum",
+      "sourceType": "EffectEvaluationReason",
+      "targetType": "WorkerClaimReason",
+      "unknownException": "ArgumentOutOfRangeException",
+      "rows": [
+        { "source": "None", "target": "None" },
+        { "source": "UnsupportedContract", "target": "UnsupportedContract" },
+        { "source": "EffectContractNotEstablished", "target": "EffectContractNotEstablished" },
+        { "source": "EffectSummaryIncomplete", "target": "EffectSummaryIncomplete" },
+        { "source": "ResourceLimit", "target": "ResourceLimit" },
+        { "source": "UnsupportedBody", "target": "UnsupportedBody" }
+      ]
+    },
+    {
+      "name": "EffectEvaluationCertainty",
+      "owner": "CompilerEffectEvaluationWireMappings",
+      "method": "ToWorker",
+      "kind": "enum",
+      "sourceType": "EffectEvaluationCertainty",
+      "targetType": "WorkerEffectEvidenceCertainty",
+      "unknownException": "ArgumentOutOfRangeException",
+      "rows": [
+        { "source": "IncompleteMayEffectSummary", "target": "IncompleteMayEffectSummary" },
+        { "source": "CompleteMayEffectSummary", "target": "CompleteMayEffectSummary" },
+        { "source": "TrustedCompleteBoundary", "target": "TrustedCompleteBoundary" },
+        { "source": "DefiniteViolation", "target": "DefiniteViolation" },
+        { "source": "Unavailable", "target": "Unavailable" }
+      ]
+    },
+    {
+      "name": "EffectContractKind",
+      "owner": "ClaimManifestBuilder",
+      "method": "ToWorkerEffects",
+      "kind": "flags",
+      "sourceType": "EffectContractKind",
+      "targetType": "WorkerEffectSet",
+      "sourceMask": "EffectContractMetadata.AllEffects",
+      "unknownException": "ArgumentOutOfRangeException",
+      "rows": [
+        { "source": "None", "target": "None" },
+        { "source": "ReadsReceiverState", "target": "ReadsReceiverState" },
+        { "source": "ReadsArgumentState", "target": "ReadsArgumentState" },
+        { "source": "ReadsCapturedState", "target": "ReadsCapturedState" },
+        { "source": "ReadsStaticState", "target": "ReadsStaticState" },
+        { "source": "ReadsAmbientState", "target": "ReadsAmbientState" },
+        { "source": "WritesReceiverState", "target": "WritesReceiverState" },
+        { "source": "WritesArgumentState", "target": "WritesArgumentState" },
+        { "source": "WritesCapturedState", "target": "WritesCapturedState" },
+        { "source": "WritesStaticState", "target": "WritesStaticState" },
+        { "source": "WritesAmbientState", "target": "WritesAmbientState" },
+        { "source": "Allocates", "target": "Allocates" },
+        { "source": "Throws", "target": "Throws" },
+        { "source": "Synchronizes", "target": "Synchronizes" },
+        { "source": "UsesNondeterminism", "target": "UsesNondeterminism" },
+        { "source": "UsesNativeCode", "target": "UsesNativeCode" },
+        { "source": "UsesReflection", "target": "UsesReflection" }
+      ]
+    },
+    {
+      "name": "EffectContractCapabilityKind",
+      "owner": "ClaimManifestBuilder",
+      "method": "ToWorkerCapabilities",
+      "kind": "flags",
+      "sourceType": "EffectContractCapabilityKind",
+      "targetType": "WorkerEffectCapabilitySet",
+      "sourceMask": "EffectContractMetadata.AllCapabilities",
+      "unknownException": "ArgumentOutOfRangeException",
+      "rows": [
+        { "source": "None", "target": "None" },
+        { "source": "IO", "target": "IO" },
+        { "source": "FileRead", "target": "FileRead" },
+        { "source": "FileWrite", "target": "FileWrite" },
+        { "source": "Network", "target": "Network" },
+        { "source": "Console", "target": "Console" },
+        { "source": "Process", "target": "Process" },
+        { "source": "Environment", "target": "Environment" },
+        { "source": "Registry", "target": "Registry" },
+        { "source": "Clock", "target": "Clock" },
+        { "source": "Randomness", "target": "Randomness" },
+        { "source": "Reflection", "target": "Reflection" },
+        { "source": "Synchronization", "target": "Synchronization" },
+        { "source": "NativeInterop", "target": "NativeInterop" }
+      ]
+    },
+    {
+      "name": "BoundContractKind",
+      "owner": "CompilerLoweringWireMappings",
+      "method": "ToCompiler",
+      "kind": "enum",
+      "sourceType": "BoundContractKind",
+      "targetType": "CompilerContractKind",
+      "unknownException": "ArgumentOutOfRangeException",
+      "rows": [
+        { "source": "Requires", "target": "Requires" },
+        { "source": "Ensures", "target": "Ensures" },
+        { "source": "Assume", "target": "Assume" }
+      ]
+    },
+    {
+      "name": "BoundContractEvidence",
+      "owner": "CompilerLoweringWireMappings",
+      "method": "ToCompiler",
+      "kind": "enum",
+      "sourceType": "BoundContractEvidence",
+      "targetType": "CompilerContractEvidence",
+      "unknownException": "ArgumentOutOfRangeException",
+      "rows": [
+        { "source": "CompilerBoundInvocation", "target": "CompilerBoundInvocation" },
+        { "source": "ClosedAttribute", "target": "ClosedAttribute" },
+        { "source": "Companion", "target": "Companion" }
+      ]
+    },
+    {
+      "name": "BoundContractVariableRole",
+      "owner": "CompilerLoweringWireMappings",
+      "method": "ToCompiler",
+      "kind": "enum",
+      "sourceType": "BoundContractVariableRole",
+      "targetType": "CompilerVariableRole",
+      "unknownException": "ArgumentOutOfRangeException",
+      "rows": [
+        { "source": "Receiver", "target": "Receiver" },
+        { "source": "Parameter", "target": "Parameter" },
+        { "source": "Result", "target": "Result" },
+        { "source": "PreState", "target": "PreState" }
+      ]
+    },
+    {
+      "name": "BoundContractEvidenceWorker",
+      "owner": "CompilerLoweringWireMappings",
+      "method": "ToWorkerEvidence",
+      "kind": "enum",
+      "sourceType": "BoundContractEvidence",
+      "targetType": "WorkerClaimEvidence",
+      "unknownException": "ArgumentOutOfRangeException",
+      "rows": [
+        { "source": "CompilerBoundInvocation", "target": "DirectClause" },
+        { "source": "ClosedAttribute", "target": "ReturnAttribute" },
+        { "source": "Companion", "target": "CompanionClause" }
+      ]
+    },
+    {
+      "name": "ContractBindingFailure",
+      "owner": "CompilerLoweringWireMappings",
+      "method": "ToWorkerFailure",
+      "kind": "enum",
+      "sourceType": "ContractBindingFailure",
+      "targetType": "WorkerClaimReason",
+      "allowTargetAliases": true,
+      "unknownException": "ArgumentOutOfRangeException",
+      "rows": [
+        { "source": "None", "target": "UnsupportedCallable" },
+        { "source": "ContractApiUnavailable", "target": "UnsupportedCallable" },
+        { "source": "UnsupportedExpression", "target": "UnsupportedExpression" },
+        { "source": "NonBooleanCondition", "target": "UnsupportedContract" },
+        { "source": "ResultOutsideEnsures", "target": "UnsupportedContract" },
+        { "source": "OldOutsideEnsures", "target": "UnsupportedContract" },
+        { "source": "NestedOld", "target": "UnsupportedContract" },
+        { "source": "InvalidIntrinsicSignature", "target": "UnsupportedContract" },
+        { "source": "MissingCompanion", "target": "UnsupportedCallable" },
+        { "source": "AmbiguousCompanion", "target": "UnsupportedCallable" },
+        { "source": "CompanionSignatureMismatch", "target": "UnsupportedCallable" },
+        { "source": "CompanionBodyUnavailable", "target": "UnsupportedCallable" },
+        { "source": "InvalidClosedAttribute", "target": "UnsupportedContract" },
+        { "source": "InvalidClausePlacement", "target": "UnsupportedContract" },
+        { "source": "UnsupportedTarget", "target": "UnsupportedCallable" }
+      ]
+    }
+  ],
   "effectEvidence": {
     "domain": "SharpProof.CompilerEffectClaimEvidence",
-    "version": 7,
+    "version": 8,
     "unknownReasons": [
       "UnsupportedContract",
+      "CounterexampleNotReplayable",
       "EffectSummaryIncomplete",
       "EffectContractNotEstablished"
     ],
@@ -2367,6 +2973,14 @@
       "capabilities": "AllowedCapabilities",
       "exceptions": "AllowedExceptions",
       "combined": "EffectContract"
+    },
+    "replay": {
+      "pathKind": "Unconditional",
+      "maximumEvents": 256,
+      "supportedEventKinds": [
+        "ManagedObjectAllocation",
+        "ManagedArrayAllocation"
+      ]
     },
     "sortAllowedExceptionTypes": true,
     "sortWitnessExceptionHierarchy": true

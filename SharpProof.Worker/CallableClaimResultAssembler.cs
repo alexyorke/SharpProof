@@ -128,31 +128,12 @@ internal static class CallableClaimResultAssembler
 
     private static (string Kind, string Value) Format(IrValue value)
     {
-        return value.Kind switch
-        {
-            IrValueKind.Boolean => (nameof(IrValueKind.Boolean), value.Boolean ? "true" : "false"),
-            IrValueKind.Integer => (nameof(IrValueKind.Integer), value.Integer.ToString(CultureInfo.InvariantCulture)),
-            IrValueKind.String => (nameof(IrValueKind.String), value.String),
-            IrValueKind.Null => (nameof(IrValueKind.Null), "null"),
-            IrValueKind.Reference => (nameof(IrValueKind.Reference), "<opaque>"),
-            IrValueKind.Sequence => (nameof(IrValueKind.Sequence), "<opaque>"),
-            _ => throw new ArgumentOutOfRangeException(nameof(value))
-        };
+        return WorkerProjections.FormatValue(value);
     }
 
     internal static WorkerClaimReason MapAbstention(
         AbstentionReason reason)
     {
-        return reason switch
-        {
-            AbstentionReason.ResourceLimit => WorkerClaimReason.ResourceLimit,
-            AbstentionReason.Timeout => WorkerClaimReason.MethodTimeout,
-            AbstentionReason.BackendUnavailable => WorkerClaimReason.BackendUnavailable,
-            AbstentionReason.InfrastructureFailure => WorkerClaimReason.InfrastructureFailure,
-            AbstentionReason.MalformedBackendResult => WorkerClaimReason.MalformedBackendResult,
-            AbstentionReason.CounterexampleReplayFailed => WorkerClaimReason.CounterexampleReplayFailed,
-            AbstentionReason.PostconditionMayBeUndefined => WorkerClaimReason.PostconditionMayBeUndefined,
-            _ => WorkerClaimReason.UnsupportedExpression
-        };
+        return WorkerProjections.MapAbstention(reason);
     }
 }

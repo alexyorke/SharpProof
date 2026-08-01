@@ -26,6 +26,16 @@ public sealed class PackageLayoutSmokeTests
 
     private static readonly string[] ExpectedAnalyzerDependencyFileNames = [];
 
+    private static readonly string[] ExpectedAllocationReplayEventKinds = [
+        "ManagedArrayAllocation",
+        "ManagedObjectAllocation"
+    ];
+
+    private static readonly string[] ExpectedAllocationReplayWitnessKinds = [
+        "managed-allocation",
+        "managed-array-allocation"
+    ];
+
     private static readonly string[] ExpectedCollectorEntryFileNames = [
         "SharpProof.CompilerCollector.dll"
     ];
@@ -684,6 +694,108 @@ public sealed class PackageLayoutSmokeTests
                 verification.Output,
                 Does.Contain(
                     "supported only on Windows x64"));
+        }
+    }
+
+    [Test]
+    public async Task PackagedVerifierReplaysObjectAndArrayAllocationEffects()
+    {
+        RequireWindowsX64Worker();
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteEffectReplayVerifierConsumer(feed.Version);
+        var restore = await RestoreConsumerAsync(workspace, feed);
+        Assert.That(restore.ExitCode, Is.Zero, restore.Output);
+
+        var verification = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "build",
+            workspace.ConsumerProject,
+            "-c",
+            "Release",
+            "--no-restore",
+            "--nologo",
+            "/nodeReuse:false",
+            "-p:UseSharedCompilation=false",
+            "-p:SharpProofVerify=true",
+            "-p:SharpProofVerifyCacheEnabled=true");
+        Assert.That(
+            verification.ExitCode,
+            Is.Not.Zero,
+            verification.Output);
+        Assert.That(
+            verification.Output,
+            Does.Contain("SharpProof Refuted")
+                .And.Contain("failed with exit code 5"));
+        Assert.That(
+            File.Exists(workspace.ResultPath),
+            Is.True,
+            verification.Output);
+        Assert.That(
+            File.Exists(workspace.CompilerManifestPath),
+            Is.True,
+            verification.Output);
+
+        using (var manifest = JsonDocument.Parse(
+                   await File.ReadAllTextAsync(
+                       workspace.CompilerManifestPath)))
+        {
+            Assert.That(
+                manifest.RootElement
+                    .GetProperty("schemaVersion")
+                    .GetInt32(),
+                Is.EqualTo(9));
+            var eventKinds = manifest.RootElement
+                .GetProperty("callables")
+                .EnumerateArray()
+                .SelectMany(static callable => callable
+                    .GetProperty("effectClaims")
+                    .EnumerateArray())
+                .Select(static claim => claim
+                    .GetProperty("replay")
+                    .GetProperty("events")[0]
+                    .GetProperty("kind")
+                    .GetString())
+                .OrderBy(static kind => kind, StringComparer.Ordinal)
+                .ToArray();
+            Assert.That(
+                eventKinds,
+                Is.EqualTo(ExpectedAllocationReplayEventKinds));
+        }
+
+        using var result = JsonDocument.Parse(
+            await File.ReadAllTextAsync(workspace.ResultPath));
+        Assert.That(
+            result.RootElement.GetProperty("runStatus").GetString(),
+            Is.EqualTo("Complete"));
+        Assert.That(
+            result.RootElement
+                .GetProperty("summary")
+                .GetProperty("cacheStatus")
+                .GetString(),
+            Is.EqualTo("Miss"));
+        var claims = result.RootElement
+            .GetProperty("claimResults")
+            .EnumerateArray()
+            .ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(claims, Has.Length.EqualTo(2));
+            Assert.That(
+                claims.Select(static claim =>
+                    claim.GetProperty("outcome").GetString()),
+                Is.All.EqualTo("Refuted"));
+            Assert.That(
+                claims.Select(static claim =>
+                    claim.GetProperty("effectCertainty").GetString()),
+                Is.All.EqualTo("DefiniteViolation"));
+            Assert.That(
+                claims.Select(static claim => claim
+                        .GetProperty("effectWitness")
+                        .GetProperty("kind")
+                        .GetString())
+                    .OrderBy(static kind => kind, StringComparer.Ordinal),
+                Is.EqualTo(ExpectedAllocationReplayWitnessKinds));
         }
     }
 
@@ -2142,6 +2254,25 @@ public sealed class PackageLayoutSmokeTests
                 """,
                 "all",
                 "SP0045");
+        }
+
+        internal void WriteEffectReplayVerifierConsumer(string version)
+        {
+            WriteAnalyzerConsumer(
+                version,
+                PackagedProductFeed.VerifierPackageId,
+                """
+                using SharpProof.Attributes;
+                public static class Subject {
+                    [ZeroAllocations]
+                    public static object AllocateObject() => new object();
+
+                    [ZeroAllocations]
+                    public static object[] AllocateArray() => new object[1];
+                }
+                """,
+                "effects",
+                "SP0016");
         }
 
         internal string PrepareNetStandardFrameworkSource()

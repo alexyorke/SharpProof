@@ -7,7 +7,8 @@ compiler-bound subset.
 SharpProof has three semantic outcomes:
 
 - `Proven`: the goal follows from exact lowering and accountable evidence.
-- `Refuted`: an executable postcondition counterexample was replayed.
+- `Refuted`: an executable postcondition counterexample or an admitted direct
+  allocation-effect violation was independently replayed.
 - `Unknown`: the language, model, evidence, or resource budget was insufficient.
 
 The default `advisory` profile is quiet for unannotated code. Unsupported code
@@ -20,7 +21,7 @@ SP0047 instead of disappearing. Diagnostic silence is still not a proof.
 |---|---|---|
 | Effect analyzer | Checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, and `[AllowedExceptions]` over the admitted source subset | Advisory "not proven" diagnostics on selected code |
 | Contract analyzer | Replays definitely executed, compiler-bound `Contract.Requires(...)` clauses with exact call inputs | SP0027 only when the precondition concretely evaluates to false |
-| Worker | Builds an accountable claim manifest and verifies bounded `Contract.Ensures(...)` obligations over acyclic Boolean bodies, admitted integer comparisons, checked `long` arithmetic, and a few exact API-result facts | One `Proven`, replay-validated postcondition `Refuted`, or typed `Unknown` result for every manifest claim |
+| Worker | Builds an accountable claim manifest, verifies bounded `Contract.Ensures(...)` obligations over acyclic Boolean bodies, and independently replays the admitted direct-allocation effect evidence | One `Proven`, replay-validated `Refuted`, or typed `Unknown` result for every manifest claim |
 
 The analyzer does not run SMT or load Z3. General source-callee
 assume/guarantee verification, loops in the worker, mutable-heap
@@ -77,7 +78,7 @@ both implemented feature groups:
   verification.
 
 `SharpProofFeatures` values are `effects`, `contracts`, and `all` (the
-default). The effective selection is sealed into the schema-8 compiler
+default). The effective selection is sealed into the schema-9 compiler
 artifact and filters its manifest: `contracts` excludes effect-only
 annotations, `effects` excludes postcondition claims and contract assumptions,
 and `all` selects both surfaces. Every effective effect contract has one typed
@@ -103,8 +104,9 @@ dotnet_diagnostic.SP0046.severity = suggestion
 
 SP0024, for malformed supported control/effect arguments, is an Error.
 SP0025, for invalid analyzer configuration, is a Warning. SP0013,
-SP0015, and SP0030 are reserved until concrete effect-trace replay exists; the
-current may-effect analyzer does not emit them.
+SP0015, and SP0030 remain reserved live-analyzer diagnostics; the current
+may-effect analyzer does not emit them. The opt-in worker separately replays
+the narrow allocation evidence described below.
 
 `SharpProofMode` and `sharpproof_mode` remain preview-only compatibility
 aliases with values `off`, `effects`, `contracts`, and `all-experimental`.
@@ -343,23 +345,33 @@ Each manifest claim receives:
 
 - `Proven` carries its canonical proof core, which can be empty for a hygienic
   tautology.
-- `Refuted` is currently limited to postconditions with a replay-validated
-  concrete model and fails the build with worker exit code 5.
+- `Refuted` requires independent replay and fails the build with worker exit
+  code 5. It currently covers postconditions with a replay-validated concrete
+  model and the narrow direct-allocation effect evidence described below.
 - `Unknown` has a closed reason such as `UnsupportedBody`,
   `DeepPostcondition`, `EffectSummaryIncomplete`,
   `EffectContractNotEstablished`, `ResourceLimit`, or `MethodTimeout`.
 
 Effect claims use canonical compiler-produced evidence. They are `Proven` only
-when a complete effect summary establishes the selected contract. The compiler
-can record a source-located `DefiniteViolation` candidate for a narrow direct
-operation, but that candidate is not an independently executable trace.
-Until effect operations and paths are lowered for worker replay, every such
-compiler `Refuted` candidate fails closed as
-`Unknown(CounterexampleReplayFailed)` with unavailable effect certainty and no
-published witness. Consequently, the worker emits no effect `Refuted` result
-today. Conditional, path-dependent, static-initialization-sensitive, or
+when a complete effect summary establishes the selected contract. Compiler
+artifact schema 9 can additionally seal one independently replayable,
+unconditional direct event for a definite managed object or array allocation.
+The worker validates the event's order, source-tree hash and span, semantic
+identity, selected constraint, and compiler witness, then derives the
+`Allocates` effect itself. A successful replay can refute
+`[ZeroAllocations]` or `[EffectContract]` when its allowed-effect set excludes
+`Allocates`. `[EnforcePure]` is observable purity and permits fresh allocation,
+so allocation evidence does not refute it.
+
+The compiler does not publish other direct candidates as refutations. Definite
+explicit throw, field access, `lock`/`Monitor`, static-initialization-sensitive
+allocation, and other non-replayable direct candidates become
+`Unknown(CounterexampleNotReplayable)`. Conditional, path-dependent, and other
 may-only conflicts remain `Unknown(EffectContractNotEstablished)`; incomplete
-summaries remain `Unknown(EffectSummaryIncomplete)`.
+summaries remain `Unknown(EffectSummaryIncomplete)`. Invalid replay structure
+is malformed compiler evidence and fails the run. A semantic disagreement
+during an otherwise valid replay becomes the fatal
+`Unknown(CounterexampleReplayFailed)`. Effect results remain noncacheable.
 
 Proven postconditions explicitly record `ContradictoryPreconditions` or
 `NoModeledNormalReturn` when the proof is vacuous under partial-correctness
@@ -585,16 +597,25 @@ simulation are available through:
 
 ## Closed compiler artifact and remaining release gaps
 
-The build-only collector now emits compiler artifact schema version 8 from the
+The build-only collector now emits compiler artifact schema version 9 from the
 final post-generator Roslyn `Compilation`. It seals the feature-selected claim
 manifest and, for each selected callable, either a typed lowering failure or
 portable whole-body CFG/IR with bound contract clauses, canonical variables,
 body-entry state, parameter mappings, exact API-spec witness metadata, and
-canonical per-effect outcome/reason/evidence digests. The
-artifact also records compiler error diagnostics with mapped locations,
+canonical per-effect outcome/reason/evidence digests. For the admitted direct
+managed object/array allocations, it also seals the ordered unconditional
+event, exact constraint identity, semantic operation identity, and source-tree
+span needed for independent worker replay. Worker protocol version 9 and cache
+schema version 11 are unchanged. The artifact also records compiler error
+diagnostics with mapped locations,
 handwritten and generated tree hashes and parse settings, a bounded
 proof-relevant compilation-option set, assembly/target identity, and
 compiler/reference provenance. It contains no source text.
+
+The semantic-operation hash is a canonical consistency check over the
+compiler-produced event fields; it is not a second source binding. Contract
+discovery, effect analysis, and event lowering remain explicit parts of the
+trusted computing base.
 
 The artifact is the worker's sole compilation input. The worker verifies its
 digest and canonical shape, requires its compiler-visible maximum expression
@@ -698,6 +719,8 @@ the commit-bound JSON evidence.
   records the latest analyzer, contract, effect, and worker adversarial review.
 - [Formatting-neutral source metrics](https://github.com/alexyorke/SharpProof/blob/master/docs/soundness-notes/2026-07-29-formatting-neutral-source-metrics.md)
   records the readable formatting policy and structural complexity gates.
+- [Allocation effect replay](https://github.com/alexyorke/SharpProof/blob/master/docs/soundness-notes/2026-07-30-allocation-effect-replay.md)
+  records the independently interpreted allocation-refutation boundary.
 - [Acceptance contract](https://github.com/alexyorke/SharpProof/blob/master/eng/acceptance/README.md)
   describes the active release gate.
 

@@ -78,9 +78,6 @@ public sealed class NullnessDomain : ClosedAbstractDomain<NullnessValue>
 
     private static void Validate(NullnessValue value)
     {
-        if (value < NullnessValue.Bottom || value > NullnessValue.MaybeNull)
-        {
-            throw new ArgumentOutOfRangeException(nameof(value));
-        }
+        _ = ArgumentNullGuard.RequireDefined(value, nameof(value));
     }
 }

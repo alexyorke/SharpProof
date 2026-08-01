@@ -23,7 +23,7 @@
   "worker": {
     "protocolVersion": 9,
     "manifestSchemaVersion": 4,
-    "compilerArtifactSchemaVersion": 8,
+    "compilerArtifactSchemaVersion": 9,
     "maximumParallelism": 4,
     "maximumMemoryMiB": 2048,
     "queryRlimit": 3000000,
@@ -58,13 +58,13 @@
           "SharpProof.CompilerCollector/FinalCompilationCollectorAnalyzer.cs",
           "SharpProof.CompilerCollector/FinalCompilationCollector.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs",
-          "SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectEvaluationWireMappings.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs",
           "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
           "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
           "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
           "SharpProof.Frontend/ContractApiIdentityResolver.cs",
-          "SharpProof.Frontend/ContractApiMetadata.cs",
+          "SharpProof.Frontend/ContractApiMetadataRuntime.cs",
           "SharpProof.Frontend/SharpProof.Frontend.csproj"
         ]
       },
@@ -74,7 +74,6 @@
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs",
           "SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs",
-          "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
           "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
           "SharpProof.Contracts/ClosedContractAttributeValidator.cs",
           "SharpProof.Contracts/ContractBinder.cs",
@@ -137,7 +136,102 @@
         "paths": [
           "SharpProof.Frontend/CSharpScalarSemantics.json",
           "scripts/Generate-CSharpScalarSemantics.ps1",
-          "SharpProof.Frontend/CSharpScalarSemantics.generated.cs"
+          "SharpProof.Frontend/CSharpScalarSemantics.generated.cs",
+          "SharpProof.Ir/IrOperatorCatalog.generated.cs"
+        ]
+      },
+      {
+        "name": "contractApiCatalog",
+        "paths": [
+          "SharpProof.Frontend/ContractApi.catalog.json",
+          "scripts/Generate-ContractApiCatalog.ps1",
+          "SharpProof.Frontend/ContractApiMetadata.generated.cs"
+        ]
+      },
+      {
+        "name": "analyzerDiagnosticCatalog",
+        "paths": [
+          "SharpProof.Analyzer/AnalyzerDiagnostic.catalog.json",
+          "scripts/Generate-AnalyzerDiagnosticCatalog.ps1",
+          "SharpProof.Analyzer/AnalyzerDiagnosticCatalog.generated.cs"
+        ]
+      },
+      {
+        "name": "projectionCatalog",
+        "paths": [
+          "SharpProof.Projection.catalog.json",
+          "scripts/Generate-ProjectionCatalog.ps1",
+          "SharpProof.Verify/VerificationProjections.generated.cs",
+          "SharpProof.Worker/WorkerProjections.generated.cs",
+          "SharpProof.Contracts/ContractProjections.generated.cs",
+          "SharpProof.Ir/IrPrinterProjections.generated.cs",
+          "SharpProof.Effects/EffectProjections.generated.cs",
+          "SharpProof.Frontend/OperationSupportProjections.generated.cs",
+          "SharpProof.Worker.Launcher/LauncherProjections.generated.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableProjections.generated.cs",
+          "SharpProof.Frontend/CompilerIdentityProjections.generated.cs"
+        ]
+      },
+      {
+        "name": "declarativeModelsCatalog",
+        "paths": [
+          "SharpProof.DeclarativeModels.catalog.json",
+          "scripts/Generate-DeclarativeModels.ps1",
+          "SharpProof.Analyzer/DeclarativeModels.generated.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/DeclarativeModels.generated.cs",
+          "SharpProof.Specs/DeclarativeModels.generated.cs",
+          "SharpProof.Worker/DeclarativeModels.generated.cs",
+          "SharpProof.Contracts/DeclarativeModels.generated.cs",
+          "SharpProof.Contracts/EffectiveContractModels.generated.cs",
+          "SharpProof.Effects/EffectResultModels.generated.cs",
+          "SharpProof.Effects/ApiSpecResolutionModels.generated.cs",
+          "SharpProof.Frontend/DeclarativeModels.generated.cs",
+          "SharpProof.Verify/DeclarativeModels.generated.cs"
+        ]
+      },
+      {
+        "name": "boundContractModelCatalog",
+        "paths": [
+          "SharpProof.Contracts/BoundContractModel.schema.json",
+          "scripts/Generate-BoundContractModel.ps1",
+          "SharpProof.Contracts/BoundContractModel.generated.cs"
+        ]
+      },
+      {
+        "name": "effectContractCatalog",
+        "paths": [
+          "SharpProof.Effects/EffectContractMappings.catalog.json",
+          "scripts/Generate-EffectContractMappings.ps1",
+          "SharpProof.Effects/EffectContractMappings.generated.cs"
+        ]
+      },
+      {
+        "name": "operationSupportCatalog",
+        "paths": [
+          "SharpProof.Frontend/OperationSupport.catalog.json",
+          "scripts/Generate-OperationSupportCatalog.ps1",
+          "SharpProof.Frontend/OperationSupportCatalog.generated.cs"
+        ]
+      },
+      {
+        "name": "irModelCatalog",
+        "paths": [
+          "SharpProof.Ir/IrModel.schema.json",
+          "scripts/Generate-IrModel.ps1",
+          "SharpProof.Ir/IrIdentifierAliases.cs",
+          "SharpProof.Ir/ScopedIrId.cs",
+          "SharpProof.Ir/ArgumentNullGuard.cs",
+          "SharpProof.Ir/IrModel.generated.cs",
+          "SharpProof.Ir/IrProgram.cs"
+        ]
+      },
+      {
+        "name": "compilerWireCatalog",
+        "paths": [
+          "SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json",
+          "scripts/Generate-CompilerArtifactModel.ps1",
+          "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerWireMappings.generated.cs"
         ]
       },
       {
@@ -187,7 +281,9 @@
           "SharpProof.Verify/ProofKernel.cs",
           "SharpProof.Ir/IrInterpreter.cs",
           "SharpProof.Ir/IrProgramInterpreter.cs",
-          "SharpProof.Worker/CallableCounterexampleReplayer.cs"
+          "SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs",
+          "SharpProof.Worker/CallableCounterexampleReplayer.cs",
+          "SharpProof.Worker/EffectCounterexampleReplayer.cs"
         ]
       },
       {
@@ -232,6 +328,7 @@
         "paths": [
           "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
           "SharpProof.Worker.Protocol/ProtocolManifest.cs",
+          "SharpProof.Worker.Protocol/ProtocolManifestPayload.cs",
           "SharpProof.Worker.Protocol/ProtocolJson.cs",
           "SharpProof.Worker.Protocol/ProtocolJsonSupport.cs"
         ],

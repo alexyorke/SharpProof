@@ -14,15 +14,8 @@ internal static class CompilerArtifactInputHash
         string apiSpecVersion,
         string apiSpecContentSha256)
     {
-        if (request == null)
-        {
-            throw new ArgumentNullException(nameof(request));
-        }
-
-        if (artifactBytes == null)
-        {
-            throw new ArgumentNullException(nameof(artifactBytes));
-        }
+        request = ArgumentNullGuard.NotNull(request, nameof(request));
+        artifactBytes = ArgumentNullGuard.NotNull(artifactBytes, nameof(artifactBytes));
 
         using var hash = new CanonicalHashWriter();
         hash.Add(
@@ -139,10 +132,7 @@ internal static class CompilerManifestArtifactJson
 {
     internal static string Serialize(CompilerManifestArtifact artifact)
     {
-        if (artifact == null)
-        {
-            throw new ArgumentNullException(nameof(artifact));
-        }
+        artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
 
         WorkerProtocolJson.Canonicalize(artifact.Manifest);
         artifact.CompilerDiagnostics = [
@@ -160,10 +150,7 @@ internal static class CompilerManifestArtifactJson
 
     internal static CompilerManifestArtifact Deserialize(string json)
     {
-        if (json == null)
-        {
-            throw new ArgumentNullException(nameof(json));
-        }
+        json = ArgumentNullGuard.NotNull(json, nameof(json));
 
         var artifact = JsonSerializer.Deserialize<CompilerManifestArtifact>(
             json, WorkerProtocolJson.Options) ??
@@ -181,14 +168,18 @@ internal static class CompilerManifestArtifactJson
         CompilerManifestArtifact artifact)
     {
         Validate(artifact);
-        return CompilerLoweredArtifact.Decode(artifact.Callables, artifact.Manifest);
+        return CompilerLoweredArtifact.Decode(
+            artifact.Callables,
+            artifact.Manifest,
+            artifact.Compilation);
     }
 
     internal static void Validate(CompilerManifestArtifact value)
     {
         if (!HasValidEnvelope(value) ||
             !HasValidDiagnostics(value.CompilerDiagnostics) ||
-            !HasMatchingCallables(value.Callables, value.Manifest))
+            !HasMatchingCallables(value.Callables, value.Manifest) ||
+            !HasValidEffectReplayTrees(value.Callables, value.Compilation))
         {
             throw new JsonException("The compiler manifest artifact is invalid.");
         }
@@ -231,5 +222,42 @@ internal static class CompilerManifestArtifactJson
         callables.Select(static item => item?.CallableId).SequenceEqual(
             manifest.Callables.Select(static item => item.CallableId),
             StringComparer.Ordinal);
+    }
+
+    private static bool HasValidEffectReplayTrees(
+        CompilerCallableArtifact[]? callables,
+        CompilerCompilationSnapshot? compilation)
+    {
+        if (callables == null || compilation?.SyntaxTrees == null)
+        {
+            return false;
+        }
+
+        foreach (var effectEvent in callables
+                     .Where(static callable => callable != null)
+                     .SelectMany(static callable => callable.EffectClaims ?? [])
+                     .Where(static claim => claim != null)
+                     .SelectMany(static claim => claim.Replay?.Events ?? []))
+        {
+            if (effectEvent == null ||
+                effectEvent.SyntaxTreeOrdinal < 0 ||
+                effectEvent.SyntaxTreeOrdinal >= compilation.SyntaxTrees.Length)
+            {
+                return false;
+            }
+
+            var tree = compilation.SyntaxTrees[effectEvent.SyntaxTreeOrdinal];
+            if (tree == null ||
+                effectEvent.SyntaxTreeSha256 != tree.Sha256 ||
+                effectEvent.SyntaxStart < 0 ||
+                effectEvent.SyntaxLength <= 0 ||
+                effectEvent.SyntaxStart > tree.TextLength ||
+                effectEvent.SyntaxLength > tree.TextLength - effectEvent.SyntaxStart)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

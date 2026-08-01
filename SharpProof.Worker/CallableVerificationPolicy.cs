@@ -36,7 +36,8 @@ internal static class CallableVerificationPolicy
                     EffectClaimResultAssembler.Assemble(
                         target,
                         evidence,
-                        proof.EntryFeasibility)))
+                        proof.EntryFeasibility,
+                        methodBoundary.Token)))
                 .OrderBy(result => ordinal[result.ClaimId])
                 .ToImmutableArray();
             var reason = records.Any(static record => record.Outcome == WorkerClaimOutcome.Unknown)
@@ -89,6 +90,3 @@ internal static class CallableVerificationPolicy
             claims);
     }
 }
-
-internal sealed record CallableVerificationResult(
-    WorkerCallableResult Callable, ImmutableArray<WorkerClaimResult> Claims);

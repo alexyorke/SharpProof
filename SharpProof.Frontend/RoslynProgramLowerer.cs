@@ -3,15 +3,13 @@ namespace SharpProof.Frontend;
 public sealed class RoslynProgramLowerer(
     IrFactory factory, Func<IMethodSymbol, bool>? isKnownPure = null)
 {
-    private readonly IrFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
+    private readonly IrFactory _factory =
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
     private readonly Func<IMethodSymbol, bool> _isKnownPure = isKnownPure ?? (static _ => false);
 
     public FrontendProgramLoweringResult Lower(ControlFlowGraph graph)
     {
-        if (graph == null)
-        {
-            throw new ArgumentNullException(nameof(graph));
-        }
+        graph = ArgumentNullGuard.NotNull(graph, nameof(graph));
 
         return new LoweringSession(_factory, graph, _isKnownPure, graph.Blocks[0], 0, static _ => false).Lower().Lowering;
     }
@@ -22,20 +20,9 @@ public sealed class RoslynProgramLowerer(
         int firstOperation,
         Func<IOperation, bool> exclude)
     {
-        if (graph == null)
-        {
-            throw new ArgumentNullException(nameof(graph));
-        }
-
-        if (entry == null)
-        {
-            throw new ArgumentNullException(nameof(entry));
-        }
-
-        if (exclude == null)
-        {
-            throw new ArgumentNullException(nameof(exclude));
-        }
+        graph = ArgumentNullGuard.NotNull(graph, nameof(graph));
+        entry = ArgumentNullGuard.NotNull(entry, nameof(entry));
+        exclude = ArgumentNullGuard.NotNull(exclude, nameof(exclude));
 
         if (!graph.Blocks.Contains(entry) || firstOperation < 0 || firstOperation > entry.Operations.Length)
         {

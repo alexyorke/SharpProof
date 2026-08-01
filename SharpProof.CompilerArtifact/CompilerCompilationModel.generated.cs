@@ -44,6 +44,7 @@ internal sealed class CompilerSyntaxTreeSnapshot
 {
     public string Path { get; set; } = string.Empty;
     public string Sha256 { get; set; } = string.Empty;
+    public int TextLength { get; set; }
     public string LanguageVersion { get; set; } = string.Empty;
     public string DocumentationMode { get; set; } = string.Empty;
     public string Kind { get; set; } = string.Empty;

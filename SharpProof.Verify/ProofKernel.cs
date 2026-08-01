@@ -2,15 +2,13 @@ namespace SharpProof.Verify;
 
 public sealed class ProofKernel(ISmtBackend backend)
 {
-    private readonly ISmtBackend _backend = backend ?? throw new ArgumentNullException(nameof(backend));
+    private readonly ISmtBackend _backend =
+        ArgumentNullGuard.NotNull(backend, nameof(backend));
 
     public async Task<ProofOutcome> VerifyAsync(VerificationQuery query,
         CancellationToken cancellationToken = default)
     {
-        if (query == null)
-        {
-            throw new ArgumentNullException(nameof(query));
-        }
+        query = ArgumentNullGuard.NotNull(query, nameof(query));
 
         cancellationToken.ThrowIfCancellationRequested();
         var result = await _backend.CheckAsync(query, cancellationToken).ConfigureAwait(false);
@@ -24,7 +22,8 @@ public sealed class ProofKernel(ISmtBackend backend)
         {
             BackendCheckStatus.Unsatisfiable => CreateProven(query, result),
             BackendCheckStatus.Satisfiable => ReplayCounterexample(query, result, cancellationToken),
-            BackendCheckStatus.Unknown => Unknown(MapFailure(result.FailureReason)),
+            BackendCheckStatus.Unknown => Unknown(
+                VerificationProjections.MapFailure(result.FailureReason)),
             _ => Unknown(AbstentionReason.MalformedBackendResult)
         };
     }
@@ -121,19 +120,6 @@ public sealed class ProofKernel(ISmtBackend backend)
         return result.Status == IrEvaluationStatus.Value &&
         result.Value is { Kind: IrValueKind.Boolean } value &&
         value.Boolean == expected;
-    }
-
-    private static AbstentionReason MapFailure(BackendFailureReason reason)
-    {
-        return reason switch
-        {
-            BackendFailureReason.UnsupportedEncoding => AbstentionReason.UnsupportedEncoding,
-            BackendFailureReason.ResourceLimit => AbstentionReason.ResourceLimit,
-            BackendFailureReason.Timeout => AbstentionReason.Timeout,
-            BackendFailureReason.Unavailable => AbstentionReason.BackendUnavailable,
-            BackendFailureReason.InfrastructureFailure => AbstentionReason.InfrastructureFailure,
-            _ => AbstentionReason.MalformedBackendResult
-        };
     }
 
     private static UnknownOutcome Unknown(AbstentionReason reason)

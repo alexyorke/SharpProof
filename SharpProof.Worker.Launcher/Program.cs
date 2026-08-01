@@ -72,15 +72,8 @@ internal static class Program
         }
         if (!File.Exists(arguments.ResultPath))
         {
-            LauncherFailure launcherFailure = exitCode switch
-            {
-                124 => new(exitCode, WorkerRunStatus.TimedOut, WorkerRunFailureReason.None,
-                    "worker.timeout", "The worker exceeded its project time budget.", string.Empty),
-                125 => new(exitCode, WorkerRunStatus.Failed, WorkerRunFailureReason.ContainmentFailure,
-                    "containment.unavailable", "Required worker containment could not be established.", string.Empty),
-                _ => new(exitCode, WorkerRunStatus.Failed, WorkerRunFailureReason.MalformedResult,
-                    "worker.no_result", "The worker exited without a result.", string.Empty)
-            };
+            LauncherFailure launcherFailure =
+                LauncherPresentation.NoResultFailure(exitCode);
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
                 launcherFailure.Status, launcherFailure.Reason, launcherFailure.Code, launcherFailure.Message).ConfigureAwait(false);
         }
@@ -140,7 +133,7 @@ internal static class Program
         };
     }
 
-    private sealed record LauncherFailure(
+    internal sealed record LauncherFailure(
         int ExitCode, WorkerRunStatus Status, WorkerRunFailureReason Reason,
         string Code, string Message, string ConsoleMessage);
 
@@ -294,12 +287,7 @@ internal static class Program
         {
             Console.Error.WriteLine("SharpProof worker run " + response.RunStatus +
                 " (" + response.FailureReason + ").");
-            return response.RunStatus switch
-            {
-                WorkerRunStatus.TimedOut => 124,
-                WorkerRunStatus.Canceled => 4,
-                _ => 3
-            };
+            return LauncherPresentation.ExitCode(response.RunStatus);
         }
         if (response.Errors.Length != 0)
         {
@@ -442,30 +430,8 @@ internal static class Program
     }
 }
 
-internal static class LauncherPresentation
+internal static partial class LauncherPresentation
 {
-    internal static string ClaimKind(WorkerClaimManifestEntry claim)
-    {
-        return claim.Kind switch
-        {
-            WorkerClaimKind.Postcondition => "Postcondition",
-            WorkerClaimKind.Effect => "effect:" + EffectKind(claim.EffectContractKind),
-            _ => throw new ArgumentOutOfRangeException(nameof(claim))
-        };
-    }
-
-    private static string EffectKind(WorkerEffectContractKind kind)
-    {
-        if (kind is not (WorkerEffectContractKind.EnforcePure or WorkerEffectContractKind.ZeroAllocations or
-            WorkerEffectContractKind.AllowedCapabilities or WorkerEffectContractKind.DoesNotThrow or
-            WorkerEffectContractKind.AllowedExceptions or WorkerEffectContractKind.EffectContract))
-        {
-            throw new ArgumentOutOfRangeException(nameof(kind));
-        }
-
-        return kind.ToString();
-    }
-
     internal static string Level(WorkerVerifyPolicy policy, string advisory)
     {
         return Level((object)policy, advisory);
@@ -476,41 +442,6 @@ internal static class LauncherPresentation
         return Level((object)policy, advisory);
     }
 
-    private static string Level(object policy, string advisory)
-    {
-        return policy switch
-        {
-            WorkerVerifyPolicy.Advisory or WorkerAssumptionPolicy.Allow => advisory,
-            WorkerVerifyPolicy.WarnOnUnknown or WorkerAssumptionPolicy.Warn => "warning",
-            WorkerVerifyPolicy.RequireProven or WorkerAssumptionPolicy.Error => "error",
-            _ => throw new InvalidOperationException("The policy was not validated.")
-        };
-    }
-
-    internal static WorkerVerifyPolicy ParseVerifyPolicy(string value)
-    {
-        return (WorkerVerifyPolicy)ParsePolicy(value, assumptions: false);
-    }
-
-    internal static WorkerAssumptionPolicy ParseAssumptionPolicy(string value)
-    {
-        return (WorkerAssumptionPolicy)ParsePolicy(value, assumptions: true);
-    }
-
-    private static object ParsePolicy(string value, bool assumptions)
-    {
-        return (assumptions, value.ToUpperInvariant()) switch
-        {
-            (false, "ADVISORY") => WorkerVerifyPolicy.Advisory,
-            (false, "WARN-ON-UNKNOWN") => WorkerVerifyPolicy.WarnOnUnknown,
-            (false, "REQUIRE-PROVEN") => WorkerVerifyPolicy.RequireProven,
-            (true, "ALLOW") => WorkerAssumptionPolicy.Allow,
-            (true, "WARN") => WorkerAssumptionPolicy.Warn,
-            (true, "ERROR") => WorkerAssumptionPolicy.Error,
-            _ => throw new ArgumentException(assumptions
-                ? "The assumption policy is invalid." : "The verifier policy is invalid.", nameof(value))
-        };
-    }
 }
 
 internal sealed class LauncherArguments

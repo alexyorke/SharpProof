@@ -4,13 +4,6 @@ namespace SharpProof.Analyzer;
 
 internal static class ManagedContractFacts
 {
-    private static readonly ImmutableDictionary<IrBinaryOperator, BinaryOperatorKind> Operators =
-        Enum.GetValues(typeof(BinaryOperatorKind))
-            .Cast<BinaryOperatorKind>()
-            .Select(static kind => (Kind: kind, Ir: CSharpScalarSemantics.MapBinary(kind, SpecialType.None)))
-            .Where(static item => item.Ir.HasValue)
-            .ToImmutableDictionary(static item => item.Ir!.Value, static item => item.Kind);
-
     internal static ManagedFlowState ApplyRequires(
         ManagedFlowState state, BoundMethodContracts? contracts)
     {
@@ -81,7 +74,7 @@ internal static class ManagedContractFacts
                 ManagedAbstractValue.NegateBoolean(
                     Evaluate(unary.Operand, variables, definitelyStrings)),
             IrBinaryTerm binary => ManagedAbstractValue.Binary(
-                Map(binary.Operator),
+                CSharpScalarSemantics.MapBinaryToRoslyn(binary.Operator),
                 Evaluate(binary.Left, variables, definitelyStrings),
                 Evaluate(binary.Right, variables, definitelyStrings)),
             IrConditionalTerm conditional => Evaluate(
@@ -148,20 +141,20 @@ internal static class ManagedContractFacts
                 state.Set(symbol, ManagedAbstractValue.Boolean(expected)),
             IrBinaryTerm { Left: IrVariableTerm left } binary
                 when variables.TryGetValue(left.Variable, out var leftSymbol) =>
-                ManagedAbstractFlow.Refine(state, leftSymbol, Map(binary.Operator),
+                ManagedAbstractFlow.Refine(
+                    state,
+                    leftSymbol,
+                    CSharpScalarSemantics.MapBinaryToRoslyn(binary.Operator),
                     Evaluate(binary.Right, EmptyValues), expected),
             IrBinaryTerm { Right: IrVariableTerm right } binary
                 when variables.TryGetValue(right.Variable, out var rightSymbol) =>
                 ManagedAbstractFlow.Refine(state, rightSymbol,
-                    ManagedAbstractValue.ReverseComparison(Map(binary.Operator)),
+                    CSharpScalarSemantics.ReverseBinary(
+                        CSharpScalarSemantics.MapBinaryToRoslyn(
+                            binary.Operator)),
                     Evaluate(binary.Left, EmptyValues), expected),
             _ => state
         };
-    }
-
-    private static BinaryOperatorKind Map(IrBinaryOperator @operator)
-    {
-        return Operators.TryGetValue(@operator, out var kind) ? kind : BinaryOperatorKind.None;
     }
 
     private static IReadOnlyDictionary<IrVarId, ManagedAbstractValue> EmptyValues

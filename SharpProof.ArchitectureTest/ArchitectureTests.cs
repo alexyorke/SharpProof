@@ -326,10 +326,15 @@ public sealed class ArchitectureTests
         };
         var violations = semanticConsumers
             .SelectMany(ProductionSourceFiles)
-            .Where(file => !string.Equals(
-                Relative(file),
-                "SharpProof.Frontend/ContractApiMetadata.cs",
-                StringComparison.Ordinal))
+            .Where(file =>
+                !string.Equals(
+                    Relative(file),
+                    "SharpProof.Frontend/ContractApiMetadataRuntime.cs",
+                    StringComparison.Ordinal) &&
+                !string.Equals(
+                    Relative(file),
+                    "SharpProof.Frontend/ContractApiMetadata.generated.cs",
+                    StringComparison.Ordinal))
             .SelectMany(file => CSharpSyntaxTree.ParseText(
                     File.ReadAllText(file),
                     CSharpParseOptions.Default.WithLanguageVersion(
@@ -508,20 +513,19 @@ public sealed class ArchitectureTests
                 "SharpProof.CompilerCollector/FinalCompilationCollectorAnalyzer.cs",
                 "SharpProof.CompilerCollector/FinalCompilationCollector.cs",
                 "SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs",
-                "SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectEvaluationWireMappings.cs",
+                "SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs",
                 "SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs",
                 "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
                 "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
                 "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
                 "SharpProof.Frontend/ContractApiIdentityResolver.cs",
-                "SharpProof.Frontend/ContractApiMetadata.cs",
+                "SharpProof.Frontend/ContractApiMetadataRuntime.cs",
                 "SharpProof.Frontend/SharpProof.Frontend.csproj"
             ],
             ["lowering"] = [
                 "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs",
                 "SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs",
                 "SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs",
-                "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
                 "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
                 "SharpProof.Contracts/ClosedContractAttributeValidator.cs",
                 "SharpProof.Contracts/ContractBinder.cs",
@@ -561,7 +565,75 @@ public sealed class ArchitectureTests
             ["scalarSemanticsCatalog"] = [
                 "SharpProof.Frontend/CSharpScalarSemantics.json",
                 "scripts/Generate-CSharpScalarSemantics.ps1",
-                "SharpProof.Frontend/CSharpScalarSemantics.generated.cs"
+                "SharpProof.Frontend/CSharpScalarSemantics.generated.cs",
+                "SharpProof.Ir/IrOperatorCatalog.generated.cs"
+            ],
+            ["contractApiCatalog"] = [
+                "SharpProof.Frontend/ContractApi.catalog.json",
+                "scripts/Generate-ContractApiCatalog.ps1",
+                "SharpProof.Frontend/ContractApiMetadata.generated.cs"
+            ],
+            ["analyzerDiagnosticCatalog"] = [
+                "SharpProof.Analyzer/AnalyzerDiagnostic.catalog.json",
+                "scripts/Generate-AnalyzerDiagnosticCatalog.ps1",
+                "SharpProof.Analyzer/AnalyzerDiagnosticCatalog.generated.cs"
+            ],
+            ["projectionCatalog"] = [
+                "SharpProof.Projection.catalog.json",
+                "scripts/Generate-ProjectionCatalog.ps1",
+                "SharpProof.Verify/VerificationProjections.generated.cs",
+                "SharpProof.Worker/WorkerProjections.generated.cs",
+                "SharpProof.Contracts/ContractProjections.generated.cs",
+                "SharpProof.Ir/IrPrinterProjections.generated.cs",
+                "SharpProof.Effects/EffectProjections.generated.cs",
+                "SharpProof.Frontend/OperationSupportProjections.generated.cs",
+                "SharpProof.Worker.Launcher/LauncherProjections.generated.cs",
+                "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableProjections.generated.cs",
+                "SharpProof.Frontend/CompilerIdentityProjections.generated.cs"
+            ],
+            ["declarativeModelsCatalog"] = [
+                "SharpProof.DeclarativeModels.catalog.json",
+                "scripts/Generate-DeclarativeModels.ps1",
+                "SharpProof.Analyzer/DeclarativeModels.generated.cs",
+                "SharpProof.CompilerCollector/CompilerArtifact/DeclarativeModels.generated.cs",
+                "SharpProof.Specs/DeclarativeModels.generated.cs",
+                "SharpProof.Worker/DeclarativeModels.generated.cs",
+                "SharpProof.Contracts/DeclarativeModels.generated.cs",
+                "SharpProof.Contracts/EffectiveContractModels.generated.cs",
+                "SharpProof.Effects/EffectResultModels.generated.cs",
+                "SharpProof.Effects/ApiSpecResolutionModels.generated.cs",
+                "SharpProof.Frontend/DeclarativeModels.generated.cs",
+                "SharpProof.Verify/DeclarativeModels.generated.cs"
+            ],
+            ["boundContractModelCatalog"] = [
+                "SharpProof.Contracts/BoundContractModel.schema.json",
+                "scripts/Generate-BoundContractModel.ps1",
+                "SharpProof.Contracts/BoundContractModel.generated.cs"
+            ],
+            ["effectContractCatalog"] = [
+                "SharpProof.Effects/EffectContractMappings.catalog.json",
+                "scripts/Generate-EffectContractMappings.ps1",
+                "SharpProof.Effects/EffectContractMappings.generated.cs"
+            ],
+            ["operationSupportCatalog"] = [
+                "SharpProof.Frontend/OperationSupport.catalog.json",
+                "scripts/Generate-OperationSupportCatalog.ps1",
+                "SharpProof.Frontend/OperationSupportCatalog.generated.cs"
+            ],
+            ["irModelCatalog"] = [
+                "SharpProof.Ir/IrModel.schema.json",
+                "scripts/Generate-IrModel.ps1",
+                "SharpProof.Ir/IrIdentifierAliases.cs",
+                "SharpProof.Ir/ScopedIrId.cs",
+                "SharpProof.Ir/ArgumentNullGuard.cs",
+                "SharpProof.Ir/IrModel.generated.cs",
+                "SharpProof.Ir/IrProgram.cs"
+            ],
+            ["compilerWireCatalog"] = [
+                "SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json",
+                "scripts/Generate-CompilerArtifactModel.ps1",
+                "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
+                "SharpProof.CompilerCollector/CompilerArtifact/CompilerWireMappings.generated.cs"
             ],
             ["effectAnalysis"] = [
                 "SharpProof.Analyzer/AnalyzerFeaturePipeline.cs",
@@ -605,7 +677,9 @@ public sealed class ArchitectureTests
                 "SharpProof.Verify/ProofKernel.cs",
                 "SharpProof.Ir/IrInterpreter.cs",
                 "SharpProof.Ir/IrProgramInterpreter.cs",
-                "SharpProof.Worker/CallableCounterexampleReplayer.cs"
+                "SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs",
+                "SharpProof.Worker/CallableCounterexampleReplayer.cs",
+                "SharpProof.Worker/EffectCounterexampleReplayer.cs"
             ],
             ["effectResultAssembly"] = [
                 "SharpProof.Worker/EffectClaimResultAssembler.cs"
@@ -632,6 +706,7 @@ public sealed class ArchitectureTests
             ["protocolValidation"] = [
                 "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
                 "SharpProof.Worker.Protocol/ProtocolManifest.cs",
+                "SharpProof.Worker.Protocol/ProtocolManifestPayload.cs",
                 "SharpProof.Worker.Protocol/ProtocolJson.cs",
                 "SharpProof.Worker.Protocol/ProtocolJsonSupport.cs"
             ],
@@ -911,7 +986,7 @@ public sealed class ArchitectureTests
         var catalog = Path.GetFullPath(Path.Combine(
             root,
             "SharpProof.Frontend",
-            "ContractApiMetadata.cs"));
+            "ContractApiMetadataRuntime.cs"));
         var violations = ProductionProjects
             .SelectMany(ProductionSourceFiles)
             .Where(path => !string.Equals(
@@ -932,6 +1007,36 @@ public sealed class ArchitectureTests
                     StringComparison.Ordinal))
             .Select(entry =>
                 $"{Path.GetRelativePath(root, entry.Path)}:{entry.Number}")
+            .ToArray();
+
+        Assert.That(violations, Is.Empty);
+    }
+
+    [Test]
+    public void DeclarativeModelOutputsContainOnlyStorageDeclarations()
+    {
+        var root = RepositoryRoot();
+        using var catalog = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root,
+            "SharpProof.DeclarativeModels.catalog.json")));
+        var violations = catalog.RootElement
+            .GetProperty("outputs")
+            .EnumerateArray()
+            .Select(static output => output.GetProperty("path").GetString()!)
+            .Select(path => new
+            {
+                Path = path,
+                Source = File.ReadAllText(Path.Combine(
+                    root,
+                    path.Replace('/', Path.DirectorySeparatorChar)))
+            })
+            .Where(static output =>
+                Regex.IsMatch(
+                    output.Source,
+                    @"(?m)^\s*(if|else|switch|case|for|foreach|while|do|catch)\b",
+                    RegexOptions.CultureInvariant) ||
+                output.Source.Contains("throw ", StringComparison.Ordinal))
+            .Select(static output => output.Path)
             .ToArray();
 
         Assert.That(violations, Is.Empty);

@@ -59,16 +59,26 @@ silently counted as analyzed. Repeated effect attributes receive distinct
 manifest claims while sharing the effective combined constraint and evidence.
 Each effect claim is `Proven` only when a complete compiler-produced effect
 summary establishes its contract. The compiler can record a structured
-`DefiniteViolation` candidate for a simple unconditional direct operation, but
-the current artifact does not carry an independently executable effect path.
-The worker therefore fails closed by mapping every such candidate to the fatal
-typed result `Unknown(CounterexampleReplayFailed)` with unavailable certainty
-and no published witness. The worker does not emit effect `Refuted` results.
-Conditional and may-only conflicts remain
-`Unknown(EffectContractNotEstablished)`; incomplete evidence is
+`DefiniteViolation` candidate for a simple unconditional direct operation.
+Compiler artifact schema 9 carries an independently replayable event only for
+a definite managed object or array allocation whose operands are already
+known to complete and whose allocation is not static-initialization-sensitive.
+The worker derives `Allocates` from that event rather than trusting the
+compiler's effect bits. A matching event can `Refute` `ZeroAllocations` or
+`EffectContract` when the selected allowed-effect set excludes `Allocates`.
+It cannot refute `EnforcePure`, because observable purity permits fresh
+allocation.
+
+Other direct candidates, including explicit throw, receiver-field access,
+empty `lock`, and exact `Monitor` calls, are not yet in the executable replay
+subset and become `Unknown(CounterexampleNotReplayable)`. The same reason
+applies to static-initialization-sensitive allocation and other non-replayable
+definite candidates. Conditional, path-dependent, and other may-only conflicts
+remain `Unknown(EffectContractNotEstablished)`; incomplete evidence is
 `Unknown(EffectSummaryIncomplete)`. Other certainty values distinguish a
 complete or incomplete may-effect summary, a trusted complete boundary, and
-unavailable evidence.
+unavailable evidence. Effect claim results are never stored in or reused from
+the semantic cache.
 
 Exception constraints and exact witness hierarchies use the type-reference
 documentation ID qualified by the full compiler assembly identity: name,
@@ -215,13 +225,26 @@ therefore makes the corresponding contract `Unknown`; a may-effect alone cannot
 produce `Refuted`. Separately, the compiler recognizes a narrow set of simple
 unconditional direct operations: managed object/array allocation, explicit
 throw, receiver-field access, empty `lock`, and exact `Monitor` calls. It
-records a source-located structured candidate, but the worker cannot
-independently replay its effect operation and path. The candidate is therefore
-reported as the fatal typed result
-`Unknown(CounterexampleReplayFailed)`, not `Refuted`.
-Static-field access, conditional/path-dependent operations, and
-user-constructed exact exception types remain outside that direct-candidate
+records a source-located structured candidate.
+
+Only an unconditional definite managed object or array allocation is currently
+lowered to the compiler-neutral replay event. Its operand evaluation must
+already be known to complete, and object allocation must not depend on
+unmodeled static initialization. The worker independently validates the event
+order, compiler-tree identity and span, semantic operation identity, selected
+constraint, and sealed witness. It derives `Allocates` from the event and can
+publish `Refuted` only for `ZeroAllocations` or an `EffectContract` that
+excludes `Allocates`. Fresh allocation remains compatible with `EnforcePure`.
+Other direct candidates, including a static-initialization-sensitive
+allocation, become `Unknown(CounterexampleNotReplayable)`. Conditional,
+path-dependent, and may-only conflicts without a definite candidate remain
+`Unknown(EffectContractNotEstablished)`. Static-field access and
+user-constructed exact exception types remain outside the direct-candidate
 subset.
+The semantic-operation hash checks canonical agreement among compiler-produced
+event fields; it does not independently rebind the source. Discovery, effect
+analysis, and event lowering therefore remain inside the trusted computing
+base.
 The analyzer's definitive SP0013, SP0015, and SP0030 diagnostics remain
 reserved; direct violations are accountable through worker claim results and
 SARIF.
@@ -311,17 +334,21 @@ its outcome is not combined with the containing callable. Unavailable captured
 facts remain unknown. An expression-tree lambda is quoted code and is not
 treated as an executing call site.
 
-The packaged verifier consumes compiler artifact schema version 8 produced
+The packaged verifier consumes compiler artifact schema version 9 produced
 from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed
 lowering failure or portable whole-body CFG/IR with bound clauses, canonical
 variables, body-entry state, parameter mappings, and bound API-spec witness
-metadata. It also carries compiler error diagnostics and mapped locations,
-handwritten and generated tree hashes, raw and effective per-tree preprocessor
-symbols, and parse evidence, plus a bounded proof-relevant compilation-option
-set, assembly and target identity, and compiler/reference provenance. An
-effective `SHARPPROOF_CONTRACTS` symbol invalidates the artifact before
-verification. The artifact contains no source text.
+metadata. It also carries the admitted unconditional managed-allocation replay
+events, their selected-constraint and semantic-operation hashes, and their
+source-tree identities and spans. Worker protocol version 9 and semantic cache
+schema version 11 are unchanged. The artifact further carries compiler error
+diagnostics and mapped locations, handwritten and generated tree hashes, raw
+and effective per-tree preprocessor symbols, and parse evidence, plus a bounded
+proof-relevant compilation-option set, assembly and target identity, and
+compiler/reference provenance. An effective `SHARPPROOF_CONTRACTS` symbol
+invalidates the artifact before verification. The artifact contains no source
+text.
 
 Before cache lookup or backend creation, the worker validates the artifact
 digest and canonical shape, requires the compiler-visible maximum expression
@@ -353,3 +380,12 @@ discrepancy for an otherwise executable counterexample remains the fatal
 `CounterexampleReplayFailed` run failure. Optional SARIF 2.1.0 is a
 deterministic projection of the validated protocol response; it does not
 participate in proof construction or change build success.
+
+Effect refutation replay is separate from SMT and whole-body postcondition
+replay. The worker interprets the compiler-neutral ordered event, recomputes
+its constraint and operation identities, derives the observed allocation
+effect, and compares the result with the sealed compiler witness. Invalid
+event order, source-tree identity/span, hash, or structural shape is malformed
+compiler evidence and fails as `CompilerManifestMismatch`. A structurally
+valid event that does not reproduce the claimed semantic violation becomes
+`Unknown(CounterexampleReplayFailed)` and makes the run `Failed`.

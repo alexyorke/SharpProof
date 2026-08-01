@@ -18,54 +18,32 @@ public enum BackendFailureReason
     InfrastructureFailure
 }
 
-public sealed class BackendModel(IEnumerable<KeyValuePair<IrVarId, IrValue>> assignments)
+public sealed partial class BackendModel
 {
-    public ImmutableDictionary<IrVarId, IrValue> Assignments
+    public BackendModel(IEnumerable<KeyValuePair<IrVarId, IrValue>> assignments)
+        : this(
+            ArgumentNullGuard.NotNull(assignments, nameof(assignments)).ToImmutableDictionary(
+                static assignment => assignment.Key,
+                static assignment => assignment.Value),
+            default)
     {
-        get;
-    } =
-        (assignments ?? throw new ArgumentNullException(nameof(assignments))).ToImmutableDictionary(
-            static assignment => assignment.Key,
-            static assignment => assignment.Value);
+    }
 }
 
-public sealed class BackendCheckResult
+public sealed partial class BackendCheckResult
 {
     private BackendCheckResult(
         BackendCheckStatus status,
         ImmutableArray<int> unsatCore,
         BackendModel? model,
         BackendFailureReason failureReason)
+        : this(status, unsatCore, model, failureReason, default)
     {
-        Status = status;
-        UnsatCore = unsatCore;
-        Model = model;
-        FailureReason = failureReason;
-    }
-
-    public BackendCheckStatus Status
-    {
-        get;
-    }
-    public ImmutableArray<int> UnsatCore
-    {
-        get;
-    }
-    public BackendModel? Model
-    {
-        get;
-    }
-    public BackendFailureReason FailureReason
-    {
-        get;
     }
 
     public static BackendCheckResult Unsatisfiable(IEnumerable<int> assumptionIndices)
     {
-        if (assumptionIndices == null)
-        {
-            throw new ArgumentNullException(nameof(assumptionIndices));
-        }
+        assumptionIndices = ArgumentNullGuard.NotNull(assumptionIndices, nameof(assumptionIndices));
 
         return new BackendCheckResult(BackendCheckStatus.Unsatisfiable,
             [.. assumptionIndices], null, BackendFailureReason.None);
@@ -74,7 +52,7 @@ public sealed class BackendCheckResult
     public static BackendCheckResult Satisfiable(BackendModel model)
     {
         return new(BackendCheckStatus.Satisfiable, [],
-            model ?? throw new ArgumentNullException(nameof(model)), BackendFailureReason.None);
+            ArgumentNullGuard.NotNull(model, nameof(model)), BackendFailureReason.None);
     }
 
     public static BackendCheckResult Unknown(BackendFailureReason reason)
@@ -103,14 +81,17 @@ public sealed class VerificationQuery
         Goal goal,
         ImmutableArray<IrVarId> modelVariables = default)
     {
-        Factory = factory ?? throw new ArgumentNullException(nameof(factory));
-        Assumptions = [.. assumptions ?? throw new ArgumentNullException(nameof(assumptions))];
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        assumptions = ArgumentNullGuard.NotNull(assumptions, nameof(assumptions));
+        goal = ArgumentNullGuard.NotNull(goal, nameof(goal));
+        Factory = factory;
+        Assumptions = [.. assumptions];
         if (Assumptions.Any(static assumption => assumption == null))
         {
             throw new ArgumentException("Assumptions cannot contain null.", nameof(assumptions));
         }
 
-        Goal = goal ?? throw new ArgumentNullException(nameof(goal));
+        Goal = goal;
         foreach (var assumption in Assumptions)
         {
             FactoryGuards.RequireBooleanTerm(factory, assumption.Predicate, nameof(assumptions));

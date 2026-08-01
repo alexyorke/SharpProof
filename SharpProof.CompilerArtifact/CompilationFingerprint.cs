@@ -9,15 +9,12 @@ internal static class CompilationFingerprint
 
     internal static string ComputeSha256(CompilerCompilationSnapshot snapshot)
     {
-        if (snapshot == null)
-        {
-            throw new ArgumentNullException(nameof(snapshot));
-        }
+        snapshot = ArgumentNullGuard.NotNull(snapshot, nameof(snapshot));
 
         using var hash = new CanonicalHashWriter();
         hash.Add(
             "SharpProof.CompilerCompilationSnapshot",
-            5,
+            6,
             JsonSerializer.Serialize(snapshot, WorkerProtocolJson.Options));
         return hash.Finish();
     }
@@ -65,6 +62,7 @@ internal static class CompilationFingerprint
     {
         return value != null &&
         WorkerProtocolJson.IsSha256(value.Sha256) &&
+        value.TextLength >= 0 &&
         HasText(value.LanguageVersion) &&
         value.DocumentationMode is "None" or "Parse" or "Diagnose" &&
         value.Kind is "Regular" or "Script" &&

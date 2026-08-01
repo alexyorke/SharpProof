@@ -1,38 +1,5 @@
 namespace SharpProof.Effects;
 
-[Flags]
-public enum EffectAllocationKind
-{
-    None = 0,
-    Managed = 1 << 0,
-    Native = 1 << 1,
-    ManagedAndNative = Managed | Native,
-    Unknown = Managed | Native | 1 << 2
-}
-
-[Flags]
-public enum EffectCapabilityKind
-{
-    None = 0,
-    IO = 1 << 0,
-    FileRead = 1 << 1,
-    FileWrite = 1 << 2,
-    Network = 1 << 3,
-    Console = 1 << 4,
-    Process = 1 << 5,
-    Environment = 1 << 6,
-    Registry = 1 << 7,
-    Clock = 1 << 8,
-    Randomness = 1 << 9,
-    Reflection = 1 << 10,
-    Synchronization = 1 << 11,
-    NativeInterop = 1 << 12,
-    AllKnown = IO | FileRead | FileWrite | Network | Console | Process |
-               Environment | Registry | Clock | Randomness | Reflection |
-               Synchronization | NativeInterop,
-    Unknown = AllKnown | 1 << 13
-}
-
 public readonly record struct EffectCapabilitySet
 {
     public EffectCapabilitySet(EffectCapabilityKind kinds)
@@ -71,59 +38,59 @@ public readonly record struct EffectCapabilitySet
     }
 }
 
-public enum EffectTermination
-{
-    Bottom,
-    Terminates,
-    MayDiverge,
-    Unknown
-}
-
-public enum EffectCompleteness
-{
-    Complete,
-    Incomplete
-}
-
-[Flags]
-internal enum EffectAnalysisIncompleteReason
-{
-    None = 0,
-    BlockBudgetExceeded = 1 << 0,
-    OperationBudgetExceeded = 1 << 1,
-    CyclicControlFlow = 1 << 2,
-    CallPreconditionNotProven = 1 << 3
-}
-
 internal sealed class EffectDirectWitness(
     EffectContractKind effects,
     EffectContractCapabilityKind capabilities,
     INamedTypeSymbol? exceptionType,
-    string kind,
+    EffectDirectEventKind eventKind,
     string detail,
-    Location location)
+    IOperation origin)
 {
+    internal EffectDirectEventKind EventKind { get; } = eventKind;
     internal EffectContractKind Effects { get; } = effects;
     internal EffectContractCapabilityKind Capabilities { get; } = capabilities;
     internal INamedTypeSymbol? ExceptionType { get; } = exceptionType;
-    internal string Kind { get; } = kind;
+    internal string Kind { get; } =
+        EffectDirectEventKinds.ToWireName(eventKind);
     internal string Detail { get; } = detail;
-    internal Location Location { get; } = location;
+    internal IOperation Origin { get; } =
+        ArgumentNullGuard.NotNull(origin, nameof(origin));
+    internal Location Location { get; } = origin.Syntax.GetLocation();
 }
 
-[Flags]
-public enum EffectUncertainty
+internal static class EffectDirectEventKinds
 {
-    None = 0,
-    DirectCall = 1 << 0,
-    Dispatch = 1 << 1,
-    UnsupportedOperation = 1 << 2,
-    UnmodeledCall = 1 << 3,
-    Recursion = 1 << 4,
-    InvalidContract = 1 << 5,
-    All = DirectCall | Dispatch | UnsupportedOperation | UnmodeledCall |
-          Recursion | InvalidContract,
-    Unknown = All | 1 << 6
+    internal static readonly (EffectDirectEventKind Event, string WireName)[] WireNames =
+        EffectContractMappingCatalog.DirectEvents;
+
+    internal static EffectDirectEventKind FromWireName(string kind)
+    {
+        foreach (var mapping in WireNames)
+        {
+            if (string.Equals(
+                    mapping.WireName,
+                    kind,
+                    StringComparison.Ordinal))
+            {
+                return mapping.Event;
+            }
+        }
+
+        throw new ArgumentOutOfRangeException(nameof(kind));
+    }
+
+    internal static string ToWireName(EffectDirectEventKind kind)
+    {
+        foreach (var mapping in WireNames)
+        {
+            if (mapping.Event == kind)
+            {
+                return mapping.WireName;
+            }
+        }
+
+        throw new ArgumentOutOfRangeException(nameof(kind));
+    }
 }
 
 public readonly struct EffectThrowSet : IEquatable<EffectThrowSet>
@@ -148,10 +115,7 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet>
     public static EffectThrowSet Create(
         IEnumerable<INamedTypeSymbol> types, bool includesUnknown = false)
     {
-        if (types == null)
-        {
-            throw new ArgumentNullException(nameof(types));
-        }
+        types = ArgumentNullGuard.NotNull(types, nameof(types));
 
         var distinct = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
         foreach (var type in types)
@@ -170,10 +134,7 @@ public readonly struct EffectThrowSet : IEquatable<EffectThrowSet>
 
     public bool Contains(INamedTypeSymbol type)
     {
-        if (type == null)
-        {
-            throw new ArgumentNullException(nameof(type));
-        }
+        type = ArgumentNullGuard.NotNull(type, nameof(type));
 
         return IncludesUnknown ||
                Types.Any(candidate => SymbolEqualityComparer.Default.Equals(candidate, type));

@@ -68,11 +68,85 @@ public sealed class CSharpScalarOperatorSemanticsTests
                 Is.EqualTo(checkedArithmetic.Contains(kind)),
                 kind.ToString());
         }
+        foreach (var mapping in mappings)
+        {
+            Assert.That(
+                CSharpScalarSemantics.MapBinaryToRoslyn(mapping.Value),
+                Is.EqualTo(mapping.Key),
+                mapping.Value.ToString());
+        }
         Assert.That(
             CSharpScalarSemantics.MapBinary(
                 BinaryOperatorKind.Add,
                 SpecialType.System_String),
             Is.EqualTo(IrBinaryOperator.StringConcat));
+        Assert.That(
+            CSharpScalarSemantics.MapBinaryToRoslyn(
+                IrBinaryOperator.StringConcat),
+            Is.EqualTo(BinaryOperatorKind.None));
+    }
+
+    [Test]
+    public void BinaryReverseAndNegationRelationsAreExactAndInvolutive()
+    {
+        var reversed = new Dictionary<
+            BinaryOperatorKind,
+            BinaryOperatorKind>
+        {
+            [BinaryOperatorKind.LessThan] =
+                BinaryOperatorKind.GreaterThan,
+            [BinaryOperatorKind.LessThanOrEqual] =
+                BinaryOperatorKind.GreaterThanOrEqual,
+            [BinaryOperatorKind.GreaterThan] =
+                BinaryOperatorKind.LessThan,
+            [BinaryOperatorKind.GreaterThanOrEqual] =
+                BinaryOperatorKind.LessThanOrEqual
+        };
+        var negated = new Dictionary<
+            BinaryOperatorKind,
+            BinaryOperatorKind>
+        {
+            [BinaryOperatorKind.Equals] =
+                BinaryOperatorKind.NotEquals,
+            [BinaryOperatorKind.NotEquals] =
+                BinaryOperatorKind.Equals,
+            [BinaryOperatorKind.LessThan] =
+                BinaryOperatorKind.GreaterThanOrEqual,
+            [BinaryOperatorKind.LessThanOrEqual] =
+                BinaryOperatorKind.GreaterThan,
+            [BinaryOperatorKind.GreaterThan] =
+                BinaryOperatorKind.LessThanOrEqual,
+            [BinaryOperatorKind.GreaterThanOrEqual] =
+                BinaryOperatorKind.LessThan
+        };
+
+        foreach (var kind in Enum.GetValues<BinaryOperatorKind>())
+        {
+            var reverse = CSharpScalarSemantics.ReverseBinary(kind);
+            var negate = CSharpScalarSemantics.NegateBinary(kind);
+            Assert.That(
+                reverse,
+                Is.EqualTo(
+                    reversed.TryGetValue(kind, out var expectedReverse)
+                        ? expectedReverse
+                        : kind),
+                $"reverse {kind}");
+            Assert.That(
+                negate,
+                Is.EqualTo(
+                    negated.TryGetValue(kind, out var expectedNegation)
+                        ? expectedNegation
+                        : kind),
+                $"negate {kind}");
+            Assert.That(
+                CSharpScalarSemantics.ReverseBinary(reverse),
+                Is.EqualTo(kind),
+                $"reverse involution {kind}");
+            Assert.That(
+                CSharpScalarSemantics.NegateBinary(negate),
+                Is.EqualTo(kind),
+                $"negation involution {kind}");
+        }
     }
 
     [Test]

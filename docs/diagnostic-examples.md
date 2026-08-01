@@ -71,8 +71,10 @@ This is a not-proven diagnostic. It does not claim a replayed impure trace.
 <a id="sp0013"></a>
 ## SP0013 - allocation in a zero-allocation method
 
-Reserved for a future replay-validated allocation witness. The current
-path-insensitive may-effect analyzer never emits SP0013.
+Reserved as a live-analyzer diagnostic. The current path-insensitive
+may-effect analyzer never emits SP0013. Separately, the opt-in Windows worker
+can publish a typed effect `Refuted` result after independently replaying the
+schema-9 event for an unconditional definite managed object/array allocation.
 
 A possible allocation is reported as SP0045 instead.
 
@@ -192,7 +194,7 @@ the exception summary is incomplete, contains unknown exceptions, or includes
 a possibly disallowed exception.
 
 This is a not-proven result. The analyzer reserves definitive SP0030 reporting
-until it has concrete effect-trace replay.
+until it has concrete exception-effect replay.
 
 <a id="sp0047"></a>
 ## SP0047 - selected analysis incomplete
@@ -235,7 +237,7 @@ artifact lowering, serialization, or write failure. The diagnostic is an error
 because the required closed compiler evidence is missing. It is an
 infrastructure failure, never a contract or proof outcome.
 
-Compiler artifact schema version 8 includes the sealed selected-claim manifest,
+Compiler artifact schema version 9 includes the sealed selected-claim manifest,
 compiler diagnostics, source/generated-tree hashes and parse evidence, and,
 for each supported selected callable, bound contract/spec metadata plus
 portable whole-body lowered CFG/IR. It contains no source text. The worker

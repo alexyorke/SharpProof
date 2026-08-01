@@ -4,8 +4,9 @@ internal sealed class MethodResourceBudget(
     Func<long>? readConsumedResourceCount, uint queryRlimit, uint methodRlimit)
 {
     private readonly Func<long>? _readConsumedResourceCount = readConsumedResourceCount;
-    private readonly long _queryRlimit = queryRlimit > 0 ? queryRlimit :
-        throw new ArgumentOutOfRangeException(nameof(queryRlimit));
+    private readonly long _queryRlimit = ArgumentNullGuard.RequirePositive(
+        queryRlimit,
+        nameof(queryRlimit));
     private readonly long _methodRlimit = methodRlimit >= queryRlimit ? methodRlimit :
         throw new ArgumentOutOfRangeException(nameof(methodRlimit));
     private readonly long _startingResourceCount = RequireNonnegative(readConsumedResourceCount?.Invoke() ?? 0);

@@ -21,13 +21,7 @@ internal readonly struct ClosedContractAttributeValidation(
     internal bool IsRecognized => Kind != ClosedContractAttributeKind.None;
     internal bool IsValid => IsRecognized && InvalidReason == null;
 
-    internal string AttributeName => Kind switch
-    {
-        ClosedContractAttributeKind.NotNull => "[NotNull]",
-        ClosedContractAttributeKind.Positive => "[Positive]",
-        ClosedContractAttributeKind.InRange => "[InRange]",
-        _ => throw new InvalidOperationException("The attribute is not a closed contract.")
-    };
+    internal string AttributeName => ContractProjections.ClosedAttributeName(Kind);
 }
 
 internal static class ClosedContractAttributeValidator

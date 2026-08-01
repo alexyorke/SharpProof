@@ -11,7 +11,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 8;
+    internal const int Current = 9;
 }
 
 internal enum CompilerContractKind
@@ -53,6 +53,7 @@ internal sealed record CompilerCallablePreparation(
 {
     internal bool IsSuccess => FailureReason == WorkerClaimReason.None;
     internal ImmutableArray<CompilerEffectClaimArtifact> EffectClaims { get; init; } = [];
+    internal CompilerCompilationSnapshot Compilation { get; init; } = new();
 }
 
 internal sealed record CompilerPreparedClause(
@@ -131,6 +132,7 @@ internal sealed class CompilerEffectClaimArtifact
     public WorkerEffectEvidenceCertainty Certainty { get; set; }
     public CompilerEffectConstraintArtifact Constraint { get; set; } = new();
     public WorkerEffectViolationWitness? Witness { get; set; }
+    public CompilerEffectReplayArtifact? Replay { get; set; }
     public string Evidence { get; set; } = string.Empty;
     public string EvidenceSha256 { get; set; } = string.Empty;
 }
@@ -140,6 +142,50 @@ internal sealed class CompilerEffectConstraintArtifact
     public WorkerEffectSet AllowedEffects { get; set; }
     public WorkerEffectCapabilitySet AllowedCapabilities { get; set; }
     public string[] AllowedExceptionTypes { get; set; } = [];
+}
+
+internal enum CompilerEffectReplayPathKind
+{
+    Unspecified = 0,
+    Unconditional = 1
+}
+
+internal enum CompilerEffectReplayEventKind
+{
+    Unspecified = 0,
+    ManagedObjectAllocation = 1,
+    ManagedArrayAllocation = 2,
+    ExplicitThrow = 3,
+    ReceiverFieldRead = 4,
+    ReceiverFieldWrite = 5,
+    MonitorCall = 6,
+    EmptyLock = 7
+}
+
+internal sealed class CompilerEffectReplayArtifact
+{
+    public CompilerEffectReplayPathKind PathKind { get; set; }
+    public string ConstraintSha256 { get; set; } = string.Empty;
+    public CompilerEffectReplayEventArtifact[] Events { get; set; } = [];
+}
+
+internal sealed class CompilerEffectReplayEventArtifact
+{
+    public int Ordinal { get; set; } = -1;
+    public CompilerEffectReplayEventKind Kind { get; set; }
+    public int SyntaxTreeOrdinal { get; set; } = -1;
+    public string SyntaxTreeSha256 { get; set; } = string.Empty;
+    public int SyntaxStart { get; set; } = -1;
+    public int SyntaxLength { get; set; } = -1;
+    public string OperationIdentitySha256 { get; set; } = string.Empty;
+    public string MemberIdentity { get; set; } = string.Empty;
+    public string? MemberDocumentationId { get; set; }
+    public string TypeIdentity { get; set; } = string.Empty;
+    public string? TypeDocumentationId { get; set; }
+    public string? SpecWitnessIdentifier { get; set; }
+    public long[] ScalarOperands { get; set; } = [];
+    public string[] ExactExceptionTypeHierarchy { get; set; } = [];
+    public WorkerSourceLocation Location { get; set; } = new();
 }
 
 internal sealed class CompilerClauseArtifact
@@ -264,82 +310,45 @@ internal sealed class CompilerManifestArtifact
     public CompilerCallableArtifact[] Callables { get; set; } = [];
 }
 
-internal static class CompilerEffectClaimArtifactCodec
+internal readonly struct CompilerEffectConstraintRule(
+    WorkerEffectContractKind kind,
+    bool effectsMustBeEmpty,
+    bool capabilitiesMustBeEmpty,
+    bool exceptionsMustBeEmpty)
 {
-    internal static void Seal(CompilerEffectClaimArtifact value) =>
-        value.EvidenceSha256 = ComputeSha256(value);
+    internal WorkerEffectContractKind Kind { get; } = kind;
+    internal bool EffectsMustBeEmpty { get; } = effectsMustBeEmpty;
+    internal bool CapabilitiesMustBeEmpty { get; } = capabilitiesMustBeEmpty;
+    internal bool ExceptionsMustBeEmpty { get; } = exceptionsMustBeEmpty;
+}
 
-    internal static void Validate(CompilerEffectClaimArtifact value)
-    {
-        if (value == null || string.IsNullOrWhiteSpace(value.ClaimId) ||
-            string.IsNullOrWhiteSpace(value.Evidence) ||
-            !WorkerProtocolJson.IsDefined(value.ContractKind, WorkerEffectContractKind.Unspecified) ||
-            !Enum.IsDefined(typeof(WorkerClaimReason), value.Reason) ||
-            !WorkerProtocolJson.IsDefined(value.Certainty, WorkerEffectEvidenceCertainty.Unspecified) ||
-            !HasValidConstraint(value.ContractKind, value.Constraint) ||
-            !HasValidOutcome(value) ||
-            value.EvidenceSha256 != ComputeSha256(value))
-            throw new InvalidDataException("Compiler effect-claim evidence is invalid.");
-    }
-
-    private static bool HasValidOutcome(CompilerEffectClaimArtifact value) =>
-        WorkerProtocolJson.HasValidEffectCertainty(value.Outcome, value.Reason, value.Certainty) &&
-        (value.Outcome, value.Reason, value.Certainty, value.Witness) switch
-        {
-            (WorkerClaimOutcome.Proven, WorkerClaimReason.None, _, null) => true,
-            (WorkerClaimOutcome.Refuted, WorkerClaimReason.None,
-                _, { } witness) => WorkerProtocolJson.HasValidEffectWitness(witness) &&
-                    WorkerProtocolJson.HasValidLocation(witness.Location),
-            (WorkerClaimOutcome.Unknown,
-                WorkerClaimReason.UnsupportedContract or
-                WorkerClaimReason.EffectSummaryIncomplete or
-                WorkerClaimReason.EffectContractNotEstablished,
-                _, null) => true,
-            _ => false
-        };
-
-    private static bool HasValidConstraint(
-        WorkerEffectContractKind kind,
-        CompilerEffectConstraintArtifact? constraint)
-    {
-        if (constraint == null ||
-            !WorkerProtocolJson.HasKnownEffects(
-                constraint.AllowedEffects, constraint.AllowedCapabilities) ||
-            !WorkerProtocolJson.AreDistinctNonblank(constraint.AllowedExceptionTypes))
-            return false;
-        return kind switch
-        {
-            WorkerEffectContractKind.AllowedCapabilities =>
-                constraint.AllowedEffects == WorkerEffectSet.None &&
-                constraint.AllowedExceptionTypes.Length == 0,
-            WorkerEffectContractKind.AllowedExceptions =>
-                constraint.AllowedEffects == WorkerEffectSet.None &&
-                constraint.AllowedCapabilities == WorkerEffectCapabilitySet.None,
-            WorkerEffectContractKind.EffectContract => true,
-            _ => constraint.AllowedEffects == WorkerEffectSet.None &&
-                constraint.AllowedCapabilities == WorkerEffectCapabilitySet.None &&
-                constraint.AllowedExceptionTypes.Length == 0
-        };
-    }
-
-    private static string ComputeSha256(CompilerEffectClaimArtifact value)
-    {
-        var witness = value.Witness;
-        var constraint = value.Constraint;
-        using var hash = new CanonicalHashWriter();
-        hash.Add("SharpProof.CompilerEffectClaimEvidence", 7, value.ClaimId,
-            value.ContractKind, value.Outcome, value.Reason, value.Certainty,
-            constraint.AllowedEffects, constraint.AllowedCapabilities);
-        foreach (var type in constraint.AllowedExceptionTypes
-                     .OrderBy(static item => item, StringComparer.Ordinal))
-            hash.Add(type);
-        hash.Add(witness?.Kind, witness?.Detail, witness?.Effects ?? WorkerEffectSet.None,
-            witness?.Capabilities ?? WorkerEffectCapabilitySet.None);
-        foreach (var type in (witness?.ExactExceptionTypeHierarchy ?? [])
-                     .OrderBy(static item => item, StringComparer.Ordinal))
-            hash.Add(type);
-        return hash.Add(witness?.Location.Path, witness?.Location.Start ?? -1,
-            witness?.Location.Length ?? -1, witness?.Location.Line ?? -1,
-            witness?.Location.Column ?? -1, value.Evidence).Finish();
-    }
+internal static class CompilerEffectEvidenceCatalog
+{
+    internal const string ConstraintDomain = "SharpProof.CompilerEffectReplayConstraint";
+    internal const int ConstraintVersion = 1;
+    internal const string OperationDomain = "SharpProof.CompilerEffectReplayOperation";
+    internal const int OperationVersion = 1;
+    internal const string EvidenceDomain = "SharpProof.CompilerEffectClaimEvidence";
+    internal const int EvidenceVersion = 8;
+    internal const int MaximumReplayEvents = 256;
+    internal const CompilerEffectReplayPathKind ReplayPathKind =
+        CompilerEffectReplayPathKind.Unconditional;
+    internal static readonly WorkerClaimReason[] UnknownReasons = [
+        WorkerClaimReason.UnsupportedContract,
+        WorkerClaimReason.CounterexampleNotReplayable,
+        WorkerClaimReason.EffectSummaryIncomplete,
+        WorkerClaimReason.EffectContractNotEstablished,
+    ];
+    internal static readonly CompilerEffectConstraintRule[] ConstraintRules = [
+        new(WorkerEffectContractKind.EnforcePure, true, true, true),
+        new(WorkerEffectContractKind.ZeroAllocations, true, true, true),
+        new(WorkerEffectContractKind.AllowedCapabilities, true, false, true),
+        new(WorkerEffectContractKind.DoesNotThrow, true, true, true),
+        new(WorkerEffectContractKind.AllowedExceptions, true, true, false),
+        new(WorkerEffectContractKind.EffectContract, false, false, false),
+    ];
+    internal static readonly CompilerEffectReplayEventKind[] SupportedReplayEventKinds = [
+        CompilerEffectReplayEventKind.ManagedObjectAllocation,
+        CompilerEffectReplayEventKind.ManagedArrayAllocation,
+    ];
 }

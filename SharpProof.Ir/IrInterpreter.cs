@@ -1,40 +1,5 @@
 namespace SharpProof.Ir;
 
-public enum IrValueKind
-{
-    Boolean,
-    Integer,
-    String,
-    Null,
-    Reference,
-    Sequence
-}
-
-public enum IrEvaluationStatus
-{
-    Value,
-    Unsupported,
-    Exception
-}
-
-public enum IrUnsupportedReason
-{
-    OpaqueTerm,
-    MissingVariable,
-    InvalidVariableValue,
-    UnsupportedCast,
-    UnsupportedOperation
-}
-
-public enum IrExceptionKind
-{
-    DivideByZero,
-    Overflow,
-    NullReference,
-    IndexOutOfRange,
-    InvalidCast
-}
-
 internal enum IrScalarResultKind
 {
     Integer,
@@ -93,23 +58,8 @@ internal static class IrScalarOperations
     }
 }
 
-public sealed class IrValue
+public sealed partial class IrValue
 {
-    private readonly object? _value;
-
-    internal IrValue(IrTypeId type, IrValueKind kind, object? value)
-    {
-        (Type, Kind, _value) = (type, kind, value);
-    }
-
-    public IrTypeId Type
-    {
-        get;
-    }
-    public IrValueKind Kind
-    {
-        get;
-    }
     public bool Boolean => Get<bool>(IrValueKind.Boolean, "The IR value is not boolean.");
     public long Integer => Get<long>(IrValueKind.Integer, "The IR value is not an integer.");
     public string String => Get<string>(IrValueKind.String, "The IR value is not a string.");
@@ -119,70 +69,12 @@ public sealed class IrValue
 
     private T Get<T>(IrValueKind expectedKind, string message)
     {
-        return Kind == expectedKind ? (T)_value! : throw new InvalidOperationException(message);
+        return Kind == expectedKind ? (T)Payload! : throw new InvalidOperationException(message);
     }
 }
 
-public sealed class IrUnsupportedInfo
+public sealed partial class IrEvaluationResult
 {
-    internal IrUnsupportedInfo(IrUnsupportedReason reason, string detail)
-    {
-        (Reason, Detail) = (reason, detail);
-    }
-
-    public IrUnsupportedReason Reason
-    {
-        get;
-    }
-    public string Detail
-    {
-        get;
-    }
-}
-
-public sealed class IrExceptionInfo
-{
-    internal IrExceptionInfo(IrExceptionKind kind, string detail)
-    {
-        (Kind, Detail) = (kind, detail);
-    }
-
-    public IrExceptionKind Kind
-    {
-        get;
-    }
-    public string Detail
-    {
-        get;
-    }
-}
-
-public sealed class IrEvaluationResult
-{
-    private IrEvaluationResult(
-        IrEvaluationStatus status, IrValue? value,
-        IrUnsupportedInfo? unsupported, IrExceptionInfo? exception)
-    {
-        (Status, Value, Unsupported, Exception) = (status, value, unsupported, exception);
-    }
-
-    public IrEvaluationStatus Status
-    {
-        get;
-    }
-    public IrValue? Value
-    {
-        get;
-    }
-    public IrUnsupportedInfo? Unsupported
-    {
-        get;
-    }
-    public IrExceptionInfo? Exception
-    {
-        get;
-    }
-
     internal static IrEvaluationResult FromValue(IrValue value)
     {
         return new(IrEvaluationStatus.Value, value, null, null);
@@ -203,17 +95,15 @@ public sealed class IrInterpreter(IrFactory factory)
 {
     private static readonly IReadOnlyDictionary<IrVarId, IrValue> EmptyEnvironment =
         ImmutableDictionary<IrVarId, IrValue>.Empty;
-    private readonly IrFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
+    private readonly IrFactory _factory =
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
 
     public IrEvaluationResult Evaluate(
         IrTerm term,
         IReadOnlyDictionary<IrVarId, IrValue>? variables = null,
         CancellationToken cancellationToken = default)
     {
-        if (term == null)
-        {
-            throw new ArgumentNullException(nameof(term));
-        }
+        ArgumentNullGuard.NotNull(term, nameof(term));
 
         _factory.EnsureTerm(term, nameof(term));
         return EvaluateCore(term, new(variables ?? EmptyEnvironment, cancellationToken));

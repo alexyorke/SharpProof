@@ -3,33 +3,17 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SharpProof.Effects;
 
-public sealed class EffectMethodResult
+public sealed partial class EffectMethodResult
 {
     internal EffectMethodResult(
         IMethodSymbol method, EffectSummary summary,
         ImmutableArray<EffectDirectWitness> directWitnesses = default)
+        : this(
+            method,
+            summary,
+            EffectSummaryProjector.Project(summary),
+            directWitnesses.IsDefault ? [] : directWitnesses)
     {
-        Method = method;
-        Summary = summary;
-        Projection = EffectSummaryProjector.Project(summary);
-        DirectWitnesses = directWitnesses.IsDefault ? [] : directWitnesses;
-    }
-
-    public IMethodSymbol Method
-    {
-        get;
-    }
-    public EffectSummary Summary
-    {
-        get;
-    }
-    public EffectProjection Projection
-    {
-        get;
-    }
-    internal ImmutableArray<EffectDirectWitness> DirectWitnesses
-    {
-        get;
     }
 }
 
@@ -52,9 +36,9 @@ public sealed class EffectAnalysisSession
 
     public EffectAnalysisSession(Compilation compilation, ApiSpecTable? apiSpecs = null)
         : this(
-            compilation,
+            ArgumentNullGuard.NotNull(compilation, nameof(compilation)),
             new ApiSpecResolver(apiSpecs ?? ApiSpecTable.Default)
-                .Resolve(compilation ?? throw new ArgumentNullException(nameof(compilation))),
+                .Resolve(compilation),
             callPreconditions: null)
     {
     }
@@ -64,10 +48,10 @@ public sealed class EffectAnalysisSession
         ResolvedApiSpecTable apiSpecs,
         IEffectCallPreconditionPolicy? callPreconditions = null)
     {
-        _compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
+        _compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         _conditionalAttribute = compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.ConditionalAttribute);
         _external = new ExternalEffectResolver(compilation,
-            apiSpecs ?? throw new ArgumentNullException(nameof(apiSpecs)));
+            ArgumentNullGuard.NotNull(apiSpecs, nameof(apiSpecs)));
         _callPreconditions =
             callPreconditions ??
             new ConservativeEffectCallPreconditionPolicy(
@@ -89,10 +73,7 @@ public sealed class EffectAnalysisSession
     public EffectMethodResult Analyze(
         IMethodSymbol method, CancellationToken cancellationToken = default)
     {
-        if (method == null)
-        {
-            throw new ArgumentNullException(nameof(method));
-        }
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
 
         cancellationToken.ThrowIfCancellationRequested();
         var normalized = NormalizeMethod(method);
@@ -269,7 +250,9 @@ public sealed class EffectAnalysisSession
         var isSourceType = SymbolEqualityComparer.Default.Equals(
             normalizedTarget.ContainingAssembly, _compilation.Assembly);
         var mayInitialize = !isSourceType ||
-            EffectMethodNodeBuilder.HasPotentialStaticInitialization(normalizedTarget);
+            EffectMethodNodeBuilder.HasPotentialStaticInitialization(
+                normalizedTarget,
+                ApiSpecs);
         return mayInitialize
             ? EffectSummaryOperations.UnknownBoundary(EffectUncertainty.UnmodeledCall)
             : EffectSummary.Empty;
@@ -439,8 +422,3 @@ public sealed class EffectAnalysisSession
         return normalized.OriginalDefinition;
     }
 }
-
-internal readonly record struct EffectMethodNode(
-    EffectSummary LocalSummary,
-    ImmutableArray<EffectCallSite> Calls,
-    ImmutableArray<EffectDirectWitness> DirectWitnesses);

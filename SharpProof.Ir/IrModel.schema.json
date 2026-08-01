@@ -1,0 +1,1109 @@
+{
+  "schemaVersion": 1,
+  "namespace": "SharpProof.Ir",
+  "declarations": [
+    {
+      "kind": "enum",
+      "name": "IrValueKind",
+      "members": [
+        { "name": "Boolean", "value": 0 },
+        { "name": "Integer", "value": 1 },
+        { "name": "String", "value": 2 },
+        { "name": "Null", "value": 3 },
+        { "name": "Reference", "value": 4 },
+        { "name": "Sequence", "value": 5 }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "IrEvaluationStatus",
+      "members": [
+        { "name": "Value", "value": 0 },
+        { "name": "Unsupported", "value": 1 },
+        { "name": "Exception", "value": 2 }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "IrUnsupportedReason",
+      "members": [
+        { "name": "OpaqueTerm", "value": 0 },
+        { "name": "MissingVariable", "value": 1 },
+        { "name": "InvalidVariableValue", "value": 2 },
+        { "name": "UnsupportedCast", "value": 3 },
+        { "name": "UnsupportedOperation", "value": 4 }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "IrExceptionKind",
+      "members": [
+        { "name": "DivideByZero", "value": 0 },
+        { "name": "Overflow", "value": 1 },
+        { "name": "NullReference", "value": 2 },
+        { "name": "IndexOutOfRange", "value": 3 },
+        { "name": "InvalidCast", "value": 4 }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "IrProgramExecutionStatus",
+      "members": [
+        { "name": "Returned", "value": 0 },
+        { "name": "AssumptionViolated", "value": 1 },
+        { "name": "AssertionFailed", "value": 2 },
+        { "name": "Unsupported", "value": 3 },
+        { "name": "Exception", "value": 4 },
+        { "name": "StepLimit", "value": 5 }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrValue",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "partial": true,
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrTypeId", "name": "type" },
+          { "type": "IrValueKind", "name": "kind" },
+          { "type": "object?", "name": "payload" }
+        ],
+        "assignments": [
+          { "property": "Type", "parameter": "type" },
+          { "property": "Kind", "parameter": "kind" },
+          { "property": "Payload", "parameter": "payload" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrTypeId", "name": "Type", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrValueKind", "name": "Kind", "implementation": "generated" },
+        { "accessibility": "internal", "type": "object?", "name": "Payload", "implementation": "generated" },
+        { "accessibility": "public", "type": "bool", "name": "Boolean", "implementation": "handwritten" },
+        { "accessibility": "public", "type": "long", "name": "Integer", "implementation": "handwritten" },
+        { "accessibility": "public", "type": "string", "name": "String", "implementation": "handwritten" },
+        { "accessibility": "public", "type": "object", "name": "Reference", "implementation": "handwritten" },
+        { "accessibility": "public", "type": "ImmutableArray<IrValue>", "name": "Elements", "implementation": "handwritten" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrUnsupportedInfo",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrUnsupportedReason", "name": "reason" },
+          { "type": "string", "name": "detail" }
+        ],
+        "assignments": [
+          { "property": "Reason", "parameter": "reason" },
+          { "property": "Detail", "parameter": "detail" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrUnsupportedReason", "name": "Reason", "implementation": "generated" },
+        { "accessibility": "public", "type": "string", "name": "Detail", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrExceptionInfo",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrExceptionKind", "name": "kind" },
+          { "type": "string", "name": "detail" }
+        ],
+        "assignments": [
+          { "property": "Kind", "parameter": "kind" },
+          { "property": "Detail", "parameter": "detail" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrExceptionKind", "name": "Kind", "implementation": "generated" },
+        { "accessibility": "public", "type": "string", "name": "Detail", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrEvaluationResult",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "partial": true,
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrEvaluationStatus", "name": "status" },
+          { "type": "IrValue?", "name": "value" },
+          { "type": "IrUnsupportedInfo?", "name": "unsupported" },
+          { "type": "IrExceptionInfo?", "name": "exception" }
+        ],
+        "assignments": [
+          { "property": "Status", "parameter": "status" },
+          { "property": "Value", "parameter": "value" },
+          { "property": "Unsupported", "parameter": "unsupported" },
+          { "property": "Exception", "parameter": "exception" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrEvaluationStatus", "name": "Status", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrValue?", "name": "Value", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrUnsupportedInfo?", "name": "Unsupported", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrExceptionInfo?", "name": "Exception", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrProgramExecutionResult",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "partial": true,
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrProgramExecutionStatus", "name": "status" },
+          { "type": "IrValue?", "name": "returnValue" },
+          { "type": "IrInstruction?", "name": "instruction" },
+          { "type": "IrUnsupportedInfo?", "name": "unsupported" },
+          { "type": "IrExceptionInfo?", "name": "exception" },
+          { "type": "ImmutableDictionary<IrVarId, IrValue>", "name": "values" },
+          { "type": "int", "name": "steps" }
+        ],
+        "assignments": [
+          { "property": "Status", "parameter": "status" },
+          { "property": "ReturnValue", "parameter": "returnValue" },
+          { "property": "Instruction", "parameter": "instruction" },
+          { "property": "Unsupported", "parameter": "unsupported" },
+          { "property": "Exception", "parameter": "exception" },
+          { "property": "Values", "parameter": "values" },
+          { "property": "Steps", "parameter": "steps" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrProgramExecutionStatus", "name": "Status", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrValue?", "name": "ReturnValue", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrInstruction?", "name": "Instruction", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrUnsupportedInfo?", "name": "Unsupported", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrExceptionInfo?", "name": "Exception", "implementation": "generated" },
+        { "accessibility": "public", "type": "ImmutableDictionary<IrVarId, IrValue>", "name": "Values", "implementation": "generated" },
+        { "accessibility": "public", "type": "int", "name": "Steps", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "IrTermKind",
+      "members": [
+        { "name": "Boolean", "value": 0 },
+        { "name": "Integer", "value": 1 },
+        { "name": "String", "value": 2 },
+        { "name": "Null", "value": 3 },
+        { "name": "Variable", "value": 4 },
+        { "name": "Opaque", "value": 5 },
+        { "name": "Unary", "value": 6 },
+        { "name": "Binary", "value": 7 },
+        { "name": "Conditional", "value": 8 },
+        { "name": "Cast", "value": 9 },
+        { "name": "Length", "value": 10 },
+        { "name": "SequenceAccess", "value": 11 }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "IrOpaquePurity",
+      "members": [
+        { "name": "Pure", "value": 0 },
+        { "name": "Impure", "value": 1 }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrTypeInfo",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrTypeId", "name": "id" },
+          { "type": "IrStringId", "name": "name" },
+          { "type": "IrTypeKind", "name": "kind" },
+          { "type": "IrTypeId?", "name": "elementType" }
+        ],
+        "assignments": [
+          { "property": "Id", "parameter": "id" },
+          { "property": "Name", "parameter": "name" },
+          { "property": "Kind", "parameter": "kind" },
+          { "property": "ElementType", "parameter": "elementType" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrTypeId", "name": "Id", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrStringId", "name": "Name", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTypeKind", "name": "Kind", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTypeId?", "name": "ElementType", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrVariableInfo",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrVarId", "name": "id" },
+          { "type": "IrStringId", "name": "name" },
+          { "type": "IrTypeId", "name": "type" }
+        ],
+        "assignments": [
+          { "property": "Id", "parameter": "id" },
+          { "property": "Name", "parameter": "name" },
+          { "property": "Type", "parameter": "type" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrVarId", "name": "Id", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrStringId", "name": "Name", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTypeId", "name": "Type", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrMemberInfo",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrMemberId", "name": "id" },
+          { "type": "IrIdentityId", "name": "identity" },
+          { "type": "IrTypeId", "name": "declaringType" },
+          { "type": "IrStringId", "name": "name" },
+          { "type": "IrTypeId", "name": "returnType" },
+          { "type": "bool", "name": "isStatic" },
+          { "type": "ImmutableArray<IrTypeId>", "name": "parameterTypes" }
+        ],
+        "assignments": [
+          { "property": "Id", "parameter": "id" },
+          { "property": "Identity", "parameter": "identity" },
+          { "property": "DeclaringType", "parameter": "declaringType" },
+          { "property": "Name", "parameter": "name" },
+          { "property": "ReturnType", "parameter": "returnType" },
+          { "property": "IsStatic", "parameter": "isStatic" },
+          { "property": "ParameterTypes", "parameter": "parameterTypes" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrMemberId", "name": "Id", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrIdentityId", "name": "Identity", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTypeId", "name": "DeclaringType", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrStringId", "name": "Name", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTypeId", "name": "ReturnType", "implementation": "generated" },
+        { "accessibility": "public", "type": "bool", "name": "IsStatic", "implementation": "generated" },
+        { "accessibility": "public", "type": "ImmutableArray<IrTypeId>", "name": "ParameterTypes", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrOperationInfo",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "OperationId", "name": "id" },
+          { "type": "IrStringId?", "name": "description" }
+        ],
+        "assignments": [
+          { "property": "Id", "parameter": "id" },
+          { "property": "Description", "parameter": "description" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "OperationId", "name": "Id", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrStringId?", "name": "Description", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrTerm",
+      "accessibility": "public",
+      "modifier": "abstract",
+      "constructor": {
+        "accessibility": "private protected",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrId", "name": "id" },
+          { "type": "IrTypeId", "name": "type" },
+          { "type": "IrTermKind", "name": "kind" }
+        ],
+        "assignments": [
+          { "property": "Id", "parameter": "id" },
+          { "property": "Type", "parameter": "type" },
+          { "property": "Kind", "parameter": "kind" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrId", "name": "Id", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTypeId", "name": "Type", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTermKind", "name": "Kind", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrBooleanTerm",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrTerm",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrId", "name": "id" },
+          { "type": "IrTypeId", "name": "type" },
+          { "type": "bool", "name": "value" }
+        ],
+        "baseArguments": [ "id", "type", "IrTermKind.Boolean" ],
+        "assignments": [
+          { "property": "Value", "parameter": "value" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "bool", "name": "Value", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrIntegerTerm",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrTerm",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrId", "name": "id" },
+          { "type": "IrTypeId", "name": "type" },
+          { "type": "long", "name": "value" }
+        ],
+        "baseArguments": [ "id", "type", "IrTermKind.Integer" ],
+        "assignments": [
+          { "property": "Value", "parameter": "value" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "long", "name": "Value", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrStringTerm",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrTerm",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrId", "name": "id" },
+          { "type": "IrTypeId", "name": "type" },
+          { "type": "IrStringId", "name": "value" }
+        ],
+        "baseArguments": [ "id", "type", "IrTermKind.String" ],
+        "assignments": [
+          { "property": "Value", "parameter": "value" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrStringId", "name": "Value", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrNullTerm",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrTerm",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrId", "name": "id" },
+          { "type": "IrTypeId", "name": "type" }
+        ],
+        "baseArguments": [ "id", "type", "IrTermKind.Null" ],
+        "assignments": []
+      },
+      "properties": []
+    },
+    {
+      "kind": "class",
+      "name": "IrVariableTerm",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrTerm",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrId", "name": "id" },
+          { "type": "IrTypeId", "name": "type" },
+          { "type": "IrVarId", "name": "variable" }
+        ],
+        "baseArguments": [ "id", "type", "IrTermKind.Variable" ],
+        "assignments": [
+          { "property": "Variable", "parameter": "variable" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrVarId", "name": "Variable", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrOpaqueTerm",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrTerm",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrId", "name": "id" },
+          { "type": "IrTypeId", "name": "type" },
+          { "type": "IrMemberId", "name": "member" },
+          { "type": "IrTerm?", "name": "receiver" },
+          { "type": "ImmutableArray<IrTerm>", "name": "arguments" },
+          { "type": "IrOpaquePurity", "name": "purity" },
+          { "type": "OperationId", "name": "operation" }
+        ],
+        "baseArguments": [ "id", "type", "IrTermKind.Opaque" ],
+        "assignments": [
+          { "property": "Member", "parameter": "member" },
+          { "property": "Receiver", "parameter": "receiver" },
+          { "property": "Arguments", "parameter": "arguments" },
+          { "property": "Purity", "parameter": "purity" },
+          { "property": "Operation", "parameter": "operation" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrMemberId", "name": "Member", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTerm?", "name": "Receiver", "implementation": "generated" },
+        { "accessibility": "public", "type": "ImmutableArray<IrTerm>", "name": "Arguments", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrOpaquePurity", "name": "Purity", "implementation": "generated" },
+        { "accessibility": "public", "type": "OperationId", "name": "Operation", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrUnaryTerm",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrTerm",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrId", "name": "id" },
+          { "type": "IrTypeId", "name": "type" },
+          { "type": "IrUnaryOperator", "name": "operator" },
+          { "type": "IrTerm", "name": "operand" }
+        ],
+        "baseArguments": [ "id", "type", "IrTermKind.Unary" ],
+        "assignments": [
+          { "property": "Operator", "parameter": "operator" },
+          { "property": "Operand", "parameter": "operand" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrUnaryOperator", "name": "Operator", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTerm", "name": "Operand", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrBinaryTerm",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrTerm",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrId", "name": "id" },
+          { "type": "IrTypeId", "name": "type" },
+          { "type": "IrBinaryOperator", "name": "operator" },
+          { "type": "IrTerm", "name": "left" },
+          { "type": "IrTerm", "name": "right" }
+        ],
+        "baseArguments": [ "id", "type", "IrTermKind.Binary" ],
+        "assignments": [
+          { "property": "Operator", "parameter": "operator" },
+          { "property": "Left", "parameter": "left" },
+          { "property": "Right", "parameter": "right" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrBinaryOperator", "name": "Operator", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTerm", "name": "Left", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTerm", "name": "Right", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrConditionalTerm",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrTerm",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrId", "name": "id" },
+          { "type": "IrTypeId", "name": "type" },
+          { "type": "IrTerm", "name": "condition" },
+          { "type": "IrTerm", "name": "whenTrue" },
+          { "type": "IrTerm", "name": "whenFalse" }
+        ],
+        "baseArguments": [ "id", "type", "IrTermKind.Conditional" ],
+        "assignments": [
+          { "property": "Condition", "parameter": "condition" },
+          { "property": "WhenTrue", "parameter": "whenTrue" },
+          { "property": "WhenFalse", "parameter": "whenFalse" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrTerm", "name": "Condition", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTerm", "name": "WhenTrue", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTerm", "name": "WhenFalse", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrCastTerm",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrTerm",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrId", "name": "id" },
+          { "type": "IrTypeId", "name": "type" },
+          { "type": "IrTerm", "name": "operand" }
+        ],
+        "baseArguments": [ "id", "type", "IrTermKind.Cast" ],
+        "assignments": [
+          { "property": "Operand", "parameter": "operand" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrTerm", "name": "Operand", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrLengthTerm",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrTerm",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrId", "name": "id" },
+          { "type": "IrTypeId", "name": "type" },
+          { "type": "IrTerm", "name": "value" }
+        ],
+        "baseArguments": [ "id", "type", "IrTermKind.Length" ],
+        "assignments": [
+          { "property": "Value", "parameter": "value" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrTerm", "name": "Value", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrSequenceAccessTerm",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrTerm",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrId", "name": "id" },
+          { "type": "IrTypeId", "name": "type" },
+          { "type": "IrTerm", "name": "sequence" },
+          { "type": "IrTerm", "name": "index" }
+        ],
+        "baseArguments": [ "id", "type", "IrTermKind.SequenceAccess" ],
+        "assignments": [
+          { "property": "Sequence", "parameter": "sequence" },
+          { "property": "Index", "parameter": "index" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrTerm", "name": "Sequence", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTerm", "name": "Index", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "IrInstructionKind",
+      "members": [
+        { "name": "Assign", "value": 0 },
+        { "name": "Load", "value": 1 },
+        { "name": "Store", "value": 2 },
+        { "name": "Call", "value": 3 },
+        { "name": "Assume", "value": 4 },
+        { "name": "Assert", "value": 5 },
+        { "name": "Havoc", "value": 6 },
+        { "name": "Branch", "value": 7 },
+        { "name": "Goto", "value": 8 },
+        { "name": "Return", "value": 9 }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "IrLocationKind",
+      "members": [
+        { "name": "Member", "value": 0 },
+        { "name": "Sequence", "value": 1 }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "IrHavocKind",
+      "members": [
+        { "name": "Variables", "value": 0 },
+        { "name": "Memory", "value": 1 },
+        { "name": "VariablesAndMemory", "value": 2 }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrLocation",
+      "accessibility": "public",
+      "modifier": "abstract",
+      "constructor": {
+        "accessibility": "private protected",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrTypeId", "name": "type" },
+          { "type": "IrLocationKind", "name": "kind" }
+        ],
+        "assignments": [
+          { "property": "Type", "parameter": "type" },
+          { "property": "Kind", "parameter": "kind" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrTypeId", "name": "Type", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrLocationKind", "name": "Kind", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrMemberLocation",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrLocation",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrTypeId", "name": "type" },
+          { "type": "IrMemberId", "name": "member" },
+          { "type": "IrTerm?", "name": "receiver" },
+          { "type": "ImmutableArray<IrTerm>", "name": "arguments" }
+        ],
+        "baseArguments": [ "type", "IrLocationKind.Member" ],
+        "assignments": [
+          { "property": "Member", "parameter": "member" },
+          { "property": "Receiver", "parameter": "receiver" },
+          { "property": "Arguments", "parameter": "arguments" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrMemberId", "name": "Member", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTerm?", "name": "Receiver", "implementation": "generated" },
+        { "accessibility": "public", "type": "ImmutableArray<IrTerm>", "name": "Arguments", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrSequenceLocation",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrLocation",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrTypeId", "name": "type" },
+          { "type": "IrTerm", "name": "sequence" },
+          { "type": "IrTerm", "name": "index" }
+        ],
+        "baseArguments": [ "type", "IrLocationKind.Sequence" ],
+        "assignments": [
+          { "property": "Sequence", "parameter": "sequence" },
+          { "property": "Index", "parameter": "index" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrTerm", "name": "Sequence", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTerm", "name": "Index", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrInstruction",
+      "accessibility": "public",
+      "modifier": "abstract",
+      "partial": true,
+      "constructor": {
+        "accessibility": "private protected",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrInstructionId", "name": "id" },
+          { "type": "IrInstructionKind", "name": "kind" },
+          { "type": "OperationId", "name": "operation" }
+        ],
+        "assignments": [
+          { "property": "Id", "parameter": "id" },
+          { "property": "Kind", "parameter": "kind" },
+          { "property": "Operation", "parameter": "operation" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrInstructionId", "name": "Id", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrInstructionKind", "name": "Kind", "implementation": "generated" },
+        { "accessibility": "public", "type": "OperationId", "name": "Operation", "implementation": "generated" },
+        { "accessibility": "public", "type": "bool", "name": "IsTerminal", "implementation": "handwritten" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrAssignInstruction",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrInstruction",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrInstructionId", "name": "id" },
+          { "type": "OperationId", "name": "operation" },
+          { "type": "IrVarId", "name": "target" },
+          { "type": "IrTerm", "name": "value" }
+        ],
+        "baseArguments": [ "id", "IrInstructionKind.Assign", "operation" ],
+        "assignments": [
+          { "property": "Target", "parameter": "target" },
+          { "property": "Value", "parameter": "value" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrVarId", "name": "Target", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTerm", "name": "Value", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrLoadInstruction",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrInstruction",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrInstructionId", "name": "id" },
+          { "type": "OperationId", "name": "operation" },
+          { "type": "IrVarId", "name": "target" },
+          { "type": "IrLocation", "name": "location" }
+        ],
+        "baseArguments": [ "id", "IrInstructionKind.Load", "operation" ],
+        "assignments": [
+          { "property": "Target", "parameter": "target" },
+          { "property": "Location", "parameter": "location" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrVarId", "name": "Target", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrLocation", "name": "Location", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrStoreInstruction",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrInstruction",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrInstructionId", "name": "id" },
+          { "type": "OperationId", "name": "operation" },
+          { "type": "IrLocation", "name": "location" },
+          { "type": "IrTerm", "name": "value" }
+        ],
+        "baseArguments": [ "id", "IrInstructionKind.Store", "operation" ],
+        "assignments": [
+          { "property": "Location", "parameter": "location" },
+          { "property": "Value", "parameter": "value" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrLocation", "name": "Location", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTerm", "name": "Value", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrCallInstruction",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrInstruction",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrInstructionId", "name": "id" },
+          { "type": "OperationId", "name": "operation" },
+          { "type": "IrVarId?", "name": "target" },
+          { "type": "IrMemberId", "name": "member" },
+          { "type": "IrTerm?", "name": "receiver" },
+          { "type": "ImmutableArray<IrTerm>", "name": "arguments" }
+        ],
+        "baseArguments": [ "id", "IrInstructionKind.Call", "operation" ],
+        "assignments": [
+          { "property": "Target", "parameter": "target" },
+          { "property": "Member", "parameter": "member" },
+          { "property": "Receiver", "parameter": "receiver" },
+          { "property": "Arguments", "parameter": "arguments" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrVarId?", "name": "Target", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrMemberId", "name": "Member", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrTerm?", "name": "Receiver", "implementation": "generated" },
+        { "accessibility": "public", "type": "ImmutableArray<IrTerm>", "name": "Arguments", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrAssumeInstruction",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrInstruction",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrInstructionId", "name": "id" },
+          { "type": "OperationId", "name": "operation" },
+          { "type": "IrTerm", "name": "condition" }
+        ],
+        "baseArguments": [ "id", "IrInstructionKind.Assume", "operation" ],
+        "assignments": [
+          { "property": "Condition", "parameter": "condition" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrTerm", "name": "Condition", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrAssertInstruction",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrInstruction",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrInstructionId", "name": "id" },
+          { "type": "OperationId", "name": "operation" },
+          { "type": "IrTerm", "name": "condition" }
+        ],
+        "baseArguments": [ "id", "IrInstructionKind.Assert", "operation" ],
+        "assignments": [
+          { "property": "Condition", "parameter": "condition" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrTerm", "name": "Condition", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrHavocInstruction",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrInstruction",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrInstructionId", "name": "id" },
+          { "type": "OperationId", "name": "operation" },
+          { "type": "IrHavocKind", "name": "havocKind" },
+          { "type": "ImmutableArray<IrVarId>", "name": "variables" }
+        ],
+        "baseArguments": [ "id", "IrInstructionKind.Havoc", "operation" ],
+        "assignments": [
+          { "property": "HavocKind", "parameter": "havocKind" },
+          { "property": "Variables", "parameter": "variables" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrHavocKind", "name": "HavocKind", "implementation": "generated" },
+        { "accessibility": "public", "type": "ImmutableArray<IrVarId>", "name": "Variables", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrBranchInstruction",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrInstruction",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrInstructionId", "name": "id" },
+          { "type": "OperationId", "name": "operation" },
+          { "type": "IrTerm", "name": "condition" },
+          { "type": "IrBlockId", "name": "whenTrue" },
+          { "type": "IrBlockId", "name": "whenFalse" }
+        ],
+        "baseArguments": [ "id", "IrInstructionKind.Branch", "operation" ],
+        "assignments": [
+          { "property": "Condition", "parameter": "condition" },
+          { "property": "WhenTrue", "parameter": "whenTrue" },
+          { "property": "WhenFalse", "parameter": "whenFalse" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrTerm", "name": "Condition", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrBlockId", "name": "WhenTrue", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrBlockId", "name": "WhenFalse", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrGotoInstruction",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrInstruction",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrInstructionId", "name": "id" },
+          { "type": "OperationId", "name": "operation" },
+          { "type": "IrBlockId", "name": "target" }
+        ],
+        "baseArguments": [ "id", "IrInstructionKind.Goto", "operation" ],
+        "assignments": [
+          { "property": "Target", "parameter": "target" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrBlockId", "name": "Target", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrReturnInstruction",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "baseType": "IrInstruction",
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrInstructionId", "name": "id" },
+          { "type": "OperationId", "name": "operation" },
+          { "type": "IrTerm?", "name": "value" }
+        ],
+        "baseArguments": [ "id", "IrInstructionKind.Return", "operation" ],
+        "assignments": [
+          { "property": "Value", "parameter": "value" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrTerm?", "name": "Value", "implementation": "generated" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrBasicBlock",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "partial": true,
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "generated",
+        "parameters": [
+          { "type": "IrBlockId", "name": "id" },
+          { "type": "IrStringId?", "name": "name" },
+          { "type": "ImmutableArray<IrInstruction>", "name": "instructions" }
+        ],
+        "assignments": [
+          { "property": "Id", "parameter": "id" },
+          { "property": "Name", "parameter": "name" },
+          { "property": "Instructions", "parameter": "instructions" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrBlockId", "name": "Id", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrStringId?", "name": "Name", "implementation": "generated" },
+        { "accessibility": "public", "type": "ImmutableArray<IrInstruction>", "name": "Instructions", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrInstruction", "name": "Terminator", "implementation": "handwritten" }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "IrProgram",
+      "accessibility": "public",
+      "modifier": "sealed",
+      "partial": true,
+      "constructor": {
+        "accessibility": "internal",
+        "implementation": "handwritten",
+        "parameters": [
+          { "type": "IrFactory", "name": "factory" },
+          { "type": "long", "name": "scope" },
+          { "type": "IrBlockId", "name": "entry" },
+          { "type": "ImmutableArray<IrBasicBlock>", "name": "blocks" }
+        ]
+      },
+      "properties": [
+        { "accessibility": "public", "type": "IrFactory", "name": "Factory", "implementation": "generated" },
+        { "accessibility": "internal", "type": "long", "name": "Scope", "implementation": "generated" },
+        { "accessibility": "public", "type": "IrBlockId", "name": "Entry", "implementation": "generated" },
+        { "accessibility": "public", "type": "ImmutableArray<IrBasicBlock>", "name": "Blocks", "implementation": "generated" }
+      ]
+    }
+  ]
+}

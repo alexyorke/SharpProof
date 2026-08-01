@@ -78,34 +78,22 @@ public readonly struct FrontendVariableBinding(ISymbol symbol, IrVarId variable)
     public ISymbol Symbol
     {
         get;
-    } =
-        symbol ?? throw new ArgumentNullException(nameof(symbol));
+    } = ArgumentNullGuard.NotNull(symbol, nameof(symbol));
     public IrVarId Variable { get; } = variable;
 }
 
-public sealed class FrontendLoweringResult
+public sealed partial class FrontendLoweringResult
 {
     internal FrontendLoweringResult(
         IrTerm term,
         FrontendSubsetClassification classification,
         ImmutableArray<FrontendVariableBinding> variables)
+        : this(
+            ArgumentNullGuard.NotNull(term, nameof(term)),
+            classification,
+            variables,
+            default)
     {
-        Term = term ?? throw new ArgumentNullException(nameof(term));
-        Classification = classification;
-        Variables = variables;
-    }
-
-    public IrTerm Term
-    {
-        get;
-    }
-    public FrontendSubsetClassification Classification
-    {
-        get;
-    }
-    public ImmutableArray<FrontendVariableBinding> Variables
-    {
-        get;
     }
     public bool IsExact => Classification.IsExact;
 }
@@ -144,7 +132,7 @@ public readonly struct FrontendProgramAbstention
     }
 }
 
-public sealed class FrontendProgramLoweringResult
+public sealed partial class FrontendProgramLoweringResult
 {
     internal FrontendProgramLoweringResult(
         IrProgram program,
@@ -152,33 +140,14 @@ public sealed class FrontendProgramLoweringResult
         ImmutableArray<FrontendVariableBinding> variables,
         ImmutableArray<IrVarId> captures,
         ImmutableArray<FrontendProgramAbstention> abstentions)
+        : this(
+            ArgumentNullGuard.NotNull(program, nameof(program)),
+            classification,
+            variables,
+            captures,
+            abstentions,
+            default)
     {
-        Program = program ?? throw new ArgumentNullException(nameof(program));
-        Classification = classification;
-        Variables = variables;
-        Captures = captures;
-        Abstentions = abstentions;
-    }
-
-    public IrProgram Program
-    {
-        get;
-    }
-    public FrontendSubsetClassification Classification
-    {
-        get;
-    }
-    public ImmutableArray<FrontendVariableBinding> Variables
-    {
-        get;
-    }
-    public ImmutableArray<IrVarId> Captures
-    {
-        get;
-    }
-    public ImmutableArray<FrontendProgramAbstention> Abstentions
-    {
-        get;
     }
     public bool IsExact => Classification.IsExact;
 }

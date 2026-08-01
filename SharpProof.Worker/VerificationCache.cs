@@ -1,11 +1,11 @@
 namespace SharpProof.Worker;
 
-internal sealed class VerificationCache(string directory, long maximumBytes)
+internal sealed partial class VerificationCache(string directory, long maximumBytes)
 {
     private readonly string _directory = Path.GetFullPath(
-        directory ?? throw new ArgumentNullException(nameof(directory)));
-    private readonly long _maximumBytes = maximumBytes > 0 ? maximumBytes :
-        throw new ArgumentOutOfRangeException(nameof(maximumBytes));
+        ArgumentNullGuard.NotNull(directory, nameof(directory)));
+    private readonly long _maximumBytes = ArgumentNullGuard.RequirePositive(
+        maximumBytes, nameof(maximumBytes));
 
     internal async Task<WorkerVerifyResponse?> TryReadAsync(
         string inputHash,
@@ -313,8 +313,4 @@ internal sealed class VerificationCache(string directory, long maximumBytes)
         return true;
     }
 
-    private sealed record CacheEnvelope(
-        int SchemaVersion, string InputHash, string PayloadHash, string Payload);
-    private sealed record CachePayload(string ManifestHash,
-        WorkerCallableResult[] CallableResults, WorkerClaimResult[] ClaimResults);
 }

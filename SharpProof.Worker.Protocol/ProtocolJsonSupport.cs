@@ -13,10 +13,7 @@ public static partial class WorkerProtocolJson
         string json,
         IEnumerable<string> requiredProperties)
     {
-        if (json == null)
-        {
-            throw new ArgumentNullException(nameof(json));
-        }
+        json = json ?? throw new ArgumentNullException(nameof(json));
 
         using var document = JsonDocument.Parse(json);
         if (document.RootElement.ValueKind != JsonValueKind.Object)

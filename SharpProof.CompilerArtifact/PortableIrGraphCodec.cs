@@ -2,13 +2,46 @@ namespace SharpProof.CompilerArtifact;
 
 internal static partial class PortableIrGraphCodec
 {
+    private static readonly IrOpaquePurity[] OpaquePurities =
+        PortableIrWireCatalog.OpaquePurities;
+    private static readonly IrUnaryOperator[] UnaryOperators =
+        PortableIrWireCatalog.UnaryOperators;
+    private static readonly IrBinaryOperator[] BinaryOperators =
+        PortableIrWireCatalog.BinaryOperators;
+    private static readonly IrHavocKind[] HavocKinds =
+        PortableIrWireCatalog.HavocKinds;
+
+    internal static bool HasCompleteWireEnumCatalogs =>
+        new[] {
+            IsComplete(OpaquePurities),
+            IsComplete(UnaryOperators),
+            IsComplete(BinaryOperators),
+            IsComplete(HavocKinds)
+        }.All(static complete => complete);
+
+    internal static bool HasCompleteSlotCatalogs =>
+        IsCompleteSlots(PortableIrSlotCatalog.Terms, typeof(IrTermKind)) &&
+        IsCompleteSlots(PortableIrSlotCatalog.Locations, typeof(IrLocationKind)) &&
+        IsCompleteSlots(
+            PortableIrSlotCatalog.Instructions,
+            typeof(IrInstructionKind));
+
+    private static bool IsComplete<T>(T[] values) where T : struct, Enum
+    {
+        return values.SequenceEqual(Enum.GetValues(typeof(T)).Cast<T>());
+    }
+
+    private static bool IsCompleteSlots(
+        IReadOnlyList<PortableIrSlotMapping> mappings,
+        Type enumType)
+    {
+        return mappings.Select(static mapping => mapping.Kind)
+            .SequenceEqual(Enum.GetNames(enumType), StringComparer.Ordinal);
+    }
 
     internal static EncodedPortableIrGraph Encode(IrProgram program, IReadOnlyList<IrTerm> roots)
     {
-        if (program == null)
-        {
-            throw new ArgumentNullException(nameof(program));
-        }
+        program = ArgumentNullGuard.NotNull(program, nameof(program));
 
         return Encode(program.Factory, program, roots);
     }
@@ -17,15 +50,8 @@ internal static partial class PortableIrGraphCodec
         IrFactory factory, IrProgram? program, IReadOnlyList<IrTerm> roots,
         IReadOnlyList<IrVarId>? variables = null)
     {
-        if (factory == null)
-        {
-            throw new ArgumentNullException(nameof(factory));
-        }
-
-        if (roots == null)
-        {
-            throw new ArgumentNullException(nameof(roots));
-        }
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        roots = ArgumentNullGuard.NotNull(roots, nameof(roots));
 
         if (program != null && !ReferenceEquals(factory, program.Factory))
         {
@@ -37,10 +63,7 @@ internal static partial class PortableIrGraphCodec
 
     internal static DecodedPortableIrGraph Decode(PortableIrGraph graph)
     {
-        if (graph == null)
-        {
-            throw new ArgumentNullException(nameof(graph));
-        }
+        graph = ArgumentNullGuard.NotNull(graph, nameof(graph));
 
         try
         {
@@ -68,6 +91,35 @@ internal static partial class PortableIrGraphCodec
         {
             throw Bad(message);
         }
+    }
+
+    private static void RequireCanonicalSlots<TEnum>(
+        IReadOnlyList<PortableIrSlotMapping> catalog,
+        TEnum kind,
+        params object?[] values)
+        where TEnum : struct, Enum
+    {
+        var mapping = catalog.FirstOrDefault(candidate =>
+            string.Equals(candidate.Kind, kind.ToString(), StringComparison.Ordinal));
+        Require(mapping.Kind != null, $"Portable IR {kind} slots are not declared.");
+        Require(mapping.Slots != null, $"Portable IR {kind} slots are not declared.");
+        Require(
+            mapping.Slots!.Length == values.Length,
+            $"Portable IR {kind} slots have an invalid shape.");
+        Require(
+            Enumerable.Range(0, values.Length).All(index =>
+                IsCanonicalSlotDefault(mapping.Slots![index], values[index])),
+            $"Portable IR {kind} slots are not canonical.");
+    }
+
+    private static bool IsCanonicalSlotDefault(string role, object? value)
+    {
+        return role switch
+        {
+            "unused" => new object?[] { null, -1, 0L }.Contains(value),
+            "empty" => value is int[] { Length: 0 },
+            _ => true
+        };
     }
 
     private static int Wire<T>(T value, T[] values) where T : struct, Enum
@@ -223,28 +275,21 @@ internal static partial class PortableIrGraphCodec
         private PortableIrTerm TermRow(IrId id)
         {
             var term = _factory.GetTerm(id);
-            return term switch
-            {
-                IrBooleanTerm value => TermRow(term, a: value.Value ? 1 : 0),
-                IrIntegerTerm value => TermRow(term, number: value.Value),
-                IrStringTerm value => TermRow(term, text: _factory.GetString(value.Value)),
-                IrNullTerm => TermRow(term),
-                IrVariableTerm value => TermRow(term, a: VariableIndex(value.Variable)),
-                IrOpaqueTerm value => TermRow(
-                    term, MemberIndex(value.Member), OptionalTermIndex(value.Receiver), Wire(value.Purity, OpaquePurities),
-                    d: value.Purity == IrOpaquePurity.Pure ? -1 : OperationIndex(value.Operation),
-                    items: TermIndices(value.Arguments)),
-                IrUnaryTerm value => TermRow(
-                    term, Wire(value.Operator, UnaryOperators), TermIndex(value.Operand)),
-                IrBinaryTerm value => TermRow(
-                    term, Wire(value.Operator, BinaryOperators), TermIndex(value.Left), TermIndex(value.Right)),
-                IrConditionalTerm value => TermRow(
-                    term, TermIndex(value.Condition), TermIndex(value.WhenTrue), TermIndex(value.WhenFalse)),
-                IrCastTerm value => TermRow(term, a: TermIndex(value.Operand)),
-                IrLengthTerm value => TermRow(term, a: TermIndex(value.Value)),
-                IrSequenceAccessTerm value => TermRow(term, TermIndex(value.Sequence), TermIndex(value.Index)),
-                _ => throw Bad("Unknown IR term kind.")
-            };
+            return PortableIrGraphCodecProjections.EncodeTerm(
+                term,
+                TypeIndex,
+                _factory.GetString,
+                VariableIndex,
+                TermIndex,
+                MemberIndex,
+                OperationIndex,
+                OptionalTermIndex,
+                TermIndices,
+                value => Wire(value, OpaquePurities),
+                value => Wire(value, UnaryOperators),
+                value => Wire(value, BinaryOperators),
+                TermRow,
+                static () => Bad("Unknown IR term kind."));
         }
 
         private PortableIrTerm TermRow(
@@ -256,14 +301,16 @@ internal static partial class PortableIrGraphCodec
 
         private PortableIrLocation LocationRow(IrLocation location)
         {
-            return location switch
-            {
-                IrMemberLocation value => new(
-                    value.Kind, TypeIndex(value.Type), MemberIndex(value.Member),
-                    OptionalTermIndex(value.Receiver), TermIndices(value.Arguments)),
-                IrSequenceLocation value => new(value.Kind, TypeIndex(value.Type), TermIndex(value.Sequence), TermIndex(value.Index)),
-                _ => throw Bad("Unknown IR location kind.")
-            };
+            return PortableIrGraphCodecProjections.EncodeLocation(
+                location,
+                TypeIndex,
+                MemberIndex,
+                OptionalTermIndex,
+                TermIndex,
+                TermIndices,
+                (value, a, b, items) => new(
+                    value.Kind, TypeIndex(value.Type), a, b, items),
+                static () => Bad("Unknown IR location kind."));
         }
 
         private PortableIrBlock BlockRow(IrBasicBlock block)
@@ -275,38 +322,29 @@ internal static partial class PortableIrGraphCodec
 
         private PortableIrInstruction InstructionRow(IrInstruction instruction)
         {
-            return instruction switch
-            {
-                IrAssignInstruction value => InstructionRow(
-                    instruction, a: VariableIndex(value.Target), b: TermIndex(value.Value)),
-                IrLoadInstruction value => InstructionRow(
-                    instruction, a: VariableIndex(value.Target), location: LocationRow(value.Location)),
-                IrStoreInstruction value => InstructionRow(
-                    instruction, a: TermIndex(value.Value), location: LocationRow(value.Location)),
-                IrCallInstruction value => InstructionRow(
-                    instruction, a: value.Target.HasValue ? VariableIndex(value.Target.Value) : -1,
-                    b: MemberIndex(value.Member), c: OptionalTermIndex(value.Receiver),
-                    items: TermIndices(value.Arguments)),
-                IrAssumeInstruction value => InstructionRow(instruction, a: TermIndex(value.Condition)),
-                IrAssertInstruction value => InstructionRow(instruction, a: TermIndex(value.Condition)),
-                IrHavocInstruction value => InstructionRow(
-                    instruction, a: Wire(value.HavocKind, HavocKinds),
-                    items: [.. value.Variables.Select(VariableIndex)]),
-                IrBranchInstruction value => InstructionRow(
-                    instruction, a: TermIndex(value.Condition),
-                    b: BlockIndex(value.WhenTrue), c: BlockIndex(value.WhenFalse)),
-                IrGotoInstruction value => InstructionRow(instruction, a: BlockIndex(value.Target)),
-                IrReturnInstruction value => InstructionRow(instruction, a: OptionalTermIndex(value.Value)),
-                _ => throw Bad("Unknown IR instruction kind.")
-            };
+            return PortableIrGraphCodecProjections.EncodeInstruction(
+                instruction,
+                OperationIndex,
+                VariableIndex,
+                TermIndex,
+                value => value.HasValue ? VariableIndex(value.Value) : -1,
+                MemberIndex,
+                OptionalTermIndex,
+                value => Wire(value, HavocKinds),
+                BlockIndex,
+                TermIndices,
+                values => [.. values.Select(VariableIndex).OrderBy(static index => index)],
+                LocationRow,
+                InstructionRow,
+                static () => Bad("Unknown IR instruction kind."));
         }
 
         private PortableIrInstruction InstructionRow(
-            IrInstruction instruction, int a = -1, int b = -1, int c = -1,
+            IrInstruction instruction, int operation, int a = -1, int b = -1, int c = -1,
             int[]? items = null, PortableIrLocation? location = null)
         {
             return new(
-                instruction.Kind, OperationIndex(instruction.Operation),
+                instruction.Kind, operation,
                 a, b, c, items, location);
         }
 
@@ -377,7 +415,7 @@ internal static partial class PortableIrGraphCodec
                 row => _factory.CreateVariable(row.Name, Type(row.Type)));
             _members = DecodeRows(_graph.Members, "member", DecodeMember);
             _operations = DecodeRows(_graph.Operations, "operation",
-                row => _factory.CreateOperation(row.Description));
+                DecodeOperation);
             _terms = new IrTerm?[_graph.Terms.Length];
             _termState = new byte[_terms.Length];
             for (var index = 0; index < _terms.Length; index++)
@@ -444,6 +482,7 @@ internal static partial class PortableIrGraphCodec
             _typeState[index] = 1;
             var row = Required(_graph.Types[index], "type row");
             Require(!string.IsNullOrWhiteSpace(row.Name), "Portable IR type metadata is invalid.");
+            Require(row.Element >= -1, "Portable IR type metadata is invalid.");
             _types[index] = row.Kind switch
             {
                 IrTypeKind.Reference when row.Element == -1 =>
@@ -455,7 +494,7 @@ internal static partial class PortableIrGraphCodec
             var info = _factory.GetTypeInfo(_types[index]);
             Require(
                 info.Kind == row.Kind &&
-                info.ElementType == (row.Element < 0 ? null : _types[row.Element]),
+                info.ElementType == (row.Element == -1 ? null : _types[row.Element]),
                 "Portable IR type metadata is inconsistent.");
             _typeState[index] = 2;
             return _types[index];
@@ -496,25 +535,31 @@ internal static partial class PortableIrGraphCodec
             _termState[index] = 1;
             var row = Required(_graph.Terms[index], "term row");
             Require(row.Items != null, "Portable IR term metadata is invalid.");
-            var term = row.Kind switch
-            {
-                IrTermKind.Boolean when row.A is 0 or 1 => _factory.Boolean(row.A == 1),
-                IrTermKind.Integer => _factory.Integer(row.Number),
-                IrTermKind.String when row.Text != null => _factory.String(row.Text),
-                IrTermKind.Null => _factory.Null(Type(row.Type)),
-                IrTermKind.Variable => _factory.Variable(Variable(row.A)),
-                IrTermKind.Opaque => Opaque(row, depth),
-                IrTermKind.Unary => _factory.Unary(Wire(row.A, UnaryOperators), DecodeTerm(row.B, depth + 1)),
-                IrTermKind.Binary => _factory.Binary(
-                    Wire(row.A, BinaryOperators), DecodeTerm(row.B, depth + 1), DecodeTerm(row.C, depth + 1)),
-                IrTermKind.Conditional => _factory.Conditional(
-                    DecodeTerm(row.A, depth + 1), DecodeTerm(row.B, depth + 1), DecodeTerm(row.C, depth + 1)),
-                IrTermKind.Cast => _factory.Cast(Type(row.Type), DecodeTerm(row.A, depth + 1)),
-                IrTermKind.Length => _factory.Length(DecodeTerm(row.A, depth + 1)),
-                IrTermKind.SequenceAccess => _factory.SequenceAccess(
-                    DecodeTerm(row.A, depth + 1), DecodeTerm(row.B, depth + 1)),
-                _ => throw Bad("Portable IR term metadata is invalid.")
-            };
+            RequireCanonicalSlots(
+                PortableIrSlotCatalog.Terms,
+                row.Kind,
+                row.A,
+                row.B,
+                row.C,
+                row.D,
+                row.Number,
+                row.Text,
+                row.Items);
+            var term = PortableIrGraphCodecProjections.DecodeTerm(
+                row,
+                _factory,
+                depth,
+                Type,
+                DecodeTerm,
+                OptionalTerm,
+                Variable,
+                Member,
+                Operation,
+                TermsAtDepth,
+                value => Wire(value, OpaquePurities),
+                value => Wire(value, UnaryOperators),
+                value => Wire(value, BinaryOperators),
+                static () => Bad("Portable IR term metadata is invalid."));
             Require(
                 term.Kind == row.Kind &&
                 term.Type == Type(row.Type) &&
@@ -525,18 +570,9 @@ internal static partial class PortableIrGraphCodec
             return term;
         }
 
-        private IrOpaqueTerm Opaque(PortableIrTerm row, int depth)
+        private IrTerm[] TermsAtDepth(int[] indices, int depth)
         {
-            var purity = Wire(row.C, OpaquePurities);
-            var receiver = row.B < 0 ? null : DecodeTerm(row.B, depth + 1);
-            IrTerm[] arguments = [.. row.Items.Select(index => DecodeTerm(index, depth + 1))];
-            return purity switch
-            {
-                IrOpaquePurity.Pure when row.D == -1 =>
-                    _factory.PureOpaque(Member(row.A), receiver, arguments),
-                IrOpaquePurity.Impure => _factory.ImpureOpaque(Operation(row.D), Member(row.A), receiver, arguments),
-                _ => throw Bad("Portable IR opaque metadata is invalid.")
-            };
+            return [.. indices.Select(index => DecodeTerm(index, depth + 1))];
         }
 
         private (IrProgram? Program, IrBlockId[] Blocks, IrInstruction[] Instructions) DecodeProgram()
@@ -552,6 +588,7 @@ internal static partial class PortableIrGraphCodec
             {
                 var row = Required(_graph.Blocks[index], "block row");
                 Require(row.Instructions != null, "Portable IR instruction arrays cannot be null.");
+                RequireCanonicalOptionalText(row.Name, "block name");
                 blocks[index] = builder.CreateBlock(row.Name);
             }
             builder.SetEntry(Block(_graph.Entry, blocks));
@@ -573,41 +610,57 @@ internal static partial class PortableIrGraphCodec
         {
             row = Required(row, "instruction row");
             Require(row.Items != null, "Portable IR instruction metadata is invalid.");
-            var operation = Operation(row.Operation);
-            return row.Kind switch
+            RequireCanonicalSlots(
+                PortableIrSlotCatalog.Instructions,
+                row.Kind,
+                row.A,
+                row.B,
+                row.C,
+                -1,
+                row.Items,
+                row.Location);
+            if (row.Kind == IrInstructionKind.Havoc)
             {
-                IrInstructionKind.Assign => builder.Assign(block, operation, Variable(row.A), Term(row.B)),
-                IrInstructionKind.Load => builder.Load(block, operation, Variable(row.A), Location(builder, row.Location)),
-                IrInstructionKind.Store => builder.Store(block, operation, Location(builder, row.Location), Term(row.A)),
-                IrInstructionKind.Call => builder.Call(
-                    block, operation, row.A < 0 ? null : Variable(row.A),
-                    Member(row.B), row.C < 0 ? null : Term(row.C),
-                    [.. row.Items.Select(Term)]),
-                IrInstructionKind.Assume => builder.Assume(block, operation, Term(row.A)),
-                IrInstructionKind.Assert => builder.Assert(block, operation, Term(row.A)),
-                IrInstructionKind.Havoc => builder.Havoc(
-                    block, operation, Wire(row.A, HavocKinds), [.. row.Items.Select(Variable)]),
-                IrInstructionKind.Branch => builder.Branch(
-                    block, operation, Term(row.A),
-                    Block(row.B, blocks), Block(row.C, blocks)),
-                IrInstructionKind.Goto => builder.Goto(block, operation, Block(row.A, blocks)),
-                IrInstructionKind.Return => builder.Return(block, operation, row.A < 0 ? null : Term(row.A)),
-                _ => throw Bad("Portable IR instruction metadata is invalid.")
-            };
+                RequireCanonicalVariableIndices(row.Items!);
+            }
+            return PortableIrGraphCodecProjections.DecodeInstruction(
+                builder,
+                block,
+                row,
+                Operation,
+                Variable,
+                Member,
+                index => OptionalTerm(index),
+                Term,
+                OptionalVariable,
+                value => Wire(value, HavocKinds),
+                index => Block(index, blocks),
+                value => Location(builder, value),
+                indices => [.. indices.Select(Term)],
+                indices => [.. indices.Select(Variable)],
+                static () => Bad("Portable IR instruction metadata is invalid."));
         }
 
         private IrLocation Location(IrProgramBuilder builder, PortableIrLocation? row)
         {
             row = Required(row, "location row");
             Require(row.Items != null, "Portable IR location metadata is invalid.");
-            IrLocation location = row.Kind switch
-            {
-                IrLocationKind.Member => builder.MemberLocation(
-                    Member(row.A), row.B < 0 ? null : Term(row.B),
-                    [.. row.Items.Select(Term)]),
-                IrLocationKind.Sequence => builder.SequenceLocation(Term(row.A), Term(row.B)),
-                _ => throw Bad("Portable IR location metadata is invalid.")
-            };
+            RequireCanonicalSlots(
+                PortableIrSlotCatalog.Locations,
+                row.Kind,
+                row.A,
+                row.B,
+                -1,
+                -1,
+                row.Items);
+            var location = PortableIrGraphCodecProjections.DecodeLocation(
+                builder,
+                row,
+                Member,
+                index => OptionalTerm(index),
+                Term,
+                indices => [.. indices.Select(Term)],
+                static () => Bad("Portable IR location metadata is invalid."));
             Require(
                 location.Type == Type(row.Type),
                 "Portable IR location type metadata is inconsistent.");
@@ -623,6 +676,32 @@ internal static partial class PortableIrGraphCodec
             }
 
             return result;
+        }
+
+        private OperationId DecodeOperation(PortableIrOperation row)
+        {
+            RequireCanonicalOptionalText(row.Description, "operation description");
+            return _factory.CreateOperation(row.Description);
+        }
+
+        private static void RequireCanonicalOptionalText(string? value, string kind)
+        {
+            Require(
+                value == null || !string.IsNullOrWhiteSpace(value),
+                $"Portable IR {kind} cannot be whitespace.");
+        }
+
+        private void RequireCanonicalVariableIndices(int[] indices)
+        {
+            var previous = -1;
+            foreach (var index in indices)
+            {
+                Check(index, _variables.Length, "variable");
+                Require(
+                    index > previous,
+                    "Portable IR havoc variables are not canonical.");
+                previous = index;
+            }
         }
 
         private static T Required<T>(T? value, string kind) where T : class
@@ -659,6 +738,18 @@ internal static partial class PortableIrGraphCodec
         private IrTerm Term(int index)
         {
             return DecodeTerm(index);
+        }
+
+        private IrTerm? OptionalTerm(int index, int depth = 0)
+        {
+            Require(index >= -1, "Portable IR contains an invalid optional term index.");
+            return index == -1 ? null : DecodeTerm(index, depth + 1);
+        }
+
+        private IrVarId? OptionalVariable(int index)
+        {
+            Require(index >= -1, "Portable IR contains an invalid optional variable index.");
+            return index == -1 ? null : Variable(index);
         }
 
         private static IrBlockId Block(int index, IrBlockId[] blocks)

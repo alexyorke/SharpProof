@@ -361,8 +361,13 @@ public static partial class WorkerProtocolJson
     }
     private static bool SummaryAssumptionsMatch(WorkerAssumptionSummary? actual, WorkerAssumptionSummary expected)
     {
-        return actual != null && actual.Total == expected.Total && actual.Used == expected.Used &&
-        actual.User == expected.User && actual.Trusted == expected.Trusted;
+        if (actual == null)
+        {
+            return false;
+        }
+
+        return (actual.Total, actual.Used, actual.User, actual.Trusted) ==
+               (expected.Total, expected.Used, expected.User, expected.Trusted);
     }
 
     private static bool CountsMatch<TCount, TKind>(TCount[]? actual, IEnumerable<TKind> values,

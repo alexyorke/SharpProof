@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Globalization;
 using System.Reflection.Metadata;
 using Microsoft.CodeAnalysis;
+using SharpProof.Effects;
 namespace SharpProof.Specs;
 public enum ApiSpecResolutionFailureKind
 {
@@ -13,9 +14,6 @@ public enum ApiSpecResolutionFailureKind
     AmbiguousMember,
     DuplicateResolvedSymbol
 }
-public sealed record ApiSpecResolutionFailure(SpecId Spec, string WitnessIdentifier,
-    ApiSpecResolutionFailureKind Kind, string Detail);
-public sealed record ResolvedApiSpec(ApiSpecTemplate Template, ISymbol Symbol);
 public enum ApiSpecLookupStatus
 {
     Resolved,
@@ -24,13 +22,6 @@ public enum ApiSpecLookupStatus
 public enum ApiSpecLookupFailureKind
 {
     UnspecifiedMember
-}
-public sealed record ApiSpecLookupFailure(ApiSpecLookupFailureKind Kind, string SymbolIdentifier, string Detail);
-public sealed class ApiSpecLookupResult(ApiSpecLookupStatus status, ResolvedApiSpec? spec, ApiSpecLookupFailure? failure)
-{
-    public ApiSpecLookupStatus Status { get; } = status;
-    public ResolvedApiSpec? Spec { get; } = spec;
-    public ApiSpecLookupFailure? Failure { get; } = failure;
 }
 public sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, ResolvedApiSpec> specs,
     ImmutableArray<ApiSpecResolutionFailure> failures)
@@ -43,10 +34,7 @@ public sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, ResolvedAp
         ISymbol symbol,
         [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ResolvedApiSpec? spec)
     {
-        if (symbol == null)
-        {
-            throw new ArgumentNullException(nameof(symbol));
-        }
+        symbol = ArgumentNullGuard.NotNull(symbol, nameof(symbol));
 
         var normalized = NormalizeSymbol(symbol);
         spec = null;
@@ -67,10 +55,7 @@ public sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, ResolvedAp
 
     public ApiSpecLookupResult Lookup(ISymbol symbol)
     {
-        if (symbol == null)
-        {
-            throw new ArgumentNullException(nameof(symbol));
-        }
+        symbol = ArgumentNullGuard.NotNull(symbol, nameof(symbol));
 
         if (TryGet(symbol, out var spec))
         {
@@ -95,26 +80,14 @@ public sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, ResolvedAp
 }
 public sealed class ApiSpecResolver(ApiSpecTable table)
 {
-    private static readonly ImmutableArray<(string Marker, ApiSpecReferenceFamily Family)> ReferenceFamilyMarkers = [
-            ("/PACKS/MICROSOFT.NETCORE.APP.REF/", ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack),
-            ("/PACKS/NETSTANDARD.LIBRARY.REF/", ApiSpecReferenceFamily.NetStandardReferencePack),
-            ("/PACKAGES/NETSTANDARD.LIBRARY/", ApiSpecReferenceFamily.NetStandardReferencePack),
-            ("/REFERENCEPACKS/NETSTANDARD", ApiSpecReferenceFamily.NetStandardReferencePack),
-            ("/REFERENCE ASSEMBLIES/MICROSOFT/FRAMEWORK/.NETFRAMEWORK/",
-                ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
-            ("/PACKAGES/MICROSOFT.NETFRAMEWORK.REFERENCEASSEMBLIES",
-                ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
-            ("/REFERENCEPACKS/NET47", ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
-            ("/SHARED/MICROSOFT.NETCORE.APP/", ApiSpecReferenceFamily.MicrosoftNetCoreRuntime)
-        ];
+    private static readonly (string Marker, ApiSpecReferenceFamily Family)[] ReferenceFamilyMarkers =
+        EffectContractMappingCatalog.ReferenceFamilyMarkers;
     private readonly ConditionalWeakTable<Compilation, ResolvedApiSpecTable> _cache = new();
-    private readonly ApiSpecTable _table = table ?? throw new ArgumentNullException(nameof(table));
+    private readonly ApiSpecTable _table =
+        ArgumentNullGuard.NotNull(table, nameof(table));
     public ResolvedApiSpecTable Resolve(Compilation compilation)
     {
-        if (compilation == null)
-        {
-            throw new ArgumentNullException(nameof(compilation));
-        }
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
 
         return _cache.GetValue(compilation, Build);
     }

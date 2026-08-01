@@ -16,6 +16,10 @@ public sealed class ProtocolModelSchemaTests
         "SharpProof.Worker.Protocol.WorkerProtocolMetadata",
         throwOnError: true)!;
     private static readonly NullabilityInfoContext s_nullability = new();
+    private static readonly string[] s_manifestIdentityCollections = [
+        "Callables",
+        "Claims"
+    ];
 
     [Test]
     public void SchemaPinsTheReleasedWireVersions()
@@ -81,6 +85,87 @@ public sealed class ProtocolModelSchemaTests
         AssertDefinedEnums(schema.RootElement);
         AssertManifestNames(schema.RootElement);
         AssertValidationPlans(schema.RootElement);
+    }
+
+    [Test]
+    public void GeneratedManifestIdentityCatalogIsCompleteAndOrdered()
+    {
+        var rootFields = WorkerManifestIdentityCatalog.RootFields;
+        var collections = WorkerManifestIdentityCatalog.Collections;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(rootFields, Has.Length.EqualTo(1));
+            Assert.That(collections, Has.Length.EqualTo(2));
+            Assert.That(
+                (rootFields[0].Label, rootFields[0].Property,
+                    rootFields[0].Kind, rootFields[0].DefaultMember),
+                Is.EqualTo((
+                    "manifest.schemaVersion", "SchemaVersion",
+                    WorkerManifestIdentityFieldKind.Int, (string?)null)));
+            Assert.That(
+                collections.Select(static collection => collection.Property).ToArray(),
+                Is.EqualTo(s_manifestIdentityCollections));
+        }
+
+        foreach (var collection in collections)
+        {
+            Assert.That(collection.LengthLabel, Does.StartWith("manifest."));
+            Assert.That(collection.EntryLabel, Does.Not.EndWith("."));
+            Assert.That(collection.Order, Is.Not.Empty);
+            Assert.That(collection.Fields, Is.Not.Empty);
+            foreach (var order in collection.Order)
+            {
+                Assert.That(order.Property, Is.Not.Empty);
+                Assert.That(order.Kind, Is.Not.Empty);
+            }
+
+            foreach (var field in collection.Fields)
+            {
+                Assert.That(field.Label, Is.Not.Empty);
+                Assert.That(field.Property, Is.Not.Empty);
+                Assert.That(
+                    Enum.IsDefined(field.Kind),
+                    Is.True);
+                _ = field.DefaultMember;
+            }
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                WorkerProtocolMetadata.GetAssumptionOrder(
+                    WorkerAssumptionKind.Unspecified),
+                Is.EqualTo(0));
+            Assert.That(
+                WorkerProtocolMetadata.GetAssumptionOrder(
+                    WorkerAssumptionKind.Precondition),
+                Is.EqualTo(1));
+            Assert.That(
+                WorkerProtocolMetadata.GetAssumptionOrder(
+                    WorkerAssumptionKind.UserAssume),
+                Is.EqualTo(2));
+            Assert.That(
+                WorkerProtocolMetadata.GetAssumptionOrder(
+                    WorkerAssumptionKind.TrustedBoundary),
+                Is.EqualTo(3));
+            Assert.That(
+                WorkerProtocolMetadata.GetAssumptionOrder(
+                    WorkerAssumptionKind.ApiSpecification),
+                Is.EqualTo(4));
+            Assert.That(
+                WorkerProtocolMetadata.GetAssumptionOrder(
+                    WorkerAssumptionKind.SourceDomain),
+                Is.EqualTo(5));
+            Assert.That(
+                WorkerProtocolMetadata.GetAssumptionOrder(
+                    WorkerAssumptionKind.NormalCompletion),
+                Is.EqualTo(6));
+        }
+
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+            WorkerProtocolMetadata.GetAssumptionOrder(
+                (WorkerAssumptionKind)999)));
     }
 
     [Test]

@@ -7,12 +7,12 @@ internal sealed class EffectCallSiteResolver(
     ManagedFlowResult? flow)
 {
     private readonly IMethodSymbol _caller =
-        caller ?? throw new ArgumentNullException(nameof(caller));
+        ArgumentNullGuard.NotNull(caller, nameof(caller));
     private readonly ManagedFlowResult? _flow = flow;
     private readonly EffectAnalysisSession _session =
-        session ?? throw new ArgumentNullException(nameof(session));
+        ArgumentNullGuard.NotNull(session, nameof(session));
     private readonly List<EffectCallSite> _sourceCalls =
-        sourceCalls ?? throw new ArgumentNullException(nameof(sourceCalls));
+        ArgumentNullGuard.NotNull(sourceCalls, nameof(sourceCalls));
 
     internal EffectSummary Resolve(
         IMethodSymbol target,

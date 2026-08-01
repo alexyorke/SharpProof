@@ -13,24 +13,41 @@ public sealed class CompilerOptionWireMappingsTests
     {
         Assert.That(
             Enum.GetValues<OutputKind>()
-                .Select(CompilerOptionWireMappings.Map),
-            Is.All.TypeOf<CompilerOutputKind>());
+                .Select(value =>
+                    CompilerOptionWireMappings.Map(value).ToString()),
+            Is.EqualTo(Enum.GetValues<OutputKind>()
+                .Select(static value => value.ToString())));
         Assert.That(
             Enum.GetValues<OptimizationLevel>()
-                .Select(CompilerOptionWireMappings.Map),
-            Is.All.TypeOf<CompilerOptimizationLevel>());
+                .Select(value =>
+                    CompilerOptionWireMappings.Map(value).ToString()),
+            Is.EqualTo(Enum.GetValues<OptimizationLevel>()
+                .Select(static value => value.ToString())));
         Assert.That(
             Enum.GetValues<Platform>()
-                .Select(CompilerOptionWireMappings.Map),
-            Is.All.TypeOf<CompilerPlatform>());
+                .Select(value =>
+                    CompilerOptionWireMappings.Map(value).ToString()),
+            Is.EqualTo(Enum.GetValues<Platform>()
+                .Select(static value => value.ToString())));
         Assert.That(
             Enum.GetValues<NullableContextOptions>()
-                .Select(CompilerOptionWireMappings.Map),
-            Is.All.TypeOf<CompilerNullableContext>());
+                .Select(value =>
+                    CompilerOptionWireMappings.Map(value).ToString()),
+            Is.EqualTo(Enum.GetValues<NullableContextOptions>()
+                .Select(static value => value.ToString())));
         Assert.That(
             Enum.GetValues<MetadataImportOptions>()
-                .Select(CompilerOptionWireMappings.Map),
-            Is.All.TypeOf<CompilerMetadataImportOptions>());
+                .Select(value =>
+                    CompilerOptionWireMappings.Map(value).ToString()),
+            Is.EqualTo(Enum.GetValues<MetadataImportOptions>()
+                .Select(static value => value.ToString())));
+        Assert.That(
+            CompilerOptionWireMappings.Map(AssemblyIdentityComparer.Default),
+            Is.EqualTo(CompilerAssemblyIdentityComparer.Default));
+        Assert.That(
+            CompilerOptionWireMappings.Map(
+                DesktopAssemblyIdentityComparer.Default),
+            Is.EqualTo(CompilerAssemblyIdentityComparer.Desktop));
     }
 
     [Test]
@@ -47,6 +64,8 @@ public sealed class CompilerOptionWireMappingsTests
         Assert.Throws<InvalidOperationException>(
             (Action)(() => CompilerOptionWireMappings.Map(
                 unchecked((MetadataImportOptions)byte.MaxValue))));
+        Assert.Throws<InvalidOperationException>(
+            (Action)(() => CompilerOptionWireMappings.Map(null!)));
     }
 
     [Test]

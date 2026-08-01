@@ -8,10 +8,7 @@ public sealed class FinalCompilationCollectorAnalyzer : DiagnosticAnalyzer
 
     public override void Initialize(AnalysisContext context)
     {
-        if (context == null)
-        {
-            throw new ArgumentNullException(nameof(context));
-        }
+        context = ArgumentNullGuard.NotNull(context, nameof(context));
 
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(

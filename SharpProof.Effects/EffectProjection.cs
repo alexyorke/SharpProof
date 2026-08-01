@@ -1,42 +1,14 @@
 namespace SharpProof.Effects;
 
-public readonly record struct EffectProjection
-{
-    public EffectProjection(
-        EffectContractKind effects,
-        EffectContractCapabilityKind capabilities,
-        bool isComplete)
-    {
-        (Effects, Capabilities, IsComplete) =
-            (effects, capabilities, isComplete);
-    }
-
-    public EffectContractKind Effects
-    {
-        get;
-    }
-    public EffectContractCapabilityKind Capabilities
-    {
-        get;
-    }
-    public bool IsComplete
-    {
-        get;
-    }
-}
-
 public static class EffectSummaryProjector
 {
     public static EffectProjection Project(EffectSummary summary)
     {
-        if (summary == null)
-        {
-            throw new ArgumentNullException(nameof(summary));
-        }
+        summary = ArgumentNullGuard.NotNull(summary, nameof(summary));
 
         if (summary.IsBottom)
         {
-            return new EffectProjection(EffectContractKind.None, EffectContractCapabilityKind.None, isComplete: true);
+            return new EffectProjection(EffectContractKind.None, EffectContractCapabilityKind.None, true);
         }
 
         var effects = ProjectRegions(summary.Reads, isWrite: false) |

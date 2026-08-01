@@ -40,6 +40,94 @@ $mutations = @(
         Filter = 'FullyQualifiedName~SupportedIntegerCatalogIsExactAndExhaustive'
     },
     [pscustomobject]@{
+        Name = 'scalar-binary-reverse-relation'
+        File = 'SharpProof.Frontend\CSharpScalarSemantics.generated.cs'
+        Original = 'new(BinaryOperatorKind.LessThan, IrBinaryOperator.LessThan, reverseKind: BinaryOperatorKind.GreaterThan, negatedKind: BinaryOperatorKind.GreaterThanOrEqual),'
+        Mutated = 'new(BinaryOperatorKind.LessThan, IrBinaryOperator.LessThan, reverseKind: BinaryOperatorKind.GreaterThanOrEqual, negatedKind: BinaryOperatorKind.GreaterThanOrEqual),'
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~BinaryReverseAndNegationRelationsAreExactAndInvolutive'
+    },
+    [pscustomobject]@{
+        Name = 'scalar-binary-inverse-mapping'
+        File = 'SharpProof.Frontend\CSharpScalarSemantics.generated.cs'
+        Original = '            if (candidate.IrOperator == @operator)'
+        Mutated = '            if (candidate.IrOperator != @operator)'
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~BinaryMappingsAndArithmeticCategoriesAreExhaustive'
+    },
+    [pscustomobject]@{
+        Name = 'scalar-ir-binary-key'
+        File = 'SharpProof.Ir\IrOperatorCatalog.generated.cs'
+        Original = '            IrBinaryOperator.LessThan => (9, IrTypeKind.Integer, IrTypeKind.Boolean, "<"),'
+        Mutated = '            IrBinaryOperator.LessThan => (8, IrTypeKind.Integer, IrTypeKind.Boolean, "<"),'
+        Project = 'SharpProof.Ir.Test\SharpProof.Ir.Test.csproj'
+        Filter = 'FullyQualifiedName~BinaryMetadataIsExactAndExhaustive'
+    },
+    [pscustomobject]@{
+        Name = 'scalar-ir-binary-enum-value'
+        File = 'SharpProof.Ir\IrOperatorCatalog.generated.cs'
+        Original = '    LessThan = 9,'
+        Mutated = '    LessThan = 14,'
+        Project = 'SharpProof.Ir.Test\SharpProof.Ir.Test.csproj'
+        Filter = 'FullyQualifiedName~BinaryMetadataIsExactAndExhaustive'
+    },
+    [pscustomobject]@{
+        Name = 'portable-codec-unknown-wire-fails-closed'
+        File = 'SharpProof.CompilerArtifact\PortableIrGraphCodec.cs'
+        Original = '        return value >= 0 && value < values.Length'
+        Mutated = '        return value >= 0'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~DecoderRejectsUnknownWireEnumCodes'
+    },
+    [pscustomobject]@{
+        Name = 'portable-codec-havoc-order-fails-closed'
+        File = 'SharpProof.CompilerArtifact\PortableIrGraphCodec.cs'
+        Original = '                    index > previous,'
+        Mutated = '                    index >= previous,'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~DecoderRejectsMalformedGraphs'
+    },
+    [pscustomobject]@{
+        Name = 'portable-codec-whitespace-name-fails-closed'
+        File = 'SharpProof.CompilerArtifact\PortableIrGraphCodec.cs'
+        Original = '                value == null || !string.IsNullOrWhiteSpace(value),'
+        Mutated = '                value == null || !string.IsNullOrEmpty(value),'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~DecoderRejectsMalformedGraphs'
+    },
+    [pscustomobject]@{
+        Name = 'portable-codec-unused-slot-fails-closed'
+        File = 'SharpProof.CompilerArtifact\PortableIrGraphCodec.cs'
+        Original = "                row.A,`n                row.B,`n                row.C,`n                row.D,"
+        Mutated = "                row.A,`n                -1,`n                row.C,`n                row.D,"
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~DecoderRejectsNonCanonicalSlots'
+    },
+    [pscustomobject]@{
+        Name = 'collector-option-output-kind'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerWireMappings.generated.cs'
+        Original = '            OutputKind.ConsoleApplication => CompilerOutputKind.ConsoleApplication,'
+        Mutated = '            OutputKind.ConsoleApplication => CompilerOutputKind.WindowsApplication,'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~EveryCurrentRoslynCompilerOptionHasAClosedWireMapping'
+    },
+    [pscustomobject]@{
+        Name = 'collector-identity-comparer'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerWireMappings.generated.cs'
+        Original = '            return CompilerAssemblyIdentityComparer.Default;'
+        Mutated = '            return CompilerAssemblyIdentityComparer.Desktop;'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~EveryCurrentRoslynCompilerOptionHasAClosedWireMapping'
+    },
+    [pscustomobject]@{
+        Name = 'collector-effect-flag-projection'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerWireMappings.generated.cs'
+        Original = '            result |= WorkerEffectSet.ReadsReceiverState;'
+        Mutated = '            result |= WorkerEffectSet.ReadsArgumentState;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~EffectWireMappingsAreNamedAndExhaustive'
+    },
+    [pscustomobject]@{
         Name = 'lowering-unchecked-arithmetic'
         File = 'SharpProof.Frontend\RoslynOperationLowerer.cs'
         Original = "CSharpScalarSemantics.RequiresCheckedArithmetic(operation.OperatorKind) &&`n                !operation.IsChecked)"
@@ -80,6 +168,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~CatchVariableFlowUsesTheEffectDiscoveryCatalog'
     },
     [pscustomobject]@{
+        Name = 'effect-region-contract-catalog'
+        File = 'SharpProof.Effects\EffectContractMappings.generated.cs'
+        Original = '        (EffectRegionKind.Receiver, EffectContractKind.ReadsReceiverState, EffectContractKind.WritesReceiverState, EffectRegionId.Receiver, false),'
+        Mutated = '        (EffectRegionKind.Receiver, EffectContractKind.ReadsArgumentState, EffectContractKind.WritesReceiverState, EffectRegionId.Receiver, false),'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~RegionCatalogIsClosedAndDrivesBothDirections'
+    },
+    [pscustomobject]@{
+        Name = 'effect-direct-event-wire-catalog'
+        File = 'SharpProof.Effects\EffectContractMappings.generated.cs'
+        Original = '        (EffectDirectEventKind.ManagedObjectAllocation, "managed-allocation"),'
+        Mutated = '        (EffectDirectEventKind.ManagedObjectAllocation, "managed-object-allocation"),'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~DirectEventWireCatalogIsClosedAndBijective'
+    },
+    [pscustomobject]@{
         Name = 'effect-lock-constructor-completion'
         File = 'SharpProof.Effects\OperationEffectScanner.cs'
         Original = "                RecordAllocation(creation) &&`n                HasNonThrowingConstructorSpec(creation),"
@@ -112,18 +216,90 @@ $mutations = @(
         Filter = 'FullyQualifiedName~EffectArrayCardinalityRequiresCompilerBoundSymbolIdentity'
     },
     [pscustomobject]@{
+        Name = 'effect-allocation-base-type-initialization'
+        File = 'SharpProof.Effects\EffectMethodNodeBuilder.cs'
+        Original = '            current = current.BaseType;'
+        Mutated = '            current = null;'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~DirectWitnessesAreNarrowDeterministicAndOrdered'
+    },
+    [pscustomobject]@{
+        Name = 'effect-allocation-base-depth-budget'
+        File = 'SharpProof.Effects\EffectMethodNodeBuilder.cs'
+        Original = '            if (depth >= maximumBaseTypeDepth ||'
+        Mutated = '            if (depth < 0 && depth >= maximumBaseTypeDepth ||'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~ExcessiveBaseTypeDepthFailsClosedWithoutRecursion'
+    },
+    [pscustomobject]@{
+        Name = 'effect-allocation-metadata-type-initialization'
+        File = 'SharpProof.Effects\EffectMethodNodeBuilder.cs'
+        Original = "        if (type.DeclaringSyntaxReferences.Length == 0)`n        {`n            return true;`n        }"
+        Mutated = "        if (type.DeclaringSyntaxReferences.Length == 0)`n        {`n            return false;`n        }"
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~MetadataBaseInitializationBlocksDirectAllocationWitness'
+    },
+    [pscustomobject]@{
+        Name = 'effect-direct-witness-prebody-completion'
+        File = 'SharpProof.Effects\EffectMethodNodeBuilder.cs'
+        Original = "            allowDirectWitnesses:`n                graph != null &&`n                HasDefiniteBodyEntry(method, _session.ApiSpecs));"
+        Mutated = "            allowDirectWitnesses:`n                graph != null &&`n                !HasDefiniteBodyEntry(method, _session.ApiSpecs));"
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~PreBodyExecutionBlocksDirectBodyWitnesses'
+    },
+    [pscustomobject]@{
+        Name = 'effect-system-object-approved-identity'
+        File = 'SharpProof.Effects\EffectMethodNodeBuilder.cs'
+        Original = "        if (type.SpecialType == SpecialType.System_Object &&`n            HasApprovedSystemObjectConstructor(type, apiSpecs))"
+        Mutated = "        if (type.SpecialType == SpecialType.System_Object &&`n            !HasApprovedSystemObjectConstructor(type, apiSpecs))"
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~SystemObjectAllocationRequiresApprovedFrameworkIdentity'
+    },
+    [pscustomobject]@{
+        Name = 'effect-direct-witness-conversion-completion'
+        File = 'SharpProof.Effects\ManagedAbstractFlow.cs'
+        Original = "        !conversion.Conversion.IsUserDefined &&`n        (conversion.Conversion.IsIdentity ||`n         conversion.Conversion.IsImplicit) &&"
+        Mutated = "        !conversion.Conversion.IsUserDefined &&`n        true &&"
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~DirectAllocationWitnessesRequireArgumentCompletion'
+    },
+    [pscustomobject]@{
+        Name = 'effect-collector-subset-admission'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\ClaimManifestBuilder.cs'
+        Original = "            target.MethodKind is`n                MethodKind.Ordinary or`n                MethodKind.Constructor &&`n            selectedSubset.IsSupported;"
+        Mutated = "            target.MethodKind is`n                MethodKind.Ordinary or`n                MethodKind.Constructor &&`n            true;"
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~UnsupportedEffectCallablesCannotCarryConcreteEvidence'
+    },
+    [pscustomobject]@{
+        Name = 'effect-collector-contract-subset-admission'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\ClaimManifestBuilder.cs'
+        Original = "            analyzerContractsSelected ||`n            analyzerEffectsSelected"
+        Mutated = "            false ||`n            analyzerEffectsSelected"
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~UnsupportedContractCallablesUseTheSharedSubsetGate'
+    },
+    [pscustomobject]@{
+        Name = 'effect-collector-full-support-evidence'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\ClaimManifestBuilder.cs'
+        Original = '                target, callableId, postconditions.Length, supported)'
+        Mutated = '                target, callableId, postconditions.Length, selectedSubset.IsSupported)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~UnsupportedEffectCallableShapesCannotCarryReplayEvidence'
+    },
+    [pscustomobject]@{
         Name = 'runtime-interpolation-fails-closed'
-        File = 'SharpProof.Frontend\OperationSupportCatalog.cs'
-        Original = "            OperationKind.ConditionalAccessInstance or`n            OperationKind.ObjectOrCollectionInitializer or"
-        Mutated = "            OperationKind.ConditionalAccessInstance or`n            OperationKind.InterpolatedString or`n            OperationKind.ObjectOrCollectionInitializer or"
+        File = 'SharpProof.Frontend\OperationSupportCatalog.generated.cs'
+        Original = "        OperationKind.ConditionalAccessInstance,`n        OperationKind.ObjectOrCollectionInitializer,"
+        Mutated = "        OperationKind.ConditionalAccessInstance,`n        OperationKind.InterpolatedString,`n        OperationKind.ObjectOrCollectionInitializer,"
         Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
         Filter = 'FullyQualifiedName~StringConstructionDistinguishesKnownAndUnknownAllocation'
     },
     [pscustomobject]@{
         Name = 'advisory-contract-candidate-detection'
-        File = 'SharpProof.Frontend\ContractApiMetadata.cs'
-        Original = '        EnsuresMethodName,'
-        Mutated = '        RequiresMethodName,'
+        File = 'SharpProof.Frontend\ContractApiMetadata.generated.cs'
+        Original = '            "Ensures",'
+        Mutated = '            "Requires",'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~ContractCandidateActivationRunsClausePlacementValidation'
     },
@@ -145,9 +321,9 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'external-precondition-screening'
-        File = 'SharpProof.Analyzer\SharpProofAnalyzer.cs'
-        Original = '            "PositiveAttribute" or'
-        Mutated = '            "NotNullAttribute" or'
+        File = 'SharpProof.Frontend\ContractApiMetadataRuntime.cs'
+        Original = "                attribute.Category ==`n                    ContractApiAttributeCategory.Closed &&"
+        Mutated = "                attribute.Category !=`n                    ContractApiAttributeCategory.Closed &&"
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~UnannotatedCallerStillChecksExternalClosedPreconditions'
     },
@@ -208,12 +384,52 @@ $mutations = @(
         Filter = 'FullyQualifiedName~SpecCallArgumentDefinednessConstrainsSubsequentFlow'
     },
     [pscustomobject]@{
-        Name = 'effect-refutation-fail-closed'
-        File = 'SharpProof.Worker\EffectClaimResultAssembler.cs'
-        Original = 'if (evidence.Outcome == WorkerClaimOutcome.Refuted)'
-        Mutated = 'if (evidence.Outcome == WorkerClaimOutcome.Unknown)'
+        Name = 'effect-unsupported-candidate-downgrade'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\ClaimManifestBuilder.cs'
+        Original = '        evidence.Outcome = WorkerClaimOutcome.Unknown;'
+        Mutated = '        evidence.Outcome = WorkerClaimOutcome.Refuted;'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
-        Filter = 'FullyQualifiedName~CompilerOnlyEffectViolationFailsClosedWithoutAReplayTrace'
+        Filter = 'FullyQualifiedName~UnsupportedDefiniteEffectViolationFailsClosedWithoutReplay'
+    },
+    [pscustomobject]@{
+        Name = 'effect-replay-object-event-kind'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerEffectReplayLowerer.cs'
+        Original = "                eventKind =`n                    CompilerEffectReplayEventKind.ManagedObjectAllocation;"
+        Mutated = "                eventKind =`n                    CompilerEffectReplayEventKind.ManagedArrayAllocation;"
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~AllocationViolationsCarrySealedUnconditionalReplayEvidence'
+    },
+    [pscustomobject]@{
+        Name = 'effect-replay-worker-constraint-hash'
+        File = 'SharpProof.Worker\EffectCounterexampleReplayer.cs'
+        Original = "            `"SharpProof.CompilerEffectReplayConstraint`",`n            1,`n            kind,"
+        Mutated = "            `"SharpProof.CompilerEffectReplayConstraint`",`n            2,`n            kind,"
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~WorkerOwnsCanonicalReplayHashing'
+    },
+    [pscustomobject]@{
+        Name = 'effect-replay-tree-identity'
+        File = 'SharpProof.Worker\EffectCounterexampleReplayer.cs'
+        Original = '            effectEvent.SyntaxTreeSha256 != tree.Sha256 ||'
+        Mutated = '            false && effectEvent.SyntaxTreeSha256 != tree.Sha256 ||'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~StructurallyMalformedReplayEvidenceIsRejected'
+    },
+    [pscustomobject]@{
+        Name = 'effect-replay-allocation-constraint'
+        File = 'SharpProof.Worker\EffectCounterexampleReplayer.cs'
+        Original = '                (observed & WorkerEffectSet.Allocates) != 0,'
+        Mutated = '                (observed & WorkerEffectSet.Allocates) == 0,'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~AllocationReplayRespectsTheSelectedContract'
+    },
+    [pscustomobject]@{
+        Name = 'effect-replay-exact-witness'
+        File = 'SharpProof.Worker\EffectCounterexampleReplayer.cs'
+        Original = '        return (actual.Kind, actual.Detail, actual.Effects,'
+        Mutated = '        return (actual.Kind, claimed.Detail, actual.Effects,'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~SemanticWitnessMismatchRemainsTypedUnknown'
     },
     [pscustomobject]@{
         Name = 'effect-vacuity-requires-entry-contradiction'
@@ -222,6 +438,14 @@ $mutations = @(
         Mutated = 'if (!entryFeasibility.IsUnknown)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~EffectOnlyClaimRemainsAccountableWhileMixedRequiresFailsClosed'
+    },
+    [pscustomobject]@{
+        Name = 'effect-invalid-contract-before-vacuity'
+        File = 'SharpProof.Worker\EffectClaimResultAssembler.cs'
+        Original = "        if (evidence.Outcome == WorkerClaimOutcome.Unknown &&`n            evidence.Reason == WorkerClaimReason.UnsupportedContract)"
+        Mutated = "        if (false &&`n            evidence.Reason == WorkerClaimReason.UnsupportedContract)"
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~InvalidEffectClaimsCannotBecomeVacuouslyProven'
     },
     [pscustomobject]@{
         Name = 'effect-vacuity-used-assumption-core'
@@ -234,8 +458,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'live-effect-bottom-entry-fails-closed'
         File = 'SharpProof.Analyzer\EffectContractDiagnostics.cs'
-        Original = "var declaredComplete = !entryIsBottom && !summary.IsBottom &&`n            projection.IsComplete &&"
-        Mutated = "var declaredComplete = projection.IsComplete &&"
+        Original = '        var declaredComplete = entrySummaryReachable && projection.IsComplete &&'
+        Mutated = '        var declaredComplete = projection.IsComplete &&'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~BottomEntryCannotDirectlyProveAnEffectContract'
     },

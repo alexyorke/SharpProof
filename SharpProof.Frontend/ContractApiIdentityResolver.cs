@@ -23,20 +23,9 @@ internal sealed class ContractApiIdentityResolver
     private static readonly ConditionalWeakTable<
         Compilation, ContractApiIdentityResolver> Cache = new();
     private static readonly ImmutableHashSet<string> AttributeMetadataNames =
-        ImmutableHashSet.Create(
+        ImmutableHashSet.CreateRange(
             StringComparer.Ordinal,
-            ContractApiMetadata.ContractFor,
-            ContractApiMetadata.EnforcePure,
-            ContractApiMetadata.ZeroAllocations,
-            ContractApiMetadata.AllowedCapabilities,
-            ContractApiMetadata.DoesNotThrow,
-            ContractApiMetadata.AllowedExceptions,
-            ContractApiMetadata.EffectContract,
-            ContractApiMetadata.NotNull,
-            ContractApiMetadata.Positive,
-            ContractApiMetadata.InRange,
-            ContractApiMetadata.Suppress,
-            ContractApiMetadata.Trusted);
+            ContractApiMetadata.AttributeMetadataNames);
     private readonly Compilation _compilation;
     private readonly INamedTypeSymbol? _attribute;
     private readonly INamedTypeSymbol? _conditionalAttribute;
@@ -45,8 +34,7 @@ internal sealed class ContractApiIdentityResolver
 
     private ContractApiIdentityResolver(Compilation compilation)
     {
-        _compilation = compilation ??
-            throw new ArgumentNullException(nameof(compilation));
+        _compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         _attribute = compilation.GetTypeByMetadataName(
             ContractApiMetadata.Attribute);
         _conditionalAttribute = compilation.GetTypeByMetadataName(
@@ -81,7 +69,7 @@ internal sealed class ContractApiIdentityResolver
         Compilation compilation)
     {
         return Cache.GetValue(
-            compilation ?? throw new ArgumentNullException(nameof(compilation)),
+            ArgumentNullGuard.NotNull(compilation, nameof(compilation)),
             static value => new(value));
     }
 

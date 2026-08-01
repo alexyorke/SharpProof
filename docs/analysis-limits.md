@@ -18,8 +18,9 @@ defaults and validation bounds. The release gate mirrors selected values in
 `eng/acceptance/contract.json` and verifies that they agree.
 `SharpProof.Frontend/CSharpScalarSemantics.json` is the corresponding review
 source for admitted integer widths and ranges, value-preserving conversions,
-checked behavior, and Roslyn-to-IR operator mappings; CI verifies its generated
-C# projection before building.
+checked behavior, Roslyn-to-IR and inverse mappings, comparison relations, and
+the ordered IR type/operator vocabulary and canonical metadata; CI verifies
+both generated C# projections before building.
 
 ## Package and worker defaults
 
@@ -99,9 +100,10 @@ process boundary.
 
 `SharpProofVerifyMaximumExpressionDepth` is also a compiler-visible property.
 The collector parses it, enforces the 1-through-256 range, and seals it into the
-schema-8 compiler artifact. The launcher supplies the same property as the worker request
-budget. A mismatch is `CompilerManifestMismatch` and stops before cache lookup
-or backend creation; neither side may silently use a different depth.
+schema-9 compiler artifact. The launcher supplies the same property as the
+worker request budget. A mismatch is `CompilerManifestMismatch` and stops
+before cache lookup or backend creation; neither side may silently use a
+different depth.
 
 Every budget and every artifact byte participates in worker input and cache
 identity. The artifact contains portable lowered callables plus a bounded
@@ -123,12 +125,13 @@ claims and contract assumptions; `all` includes both.
 ## Fixed portable analyzer bounds
 
 The live analyzer's compilation-scoped managed CFG pass accepts at most 256
-Roslyn CFG blocks and 4,096 descendant operations per callable. It rejects
-reachable cycles in this preview. Crossing either budget, or encountering a
-cycle, produces a typed incomplete result; selected effect contracts become
-`Unknown` with SP0047 evidence, and incomplete flow cannot discharge a
-call-site precondition. These bounds are deterministic and the analyzer never
-loads Z3.
+Roslyn CFG blocks and 4,096 descendant operations per callable. Crossing either
+budget produces typed incomplete evidence; incomplete flow cannot discharge a
+call-site precondition. Reachable cycles are retained in effect summaries as
+`MayDiverge` termination evidence, so a cycle alone does not erase modeled
+effects or turn an otherwise accountable effect claim into SP0047. Unsupported
+shapes and budget failures still fail closed. These bounds are deterministic
+and the analyzer never loads Z3.
 
 ## Fixed worker body bounds
 
@@ -141,10 +144,12 @@ non-configurable bounds for one admitted body:
 | Lowered body instructions | 4,096 |
 | Symbolic operations | 65,536 |
 
-Crossing one of these bounds returns `Unknown` with `UnsupportedBody`; it does
-not produce a partial proof. The executor merges predecessor states with
-symbolic path predicates instead of enumerating a fixed number of paths or
-states. Loops are rejected by the acyclic-body check before symbolic execution.
+Crossing the reachable-block or lowered-instruction bound returns `Unknown`
+with `UnsupportedBody`; exhausting the symbolic-operation budget returns
+`Unknown` with `ResourceLimit`. Neither path produces a partial proof. The
+executor merges predecessor states with symbolic path predicates instead of
+enumerating a fixed number of paths or states. Loops are rejected by the
+acyclic-body check before symbolic execution.
 
 The manifest discovers local functions, lambdas, anonymous methods, and the
 top-level entry point, including their directly owned postconditions. These
@@ -189,7 +194,7 @@ is the observed runner total rather than the requested budget.
 | IDE edit maximum | At most 250 ms |
 
 The active contract also fixes protocol version 9, cache schema version 11,
-claim-manifest schema version 4, and compiler artifact schema version 8, along
+claim-manifest schema version 4, and compiler artifact schema version 9, along
 with exact proof-kernel and component TCB path inventories, formatting-neutral
 Roslyn complexity ratchets, and the reference surfaces `netstandard2.0`,
 `net8.0`, and `net472`.
@@ -212,9 +217,18 @@ claims are all replay-validated `Refuted` can enter the semantic cache. Every
 cache hit reconstructs its scalar models and repeats whole-body replay. See
 [Typed abstention reasons](unknown-reasons.md) for exact reason values.
 
-Replay validation has two layers: exact backend-model and lowered-term checks
-in the proof kernel, followed by independent execution of the compiler-produced
-whole-body CFG in the worker. Executed spec calls become typed
-`CounterexampleNotReplayable`; other unsupported or inconsistent replay state
-fails the run as `CounterexampleReplayFailed`. Instructions on unselected
-paths do not block a concrete replay.
+Postcondition replay validation has two layers: exact backend-model and
+lowered-term checks in the proof kernel, followed by independent execution of
+the compiler-produced whole-body CFG in the worker. Executed spec calls become
+typed `CounterexampleNotReplayable`; other unsupported or inconsistent replay
+state fails the run as `CounterexampleReplayFailed`. Instructions on
+unselected paths do not block a concrete replay.
+
+Effect replay uses a separate compiler-neutral event interpreter rather than
+SMT or user-code execution. It admits only an unconditional definite managed
+object/array allocation with completed operands and no unmodeled static
+initialization. Other definite effect candidates become
+`CounterexampleNotReplayable`; may-only conflicts remain
+`EffectContractNotEstablished`. Structural artifact tamper is a
+`CompilerManifestMismatch`, while semantic replay disagreement is the fatal
+`CounterexampleReplayFailed`. Effect results are not cacheable.

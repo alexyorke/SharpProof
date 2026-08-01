@@ -2,12 +2,16 @@ using System.Text.Json;
 namespace SharpProof.CompilerArtifact;
 internal static class CompilerLoweredArtifact
 {
+    private static readonly WorkerClaimEvidence[] ManifestEvidenceMap =
+    [
+        WorkerClaimEvidence.DirectClause,
+        WorkerClaimEvidence.ReturnAttribute,
+        WorkerClaimEvidence.CompanionClause
+    ];
+
     internal static CompilerCallableArtifact Encode(CompilerCallablePreparation preparation)
     {
-        if (preparation == null)
-        {
-            throw new ArgumentNullException(nameof(preparation));
-        }
+        preparation = ArgumentNullGuard.NotNull(preparation, nameof(preparation));
 
         if (!preparation.IsSuccess)
         {
@@ -91,11 +95,18 @@ internal static class CompilerLoweredArtifact
         return artifact;
     }
     internal static ImmutableArray<CompilerCallablePreparation> Decode(
-        CompilerCallableArtifact[] artifacts, WorkerClaimManifest manifest)
+        CompilerCallableArtifact[] artifacts,
+        WorkerClaimManifest manifest,
+        CompilerCompilationSnapshot compilation)
     {
         if (artifacts == null)
         {
             throw new InvalidDataException("The lowered callable payload is missing.");
+        }
+
+        if (compilation == null)
+        {
+            throw new InvalidDataException("The compiler compilation evidence is missing.");
         }
 
         var callables = manifest.Callables.ToDictionary(static item => item.CallableId, StringComparer.Ordinal);
@@ -120,14 +131,15 @@ internal static class CompilerLoweredArtifact
                 throw new InvalidDataException("A lowered callable claim list does not equal the manifest.");
             }
 
-            result.Add(Decode(artifact, entry, targetClaims));
+            result.Add(Decode(artifact, entry, targetClaims, compilation));
         }
         return result.MoveToImmutable();
     }
     private static CompilerCallablePreparation Decode(
         CompilerCallableArtifact artifact,
         WorkerCallableManifestEntry entry,
-        ImmutableArray<WorkerClaimManifestEntry> claims)
+        ImmutableArray<WorkerClaimManifestEntry> claims,
+        CompilerCompilationSnapshot compilation)
     {
         if (!Enum.IsDefined(typeof(WorkerClaimReason), artifact.FailureReason) ||
             artifact.FailureReason == WorkerClaimReason.Unspecified)
@@ -146,7 +158,8 @@ internal static class CompilerLoweredArtifact
             return new CompilerCallablePreparation(
                 new IrFactory(), entry, [], [], artifact.FailureReason, null)
             {
-                EffectClaims = DecodeEffects(artifact, claims)
+                EffectClaims = DecodeEffects(artifact, claims),
+                Compilation = compilation
             };
         }
         if (artifact.Graph == null || artifact.Clauses == null || artifact.Variables == null)
@@ -237,7 +250,8 @@ internal static class CompilerLoweredArtifact
         return new CompilerCallablePreparation(
             decoded.Factory, entry, clauses, variables, WorkerClaimReason.None, body)
         {
-            EffectClaims = DecodeEffects(artifact, claims)
+            EffectClaims = DecodeEffects(artifact, claims),
+            Compilation = compilation
         };
     }
     private static ImmutableArray<CompilerEffectClaimArtifact> DecodeEffects(
@@ -420,13 +434,10 @@ internal static class CompilerLoweredArtifact
     }
     private static WorkerClaimEvidence ManifestEvidence(CompilerContractEvidence value)
     {
-        return value switch
-        {
-            CompilerContractEvidence.CompilerBoundInvocation => WorkerClaimEvidence.DirectClause,
-            CompilerContractEvidence.Companion => WorkerClaimEvidence.CompanionClause,
-            CompilerContractEvidence.ClosedAttribute => WorkerClaimEvidence.ReturnAttribute,
-            _ => WorkerClaimEvidence.Unspecified
-        };
+        var index = (int)value;
+        return index >= 0 && index < ManifestEvidenceMap.Length
+            ? ManifestEvidenceMap[index]
+            : WorkerClaimEvidence.Unspecified;
     }
 
     private static string PredicateSha256(IrFactory factory, CompilerPreparedClause clause)

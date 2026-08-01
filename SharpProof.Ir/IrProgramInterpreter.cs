@@ -1,48 +1,7 @@
 namespace SharpProof.Ir;
 
-public enum IrProgramExecutionStatus
+public sealed partial class IrProgramExecutionResult
 {
-    Returned, AssumptionViolated, AssertionFailed, Unsupported, Exception, StepLimit
-}
-
-public sealed class IrProgramExecutionResult
-{
-    internal IrProgramExecutionResult(IrProgramExecutionStatus status, IrValue? returnValue,
-        IrInstruction? instruction, IrUnsupportedInfo? unsupported,
-        IrExceptionInfo? exception, ImmutableDictionary<IrVarId, IrValue> values, int steps)
-    {
-        (Status, ReturnValue, Instruction, Unsupported, Exception, Values, Steps) =
-        (status, returnValue, instruction, unsupported, exception, values, steps);
-    }
-
-    public IrProgramExecutionStatus Status
-    {
-        get;
-    }
-    public IrValue? ReturnValue
-    {
-        get;
-    }
-    public IrInstruction? Instruction
-    {
-        get;
-    }
-    public IrUnsupportedInfo? Unsupported
-    {
-        get;
-    }
-    public IrExceptionInfo? Exception
-    {
-        get;
-    }
-    public ImmutableDictionary<IrVarId, IrValue> Values
-    {
-        get;
-    }
-    public int Steps
-    {
-        get;
-    }
     public IrValue? GetCurrentValue(IrVarId variable)
     {
         return Values.TryGetValue(variable, out var value) ? value : null;
@@ -51,27 +10,24 @@ public sealed class IrProgramExecutionResult
 
 public sealed class IrProgramInterpreter(IrFactory factory)
 {
-    private readonly IrFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
-    private readonly IrInterpreter _terms = new(factory ?? throw new ArgumentNullException(nameof(factory)));
+    private readonly IrFactory _factory =
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
+    private readonly IrInterpreter _terms =
+        new(ArgumentNullGuard.NotNull(factory, nameof(factory)));
     public IrProgramExecutionResult Execute(
         IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues = null, int maximumSteps = 10000,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (program == null)
-        {
-            throw new ArgumentNullException(nameof(program));
-        }
+        ArgumentNullGuard.NotNull(program, nameof(program));
 
         if (!ReferenceEquals(program.Factory, _factory))
         {
             throw new ArgumentException("The program belongs to a different IR factory.", nameof(program));
         }
 
-        if (maximumSteps <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(maximumSteps));
-        }
+        maximumSteps = ArgumentNullGuard.RequirePositive(
+            maximumSteps, nameof(maximumSteps));
 
         var values = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         if (initialValues != null)

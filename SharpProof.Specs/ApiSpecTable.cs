@@ -43,10 +43,7 @@ public sealed partial class ApiSpecTable
 
     public static ApiSpecTable Create(IEnumerable<ApiSpecDeclaration> declarations)
     {
-        if (declarations == null)
-        {
-            throw new ArgumentNullException(nameof(declarations));
-        }
+        declarations = ArgumentNullGuard.NotNull(declarations, nameof(declarations));
 
         var ordered = declarations
             .Select(declaration => declaration ??
@@ -95,10 +92,8 @@ public sealed partial class ApiSpecTable
         string witnessIdentifier,
         [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ApiSpecTemplate? template)
     {
-        if (witnessIdentifier == null)
-        {
-            throw new ArgumentNullException(nameof(witnessIdentifier));
-        }
+        witnessIdentifier = ArgumentNullGuard.NotNull(
+            witnessIdentifier, nameof(witnessIdentifier));
 
         return _byWitness.TryGetValue(witnessIdentifier, out template);
     }
@@ -137,7 +132,7 @@ public sealed partial class ApiSpecTable
                 postcondition.Condition,
                 bySlot,
                 facets);
-            if (condition.Type != SpecValueType.Boolean)
+            if (condition.Type != IrTypeKind.Boolean)
             {
                 throw new ArgumentException("Postconditions must be boolean.", nameof(declaration));
             }
@@ -159,7 +154,7 @@ public sealed partial class ApiSpecTable
 
     private static SpecVarId AddVariable(
         SpecId id, ImmutableArray<SpecVariableInfo>.Builder variables,
-        SpecVariableRole role, int ordinal, SpecValueType type)
+        SpecVariableRole role, int ordinal, IrTypeKind type)
     {
         var variable = new SpecVarId(id, variables.Count);
         variables.Add(new SpecVariableInfo(variable, role, ordinal, type));
@@ -168,7 +163,7 @@ public sealed partial class ApiSpecTable
 
     private static SpecVarId? AddOptionalVariable(
         SpecId id, ImmutableArray<SpecVariableInfo>.Builder variables,
-        SpecVariableRole role, SpecValueType? type)
+        SpecVariableRole role, IrTypeKind? type)
     {
         return type.HasValue
             ? AddVariable(id, variables, role, -1, type.Value)
@@ -188,10 +183,8 @@ public sealed partial class ApiSpecTable
         ValidateText(target.ContainingTypeMetadataName, nameof(target.ContainingTypeMetadataName));
         ValidateText(target.MemberName, nameof(target.MemberName));
         ValidateDefined(target.MemberKind, nameof(target.MemberKind));
-        if (target.GenericArity < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(declaration));
-        }
+        _ = ArgumentNullGuard.RequireNonnegative(
+            target.GenericArity, nameof(declaration));
 
         if (target.ParameterTypes.IsDefault)
         {
@@ -223,17 +216,17 @@ public sealed partial class ApiSpecTable
 
         foreach (var parameterType in target.ParameterTypes)
         {
-            ValidateDefined(parameterType, nameof(target.ParameterTypes));
+            ValidateSpecType(parameterType, nameof(target.ParameterTypes));
         }
 
         if (target.ReceiverType.HasValue)
         {
-            ValidateDefined(target.ReceiverType.Value, nameof(target.ReceiverType));
+            ValidateSpecType(target.ReceiverType.Value, nameof(target.ReceiverType));
         }
 
         if (target.ResultType.HasValue)
         {
-            ValidateDefined(target.ResultType.Value, nameof(target.ResultType));
+            ValidateSpecType(target.ResultType.Value, nameof(target.ResultType));
         }
 
         if (target.IsStatic && target.ReceiverType.HasValue ||
@@ -334,7 +327,17 @@ public sealed partial class ApiSpecTable
 
     private static void ValidateDefined<T>(T value, string parameterName) where T : struct, Enum
     {
-        if (!Enum.IsDefined(typeof(T), value))
+        _ = ArgumentNullGuard.RequireDefined(value, parameterName);
+    }
+
+    private static void ValidateSpecType(IrTypeKind value, string parameterName)
+    {
+        if (value is not (
+            IrTypeKind.Boolean or
+            IrTypeKind.Integer or
+            IrTypeKind.String or
+            IrTypeKind.Reference or
+            IrTypeKind.Sequence))
         {
             throw new ArgumentOutOfRangeException(parameterName);
         }

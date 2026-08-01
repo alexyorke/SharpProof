@@ -5,7 +5,8 @@ public sealed class ContractBinder(
     IrFactory factory,
     ContractClauseInventoryBuilder? clauseInventory = null)
 {
-    private readonly IrFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
+    private readonly IrFactory _factory =
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
     private readonly ContractApiSymbols? _api = ContractApiSymbols.TryCreate(compilation);
     private readonly ContractIntrinsicValidator _intrinsics = new(compilation);
     private readonly ContractCanonicalization _canonicalization =
@@ -25,10 +26,7 @@ public sealed class ContractBinder(
         IMethodSymbol target,
         IOperation? implementationBody = null)
     {
-        if (target == null)
-        {
-            throw new ArgumentNullException(nameof(target));
-        }
+        target = ArgumentNullGuard.NotNull(target, nameof(target));
 
         return implementationBody == null
             ? _bindings.GetOrAdd(target, BindUncached)
@@ -39,10 +37,7 @@ public sealed class ContractBinder(
         IMethodSymbol target,
         IOperation? implementationBody = null)
     {
-        if (target == null)
-        {
-            throw new ArgumentNullException(nameof(target));
-        }
+        target = ArgumentNullGuard.NotNull(target, nameof(target));
 
         return implementationBody == null
             ? _requiresBindings.GetOrAdd(target, BindRequiresUncached)
@@ -52,7 +47,8 @@ public sealed class ContractBinder(
     public ContractClauseInventory GetClauseInventory(IMethodSymbol target)
     {
         return _clauseInventory.Create(
-            ContractClauseInventoryBuilder.NormalizeCallable(target ?? throw new ArgumentNullException(nameof(target))));
+            ContractClauseInventoryBuilder.NormalizeCallable(
+                ArgumentNullGuard.NotNull(target, nameof(target))));
     }
 
     private ContractBindingResult BindUncached(IMethodSymbol target)

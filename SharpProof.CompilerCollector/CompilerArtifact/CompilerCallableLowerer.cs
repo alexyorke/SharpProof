@@ -10,22 +10,15 @@ internal sealed class CompilerCallableLowerer
 
     internal CompilerCallableLowerer(CSharpCompilation compilation, IrFactory factory)
     {
-        if (compilation == null)
-        {
-            throw new ArgumentNullException(nameof(compilation));
-        }
-
-        _factory = factory ?? throw new ArgumentNullException(nameof(factory));
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _contracts = new ContractBinder(compilation, factory);
         _apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
     }
 
     internal CompilerCallablePreparation Prepare(ManifestCallableTarget target, CancellationToken cancellationToken = default)
     {
-        if (target == null)
-        {
-            throw new ArgumentNullException(nameof(target));
-        }
+        target = ArgumentNullGuard.NotNull(target, nameof(target));
 
         cancellationToken.ThrowIfCancellationRequested();
         if (!target.IsVerifierSupported || target.Declaration is not BaseMethodDeclarationSyntax || target.SemanticModel == null)
@@ -57,7 +50,8 @@ internal sealed class CompilerCallableLowerer
         var assumptionOrdinal = 0;
         var claimOrdinal = 0;
         ImmutableArray<CompilerPreparedClause> clauses = [.. contracts.Clauses.Select(clause => new CompilerPreparedClause(
-            Kind(clause.Kind), clause.Condition, CompilerEvidence(clause.Evidence),
+            CompilerLoweringWireMappings.ToCompiler(clause.Kind), clause.Condition,
+            CompilerLoweringWireMappings.ToCompiler(clause.Evidence),
             clause.Kind == BoundContractKind.Ensures ? target.Claims[claimOrdinal++].Entry.ClaimId : null,
             clause.Kind == BoundContractKind.Requires ? preconditions[preconditionOrdinal++].Id :
                 clause.Kind == BoundContractKind.Assume ? userAssumptions[assumptionOrdinal++].Id : null))];
@@ -194,7 +188,8 @@ internal sealed class CompilerCallableLowerer
             if (claim.Entry.Ordinal != index ||
                 claim.Entry.Kind != WorkerClaimKind.Postcondition ||
                 claim.Entry.CallableId != target.Entry.CallableId ||
-                claim.Entry.Evidence != ManifestEvidence(ensures[index].Evidence) ||
+                claim.Entry.Evidence !=
+                    CompilerLoweringWireMappings.ToWorkerEvidence(ensures[index].Evidence) ||
                 (ensures[index].Evidence == BoundContractEvidence.ClosedAttribute) != (claim.SourceAttribute != null) ||
                 (ensures[index].Evidence != BoundContractEvidence.ClosedAttribute) != (claim.SourceOperation != null))
             {
@@ -206,36 +201,20 @@ internal sealed class CompilerCallableLowerer
 
     private static CompilerCanonicalVariable CreateVariable(BoundContractVariable variable, BoundMethodContracts contracts)
     {
-        var source = variable.Role switch
-        {
-            BoundContractVariableRole.Parameter when variable.Symbol is IParameterSymbol parameter => parameter.Type,
-            BoundContractVariableRole.Receiver => variable.Symbol as ITypeSymbol,
-            BoundContractVariableRole.Result => contracts.Target.ReturnType,
-            _ => null
-        };
-        return new CompilerCanonicalVariable(Role(variable.Role), variable.Ordinal, variable.Variable,
-            variable.CurrentStateVariable, IntegerInterval(source?.SpecialType), ModelLabel(variable));
+        var source = CompilerCallableProjections.GetVariableSource(
+            variable,
+            contracts);
+        return new CompilerCanonicalVariable(
+            CompilerLoweringWireMappings.ToCompiler(variable.Role), variable.Ordinal, variable.Variable,
+            variable.CurrentStateVariable,
+            IntegerInterval(source?.SpecialType),
+            CompilerCallableProjections.GetModelLabel(variable));
     }
 
     private static CompilerIntegerInterval? IntegerInterval(SpecialType? type)
     {
         return type.HasValue && CSharpScalarSemantics.TryGetInteger(type.Value, out var semantics) && semantics.BitWidth < 64
             ? new(semantics.Minimum, semantics.Maximum) : null;
-    }
-
-    private static string ModelLabel(BoundContractVariable variable)
-    {
-        return variable.Role switch
-        {
-            BoundContractVariableRole.Parameter => "parameter:" + variable.Ordinal.ToString(CultureInfo.InvariantCulture),
-            BoundContractVariableRole.Receiver => "receiver",
-            BoundContractVariableRole.Result => "result",
-            BoundContractVariableRole.PreState =>
-                "pre:" +
-                (variable.CurrentStateVariable?.Value ?? -1)
-                    .ToString(CultureInfo.InvariantCulture),
-            _ => "variable:" + variable.Variable.Value.ToString(CultureInfo.InvariantCulture)
-        };
     }
 
     private bool TryPrepareSpecCall(IrCallInstruction call, IInvocationOperation invocation, string callIdentity,
@@ -291,22 +270,22 @@ internal sealed class CompilerCallableLowerer
                 || cardinality is { Result: SpecCardinality.Exact, ExactCount: not null });
     }
 
-    private bool TryGetSpecResultType(ITypeSymbol? sourceType, SpecValueType? specType,
+    private bool TryGetSpecResultType(ITypeSymbol? sourceType, IrTypeKind? specType,
         IrTypeId loweredResultType, out IrTypeId resultType)
     {
         switch (specType)
         {
-            case SpecValueType.Boolean when sourceType?.SpecialType == SpecialType.System_Boolean:
+            case IrTypeKind.Boolean when sourceType?.SpecialType == SpecialType.System_Boolean:
                 resultType = _factory.BooleanType;
                 return true;
-            case SpecValueType.Integer when CSharpScalarSemantics.IsSupportedInteger(
+            case IrTypeKind.Integer when CSharpScalarSemantics.IsSupportedInteger(
                 sourceType?.SpecialType ?? SpecialType.None):
                 resultType = _factory.IntegerType;
                 return true;
-            case SpecValueType.String when sourceType?.SpecialType == SpecialType.System_String:
+            case IrTypeKind.String when sourceType?.SpecialType == SpecialType.System_String:
                 resultType = _factory.StringType;
                 return true;
-            case SpecValueType.Sequence when sourceType is IArrayTypeSymbol
+            case IrTypeKind.Sequence when sourceType is IArrayTypeSymbol
                 && _factory.GetTypeInfo(loweredResultType).Kind == IrTypeKind.Sequence:
                 resultType = loweredResultType;
                 return true;
@@ -414,11 +393,6 @@ internal sealed class CompilerCallableLowerer
             instructions += block.Instructions.Length;
             foreach (var successor in GetSuccessors(block.Terminator))
             {
-                if (colors.TryGetValue(successor, out color) && color == 1)
-                {
-                    return false;
-                }
-
                 if (!Visit(successor))
                 {
                     return false;
@@ -485,62 +459,16 @@ internal sealed class CompilerCallableLowerer
             clause.Invocation.Syntax.SyntaxTree == expression.SyntaxTree && clause.Invocation.Syntax.Span == expression.Expression.Span);
     }
 
-    private static WorkerClaimEvidence ManifestEvidence(BoundContractEvidence evidence)
-    {
-        return evidence switch
-        {
-            BoundContractEvidence.CompilerBoundInvocation => WorkerClaimEvidence.DirectClause,
-            BoundContractEvidence.Companion => WorkerClaimEvidence.CompanionClause,
-            BoundContractEvidence.ClosedAttribute => WorkerClaimEvidence.ReturnAttribute,
-            _ => WorkerClaimEvidence.Unspecified
-        };
-    }
-
-    private static CompilerContractKind Kind(BoundContractKind value)
-    {
-        return value switch
-        {
-            BoundContractKind.Requires => CompilerContractKind.Requires,
-            BoundContractKind.Ensures => CompilerContractKind.Ensures,
-            BoundContractKind.Assume => CompilerContractKind.Assume,
-            _ => throw new ArgumentOutOfRangeException(nameof(value))
-        };
-    }
-
-    private static CompilerContractEvidence CompilerEvidence(BoundContractEvidence value)
-    {
-        return value switch
-        {
-            BoundContractEvidence.CompilerBoundInvocation => CompilerContractEvidence.CompilerBoundInvocation,
-            BoundContractEvidence.ClosedAttribute => CompilerContractEvidence.ClosedAttribute,
-            BoundContractEvidence.Companion => CompilerContractEvidence.Companion,
-            _ => throw new ArgumentOutOfRangeException(nameof(value))
-        };
-    }
-
-    private static CompilerVariableRole Role(BoundContractVariableRole value)
-    {
-        return value switch
-        {
-            BoundContractVariableRole.Receiver => CompilerVariableRole.Receiver,
-            BoundContractVariableRole.Parameter => CompilerVariableRole.Parameter,
-            BoundContractVariableRole.Result => CompilerVariableRole.Result,
-            BoundContractVariableRole.PreState => CompilerVariableRole.PreState,
-            _ => throw new ArgumentOutOfRangeException(nameof(value))
-        };
-    }
-
     private static WorkerClaimReason MapBindingFailure(ContractBindingFailure failure)
     {
-        return failure switch
+        try
         {
-            ContractBindingFailure.UnsupportedExpression => WorkerClaimReason.UnsupportedExpression,
-            ContractBindingFailure.ResultOutsideEnsures or ContractBindingFailure.OldOutsideEnsures or ContractBindingFailure.NestedOld or
-            ContractBindingFailure.InvalidIntrinsicSignature or ContractBindingFailure.NonBooleanCondition or
-            ContractBindingFailure.InvalidClosedAttribute or
-            ContractBindingFailure.InvalidClausePlacement => WorkerClaimReason.UnsupportedContract,
-            _ => WorkerClaimReason.UnsupportedCallable
-        };
+            return CompilerLoweringWireMappings.ToWorkerFailure(failure);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return WorkerClaimReason.UnsupportedCallable;
+        }
     }
 
     private bool IsKnownPure(IMethodSymbol method)

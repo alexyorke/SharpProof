@@ -3,7 +3,7 @@ using System.Reflection.Metadata;
 namespace SharpProof.Analyzer;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
+public sealed partial class SharpProofAnalyzer : DiagnosticAnalyzer
 {
     private readonly IAnalyzerSessionFactory _sessionFactory;
 
@@ -14,8 +14,8 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
 
     internal SharpProofAnalyzer(IAnalyzerSessionFactory sessionFactory)
     {
-        _sessionFactory = sessionFactory ??
-            throw new ArgumentNullException(nameof(sessionFactory));
+        _sessionFactory = ArgumentNullGuard.NotNull(
+            sessionFactory, nameof(sessionFactory));
     }
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
@@ -23,10 +23,7 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
 
     public override void Initialize(AnalysisContext context)
     {
-        if (context == null)
-        {
-            throw new ArgumentNullException(nameof(context));
-        }
+        context = ArgumentNullGuard.NotNull(context, nameof(context));
 
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(
@@ -375,18 +372,9 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
         StringHandle namespaceHandle,
         StringHandle nameHandle)
     {
-        if (!string.Equals(
-                reader.GetString(namespaceHandle),
-                "SharpProof.Attributes",
-                StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        return reader.GetString(nameHandle) is
-            "NotNullAttribute" or
-            "PositiveAttribute" or
-            "InRangeAttribute";
+        return ContractApiMetadata.IsClosedAttributeTypeName(
+            reader.GetString(namespaceHandle),
+            reader.GetString(nameHandle));
     }
 
     private static bool NamespaceContainsClosedPrecondition(
@@ -559,10 +547,7 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
             invalidValue.Reason);
     }
 
-    private readonly record struct AdvisoryActivation(
-        bool RequiresSymbolAnalysis,
-        bool RequiresOperationAnalysis,
-        bool RequiresFullOperationAnalysis)
+    private readonly partial record struct AdvisoryActivation
     {
         internal static AdvisoryActivation Full { get; } =
             new(

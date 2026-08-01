@@ -4,9 +4,14 @@
     <LangVersion>12.0</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <IsPackable>false</IsPackable>
+    <DefineConstants>$(DefineConstants);SHARPPROOF_DATAFLOW_ARGUMENT_GUARD</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.Collections.Immutable" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\SharpProof.Ir\ArgumentNullGuard.cs"
+             Link="ArgumentNullGuard.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj"

@@ -166,19 +166,24 @@ internal static class ContractForSymbolMatcher
         IMethodSymbol target,
         IMethodSymbol companion)
     {
-        if (!string.Equals(target.Name, companion.Name, StringComparison.Ordinal) ||
-            !companion.IsStatic ||
-            companion.Arity != target.Arity ||
-            companion.ReturnsByRef != target.ReturnsByRef ||
-            companion.ReturnsByRefReadonly != target.ReturnsByRefReadonly ||
+        if ((target.Name, target.Arity, target.ReturnsByRef,
+                target.ReturnsByRefReadonly, true) !=
+            (companion.Name, companion.Arity, companion.ReturnsByRef,
+                companion.ReturnsByRefReadonly, companion.IsStatic) ||
             !TypesMatch(target.ReturnType, companion.ReturnType, target, companion))
         {
             return false;
         }
 
         var offset = target.IsStatic ? 0 : 1;
-        return companion.Parameters.Length == target.Parameters.Length + offset &&
-               (target.IsStatic || IsReceiver(target, companion.Parameters[0])) &&
+        if (companion.Parameters.Length != target.Parameters.Length + offset)
+        {
+            return false;
+        }
+
+        var receiverMatches =
+            target.IsStatic || IsReceiver(target, companion.Parameters[0]);
+        return receiverMatches &&
                target.Parameters.Select((parameter, index) =>
                        ParametersMatch(parameter, companion.Parameters[index + offset]))
                    .All(static matches => matches) &&
@@ -258,11 +263,10 @@ internal static class ContractForSymbolMatcher
 
     private static bool ParametersMatch(IParameterSymbol left, IParameterSymbol right)
     {
-        return left.RefKind == right.RefKind &&
-        left.ScopedKind == right.ScopedKind &&
-        left.IsParams == right.IsParams &&
-        left.IsOptional == right.IsOptional &&
-        left.HasExplicitDefaultValue == right.HasExplicitDefaultValue &&
+        return (left.RefKind, left.ScopedKind, left.IsParams,
+                   left.IsOptional, left.HasExplicitDefaultValue) ==
+               (right.RefKind, right.ScopedKind, right.IsParams,
+                   right.IsOptional, right.HasExplicitDefaultValue) &&
         (!left.HasExplicitDefaultValue || Equals(left.ExplicitDefaultValue, right.ExplicitDefaultValue)) &&
         TypesMatch(left.Type, right.Type, left.ContainingSymbol, right.ContainingSymbol);
     }
@@ -281,14 +285,16 @@ internal static class ContractForSymbolMatcher
         ITypeParameterSymbol left,
         ITypeParameterSymbol right)
     {
-        if (left.HasConstructorConstraint != right.HasConstructorConstraint ||
-            left.HasReferenceTypeConstraint != right.HasReferenceTypeConstraint ||
-            left.ReferenceTypeConstraintNullableAnnotation != right.ReferenceTypeConstraintNullableAnnotation ||
-            left.HasValueTypeConstraint != right.HasValueTypeConstraint ||
-            left.HasNotNullConstraint != right.HasNotNullConstraint ||
-            left.HasUnmanagedTypeConstraint != right.HasUnmanagedTypeConstraint ||
-            left.AllowsRefLikeType != right.AllowsRefLikeType ||
-            left.ConstraintTypes.Length != right.ConstraintTypes.Length)
+        if ((left.HasConstructorConstraint, left.HasReferenceTypeConstraint,
+                left.ReferenceTypeConstraintNullableAnnotation,
+                left.HasValueTypeConstraint, left.HasNotNullConstraint,
+                left.HasUnmanagedTypeConstraint, left.AllowsRefLikeType,
+                left.ConstraintTypes.Length) !=
+            (right.HasConstructorConstraint, right.HasReferenceTypeConstraint,
+                right.ReferenceTypeConstraintNullableAnnotation,
+                right.HasValueTypeConstraint, right.HasNotNullConstraint,
+                right.HasUnmanagedTypeConstraint, right.AllowsRefLikeType,
+                right.ConstraintTypes.Length))
         {
             return false;
         }
@@ -320,9 +326,8 @@ internal static class ContractForSymbolMatcher
             return left is null && right is null;
         }
 
-        if (GetAnnotation(left, normalizeMappedTypeParameters) !=
-                GetAnnotation(right, normalizeMappedTypeParameters) ||
-            left.TypeKind != right.TypeKind ||
+        if ((GetAnnotation(left, normalizeMappedTypeParameters), left.TypeKind) !=
+                (GetAnnotation(right, normalizeMappedTypeParameters), right.TypeKind) ||
             left.TypeKind == TypeKind.Error)
         {
             return false;
@@ -331,16 +336,16 @@ internal static class ContractForSymbolMatcher
         if (left is ITypeParameterSymbol leftParameter &&
             right is ITypeParameterSymbol rightParameter)
         {
-            return leftParameter.TypeParameterKind == rightParameter.TypeParameterKind &&
-                   leftParameter.Ordinal == rightParameter.Ordinal &&
+            return (leftParameter.TypeParameterKind, leftParameter.Ordinal) ==
+                   (rightParameter.TypeParameterKind, rightParameter.Ordinal) &&
                    OwnersMatch(leftParameter.ContainingSymbol,
                        rightParameter.ContainingSymbol, leftScope, rightScope);
         }
 
         if (left is IArrayTypeSymbol leftArray && right is IArrayTypeSymbol rightArray)
         {
-            return leftArray.Rank == rightArray.Rank &&
-                   leftArray.IsSZArray == rightArray.IsSZArray &&
+            return (leftArray.Rank, leftArray.IsSZArray) ==
+                   (rightArray.Rank, rightArray.IsSZArray) &&
                    TypesMatch(leftArray.ElementType, rightArray.ElementType,
                        leftScope, rightScope, normalizeMappedTypeParameters);
         }
@@ -356,12 +361,12 @@ internal static class ContractForSymbolMatcher
             return SymbolEqualityComparer.IncludeNullability.Equals(left, right);
         }
 
-        if (!SymbolEqualityComparer.Default.Equals(
+        if ((leftNamed.TypeArguments.Length, leftNamed.IsTupleType) !=
+                (rightNamed.TypeArguments.Length, rightNamed.IsTupleType) ||
+            !SymbolEqualityComparer.Default.Equals(
                 leftNamed.OriginalDefinition, rightNamed.OriginalDefinition) ||
             !TypesMatch(leftNamed.ContainingType, rightNamed.ContainingType,
                 leftScope, rightScope, normalizeMappedTypeParameters) ||
-            leftNamed.TypeArguments.Length != rightNamed.TypeArguments.Length ||
-            leftNamed.IsTupleType != rightNamed.IsTupleType ||
             !leftNamed.TypeArguments.Select((argument, index) =>
                     TypesMatch(argument, rightNamed.TypeArguments[index],
                         leftScope, rightScope, normalizeMappedTypeParameters))

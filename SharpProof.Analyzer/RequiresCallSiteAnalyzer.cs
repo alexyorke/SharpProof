@@ -1,6 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal static class RequiresCallSiteAnalyzer
+internal static partial class RequiresCallSiteAnalyzer
 {
     internal static AnalyzerSemanticOutcome Analyze(
         IMethodSymbol caller,
@@ -416,5 +416,4 @@ internal static class RequiresCallSiteAnalyzer
             .Type?.SpecialType == SpecialType.System_String;
     }
 
-    private readonly record struct ClauseEvaluation(bool? Value, IrTerm Condition);
 }

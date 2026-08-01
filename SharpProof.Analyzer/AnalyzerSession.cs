@@ -55,8 +55,8 @@ internal sealed class AnalyzerSession
         Action<IMethodSymbol, AnalyzerSemanticOutcome>? outcomeObserver = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        Compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
-        Configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        Compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        Configuration = ArgumentNullGuard.NotNull(configuration, nameof(configuration));
         _outcomeObserver = outcomeObserver;
         _attributes = new(
             () => ContractSelectionInventory.ForCompilation(compilation),

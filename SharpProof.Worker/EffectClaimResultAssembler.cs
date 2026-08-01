@@ -9,7 +9,8 @@ internal static class EffectClaimResultAssembler
         return Assemble(
             target,
             evidence,
-            CallableEntryFeasibility.Feasible);
+            CallableEntryFeasibility.Feasible,
+            CancellationToken.None);
     }
 
     internal static WorkerClaimResult Assemble(
@@ -17,6 +18,30 @@ internal static class EffectClaimResultAssembler
         CompilerEffectClaimArtifact evidence,
         CallableEntryFeasibility entryFeasibility)
     {
+        return Assemble(
+            target,
+            evidence,
+            entryFeasibility,
+            CancellationToken.None);
+    }
+
+    internal static WorkerClaimResult Assemble(
+        CompilerCallablePreparation target,
+        CompilerEffectClaimArtifact evidence,
+        CallableEntryFeasibility entryFeasibility,
+        CancellationToken cancellationToken)
+    {
+        if (evidence.Outcome == WorkerClaimOutcome.Unknown &&
+            evidence.Reason == WorkerClaimReason.UnsupportedContract)
+        {
+            return CallableClaimResultAssembler.Create(
+                target,
+                evidence.ClaimId,
+                evidence.Outcome,
+                evidence.Reason,
+                evidence.Certainty);
+        }
+
         if (entryFeasibility.IsUnknown)
         {
             return CallableClaimResultAssembler.Create(
@@ -47,12 +72,28 @@ internal static class EffectClaimResultAssembler
 
         if (evidence.Outcome == WorkerClaimOutcome.Refuted)
         {
-            return CallableClaimResultAssembler.Create(
+            var replayed = EffectCounterexampleReplayer.Replay(
+                target,
+                evidence,
+                cancellationToken);
+            if (replayed == null)
+            {
+                return CallableClaimResultAssembler.Create(
+                    target,
+                    evidence.ClaimId,
+                    WorkerClaimOutcome.Unknown,
+                    WorkerClaimReason.CounterexampleReplayFailed,
+                    WorkerEffectEvidenceCertainty.Unavailable);
+            }
+
+            var refuted = CallableClaimResultAssembler.Create(
                 target,
                 evidence.ClaimId,
-                WorkerClaimOutcome.Unknown,
-                WorkerClaimReason.CounterexampleReplayFailed,
-                WorkerEffectEvidenceCertainty.Unavailable);
+                WorkerClaimOutcome.Refuted,
+                WorkerClaimReason.None,
+                WorkerEffectEvidenceCertainty.DefiniteViolation);
+            refuted.EffectWitness = replayed;
+            return refuted;
         }
 
         var result = CallableClaimResultAssembler.Create(

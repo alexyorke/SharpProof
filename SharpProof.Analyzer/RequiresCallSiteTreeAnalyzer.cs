@@ -1,6 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal static class RequiresCallSiteTreeAnalyzer
+internal static partial class RequiresCallSiteTreeAnalyzer
 {
     internal static AnalyzerSemanticOutcome Analyze(
         IMethodSymbol caller,
@@ -352,10 +352,4 @@ internal static class RequiresCallSiteTreeAnalyzer
         }
     }
 
-    private readonly record struct NestedCallable(
-        IMethodSymbol Method,
-        SyntaxNode Declaration,
-        IFlowAnonymousFunctionOperation?
-            AnonymousFunction,
-        bool IsExpressionTree);
 }
