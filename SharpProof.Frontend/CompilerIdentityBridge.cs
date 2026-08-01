@@ -6,15 +6,8 @@ public static class CompilerIdentityBridge
         IrFactory factory,
         ISymbol symbol)
     {
-        if (factory == null)
-        {
-            throw new ArgumentNullException(nameof(factory));
-        }
-
-        if (symbol == null)
-        {
-            throw new ArgumentNullException(nameof(symbol));
-        }
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        symbol = ArgumentNullGuard.NotNull(symbol, nameof(symbol));
 
         return factory.InternExternalIdentity<ISymbol>(
             symbol,
@@ -34,15 +27,8 @@ public static class CompilerIdentityBridge
         ISymbol? symbol,
         bool isPure)
     {
-        if (factory == null)
-        {
-            throw new ArgumentNullException(nameof(factory));
-        }
-
-        if (operation == null)
-        {
-            throw new ArgumentNullException(nameof(operation));
-        }
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
 
         if (symbol != null)
         {
@@ -124,19 +110,8 @@ public static class CompilerIdentityBridge
             (operation as IBinaryOperation)?.OperatorKind,
             (operation as IUnaryOperation)?.OperatorKind,
             (operation as IInstanceReferenceOperation)?.ReferenceKind,
-            operation switch
-            {
-                IBinaryOperation binary => binary.IsChecked,
-                IUnaryOperation unary => unary.IsChecked,
-                IConversionOperation conversion => conversion.IsChecked,
-                _ => false
-            },
-            operation switch
-            {
-                IBinaryOperation binary => binary.IsLifted,
-                IUnaryOperation unary => unary.IsLifted,
-                _ => false
-            });
+            CompilerIdentityProjections.IsChecked(operation),
+            CompilerIdentityProjections.IsLifted(operation));
     }
 
     public static string CreateSymbolDisplay(ISymbol? symbol)

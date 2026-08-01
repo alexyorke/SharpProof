@@ -22,12 +22,7 @@ public readonly record struct SourceLocationId
 {
     public SourceLocationId(int value)
     {
-        if (value < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(value));
-        }
-
-        Value = value;
+        Value = ArgumentNullGuard.RequireNonnegative(value, nameof(value));
     }
 
     public int Value
@@ -93,7 +88,7 @@ public sealed class Assumption
         ProofJustification justification)
     {
         FactoryGuards.RequireBooleanTerm(factory, predicate, nameof(predicate));
-        Justification = justification ?? throw new ArgumentNullException(nameof(justification));
+        Justification = ArgumentNullGuard.NotNull(justification, nameof(justification));
         Predicate = predicate;
     }
 
@@ -107,12 +102,20 @@ public sealed class Assumption
     }
 }
 
-public sealed class Goal(IrFactory factory, IrTerm predicate,
-    ProofDiagnosticKind diagnostic, SourceLocationId location)
+public sealed partial class Goal
 {
-    public IrTerm Predicate { get; } = FactoryGuards.RequireBooleanTerm(factory, predicate, nameof(predicate));
-    public ProofDiagnosticKind Diagnostic { get; } = diagnostic;
-    public SourceLocationId Location { get; } = location;
+    public Goal(
+        IrFactory factory,
+        IrTerm predicate,
+        ProofDiagnosticKind diagnostic,
+        SourceLocationId location)
+        : this(
+            FactoryGuards.RequireBooleanTerm(factory, predicate, nameof(predicate)),
+            diagnostic,
+            location,
+            default)
+    {
+    }
 }
 
 internal static class FactoryGuards
@@ -122,15 +125,8 @@ internal static class FactoryGuards
         IrTerm term,
         string parameterName)
     {
-        if (factory == null)
-        {
-            throw new ArgumentNullException(nameof(factory));
-        }
-
-        if (term == null)
-        {
-            throw new ArgumentNullException(parameterName);
-        }
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        term = ArgumentNullGuard.NotNull(term, parameterName);
 
         factory.EnsureTerm(term, parameterName);
         if (term.Type != factory.BooleanType)

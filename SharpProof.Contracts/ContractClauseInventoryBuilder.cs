@@ -4,7 +4,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
 {
     private static readonly ConditionalWeakTable<Compilation, ContractClauseInventoryBuilder> Cache = new();
     private readonly Compilation _compilation =
-        compilation ?? throw new ArgumentNullException(nameof(compilation));
+        ArgumentNullGuard.NotNull(compilation, nameof(compilation));
     private readonly ContractApiIdentityResolver _identity =
         ContractApiIdentityResolver.ForCompilation(compilation);
     private readonly ContractClauseSymbols? _api = ContractClauseSymbols.TryCreate(compilation);
@@ -28,10 +28,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IMethodSymbol callable,
         IOperation? implementationBody = null)
     {
-        if (callable == null)
-        {
-            throw new ArgumentNullException(nameof(callable));
-        }
+        callable = ArgumentNullGuard.NotNull(callable, nameof(callable));
 
         callable = NormalizeCallable(callable);
         return implementationBody == null

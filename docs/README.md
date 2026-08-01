@@ -44,6 +44,41 @@ The implementation remains the authority for enumerated surfaces:
   is its checked-in compiled projection, while
   `CompilerManifestArtifact.cs` validates the closed compiler-evidence
   envelope.
+- `SharpProof.Frontend/ContractApi.catalog.json` is the authoritative contract
+  API vocabulary. `Generate-ContractApiCatalog.ps1` produces declarative
+  descriptors; `ContractApiMetadataRuntime.cs` contains the handwritten lookup
+  behavior.
+- `SharpProof.Analyzer/AnalyzerDiagnostic.catalog.json` owns finite diagnostic
+  wording projections for intrinsic and clause-placement failures.
+  `Generate-AnalyzerDiagnosticCatalog.ps1` produces the projection; diagnostic
+  selection and reporting remain handwritten.
+- `SharpProof.Projection.catalog.json` owns finite output, result, clause-label,
+  policy, operation-stage, and effect-wiring projections. `Generate-ProjectionCatalog.ps1` produces
+  checked-in tables; validation, replay, and analysis algorithms remain
+  handwritten.
+- `SharpProof.DeclarativeModels.catalog.json` is the shared declarative storage
+  catalog for cross-project result records and model containers.
+  `Generate-DeclarativeModels.ps1` produces checked-in storage projections;
+  validation, indexing, reconstruction, and fail-closed analysis algorithms
+  remain handwritten.
+- `SharpProof.Contracts/BoundContractModel.schema.json` is the authoritative
+  bound-contract model vocabulary. `Generate-BoundContractModel.ps1` produces
+  the data containers and enum projection; binding and failure construction
+  remain handwritten.
+- `SharpProof.Effects/EffectContractMappings.catalog.json` is the authoritative
+  effect-contract, region, direct-event, and reference-family vocabulary.
+  `Generate-EffectContractMappings.ps1` produces its declarative mapping
+  tables; effect projection and validation algorithms remain handwritten.
+- `SharpProof.Frontend/OperationSupport.catalog.json` is the authoritative
+  finite Roslyn operation vocabulary for contract-expression lowering and
+  effect discovery. `Generate-OperationSupportCatalog.ps1` produces its
+  declarative stage tables; support queries and stage-specific validation
+  remain handwritten.
+- `SharpProof.Ir/IrModel.schema.json` and the
+  `portableIrSlotMappings` section of the compiler-artifact schema own typed IR
+  model and wire vocabulary. Their generated outputs contain declarative tables
+  and wire projection adapters; indexing, validation, reconstruction, and
+  fail-closed algorithms remain handwritten.
 - `eng/acceptance/contract.json` declares release-gate budgets. Package
   defaults that are not release-gate fields live in the portable and verifier
   build-transitive props and targets.

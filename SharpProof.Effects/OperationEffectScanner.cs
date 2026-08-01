@@ -2,12 +2,6 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SharpProof.Effects;
 
-internal readonly record struct EffectCallSite(
-    IMethodSymbol Target,
-    EffectRegionSet Receiver,
-    ImmutableArray<EffectRegionSet> Arguments,
-    IOperation Origin);
-
 internal sealed class OperationEffectScanner
 {
     private readonly ManagedFlowResult? _abstractFlow;
@@ -50,6 +44,7 @@ internal sealed class OperationEffectScanner
 
     internal EffectSummary Scan(IOperation operation)
     {
+        operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
         if (_scanDepth++ == 0)
         {
             _directOperation = _allowDirectWitnesses
@@ -114,11 +109,6 @@ internal sealed class OperationEffectScanner
 
     private EffectSummary Scan(IOperation operation, EffectAccess access)
     {
-        if (operation == null)
-        {
-            throw new ArgumentNullException(nameof(operation));
-        }
-
         if (ReferenceEquals(operation, _directOperation))
         {
             RecordDirect(operation);
@@ -704,7 +694,9 @@ internal sealed class OperationEffectScanner
                 HasNonThrowingConstructorSpec(creation):
                 _ = RecordAllocation(creation);
                 var exact = IsFrameworkException(exceptionType);
-                AddWitness(EffectContractKind.Throws, "explicit-throw",
+                AddWitness(
+                    EffectContractKind.Throws,
+                    EffectDirectEventKind.ExplicitThrow,
                     Symbol(exceptionType) + (exact ? ";exact-type=true" : ";exact-type=false"),
                     thrown, exact ? exceptionType : null);
                 break;
@@ -717,7 +709,9 @@ internal sealed class OperationEffectScanner
                 break;
             case IInvocationOperation invocation when IsMonitorCall(invocation):
                 AddSynchronization(
-                    "synchronization-call", Symbol(invocation.TargetMethod), invocation);
+                    EffectDirectEventKind.MonitorCall,
+                    Symbol(invocation.TargetMethod),
+                    invocation);
                 break;
         }
     }
@@ -731,7 +725,9 @@ internal sealed class OperationEffectScanner
         }
 
         AddSynchronization(
-            "synchronization-lock", FrameworkTypeMetadataNames.Monitor, @lock);
+            EffectDirectEventKind.EmptyLock,
+            FrameworkTypeMetadataNames.Monitor,
+            @lock);
     }
 
     private bool RecordDirectLockReceiver(IOperation value)
@@ -773,7 +769,9 @@ internal sealed class OperationEffectScanner
             return false;
         }
 
-        AddWitness(EffectContractKind.Allocates, "managed-allocation",
+        AddWitness(
+            EffectContractKind.Allocates,
+            EffectDirectEventKind.ManagedObjectAllocation,
             Symbol(creation.Constructor ?? (ISymbol?)creation.Type), creation);
         return true;
     }
@@ -785,8 +783,11 @@ internal sealed class OperationEffectScanner
             return false;
         }
 
-        AddWitness(EffectContractKind.Allocates,
-            "managed-array-allocation", Symbol(array.Type), array);
+        AddWitness(
+            EffectContractKind.Allocates,
+            EffectDirectEventKind.ManagedArrayAllocation,
+            Symbol(array.Type),
+            array);
         return true;
     }
 
@@ -804,10 +805,17 @@ internal sealed class OperationEffectScanner
 
         AddWitness(
             isWrite ? EffectContractKind.WritesReceiverState : EffectContractKind.ReadsReceiverState,
-            isWrite ? "direct-field-write" : "direct-field-read", Symbol(field.Field), field);
+            isWrite
+                ? EffectDirectEventKind.ReceiverFieldWrite
+                : EffectDirectEventKind.ReceiverFieldRead,
+            Symbol(field.Field),
+            field);
         if (field.Field.IsVolatile)
         {
-            AddSynchronization("volatile-field-access", Symbol(field.Field), field);
+            AddSynchronization(
+                EffectDirectEventKind.VolatileFieldAccess,
+                Symbol(field.Field),
+                field);
         }
 
         return true;
@@ -844,17 +852,27 @@ internal sealed class OperationEffectScanner
     }
 
     private void AddWitness(
-        EffectContractKind effects, string kind, string detail, IOperation operation,
+        EffectContractKind effects,
+        EffectDirectEventKind eventKind,
+        string detail,
+        IOperation operation,
         INamedTypeSymbol? exceptionType = null,
         EffectContractCapabilityKind capabilities = EffectContractCapabilityKind.None)
     {
         _directWitnesses.Add(new EffectDirectWitness(
-            effects, capabilities, exceptionType, kind, detail, operation));
+            effects, capabilities, exceptionType, eventKind, detail, operation));
     }
 
-    private void AddSynchronization(string kind, string detail, IOperation operation)
+    private void AddSynchronization(
+        EffectDirectEventKind eventKind,
+        string detail,
+        IOperation operation)
     {
-        AddWitness(EffectContractKind.Synchronizes, kind, detail, operation,
+        AddWitness(
+            EffectContractKind.Synchronizes,
+            eventKind,
+            detail,
+            operation,
             capabilities: EffectContractCapabilityKind.Synchronization);
     }
 

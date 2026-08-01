@@ -1,49 +1,16 @@
 namespace SharpProof.Ir;
 
-public sealed class IrPrinter(IrFactory factory)
+public sealed partial class IrPrinter(IrFactory factory)
 {
     private readonly IrFactory _factory =
-        factory ?? throw new ArgumentNullException(nameof(factory));
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
 
     public string Print(IrTerm term)
     {
-        if (term == null)
-        {
-            throw new ArgumentNullException(nameof(term));
-        }
+        ArgumentNullGuard.NotNull(term, nameof(term));
 
         _factory.EnsureTerm(term, nameof(term));
         return Format(term);
-    }
-
-    private string Format(IrTerm term)
-    {
-        return term switch
-        {
-            IrBooleanTerm value => value.Value ? "true" : "false",
-            IrIntegerTerm value =>
-                value.Value.ToString(CultureInfo.InvariantCulture),
-            IrStringTerm value => Quote(_factory.GetString(value.Value)),
-            IrNullTerm => "((" + TypeName(term.Type) + ")null)",
-            IrVariableTerm value => "v" +
-                value.Variable.Value.ToString(CultureInfo.InvariantCulture),
-            IrOpaqueTerm value => FormatOpaque(value),
-            IrUnaryTerm value => "(" +
-                IrOperatorCatalog.Get(value.Operator).Token +
-                Format(value.Operand) + ")",
-            IrBinaryTerm value => "(" + Format(value.Left) + " " +
-                IrOperatorCatalog.Get(value.Operator).Token + " " +
-                Format(value.Right) + ")",
-            IrConditionalTerm value => "(" + Format(value.Condition) + " ? " +
-                Format(value.WhenTrue) + " : " + Format(value.WhenFalse) + ")",
-            IrCastTerm value =>
-                "((" + TypeName(value.Type) + ")" + Format(value.Operand) + ")",
-            IrLengthTerm value => "len(" + Format(value.Value) + ")",
-            IrSequenceAccessTerm value =>
-                Format(value.Sequence) + "[" + Format(value.Index) + "]",
-            _ => throw new InvalidOperationException(
-                "Unknown IR term kind: " + term.Kind + ".")
-        };
     }
 
     private string FormatOpaque(IrOpaqueTerm opaque)

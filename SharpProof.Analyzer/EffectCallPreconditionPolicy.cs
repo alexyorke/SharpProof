@@ -7,16 +7,13 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
     : IEffectCallPreconditionPolicy
 {
     private readonly ContractBinder _binder =
-        binder ??
-        throw new ArgumentNullException(nameof(binder));
+        ArgumentNullGuard.NotNull(binder, nameof(binder));
     private readonly ContractClauseInventoryBuilder
         _clauses =
-            clauses ??
-            throw new ArgumentNullException(nameof(clauses));
+            ArgumentNullGuard.NotNull(clauses, nameof(clauses));
     private readonly ConservativeEffectCallPreconditionPolicy
         _fallback =
-            fallback ??
-            throw new ArgumentNullException(nameof(fallback));
+            ArgumentNullGuard.NotNull(fallback, nameof(fallback));
 
     public EffectCallPreconditionStatus Assess(
         EffectCallPreconditionContext context)

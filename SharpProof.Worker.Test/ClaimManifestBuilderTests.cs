@@ -44,14 +44,57 @@ public sealed class ClaimManifestBuilderTests
                 Is.EqualTo(capability.ToString()));
         }
 
-        Assert.That(
-            ClaimManifestBuilder.ToWorkerEffects(effects.Aggregate(
-                static (left, right) => left | right)),
-            Is.EqualTo(WorkerEffectSet.AllKnown));
-        Assert.That(
-            ClaimManifestBuilder.ToWorkerCapabilities(capabilities.Aggregate(
-                static (left, right) => left | right)),
-            Is.EqualTo(WorkerEffectCapabilitySet.AllKnown));
+        var effectCombinations =
+            new Dictionary<SharpProof.Effects.EffectContractKind, WorkerEffectSet>
+            {
+                [SharpProof.Effects.EffectContractKind.None] =
+                    WorkerEffectSet.None
+            };
+        foreach (var effect in effects.Where(static effect =>
+                     effect != SharpProof.Effects.EffectContractKind.None))
+        {
+            var mapped = ClaimManifestBuilder.ToWorkerEffects(effect);
+            foreach (var combination in effectCombinations.ToArray())
+            {
+                effectCombinations[combination.Key | effect] =
+                    combination.Value | mapped;
+            }
+        }
+        foreach (var combination in effectCombinations)
+        {
+            Assert.That(
+                ClaimManifestBuilder.ToWorkerEffects(combination.Key),
+                Is.EqualTo(combination.Value),
+                combination.Key.ToString());
+        }
+
+        var capabilityCombinations =
+            new Dictionary<
+                SharpProof.Effects.EffectContractCapabilityKind,
+                WorkerEffectCapabilitySet>
+            {
+                [SharpProof.Effects.EffectContractCapabilityKind.None] =
+                    WorkerEffectCapabilitySet.None
+            };
+        foreach (var capability in capabilities.Where(static capability =>
+                     capability !=
+                     SharpProof.Effects.EffectContractCapabilityKind.None))
+        {
+            var mapped =
+                ClaimManifestBuilder.ToWorkerCapabilities(capability);
+            foreach (var combination in capabilityCombinations.ToArray())
+            {
+                capabilityCombinations[combination.Key | capability] =
+                    combination.Value | mapped;
+            }
+        }
+        foreach (var combination in capabilityCombinations)
+        {
+            Assert.That(
+                ClaimManifestBuilder.ToWorkerCapabilities(combination.Key),
+                Is.EqualTo(combination.Value),
+                combination.Key.ToString());
+        }
         Action invalidEffect = () => _ = ClaimManifestBuilder.ToWorkerEffects(
             (SharpProof.Effects.EffectContractKind)(1L << 30));
         Action invalidCapability = () => _ = ClaimManifestBuilder.ToWorkerCapabilities(

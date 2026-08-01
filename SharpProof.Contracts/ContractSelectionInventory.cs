@@ -19,10 +19,7 @@ internal sealed class ContractSelectionInventory
 
     private ContractSelectionInventory(Compilation compilation)
     {
-        if (compilation == null)
-        {
-            throw new ArgumentNullException(nameof(compilation));
-        }
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
 
         _identity = ContractApiIdentityResolver.ForCompilation(compilation);
         ContractFor = _identity.ResolveAttribute(ContractApiMetadata.ContractFor);
@@ -231,20 +228,10 @@ internal sealed class ContractSelectionInventory
             return ContractSelectionFeatures.None;
         }
 
-        return metadataName switch
-        {
-            ContractApiMetadata.EnforcePure or
-            ContractApiMetadata.ZeroAllocations or
-            ContractApiMetadata.AllowedCapabilities or
-            ContractApiMetadata.DoesNotThrow or
-            ContractApiMetadata.AllowedExceptions or
-            ContractApiMetadata.EffectContract =>
-                ContractSelectionFeatures.Effects,
-            ContractApiMetadata.Trusted or
-            ContractApiMetadata.Suppress =>
-                ContractSelectionFeatures.Contracts |
-                ContractSelectionFeatures.Effects,
-            _ => ContractSelectionFeatures.Contracts
-        };
+        return ContractApiMetadata.TryGetAttribute(
+                metadataName,
+                out var descriptor) ?
+            (ContractSelectionFeatures)(int)descriptor.Selection :
+            ContractSelectionFeatures.Contracts;
     }
 }

@@ -1,6 +1,5 @@
 namespace SharpProof.Worker;
 
-internal readonly record struct SpecResultProjection(IrVarId? NonNullVariable, IrVarId? LengthVariable);
 internal static class SpecResultDomainProjection
 {
     internal static bool TryCreate(IrFactory factory, ApiSpecTemplate template, IrVarId resultVariable,
@@ -9,8 +8,10 @@ internal static class SpecResultDomainProjection
         ArgumentNullException.ThrowIfNull(factory);
         ArgumentNullException.ThrowIfNull(template);
         var kind = factory.GetTypeInfo(factory.GetVariableInfo(resultVariable).Type).Kind;
-        var nullness = Project(template.Facets.Nullness.Result);
-        var cardinality = Project(template.Facets.Cardinality.Result, template.Facets.Cardinality.ExactCount);
+        var nullness = WorkerProjections.MapNullness(template.Facets.Nullness.Result);
+        var cardinality = WorkerProjections.MapCardinality(
+            template.Facets.Cardinality.Result,
+            template.Facets.Cardinality.ExactCount);
         if (nullness == NullnessValue.Bottom || cardinality.IsBottom)
         {
             return Fail(out projection, out evidencePredicates);
@@ -145,30 +146,6 @@ internal static class SpecResultDomainProjection
                 ? factory.Variable(proxy) : factory.Length(Visit(length.Value));
         }
     }
-    private static NullnessValue Project(SpecNullness value)
-    {
-        return value switch
-        {
-            SpecNullness.NonNull => NullnessValue.NonNull,
-            SpecNullness.Null => NullnessValue.Null,
-            SpecNullness.MaybeNull or SpecNullness.Unknown or SpecNullness.NotApplicable =>
-                NullnessValue.MaybeNull,
-            _ => NullnessValue.Bottom
-        };
-    }
-
-    private static SequenceCardinalityValue Project(SpecCardinality value, long? count)
-    {
-        return value switch
-        {
-            SpecCardinality.Empty => SequenceCardinalityDomain.Instance.Empty,
-            SpecCardinality.NonEmpty => SequenceCardinalityDomain.Instance.NonEmpty,
-            SpecCardinality.Exact when count.HasValue => SequenceCardinalityDomain.Instance.KnownLength(count.Value),
-            SpecCardinality.Unknown or SpecCardinality.NotApplicable => SequenceCardinalityDomain.Instance.Top,
-            _ => SequenceCardinalityDomain.Instance.Bottom
-        };
-    }
-
     private static IrVarId CreateProxy(
             IrFactory factory, ApiSpecTemplate template, IrVarId result, string facet, IrTypeId type)
     {

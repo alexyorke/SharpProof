@@ -1,9 +1,22 @@
 using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
+using SharpProof.Analyzer;
 using SharpProof.CompilerArtifact;
+using SharpProof.Contracts;
+using SharpProof.Effects;
+using SharpProof.Ir;
 using SharpProof.Worker.Protocol;
+using AssemblyIdentityComparer = Microsoft.CodeAnalysis.AssemblyIdentityComparer;
+using DesktopAssemblyIdentityComparer =
+    Microsoft.CodeAnalysis.DesktopAssemblyIdentityComparer;
+using MetadataImportOptions = Microsoft.CodeAnalysis.MetadataImportOptions;
+using NullableContextOptions = Microsoft.CodeAnalysis.NullableContextOptions;
+using OptimizationLevel = Microsoft.CodeAnalysis.OptimizationLevel;
+using OutputKind = Microsoft.CodeAnalysis.OutputKind;
+using Platform = Microsoft.CodeAnalysis.Platform;
 
 namespace SharpProof.Worker.Test;
 
@@ -13,6 +26,14 @@ public sealed class CompilerArtifactModelSchemaTests
     private static readonly Assembly s_artifactAssembly =
         typeof(CompilerManifestArtifact).Assembly;
     private static readonly NullabilityInfoContext s_nullability = new();
+    private static readonly string[] s_assemblyComparerSources = [
+        "AssemblyIdentityComparer.Default",
+        "DesktopAssemblyIdentityComparer.Default"
+    ];
+    private static readonly string[] s_assemblyComparerTargets = [
+        "Default",
+        "Desktop"
+    ];
 
     [Test]
     public void GeneratedDeclarationsMatchTheAuthoritativeSchema()
@@ -116,6 +137,224 @@ public sealed class CompilerArtifactModelSchemaTests
                 field.Name);
         }
         Assert.That(PortableIrGraphCodec.HasCompleteWireEnumCatalogs, Is.True);
+
+        var slotCatalog = typeof(PortableIrSlotCatalog);
+        foreach (var domain in schema.RootElement
+                     .GetProperty("portableIrSlotMappings")
+                     .EnumerateObject())
+        {
+            var field = slotCatalog.GetField(
+                char.ToUpperInvariant(domain.Name[0]) + domain.Name[1..],
+                BindingFlags.NonPublic |
+                BindingFlags.Static)!;
+            var actual = (PortableIrSlotMapping[])field.GetValue(null)!;
+            var expected = domain.Value.EnumerateArray().ToArray();
+            Assert.That(actual.Length, Is.EqualTo(expected.Length), domain.Name);
+            for (var index = 0; index < actual.Length; index++)
+            {
+                Assert.That(actual[index].Kind,
+                    Is.EqualTo(expected[index].GetProperty("kind").GetString()),
+                    domain.Name + " kind");
+                Assert.That(actual[index].Slots,
+                    Is.EqualTo(expected[index].GetProperty("slots")
+                        .EnumerateArray()
+                        .Select(static value => value.GetString())),
+                    domain.Name + " slots");
+            }
+        }
+        Assert.That(PortableIrGraphCodec.HasCompleteSlotCatalogs, Is.True);
+    }
+
+    [Test]
+    public void CollectorWireCatalogIsUniqueAndSourceComplete()
+    {
+        using var schema = ReadSchema();
+        JsonElement[] mappings = [
+            .. schema.RootElement.GetProperty("collectorWireMappings")
+                .EnumerateArray()
+        ];
+        var expectedTypes = new Dictionary<string, (Type Source, Type Target)>(
+            StringComparer.Ordinal)
+        {
+            [nameof(OutputKind)] =
+                (typeof(OutputKind), typeof(CompilerOutputKind)),
+            [nameof(OptimizationLevel)] =
+                (typeof(OptimizationLevel), typeof(CompilerOptimizationLevel)),
+            [nameof(Platform)] =
+                (typeof(Platform), typeof(CompilerPlatform)),
+            [nameof(NullableContextOptions)] =
+                (typeof(NullableContextOptions), typeof(CompilerNullableContext)),
+            [nameof(MetadataImportOptions)] =
+                (typeof(MetadataImportOptions), typeof(CompilerMetadataImportOptions)),
+            [nameof(AssemblyIdentityComparer)] =
+                (typeof(AssemblyIdentityComparer),
+                    typeof(CompilerAssemblyIdentityComparer)),
+            [nameof(EffectEvaluationContractKind)] =
+                (typeof(EffectEvaluationContractKind),
+                    typeof(WorkerEffectContractKind)),
+            [nameof(EffectEvaluationOutcome)] =
+                (typeof(EffectEvaluationOutcome), typeof(WorkerClaimOutcome)),
+            [nameof(EffectEvaluationReason)] =
+                (typeof(EffectEvaluationReason), typeof(WorkerClaimReason)),
+            [nameof(EffectEvaluationCertainty)] =
+                (typeof(EffectEvaluationCertainty),
+                    typeof(WorkerEffectEvidenceCertainty)),
+            [nameof(EffectContractKind)] =
+                (typeof(EffectContractKind), typeof(WorkerEffectSet)),
+            [nameof(EffectContractCapabilityKind)] =
+                (typeof(EffectContractCapabilityKind),
+                    typeof(WorkerEffectCapabilitySet)),
+            [nameof(BoundContractKind)] =
+                (typeof(BoundContractKind), typeof(CompilerContractKind)),
+            [nameof(BoundContractEvidence)] =
+                (typeof(BoundContractEvidence), typeof(CompilerContractEvidence)),
+            [nameof(BoundContractVariableRole)] =
+                (typeof(BoundContractVariableRole), typeof(CompilerVariableRole)),
+            ["BoundContractEvidenceWorker"] =
+                (typeof(BoundContractEvidence), typeof(WorkerClaimEvidence)),
+            [nameof(ContractBindingFailure)] =
+                (typeof(ContractBindingFailure), typeof(WorkerClaimReason))
+        };
+        string[] expectedNames = [
+            nameof(OutputKind),
+            nameof(OptimizationLevel),
+            nameof(Platform),
+            nameof(NullableContextOptions),
+            nameof(MetadataImportOptions),
+            nameof(AssemblyIdentityComparer),
+            nameof(EffectEvaluationContractKind),
+            nameof(EffectEvaluationOutcome),
+            nameof(EffectEvaluationReason),
+            nameof(EffectEvaluationCertainty),
+            nameof(EffectContractKind),
+            nameof(EffectContractCapabilityKind),
+            nameof(BoundContractKind),
+            nameof(BoundContractEvidence),
+            nameof(BoundContractVariableRole),
+            "BoundContractEvidenceWorker",
+            nameof(ContractBindingFailure)
+        ];
+        Assert.That(
+            mappings.Select(static mapping =>
+                mapping.GetProperty("name").GetString()),
+            Is.EqualTo(expectedNames));
+        Assert.That(
+            mappings.Select(static mapping =>
+                mapping.GetProperty("owner").GetString() + "." +
+                mapping.GetProperty("method").GetString() + "(" +
+                mapping.GetProperty("sourceType").GetString() + ")")
+                .Distinct(StringComparer.Ordinal)
+                .Count(),
+            Is.EqualTo(mappings.Length));
+
+        foreach (var mapping in mappings)
+        {
+            var name = mapping.GetProperty("name").GetString()!;
+            var types = expectedTypes[name];
+            var isOption = Array.IndexOf(expectedNames, name) < 6;
+            var isEvaluation =
+                Array.IndexOf(expectedNames, name) is >= 6 and < 10;
+            var isLowering =
+                Array.IndexOf(expectedNames, name) is >= 12 and < 17;
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    mapping.GetProperty("sourceType").GetString(),
+                    Is.EqualTo(types.Source.Name),
+                    name + " source type");
+                Assert.That(
+                    mapping.GetProperty("targetType").GetString(),
+                    Is.EqualTo(types.Target.Name),
+                    name + " target type");
+                Assert.That(
+                    mapping.GetProperty("owner").GetString(),
+                    Is.EqualTo(isOption
+                        ? "CompilerOptionWireMappings"
+                        : isEvaluation
+                            ? "CompilerEffectEvaluationWireMappings"
+                            : isLowering
+                                ? "CompilerLoweringWireMappings"
+                                : "ClaimManifestBuilder"),
+                    name + " owner");
+                Assert.That(
+                    mapping.GetProperty("method").GetString(),
+                    Is.EqualTo(isOption
+                        ? "Map"
+                        : isEvaluation
+                            ? "ToWorker"
+                            : isLowering
+                                ? name == nameof(BoundContractKind) ||
+                                    name == nameof(BoundContractEvidence) ||
+                                    name == nameof(BoundContractVariableRole)
+                                    ? "ToCompiler"
+                                    : name == "BoundContractEvidenceWorker"
+                                        ? "ToWorkerEvidence"
+                                        : "ToWorkerFailure"
+                            : name == nameof(EffectContractKind)
+                                ? "ToWorkerEffects"
+                                : "ToWorkerCapabilities"),
+                    name + " method");
+                Assert.That(
+                    mapping.GetProperty("kind").GetString(),
+                    Is.EqualTo(name == nameof(AssemblyIdentityComparer)
+                        ? "referenceIdentity"
+                        : isOption || isEvaluation || isLowering
+                            ? "enum"
+                            : "flags"),
+                    name + " kind");
+                Assert.That(
+                    mapping.GetProperty("unknownException").GetString(),
+                    Is.EqualTo(isOption
+                        ? "InvalidOperationException"
+                        : "ArgumentOutOfRangeException"),
+                    name + " unknown exception");
+            }
+            string[] sources = [
+                .. mapping.GetProperty("rows").EnumerateArray()
+                    .Select(static row =>
+                        row.GetProperty("source").GetString()!)
+            ];
+            string[] targets = [
+                .. mapping.GetProperty("rows").EnumerateArray()
+                    .Select(static row =>
+                        row.GetProperty("target").GetString()!)
+            ];
+            Assert.That(
+                sources.Distinct(StringComparer.Ordinal).Count(),
+                Is.EqualTo(sources.Length),
+                name + " sources");
+            if (!mapping.TryGetProperty("allowTargetAliases", out var aliases) ||
+                !aliases.GetBoolean())
+            {
+                Assert.That(
+                    targets.Distinct(StringComparer.Ordinal).Count(),
+                    Is.EqualTo(targets.Length),
+                    name + " targets");
+            }
+
+            if (name == nameof(AssemblyIdentityComparer))
+            {
+                Assert.That(
+                    sources,
+                    Is.EqualTo(s_assemblyComparerSources));
+                Assert.That(
+                    targets,
+                    Is.EqualTo(s_assemblyComparerTargets));
+                continue;
+            }
+
+            Assert.That(
+                sources,
+                Is.EquivalentTo(Enum.GetNames(types.Source)),
+                name + " source completeness");
+            Assert.That(
+                targets.All(target =>
+                    Enum.GetNames(types.Target).Contains(
+                        target,
+                        StringComparer.Ordinal)),
+                Is.True,
+                name + " target names");
+        }
     }
 
     private static void AssertConstants(Type type, JsonElement declaration)
@@ -524,6 +763,12 @@ public sealed class CompilerArtifactModelSchemaTests
             return SchemaType(type.GetElementType()!, nullability?.ElementType) + "[]";
         }
 
+        if (type.IsGenericType &&
+            type.GetGenericTypeDefinition() == typeof(ScopedIrId<>))
+        {
+            return IrIdentifierSchemaName(type.GetGenericArguments()[0]);
+        }
+
         var name = type == typeof(string)
             ? "string"
             : type == typeof(bool)
@@ -550,6 +795,24 @@ public sealed class CompilerArtifactModelSchemaTests
                nullability?.ReadState == NullabilityState.Nullable
             ? name + "?"
             : name;
+    }
+
+    private static string IrIdentifierSchemaName(Type tag)
+    {
+        return tag.Name switch
+        {
+            nameof(IrIdentityTag) => "IrIdentityId",
+            nameof(IrTermTag) => "IrId",
+            nameof(IrVariableTag) => "IrVarId",
+            nameof(IrTypeTag) => "IrTypeId",
+            nameof(IrMemberTag) => "IrMemberId",
+            nameof(IrStringTag) => "IrStringId",
+            nameof(IrOperationTag) => "OperationId",
+            nameof(IrBlockTag) => "IrBlockId",
+            nameof(IrInstructionTag) => "IrInstructionId",
+            _ => throw new InvalidOperationException(
+                $"Unknown IR identifier tag '{tag.FullName}'.")
+        };
     }
 
     private static JsonDocument ReadSchema()

@@ -16,31 +16,8 @@ public enum SpecInstantiationFailureKind
     InvalidExpression
 }
 
-public sealed record SpecInstantiationFailure(
-    SpecInstantiationFailureKind Kind, SpecVarId? Variable, string Detail);
-
-public sealed class SpecInstantiationResult
+public sealed partial class SpecInstantiationResult
 {
-    private SpecInstantiationResult(
-        SpecInstantiationStatus status, ImmutableArray<IrTerm> postconditions,
-        SpecInstantiationFailure? failure)
-    {
-        (Status, Postconditions, Failure) = (status, postconditions, failure);
-    }
-
-    public SpecInstantiationStatus Status
-    {
-        get;
-    }
-    public ImmutableArray<IrTerm> Postconditions
-    {
-        get;
-    }
-    public SpecInstantiationFailure? Failure
-    {
-        get;
-    }
-
     internal static SpecInstantiationResult Succeeded(ImmutableArray<IrTerm> postconditions)
     {
         return new(SpecInstantiationStatus.Succeeded, postconditions, null);
@@ -52,26 +29,16 @@ public sealed class SpecInstantiationResult
     }
 }
 
-public static class ApiSpecInstantiator
+public static partial class ApiSpecInstantiator
 {
     public static SpecInstantiationResult InstantiatePostconditions(
         ApiSpecTemplate template, IrFactory factory,
         IReadOnlyDictionary<SpecVarId, IrTerm> substitutions)
     {
-        if (template == null)
-        {
-            throw new ArgumentNullException(nameof(template));
-        }
-
-        if (factory == null)
-        {
-            throw new ArgumentNullException(nameof(factory));
-        }
-
-        if (substitutions == null)
-        {
-            throw new ArgumentNullException(nameof(substitutions));
-        }
+        template = ArgumentNullGuard.NotNull(template, nameof(template));
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        substitutions = ArgumentNullGuard.NotNull(
+            substitutions, nameof(substitutions));
 
         var variables = template.Variables.ToImmutableDictionary(static item => item.Id);
         foreach (var substitution in substitutions)
@@ -129,7 +96,7 @@ public static class ApiSpecInstantiator
         }
     }
 
-    private static bool MatchesType(IrFactory factory, IrTypeId type, SpecValueType expected)
+    private static bool MatchesType(IrFactory factory, IrTypeId type, IrTypeKind expected)
     {
         IrTypeInfo info;
         try
@@ -140,15 +107,19 @@ public static class ApiSpecInstantiator
         {
             return false;
         }
-        return expected switch
-        {
-            SpecValueType.Boolean => type == factory.BooleanType,
-            SpecValueType.Integer => type == factory.IntegerType,
-            SpecValueType.String => type == factory.StringType,
-            SpecValueType.Reference => info.Kind == IrTypeKind.Reference,
-            SpecValueType.Sequence => info.Kind == IrTypeKind.Sequence,
-            _ => false
-        };
+
+        return IsSupportedSpecType(expected) &&
+               info.Kind == expected;
+    }
+
+    private static bool IsSupportedSpecType(IrTypeKind type)
+    {
+        return type is
+            IrTypeKind.Boolean or
+            IrTypeKind.Integer or
+            IrTypeKind.String or
+            IrTypeKind.Reference or
+            IrTypeKind.Sequence;
     }
 
     private static SpecInstantiationResult Failed(
@@ -157,7 +128,7 @@ public static class ApiSpecInstantiator
         return SpecInstantiationResult.Failed(new SpecInstantiationFailure(kind, variable, detail));
     }
 
-    private sealed class Instantiation(
+    private sealed partial class Instantiation(
         IrFactory factory,
         IReadOnlyDictionary<SpecVarId, IrTerm> substitutions,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables)
@@ -202,8 +173,8 @@ public static class ApiSpecInstantiator
         {
             var type = value.Type switch
             {
-                SpecValueType.String => factory.StringType,
-                SpecValueType.Reference => factory.ObjectType,
+                IrTypeKind.String => factory.StringType,
+                IrTypeKind.Reference => factory.ObjectType,
                 _ => default
             };
             return type.IsDefault
@@ -214,12 +185,9 @@ public static class ApiSpecInstantiator
 
         private TermResult Unary(SpecUnaryDeclaration unary)
         {
-            return Child(unary.Operand, operand => factory.Unary(unary.Operator switch
-            {
-                SpecUnaryOperator.Not => IrUnaryOperator.Not,
-                SpecUnaryOperator.Negate => IrUnaryOperator.Negate,
-                _ => throw new ArgumentOutOfRangeException(nameof(unary))
-            }, operand));
+            return Child(
+                unary.Operand,
+                operand => factory.Unary(unary.Operator, operand));
         }
 
         private TermResult Binary(SpecBinaryDeclaration binary)
@@ -236,25 +204,9 @@ public static class ApiSpecInstantiator
                 return right;
             }
 
-            var @operator = binary.Operator switch
-            {
-                SpecBinaryOperator.Add => IrBinaryOperator.Add,
-                SpecBinaryOperator.Subtract => IrBinaryOperator.Subtract,
-                SpecBinaryOperator.Multiply => IrBinaryOperator.Multiply,
-                SpecBinaryOperator.Divide => IrBinaryOperator.Divide,
-                SpecBinaryOperator.Remainder => IrBinaryOperator.Remainder,
-                SpecBinaryOperator.AndAlso => IrBinaryOperator.AndAlso,
-                SpecBinaryOperator.OrElse => IrBinaryOperator.OrElse,
-                SpecBinaryOperator.Equal => IrBinaryOperator.Equal,
-                SpecBinaryOperator.NotEqual => IrBinaryOperator.NotEqual,
-                SpecBinaryOperator.LessThan => IrBinaryOperator.LessThan,
-                SpecBinaryOperator.LessThanOrEqual => IrBinaryOperator.LessThanOrEqual,
-                SpecBinaryOperator.GreaterThan => IrBinaryOperator.GreaterThan,
-                SpecBinaryOperator.GreaterThanOrEqual => IrBinaryOperator.GreaterThanOrEqual,
-                SpecBinaryOperator.StringConcat => IrBinaryOperator.StringConcat,
-                _ => throw new ArgumentOutOfRangeException(nameof(binary))
-            };
-            return new(factory.Binary(@operator, left.Term!, right.Term!), null);
+            return new(
+                factory.Binary(binary.Operator, left.Term!, right.Term!),
+                null);
         }
 
         private TermResult Conditional(SpecConditionalDeclaration conditional)
@@ -294,6 +246,4 @@ public static class ApiSpecInstantiator
         }
     }
 
-    private readonly record struct TermResult(
-        IrTerm? Term, SpecInstantiationFailure? Failure);
 }

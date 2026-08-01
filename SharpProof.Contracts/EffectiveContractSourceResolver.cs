@@ -1,17 +1,7 @@
 namespace SharpProof.Contracts;
 
-internal sealed class EffectiveContractSourceResolution(
-    IMethodSymbol source,
-    ContractClauseInventory directInventory,
-    ContractClauseInventory inventory,
-    bool usesCompanion,
-    ContractBindingFailure failure)
+internal sealed partial class EffectiveContractSourceResolution
 {
-    internal IMethodSymbol Source { get; } = source;
-    internal ContractClauseInventory DirectInventory { get; } = directInventory;
-    internal ContractClauseInventory Inventory { get; } = inventory;
-    internal bool UsesCompanion { get; } = usesCompanion;
-    internal ContractBindingFailure Failure { get; } = failure;
     internal bool HasValidDirectClause =>
         DirectInventory.Clauses.Any(static clause => clause.IsValid);
     internal bool HasSelectedContractIntent =>
@@ -38,9 +28,9 @@ internal sealed class EffectiveContractSourceResolver
         Compilation compilation,
         ContractClauseInventoryBuilder clauses)
     {
-        _clauses = clauses ?? throw new ArgumentNullException(nameof(clauses));
+        _clauses = ArgumentNullGuard.NotNull(clauses, nameof(clauses));
         _companions = ContractForSymbolMatcher.DiscoverCompanions(
-            compilation ?? throw new ArgumentNullException(nameof(compilation)));
+            ArgumentNullGuard.NotNull(compilation, nameof(compilation)));
     }
 
     internal ImmutableArray<ContractForSymbolMatcher.CompanionDescriptor> Companions =>
@@ -50,7 +40,7 @@ internal sealed class EffectiveContractSourceResolver
         Compilation compilation)
     {
         return Cache.GetValue(
-            compilation ?? throw new ArgumentNullException(nameof(compilation)),
+            ArgumentNullGuard.NotNull(compilation, nameof(compilation)),
             static value => new(
                 value,
                 ContractClauseInventoryBuilder.ForCompilation(value)));
@@ -60,10 +50,7 @@ internal sealed class EffectiveContractSourceResolver
         IMethodSymbol target,
         IOperation? implementationBody = null)
     {
-        if (target == null)
-        {
-            throw new ArgumentNullException(nameof(target));
-        }
+        target = ArgumentNullGuard.NotNull(target, nameof(target));
 
         target = ContractClauseInventoryBuilder.NormalizeCallable(target);
         return implementationBody == null

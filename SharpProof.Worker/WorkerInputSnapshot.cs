@@ -1,7 +1,6 @@
 namespace SharpProof.Worker;
 
-internal sealed record WorkerInputSnapshot(
-    CompilerManifestArtifact CompilerManifest, string InputHash)
+internal sealed partial record WorkerInputSnapshot
 {
     internal const string ManifestUnavailable = "The compiler manifest is unavailable.";
     internal const string ManifestInvalid = "The compiler manifest is invalid.";

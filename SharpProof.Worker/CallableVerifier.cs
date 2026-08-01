@@ -5,12 +5,12 @@ namespace SharpProof.Worker;
 
 internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressionDepth)
 {
-    private readonly ProofKernel _kernel = new(backend ?? throw new ArgumentNullException(nameof(backend)));
+    private readonly ProofKernel _kernel = new(
+        ArgumentNullGuard.NotNull(backend, nameof(backend)));
     private readonly AcyclicBlockPredicateExecutor _executor = new(maximumExpressionDepth);
     private readonly int _maximumExpressionDepth =
-        maximumExpressionDepth > 0
-            ? maximumExpressionDepth
-            : throw new ArgumentOutOfRangeException(nameof(maximumExpressionDepth));
+        ArgumentNullGuard.RequirePositive(
+            maximumExpressionDepth, nameof(maximumExpressionDepth));
 
     internal async Task<ImmutableArray<WorkerClaimResult>> VerifyAsync(
         CompilerCallablePreparation target,

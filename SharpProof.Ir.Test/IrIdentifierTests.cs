@@ -7,6 +7,24 @@ namespace SharpProof.Ir.Test;
 public sealed class IrIdentifierTests
 {
     [Test]
+    public void DefaultIdentifiersPreserveKindSpecificFormatting()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(default(IrIdentityId).IsDefault, Is.True);
+            Assert.That(default(IrIdentityId).ToString(), Is.EqualTo("identity0"));
+            Assert.That(default(IrId).ToString(), Is.EqualTo("ir0"));
+            Assert.That(default(IrVarId).ToString(), Is.EqualTo("v0"));
+            Assert.That(default(IrTypeId).ToString(), Is.EqualTo("t0"));
+            Assert.That(default(IrMemberId).ToString(), Is.EqualTo("m0"));
+            Assert.That(default(IrStringId).ToString(), Is.EqualTo("s0"));
+            Assert.That(default(OperationId).ToString(), Is.EqualTo("op0"));
+            Assert.That(default(IrBlockId).ToString(), Is.EqualTo("b0"));
+            Assert.That(default(IrInstructionId).ToString(), Is.EqualTo("i0"));
+        }
+    }
+
+    [Test]
     public void FactoryIdentifiersExposeStableNondefaultFormatting()
     {
         var factory = new IrFactory();

@@ -3,13 +3,13 @@ using SharpProof.Analyzer;
 // This builder runs only in the build-time compiler collector.
 namespace SharpProof.CompilerArtifact;
 
-internal sealed class ClaimManifestBuilder(
+internal sealed partial class ClaimManifestBuilder(
     CSharpCompilation compilation,
     WorkerFeatureSet enabledFeatures = WorkerFeatureSet.All,
     CancellationToken cancellationToken = default)
 {
     private readonly CSharpCompilation _compilation =
-        compilation ?? throw new ArgumentNullException(nameof(compilation));
+        ArgumentNullGuard.NotNull(compilation, nameof(compilation));
     private readonly ContractClauseInventoryBuilder _clauses =
         ContractClauseInventoryBuilder.ForCompilation(compilation);
     private readonly ContractSelectionInventory _attributes =
@@ -372,12 +372,7 @@ internal sealed class ClaimManifestBuilder(
         };
         if (!isSupported)
         {
-            evidence.Outcome = WorkerClaimOutcome.Unknown;
-            evidence.Reason = WorkerClaimReason.UnsupportedContract;
-            evidence.Certainty =
-                WorkerEffectEvidenceCertainty.Unavailable;
-            evidence.Witness = null;
-            evidence.Replay = null;
+            MarkUnavailable(evidence, WorkerClaimReason.UnsupportedContract);
             return evidence;
         }
 
@@ -396,16 +391,10 @@ internal sealed class ClaimManifestBuilder(
                 witness,
                 ToSourceLocation(witness.Origin.Syntax.GetLocation()),
                 cancellationToken,
-                out var replay,
-                out var witnessDetail))
+            out var replay,
+            out var witnessDetail))
         {
-            evidence.Outcome = WorkerClaimOutcome.Unknown;
-            evidence.Reason =
-                WorkerClaimReason.CounterexampleNotReplayable;
-            evidence.Certainty =
-                WorkerEffectEvidenceCertainty.Unavailable;
-            evidence.Witness = null;
-            evidence.Replay = null;
+            MarkUnavailable(evidence, WorkerClaimReason.CounterexampleNotReplayable);
             return evidence;
         }
 
@@ -423,81 +412,15 @@ internal sealed class ClaimManifestBuilder(
         return evidence;
     }
 
-    internal static WorkerEffectSet ToWorkerEffects(EffectContractKind source)
+    private static void MarkUnavailable(
+        CompilerEffectClaimArtifact evidence,
+        WorkerClaimReason reason)
     {
-        return source switch
-        {
-            EffectContractKind.None => WorkerEffectSet.None,
-            _ when (source & EffectContractKind.ReadsReceiverState) != 0 =>
-                WorkerEffectSet.ReadsReceiverState | ToWorkerEffects(source & ~EffectContractKind.ReadsReceiverState),
-            _ when (source & EffectContractKind.ReadsArgumentState) != 0 =>
-                WorkerEffectSet.ReadsArgumentState | ToWorkerEffects(source & ~EffectContractKind.ReadsArgumentState),
-            _ when (source & EffectContractKind.ReadsCapturedState) != 0 =>
-                WorkerEffectSet.ReadsCapturedState | ToWorkerEffects(source & ~EffectContractKind.ReadsCapturedState),
-            _ when (source & EffectContractKind.ReadsStaticState) != 0 =>
-                WorkerEffectSet.ReadsStaticState | ToWorkerEffects(source & ~EffectContractKind.ReadsStaticState),
-            _ when (source & EffectContractKind.ReadsAmbientState) != 0 =>
-                WorkerEffectSet.ReadsAmbientState | ToWorkerEffects(source & ~EffectContractKind.ReadsAmbientState),
-            _ when (source & EffectContractKind.WritesReceiverState) != 0 =>
-                WorkerEffectSet.WritesReceiverState | ToWorkerEffects(source & ~EffectContractKind.WritesReceiverState),
-            _ when (source & EffectContractKind.WritesArgumentState) != 0 =>
-                WorkerEffectSet.WritesArgumentState | ToWorkerEffects(source & ~EffectContractKind.WritesArgumentState),
-            _ when (source & EffectContractKind.WritesCapturedState) != 0 =>
-                WorkerEffectSet.WritesCapturedState | ToWorkerEffects(source & ~EffectContractKind.WritesCapturedState),
-            _ when (source & EffectContractKind.WritesStaticState) != 0 =>
-                WorkerEffectSet.WritesStaticState | ToWorkerEffects(source & ~EffectContractKind.WritesStaticState),
-            _ when (source & EffectContractKind.WritesAmbientState) != 0 =>
-                WorkerEffectSet.WritesAmbientState | ToWorkerEffects(source & ~EffectContractKind.WritesAmbientState),
-            _ when (source & EffectContractKind.Allocates) != 0 =>
-                WorkerEffectSet.Allocates | ToWorkerEffects(source & ~EffectContractKind.Allocates),
-            _ when (source & EffectContractKind.Throws) != 0 =>
-                WorkerEffectSet.Throws | ToWorkerEffects(source & ~EffectContractKind.Throws),
-            _ when (source & EffectContractKind.Synchronizes) != 0 =>
-                WorkerEffectSet.Synchronizes | ToWorkerEffects(source & ~EffectContractKind.Synchronizes),
-            _ when (source & EffectContractKind.UsesNondeterminism) != 0 =>
-                WorkerEffectSet.UsesNondeterminism | ToWorkerEffects(source & ~EffectContractKind.UsesNondeterminism),
-            _ when (source & EffectContractKind.UsesNativeCode) != 0 =>
-                WorkerEffectSet.UsesNativeCode | ToWorkerEffects(source & ~EffectContractKind.UsesNativeCode),
-            _ when (source & EffectContractKind.UsesReflection) != 0 =>
-                WorkerEffectSet.UsesReflection | ToWorkerEffects(source & ~EffectContractKind.UsesReflection),
-            _ => throw new ArgumentOutOfRangeException(nameof(source))
-        };
-    }
-
-    internal static WorkerEffectCapabilitySet ToWorkerCapabilities(
-        EffectContractCapabilityKind source)
-    {
-        return source switch
-        {
-            EffectContractCapabilityKind.None => WorkerEffectCapabilitySet.None,
-            _ when (source & EffectContractCapabilityKind.IO) != 0 =>
-                WorkerEffectCapabilitySet.IO | ToWorkerCapabilities(source & ~EffectContractCapabilityKind.IO),
-            _ when (source & EffectContractCapabilityKind.FileRead) != 0 =>
-                WorkerEffectCapabilitySet.FileRead | ToWorkerCapabilities(source & ~EffectContractCapabilityKind.FileRead),
-            _ when (source & EffectContractCapabilityKind.FileWrite) != 0 =>
-                WorkerEffectCapabilitySet.FileWrite | ToWorkerCapabilities(source & ~EffectContractCapabilityKind.FileWrite),
-            _ when (source & EffectContractCapabilityKind.Network) != 0 =>
-                WorkerEffectCapabilitySet.Network | ToWorkerCapabilities(source & ~EffectContractCapabilityKind.Network),
-            _ when (source & EffectContractCapabilityKind.Console) != 0 =>
-                WorkerEffectCapabilitySet.Console | ToWorkerCapabilities(source & ~EffectContractCapabilityKind.Console),
-            _ when (source & EffectContractCapabilityKind.Process) != 0 =>
-                WorkerEffectCapabilitySet.Process | ToWorkerCapabilities(source & ~EffectContractCapabilityKind.Process),
-            _ when (source & EffectContractCapabilityKind.Environment) != 0 =>
-                WorkerEffectCapabilitySet.Environment | ToWorkerCapabilities(source & ~EffectContractCapabilityKind.Environment),
-            _ when (source & EffectContractCapabilityKind.Registry) != 0 =>
-                WorkerEffectCapabilitySet.Registry | ToWorkerCapabilities(source & ~EffectContractCapabilityKind.Registry),
-            _ when (source & EffectContractCapabilityKind.Clock) != 0 =>
-                WorkerEffectCapabilitySet.Clock | ToWorkerCapabilities(source & ~EffectContractCapabilityKind.Clock),
-            _ when (source & EffectContractCapabilityKind.Randomness) != 0 =>
-                WorkerEffectCapabilitySet.Randomness | ToWorkerCapabilities(source & ~EffectContractCapabilityKind.Randomness),
-            _ when (source & EffectContractCapabilityKind.Reflection) != 0 =>
-                WorkerEffectCapabilitySet.Reflection | ToWorkerCapabilities(source & ~EffectContractCapabilityKind.Reflection),
-            _ when (source & EffectContractCapabilityKind.Synchronization) != 0 =>
-                WorkerEffectCapabilitySet.Synchronization | ToWorkerCapabilities(source & ~EffectContractCapabilityKind.Synchronization),
-            _ when (source & EffectContractCapabilityKind.NativeInterop) != 0 =>
-                WorkerEffectCapabilitySet.NativeInterop | ToWorkerCapabilities(source & ~EffectContractCapabilityKind.NativeInterop),
-            _ => throw new ArgumentOutOfRangeException(nameof(source))
-        };
+        evidence.Outcome = WorkerClaimOutcome.Unknown;
+        evidence.Reason = reason;
+        evidence.Certainty = WorkerEffectEvidenceCertainty.Unavailable;
+        evidence.Witness = null;
+        evidence.Replay = null;
     }
 
     private IEnumerable<(ISymbol Scope, AttributeData Attribute)> TrustedAttributes(
@@ -697,27 +620,10 @@ internal sealed class ClaimManifestBuilder(
         };
     }
 
-    private readonly record struct ClaimCandidate(
-        string Fingerprint, Location Location, WorkerClaimEvidence Evidence,
-        IInvocationOperation? Operation, AttributeData? Attribute,
-        ContractClausePlacement? Placement);
-    private readonly record struct AssumptionCandidate(WorkerAssumptionKind Kind, string Fingerprint);
-    private readonly record struct CallableSeed(
-        IMethodSymbol Method, SyntaxNode? Declaration, SemanticModel? Model);
 }
 
-internal sealed record ClaimManifestBuildResult(WorkerClaimManifest Manifest,
-    ImmutableDictionary<IMethodSymbol, ManifestCallableTarget> Targets);
-
-internal sealed record ManifestCallableTarget(IMethodSymbol Method, SyntaxNode? Declaration,
-    SemanticModel? SemanticModel, WorkerCallableManifestEntry Entry, ImmutableArray<ManifestClaim> Claims,
-    ImmutableArray<ManifestEffectClaim> EffectClaims, bool IsVerifierSupported)
+internal sealed partial record ManifestCallableTarget
 {
     internal BaseMethodDeclarationSyntax VerifierDeclaration => (BaseMethodDeclarationSyntax)Declaration!;
     internal SemanticModel VerifierSemanticModel => SemanticModel!;
 }
-
-internal sealed record ManifestClaim(WorkerClaimManifestEntry Entry, IInvocationOperation? SourceOperation,
-    AttributeData? SourceAttribute, ContractClausePlacement? Placement);
-
-internal sealed record ManifestEffectClaim(WorkerClaimManifestEntry Entry, CompilerEffectClaimArtifact Evidence);

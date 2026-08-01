@@ -7,13 +7,11 @@ public sealed class ForwardDataflowAnalysisOptions(
     public int WidenAfter
     {
         get;
-    } = widenAfter >= 0
-        ? widenAfter : throw new ArgumentOutOfRangeException(nameof(widenAfter));
+    } = ArgumentNullGuard.RequireNonnegative(widenAfter, nameof(widenAfter));
     public int MaxIterations
     {
         get;
-    } = maxIterations > 0
-        ? maxIterations : throw new ArgumentOutOfRangeException(nameof(maxIterations));
+    } = ArgumentNullGuard.RequirePositive(maxIterations, nameof(maxIterations));
 }
 
 public sealed class DataflowAnalysisResult<T>
@@ -74,10 +72,7 @@ public static class ForwardDataflowAnalysis
         ForwardDataflowAnalysisOptions options,
         Func<ImmutableArray<int>, ImmutableArray<int>> worklistOrder)
     {
-        if (worklistOrder == null)
-        {
-            throw new ArgumentNullException(nameof(worklistOrder));
-        }
+        ArgumentNullGuard.NotNull(worklistOrder, nameof(worklistOrder));
 
         return AnalyzeCore(graph, domain, initialState, options, worklistOrder);
     }
@@ -89,20 +84,9 @@ public static class ForwardDataflowAnalysis
         ForwardDataflowAnalysisOptions options,
         Func<ImmutableArray<int>, ImmutableArray<int>>? worklistOrder)
     {
-        if (graph == null)
-        {
-            throw new ArgumentNullException(nameof(graph));
-        }
-
-        if (domain == null)
-        {
-            throw new ArgumentNullException(nameof(domain));
-        }
-
-        if (options == null)
-        {
-            throw new ArgumentNullException(nameof(options));
-        }
+        ArgumentNullGuard.NotNull(graph, nameof(graph));
+        ArgumentNullGuard.NotNull(domain, nameof(domain));
+        ArgumentNullGuard.NotNull(options, nameof(options));
 
         var inputs = Enumerable.Repeat(domain.Bottom, graph.Blocks.Length).ToArray();
         var outputs = Enumerable.Repeat(domain.Bottom, graph.Blocks.Length).ToArray();

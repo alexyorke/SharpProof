@@ -9,10 +9,7 @@ internal static class CSharpPreprocessorSymbols
         SyntaxTree tree,
         CancellationToken cancellationToken = default)
     {
-        if (tree == null)
-        {
-            throw new ArgumentNullException(nameof(tree));
-        }
+        tree = ArgumentNullGuard.NotNull(tree, nameof(tree));
 
         if (tree.Options is not CSharpParseOptions options)
         {

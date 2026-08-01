@@ -17,7 +17,7 @@ public sealed class SpecResultDomainProjectionTests
             factory.IntegerType);
         var result = factory.CreateVariable("result", sequenceType);
         var template = CreateTemplate(
-            SpecValueType.Sequence,
+            IrTypeKind.Sequence,
             SpecNullness.NonNull,
             SpecCardinality.Empty);
 
@@ -73,7 +73,7 @@ public sealed class SpecResultDomainProjectionTests
             "result",
             factory.ObjectType);
         var template = CreateTemplate(
-            SpecValueType.Reference,
+            IrTypeKind.Reference,
             SpecNullness.Unknown,
             SpecCardinality.NotApplicable);
 
@@ -103,11 +103,11 @@ public sealed class SpecResultDomainProjectionTests
             "reference",
             factory.ObjectType);
         var nullableCardinality = CreateTemplate(
-            SpecValueType.Sequence,
+            IrTypeKind.Sequence,
             SpecNullness.MaybeNull,
             SpecCardinality.Empty);
         var referenceCardinality = CreateTemplate(
-            SpecValueType.Reference,
+            IrTypeKind.Reference,
             SpecNullness.NonNull,
             SpecCardinality.Empty);
 
@@ -170,7 +170,7 @@ public sealed class SpecResultDomainProjectionTests
     }
 
     private static ApiSpecTemplate CreateTemplate(
-        SpecValueType resultType,
+        IrTypeKind resultType,
         SpecNullness nullness,
         SpecCardinality cardinality)
     {

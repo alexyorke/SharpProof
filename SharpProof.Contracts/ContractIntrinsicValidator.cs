@@ -5,17 +5,14 @@ internal sealed class ContractIntrinsicValidator
     private readonly ContractApiSymbols? _api;
     internal ContractIntrinsicValidator(Compilation compilation)
     {
-        _api = ContractApiSymbols.TryCreate(compilation ??
-            throw new ArgumentNullException(nameof(compilation)));
+        _api = ContractApiSymbols.TryCreate(
+            ArgumentNullGuard.NotNull(compilation, nameof(compilation)));
     }
 
     internal ImmutableArray<ContractIntrinsicViolation> Validate(
         IMethodSymbol callable, IOperation? body, bool includeNestedCallables = false)
     {
-        if (callable == null)
-        {
-            throw new ArgumentNullException(nameof(callable));
-        }
+        callable = ArgumentNullGuard.NotNull(callable, nameof(callable));
 
         if (_api == null || body == null)
         {

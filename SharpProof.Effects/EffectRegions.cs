@@ -1,24 +1,10 @@
 namespace SharpProof.Effects;
 
-public enum EffectRegionKind
-{
-    Receiver,
-    Parameter,
-    Captured,
-    Static,
-    Fresh,
-    Ambient,
-    Unknown
-}
-
 public readonly record struct EffectRegionId : IComparable<EffectRegionId>
 {
     public EffectRegionId(EffectRegionKind kind, int ordinal = 0)
     {
-        if (!Enum.IsDefined(typeof(EffectRegionKind), kind))
-        {
-            throw new ArgumentOutOfRangeException(nameof(kind));
-        }
+        kind = ArgumentNullGuard.RequireDefined(kind, nameof(kind));
 
         if (ordinal < 0)
         {
@@ -100,10 +86,7 @@ public readonly struct EffectRegionSet : IEquatable<EffectRegionSet>
 
     public static EffectRegionSet Create(IEnumerable<EffectRegionId> regions)
     {
-        if (regions == null)
-        {
-            throw new ArgumentNullException(nameof(regions));
-        }
+        regions = ArgumentNullGuard.NotNull(regions, nameof(regions));
 
         var distinct = regions.Distinct().OrderBy(static region => region).ToImmutableArray();
         if (distinct.Any(static region => region.Kind == EffectRegionKind.Unknown))

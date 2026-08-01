@@ -32,11 +32,7 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
 
     public SequenceCardinalityValue KnownLength(long length)
     {
-        if (length < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(length));
-        }
-
+        length = ArgumentNullGuard.RequireNonnegative(length, nameof(length));
         return Create(SequenceCardinalityKind.Top, _intervals.Constant(length));
     }
 
@@ -68,8 +64,6 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
                 break;
             case SequenceCardinalityKind.Top:
                 break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(kind));
         }
 
         var canonicalKind = restricted.IsSingleton && restricted.SingletonValue == 0
@@ -149,11 +143,8 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
         SequenceCardinalityValue value, long appendedCount = 1)
     {
         Validate(value.Kind);
-        if (appendedCount < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(appendedCount));
-        }
-
+        appendedCount = ArgumentNullGuard.RequireNonnegative(
+            appendedCount, nameof(appendedCount));
         if (value.IsBottom)
         {
             return Bottom;
@@ -229,9 +220,6 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
 
     private static void Validate(SequenceCardinalityKind kind)
     {
-        if (kind < SequenceCardinalityKind.Bottom || kind > SequenceCardinalityKind.Top)
-        {
-            throw new ArgumentOutOfRangeException(nameof(kind));
-        }
+        _ = ArgumentNullGuard.RequireDefined(kind, nameof(kind));
     }
 }

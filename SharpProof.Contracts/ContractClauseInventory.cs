@@ -10,82 +10,14 @@ public enum ContractClausePlacement
     Misplaced
 }
 
-public sealed class ContractClauseOccurrence
+public sealed partial class ContractClauseOccurrence
 {
-    internal ContractClauseOccurrence(
-        BoundContractKind kind,
-        ContractClausePlacement placement,
-        int ordinal,
-        int sourceOrdinal,
-        IInvocationOperation invocation)
-    {
-        Kind = kind;
-        Placement = placement;
-        Ordinal = ordinal;
-        SourceOrdinal = sourceOrdinal;
-        Invocation = invocation;
-    }
-
-    public BoundContractKind Kind
-    {
-        get;
-    }
-    public ContractClausePlacement Placement
-    {
-        get;
-    }
-    public int Ordinal
-    {
-        get;
-    }
-    public int SourceOrdinal
-    {
-        get;
-    }
-    public IInvocationOperation Invocation
-    {
-        get;
-    }
     public Location Location => Invocation.Syntax.GetLocation();
     public bool IsValid => Placement == ContractClausePlacement.ValidPrologue;
 }
 
-public sealed class ContractClauseInventory
+public sealed partial class ContractClauseInventory
 {
-    internal ContractClauseInventory(
-        IMethodSymbol callable,
-        bool contractApiAvailable,
-        bool hasRejectedContractApiUsage,
-        IOperation? implementationBody,
-        ImmutableArray<ContractClauseOccurrence> clauses)
-    {
-        Callable = callable;
-        ContractApiAvailable = contractApiAvailable;
-        HasRejectedContractApiUsage = hasRejectedContractApiUsage;
-        ImplementationBody = implementationBody;
-        Clauses = clauses;
-    }
-
-    public IMethodSymbol Callable
-    {
-        get;
-    }
-    public bool ContractApiAvailable
-    {
-        get;
-    }
-    public bool HasRejectedContractApiUsage
-    {
-        get;
-    }
-    public IOperation? ImplementationBody
-    {
-        get;
-    }
-    public ImmutableArray<ContractClauseOccurrence> Clauses
-    {
-        get;
-    }
     public bool HasPlacementErrors =>
         Clauses.Any(static clause =>
             !clause.IsValid &&

@@ -161,26 +161,27 @@ internal static class EffectCounterexampleReplayer
         WorkerEffectViolationWitness actual,
         WorkerEffectViolationWitness? claimed)
     {
-        return claimed != null &&
-            actual.Kind == claimed.Kind &&
-            actual.Detail == claimed.Detail &&
-            actual.Effects == claimed.Effects &&
-            actual.Capabilities == claimed.Capabilities &&
-            actual.ExactExceptionTypeHierarchy.SequenceEqual(
+        if (claimed == null)
+        {
+            return false;
+        }
+
+        return (actual.Kind, actual.Detail, actual.Effects,
+                   actual.Capabilities) ==
+               (claimed.Kind, claimed.Detail, claimed.Effects,
+                   claimed.Capabilities) &&
+               actual.ExactExceptionTypeHierarchy.SequenceEqual(
                 claimed.ExactExceptionTypeHierarchy,
                 StringComparer.Ordinal) &&
-            LocationsEqual(actual.Location, claimed.Location);
+               LocationsEqual(actual.Location, claimed.Location);
     }
 
     private static bool LocationsEqual(
         WorkerSourceLocation left,
         WorkerSourceLocation right)
     {
-        return left.Path == right.Path &&
-            left.Start == right.Start &&
-            left.Length == right.Length &&
-            left.Line == right.Line &&
-            left.Column == right.Column;
+        return (left.Path, left.Start, left.Length, left.Line, left.Column) ==
+               (right.Path, right.Start, right.Length, right.Line, right.Column);
     }
 
     private static WorkerSourceLocation Copy(
@@ -212,7 +213,7 @@ internal static class EffectCounterexampleReplayer
         CompilerEffectConstraintArtifact constraint)
     {
         ArgumentNullException.ThrowIfNull(constraint);
-        using var hash = new EffectReplayHashWriter();
+        using var hash = new CanonicalHashWriter();
         hash.Add(
             "SharpProof.CompilerEffectReplayConstraint",
             1,
@@ -233,7 +234,7 @@ internal static class EffectCounterexampleReplayer
     {
         ArgumentNullException.ThrowIfNull(effectEvent);
         var location = effectEvent.Location;
-        using var hash = new EffectReplayHashWriter();
+        using var hash = new CanonicalHashWriter();
         hash.Add(
             "SharpProof.CompilerEffectReplayOperation",
             1,
@@ -273,127 +274,4 @@ internal static class EffectCounterexampleReplayer
         return new InvalidDataException(message);
     }
 
-    private sealed class EffectReplayHashWriter : IDisposable
-    {
-        private readonly IncrementalHash _hash =
-            IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        private bool _finished;
-
-        internal EffectReplayHashWriter Add(params object?[] values)
-        {
-            foreach (var value in values)
-            {
-                _ = value switch
-                {
-                    null => Add((string?)null),
-                    string text => Add(text),
-                    int integer => Add(integer),
-                    long integer => Add(integer),
-                    Enum enumeration => Add(enumeration),
-                    _ => throw new ArgumentException(
-                        "Effect replay hash values must use an exact " +
-                        "supported type.",
-                        nameof(values))
-                };
-            }
-
-            return this;
-        }
-
-        internal EffectReplayHashWriter Add(string? value)
-        {
-            return value == null
-                ? AddFrame(ValueKind.Null, [])
-                : AddFrame(
-                    ValueKind.String,
-                    Encoding.UTF8.GetBytes(value));
-        }
-
-        internal EffectReplayHashWriter Add(int value)
-        {
-            return AddFrame(
-                ValueKind.Int32,
-                Encoding.UTF8.GetBytes(
-                    value.ToString(CultureInfo.InvariantCulture)));
-        }
-
-        internal EffectReplayHashWriter Add(long value)
-        {
-            return AddFrame(
-                ValueKind.Int64,
-                Encoding.UTF8.GetBytes(
-                    value.ToString(CultureInfo.InvariantCulture)));
-        }
-
-        private EffectReplayHashWriter Add(Enum value)
-        {
-            var name = value.ToString();
-            if (name.Length == 0 ||
-                name[0] == '-' ||
-                char.IsDigit(name[0]))
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(value),
-                    "Canonical enum values must have a declared name.");
-            }
-
-            var type = value.GetType();
-            return AddFrame(
-                ValueKind.Enum,
-                Encoding.UTF8.GetBytes(
-                    (type.Assembly.GetName().Name ?? string.Empty) +
-                    "\n" +
-                    (type.FullName ?? type.Name) +
-                    "\n" +
-                    name));
-        }
-
-        private EffectReplayHashWriter AddFrame(
-            ValueKind kind,
-            byte[] bytes)
-        {
-            ObjectDisposedException.ThrowIf(_finished, this);
-
-            var length = bytes.Length;
-            _hash.AppendData([
-                (byte)kind,
-                (byte)length,
-                (byte)(length >> 8),
-                (byte)(length >> 16),
-                (byte)(length >> 24)
-            ]);
-            _hash.AppendData(bytes);
-            return this;
-        }
-
-        internal string Finish()
-        {
-            ObjectDisposedException.ThrowIf(_finished, this);
-
-            _finished = true;
-            return string.Concat(
-                _hash.GetHashAndReset().Select(static value =>
-                    value.ToString(
-                        "x2",
-                        CultureInfo.InvariantCulture)));
-        }
-
-        public void Dispose()
-        {
-            _finished = true;
-            _hash.Dispose();
-        }
-
-        private enum ValueKind : byte
-        {
-            Null,
-            String,
-            Boolean,
-            Int32,
-            UInt32,
-            Int64,
-            Bytes,
-            Enum
-        }
-    }
 }

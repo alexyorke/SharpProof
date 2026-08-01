@@ -16,123 +16,123 @@ public sealed class ApiSpecInstantiationCoverageTests
         var receiver = Variable(
             SpecVariableRole.Receiver,
             -1,
-            SpecValueType.String);
+            IrTypeKind.String);
         var boolean = Variable(
             SpecVariableRole.Parameter,
             0,
-            SpecValueType.Boolean);
+            IrTypeKind.Boolean);
         var integer = Variable(
             SpecVariableRole.Parameter,
             1,
-            SpecValueType.Integer);
+            IrTypeKind.Integer);
         var text = Variable(
             SpecVariableRole.Parameter,
             2,
-            SpecValueType.String);
+            IrTypeKind.String);
         var reference = Variable(
             SpecVariableRole.Parameter,
             3,
-            SpecValueType.Reference);
+            IrTypeKind.Reference);
         var sequence = Variable(
             SpecVariableRole.Parameter,
             4,
-            SpecValueType.Sequence);
+            IrTypeKind.Sequence);
         var result = Variable(
             SpecVariableRole.Result,
             -1,
-            SpecValueType.Boolean);
+            IrTypeKind.Boolean);
         var postconditions = new List<SpecTermDeclaration> {
             result,
             new SpecBooleanDeclaration(true),
             new SpecUnaryDeclaration(
-                SpecUnaryOperator.Not,
+                IrUnaryOperator.Not,
                 new SpecBooleanDeclaration(false),
-                SpecValueType.Boolean),
+                IrTypeKind.Boolean),
             Equal(
                 new SpecUnaryDeclaration(
-                    SpecUnaryOperator.Negate,
+                    IrUnaryOperator.Negate,
                     new SpecIntegerDeclaration(7),
-                    SpecValueType.Integer),
+                    IrTypeKind.Integer),
                 new SpecIntegerDeclaration(-7)),
             Equal(Binary(
-                SpecBinaryOperator.Add,
+                IrBinaryOperator.Add,
                 Integer(2),
                 Integer(3),
-                SpecValueType.Integer), Integer(5)),
+                IrTypeKind.Integer), Integer(5)),
             Equal(Binary(
-                SpecBinaryOperator.Subtract,
+                IrBinaryOperator.Subtract,
                 Integer(7),
                 Integer(2),
-                SpecValueType.Integer), Integer(5)),
+                IrTypeKind.Integer), Integer(5)),
             Equal(Binary(
-                SpecBinaryOperator.Multiply,
+                IrBinaryOperator.Multiply,
                 Integer(4),
                 Integer(3),
-                SpecValueType.Integer), Integer(12)),
+                IrTypeKind.Integer), Integer(12)),
             Equal(Binary(
-                SpecBinaryOperator.Divide,
+                IrBinaryOperator.Divide,
                 Integer(12),
                 Integer(4),
-                SpecValueType.Integer), Integer(3)),
+                IrTypeKind.Integer), Integer(3)),
             Equal(Binary(
-                SpecBinaryOperator.Remainder,
+                IrBinaryOperator.Remainder,
                 Integer(14),
                 Integer(4),
-                SpecValueType.Integer), Integer(2)),
+                IrTypeKind.Integer), Integer(2)),
             Binary(
-                SpecBinaryOperator.AndAlso,
+                IrBinaryOperator.AndAlso,
                 new SpecBooleanDeclaration(true),
                 boolean,
-                SpecValueType.Boolean),
+                IrTypeKind.Boolean),
             Binary(
-                SpecBinaryOperator.OrElse,
+                IrBinaryOperator.OrElse,
                 new SpecBooleanDeclaration(false),
                 boolean,
-                SpecValueType.Boolean),
+                IrTypeKind.Boolean),
             Equal(integer, integer),
             Binary(
-                SpecBinaryOperator.NotEqual,
+                IrBinaryOperator.NotEqual,
                 Integer(1),
                 Integer(2),
-                SpecValueType.Boolean),
-            Compare(SpecBinaryOperator.LessThan, 1, 2),
-            Compare(SpecBinaryOperator.LessThanOrEqual, 2, 2),
-            Compare(SpecBinaryOperator.GreaterThan, 2, 1),
-            Compare(SpecBinaryOperator.GreaterThanOrEqual, 2, 2),
+                IrTypeKind.Boolean),
+            Compare(IrBinaryOperator.LessThan, 1, 2),
+            Compare(IrBinaryOperator.LessThanOrEqual, 2, 2),
+            Compare(IrBinaryOperator.GreaterThan, 2, 1),
+            Compare(IrBinaryOperator.GreaterThanOrEqual, 2, 2),
             Equal(Binary(
-                SpecBinaryOperator.StringConcat,
+                IrBinaryOperator.StringConcat,
                 new SpecStringDeclaration("sharp"),
                 new SpecStringDeclaration("proof"),
-                SpecValueType.String), new SpecStringDeclaration("sharpproof")),
+                IrTypeKind.String), new SpecStringDeclaration("sharpproof")),
             new SpecConditionalDeclaration(
                 boolean,
                 new SpecBooleanDeclaration(true),
                 new SpecBooleanDeclaration(false),
-                SpecValueType.Boolean),
+                IrTypeKind.Boolean),
             Equal(
                 new SpecLengthDeclaration(receiver),
                 new SpecIntegerDeclaration(3)),
             Equal(
-                new SpecNullDeclaration(SpecValueType.String),
-                new SpecNullDeclaration(SpecValueType.String)),
+                new SpecNullDeclaration(IrTypeKind.String),
+                new SpecNullDeclaration(IrTypeKind.String)),
             Equal(
-                new SpecNullDeclaration(SpecValueType.Reference),
-                new SpecNullDeclaration(SpecValueType.Reference)),
+                new SpecNullDeclaration(IrTypeKind.Reference),
+                new SpecNullDeclaration(IrTypeKind.Reference)),
             Equal(text, text),
             Equal(reference, reference),
             Equal(sequence, sequence)
         };
         var template = CreateTemplate(
             isStatic: false,
-            receiverType: SpecValueType.String,
+            receiverType: IrTypeKind.String,
             parameterTypes: [
-                SpecValueType.Boolean,
-                SpecValueType.Integer,
-                SpecValueType.String,
-                SpecValueType.Reference,
-                SpecValueType.Sequence
+                IrTypeKind.Boolean,
+                IrTypeKind.Integer,
+                IrTypeKind.String,
+                IrTypeKind.Reference,
+                IrTypeKind.Sequence
             ],
-            resultType: SpecValueType.Boolean,
+            resultType: IrTypeKind.Boolean,
             postconditions);
         var factory = new IrFactory();
         var sequenceType =
@@ -182,18 +182,18 @@ public sealed class ApiSpecInstantiationCoverageTests
         var template = CreateTemplate(
             isStatic: true,
             receiverType: null,
-            parameterTypes: [SpecValueType.Integer],
+            parameterTypes: [IrTypeKind.Integer],
             resultType: null,
             [Equal(
                 Variable(
                     SpecVariableRole.Parameter,
                     0,
-                    SpecValueType.Integer),
+                    IrTypeKind.Integer),
                 Integer(0))]);
         var otherTemplate = CreateTemplate(
             isStatic: true,
             receiverType: null,
-            parameterTypes: [SpecValueType.Integer],
+            parameterTypes: [IrTypeKind.Integer],
             resultType: null,
             [new SpecBooleanDeclaration(true)]);
         var factory = new IrFactory();
@@ -245,7 +245,7 @@ public sealed class ApiSpecInstantiationCoverageTests
     public void SequenceNullProducesAnExplicitUnsupportedValueFailure()
     {
         var nullSequence =
-            new SpecNullDeclaration(SpecValueType.Sequence);
+            new SpecNullDeclaration(IrTypeKind.Sequence);
         var template = CreateTemplate(
             isStatic: true,
             receiverType: null,
@@ -279,9 +279,9 @@ public sealed class ApiSpecInstantiationCoverageTests
 
     private static ApiSpecTemplate CreateTemplate(
         bool isStatic,
-        SpecValueType? receiverType,
-        ImmutableArray<SpecValueType> parameterTypes,
-        SpecValueType? resultType,
+        IrTypeKind? receiverType,
+        ImmutableArray<IrTypeKind> parameterTypes,
+        IrTypeKind? resultType,
         IEnumerable<SpecTermDeclaration> postconditions)
     {
         var declaration = new ApiSpecDeclaration(
@@ -324,7 +324,7 @@ public sealed class ApiSpecInstantiationCoverageTests
     private static SpecVariableDeclaration Variable(
         SpecVariableRole role,
         int ordinal,
-        SpecValueType type)
+        IrTypeKind type)
     {
         return new(role, ordinal, type);
     }
@@ -335,10 +335,10 @@ public sealed class ApiSpecInstantiationCoverageTests
     }
 
     private static SpecBinaryDeclaration Binary(
-        SpecBinaryOperator @operator,
+        IrBinaryOperator @operator,
         SpecTermDeclaration left,
         SpecTermDeclaration right,
-        SpecValueType type)
+        IrTypeKind type)
     {
         return new(@operator, left, right, type);
     }
@@ -348,14 +348,14 @@ public sealed class ApiSpecInstantiationCoverageTests
         SpecTermDeclaration right)
     {
         return Binary(
-            SpecBinaryOperator.Equal,
+            IrBinaryOperator.Equal,
             left,
             right,
-            SpecValueType.Boolean);
+            IrTypeKind.Boolean);
     }
 
     private static SpecBinaryDeclaration Compare(
-        SpecBinaryOperator @operator,
+        IrBinaryOperator @operator,
         long left,
         long right)
     {
@@ -363,6 +363,6 @@ public sealed class ApiSpecInstantiationCoverageTests
             @operator,
             Integer(left),
             Integer(right),
-            SpecValueType.Boolean);
+            IrTypeKind.Boolean);
     }
 }

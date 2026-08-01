@@ -2,8 +2,9 @@ namespace SharpProof.Dataflow;
 
 public sealed class DataflowBlock<T>(int id, Func<T, T> transfer)
 {
-    public int Id { get; } = id >= 0 ? id : throw new ArgumentOutOfRangeException(nameof(id));
-    public Func<T, T> Transfer { get; } = transfer ?? throw new ArgumentNullException(nameof(transfer));
+    public int Id { get; } = ArgumentNullGuard.RequireNonnegative(id, nameof(id));
+    public Func<T, T> Transfer { get; } =
+        ArgumentNullGuard.NotNull(transfer, nameof(transfer));
 }
 
 public readonly record struct DataflowEdge
@@ -11,8 +12,8 @@ public readonly record struct DataflowEdge
     public DataflowEdge(int sourceId, int targetId)
     {
         (SourceId, TargetId) = (
-            sourceId >= 0 ? sourceId : throw new ArgumentOutOfRangeException(nameof(sourceId)),
-            targetId >= 0 ? targetId : throw new ArgumentOutOfRangeException(nameof(targetId)));
+            ArgumentNullGuard.RequireNonnegative(sourceId, nameof(sourceId)),
+            ArgumentNullGuard.RequireNonnegative(targetId, nameof(targetId)));
     }
 
     public int SourceId
@@ -39,15 +40,8 @@ public sealed class DataflowGraph<T>
         IEnumerable<DataflowEdge> edges,
         int entryBlockId = 0)
     {
-        if (blocks == null)
-        {
-            throw new ArgumentNullException(nameof(blocks));
-        }
-
-        if (edges == null)
-        {
-            throw new ArgumentNullException(nameof(edges));
-        }
+        ArgumentNullGuard.NotNull(blocks, nameof(blocks));
+        ArgumentNullGuard.NotNull(edges, nameof(edges));
 
         Blocks = [.. blocks.OrderBy(static block => block.Id)];
         if (Blocks.IsDefaultOrEmpty)
@@ -65,10 +59,10 @@ public sealed class DataflowGraph<T>
             }
         }
 
-        if (entryBlockId < 0 || entryBlockId >= Blocks.Length)
-        {
-            throw new ArgumentOutOfRangeException(nameof(entryBlockId));
-        }
+        _ = ArgumentNullGuard.RequireIndex(
+            entryBlockId,
+            Blocks.Length,
+            nameof(entryBlockId));
 
         var distinctEdges = new HashSet<DataflowEdge>();
         foreach (var edge in edges)
@@ -139,10 +133,10 @@ public sealed class DataflowGraph<T>
 
     private void ValidateBlockId(int blockId)
     {
-        if (blockId < 0 || blockId >= Blocks.Length)
-        {
-            throw new ArgumentOutOfRangeException(nameof(blockId));
-        }
+        _ = ArgumentNullGuard.RequireIndex(
+            blockId,
+            Blocks.Length,
+            nameof(blockId));
     }
 
     private static List<int>[] CreateAdjacency(int count)

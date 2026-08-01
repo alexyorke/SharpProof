@@ -90,6 +90,3 @@ internal static class CallableVerificationPolicy
             claims);
     }
 }
-
-internal sealed record CallableVerificationResult(
-    WorkerCallableResult Callable, ImmutableArray<WorkerClaimResult> Claims);

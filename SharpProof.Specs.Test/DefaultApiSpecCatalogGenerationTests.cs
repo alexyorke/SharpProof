@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
+using SharpProof.Ir;
 
 namespace SharpProof.Specs.Test;
 
@@ -9,7 +10,7 @@ namespace SharpProof.Specs.Test;
 public sealed class DefaultApiSpecCatalogGenerationTests
 {
     private const string ExpectedContentSha256 =
-        "6fbfd786eb580fca85a8838c276d278064b9eb42963116186d1378c9c01242ad";
+        "8e177ed0d36d9c78603c634aa1abe6fcc5e765e08d9607f8702277d38c0d1386";
 
     [Test]
     public void GeneratedCatalogPreservesEveryReviewedWitness()
@@ -210,20 +211,20 @@ public sealed class DefaultApiSpecCatalogGenerationTests
             Assert.That(
                 actual.ReceiverType,
                 Is.EqualTo(
-                    NullableEnumValue<SpecValueType>(
+                    NullableEnumValue<IrTypeKind>(
                         expected.GetProperty("receiverType"))),
                 witness);
             Assert.That(
                 actual.ParameterTypes,
                 Is.EqualTo(expected.GetProperty("parameterTypes")
                     .EnumerateArray()
-                    .Select(EnumValue<SpecValueType>)
+                    .Select(EnumValue<IrTypeKind>)
                     .ToArray()),
                 witness);
             Assert.That(
                 actual.ResultType,
                 Is.EqualTo(
-                    NullableEnumValue<SpecValueType>(
+                    NullableEnumValue<IrTypeKind>(
                         expected.GetProperty("resultType"))),
                 witness);
             var assemblySet = expected

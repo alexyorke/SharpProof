@@ -7,11 +7,7 @@ internal enum CallableEntryFeasibilityKind
     Unknown
 }
 
-internal sealed record CallableEntryFeasibility(
-    CallableEntryFeasibilityKind Kind,
-    WorkerClaimReason Reason,
-    ImmutableArray<string> ProofCore,
-    ImmutableHashSet<string> UsedAssumptionIds)
+internal sealed partial record CallableEntryFeasibility
 {
     internal static CallableEntryFeasibility Feasible { get; } =
         new(
@@ -59,16 +55,7 @@ internal sealed record CallableEntryFeasibility(
     }
 }
 
-internal sealed record CallableEntryEvidence(
-    ImmutableArray<Assumption> Assumptions,
-    IReadOnlyDictionary<ProofJustification, string> Labels,
-    IReadOnlyDictionary<ProofJustification, string> AssumptionIds,
-    ImmutableArray<IrVarId> ReplayVariables,
-    bool HasNontrivialPrecondition);
-
-internal readonly record struct CallableEntryEvidenceBuildResult(
-    CallableEntryEvidence? Evidence,
-    WorkerClaimReason FailureReason)
+internal readonly partial record struct CallableEntryEvidenceBuildResult
 {
     internal bool IsSuccess => Evidence != null;
 
@@ -84,10 +71,6 @@ internal readonly record struct CallableEntryEvidenceBuildResult(
         return new(null, reason);
     }
 }
-
-internal sealed record CallableProofVerification(
-    ImmutableArray<WorkerClaimResult> Postconditions,
-    CallableEntryFeasibility EntryFeasibility);
 
 internal static class CallableEntryFeasibilityEvaluator
 {

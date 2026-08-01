@@ -106,7 +106,7 @@ internal sealed class EffectMethodNodeBuilder
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var declaration = syntaxReference.GetSyntax(cancellationToken);
-                var expression = GetInitializerExpression(declaration);
+                var expression = EffectProjections.GetInitializerExpression(declaration);
                 if (expression == null)
                 {
                     continue;
@@ -151,7 +151,7 @@ internal sealed class EffectMethodNodeBuilder
             !member.IsImplicitlyDeclared &&
             IsInitializableMember(member, staticInitializers: true) &&
             member.DeclaringSyntaxReferences.Any(reference =>
-                GetInitializerExpression(reference.GetSyntax()) != null));
+                EffectProjections.GetInitializerExpression(reference.GetSyntax()) != null));
     }
 
     internal static bool HasPotentialConstructionInitialization(
@@ -220,16 +220,6 @@ internal sealed class EffectMethodNodeBuilder
             IPropertySymbol property => property.IsStatic == staticInitializers,
             IEventSymbol @event => @event.IsStatic == staticInitializers,
             _ => false
-        };
-    }
-
-    private static ExpressionSyntax? GetInitializerExpression(SyntaxNode declaration)
-    {
-        return declaration switch
-        {
-            VariableDeclaratorSyntax variable => variable.Initializer?.Value,
-            PropertyDeclarationSyntax property => property.Initializer?.Value,
-            _ => null
         };
     }
 

@@ -3,21 +3,6 @@ using System.Runtime.CompilerServices;
 
 namespace SharpProof.Effects;
 
-internal enum EffectCallPreconditionStatus
-{
-    None,
-    Proven,
-    NotProven
-}
-
-internal readonly record struct EffectCallPreconditionContext(
-    IMethodSymbol Caller,
-    IMethodSymbol Target,
-    IOperation? Receiver,
-    ImmutableArray<IOperation?> Arguments,
-    ManagedFlowResult? Flow,
-    IOperation Origin);
-
 internal interface IEffectCallPreconditionPolicy
 {
     EffectCallPreconditionStatus AssessEntry(
@@ -52,8 +37,8 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
     internal ConservativeEffectCallPreconditionPolicy(
         Compilation compilation)
     {
-        _compilation = compilation ??
-            throw new ArgumentNullException(nameof(compilation));
+        _compilation = ArgumentNullGuard.NotNull(
+            compilation, nameof(compilation));
         var identity =
             ContractApiIdentityResolver.ForCompilation(compilation);
         _contract = identity.Contract;
@@ -163,10 +148,10 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
                 }
 
                 if (model.GetOperation(invocationSyntax) is
-                        IInvocationOperation invocation &&
+                    IInvocationOperation invocation &&
                     invocation.TargetMethod.OriginalDefinition is
                     {
-                        Name: "Requires",
+                        Name: ContractApiCatalog.RequiresMethodName,
                         ContainingType: { } containingType
                     } &&
                     SymbolEqualityComparer.Default.Equals(

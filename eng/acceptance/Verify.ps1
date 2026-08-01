@@ -16,11 +16,19 @@ $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 . (Join-Path $repositoryRoot 'scripts\CSharpSourceMetrics.ps1')
-& (Join-Path $repositoryRoot 'scripts\Generate-DiagnosticDescriptors.ps1') -Verify
-& (Join-Path $repositoryRoot 'scripts\Generate-CSharpScalarSemantics.ps1') -Verify
+    & (Join-Path $repositoryRoot 'scripts\Generate-DiagnosticDescriptors.ps1') -Verify
+    & (Join-Path $repositoryRoot 'scripts\Generate-CSharpScalarSemantics.ps1') -Verify
+    & (Join-Path $repositoryRoot 'scripts\Generate-ContractApiCatalog.ps1') -Verify
+    & (Join-Path $repositoryRoot 'scripts\Generate-AnalyzerDiagnosticCatalog.ps1') -Verify
+    & (Join-Path $repositoryRoot 'scripts\Generate-ProjectionCatalog.ps1') -Verify
+    & (Join-Path $repositoryRoot 'scripts\Generate-BoundContractModel.ps1') -Verify
+    & (Join-Path $repositoryRoot 'scripts\Generate-EffectContractMappings.ps1') -Verify
+    & (Join-Path $repositoryRoot 'scripts\Generate-OperationSupportCatalog.ps1') -Verify
+    & (Join-Path $repositoryRoot 'scripts\Generate-IrModel.ps1') -Verify
 & (Join-Path $repositoryRoot 'scripts\Generate-ApiSpecCatalog.ps1') -Verify
 & (Join-Path $repositoryRoot 'scripts\Generate-ProtocolModel.ps1') -Verify
 & (Join-Path $repositoryRoot 'scripts\Generate-CompilerArtifactModel.ps1') -Verify
+& (Join-Path $repositoryRoot 'scripts\Generate-DeclarativeModels.ps1') -Verify
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
 $directoryBuildPropsPath = Join-Path `
     $repositoryRoot `
@@ -358,6 +366,15 @@ try {
         'apiSpecificationIdentity',
         'apiSpecificationCatalog',
         'scalarSemanticsCatalog',
+        'contractApiCatalog',
+        'analyzerDiagnosticCatalog',
+        'projectionCatalog',
+        'declarativeModelsCatalog',
+        'boundContractModelCatalog',
+        'effectContractCatalog',
+        'operationSupportCatalog',
+        'irModelCatalog',
+        'compilerWireCatalog',
         'effectAnalysis',
         'replay',
         'effectResultAssembly',

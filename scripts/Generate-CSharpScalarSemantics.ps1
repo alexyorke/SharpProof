@@ -7,6 +7,9 @@ param(
     [string]$OutputPath,
 
     [Parameter()]
+    [string]$IrOutputPath,
+
+    [Parameter()]
     [Alias('Check')]
     [switch]$Verify
 )
@@ -27,8 +30,14 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
         $repositoryRoot `
         'SharpProof.Frontend\CSharpScalarSemantics.generated.cs'
 }
+if ([string]::IsNullOrWhiteSpace($IrOutputPath)) {
+    $IrOutputPath = Join-Path `
+        $repositoryRoot `
+        'SharpProof.Ir\IrOperatorCatalog.generated.cs'
+}
 $CatalogPath = [IO.Path]::GetFullPath($CatalogPath)
 $OutputPath = [IO.Path]::GetFullPath($OutputPath)
+$IrOutputPath = [IO.Path]::GetFullPath($IrOutputPath)
 if (-not [IO.File]::Exists($CatalogPath)) {
     throw "C# scalar-semantics catalog not found: $CatalogPath"
 }
@@ -76,6 +85,22 @@ function Assert-EnumName {
     return [string]$Value
 }
 
+function Assert-CSharpIdentifier {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Value,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    if ($Value -isnot [string] -or
+        [string]$Value -cnotmatch '\A[A-Z][A-Za-z0-9]*\z') {
+        throw "$Context must be a safe PascalCase C# identifier."
+    }
+    return [string]$Value
+}
+
 function Assert-Boolean {
     param(
         [Parameter(Mandatory = $true)]
@@ -89,6 +114,28 @@ function Assert-Boolean {
         throw "$Context must be Boolean."
     }
     return [bool]$Value
+}
+
+function Assert-OptionalEnumName {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [object]$Value,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$Allowed,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    if ($null -eq $Value) {
+        return $null
+    }
+    return Assert-EnumName `
+        -Value $Value `
+        -Allowed $Allowed `
+        -Context $Context
 }
 
 function ConvertTo-Long {
@@ -155,9 +202,16 @@ Assert-Properties `
         'binaryOperators',
         'unaryOperators',
         'specialBinaryOperators',
+        'irTypeKinds',
+        'irBuiltInTypes',
+        'nullableIrTypeKinds',
+        'builtInSpecialTypes',
+        'irUnaryOperators',
+        'irBinaryOperators',
+        'irOpaquePurities',
         'builtInEquality') `
     -Context 'catalog'
-if ([int]$catalog.schemaVersion -ne 1) {
+if ([int]$catalog.schemaVersion -ne 2) {
     throw "Unsupported scalar-semantics schema '$($catalog.schemaVersion)'."
 }
 if ([string]$catalog.integerConversionPolicy -ne 'range-contained') {
@@ -189,23 +243,140 @@ $binaryKinds = @(
     'LessThanOrEqual',
     'GreaterThan',
     'GreaterThanOrEqual')
-$irBinaryOperators = @(
-    'Add',
-    'Subtract',
-    'Multiply',
-    'Divide',
-    'Remainder',
-    'AndAlso',
-    'OrElse',
-    'Equal',
-    'NotEqual',
-    'LessThan',
-    'LessThanOrEqual',
-    'GreaterThan',
-    'GreaterThanOrEqual',
-    'StringConcat')
 $unaryKinds = @('Not', 'Plus', 'Minus')
-$irUnaryOperators = @('Not', 'Negate')
+$irTypeKinds = @(
+    $catalog.irTypeKinds |
+        ForEach-Object {
+            Assert-CSharpIdentifier `
+                -Value $_ `
+                -Context 'irTypeKinds'
+        })
+if ($irTypeKinds.Count -eq 0 -or
+    @($irTypeKinds | Select-Object -Unique).Count -ne
+        $irTypeKinds.Count) {
+    throw 'irTypeKinds must be non-empty and unique.'
+}
+$irBuiltInTypeRows = foreach ($type in @($catalog.irBuiltInTypes)) {
+    Assert-Properties `
+        -Value $type `
+        -Allowed @('kind', 'factoryProperty') `
+        -Context 'IR built-in type'
+    [pscustomobject]@{
+        Kind = Assert-EnumName `
+            -Value $type.kind `
+            -Allowed $irTypeKinds `
+            -Context 'IR built-in type kind'
+        FactoryProperty = Assert-CSharpIdentifier `
+            -Value $type.factoryProperty `
+            -Context 'IR built-in type factory property'
+    }
+}
+if ($irBuiltInTypeRows.Count -eq 0 -or
+    @($irBuiltInTypeRows.Kind | Select-Object -Unique).Count -ne
+        $irBuiltInTypeRows.Count) {
+    throw 'irBuiltInTypes must contain unique kinds.'
+}
+$nullableIrTypeKinds = @(
+    $catalog.nullableIrTypeKinds |
+        ForEach-Object {
+            Assert-EnumName `
+                -Value $_ `
+                -Allowed $irTypeKinds `
+                -Context 'nullableIrTypeKinds'
+        })
+if (@($nullableIrTypeKinds | Select-Object -Unique).Count -ne
+    $nullableIrTypeKinds.Count) {
+    throw 'nullableIrTypeKinds must not contain duplicates.'
+}
+$builtInSpecialTypeRows = foreach ($type in @($catalog.builtInSpecialTypes)) {
+    Assert-Properties `
+        -Value $type `
+        -Allowed @('specialType', 'factoryProperty') `
+        -Context 'built-in special type'
+    [pscustomobject]@{
+        SpecialType = Assert-EnumName `
+            -Value $type.specialType `
+            -Allowed @($specialTypes + 'System_Object') `
+            -Context 'built-in special type name'
+        FactoryProperty = Assert-CSharpIdentifier `
+            -Value $type.factoryProperty `
+            -Context 'built-in special type factory property'
+    }
+}
+if ($builtInSpecialTypeRows.Count -eq 0 -or
+    @($builtInSpecialTypeRows.SpecialType | Select-Object -Unique).Count -ne
+        $builtInSpecialTypeRows.Count) {
+    throw 'builtInSpecialTypes must contain unique special types.'
+}
+$irOpaquePurityRows = foreach ($purity in @($catalog.irOpaquePurities)) {
+    Assert-Properties `
+        -Value $purity `
+        -Allowed @('purity', 'key') `
+        -Context 'IR opaque purity'
+    $name = Assert-CSharpIdentifier `
+        -Value $purity.purity `
+        -Context 'IR opaque purity name'
+    $key = [int]$purity.key
+    if ($key -lt 0) {
+        throw "IR opaque purity '$name'.key must be nonnegative."
+    }
+    [pscustomobject]@{
+        Purity = $name
+        Key = $key
+    }
+}
+if ($irOpaquePurityRows.Count -eq 0 -or
+    @($irOpaquePurityRows.Purity | Select-Object -Unique).Count -ne
+        $irOpaquePurityRows.Count -or
+    @($irOpaquePurityRows.Key | Select-Object -Unique).Count -ne
+        $irOpaquePurityRows.Count) {
+    throw 'irOpaquePurities must contain unique purities and keys.'
+}
+for ($index = 0; $index -lt $irOpaquePurityRows.Count; $index++) {
+    if (@($irOpaquePurityRows.Key | Sort-Object)[$index] -ne $index) {
+        throw 'irOpaquePurities keys must be contiguous from zero.'
+    }
+}
+$irUnaryOperators = @(
+    $catalog.irUnaryOperators |
+        ForEach-Object {
+            Assert-CSharpIdentifier `
+                -Value $_.operator `
+                -Context 'IR unary operator name'
+        })
+if ($irUnaryOperators.Count -eq 0 -or
+    @($irUnaryOperators | Select-Object -Unique).Count -ne
+        $irUnaryOperators.Count) {
+    throw 'irUnaryOperators must be non-empty and unique.'
+}
+$irBinaryOperators = @(
+    $catalog.irBinaryOperators |
+        ForEach-Object {
+            Assert-CSharpIdentifier `
+                -Value $_.operator `
+                -Context 'IR binary operator name'
+        })
+if ($irBinaryOperators.Count -eq 0 -or
+    @($irBinaryOperators | Select-Object -Unique).Count -ne
+        $irBinaryOperators.Count) {
+    throw 'irBinaryOperators must be non-empty and unique.'
+}
+$operatorTokens = @(
+    '!',
+    '-',
+    '+',
+    '*',
+    '/',
+    '%',
+    '&&',
+    '||',
+    '==',
+    '!=',
+    '<',
+    '<=',
+    '>',
+    '>=',
+    '++')
 
 $integers = @($catalog.integers)
 if ($integers.Count -eq 0) {
@@ -265,13 +436,16 @@ $binaryRows = foreach ($binary in @($catalog.binaryOperators)) {
             'kind',
             'irOperator',
             'integerArithmetic',
-            'checkedArithmetic') `
+            'checkedArithmetic',
+            'reverseKind',
+            'negatedKind') `
         -Context 'binary operator'
+    $kind = Assert-EnumName `
+        -Value $binary.kind `
+        -Allowed $binaryKinds `
+        -Context 'binary operator kind'
     [pscustomobject]@{
-        Kind = Assert-EnumName `
-            -Value $binary.kind `
-            -Allowed $binaryKinds `
-            -Context 'binary operator kind'
+        Kind = $kind
         Ir = Assert-EnumName `
             -Value $binary.irOperator `
             -Allowed $irBinaryOperators `
@@ -282,10 +456,40 @@ $binaryRows = foreach ($binary in @($catalog.binaryOperators)) {
         Checked = Assert-Boolean `
             -Value $binary.checkedArithmetic `
             -Context "binary '$($binary.kind)'.checkedArithmetic"
+        Reverse = Assert-OptionalEnumName `
+            -Value $binary.reverseKind `
+            -Allowed $binaryKinds `
+            -Context "binary '$kind'.reverseKind"
+        Negated = Assert-OptionalEnumName `
+            -Value $binary.negatedKind `
+            -Allowed $binaryKinds `
+            -Context "binary '$kind'.negatedKind"
     }
 }
 if (@($binaryRows.Kind | Select-Object -Unique).Count -ne $binaryRows.Count) {
     throw 'binaryOperators contains duplicate kinds.'
+}
+if (@($binaryRows.Ir | Select-Object -Unique).Count -ne $binaryRows.Count) {
+    throw 'binaryOperators contains duplicate IR operators.'
+}
+foreach ($row in $binaryRows) {
+    foreach ($relation in @('Reverse', 'Negated')) {
+        $targetName = $row.$relation
+        if ($null -eq $targetName) {
+            continue
+        }
+        $target = @($binaryRows | Where-Object Kind -eq $targetName)
+        if ($target.Count -ne 1) {
+            throw "binary '$($row.Kind)'.$relation targets missing kind '$targetName'."
+        }
+        $returnName = $target[0].$relation
+        if ($null -eq $returnName) {
+            $returnName = $target[0].Kind
+        }
+        if ($returnName -ne $row.Kind) {
+            throw "binary '$($row.Kind)'.$relation must be involutive."
+        }
+    }
 }
 
 $unaryRows = foreach ($unary in @($catalog.unaryOperators)) {
@@ -347,6 +551,125 @@ $specialRows = foreach ($special in @($catalog.specialBinaryOperators)) {
     }
 }
 
+$irUnaryRows = foreach ($operator in @($catalog.irUnaryOperators)) {
+    Assert-Properties `
+        -Value $operator `
+        -Allowed @('operator', 'key', 'operandType', 'token') `
+        -Context 'IR unary operator'
+    $name = Assert-EnumName `
+        -Value $operator.operator `
+        -Allowed $irUnaryOperators `
+        -Context 'IR unary operator name'
+    $key = [int]$operator.key
+    if ($key -lt 0) {
+        throw "IR unary '$name'.key must be nonnegative."
+    }
+    [pscustomobject]@{
+        Operator = $name
+        Key = $key
+        Operand = Assert-EnumName `
+            -Value $operator.operandType `
+            -Allowed $irTypeKinds `
+            -Context "IR unary '$name'.operandType"
+        Token = Assert-EnumName `
+            -Value $operator.token `
+            -Allowed $operatorTokens `
+            -Context "IR unary '$name'.token"
+    }
+}
+if (@($irUnaryRows.Operator | Select-Object -Unique).Count -ne
+    $irUnaryRows.Count) {
+    throw 'irUnaryOperators contains duplicate operators.'
+}
+if (@($irUnaryRows.Key | Select-Object -Unique).Count -ne
+    $irUnaryRows.Count) {
+    throw 'irUnaryOperators contains duplicate keys.'
+}
+if (@(Compare-Object `
+        -ReferenceObject $irUnaryOperators `
+        -DifferenceObject @($irUnaryRows.Operator)).Count -ne 0) {
+    throw 'irUnaryOperators must cover every IR unary operator exactly once.'
+}
+for ($index = 0; $index -lt $irUnaryRows.Count; $index++) {
+    if (@($irUnaryRows.Key | Sort-Object)[$index] -ne $index) {
+        throw 'irUnaryOperators keys must be contiguous from zero.'
+    }
+}
+
+$irBinaryRows = foreach ($operator in @($catalog.irBinaryOperators)) {
+    Assert-Properties `
+        -Value $operator `
+        -Allowed @(
+            'operator',
+            'key',
+            'operandType',
+            'resultType',
+            'token') `
+        -Context 'IR binary operator'
+    $name = Assert-EnumName `
+        -Value $operator.operator `
+        -Allowed $irBinaryOperators `
+        -Context 'IR binary operator name'
+    $key = [int]$operator.key
+    if ($key -lt 0) {
+        throw "IR binary '$name'.key must be nonnegative."
+    }
+    [pscustomobject]@{
+        Operator = $name
+        Key = $key
+        Operand = Assert-OptionalEnumName `
+            -Value $operator.operandType `
+            -Allowed $irTypeKinds `
+            -Context "IR binary '$name'.operandType"
+        Result = Assert-EnumName `
+            -Value $operator.resultType `
+            -Allowed $irTypeKinds `
+            -Context "IR binary '$name'.resultType"
+        Token = Assert-EnumName `
+            -Value $operator.token `
+            -Allowed $operatorTokens `
+            -Context "IR binary '$name'.token"
+    }
+}
+if (@($irBinaryRows.Operator | Select-Object -Unique).Count -ne
+    $irBinaryRows.Count) {
+    throw 'irBinaryOperators contains duplicate operators.'
+}
+if (@($irBinaryRows.Key | Select-Object -Unique).Count -ne
+    $irBinaryRows.Count) {
+    throw 'irBinaryOperators contains duplicate keys.'
+}
+if (@(Compare-Object `
+        -ReferenceObject $irBinaryOperators `
+        -DifferenceObject @($irBinaryRows.Operator)).Count -ne 0) {
+    throw 'irBinaryOperators must cover every IR binary operator exactly once.'
+}
+for ($index = 0; $index -lt $irBinaryRows.Count; $index++) {
+    if (@($irBinaryRows.Key | Sort-Object)[$index] -ne $index) {
+        throw 'irBinaryOperators keys must be contiguous from zero.'
+    }
+}
+
+$mappedUnaryOperators = @(
+    $unaryRows |
+        Where-Object { $null -ne $_.Ir } |
+        ForEach-Object Ir)
+if (@(Compare-Object `
+        -ReferenceObject $mappedUnaryOperators `
+        -DifferenceObject @($irUnaryRows.Operator)).Count -ne 0) {
+    throw 'Every IR unary operator must have one Roslyn unary mapping.'
+}
+$mappedBinaryOperators = @(
+    $binaryRows.Ir
+    $specialRows.Ir)
+if (@($mappedBinaryOperators | Select-Object -Unique).Count -ne
+    $mappedBinaryOperators.Count -or
+    @(Compare-Object `
+        -ReferenceObject $mappedBinaryOperators `
+        -DifferenceObject @($irBinaryRows.Operator)).Count -ne 0) {
+    throw 'Every IR binary operator must have one Roslyn binary mapping.'
+}
+
 Assert-Properties `
     -Value $catalog.builtInEquality `
     -Allowed @('allowReferenceTypes', 'specialTypes') `
@@ -404,12 +727,18 @@ $lines.AddRange([string[]]@(
     '    BinaryOperatorKind kind,',
     '    IrBinaryOperator irOperator,',
     '    bool isIntegerArithmetic = false,',
-    '    bool requiresCheckedArithmetic = false) {',
+    '    bool requiresCheckedArithmetic = false,',
+    '    BinaryOperatorKind? reverseKind = null,',
+    '    BinaryOperatorKind? negatedKind = null) {',
     '    internal BinaryOperatorKind Kind { get; } = kind;',
     '    internal IrBinaryOperator IrOperator { get; } = irOperator;',
     '    internal bool IsIntegerArithmetic { get; } = isIntegerArithmetic;',
     '    internal bool RequiresCheckedArithmetic { get; } =',
     '        requiresCheckedArithmetic;',
+    '    internal BinaryOperatorKind ReverseKind { get; } =',
+    '        reverseKind ?? kind;',
+    '    internal BinaryOperatorKind NegatedKind { get; } =',
+    '        negatedKind ?? kind;',
     '}',
     '',
     'internal readonly struct CSharpUnarySemantics(',
@@ -470,6 +799,12 @@ for ($index = 0; $index -lt $binaryRows.Count; $index++) {
     if ($row.Checked) {
         $arguments += 'true'
     }
+    if ($null -ne $row.Reverse) {
+        $arguments += "reverseKind: BinaryOperatorKind.$($row.Reverse)"
+    }
+    if ($null -ne $row.Negated) {
+        $arguments += "negatedKind: BinaryOperatorKind.$($row.Negated)"
+    }
     $lines.Add("        new($($arguments -join ', '))$suffix")
 }
 Add-Lines -Lines $lines -Values @(
@@ -516,6 +851,17 @@ Add-Lines -Lines $lines -Values @(
     '    internal static bool IsSupportedInteger(SpecialType type) =>',
     '        TryGetInteger(type, out _);',
     '',
+    '    internal static IrTypeId? TryGetBuiltInType(',
+    '        IrFactory factory, SpecialType type) =>',
+    '        type switch {')
+foreach ($row in @($builtInSpecialTypeRows)) {
+    $lines.Add(
+        "            SpecialType.$($row.SpecialType) => factory.$($row.FactoryProperty),")
+}
+Add-Lines -Lines $lines -Values @(
+    '            _ => null',
+    '        };',
+    '',
     '    internal static bool TryGetInteger(',
     '        SpecialType type,',
     '        out CSharpIntegerSemantics semantics) {',
@@ -542,6 +888,26 @@ Add-Lines -Lines $lines -Values @(
     '            ? semantics.IrOperator',
     '            : null;',
     '    }',
+    '',
+    '    internal static BinaryOperatorKind MapBinaryToRoslyn(',
+    '        IrBinaryOperator @operator) {',
+    '        foreach (var candidate in BinaryOperators)',
+    '            if (candidate.IrOperator == @operator)',
+    '                return candidate.Kind;',
+    '        return BinaryOperatorKind.None;',
+    '    }',
+    '',
+    '    internal static BinaryOperatorKind ReverseBinary(',
+    '        BinaryOperatorKind kind) =>',
+    '        TryGetBinary(kind, out var semantics)',
+    '            ? semantics.ReverseKind',
+    '            : kind;',
+    '',
+    '    internal static BinaryOperatorKind NegateBinary(',
+    '        BinaryOperatorKind kind) =>',
+    '        TryGetBinary(kind, out var semantics)',
+    '            ? semantics.NegatedKind',
+    '            : kind;',
     '',
     '    internal static bool IsIntegerArithmetic(BinaryOperatorKind kind) =>',
     '        TryGetBinary(kind, out var semantics) &&',
@@ -608,9 +974,137 @@ Add-Lines -Lines $lines -Values @(
     '        IsSupportedInteger(type.SpecialType);',
     '}')
 
+$irLines = [Collections.Generic.List[string]]::new()
+Add-Lines -Lines $irLines -Values @(
+    '// <auto-generated />',
+    '// Generated by scripts/Generate-CSharpScalarSemantics.ps1 from',
+    '// SharpProof.Frontend/CSharpScalarSemantics.json.',
+    '#nullable enable',
+    '',
+    'namespace SharpProof.Ir;',
+    '')
+Add-Lines -Lines $irLines -Values @(
+    'public enum IrTypeKind',
+    '{')
+for ($index = 0; $index -lt $irTypeKinds.Count; $index++) {
+    $suffix = if ($index -eq $irTypeKinds.Count - 1) { '' } else { ',' }
+    $irLines.Add("    $($irTypeKinds[$index]) = $index$suffix")
+}
+Add-Lines -Lines $irLines -Values @(
+    '}',
+    '',
+    'public enum IrUnaryOperator',
+    '{')
+$orderedIrUnaryRows = @($irUnaryRows | Sort-Object Key)
+for ($index = 0; $index -lt $orderedIrUnaryRows.Count; $index++) {
+    $row = $orderedIrUnaryRows[$index]
+    $suffix = if ($index -eq $orderedIrUnaryRows.Count - 1) { '' } else { ',' }
+    $irLines.Add("    $($row.Operator) = $($row.Key)$suffix")
+}
+Add-Lines -Lines $irLines -Values @(
+    '}',
+    '',
+    'public enum IrBinaryOperator',
+    '{')
+$orderedIrBinaryRows = @($irBinaryRows | Sort-Object Key)
+for ($index = 0; $index -lt $orderedIrBinaryRows.Count; $index++) {
+    $row = $orderedIrBinaryRows[$index]
+    $suffix = if ($index -eq $orderedIrBinaryRows.Count - 1) { '' } else { ',' }
+    $irLines.Add("    $($row.Operator) = $($row.Key)$suffix")
+}
+Add-Lines -Lines $irLines -Values @(
+    '}',
+    '',
+    'internal static class IrOperatorCatalog',
+    '{',
+    '    internal static (int Key, IrTypeKind Operand, string Token) Get(',
+    '        IrUnaryOperator @operator)',
+    '    {',
+    '        return @operator switch',
+    '        {')
+foreach ($row in $orderedIrUnaryRows) {
+    $irLines.Add(
+        "            IrUnaryOperator.$($row.Operator) => " +
+        "($($row.Key), IrTypeKind.$($row.Operand), `"$($row.Token)`"),")
+}
+Add-Lines -Lines $irLines -Values @(
+    '            _ => throw new ArgumentOutOfRangeException(nameof(@operator))',
+    '        };',
+    '    }',
+    '',
+    '    internal static IrTypeId GetBuiltInType(',
+    '        IrFactory factory, IrTypeKind kind)',
+    '    {',
+    '        return kind switch',
+    '        {')
+foreach ($row in @($irBuiltInTypeRows)) {
+    $irLines.Add(
+        "            IrTypeKind.$($row.Kind) => factory.$($row.FactoryProperty),")
+}
+Add-Lines -Lines $irLines -Values @(
+    '            _ => throw new ArgumentOutOfRangeException(nameof(kind))',
+    '        };',
+    '    }',
+    '',
+    '    internal static bool IsNullable(IrTypeKind kind)',
+    '    {',
+    '        return kind is')
+for ($index = 0; $index -lt $nullableIrTypeKinds.Count; $index++) {
+    $suffix = if ($index -eq $nullableIrTypeKinds.Count - 1) { ';' } else { ' or' }
+    $irLines.Add(
+        "            IrTypeKind.$($nullableIrTypeKinds[$index])$suffix")
+}
+Add-Lines -Lines $irLines -Values @(
+    '    }',
+    '',
+    '',
+    '    internal static int GetPurityKey(IrOpaquePurity purity)',
+    '    {',
+    '        return purity switch',
+    '        {')
+foreach ($row in @($irOpaquePurityRows | Sort-Object Key)) {
+    $irLines.Add(
+        "            IrOpaquePurity.$($row.Purity) => $($row.Key),")
+}
+Add-Lines -Lines $irLines -Values @(
+    '            _ => throw new ArgumentOutOfRangeException(nameof(purity))',
+    '        };',
+    '    }',
+    '',
+    '    internal static (',
+    '        int Key,',
+    '        IrTypeKind? Operand,',
+    '        IrTypeKind Result,',
+    '        string Token) Get(IrBinaryOperator @operator)',
+    '    {',
+    '        return @operator switch',
+    '        {')
+foreach ($row in $orderedIrBinaryRows) {
+    $operand = if ($null -eq $row.Operand) {
+        'null'
+    } else {
+        "IrTypeKind.$($row.Operand)"
+    }
+    $irLines.Add(
+        "            IrBinaryOperator.$($row.Operator) => " +
+        "($($row.Key), $operand, IrTypeKind.$($row.Result), `"$($row.Token)`"),")
+}
+Add-Lines -Lines $irLines -Values @(
+    '            _ => throw new ArgumentOutOfRangeException(nameof(@operator))',
+    '        };',
+    '    }',
+    '}')
+
 Update-SharpProofGeneratedFile `
     -Path $OutputPath `
     -Content ($lines -join "`n") `
     -DisplayPath 'SharpProof.Frontend/CSharpScalarSemantics.generated.cs' `
+    -GeneratorCommand '.\scripts\Generate-CSharpScalarSemantics.ps1' `
+    -Verify:$Verify
+
+Update-SharpProofGeneratedFile `
+    -Path $IrOutputPath `
+    -Content ($irLines -join "`n") `
+    -DisplayPath 'SharpProof.Ir/IrOperatorCatalog.generated.cs' `
     -GeneratorCommand '.\scripts\Generate-CSharpScalarSemantics.ps1' `
     -Verify:$Verify

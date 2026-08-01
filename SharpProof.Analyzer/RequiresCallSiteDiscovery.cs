@@ -1,6 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal sealed class RequiresCallSiteDiscovery(
+internal sealed partial class RequiresCallSiteDiscovery(
     IMethodSymbol caller,
     SyntaxNode declaration,
     SemanticModel semanticModel,
@@ -24,11 +24,8 @@ internal sealed class RequiresCallSiteDiscovery(
             Func<IMethodSymbol, bool>
                 hasPotentialPreconditions)
     {
-        if (hasPotentialPreconditions == null)
-        {
-            throw new ArgumentNullException(
-                nameof(hasPotentialPreconditions));
-        }
+        hasPotentialPreconditions = ArgumentNullGuard.NotNull(
+            hasPotentialPreconditions, nameof(hasPotentialPreconditions));
 
         if (!TryGetOperationRoot(out var operationRoot))
         {
@@ -363,17 +360,4 @@ internal sealed class RequiresCallSiteDiscovery(
                     FinallyClauseSyntax);
     }
 
-    private readonly record struct RequiresCallTarget(
-        IMethodSymbol TargetMethod,
-        IOperation? Instance,
-        ImmutableArray<IArgumentOperation> Arguments);
 }
-
-internal readonly record struct RequiresCallSiteCandidate(
-    IOperation Operation,
-    IMethodSymbol TargetMethod,
-    IOperation? Instance,
-    ImmutableArray<IArgumentOperation> Arguments,
-    bool CanReplay,
-    ManagedFlowResult? Flow,
-    ManagedFlowStatus FlowStatus);

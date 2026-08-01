@@ -66,7 +66,7 @@ internal static class CallableEvidenceBuilder
 
             labels.Add(
                 justification,
-                ClauseLabel(clause.Kind) + ":" +
+                WorkerProjections.ClauseLabel(clause.Kind) + ":" +
                 assumptionOrdinal.ToString(
                     CultureInfo.InvariantCulture));
             assumptionOrdinal++;
@@ -299,31 +299,9 @@ internal static class CallableEvidenceBuilder
         }
     }
 
-    private static string ClauseLabel(CompilerContractKind kind)
-    {
-        return kind switch
-        {
-            CompilerContractKind.Requires => "requires",
-            CompilerContractKind.Assume => "assume",
-            CompilerContractKind.Ensures => "ensures",
-            _ => throw new ArgumentOutOfRangeException(nameof(kind))
-        };
-    }
 }
 
-internal sealed record CallableEvidence(
-    ImmutableArray<Assumption> Assumptions,
-    ImmutableArray<Assumption> Preconditions,
-    ImmutableArray<Assumption> EntryDomainAssumptions,
-    IReadOnlyDictionary<ProofJustification, string> AssumptionLabels,
-    IReadOnlyDictionary<ProofJustification, string> UserAssumptionIds,
-    IrTerm NormalCompletion,
-    ImmutableArray<IrVarId> ReplayVariables,
-    bool UsesSupportedDomain);
-
-internal readonly record struct CallableEvidenceBuildResult(
-    CallableEvidence? Evidence,
-    WorkerClaimReason FailureReason)
+internal readonly partial record struct CallableEvidenceBuildResult
 {
     internal bool IsSuccess => Evidence != null;
 

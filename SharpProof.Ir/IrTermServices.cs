@@ -26,7 +26,8 @@ internal static class IrTermServices
         {
             if (opaque)
             {
-                throw new ArgumentNullException(
+                ArgumentNullGuard.NotNull(
+                    receiver,
                     nameof(receiver),
                     "An instance member requires a receiver.");
             }
@@ -83,15 +84,8 @@ internal static class IrTermServices
         string sequenceParameter,
         string indexParameter)
     {
-        if (sequence == null)
-        {
-            throw new ArgumentNullException(sequenceParameter);
-        }
-
-        if (index == null)
-        {
-            throw new ArgumentNullException(indexParameter);
-        }
+        ArgumentNullGuard.NotNull(sequence, sequenceParameter);
+        ArgumentNullGuard.NotNull(index, indexParameter);
 
         factory.EnsureTerm(sequence, sequenceParameter);
         factory.EnsureTerm(index, indexParameter);
@@ -206,10 +200,7 @@ internal static class IrTermServices
 
     internal static bool IsNullable(IrTypeKind kind)
     {
-        return kind is
-            IrTypeKind.String or
-            IrTypeKind.Reference or
-            IrTypeKind.Sequence;
+        return IrOperatorCatalog.IsNullable(kind);
     }
 
     private static IrTerm? FoldIntegerBinary(
@@ -287,12 +278,6 @@ internal static class IrTermServices
         IrFactory factory,
         IrTypeKind kind)
     {
-        return kind switch
-        {
-            IrTypeKind.Boolean => factory.BooleanType,
-            IrTypeKind.Integer => factory.IntegerType,
-            IrTypeKind.String => factory.StringType,
-            _ => throw new ArgumentOutOfRangeException(nameof(kind))
-        };
+        return IrOperatorCatalog.GetBuiltInType(factory, kind);
     }
 }

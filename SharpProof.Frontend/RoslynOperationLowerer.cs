@@ -17,7 +17,7 @@ public sealed class RoslynOperationLowerer
         IrFactory factory,
         Func<IMethodSymbol, bool>? isKnownPure = null)
     {
-        _factory = factory ?? throw new ArgumentNullException(nameof(factory));
+        _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _isKnownPure = isKnownPure ?? (static _ => false);
         _visitor = new LoweringVisitor(this);
     }
@@ -31,10 +31,7 @@ public sealed class RoslynOperationLowerer
 
     public FrontendLoweringResult Lower(IOperation operation)
     {
-        if (operation == null)
-        {
-            throw new ArgumentNullException(nameof(operation));
-        }
+        operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
 
         var lowered = _visitor.Visit(operation, default);
         return new FrontendLoweringResult(
@@ -85,15 +82,11 @@ public sealed class RoslynOperationLowerer
             return _factory.IntegerType;
         }
 
-        return type.SpecialType switch
-        {
-            SpecialType.System_Boolean => _factory.BooleanType,
-            SpecialType.System_String => _factory.StringType,
-            SpecialType.System_Object => _factory.ObjectType,
-            _ => _factory.GetOrCreateReferenceType(
+        return CSharpScalarSemantics.TryGetBuiltInType(
+                _factory, type.SpecialType) ??
+            _factory.GetOrCreateReferenceType(
                 CompilerIdentityBridge.InternType(_factory, type),
-                CompilerIdentityBridge.CreateTypeDisplay(type))
-        };
+                CompilerIdentityBridge.CreateTypeDisplay(type));
     }
 
     internal IrVariableTerm GetVariable(ISymbol symbol, ITypeSymbol? type)

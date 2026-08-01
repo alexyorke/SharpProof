@@ -9,10 +9,7 @@ internal static class CompilationFingerprint
 
     internal static string ComputeSha256(CompilerCompilationSnapshot snapshot)
     {
-        if (snapshot == null)
-        {
-            throw new ArgumentNullException(nameof(snapshot));
-        }
+        snapshot = ArgumentNullGuard.NotNull(snapshot, nameof(snapshot));
 
         using var hash = new CanonicalHashWriter();
         hash.Add(

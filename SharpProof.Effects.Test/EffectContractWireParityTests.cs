@@ -3,6 +3,22 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class EffectContractWireParityTests
 {
+    [Test]
+    public void GeneratedEffectCatalogContainsNoAnalysisAlgorithms()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "SharpProof.Effects",
+            "EffectContractMappings.generated.cs"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(source, Does.Not.Contain("if ("));
+            Assert.That(source, Does.Not.Contain("switch"));
+            Assert.That(source, Does.Not.Contain("foreach"));
+        }
+    }
+
     [TestCase(
         typeof(SharpProof.Attributes.SharpProofEffect),
         typeof(EffectContractKind))]
@@ -146,6 +162,191 @@ public sealed class EffectContractWireParityTests
     }
 
     [Test]
+    public void RegionCatalogIsClosedAndDrivesBothDirections()
+    {
+        var expected = new[]
+        {
+            (
+                EffectRegionKind.Receiver,
+                EffectContractKind.ReadsReceiverState,
+                EffectContractKind.WritesReceiverState,
+                (EffectRegionId?)EffectRegionId.Receiver,
+                false),
+            (
+                EffectRegionKind.Parameter,
+                EffectContractKind.ReadsArgumentState,
+                EffectContractKind.WritesArgumentState,
+                null,
+                true),
+            (
+                EffectRegionKind.Captured,
+                EffectContractKind.ReadsCapturedState,
+                EffectContractKind.WritesCapturedState,
+                (EffectRegionId?)EffectRegionId.Captured(0),
+                false),
+            (
+                EffectRegionKind.Static,
+                EffectContractKind.ReadsStaticState,
+                EffectContractKind.WritesStaticState,
+                (EffectRegionId?)EffectRegionId.Static(),
+                false),
+            (
+                EffectRegionKind.Fresh,
+                EffectContractKind.None,
+                EffectContractKind.None,
+                null,
+                false),
+            (
+                EffectRegionKind.Ambient,
+                EffectContractKind.ReadsAmbientState,
+                EffectContractKind.WritesAmbientState,
+                (EffectRegionId?)EffectRegionId.Ambient,
+                false),
+            (
+                EffectRegionKind.Unknown,
+                EffectContractKind.None,
+                EffectContractKind.None,
+                null,
+                false)
+        };
+
+        Assert.That(
+            EffectContractMappings.RegionContracts,
+            Is.EqualTo(expected));
+        Assert.That(
+            expected.Select(static mapping => mapping.Item1),
+            Is.EqualTo(Enum.GetValues<EffectRegionKind>()));
+
+        const int parameterCount = 3;
+        foreach (var mapping in expected)
+        {
+            var expectedRegions =
+                mapping.Item5
+                    ? EffectContractMappings.ParameterRegions(parameterCount)
+                    : mapping.Item4 is { } region
+                        ? EffectRegionSet.Create(region)
+                        : EffectRegionSet.Empty;
+            var reads = EffectContractMappings.ToAnalysisRegions(
+                mapping.Item2,
+                isWrite: false,
+                parameterCount);
+            var writes = EffectContractMappings.ToAnalysisRegions(
+                mapping.Item3,
+                isWrite: true,
+                parameterCount);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    reads,
+                    Is.EqualTo(
+                        mapping.Item2 == EffectContractKind.None
+                            ? EffectRegionSet.Empty
+                            : expectedRegions),
+                    mapping.Item1 + " read");
+                Assert.That(
+                    writes,
+                    Is.EqualTo(
+                        mapping.Item3 == EffectContractKind.None
+                            ? EffectRegionSet.Empty
+                            : expectedRegions),
+                    mapping.Item1 + " write");
+            }
+        }
+    }
+
+    [Test]
+    public void RegionCatalogRejectsValuesOutsideItsClosedDomain()
+    {
+        Assert.That(
+            (Action)(() => _ =
+                EffectContractMappings.ToContractRegion(
+                    (EffectRegionKind)int.MaxValue,
+                    isWrite: false)),
+            Throws.TypeOf<ArgumentOutOfRangeException>());
+    }
+
+    [Test]
+    public void DirectEventWireCatalogIsClosedAndBijective()
+    {
+        var expected = new[]
+        {
+            (
+                EffectDirectEventKind.ManagedObjectAllocation,
+                "managed-allocation"),
+            (
+                EffectDirectEventKind.ManagedArrayAllocation,
+                "managed-array-allocation"),
+            (
+                EffectDirectEventKind.ExplicitThrow,
+                "explicit-throw"),
+            (
+                EffectDirectEventKind.ReceiverFieldRead,
+                "direct-field-read"),
+            (
+                EffectDirectEventKind.ReceiverFieldWrite,
+                "direct-field-write"),
+            (
+                EffectDirectEventKind.MonitorCall,
+                "synchronization-call"),
+            (
+                EffectDirectEventKind.EmptyLock,
+                "synchronization-lock"),
+            (
+                EffectDirectEventKind.VolatileFieldAccess,
+                "volatile-field-access")
+        };
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                EffectDirectEventKinds.WireNames,
+                Is.EqualTo(expected));
+            Assert.That(
+                expected.Select(static mapping => mapping.Item1),
+                Is.EqualTo(Enum.GetValues<EffectDirectEventKind>()));
+            Assert.That(
+                expected.Select(static mapping => mapping.Item2),
+                Is.Unique);
+        }
+
+        foreach (var mapping in expected)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    EffectDirectEventKinds.ToWireName(mapping.Item1),
+                    Is.EqualTo(mapping.Item2));
+                Assert.That(
+                    EffectDirectEventKinds.FromWireName(mapping.Item2),
+                    Is.EqualTo(mapping.Item1));
+            }
+        }
+    }
+
+    [Test]
+    public void DirectEventWireCatalogRejectsValuesOutsideItsClosedDomain()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                (Action)(() => _ =
+                    EffectDirectEventKinds.ToWireName(
+                        (EffectDirectEventKind)int.MaxValue)),
+                Throws.TypeOf<ArgumentOutOfRangeException>());
+            Assert.That(
+                (Action)(() => _ =
+                    EffectDirectEventKinds.FromWireName(
+                        "managed-allocation-vNext")),
+                Throws.TypeOf<ArgumentOutOfRangeException>());
+            Assert.That(
+                (Action)(() => _ =
+                    EffectDirectEventKinds.FromWireName(null!)),
+                Throws.TypeOf<ArgumentOutOfRangeException>());
+        }
+    }
+
+    [Test]
     public void EvidenceUsesOnlyValidatedNamedEnumValues()
     {
         using (Assert.EnterMultipleScope())
@@ -174,5 +375,21 @@ public sealed class EffectContractWireParityTests
                 Enum.Parse(enumType, name),
                 System.Globalization.CultureInfo.InvariantCulture),
             StringComparer.Ordinal);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
+             directory != null;
+             directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
+            {
+                return directory.FullName;
+            }
+        }
+
+        throw new InvalidOperationException(
+            "SharpProof repository root was not found.");
     }
 }

@@ -14,19 +14,41 @@ public sealed class CompilerEffectEvaluationWireMappingsTests
         Assert.That(
             Enum.GetValues<EffectEvaluationContractKind>()
                 .Select(CompilerEffectEvaluationWireMappings.ToWorker),
-            Is.All.TypeOf<WorkerEffectContractKind>());
+            Is.EqualTo(Enum.GetValues<WorkerEffectContractKind>()
+                .Where(static value => value !=
+                    WorkerEffectContractKind.Unspecified)));
         Assert.That(
             Enum.GetValues<EffectEvaluationOutcome>()
                 .Select(CompilerEffectEvaluationWireMappings.ToWorker),
-            Is.All.TypeOf<WorkerClaimOutcome>());
+            Is.EqualTo(new[]
+            {
+                WorkerClaimOutcome.Proven,
+                WorkerClaimOutcome.Refuted,
+                WorkerClaimOutcome.Unknown
+            }));
         Assert.That(
             Enum.GetValues<EffectEvaluationReason>()
                 .Select(CompilerEffectEvaluationWireMappings.ToWorker),
-            Is.All.TypeOf<WorkerClaimReason>());
+            Is.EqualTo(new[]
+            {
+                WorkerClaimReason.None,
+                WorkerClaimReason.UnsupportedContract,
+                WorkerClaimReason.EffectContractNotEstablished,
+                WorkerClaimReason.EffectSummaryIncomplete,
+                WorkerClaimReason.ResourceLimit,
+                WorkerClaimReason.UnsupportedBody
+            }));
         Assert.That(
             Enum.GetValues<EffectEvaluationCertainty>()
                 .Select(CompilerEffectEvaluationWireMappings.ToWorker),
-            Is.All.TypeOf<WorkerEffectEvidenceCertainty>());
+            Is.EqualTo(new[]
+            {
+                WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary,
+                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary,
+                WorkerEffectEvidenceCertainty.TrustedCompleteBoundary,
+                WorkerEffectEvidenceCertainty.DefiniteViolation,
+                WorkerEffectEvidenceCertainty.Unavailable
+            }));
     }
 
     [Test]

@@ -8,10 +8,7 @@ internal static class ContractRuntimePolicy
         Compilation compilation,
         CancellationToken cancellationToken)
     {
-        if (compilation == null)
-        {
-            throw new ArgumentNullException(nameof(compilation));
-        }
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
 
         foreach (var tree in compilation.SyntaxTrees)
         {

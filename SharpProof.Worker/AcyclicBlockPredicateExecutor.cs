@@ -1,6 +1,6 @@
 namespace SharpProof.Worker;
 
-internal sealed class AcyclicBlockPredicateExecutor
+internal sealed partial class AcyclicBlockPredicateExecutor
 {
     private const int DefaultMaximumSymbolicOperations =
         CompilerPreparedBody.MaximumInstructions * 16;
@@ -11,12 +11,10 @@ internal sealed class AcyclicBlockPredicateExecutor
         int maximumExpressionDepth,
         int maximumSymbolicOperations = DefaultMaximumSymbolicOperations)
     {
-        _maximumExpressionDepth = maximumExpressionDepth > 0
-            ? maximumExpressionDepth
-            : throw new ArgumentOutOfRangeException(nameof(maximumExpressionDepth));
-        _maximumSymbolicOperations = maximumSymbolicOperations > 0
-            ? maximumSymbolicOperations
-            : throw new ArgumentOutOfRangeException(nameof(maximumSymbolicOperations));
+        _maximumExpressionDepth = ArgumentNullGuard.RequirePositive(
+            maximumExpressionDepth, nameof(maximumExpressionDepth));
+        _maximumSymbolicOperations = ArgumentNullGuard.RequirePositive(
+            maximumSymbolicOperations, nameof(maximumSymbolicOperations));
     }
 
     internal SymbolicBodyExecution Execute(
@@ -32,7 +30,7 @@ internal sealed class AcyclicBlockPredicateExecutor
             parameterBindings, _maximumExpressionDepth, _maximumSymbolicOperations).Execute();
     }
 
-    private sealed class Run(
+    private sealed partial class Run(
         ImmutableArray<CompilerCanonicalVariable> variables,
         IrFactory factory, IrProgram program,
         ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> specCalls,
@@ -474,16 +472,18 @@ internal sealed class AcyclicBlockPredicateExecutor
             values.Add(new FlowState(order, predicate, environment));
         }
 
-        private bool IsResultType(SpecValueType? specType, IrTypeId resultType)
+        private bool IsResultType(IrTypeKind? specType, IrTypeId resultType)
         {
-            return specType switch
+            if (specType is not (
+                IrTypeKind.Boolean or
+                IrTypeKind.Integer or
+                IrTypeKind.String or
+                IrTypeKind.Sequence))
             {
-                SpecValueType.Boolean => resultType == factory.BooleanType,
-                SpecValueType.Integer => resultType == factory.IntegerType,
-                SpecValueType.String => resultType == factory.StringType,
-                SpecValueType.Sequence => factory.GetTypeInfo(resultType).Kind == IrTypeKind.Sequence,
-                _ => false
-            };
+                return false;
+            }
+
+            return factory.GetTypeInfo(resultType).Kind == specType.Value;
         }
 
         private IrTerm? Substitute(
@@ -525,20 +525,10 @@ internal sealed class AcyclicBlockPredicateExecutor
             _reason == WorkerClaimReason.None ? WorkerClaimReason.UnsupportedBody : _reason);
         }
 
-        private readonly record struct FlowState(
-            int Order, IrTerm Predicate,
-            ImmutableDictionary<IrVarId, IrTerm> Environment);
-        private readonly record struct SpecApplication(
-            IrTerm Result,
-            IrTerm Predicate,
-            bool ConsumesMemoryHavoc);
     }
 }
 
-internal sealed record SymbolicBodyExecution(
-    WorkerClaimReason Reason, ImmutableArray<SymbolicReturn> Returns,
-    ImmutableDictionary<IrVarId, SpecResultProjection> SpecResultProjections,
-    ImmutableArray<GuardedBodySpecAssumption> SpecAssumptions)
+internal sealed partial record SymbolicBodyExecution
 {
     internal bool IsSuccess => Reason == WorkerClaimReason.None;
     internal static SymbolicBodyExecution Failed(WorkerClaimReason reason)
@@ -546,13 +536,6 @@ internal sealed record SymbolicBodyExecution(
         return new(reason, [], ImmutableDictionary<IrVarId, SpecResultProjection>.Empty, []);
     }
 }
-
-internal readonly record struct SymbolicReturn(
-    IrTerm Predicate, IrTerm? ReturnTerm,
-    ImmutableDictionary<IrVarId, IrTerm> CurrentStates);
-
-internal readonly record struct GuardedBodySpecAssumption(
-    SpecId Spec, string WitnessIdentifier, IrTerm Guard, IrTerm Predicate);
 
 internal static class SymbolicTermOperations
 {

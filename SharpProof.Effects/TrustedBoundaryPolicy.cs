@@ -15,7 +15,7 @@ internal sealed class TrustedBoundaryPolicy
     private TrustedBoundaryPolicy(Compilation compilation)
     {
         var identity = ContractApiIdentityResolver.ForCompilation(
-            compilation ?? throw new ArgumentNullException(nameof(compilation)));
+            ArgumentNullGuard.NotNull(compilation, nameof(compilation)));
         _trustedAttribute = identity.ResolveAttribute(
             EffectContractMetadata.TrustedAttributeMetadataName);
     }
@@ -24,17 +24,14 @@ internal sealed class TrustedBoundaryPolicy
         Compilation compilation)
     {
         return Policies.GetValue(
-            compilation ?? throw new ArgumentNullException(nameof(compilation)),
+            ArgumentNullGuard.NotNull(compilation, nameof(compilation)),
             static value => new TrustedBoundaryPolicy(value));
     }
 
     internal bool AuthorizesDeclaredContracts(
         IMethodSymbol method)
     {
-        if (method == null)
-        {
-            throw new ArgumentNullException(nameof(method));
-        }
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
 
         if (_trustedAttribute == null)
         {

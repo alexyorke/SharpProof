@@ -92,6 +92,41 @@ public sealed class ApiSpecTests
     }
 
     [Test]
+    public void SpecTypesAndOperatorsFailClosedOnUndefinedIrVocabulary()
+    {
+        var invalidType = Declaration(
+            "invalid-type",
+            "M:Missing.InvalidType.Run(System.Int32)",
+            "Missing.InvalidType",
+            parameterTypes: [(IrTypeKind)int.MaxValue]);
+        var invalidOperator = Declaration(
+            "invalid-operator",
+            "M:Missing.InvalidOperator.Run(System.Int32)",
+            "Missing.InvalidOperator") with
+        {
+            Postconditions = [
+                new SpecPostconditionDeclaration(
+                    new SpecBinaryDeclaration(
+                        (IrBinaryOperator)int.MaxValue,
+                        new SpecIntegerDeclaration(1),
+                        new SpecIntegerDeclaration(1),
+                        IrTypeKind.Boolean),
+                    new SpecEvidence(
+                        SpecEvidenceKind.Observed,
+                        "invalid-operator"))
+            ]
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                ApiSpecTable.Create([invalidType]));
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                ApiSpecTable.Create([invalidOperator]));
+        });
+    }
+
+    [Test]
     public void DefaultBclCatalogApprovesOnlyObservedFrameworkIdentities()
     {
         var expected = new[] {
@@ -533,18 +568,18 @@ public sealed class ApiSpecTests
     {
         var evidence = new SpecEvidence(SpecEvidenceKind.Documented, "totality-test");
         var parameter = new SpecVariableDeclaration(
-            SpecVariableRole.Parameter, 0, SpecValueType.Integer);
+            SpecVariableRole.Parameter, 0, IrTypeKind.Integer);
         var result = new SpecVariableDeclaration(
-            SpecVariableRole.Result, -1, SpecValueType.Integer);
+            SpecVariableRole.Result, -1, IrTypeKind.Integer);
         var partial = new SpecBinaryDeclaration(
-            SpecBinaryOperator.Equal,
+            IrBinaryOperator.Equal,
             result,
             new SpecBinaryDeclaration(
-                SpecBinaryOperator.Add,
+                IrBinaryOperator.Add,
                 parameter,
                 new SpecIntegerDeclaration(1),
-                SpecValueType.Integer),
-            SpecValueType.Boolean);
+                IrTypeKind.Integer),
+            IrTypeKind.Boolean);
         var declaration = Declaration("partial", "M:Missing.Partial.Run(System.Int32)", "Missing.Partial")
             with
         {
@@ -564,15 +599,15 @@ public sealed class ApiSpecTests
         ApiSpecDeclaration WithRight(long divisor)
         {
             var quotient = new SpecBinaryDeclaration(
-                SpecBinaryOperator.Divide,
+                IrBinaryOperator.Divide,
                 new SpecIntegerDeclaration(12),
                 new SpecIntegerDeclaration(divisor),
-                SpecValueType.Integer);
+                IrTypeKind.Integer);
             var condition = new SpecBinaryDeclaration(
-                SpecBinaryOperator.Equal,
+                IrBinaryOperator.Equal,
                 quotient,
                 new SpecIntegerDeclaration(3),
-                SpecValueType.Boolean);
+                IrTypeKind.Boolean);
             return Declaration(
                 "constant-" + divisor,
                 "M:Missing.Constant.Run(System.Int32)",
@@ -815,7 +850,7 @@ public sealed class ApiSpecTests
         string documentationId,
         string containingType,
         string memberName = "Run",
-        ImmutableArray<SpecValueType>? parameterTypes = null,
+        ImmutableArray<IrTypeKind>? parameterTypes = null,
         ImmutableArray<ApiSpecAssemblyIdentity>? approvedAssemblies = null)
     {
         var evidence = new SpecEvidence(SpecEvidenceKind.Observed, "test-witness");
@@ -829,8 +864,8 @@ public sealed class ApiSpecTests
                 true,
                 0,
                 null,
-                parameterTypes ?? [SpecValueType.Integer],
-                SpecValueType.Integer,
+                parameterTypes ?? [IrTypeKind.Integer],
+                IrTypeKind.Integer,
                 approvedAssemblies ?? [RuntimeAssemblyIdentity()]),
             new ApiSpecFacets(
                 new SpecEffectFacet(SpecEffect.Unknown, evidence),
@@ -881,7 +916,7 @@ public sealed class ApiSpecTests
                 true,
                 0,
                 null,
-                [SpecValueType.Boolean],
+                [IrTypeKind.Boolean],
                 null,
                 [
                     new ApiSpecAssemblyIdentity(

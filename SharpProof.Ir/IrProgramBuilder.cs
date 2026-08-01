@@ -4,7 +4,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
 {
     private static long s_nextScope;
     private readonly IrFactory _factory =
-        factory ?? throw new ArgumentNullException(nameof(factory));
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
     private readonly long _scope = Interlocked.Increment(ref s_nextScope);
     private readonly List<MutableBlock> _blocks = [];
     private int _nextInstruction;
@@ -32,10 +32,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     public IrMemberLocation MemberLocation(IrMemberId member, IrTerm? receiver, params IrTerm[] arguments)
     {
-        if (arguments == null)
-        {
-            throw new ArgumentNullException(nameof(arguments));
-        }
+        ArgumentNullGuard.NotNull(arguments, nameof(arguments));
 
         var memberInfo = _factory.GetMemberInfo(member);
         _factory.ValidateCallShape(memberInfo, receiver, arguments, nameof(arguments));
@@ -76,10 +73,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
         IrTerm? receiver,
         params IrTerm[] arguments)
     {
-        if (arguments == null)
-        {
-            throw new ArgumentNullException(nameof(arguments));
-        }
+        ArgumentNullGuard.NotNull(arguments, nameof(arguments));
 
         return Append(block, id => new IrCallInstruction(
             id, operation, target, member, receiver, [.. arguments]));
@@ -101,10 +95,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
         IrHavocKind havocKind,
         params IrVarId[] variables)
     {
-        if (variables == null)
-        {
-            throw new ArgumentNullException(nameof(variables));
-        }
+        ArgumentNullGuard.NotNull(variables, nameof(variables));
 
         var distinct = variables
             .Distinct()
@@ -214,10 +205,9 @@ public sealed class IrProgramBuilder(IrFactory factory)
                     : ((IrAssertInstruction)instruction).Condition, "condition");
                 break;
             case IrHavocInstruction value:
-                if (!Enum.IsDefined(typeof(IrHavocKind), value.HavocKind))
-                {
-                    throw OutOfRange("havocKind");
-                }
+                _ = ArgumentNullGuard.RequireDefined(
+                    value.HavocKind,
+                    "havocKind");
 
                 var memoryOnly = value.HavocKind == IrHavocKind.Memory;
                 if (memoryOnly != value.Variables.IsEmpty)
@@ -263,20 +253,15 @@ public sealed class IrProgramBuilder(IrFactory factory)
                 nameof(id));
         }
 
-        if (id.Value < 0 || id.Value >= _blocks.Count)
-        {
-            throw new ArgumentOutOfRangeException(nameof(id));
-        }
-
-        return _blocks[id.Value];
+        return _blocks[ArgumentNullGuard.RequireIndex(
+            id.Value,
+            _blocks.Count,
+            nameof(id))];
     }
 
     private IrTypeId ValidateLocation(IrLocation location)
     {
-        if (location == null)
-        {
-            throw new ArgumentNullException(nameof(location));
-        }
+        ArgumentNullGuard.NotNull(location, nameof(location));
 
         _factory.GetTypeInfo(location.Type);
         switch (location)
@@ -318,10 +303,7 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     private IrTypeId ValidateTerm(IrTerm term, string parameterName)
     {
-        if (term == null)
-        {
-            throw new ArgumentNullException(parameterName);
-        }
+        ArgumentNullGuard.NotNull(term, parameterName);
 
         _factory.EnsureTerm(term, parameterName);
         return term.Type;
@@ -345,11 +327,6 @@ public sealed class IrProgramBuilder(IrFactory factory)
         string detail, string parameterName)
     {
         return new(detail, parameterName);
-    }
-
-    private static ArgumentOutOfRangeException OutOfRange(string parameterName)
-    {
-        return new(parameterName);
     }
 
     private void EnsureMutable()

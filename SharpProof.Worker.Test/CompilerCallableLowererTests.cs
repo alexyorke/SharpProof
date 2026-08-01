@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
+using SharpProof.Contracts;
 using SharpProof.Ir;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
@@ -18,6 +19,25 @@ public sealed class CompilerCallableLowererTests
         CompilerContractKind.Assume,
         CompilerContractKind.Ensures
     ];
+
+    [TestCase(ContractBindingFailure.UnsupportedExpression,
+        WorkerClaimReason.UnsupportedExpression)]
+    [TestCase(ContractBindingFailure.InvalidClausePlacement,
+        WorkerClaimReason.UnsupportedContract)]
+    [TestCase(ContractBindingFailure.CompanionBodyUnavailable,
+        WorkerClaimReason.UnsupportedCallable)]
+    public void BindingFailureWireMappingIsTyped(
+        ContractBindingFailure failure,
+        WorkerClaimReason expected)
+    {
+        Assert.That(
+            CompilerLoweringWireMappings.ToWorkerFailure(failure),
+            Is.EqualTo(expected));
+        Assert.That(
+            (Action)(() => CompilerLoweringWireMappings.ToWorkerFailure(
+                (ContractBindingFailure)int.MaxValue)),
+            Throws.TypeOf<ArgumentOutOfRangeException>());
+    }
 
     [Test]
     public void BoundContractsAndExecutableBodyRetainVerifierInputs()

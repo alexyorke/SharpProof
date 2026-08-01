@@ -54,15 +54,8 @@ public sealed class IrFactory
 
     public IrIdentityId InternExternalIdentity<T>(T identity, IEqualityComparer<T> comparer) where T : notnull
     {
-        if (identity == null)
-        {
-            throw new ArgumentNullException(nameof(identity));
-        }
-
-        if (comparer == null)
-        {
-            throw new ArgumentNullException(nameof(comparer));
-        }
+        ArgumentNullGuard.NotNull(identity, nameof(identity));
+        ArgumentNullGuard.NotNull(comparer, nameof(comparer));
 
         if (typeof(T) == typeof(string))
         {
@@ -86,10 +79,7 @@ public sealed class IrFactory
 
     public IrStringId InternString(string value)
     {
-        if (value == null)
-        {
-            throw new ArgumentNullException(nameof(value));
-        }
+        ArgumentNullGuard.NotNull(value, nameof(value));
 
         lock (_gate)
         {
@@ -173,10 +163,7 @@ public sealed class IrFactory
         params IrTypeId[] parameterTypes)
     {
         ValidateName(name, nameof(name));
-        if (parameterTypes == null)
-        {
-            throw new ArgumentNullException(nameof(parameterTypes));
-        }
+        ArgumentNullGuard.NotNull(parameterTypes, nameof(parameterTypes));
 
         lock (_gate)
         {
@@ -252,10 +239,7 @@ public sealed class IrFactory
 
     public IrValue CreateStringValue(string value)
     {
-        if (value == null)
-        {
-            throw new ArgumentNullException(nameof(value));
-        }
+        ArgumentNullGuard.NotNull(value, nameof(value));
 
         return new IrValue(StringType, IrValueKind.String, value);
     }
@@ -275,10 +259,7 @@ public sealed class IrFactory
 
     public IrValue CreateReferenceValue(IrTypeId type, object identity)
     {
-        if (identity == null)
-        {
-            throw new ArgumentNullException(nameof(identity));
-        }
+        ArgumentNullGuard.NotNull(identity, nameof(identity));
 
         lock (_gate)
         {
@@ -293,10 +274,7 @@ public sealed class IrFactory
 
     public IrValue CreateSequenceValue(IrTypeId type, IEnumerable<IrValue> elements)
     {
-        if (elements == null)
-        {
-            throw new ArgumentNullException(nameof(elements));
-        }
+        ArgumentNullGuard.NotNull(elements, nameof(elements));
 
         lock (_gate)
         {
@@ -338,10 +316,7 @@ public sealed class IrFactory
 
     public IrStringTerm String(string value)
     {
-        if (value == null)
-        {
-            throw new ArgumentNullException(nameof(value));
-        }
+        ArgumentNullGuard.NotNull(value, nameof(value));
 
         lock (_gate)
         {
@@ -390,10 +365,7 @@ public sealed class IrFactory
 
     public IrTerm Unary(IrUnaryOperator @operator, IrTerm operand)
     {
-        if (operand == null)
-        {
-            throw new ArgumentNullException(nameof(operand));
-        }
+        ArgumentNullGuard.NotNull(operand, nameof(operand));
 
         lock (_gate)
         {
@@ -422,15 +394,8 @@ public sealed class IrFactory
 
     public IrTerm Binary(IrBinaryOperator @operator, IrTerm left, IrTerm right)
     {
-        if (left == null)
-        {
-            throw new ArgumentNullException(nameof(left));
-        }
-
-        if (right == null)
-        {
-            throw new ArgumentNullException(nameof(right));
-        }
+        ArgumentNullGuard.NotNull(left, nameof(left));
+        ArgumentNullGuard.NotNull(right, nameof(right));
 
         lock (_gate)
         {
@@ -459,20 +424,9 @@ public sealed class IrFactory
 
     public IrTerm Conditional(IrTerm condition, IrTerm whenTrue, IrTerm whenFalse)
     {
-        if (condition == null)
-        {
-            throw new ArgumentNullException(nameof(condition));
-        }
-
-        if (whenTrue == null)
-        {
-            throw new ArgumentNullException(nameof(whenTrue));
-        }
-
-        if (whenFalse == null)
-        {
-            throw new ArgumentNullException(nameof(whenFalse));
-        }
+        ArgumentNullGuard.NotNull(condition, nameof(condition));
+        ArgumentNullGuard.NotNull(whenTrue, nameof(whenTrue));
+        ArgumentNullGuard.NotNull(whenFalse, nameof(whenFalse));
 
         lock (_gate)
         {
@@ -504,10 +458,7 @@ public sealed class IrFactory
 
     public IrTerm Cast(IrTypeId targetType, IrTerm operand)
     {
-        if (operand == null)
-        {
-            throw new ArgumentNullException(nameof(operand));
-        }
+        ArgumentNullGuard.NotNull(operand, nameof(operand));
 
         lock (_gate)
         {
@@ -531,10 +482,7 @@ public sealed class IrFactory
 
     public IrTerm Length(IrTerm value)
     {
-        if (value == null)
-        {
-            throw new ArgumentNullException(nameof(value));
-        }
+        ArgumentNullGuard.NotNull(value, nameof(value));
 
         lock (_gate)
         {
@@ -559,15 +507,8 @@ public sealed class IrFactory
 
     public IrTerm SequenceAccess(IrTerm sequence, IrTerm index)
     {
-        if (sequence == null)
-        {
-            throw new ArgumentNullException(nameof(sequence));
-        }
-
-        if (index == null)
-        {
-            throw new ArgumentNullException(nameof(index));
-        }
+        ArgumentNullGuard.NotNull(sequence, nameof(sequence));
+        ArgumentNullGuard.NotNull(index, nameof(index));
 
         lock (_gate)
         {
@@ -629,10 +570,7 @@ public sealed class IrFactory
 
     private IrOpaqueTerm Opaque(IrMemberId member, IrTerm? receiver, IrTerm[] arguments, IrOpaquePurity purity, OperationId operation)
     {
-        if (arguments == null)
-        {
-            throw new ArgumentNullException(nameof(arguments));
-        }
+        ArgumentNullGuard.NotNull(arguments, nameof(arguments));
 
         lock (_gate)
         {
@@ -670,12 +608,7 @@ public sealed class IrFactory
 
     private static int PurityKey(IrOpaquePurity purity)
     {
-        return purity switch
-        {
-            IrOpaquePurity.Pure => 0,
-            IrOpaquePurity.Impure => 1,
-            _ => throw new ArgumentOutOfRangeException(nameof(purity))
-        };
+        return IrOperatorCatalog.GetPurityKey(purity);
     }
 
     private static void ValidateName(string? value, string parameterName)
@@ -785,12 +718,10 @@ public sealed class IrFactory
     private T GetScoped<T>(long scope, int value, IReadOnlyList<T> items, string parameterName)
     {
         EnsureScope(scope, parameterName);
-        if (value < 0 || value >= items.Count)
-        {
-            throw new ArgumentOutOfRangeException(parameterName);
-        }
-
-        return items[value];
+        return items[ArgumentNullGuard.RequireIndex(
+            value,
+            items.Count,
+            parameterName)];
     }
 
     private abstract class ExternalIdentityKey;

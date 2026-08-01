@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "namespace": "SharpProof.Contracts",
+  "enums": [
+    {
+      "name": "BoundContractKind",
+      "members": ["Requires", "Ensures", "Assume"]
+    },
+    {
+      "name": "BoundContractEvidence",
+      "members": ["CompilerBoundInvocation", "ClosedAttribute", "Companion"]
+    },
+    {
+      "name": "BoundContractVariableRole",
+      "members": ["Receiver", "Parameter", "Result", "PreState"]
+    },
+    {
+      "name": "ContractBindingFailure",
+      "members": [
+        "None",
+        "ContractApiUnavailable",
+        "UnsupportedExpression",
+        "NonBooleanCondition",
+        "ResultOutsideEnsures",
+        "OldOutsideEnsures",
+        "NestedOld",
+        "InvalidIntrinsicSignature",
+        "MissingCompanion",
+        "AmbiguousCompanion",
+        "CompanionSignatureMismatch",
+        "CompanionBodyUnavailable",
+        "InvalidClosedAttribute",
+        "InvalidClausePlacement",
+        "UnsupportedTarget"
+      ]
+    }
+  ],
+  "classes": [
+    {
+      "name": "BoundContractClause",
+      "constructor": {
+        "access": "internal",
+        "parameters": [
+          {"type": "BoundContractKind", "name": "kind"},
+          {"type": "IrTerm", "name": "condition"},
+          {"type": "OperationId", "name": "sourceOperation"},
+          {"type": "BoundContractEvidence", "name": "evidence"}
+        ],
+        "assignments": ["Kind", "Condition", "SourceOperation", "Evidence"]
+      },
+      "properties": [
+        {"type": "BoundContractKind", "name": "Kind"},
+        {"type": "IrTerm", "name": "Condition"},
+        {"type": "OperationId", "name": "SourceOperation"},
+        {"type": "BoundContractEvidence", "name": "Evidence"}
+      ],
+      "projections": [
+        {"type": "bool", "name": "IsAssumptionEvidence", "expression": "Kind == BoundContractKind.Assume"}
+      ]
+    },
+    {
+      "name": "BoundContractVariable",
+      "constructor": {
+        "access": "internal",
+        "parameters": [
+          {"type": "ISymbol?", "name": "symbol"},
+          {"type": "BoundContractVariableRole", "name": "role"},
+          {"type": "int", "name": "ordinal"},
+          {"type": "IrVarId", "name": "variable"},
+          {"type": "IrVarId?", "name": "currentStateVariable"}
+        ],
+        "assignments": ["Symbol", "Role", "Ordinal", "Variable", "CurrentStateVariable"]
+      },
+      "properties": [
+        {"type": "ISymbol?", "name": "Symbol"},
+        {"type": "BoundContractVariableRole", "name": "Role"},
+        {"type": "int", "name": "Ordinal"},
+        {"type": "IrVarId", "name": "Variable"},
+        {"type": "IrVarId?", "name": "CurrentStateVariable"}
+      ]
+    },
+    {
+      "name": "BoundMethodContracts",
+      "constructor": {
+        "access": "internal",
+        "parameters": [
+          {"type": "IMethodSymbol", "name": "target"},
+          {"type": "IMethodSymbol", "name": "source"},
+          {"type": "ImmutableArray<BoundContractClause>", "name": "clauses"},
+          {"type": "ImmutableArray<BoundContractVariable>", "name": "variables"},
+          {"type": "bool", "name": "usesCompanion"}
+        ],
+        "assignments": ["Target", "Source", "Clauses", "Variables", "UsesCompanion"]
+      },
+      "properties": [
+        {"type": "IMethodSymbol", "name": "Target"},
+        {"type": "IMethodSymbol", "name": "Source"},
+        {"type": "ImmutableArray<BoundContractClause>", "name": "Clauses"},
+        {"type": "ImmutableArray<BoundContractVariable>", "name": "Variables"},
+        {"type": "bool", "name": "UsesCompanion"}
+      ]
+    }
+  ]
+}

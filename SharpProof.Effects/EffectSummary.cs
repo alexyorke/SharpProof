@@ -29,10 +29,9 @@ public sealed record EffectSummary
             throw new ArgumentOutOfRangeException(nameof(termination));
         }
 
-        if (!Enum.IsDefined(typeof(EffectCompleteness), completeness))
-        {
-            throw new ArgumentOutOfRangeException(nameof(completeness));
-        }
+        completeness = ArgumentNullGuard.RequireDefined(
+            completeness,
+            nameof(completeness));
 
         if ((uncertainty & ~EffectUncertainty.Unknown) != 0)
         {
@@ -160,15 +159,8 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary>
 
     public bool LessThanOrEqual(EffectSummary left, EffectSummary right)
     {
-        if (left == null)
-        {
-            throw new ArgumentNullException(nameof(left));
-        }
-
-        if (right == null)
-        {
-            throw new ArgumentNullException(nameof(right));
-        }
+        left = ArgumentNullGuard.NotNull(left, nameof(left));
+        right = ArgumentNullGuard.NotNull(right, nameof(right));
 
         if (left.IsBottom)
         {
@@ -198,15 +190,8 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary>
 
     public EffectSummary Join(EffectSummary left, EffectSummary right)
     {
-        if (left == null)
-        {
-            throw new ArgumentNullException(nameof(left));
-        }
-
-        if (right == null)
-        {
-            throw new ArgumentNullException(nameof(right));
-        }
+        left = ArgumentNullGuard.NotNull(left, nameof(left));
+        right = ArgumentNullGuard.NotNull(right, nameof(right));
 
         if (left.IsBottom)
         {
@@ -237,10 +222,7 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary>
 
     public EffectSummary Havoc(EffectSummary value)
     {
-        if (value == null)
-        {
-            throw new ArgumentNullException(nameof(value));
-        }
+        value = ArgumentNullGuard.NotNull(value, nameof(value));
 
         return value.IsBottom ? Bottom : Top;
     }

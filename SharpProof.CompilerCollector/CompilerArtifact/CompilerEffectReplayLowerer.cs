@@ -12,20 +12,9 @@ internal static class CompilerEffectReplayLowerer
         out CompilerEffectReplayArtifact? replay,
         out string witnessDetail)
     {
-        if (compilation == null)
-        {
-            throw new ArgumentNullException(nameof(compilation));
-        }
-
-        if (witness == null)
-        {
-            throw new ArgumentNullException(nameof(witness));
-        }
-
-        if (apiSpecs == null)
-        {
-            throw new ArgumentNullException(nameof(apiSpecs));
-        }
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        witness = ArgumentNullGuard.NotNull(witness, nameof(witness));
+        apiSpecs = ArgumentNullGuard.NotNull(apiSpecs, nameof(apiSpecs));
 
         replay = null;
         witnessDetail = string.Empty;

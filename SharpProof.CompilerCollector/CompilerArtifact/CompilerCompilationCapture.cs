@@ -9,10 +9,7 @@ internal static class CompilerCompilationCapture
     internal static CompilerCompilationSnapshot Capture(CSharpCompilation compilation, string projectDirectory,
         string targetFramework, ImmutableArray<AdditionalText> additionalFiles, CancellationToken cancellationToken)
     {
-        if (compilation == null)
-        {
-            throw new ArgumentNullException(nameof(compilation));
-        }
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
 
         if (string.IsNullOrWhiteSpace(projectDirectory) || string.IsNullOrWhiteSpace(targetFramework))
         {
@@ -125,10 +122,7 @@ internal static class CompilerCompilationCapture
 
     internal static string ComputeTextSha256(SourceText text)
     {
-        if (text == null)
-        {
-            throw new ArgumentNullException(nameof(text));
-        }
+        text = ArgumentNullGuard.NotNull(text, nameof(text));
 
         return Hash(Encoding.UTF8.GetBytes(text.ToString()));
     }

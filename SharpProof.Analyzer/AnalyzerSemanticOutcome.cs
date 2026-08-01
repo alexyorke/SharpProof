@@ -21,15 +21,8 @@ internal static class AnalyzerSemanticOutcomes
 
     private static int Rank(AnalyzerSemanticOutcome outcome)
     {
-        return outcome switch
-        {
-            AnalyzerSemanticOutcome.NotApplicable => 0,
-            AnalyzerSemanticOutcome.Proven => 1,
-            AnalyzerSemanticOutcome.Suppressed => 2,
-            AnalyzerSemanticOutcome.Abstained => 3,
-            AnalyzerSemanticOutcome.Unknown => 4,
-            AnalyzerSemanticOutcome.Refuted => 5,
-            _ => throw new ArgumentOutOfRangeException(nameof(outcome))
-        };
+        return (int)ArgumentNullGuard.RequireDefined(
+            outcome,
+            nameof(outcome));
     }
 }

@@ -1,0 +1,468 @@
+{
+  "schema": "SharpProof.ProjectionCatalog",
+  "schemaVersion": 1,
+  "outputs": [
+    {
+      "path": "SharpProof.Verify/VerificationProjections.generated.cs",
+      "namespace": "SharpProof.Verify",
+      "accessibility": "internal",
+      "modifiers": ["static"],
+      "name": "VerificationProjections",
+      "methods": [
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "AbstentionReason",
+          "name": "MapFailure",
+          "parameters": [{"type": "BackendFailureReason", "name": "reason"}],
+          "switchMode": "expression",
+          "target": "reason",
+          "cases": [
+            {"pattern": "BackendFailureReason.UnsupportedEncoding", "expression": "AbstentionReason.UnsupportedEncoding"},
+            {"pattern": "BackendFailureReason.ResourceLimit", "expression": "AbstentionReason.ResourceLimit"},
+            {"pattern": "BackendFailureReason.Timeout", "expression": "AbstentionReason.Timeout"},
+            {"pattern": "BackendFailureReason.Unavailable", "expression": "AbstentionReason.BackendUnavailable"},
+            {"pattern": "BackendFailureReason.InfrastructureFailure", "expression": "AbstentionReason.InfrastructureFailure"}
+          ],
+          "fallback": "AbstentionReason.MalformedBackendResult"
+        }
+      ]
+    },
+    {
+      "path": "SharpProof.Worker/WorkerProjections.generated.cs",
+      "namespace": "SharpProof.Worker",
+      "accessibility": "internal",
+      "modifiers": ["static"],
+      "name": "WorkerProjections",
+      "methods": [
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "(string Kind, string Value)",
+          "name": "FormatValue",
+          "parameters": [{"type": "IrValue", "name": "value"}],
+          "switchMode": "expression",
+          "target": "value.Kind",
+          "cases": [
+            {"pattern": "IrValueKind.Boolean", "expression": "(nameof(IrValueKind.Boolean), value.Boolean ? \"true\" : \"false\")"},
+            {"pattern": "IrValueKind.Integer", "expression": "(nameof(IrValueKind.Integer), value.Integer.ToString(CultureInfo.InvariantCulture))"},
+            {"pattern": "IrValueKind.String", "expression": "(nameof(IrValueKind.String), value.String)"},
+            {"pattern": "IrValueKind.Null", "expression": "(nameof(IrValueKind.Null), \"null\")"},
+            {"pattern": "IrValueKind.Reference", "expression": "(nameof(IrValueKind.Reference), \"<opaque>\")"},
+            {"pattern": "IrValueKind.Sequence", "expression": "(nameof(IrValueKind.Sequence), \"<opaque>\")"}
+          ],
+          "fallback": "throw new ArgumentOutOfRangeException(nameof(value))"
+        },
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "WorkerClaimReason",
+          "name": "MapAbstention",
+          "parameters": [{"type": "AbstentionReason", "name": "reason"}],
+          "switchMode": "expression",
+          "target": "reason",
+          "cases": [
+            {"pattern": "AbstentionReason.ResourceLimit", "expression": "WorkerClaimReason.ResourceLimit"},
+            {"pattern": "AbstentionReason.Timeout", "expression": "WorkerClaimReason.MethodTimeout"},
+            {"pattern": "AbstentionReason.BackendUnavailable", "expression": "WorkerClaimReason.BackendUnavailable"},
+            {"pattern": "AbstentionReason.InfrastructureFailure", "expression": "WorkerClaimReason.InfrastructureFailure"},
+            {"pattern": "AbstentionReason.MalformedBackendResult", "expression": "WorkerClaimReason.MalformedBackendResult"},
+            {"pattern": "AbstentionReason.CounterexampleReplayFailed", "expression": "WorkerClaimReason.CounterexampleReplayFailed"},
+            {"pattern": "AbstentionReason.PostconditionMayBeUndefined", "expression": "WorkerClaimReason.PostconditionMayBeUndefined"}
+          ],
+          "fallback": "WorkerClaimReason.UnsupportedExpression"
+        },
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "string",
+          "name": "ClauseLabel",
+          "parameters": [{"type": "CompilerContractKind", "name": "kind"}],
+          "switchMode": "expression",
+          "target": "kind",
+          "cases": [
+            {"pattern": "CompilerContractKind.Requires", "expression": "\"requires\""},
+            {"pattern": "CompilerContractKind.Assume", "expression": "\"assume\""},
+            {"pattern": "CompilerContractKind.Ensures", "expression": "\"ensures\""}
+          ],
+          "fallback": "throw new ArgumentOutOfRangeException(nameof(kind))"
+        },
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "NullnessValue",
+          "name": "MapNullness",
+          "parameters": [{"type": "SpecNullness", "name": "value"}],
+          "switchMode": "expression",
+          "target": "value",
+          "cases": [
+            {"pattern": "SpecNullness.NonNull", "expression": "NullnessValue.NonNull"},
+            {"pattern": "SpecNullness.Null", "expression": "NullnessValue.Null"},
+            {"pattern": "SpecNullness.MaybeNull or SpecNullness.Unknown or SpecNullness.NotApplicable", "expression": "NullnessValue.MaybeNull"}
+          ],
+          "fallback": "NullnessValue.Bottom"
+        },
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "SequenceCardinalityValue",
+          "name": "MapCardinality",
+          "parameters": [
+            {"type": "SpecCardinality", "name": "value"},
+            {"type": "long?", "name": "count"}
+          ],
+          "switchMode": "expression",
+          "target": "value",
+          "cases": [
+            {"pattern": "SpecCardinality.Empty", "expression": "SequenceCardinalityDomain.Instance.Empty"},
+            {"pattern": "SpecCardinality.NonEmpty", "expression": "SequenceCardinalityDomain.Instance.NonEmpty"},
+            {"pattern": "SpecCardinality.Exact when count.HasValue", "expression": "SequenceCardinalityDomain.Instance.KnownLength(count.Value)"},
+            {"pattern": "SpecCardinality.Unknown or SpecCardinality.NotApplicable", "expression": "SequenceCardinalityDomain.Instance.Top"}
+          ],
+          "fallback": "SequenceCardinalityDomain.Instance.Bottom"
+        }
+      ]
+    },
+    {
+      "path": "SharpProof.Effects/EffectProjections.generated.cs",
+      "namespace": "SharpProof.Effects",
+      "accessibility": "internal",
+      "modifiers": ["static"],
+      "name": "EffectProjections",
+      "methods": [
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax?",
+          "name": "GetInitializerExpression",
+          "parameters": [{"type": "Microsoft.CodeAnalysis.SyntaxNode", "name": "declaration"}],
+          "switchMode": "type",
+          "target": "declaration",
+          "cases": [
+            {"pattern": "Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclaratorSyntax variable", "expression": "variable.Initializer?.Value"},
+            {"pattern": "Microsoft.CodeAnalysis.CSharp.Syntax.PropertyDeclarationSyntax property", "expression": "property.Initializer?.Value"}
+          ],
+          "fallback": "null"
+        },
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "EffectAllocationKind",
+          "name": "MapAllocation",
+          "parameters": [{"type": "SpecAllocationBehavior", "name": "behavior"}],
+          "switchMode": "expression",
+          "target": "behavior",
+          "cases": [
+            {"pattern": "SpecAllocationBehavior.None", "expression": "EffectAllocationKind.None"},
+            {"pattern": "SpecAllocationBehavior.MayAllocate", "expression": "EffectAllocationKind.Managed"},
+            {"pattern": "SpecAllocationBehavior.Unknown", "expression": "EffectAllocationKind.Unknown"}
+          ],
+          "fallback": "EffectAllocationKind.Unknown"
+        },
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "EffectThrowSet",
+          "name": "MapNonResolvedThrowBehavior",
+          "parameters": [{"type": "SpecThrowBehavior", "name": "behavior"}],
+          "switchMode": "expression",
+          "target": "behavior",
+          "cases": [
+            {"pattern": "SpecThrowBehavior.DoesNotThrow", "expression": "EffectThrowSet.Empty"}
+          ],
+          "fallback": "EffectThrowSet.Unknown"
+        },
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "EffectTermination",
+          "name": "MapTermination",
+          "parameters": [{"type": "SpecTerminationBehavior?", "name": "behavior"}],
+          "switchMode": "expression",
+          "target": "behavior",
+          "cases": [
+            {"pattern": "SpecTerminationBehavior.Terminates", "expression": "EffectTermination.Terminates"}
+          ],
+          "fallback": "EffectTermination.Unknown"
+        }
+      ]
+    },
+    {
+      "path": "SharpProof.Contracts/ContractProjections.generated.cs",
+      "namespace": "SharpProof.Contracts",
+      "accessibility": "internal",
+      "modifiers": ["static"],
+      "name": "ContractProjections",
+      "methods": [
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "string",
+          "name": "ClosedAttributeName",
+          "parameters": [{"type": "ClosedContractAttributeKind", "name": "kind"}],
+          "switchMode": "expression",
+          "target": "kind",
+          "cases": [
+            {"pattern": "ClosedContractAttributeKind.NotNull", "expression": "\"[NotNull]\""},
+            {"pattern": "ClosedContractAttributeKind.Positive", "expression": "\"[Positive]\""},
+            {"pattern": "ClosedContractAttributeKind.InRange", "expression": "\"[InRange]\""}
+          ],
+          "fallback": "throw new InvalidOperationException(\"The attribute is not a closed contract.\")"
+        }
+      ]
+    },
+    {
+      "path": "SharpProof.Ir/IrPrinterProjections.generated.cs",
+      "namespace": "SharpProof.Ir",
+      "accessibility": "public",
+      "modifiers": ["sealed", "partial"],
+      "name": "IrPrinter",
+      "methods": [
+        {
+          "accessibility": "private",
+          "returnType": "string",
+          "name": "Format",
+          "parameters": [{"type": "IrTerm", "name": "term"}],
+          "switchMode": "type",
+          "target": "term",
+          "cases": [
+            {"pattern": "IrBooleanTerm value", "expression": "value.Value ? \"true\" : \"false\""},
+            {"pattern": "IrIntegerTerm value", "expression": "value.Value.ToString(CultureInfo.InvariantCulture)"},
+            {"pattern": "IrStringTerm value", "expression": "Quote(_factory.GetString(value.Value))"},
+            {"pattern": "IrNullTerm", "expression": "\"((\" + TypeName(term.Type) + \")null)\""},
+            {"pattern": "IrVariableTerm value", "expression": "\"v\" + value.Variable.Value.ToString(CultureInfo.InvariantCulture)"},
+            {"pattern": "IrOpaqueTerm value", "expression": "FormatOpaque(value)"},
+            {"pattern": "IrUnaryTerm value", "expression": "\"(\" + IrOperatorCatalog.Get(value.Operator).Token + Format(value.Operand) + \")\""},
+            {"pattern": "IrBinaryTerm value", "expression": "\"(\" + Format(value.Left) + \" \" + IrOperatorCatalog.Get(value.Operator).Token + \" \" + Format(value.Right) + \")\""},
+            {"pattern": "IrConditionalTerm value", "expression": "\"(\" + Format(value.Condition) + \" ? \" + Format(value.WhenTrue) + \" : \" + Format(value.WhenFalse) + \")\""},
+            {"pattern": "IrCastTerm value", "expression": "\"((\" + TypeName(value.Type) + \")\" + Format(value.Operand) + \")\""},
+            {"pattern": "IrLengthTerm value", "expression": "\"len(\" + Format(value.Value) + \")\""},
+            {"pattern": "IrSequenceAccessTerm value", "expression": "Format(value.Sequence) + \"[\" + Format(value.Index) + \"]\""}
+          ],
+          "fallback": "throw new InvalidOperationException(\"Unknown IR term kind: \" + term.Kind + \".\")"
+        }
+      ]
+    },
+    {
+      "path": "SharpProof.Frontend/OperationSupportProjections.generated.cs",
+      "namespace": "SharpProof.Frontend",
+      "accessibility": "internal",
+      "modifiers": ["static"],
+      "name": "OperationSupportProjections",
+      "methods": [
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "OperationKind[]",
+          "name": "GetSupported",
+          "parameters": [{"type": "OperationSupportStage", "name": "stage"}],
+          "switchMode": "expression",
+          "target": "stage",
+          "cases": [
+            {"pattern": "OperationSupportStage.ContractExpressionLowering", "expression": "OperationSupportCatalogData.ContractExpression"},
+            {"pattern": "OperationSupportStage.EffectDiscovery", "expression": "OperationSupportCatalogData.EffectDiscovery"}
+          ],
+          "fallback": "throw new ArgumentOutOfRangeException(nameof(stage), stage, \"Unknown operation support stage.\")"
+        }
+      ]
+    },
+    {
+      "path": "SharpProof.Worker.Launcher/LauncherProjections.generated.cs",
+      "namespace": "SharpProof.Worker.Launcher",
+      "accessibility": "internal",
+      "modifiers": ["static", "partial"],
+      "name": "LauncherPresentation",
+      "methods": [
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "int",
+          "name": "ExitCode",
+          "parameters": [{"type": "SharpProof.Worker.Protocol.WorkerRunStatus", "name": "status"}],
+          "switchMode": "expression",
+          "target": "status",
+          "cases": [
+            {"pattern": "SharpProof.Worker.Protocol.WorkerRunStatus.TimedOut", "expression": "124"},
+            {"pattern": "SharpProof.Worker.Protocol.WorkerRunStatus.Canceled", "expression": "4"}
+          ],
+          "fallback": "3"
+        },
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "Program.LauncherFailure",
+          "name": "NoResultFailure",
+          "parameters": [{"type": "int", "name": "exitCode"}],
+          "switchMode": "expression",
+          "target": "exitCode",
+          "cases": [
+            {"pattern": "124", "expression": "new Program.LauncherFailure(124, SharpProof.Worker.Protocol.WorkerRunStatus.TimedOut, SharpProof.Worker.Protocol.WorkerRunFailureReason.None, \"worker.timeout\", \"The worker exceeded its project time budget.\", string.Empty)"},
+            {"pattern": "125", "expression": "new Program.LauncherFailure(125, SharpProof.Worker.Protocol.WorkerRunStatus.Failed, SharpProof.Worker.Protocol.WorkerRunFailureReason.ContainmentFailure, \"containment.unavailable\", \"Required worker containment could not be established.\", string.Empty)"}
+          ],
+          "fallback": "new Program.LauncherFailure(exitCode, SharpProof.Worker.Protocol.WorkerRunStatus.Failed, SharpProof.Worker.Protocol.WorkerRunFailureReason.MalformedResult, \"worker.no_result\", \"The worker exited without a result.\", string.Empty)"
+        },
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "string",
+          "name": "ClaimKind",
+          "parameters": [{"type": "SharpProof.Worker.Protocol.WorkerClaimManifestEntry", "name": "claim"}],
+          "switchMode": "expression",
+          "target": "claim.Kind",
+          "cases": [
+            {"pattern": "SharpProof.Worker.Protocol.WorkerClaimKind.Postcondition", "expression": "\"Postcondition\""},
+            {"pattern": "SharpProof.Worker.Protocol.WorkerClaimKind.Effect", "expression": "\"effect:\" + EffectKind(claim.EffectContractKind)"}
+          ],
+          "fallback": "throw new ArgumentOutOfRangeException(nameof(claim))"
+        },
+        {
+          "accessibility": "private",
+          "static": true,
+          "returnType": "string",
+          "name": "EffectKind",
+          "parameters": [{"type": "SharpProof.Worker.Protocol.WorkerEffectContractKind", "name": "kind"}],
+          "switchMode": "expression",
+          "target": "kind",
+          "cases": [
+            {"pattern": "SharpProof.Worker.Protocol.WorkerEffectContractKind.EnforcePure", "expression": "\"EnforcePure\""},
+            {"pattern": "SharpProof.Worker.Protocol.WorkerEffectContractKind.ZeroAllocations", "expression": "\"ZeroAllocations\""},
+            {"pattern": "SharpProof.Worker.Protocol.WorkerEffectContractKind.AllowedCapabilities", "expression": "\"AllowedCapabilities\""},
+            {"pattern": "SharpProof.Worker.Protocol.WorkerEffectContractKind.DoesNotThrow", "expression": "\"DoesNotThrow\""},
+            {"pattern": "SharpProof.Worker.Protocol.WorkerEffectContractKind.AllowedExceptions", "expression": "\"AllowedExceptions\""},
+            {"pattern": "SharpProof.Worker.Protocol.WorkerEffectContractKind.EffectContract", "expression": "\"EffectContract\""}
+          ],
+          "fallback": "throw new ArgumentOutOfRangeException(nameof(kind))"
+        },
+        {
+          "accessibility": "private",
+          "static": true,
+          "returnType": "string",
+          "name": "Level",
+          "parameters": [
+            {"type": "object", "name": "policy"},
+            {"type": "string", "name": "advisory"}
+          ],
+          "switchMode": "type",
+          "target": "policy",
+          "cases": [
+            {"pattern": "SharpProof.Worker.Protocol.WorkerVerifyPolicy.Advisory or SharpProof.Worker.Protocol.WorkerAssumptionPolicy.Allow", "expression": "advisory"},
+            {"pattern": "SharpProof.Worker.Protocol.WorkerVerifyPolicy.WarnOnUnknown or SharpProof.Worker.Protocol.WorkerAssumptionPolicy.Warn", "expression": "\"warning\""},
+            {"pattern": "SharpProof.Worker.Protocol.WorkerVerifyPolicy.RequireProven or SharpProof.Worker.Protocol.WorkerAssumptionPolicy.Error", "expression": "\"error\""}
+          ],
+          "fallback": "throw new InvalidOperationException(\"The policy was not validated.\")"
+        },
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "SharpProof.Worker.Protocol.WorkerVerifyPolicy",
+          "name": "ParseVerifyPolicy",
+          "parameters": [{"type": "string", "name": "value"}],
+          "switchMode": "expression",
+          "target": "value.ToUpperInvariant()",
+          "cases": [
+            {"pattern": "\"ADVISORY\"", "expression": "SharpProof.Worker.Protocol.WorkerVerifyPolicy.Advisory"},
+            {"pattern": "\"WARN-ON-UNKNOWN\"", "expression": "SharpProof.Worker.Protocol.WorkerVerifyPolicy.WarnOnUnknown"},
+            {"pattern": "\"REQUIRE-PROVEN\"", "expression": "SharpProof.Worker.Protocol.WorkerVerifyPolicy.RequireProven"}
+          ],
+          "fallback": "throw new ArgumentException(\"The verifier policy is invalid.\", nameof(value))"
+        },
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "SharpProof.Worker.Protocol.WorkerAssumptionPolicy",
+          "name": "ParseAssumptionPolicy",
+          "parameters": [{"type": "string", "name": "value"}],
+          "switchMode": "expression",
+          "target": "value.ToUpperInvariant()",
+          "cases": [
+            {"pattern": "\"ALLOW\"", "expression": "SharpProof.Worker.Protocol.WorkerAssumptionPolicy.Allow"},
+            {"pattern": "\"WARN\"", "expression": "SharpProof.Worker.Protocol.WorkerAssumptionPolicy.Warn"},
+            {"pattern": "\"ERROR\"", "expression": "SharpProof.Worker.Protocol.WorkerAssumptionPolicy.Error"}
+          ],
+          "fallback": "throw new ArgumentException(\"The assumption policy is invalid.\", nameof(value))"
+        }
+      ]
+    },
+    {
+      "path": "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableProjections.generated.cs",
+      "namespace": "SharpProof.CompilerArtifact",
+      "accessibility": "internal",
+      "modifiers": ["static"],
+      "name": "CompilerCallableProjections",
+      "methods": [
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "ITypeSymbol?",
+          "name": "GetVariableSource",
+          "parameters": [
+            {"type": "BoundContractVariable", "name": "variable"},
+            {"type": "BoundMethodContracts", "name": "contracts"}
+          ],
+          "switchMode": "expression",
+          "target": "variable.Role",
+          "cases": [
+            {"pattern": "BoundContractVariableRole.Parameter when variable.Symbol is IParameterSymbol parameter", "expression": "parameter.Type"},
+            {"pattern": "BoundContractVariableRole.Receiver", "expression": "variable.Symbol as ITypeSymbol"},
+            {"pattern": "BoundContractVariableRole.Result", "expression": "contracts.Target.ReturnType"}
+          ],
+          "fallback": "null"
+        },
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "string",
+          "name": "GetModelLabel",
+          "parameters": [{"type": "BoundContractVariable", "name": "variable"}],
+          "switchMode": "expression",
+          "target": "variable.Role",
+          "cases": [
+            {"pattern": "BoundContractVariableRole.Parameter", "expression": "\"parameter:\" + variable.Ordinal.ToString(CultureInfo.InvariantCulture)"},
+            {"pattern": "BoundContractVariableRole.Receiver", "expression": "\"receiver\""},
+            {"pattern": "BoundContractVariableRole.Result", "expression": "\"result\""},
+            {"pattern": "BoundContractVariableRole.PreState", "expression": "\"pre:\" + (variable.CurrentStateVariable?.Value ?? -1).ToString(CultureInfo.InvariantCulture)"}
+          ],
+          "fallback": "\"variable:\" + variable.Variable.Value.ToString(CultureInfo.InvariantCulture)"
+        }
+      ]
+    },
+    {
+      "path": "SharpProof.Frontend/CompilerIdentityProjections.generated.cs",
+      "namespace": "SharpProof.Frontend",
+      "accessibility": "internal",
+      "modifiers": ["static"],
+      "name": "CompilerIdentityProjections",
+      "methods": [
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "bool",
+          "name": "IsChecked",
+          "parameters": [{"type": "IOperation", "name": "operation"}],
+          "switchMode": "type",
+          "target": "operation",
+          "cases": [
+            {"pattern": "IBinaryOperation binary", "expression": "binary.IsChecked"},
+            {"pattern": "IUnaryOperation unary", "expression": "unary.IsChecked"},
+            {"pattern": "IConversionOperation conversion", "expression": "conversion.IsChecked"}
+          ],
+          "fallback": "false"
+        },
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "bool",
+          "name": "IsLifted",
+          "parameters": [{"type": "IOperation", "name": "operation"}],
+          "switchMode": "type",
+          "target": "operation",
+          "cases": [
+            {"pattern": "IBinaryOperation binary", "expression": "binary.IsLifted"},
+            {"pattern": "IUnaryOperation unary", "expression": "unary.IsLifted"}
+          ],
+          "fallback": "false"
+        }
+      ]
+    }
+  ]
+}

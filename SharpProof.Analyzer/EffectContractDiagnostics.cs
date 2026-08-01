@@ -117,24 +117,23 @@ internal static class EffectContractDiagnostics
         var summaryEvidence = CreateSummaryEvidence(summary);
         var flowComplete =
             summary.AnalysisIncompleteReason == EffectAnalysisIncompleteReason.None;
-        var purityComplete = flowComplete && !entryIsBottom &&
-            !summary.IsBottom && !summary.Reads.IsUnknown &&
+        var entrySummaryReachable = !entryIsBottom && !summary.IsBottom;
+        var facetComplete = flowComplete && entrySummaryReachable;
+        var purityComplete = facetComplete && !summary.Reads.IsUnknown &&
             !summary.Writes.IsUnknown && !summary.Capabilities.IsUnknown;
-        var allocationComplete = flowComplete && !entryIsBottom &&
-            !summary.IsBottom &&
+        var allocationComplete = facetComplete &&
             summary.Allocation != EffectAllocationKind.Unknown;
-        var capabilityComplete = flowComplete && !entryIsBottom &&
-            !summary.IsBottom && !summary.Capabilities.IsUnknown;
-        var exceptionComplete = flowComplete && !entryIsBottom &&
-            !summary.IsBottom && !summary.Throws.IncludesUnknown;
+        var capabilityComplete =
+            facetComplete && !summary.Capabilities.IsUnknown;
+        var exceptionComplete =
+            facetComplete && !summary.Throws.IncludesUnknown;
         var disallowedCapabilities = projection.Capabilities & ~capabilities.Value;
         var disallowedExceptions = exceptions.IsValid
             ? summary.Throws.Types.Where(type => !IsAllowed(type, exceptions.Types)).ToImmutableArray()
             : [];
         var declaredProjection = EffectSummaryProjector.Project(contract.Summary);
         var declaredValid = contract.Kind != EffectContractResolutionKind.Invalid;
-        var declaredComplete = !entryIsBottom && !summary.IsBottom &&
-            projection.IsComplete &&
+        var declaredComplete = entrySummaryReachable && projection.IsComplete &&
             contract.Kind is not (EffectContractResolutionKind.Incomplete or EffectContractResolutionKind.Missing);
         var incompleteReason = MapIncompleteReason(summary);
 
@@ -437,17 +436,7 @@ internal static class EffectContractDiagnostics
     }
 }
 
-internal sealed record EffectClaimEvaluation(
-    EffectEvaluationContractKind Kind, ImmutableArray<AttributeData> Attributes,
-    EffectEvaluationOutcome Outcome, EffectEvaluationReason Reason,
-    EffectEvaluationCertainty Certainty,
-    string Evidence, EffectDirectWitness? Witness, EffectClaimConstraint Constraint,
-    DiagnosticDescriptor? Diagnostic, Location DiagnosticLocation, object[] DiagnosticArguments);
-
-internal sealed record EffectClaimConstraint(
-    EffectContractKind Effects,
-    EffectContractCapabilityKind Capabilities,
-    ImmutableArray<INamedTypeSymbol> ExceptionTypes)
+internal sealed partial record EffectClaimConstraint
 {
     internal static EffectClaimConstraint Empty
     {

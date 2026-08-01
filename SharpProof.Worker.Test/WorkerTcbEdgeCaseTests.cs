@@ -683,7 +683,7 @@ public sealed class WorkerTcbEdgeCaseTests
         var succeeded = SpecResultDomainProjection.TryCreate(
             factory,
             CreateTemplate(
-                SpecValueType.Reference,
+                IrTypeKind.Reference,
                 SpecNullness.Null,
                 SpecCardinality.NotApplicable),
             result,
@@ -711,7 +711,7 @@ public sealed class WorkerTcbEdgeCaseTests
         var succeeded = SpecResultDomainProjection.TryCreate(
             factory,
             CreateTemplate(
-                SpecValueType.Sequence,
+                IrTypeKind.Sequence,
                 SpecNullness.NonNull,
                 SpecCardinality.NonEmpty),
             result,
@@ -1082,7 +1082,7 @@ public sealed class WorkerTcbEdgeCaseTests
     }
 
     private static ApiSpecTemplate CreateTemplate(
-        SpecValueType resultType,
+        IrTypeKind resultType,
         SpecNullness nullness,
         SpecCardinality cardinality)
     {

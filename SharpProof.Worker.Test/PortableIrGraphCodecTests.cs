@@ -1,7 +1,9 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
+using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
@@ -80,6 +82,113 @@ public sealed class PortableIrGraphCodecTests
     }
 
     [Test]
+    public void RoundTripPreservesExplicitExtraVariables()
+    {
+        var fixture = CreateFixture();
+        var unused = fixture.Factory.CreateVariable(
+            "unused", fixture.Factory.IntegerType);
+
+        var encoded = PortableIrGraphCodec.Encode(
+            fixture.Factory,
+            fixture.Program,
+            fixture.Roots,
+            [unused]);
+        var decoded = PortableIrGraphCodec.Decode(encoded.Graph);
+        var reencoded = PortableIrGraphCodec.Encode(
+            decoded.Factory,
+            decoded.Program,
+            decoded.Roots,
+            decoded.Variables);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                decoded.Variables,
+                Has.Count.EqualTo(encoded.Graph.Variables.Length));
+            Assert.That(
+                JsonSerializer.Serialize(reencoded.Graph),
+                Is.EqualTo(JsonSerializer.Serialize(encoded.Graph)));
+        }
+    }
+
+    [Test]
+    public void RoundTripPreservesEveryWireEnumVariant()
+    {
+        var factory = new IrFactory();
+        var boolVariable = factory.CreateVariable("flag", factory.BooleanType);
+        var integerVariable = factory.CreateVariable("number", factory.IntegerType);
+        var stringVariable = factory.CreateVariable("text", factory.StringType);
+        var boolTerm = factory.Variable(boolVariable);
+        var integerTerm = factory.Variable(integerVariable);
+        var stringTerm = factory.Variable(stringVariable);
+        var unaryTerms = Enum.GetValues<IrUnaryOperator>()
+            .Select(@operator => factory.Unary(
+                @operator,
+                @operator == IrUnaryOperator.Not ? boolTerm : integerTerm))
+            .ToArray();
+        var binaryTerms = Enum.GetValues<IrBinaryOperator>()
+            .Select(@operator =>
+            {
+                var operands = @operator is
+                    IrBinaryOperator.AndAlso or IrBinaryOperator.OrElse
+                    ? (boolTerm, boolTerm)
+                    : @operator == IrBinaryOperator.StringConcat
+                        ? (stringTerm, stringTerm)
+                        : (integerTerm, integerTerm);
+                return factory.Binary(@operator, operands.Item1, operands.Item2);
+            })
+            .ToArray();
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        foreach (var havocKind in Enum.GetValues<IrHavocKind>())
+        {
+            builder.Havoc(
+                entry,
+                factory.CreateOperation($"havoc-{havocKind}"),
+                havocKind,
+                havocKind == IrHavocKind.Memory
+                    ? []
+                    : [boolVariable, integerVariable]);
+        }
+
+        builder.Return(entry, factory.CreateOperation("return"), integerTerm);
+        var roots = unaryTerms.Concat(binaryTerms).ToArray();
+        var encoded = PortableIrGraphCodec.Encode(
+            factory,
+            builder.Build(),
+            roots);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                encoded.Graph.Terms
+                    .Where(static row => row.Kind == IrTermKind.Unary)
+                    .Select(static row => row.A),
+                Is.EqualTo(Enumerable.Range(0, Enum.GetValues<IrUnaryOperator>().Length)));
+            Assert.That(
+                encoded.Graph.Terms
+                    .Where(static row => row.Kind == IrTermKind.Binary)
+                    .Select(static row => row.A),
+                Is.EqualTo(Enumerable.Range(0, Enum.GetValues<IrBinaryOperator>().Length)));
+            Assert.That(
+                encoded.Graph.Blocks
+                    .SelectMany(static block => block.Instructions)
+                    .Where(static row => row.Kind == IrInstructionKind.Havoc)
+                    .Select(static row => row.A),
+                Is.EqualTo(Enumerable.Range(0, Enum.GetValues<IrHavocKind>().Length)));
+        }
+
+        var decoded = PortableIrGraphCodec.Decode(encoded.Graph);
+        var reencoded = PortableIrGraphCodec.Encode(
+            decoded.Factory,
+            decoded.Program,
+            decoded.Roots);
+        Assert.That(
+            JsonSerializer.Serialize(reencoded.Graph),
+            Is.EqualTo(JsonSerializer.Serialize(encoded.Graph)));
+    }
+
+    [Test]
     public void EncoderReturnsStableDenseMappingsForPreparationMetadata()
     {
         var fixture = CreateFixture();
@@ -109,6 +218,151 @@ public sealed class PortableIrGraphCodecTests
     public void WireEnumCatalogsAreExhaustive()
     {
         Assert.That(PortableIrGraphCodec.HasCompleteWireEnumCatalogs, Is.True);
+    }
+
+    [Test]
+    public void SlotCatalogsAreExhaustiveAndDeclarative()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(PortableIrGraphCodec.HasCompleteSlotCatalogs, Is.True);
+            Assert.That(
+                PortableIrSlotCatalog.Terms.Select(static mapping => mapping.Kind),
+                Is.EqualTo(Enum.GetNames<IrTermKind>()));
+            Assert.That(
+                PortableIrSlotCatalog.Locations.Select(static mapping => mapping.Kind),
+                Is.EqualTo(Enum.GetNames<IrLocationKind>()));
+            Assert.That(
+                PortableIrSlotCatalog.Instructions.Select(
+                    static mapping => mapping.Kind),
+                Is.EqualTo(Enum.GetNames<IrInstructionKind>()));
+            Assert.That(
+                PortableIrSlotCatalog.Terms[(int)IrTermKind.Opaque].Slots,
+                Is.EqualTo([
+                    "memberIndex",
+                    "optionalTermIndex",
+                    "wire:OpaquePurities",
+                    "operationWhenImpure",
+                    "unused",
+                    "unused",
+                    "termIndices"]));
+            Assert.That(
+                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Call].Slots,
+                Is.EqualTo([
+                    "optionalVariableIndex",
+                    "memberIndex",
+                    "optionalTermIndex",
+                    "unused",
+                    "termIndices",
+                    "unused"]));
+        }
+    }
+
+    [Test]
+    public void CanonicalGoldenWireRoundTripsWithoutChangingBytes()
+    {
+        var fixture = CreateFixture();
+        var encoded = PortableIrGraphCodec.Encode(
+            fixture.Factory,
+            fixture.Program,
+            fixture.Roots);
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(
+            encoded.Graph,
+            WorkerProtocolJson.Options);
+        var hash = Convert.ToHexString(SHA256.HashData(bytes));
+
+        Assert.That(
+            hash,
+            Is.EqualTo(
+                "429FA548B2E9D87501BC4FB7BE5B5D8B329002043B1050A8F991A6355F492566"));
+
+        var decodedGraph = JsonSerializer.Deserialize<PortableIrGraph>(
+            bytes,
+            WorkerProtocolJson.Options)!;
+        var decoded = PortableIrGraphCodec.Decode(decodedGraph);
+        var reencoded = PortableIrGraphCodec.Encode(
+            decoded.Factory,
+            decoded.Program,
+            decoded.Roots);
+        var roundTripBytes = JsonSerializer.SerializeToUtf8Bytes(
+            reencoded.Graph,
+            WorkerProtocolJson.Options);
+        Assert.That(roundTripBytes, Is.EqualTo(bytes));
+    }
+
+    [Test]
+    public void DecoderRejectsNonCanonicalOptionalSentinels()
+    {
+        var fixture = CreateFixture();
+        var graph = PortableIrGraphCodec.Encode(
+            fixture.Program,
+            fixture.Roots).Graph;
+        var call = graph.Blocks
+            .SelectMany(static block => block.Instructions)
+            .First(static instruction => instruction.Kind == IrInstructionKind.Call);
+        call.A = -2;
+
+        Assert.Throws<InvalidDataException>(
+            (Action)(() => PortableIrGraphCodec.Decode(graph)));
+    }
+
+    [TestCase(CanonicalSlotMutation.TermUnusedIndex)]
+    [TestCase(CanonicalSlotMutation.TermUnusedNumber)]
+    [TestCase(CanonicalSlotMutation.TermUnusedText)]
+    [TestCase(CanonicalSlotMutation.TermEmptyItems)]
+    [TestCase(CanonicalSlotMutation.InstructionUnusedIndex)]
+    [TestCase(CanonicalSlotMutation.InstructionEmptyItems)]
+    [TestCase(CanonicalSlotMutation.InstructionUnusedLocation)]
+    public void DecoderRejectsNonCanonicalSlotsAfterSerialization(
+        CanonicalSlotMutation mutation)
+    {
+        var fixture = CreateFixture();
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(
+            PortableIrGraphCodec.Encode(fixture.Program, fixture.Roots).Graph,
+            WorkerProtocolJson.Options);
+        var graph = JsonSerializer.Deserialize<PortableIrGraph>(
+            bytes,
+            WorkerProtocolJson.Options)!;
+
+        switch (mutation)
+        {
+            case CanonicalSlotMutation.TermUnusedIndex:
+                graph.Terms.First(static row => row.Kind == IrTermKind.Boolean).B = 0;
+                break;
+            case CanonicalSlotMutation.TermUnusedNumber:
+                graph.Terms.First(static row => row.Kind == IrTermKind.Boolean).Number = 1;
+                break;
+            case CanonicalSlotMutation.TermUnusedText:
+                graph.Terms.First(static row => row.Kind == IrTermKind.Boolean).Text =
+                    "tampered";
+                break;
+            case CanonicalSlotMutation.TermEmptyItems:
+                graph.Terms.First(static row => row.Kind == IrTermKind.Null).Items = [0];
+                break;
+            case CanonicalSlotMutation.InstructionUnusedIndex:
+                graph.Blocks
+                    .SelectMany(static block => block.Instructions)
+                    .First(static row => row.Kind == IrInstructionKind.Assign)
+                    .C = 0;
+                break;
+            case CanonicalSlotMutation.InstructionEmptyItems:
+                graph.Blocks
+                    .SelectMany(static block => block.Instructions)
+                    .First(static row => row.Kind == IrInstructionKind.Assign)
+                    .Items = [0];
+                break;
+            case CanonicalSlotMutation.InstructionUnusedLocation:
+                graph.Blocks
+                    .SelectMany(static block => block.Instructions)
+                    .First(static row => row.Kind == IrInstructionKind.Call)
+                    .Location = new();
+                break;
+            default:
+                throw new AssertionException("Unknown mutation.");
+        }
+
+        Assert.Throws<InvalidDataException>(
+            (Action)(() => PortableIrGraphCodec.Decode(graph)));
     }
 
     [TestCase(WireEnumMutation.OpaquePurity)]
@@ -176,6 +430,9 @@ public sealed class PortableIrGraphCodecTests
     [TestCase(MalformedMutation.NullInstructionItems)]
     [TestCase(MalformedMutation.LocationKind)]
     [TestCase(MalformedMutation.ProgramShape)]
+    [TestCase(MalformedMutation.DuplicateHavocVariable)]
+    [TestCase(MalformedMutation.WhitespaceOperationDescription)]
+    [TestCase(MalformedMutation.WhitespaceBlockName)]
     public void DecoderRejectsMalformedGraphs(MalformedMutation mutation)
     {
         var fixture = CreateFixture();
@@ -237,6 +494,18 @@ public sealed class PortableIrGraphCodecTests
                 break;
             case MalformedMutation.ProgramShape:
                 graph.HasProgram = false;
+                break;
+            case MalformedMutation.DuplicateHavocVariable:
+                var havoc = graph.Blocks
+                    .SelectMany(static block => block.Instructions)
+                    .First(static row => row.Kind == IrInstructionKind.Havoc);
+                havoc.Items = [havoc.Items[0], havoc.Items[0]];
+                break;
+            case MalformedMutation.WhitespaceOperationDescription:
+                graph.Operations[0].Description = " ";
+                break;
+            case MalformedMutation.WhitespaceBlockName:
+                graph.Blocks[0].Name = "\t";
                 break;
             default:
                 throw new AssertionException("Unknown mutation.");
@@ -435,7 +704,21 @@ public sealed class PortableIrGraphCodecTests
         CollapsedTermPartition,
         NullInstructionItems,
         LocationKind,
-        ProgramShape
+        ProgramShape,
+        DuplicateHavocVariable,
+        WhitespaceOperationDescription,
+        WhitespaceBlockName
+    }
+
+    public enum CanonicalSlotMutation
+    {
+        TermUnusedIndex,
+        TermUnusedNumber,
+        TermUnusedText,
+        TermEmptyItems,
+        InstructionUnusedIndex,
+        InstructionEmptyItems,
+        InstructionUnusedLocation
     }
 
     public enum DeepGraphKind

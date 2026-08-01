@@ -47,6 +47,34 @@ jobs:
         shell: pwsh
         run: .\scripts\Generate-CSharpScalarSemantics.ps1 -Verify
 
+      - name: Verify generated Contract API catalog
+        shell: pwsh
+        run: .\scripts\Generate-ContractApiCatalog.ps1 -Verify
+
+      - name: Verify generated analyzer diagnostic catalog
+        shell: pwsh
+        run: .\scripts\Generate-AnalyzerDiagnosticCatalog.ps1 -Verify
+
+      - name: Verify generated projection catalog
+        shell: pwsh
+        run: .\scripts\Generate-ProjectionCatalog.ps1 -Verify
+
+      - name: Verify generated bound-contract model
+        shell: pwsh
+        run: .\scripts\Generate-BoundContractModel.ps1 -Verify
+
+      - name: Verify generated effect contract mappings
+        shell: pwsh
+        run: .\scripts\Generate-EffectContractMappings.ps1 -Verify
+
+      - name: Verify generated operation-support catalog
+        shell: pwsh
+        run: .\scripts\Generate-OperationSupportCatalog.ps1 -Verify
+
+      - name: Verify generated IR model
+        shell: pwsh
+        run: .\scripts\Generate-IrModel.ps1 -Verify
+
       - name: Verify generated API specification catalog
         shell: pwsh
         run: .\scripts\Generate-ApiSpecCatalog.ps1 -Verify
@@ -58,6 +86,10 @@ jobs:
       - name: Verify generated compiler artifact model
         shell: pwsh
         run: .\scripts\Generate-CompilerArtifactModel.ps1 -Verify
+
+      - name: Verify generated declarative models
+        shell: pwsh
+        run: .\scripts\Generate-DeclarativeModels.ps1 -Verify
 
       - name: Validate architecture, metadata, and size contract
         shell: pwsh

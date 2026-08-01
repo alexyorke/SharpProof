@@ -2,12 +2,16 @@ using System.Text.Json;
 namespace SharpProof.CompilerArtifact;
 internal static class CompilerLoweredArtifact
 {
+    private static readonly WorkerClaimEvidence[] ManifestEvidenceMap =
+    [
+        WorkerClaimEvidence.DirectClause,
+        WorkerClaimEvidence.ReturnAttribute,
+        WorkerClaimEvidence.CompanionClause
+    ];
+
     internal static CompilerCallableArtifact Encode(CompilerCallablePreparation preparation)
     {
-        if (preparation == null)
-        {
-            throw new ArgumentNullException(nameof(preparation));
-        }
+        preparation = ArgumentNullGuard.NotNull(preparation, nameof(preparation));
 
         if (!preparation.IsSuccess)
         {
@@ -430,13 +434,10 @@ internal static class CompilerLoweredArtifact
     }
     private static WorkerClaimEvidence ManifestEvidence(CompilerContractEvidence value)
     {
-        return value switch
-        {
-            CompilerContractEvidence.CompilerBoundInvocation => WorkerClaimEvidence.DirectClause,
-            CompilerContractEvidence.Companion => WorkerClaimEvidence.CompanionClause,
-            CompilerContractEvidence.ClosedAttribute => WorkerClaimEvidence.ReturnAttribute,
-            _ => WorkerClaimEvidence.Unspecified
-        };
+        var index = (int)value;
+        return index >= 0 && index < ManifestEvidenceMap.Length
+            ? ManifestEvidenceMap[index]
+            : WorkerClaimEvidence.Unspecified;
     }
 
     private static string PredicateSha256(IrFactory factory, CompilerPreparedClause clause)

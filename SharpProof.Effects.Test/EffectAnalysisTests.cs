@@ -1,3 +1,4 @@
+using SharpProof.Ir;
 using SharpProof.Specs;
 
 namespace SharpProof.Effects.Test;
@@ -3453,8 +3454,8 @@ public sealed class EffectAnalysisTests
                     ".ctor",
                     false,
                     0,
-                    SpecValueType.Reference,
-                    [SpecValueType.Reference],
+                    IrTypeKind.Reference,
+                    [IrTypeKind.Reference],
                     null,
                     frameworkAssemblies),
                 new ApiSpecFacets(

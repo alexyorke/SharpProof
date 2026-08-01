@@ -4,10 +4,7 @@ internal static class CompilerExceptionTypeIdentity
 {
     internal static string Encode(INamedTypeSymbol type)
     {
-        if (type == null)
-        {
-            throw new ArgumentNullException(nameof(type));
-        }
+        type = ArgumentNullGuard.NotNull(type, nameof(type));
 
         if (DocumentationCommentId.CreateReferenceId(type) is not { Length: > 0 })
         {

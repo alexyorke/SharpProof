@@ -30,12 +30,8 @@ internal sealed class ManagedAbstractFlow
         Compilation compilation,
         ResolvedApiSpecTable apiSpecs)
     {
-        if (compilation == null)
-        {
-            throw new ArgumentNullException(nameof(compilation));
-        }
-
-        _apiSpecs = apiSpecs ?? throw new ArgumentNullException(nameof(apiSpecs));
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        _apiSpecs = ArgumentNullGuard.NotNull(apiSpecs, nameof(apiSpecs));
         var contractApi = ContractApiIdentityResolver.ForCompilation(compilation);
         _contractApi = contractApi.Contract;
         _notNullAttribute = contractApi.ResolveAttribute(ContractApiMetadata.NotNull);
@@ -47,7 +43,8 @@ internal sealed class ManagedAbstractFlow
 
     internal static ManagedAbstractFlow ForCompilation(Compilation compilation)
     {
-        return Sessions.GetValue(compilation ?? throw new ArgumentNullException(nameof(compilation)), static value => new(value));
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        return Sessions.GetValue(compilation, static value => new(value));
     }
 
     internal static ManagedAbstractFlow Create(
@@ -59,10 +56,7 @@ internal sealed class ManagedAbstractFlow
 
     internal ManagedFlowState CreateEntryState(IMethodSymbol method)
     {
-        if (method == null)
-        {
-            throw new ArgumentNullException(nameof(method));
-        }
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
 
         var state = ManagedFlowState.Empty;
         foreach (var parameter in method.Parameters)
@@ -81,15 +75,8 @@ internal sealed class ManagedAbstractFlow
     internal ManagedFlowAnalysis Analyze(
         IMethodSymbol method, ControlFlowGraph graph, ManagedFlowState? entryState, CancellationToken cancellationToken)
     {
-        if (method == null)
-        {
-            throw new ArgumentNullException(nameof(method));
-        }
-
-        if (graph == null)
-        {
-            throw new ArgumentNullException(nameof(graph));
-        }
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        graph = ArgumentNullGuard.NotNull(graph, nameof(graph));
 
         var budgetReason = CheckBudget(graph, cancellationToken);
         if (budgetReason != EffectAnalysisIncompleteReason.None)
@@ -112,8 +99,8 @@ internal sealed class ManagedAbstractFlow
     internal ManagedAbstractValue Evaluate(IOperation operation, ManagedFlowState state)
     {
         return EvaluateCore(
-            operation ?? throw new ArgumentNullException(nameof(operation)),
-            state ?? throw new ArgumentNullException(nameof(state)));
+            ArgumentNullGuard.NotNull(operation, nameof(operation)),
+            ArgumentNullGuard.NotNull(state, nameof(state)));
     }
 
     internal static ManagedFlowState Refine(
@@ -292,7 +279,7 @@ internal sealed class ManagedAbstractFlow
             ? Refine(
                 state,
                 rightStorage,
-                ManagedAbstractValue.Reverse(@operator),
+                CSharpScalarSemantics.ReverseBinary(@operator),
                 leftValue,
                 expected)
             : state;
@@ -363,7 +350,9 @@ internal sealed class ManagedAbstractFlow
             return current;
         }
 
-        var normalized = expected ? @operator : ManagedAbstractValue.Negate(@operator);
+        var normalized = expected
+            ? @operator
+            : CSharpScalarSemantics.NegateBinary(@operator);
         var domain = IntervalDomain.Instance;
         var refined = normalized switch
         {
@@ -392,7 +381,9 @@ internal sealed class ManagedAbstractFlow
             return current;
         }
 
-        var normalized = expected ? @operator : ManagedAbstractValue.Negate(@operator);
+        var normalized = expected
+            ? @operator
+            : CSharpScalarSemantics.NegateBinary(@operator);
         var domain = IntervalDomain.Instance;
         var refined = interval;
         if (normalized == BinaryOperatorKind.Equals)
@@ -505,7 +496,7 @@ internal sealed class ManagedAbstractFlow
             _trustedBoundaries.AuthorizesDeclaredContracts(method))
         {
             value = ApplyAttributes(
-                ManagedAbstractValue.TopForType(type),
+                value,
                 method.GetReturnTypeAttributes());
         }
         if (method == null ||
@@ -813,7 +804,7 @@ internal sealed class ManagedAbstractFlow
         }
         return graph.Blocks
             .Where(static block => block.IsReachable)
-            .All(block => marks[block.Ordinal] != 0 || Visit(block));
+            .All(Visit);
     }
 
     private static IEnumerable<(ControlFlowBranch Branch, bool? Expected)> Successors(BasicBlock block)
@@ -966,7 +957,7 @@ internal sealed class ManagedFlowAnalysis
     internal static ManagedFlowAnalysis Complete(ManagedFlowResult result)
     {
         return new(ManagedFlowStatus.Complete, EffectAnalysisIncompleteReason.None,
-            result ?? throw new ArgumentNullException(nameof(result)));
+            ArgumentNullGuard.NotNull(result, nameof(result)));
     }
 
     internal static ManagedFlowAnalysis BudgetExceeded(EffectAnalysisIncompleteReason reason)
@@ -1024,7 +1015,7 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
             {
                 IReturnOperation { ReturnedValue: { } value } => value,
                 IExpressionStatementOperation statement => statement.Operation,
-                _ => DefiniteOperationFacts.UnwrapHarmlessValue(operation)
+                _ => operation
             };
             var unwrapped = DefiniteOperationFacts.UnwrapHarmlessValue(operation);
             if (ReferenceEquals(unwrapped, operation))
@@ -1436,51 +1427,22 @@ internal readonly record struct ManagedAbstractValue(
         return value.TryGetBoolean(out var boolean) ? Boolean(!boolean) : Unknown;
     }
 
-    internal static BinaryOperatorKind Reverse(BinaryOperatorKind @operator)
-    {
-        return @operator switch
-        {
-            BinaryOperatorKind.LessThan => BinaryOperatorKind.GreaterThan,
-            BinaryOperatorKind.LessThanOrEqual => BinaryOperatorKind.GreaterThanOrEqual,
-            BinaryOperatorKind.GreaterThan => BinaryOperatorKind.LessThan,
-            BinaryOperatorKind.GreaterThanOrEqual => BinaryOperatorKind.LessThanOrEqual,
-            _ => @operator
-        };
-    }
-
-    internal static BinaryOperatorKind ReverseComparison(BinaryOperatorKind @operator)
-    {
-        return Reverse(@operator);
-    }
-
-    internal static BinaryOperatorKind Negate(BinaryOperatorKind @operator)
-    {
-        return @operator switch
-        {
-            BinaryOperatorKind.Equals => BinaryOperatorKind.NotEquals,
-            BinaryOperatorKind.NotEquals => BinaryOperatorKind.Equals,
-            BinaryOperatorKind.LessThan => BinaryOperatorKind.GreaterThanOrEqual,
-            BinaryOperatorKind.LessThanOrEqual => BinaryOperatorKind.GreaterThan,
-            BinaryOperatorKind.GreaterThan => BinaryOperatorKind.LessThanOrEqual,
-            BinaryOperatorKind.GreaterThanOrEqual => BinaryOperatorKind.LessThan,
-            _ => @operator
-        };
-    }
-
     internal static bool TryArithmetic(
         BinaryOperatorKind @operator, IntervalValue left, IntervalValue right, out IntervalValue result)
     {
         result = IntervalValue.Top;
-        if (!left.LowerBound.HasValue || !left.UpperBound.HasValue ||
-            !right.LowerBound.HasValue || !right.UpperBound.HasValue)
+        if (left.LowerBound is not { } leftMinimum ||
+            left.UpperBound is not { } leftMaximum ||
+            right.LowerBound is not { } rightMinimum ||
+            right.UpperBound is not { } rightMaximum)
         {
             return false;
         }
 
-        var a = new BigInteger(left.LowerBound.Value);
-        var b = new BigInteger(left.UpperBound.Value);
-        var c = new BigInteger(right.LowerBound.Value);
-        var d = new BigInteger(right.UpperBound.Value);
+        var a = new BigInteger(leftMinimum);
+        var b = new BigInteger(leftMaximum);
+        var c = new BigInteger(rightMinimum);
+        var d = new BigInteger(rightMaximum);
         BigInteger[]? bounds = @operator switch
         {
             BinaryOperatorKind.Add => [a + c, b + d],
@@ -1722,7 +1684,9 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         return invocation.TargetMethod is
         {
             IsStatic: true,
-            Name: "Requires" or "Ensures" or "Assume"
+            Name: ContractApiCatalog.RequiresMethodName or
+                ContractApiCatalog.EnsuresMethodName or
+                ContractApiCatalog.AssumeMethodName
         } method &&
         _contractApi != null &&
         SymbolEqualityComparer.Default.Equals(method.ContainingType.OriginalDefinition, _contractApi.OriginalDefinition) &&

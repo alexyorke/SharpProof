@@ -1,0 +1,988 @@
+{
+  "schema": "SharpProof.DeclarativeModels",
+  "schemaVersion": 1,
+  "outputs": [
+    {
+      "path": "SharpProof.Analyzer/DeclarativeModels.generated.cs",
+      "namespace": "SharpProof.Analyzer",
+      "records": [
+        {
+          "kind": "record",
+          "accessibility": "internal",
+          "modifiers": ["sealed"],
+          "name": "EffectClaimEvaluation",
+          "parameters": [
+            {"type": "EffectEvaluationContractKind", "name": "Kind"},
+            {"type": "ImmutableArray<AttributeData>", "name": "Attributes"},
+            {"type": "EffectEvaluationOutcome", "name": "Outcome"},
+            {"type": "EffectEvaluationReason", "name": "Reason"},
+            {"type": "EffectEvaluationCertainty", "name": "Certainty"},
+            {"type": "string", "name": "Evidence"},
+            {"type": "EffectDirectWitness?", "name": "Witness"},
+            {"type": "EffectClaimConstraint", "name": "Constraint"},
+            {"type": "DiagnosticDescriptor?", "name": "Diagnostic"},
+            {"type": "Location", "name": "DiagnosticLocation"},
+            {"type": "object[]", "name": "DiagnosticArguments"}
+          ]
+        },
+        {
+          "kind": "record",
+          "accessibility": "internal",
+          "modifiers": ["sealed"],
+          "name": "EffectClaimConstraint",
+          "parameters": [
+            {"type": "EffectContractKind", "name": "Effects"},
+            {"type": "EffectContractCapabilityKind", "name": "Capabilities"},
+            {"type": "ImmutableArray<INamedTypeSymbol>", "name": "ExceptionTypes"}
+          ]
+        },
+        {
+          "kind": "recordStruct",
+          "accessibility": "internal",
+          "modifiers": ["readonly"],
+          "name": "LanguageSubsetDecision",
+          "parameters": [
+            {"type": "bool", "name": "IsSupported"},
+            {"type": "LanguageSubsetAbstentionReason", "name": "Reason"},
+            {"type": "OperationKind?", "name": "OperationKind"}
+          ]
+        },
+        {
+          "kind": "recordStruct",
+          "accessibility": "internal",
+          "modifiers": ["readonly"],
+          "name": "RequiresCallSiteCandidate",
+          "parameters": [
+            {"type": "IOperation", "name": "Operation"},
+            {"type": "IMethodSymbol", "name": "TargetMethod"},
+            {"type": "IOperation?", "name": "Instance"},
+            {"type": "ImmutableArray<IArgumentOperation>", "name": "Arguments"},
+            {"type": "bool", "name": "CanReplay"},
+            {"type": "ManagedFlowResult?", "name": "Flow"},
+            {"type": "ManagedFlowStatus", "name": "FlowStatus"}
+          ]
+        }
+      ],
+      "containers": [
+        {
+          "types": [
+            {"kind": "class", "accessibility": "public", "modifiers": ["sealed"], "name": "SharpProofAnalyzer"}
+          ],
+          "records": [
+            {
+              "kind": "recordStruct",
+              "accessibility": "private",
+              "modifiers": ["readonly"],
+              "name": "AdvisoryActivation",
+              "parameters": [
+                {"type": "bool", "name": "RequiresSymbolAnalysis"},
+                {"type": "bool", "name": "RequiresOperationAnalysis"},
+                {"type": "bool", "name": "RequiresFullOperationAnalysis"}
+              ]
+            }
+          ]
+        },
+        {
+          "types": [
+            {"kind": "class", "accessibility": "internal", "modifiers": ["static"], "name": "AnalyzerFeaturePipeline"}
+          ],
+          "records": [
+            {
+              "kind": "recordStruct",
+              "accessibility": "private",
+              "modifiers": ["readonly"],
+              "name": "MethodSelection",
+              "parameters": [
+                {"type": "ContractSelectionFeatures", "name": "Features"},
+                {"type": "bool", "name": "IsSuppressed"}
+              ]
+            }
+          ]
+        },
+        {
+          "types": [
+            {"kind": "class", "accessibility": "internal", "modifiers": ["static"], "name": "RequiresCallSiteAnalyzer"}
+          ],
+          "records": [
+            {
+              "kind": "recordStruct",
+              "accessibility": "private",
+              "modifiers": ["readonly"],
+              "name": "ClauseEvaluation",
+              "parameters": [
+                {"type": "bool?", "name": "Value"},
+                {"type": "IrTerm", "name": "Condition"}
+              ]
+            }
+          ]
+        },
+        {
+          "types": [
+            {"kind": "class", "accessibility": "internal", "modifiers": ["sealed"], "name": "RequiresCallSiteDiscovery"}
+          ],
+          "records": [
+            {
+              "kind": "recordStruct",
+              "accessibility": "private",
+              "modifiers": ["readonly"],
+              "name": "RequiresCallTarget",
+              "parameters": [
+                {"type": "IMethodSymbol", "name": "TargetMethod"},
+                {"type": "IOperation?", "name": "Instance"},
+                {"type": "ImmutableArray<IArgumentOperation>", "name": "Arguments"}
+              ]
+            }
+          ]
+        },
+        {
+          "types": [
+            {"kind": "class", "accessibility": "internal", "modifiers": ["static"], "name": "RequiresCallSiteTreeAnalyzer"}
+          ],
+          "records": [
+            {
+              "kind": "recordStruct",
+              "accessibility": "private",
+              "modifiers": ["readonly"],
+              "name": "NestedCallable",
+              "parameters": [
+                {"type": "IMethodSymbol", "name": "Method"},
+                {"type": "SyntaxNode", "name": "Declaration"},
+                {"type": "IFlowAnonymousFunctionOperation?", "name": "AnonymousFunction"},
+                {"type": "bool", "name": "IsExpressionTree"}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "SharpProof.CompilerCollector/CompilerArtifact/DeclarativeModels.generated.cs",
+      "namespace": "SharpProof.CompilerArtifact",
+      "records": [
+        {
+          "kind": "record",
+          "accessibility": "internal",
+          "modifiers": ["sealed"],
+          "name": "ClaimManifestBuildResult",
+          "parameters": [
+            {"type": "WorkerClaimManifest", "name": "Manifest"},
+            {"type": "ImmutableDictionary<IMethodSymbol, ManifestCallableTarget>", "name": "Targets"}
+          ]
+        },
+        {
+          "kind": "record",
+          "accessibility": "internal",
+          "modifiers": ["sealed"],
+          "name": "ManifestCallableTarget",
+          "parameters": [
+            {"type": "IMethodSymbol", "name": "Method"},
+            {"type": "SyntaxNode?", "name": "Declaration"},
+            {"type": "SemanticModel?", "name": "SemanticModel"},
+            {"type": "WorkerCallableManifestEntry", "name": "Entry"},
+            {"type": "ImmutableArray<ManifestClaim>", "name": "Claims"},
+            {"type": "ImmutableArray<ManifestEffectClaim>", "name": "EffectClaims"},
+            {"type": "bool", "name": "IsVerifierSupported"}
+          ]
+        },
+        {
+          "kind": "record",
+          "accessibility": "internal",
+          "modifiers": ["sealed"],
+          "name": "ManifestClaim",
+          "parameters": [
+            {"type": "WorkerClaimManifestEntry", "name": "Entry"},
+            {"type": "IInvocationOperation?", "name": "SourceOperation"},
+            {"type": "AttributeData?", "name": "SourceAttribute"},
+            {"type": "ContractClausePlacement?", "name": "Placement"}
+          ]
+        },
+        {
+          "kind": "record",
+          "accessibility": "internal",
+          "modifiers": ["sealed"],
+          "name": "ManifestEffectClaim",
+          "parameters": [
+            {"type": "WorkerClaimManifestEntry", "name": "Entry"},
+            {"type": "CompilerEffectClaimArtifact", "name": "Evidence"}
+          ]
+        }
+      ],
+      "containers": [
+        {
+          "types": [
+            {"kind": "class", "accessibility": "internal", "modifiers": ["sealed"], "name": "ClaimManifestBuilder"}
+          ],
+          "records": [
+            {
+              "kind": "recordStruct",
+              "accessibility": "private",
+              "modifiers": ["readonly"],
+              "name": "ClaimCandidate",
+              "parameters": [
+                {"type": "string", "name": "Fingerprint"},
+                {"type": "Location", "name": "Location"},
+                {"type": "WorkerClaimEvidence", "name": "Evidence"},
+                {"type": "IInvocationOperation?", "name": "Operation"},
+                {"type": "AttributeData?", "name": "Attribute"},
+                {"type": "ContractClausePlacement?", "name": "Placement"}
+              ]
+            },
+            {
+              "kind": "recordStruct",
+              "accessibility": "private",
+              "modifiers": ["readonly"],
+              "name": "AssumptionCandidate",
+              "parameters": [
+                {"type": "WorkerAssumptionKind", "name": "Kind"},
+                {"type": "string", "name": "Fingerprint"}
+              ]
+            },
+            {
+              "kind": "recordStruct",
+              "accessibility": "private",
+              "modifiers": ["readonly"],
+              "name": "CallableSeed",
+              "parameters": [
+                {"type": "IMethodSymbol", "name": "Method"},
+                {"type": "SyntaxNode?", "name": "Declaration"},
+                {"type": "SemanticModel?", "name": "Model"}
+              ]
+            }
+          ]
+        },
+        {
+          "types": [
+            {"kind": "class", "accessibility": "internal", "modifiers": ["static"], "name": "SemanticClaimIdentity"}
+          ],
+          "records": [
+            {
+              "kind": "recordStruct",
+              "accessibility": "private",
+              "modifiers": ["readonly"],
+              "name": "ClaimIdentityContext",
+              "parameters": [
+                {"type": "IMethodSymbol", "name": "Target"},
+                {"type": "IMethodSymbol", "name": "Source"},
+                {"type": "bool", "name": "UsesCompanion"}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "SharpProof.Specs/DeclarativeModels.generated.cs",
+      "namespace": "SharpProof.Specs",
+      "records": [
+        {
+          "kind": "record",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "SpecInstantiationFailure",
+          "parameters": [
+            {"type": "SpecInstantiationFailureKind", "name": "Kind"},
+            {"type": "SpecVarId?", "name": "Variable"},
+            {"type": "string", "name": "Detail"}
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "kind": "class",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "SpecInstantiationResult",
+          "constructor": {
+            "accessibility": "private",
+            "parameters": [
+              {"type": "SpecInstantiationStatus", "name": "status"},
+              {"type": "ImmutableArray<IrTerm>", "name": "postconditions"},
+              {"type": "SpecInstantiationFailure?", "name": "failure"}
+            ],
+            "assignments": [
+              {"property": "Status", "parameter": "status"},
+              {"property": "Postconditions", "parameter": "postconditions"},
+              {"property": "Failure", "parameter": "failure"}
+            ]
+          },
+          "properties": [
+            {"accessibility": "public", "type": "SpecInstantiationStatus", "name": "Status"},
+            {"accessibility": "public", "type": "ImmutableArray<IrTerm>", "name": "Postconditions"},
+            {"accessibility": "public", "type": "SpecInstantiationFailure?", "name": "Failure"}
+          ]
+        }
+      ],
+      "containers": [
+        {
+          "types": [
+            {"kind": "class", "accessibility": "public", "modifiers": ["static"], "name": "ApiSpecInstantiator"},
+            {"kind": "class", "accessibility": "private", "modifiers": ["sealed"], "name": "Instantiation"}
+          ],
+          "records": [
+            {
+              "kind": "recordStruct",
+              "accessibility": "internal",
+              "modifiers": ["readonly"],
+              "name": "TermResult",
+              "parameters": [
+                {"type": "IrTerm?", "name": "Term"},
+                {"type": "SpecInstantiationFailure?", "name": "Failure"}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "SharpProof.Worker/DeclarativeModels.generated.cs",
+      "namespace": "SharpProof.Worker",
+      "records": [
+        {
+          "kind": "record",
+          "accessibility": "internal",
+          "modifiers": ["sealed"],
+          "name": "WorkerInputSnapshot",
+          "parameters": [
+            {"type": "CompilerManifestArtifact", "name": "CompilerManifest"},
+            {"type": "string", "name": "InputHash"}
+          ]
+        },
+        {
+          "kind": "record",
+          "accessibility": "internal",
+          "modifiers": ["sealed"],
+          "name": "CallableEntryFeasibility",
+          "parameters": [
+            {"type": "CallableEntryFeasibilityKind", "name": "Kind"},
+            {"type": "WorkerClaimReason", "name": "Reason"},
+            {"type": "ImmutableArray<string>", "name": "ProofCore"},
+            {"type": "ImmutableHashSet<string>", "name": "UsedAssumptionIds"}
+          ]
+        },
+        {
+          "kind": "record",
+          "accessibility": "internal",
+          "modifiers": ["sealed"],
+          "name": "CallableEntryEvidence",
+          "parameters": [
+            {"type": "ImmutableArray<Assumption>", "name": "Assumptions"},
+            {"type": "IReadOnlyDictionary<ProofJustification, string>", "name": "Labels"},
+            {"type": "IReadOnlyDictionary<ProofJustification, string>", "name": "AssumptionIds"},
+            {"type": "ImmutableArray<IrVarId>", "name": "ReplayVariables"},
+            {"type": "bool", "name": "HasNontrivialPrecondition"}
+          ]
+        },
+        {
+          "kind": "recordStruct",
+          "accessibility": "internal",
+          "modifiers": ["readonly"],
+          "name": "CallableEntryEvidenceBuildResult",
+          "parameters": [
+            {"type": "CallableEntryEvidence?", "name": "Evidence"},
+            {"type": "WorkerClaimReason", "name": "FailureReason"}
+          ]
+        },
+        {
+          "kind": "record",
+          "accessibility": "internal",
+          "modifiers": ["sealed"],
+          "name": "CallableProofVerification",
+          "parameters": [
+            {"type": "ImmutableArray<WorkerClaimResult>", "name": "Postconditions"},
+            {"type": "CallableEntryFeasibility", "name": "EntryFeasibility"}
+          ]
+        },
+        {
+          "kind": "record",
+          "accessibility": "internal",
+          "modifiers": ["sealed"],
+          "name": "CallableEvidence",
+          "parameters": [
+            {"type": "ImmutableArray<Assumption>", "name": "Assumptions"},
+            {"type": "ImmutableArray<Assumption>", "name": "Preconditions"},
+            {"type": "ImmutableArray<Assumption>", "name": "EntryDomainAssumptions"},
+            {"type": "IReadOnlyDictionary<ProofJustification, string>", "name": "AssumptionLabels"},
+            {"type": "IReadOnlyDictionary<ProofJustification, string>", "name": "UserAssumptionIds"},
+            {"type": "IrTerm", "name": "NormalCompletion"},
+            {"type": "ImmutableArray<IrVarId>", "name": "ReplayVariables"},
+            {"type": "bool", "name": "UsesSupportedDomain"}
+          ]
+        },
+        {
+          "kind": "recordStruct",
+          "accessibility": "internal",
+          "modifiers": ["readonly"],
+          "name": "CallableEvidenceBuildResult",
+          "parameters": [
+            {"type": "CallableEvidence?", "name": "Evidence"},
+            {"type": "WorkerClaimReason", "name": "FailureReason"}
+          ]
+        },
+        {
+          "kind": "record",
+          "accessibility": "internal",
+          "modifiers": ["sealed"],
+          "name": "CallableVerificationResult",
+          "parameters": [
+            {"type": "WorkerCallableResult", "name": "Callable"},
+            {"type": "ImmutableArray<WorkerClaimResult>", "name": "Claims"}
+          ]
+        },
+        {
+          "kind": "record",
+          "accessibility": "internal",
+          "modifiers": ["sealed"],
+          "name": "SymbolicBodyExecution",
+          "parameters": [
+            {"type": "WorkerClaimReason", "name": "Reason"},
+            {"type": "ImmutableArray<SymbolicReturn>", "name": "Returns"},
+            {"type": "ImmutableDictionary<IrVarId, SpecResultProjection>", "name": "SpecResultProjections"},
+            {"type": "ImmutableArray<GuardedBodySpecAssumption>", "name": "SpecAssumptions"}
+          ]
+        },
+        {
+          "kind": "recordStruct",
+          "accessibility": "internal",
+          "modifiers": ["readonly"],
+          "name": "SymbolicReturn",
+          "parameters": [
+            {"type": "IrTerm", "name": "Predicate"},
+            {"type": "IrTerm?", "name": "ReturnTerm"},
+            {"type": "ImmutableDictionary<IrVarId, IrTerm>", "name": "CurrentStates"}
+          ]
+        },
+        {
+          "kind": "recordStruct",
+          "accessibility": "internal",
+          "modifiers": ["readonly"],
+          "name": "GuardedBodySpecAssumption",
+          "parameters": [
+            {"type": "SpecId", "name": "Spec"},
+            {"type": "string", "name": "WitnessIdentifier"},
+            {"type": "IrTerm", "name": "Guard"},
+            {"type": "IrTerm", "name": "Predicate"}
+          ]
+        },
+        {
+          "kind": "recordStruct",
+          "accessibility": "internal",
+          "modifiers": ["readonly"],
+          "name": "SpecResultProjection",
+          "parameters": [
+            {"type": "IrVarId?", "name": "NonNullVariable"},
+            {"type": "IrVarId?", "name": "LengthVariable"}
+          ]
+        }
+      ],
+      "containers": [
+        {
+          "types": [
+            {"kind": "class", "accessibility": "internal", "modifiers": ["sealed"], "name": "AcyclicBlockPredicateExecutor"},
+            {"kind": "class", "accessibility": "private", "modifiers": ["sealed"], "name": "Run"}
+          ],
+          "records": [
+            {
+              "kind": "recordStruct",
+              "accessibility": "private",
+              "modifiers": ["readonly"],
+              "name": "FlowState",
+              "parameters": [
+                {"type": "int", "name": "Order"},
+                {"type": "IrTerm", "name": "Predicate"},
+                {"type": "ImmutableDictionary<IrVarId, IrTerm>", "name": "Environment"}
+              ]
+            },
+            {
+              "kind": "recordStruct",
+              "accessibility": "private",
+              "modifiers": ["readonly"],
+              "name": "SpecApplication",
+              "parameters": [
+                {"type": "IrTerm", "name": "Result"},
+                {"type": "IrTerm", "name": "Predicate"},
+                {"type": "bool", "name": "ConsumesMemoryHavoc"}
+              ]
+            }
+          ]
+        },
+        {
+          "types": [
+            {"kind": "class", "accessibility": "internal", "modifiers": ["sealed"], "name": "VerificationCache"}
+          ],
+          "records": [
+            {
+              "kind": "record",
+              "accessibility": "private",
+              "modifiers": ["sealed"],
+              "name": "CacheEnvelope",
+              "parameters": [
+                {"type": "int", "name": "SchemaVersion"},
+                {"type": "string", "name": "InputHash"},
+                {"type": "string", "name": "PayloadHash"},
+                {"type": "string", "name": "Payload"}
+              ]
+            },
+            {
+              "kind": "record",
+              "accessibility": "private",
+              "modifiers": ["sealed"],
+              "name": "CachePayload",
+              "parameters": [
+                {"type": "string", "name": "ManifestHash"},
+                {"type": "WorkerCallableResult[]", "name": "CallableResults"},
+                {"type": "WorkerClaimResult[]", "name": "ClaimResults"}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "SharpProof.Contracts/DeclarativeModels.generated.cs",
+      "namespace": "SharpProof.Contracts",
+      "records": [],
+      "classes": [
+        {
+          "kind": "class",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "ContractClauseOccurrence",
+          "constructor": {
+            "accessibility": "internal",
+            "parameters": [
+              {"type": "BoundContractKind", "name": "kind"},
+              {"type": "ContractClausePlacement", "name": "placement"},
+              {"type": "int", "name": "ordinal"},
+              {"type": "int", "name": "sourceOrdinal"},
+              {"type": "IInvocationOperation", "name": "invocation"}
+            ],
+            "assignments": [
+              {"property": "Kind", "parameter": "kind"},
+              {"property": "Placement", "parameter": "placement"},
+              {"property": "Ordinal", "parameter": "ordinal"},
+              {"property": "SourceOrdinal", "parameter": "sourceOrdinal"},
+              {"property": "Invocation", "parameter": "invocation"}
+            ]
+          },
+          "properties": [
+            {"accessibility": "public", "type": "BoundContractKind", "name": "Kind"},
+            {"accessibility": "public", "type": "ContractClausePlacement", "name": "Placement"},
+            {"accessibility": "public", "type": "int", "name": "Ordinal"},
+            {"accessibility": "public", "type": "int", "name": "SourceOrdinal"},
+            {"accessibility": "public", "type": "IInvocationOperation", "name": "Invocation"}
+          ]
+        },
+        {
+          "kind": "class",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "ContractClauseInventory",
+          "constructor": {
+            "accessibility": "internal",
+            "parameters": [
+              {"type": "IMethodSymbol", "name": "callable"},
+              {"type": "bool", "name": "contractApiAvailable"},
+              {"type": "bool", "name": "hasRejectedContractApiUsage"},
+              {"type": "IOperation?", "name": "implementationBody"},
+              {"type": "ImmutableArray<ContractClauseOccurrence>", "name": "clauses"}
+            ],
+            "assignments": [
+              {"property": "Callable", "parameter": "callable"},
+              {"property": "ContractApiAvailable", "parameter": "contractApiAvailable"},
+              {"property": "HasRejectedContractApiUsage", "parameter": "hasRejectedContractApiUsage"},
+              {"property": "ImplementationBody", "parameter": "implementationBody"},
+              {"property": "Clauses", "parameter": "clauses"}
+            ]
+          },
+          "properties": [
+            {"accessibility": "public", "type": "IMethodSymbol", "name": "Callable"},
+            {"accessibility": "public", "type": "bool", "name": "ContractApiAvailable"},
+            {"accessibility": "public", "type": "bool", "name": "HasRejectedContractApiUsage"},
+            {"accessibility": "public", "type": "IOperation?", "name": "ImplementationBody"},
+            {"accessibility": "public", "type": "ImmutableArray<ContractClauseOccurrence>", "name": "Clauses"}
+          ]
+        },
+        {
+          "kind": "class",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "ContractBindingResult",
+          "constructor": {
+            "accessibility": "private",
+            "parameters": [
+              {"type": "BoundMethodContracts?", "name": "contracts"},
+              {"type": "ContractBindingFailure", "name": "failure"}
+            ],
+            "assignments": [
+              {"property": "Contracts", "parameter": "contracts"},
+              {"property": "Failure", "parameter": "failure"}
+            ]
+          },
+          "properties": [
+            {"accessibility": "public", "type": "BoundMethodContracts?", "name": "Contracts"},
+            {"accessibility": "public", "type": "ContractBindingFailure", "name": "Failure"}
+          ]
+        }
+      ],
+      "containers": []
+    },
+    {
+      "path": "SharpProof.Contracts/EffectiveContractModels.generated.cs",
+      "namespace": "SharpProof.Contracts",
+      "records": [],
+      "classes": [
+        {
+          "kind": "class",
+          "accessibility": "internal",
+          "modifiers": ["sealed"],
+          "name": "EffectiveContractSourceResolution",
+          "constructor": {
+            "accessibility": "internal",
+            "parameters": [
+              {"type": "IMethodSymbol", "name": "source"},
+              {"type": "ContractClauseInventory", "name": "directInventory"},
+              {"type": "ContractClauseInventory", "name": "inventory"},
+              {"type": "bool", "name": "usesCompanion"},
+              {"type": "ContractBindingFailure", "name": "failure"}
+            ],
+            "assignments": [
+              {"property": "Source", "parameter": "source"},
+              {"property": "DirectInventory", "parameter": "directInventory"},
+              {"property": "Inventory", "parameter": "inventory"},
+              {"property": "UsesCompanion", "parameter": "usesCompanion"},
+              {"property": "Failure", "parameter": "failure"}
+            ]
+          },
+          "properties": [
+            {"accessibility": "internal", "type": "IMethodSymbol", "name": "Source"},
+            {"accessibility": "internal", "type": "ContractClauseInventory", "name": "DirectInventory"},
+            {"accessibility": "internal", "type": "ContractClauseInventory", "name": "Inventory"},
+            {"accessibility": "internal", "type": "bool", "name": "UsesCompanion"},
+            {"accessibility": "internal", "type": "ContractBindingFailure", "name": "Failure"}
+          ]
+        }
+      ],
+      "containers": []
+    },
+    {
+      "path": "SharpProof.Effects/EffectResultModels.generated.cs",
+      "namespace": "SharpProof.Effects",
+      "records": [],
+      "classes": [
+        {
+          "kind": "class",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "EffectMethodResult",
+          "constructor": {
+            "accessibility": "internal",
+            "parameters": [
+              {"type": "IMethodSymbol", "name": "method"},
+              {"type": "EffectSummary", "name": "summary"},
+              {"type": "EffectProjection", "name": "projection"},
+              {"type": "ImmutableArray<EffectDirectWitness>", "name": "directWitnesses"}
+            ],
+            "assignments": [
+              {"property": "Method", "parameter": "method"},
+              {"property": "Summary", "parameter": "summary"},
+              {"property": "Projection", "parameter": "projection"},
+              {"property": "DirectWitnesses", "parameter": "directWitnesses"}
+            ]
+          },
+          "properties": [
+            {"accessibility": "public", "type": "IMethodSymbol", "name": "Method"},
+            {"accessibility": "public", "type": "EffectSummary", "name": "Summary"},
+            {"accessibility": "public", "type": "EffectProjection", "name": "Projection"},
+            {"accessibility": "internal", "type": "ImmutableArray<EffectDirectWitness>", "name": "DirectWitnesses"}
+          ]
+        }
+      ],
+      "containers": []
+    },
+    {
+      "path": "SharpProof.Effects/ApiSpecResolutionModels.generated.cs",
+      "namespace": "SharpProof.Specs",
+      "records": [
+        {
+          "kind": "record",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "ApiSpecResolutionFailure",
+          "parameters": [
+            {"type": "SpecId", "name": "Spec"},
+            {"type": "string", "name": "WitnessIdentifier"},
+            {"type": "ApiSpecResolutionFailureKind", "name": "Kind"},
+            {"type": "string", "name": "Detail"}
+          ]
+        },
+        {
+          "kind": "record",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "ResolvedApiSpec",
+          "parameters": [
+            {"type": "ApiSpecTemplate", "name": "Template"},
+            {"type": "ISymbol", "name": "Symbol"}
+          ]
+        },
+        {
+          "kind": "record",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "ApiSpecLookupFailure",
+          "parameters": [
+            {"type": "ApiSpecLookupFailureKind", "name": "Kind"},
+            {"type": "string", "name": "SymbolIdentifier"},
+            {"type": "string", "name": "Detail"}
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "kind": "class",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "ApiSpecLookupResult",
+          "constructor": {
+            "accessibility": "public",
+            "parameters": [
+              {"type": "ApiSpecLookupStatus", "name": "status"},
+              {"type": "ResolvedApiSpec?", "name": "spec"},
+              {"type": "ApiSpecLookupFailure?", "name": "failure"}
+            ],
+            "assignments": [
+              {"property": "Status", "parameter": "status"},
+              {"property": "Spec", "parameter": "spec"},
+              {"property": "Failure", "parameter": "failure"}
+            ]
+          },
+          "properties": [
+            {"accessibility": "public", "type": "ApiSpecLookupStatus", "name": "Status"},
+            {"accessibility": "public", "type": "ResolvedApiSpec?", "name": "Spec"},
+            {"accessibility": "public", "type": "ApiSpecLookupFailure?", "name": "Failure"}
+          ]
+        }
+      ],
+      "containers": []
+    },
+    {
+      "path": "SharpProof.Frontend/DeclarativeModels.generated.cs",
+      "namespace": "SharpProof.Frontend",
+      "records": [],
+      "classes": [
+        {
+          "kind": "class",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "FrontendLoweringResult",
+          "storageTag": true,
+          "constructor": {
+            "accessibility": "internal",
+            "parameters": [
+              {"type": "IrTerm", "name": "term"},
+              {"type": "FrontendSubsetClassification", "name": "classification"},
+              {"type": "ImmutableArray<FrontendVariableBinding>", "name": "variables"}
+            ],
+            "assignments": [
+              {"property": "Term", "parameter": "term"},
+              {"property": "Classification", "parameter": "classification"},
+              {"property": "Variables", "parameter": "variables"}
+            ]
+          },
+          "properties": [
+            {"accessibility": "public", "type": "IrTerm", "name": "Term"},
+            {"accessibility": "public", "type": "FrontendSubsetClassification", "name": "Classification"},
+            {"accessibility": "public", "type": "ImmutableArray<FrontendVariableBinding>", "name": "Variables"}
+          ]
+        },
+        {
+          "kind": "class",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "FrontendProgramLoweringResult",
+          "storageTag": true,
+          "constructor": {
+            "accessibility": "internal",
+            "parameters": [
+              {"type": "IrProgram", "name": "program"},
+              {"type": "FrontendSubsetClassification", "name": "classification"},
+              {"type": "ImmutableArray<FrontendVariableBinding>", "name": "variables"},
+              {"type": "ImmutableArray<IrVarId>", "name": "captures"},
+              {"type": "ImmutableArray<FrontendProgramAbstention>", "name": "abstentions"}
+            ],
+            "assignments": [
+              {"property": "Program", "parameter": "program"},
+              {"property": "Classification", "parameter": "classification"},
+              {"property": "Variables", "parameter": "variables"},
+              {"property": "Captures", "parameter": "captures"},
+              {"property": "Abstentions", "parameter": "abstentions"}
+            ]
+          },
+          "properties": [
+            {"accessibility": "public", "type": "IrProgram", "name": "Program"},
+            {"accessibility": "public", "type": "FrontendSubsetClassification", "name": "Classification"},
+            {"accessibility": "public", "type": "ImmutableArray<FrontendVariableBinding>", "name": "Variables"},
+            {"accessibility": "public", "type": "ImmutableArray<IrVarId>", "name": "Captures"},
+            {"accessibility": "public", "type": "ImmutableArray<FrontendProgramAbstention>", "name": "Abstentions"}
+          ]
+        }
+      ],
+      "containers": []
+    },
+    {
+      "path": "SharpProof.Verify/DeclarativeModels.generated.cs",
+      "namespace": "SharpProof.Verify",
+      "records": [],
+      "classes": [
+        {
+          "kind": "class",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "BackendModel",
+          "storageTag": true,
+          "constructor": {
+            "accessibility": "internal",
+            "parameters": [
+              {"type": "ImmutableDictionary<IrVarId, IrValue>", "name": "assignments"}
+            ],
+            "assignments": [
+              {"property": "Assignments", "parameter": "assignments"}
+            ]
+          },
+          "properties": [
+            {"accessibility": "public", "type": "ImmutableDictionary<IrVarId, IrValue>", "name": "Assignments"}
+          ]
+        },
+        {
+          "kind": "class",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "Goal",
+          "storageTag": true,
+          "constructor": {
+            "accessibility": "internal",
+            "parameters": [
+              {"type": "IrTerm", "name": "predicate"},
+              {"type": "ProofDiagnosticKind", "name": "diagnostic"},
+              {"type": "SourceLocationId", "name": "location"}
+            ],
+            "assignments": [
+              {"property": "Predicate", "parameter": "predicate"},
+              {"property": "Diagnostic", "parameter": "diagnostic"},
+              {"property": "Location", "parameter": "location"}
+            ]
+          },
+          "properties": [
+            {"accessibility": "public", "type": "IrTerm", "name": "Predicate"},
+            {"accessibility": "public", "type": "ProofDiagnosticKind", "name": "Diagnostic"},
+            {"accessibility": "public", "type": "SourceLocationId", "name": "Location"}
+          ]
+        },
+        {
+          "kind": "class",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "BackendCheckResult",
+          "storageTag": true,
+          "constructor": {
+            "accessibility": "internal",
+            "parameters": [
+              {"type": "BackendCheckStatus", "name": "status"},
+              {"type": "ImmutableArray<int>", "name": "unsatCore"},
+              {"type": "BackendModel?", "name": "model"},
+              {"type": "BackendFailureReason", "name": "failureReason"}
+            ],
+            "assignments": [
+              {"property": "Status", "parameter": "status"},
+              {"property": "UnsatCore", "parameter": "unsatCore"},
+              {"property": "Model", "parameter": "model"},
+              {"property": "FailureReason", "parameter": "failureReason"}
+            ]
+          },
+          "properties": [
+            {"accessibility": "public", "type": "BackendCheckStatus", "name": "Status"},
+            {"accessibility": "public", "type": "ImmutableArray<int>", "name": "UnsatCore"},
+            {"accessibility": "public", "type": "BackendModel?", "name": "Model"},
+            {"accessibility": "public", "type": "BackendFailureReason", "name": "FailureReason"}
+          ]
+        },
+        {
+          "kind": "class",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "ProvenOutcome",
+          "baseType": "ProofOutcome",
+          "constructor": {
+            "accessibility": "internal",
+            "parameters": [
+              {"type": "ImmutableArray<ProofJustification>", "name": "core"}
+            ],
+            "assignments": [
+              {"property": "Core", "parameter": "core"}
+            ]
+          },
+          "properties": [
+            {"accessibility": "public", "type": "ImmutableArray<ProofJustification>", "name": "Core"}
+          ]
+        },
+        {
+          "kind": "class",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "ValidatedModel",
+          "constructor": {
+            "accessibility": "internal",
+            "parameters": [
+              {"type": "ImmutableDictionary<IrVarId, IrValue>", "name": "assignments"}
+            ],
+            "assignments": [
+              {"property": "Assignments", "parameter": "assignments"}
+            ]
+          },
+          "properties": [
+            {"accessibility": "public", "type": "ImmutableDictionary<IrVarId, IrValue>", "name": "Assignments"}
+          ]
+        },
+        {
+          "kind": "class",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "RefutedOutcome",
+          "baseType": "ProofOutcome",
+          "constructor": {
+            "accessibility": "internal",
+            "parameters": [
+              {"type": "ValidatedModel", "name": "model"}
+            ],
+            "assignments": [
+              {"property": "Model", "parameter": "model"}
+            ]
+          },
+          "properties": [
+            {"accessibility": "public", "type": "ValidatedModel", "name": "Model"}
+          ]
+        },
+        {
+          "kind": "class",
+          "accessibility": "public",
+          "modifiers": ["sealed"],
+          "name": "UnknownOutcome",
+          "baseType": "ProofOutcome",
+          "constructor": {
+            "accessibility": "internal",
+            "parameters": [
+              {"type": "AbstentionReason", "name": "reason"}
+            ],
+            "assignments": [
+              {"property": "Reason", "parameter": "reason"}
+            ]
+          },
+          "properties": [
+            {"accessibility": "public", "type": "AbstentionReason", "name": "Reason"}
+          ]
+        }
+      ],
+      "containers": []
+    }
+  ]
+}

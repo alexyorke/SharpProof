@@ -14,15 +14,8 @@ internal static class CompilerArtifactInputHash
         string apiSpecVersion,
         string apiSpecContentSha256)
     {
-        if (request == null)
-        {
-            throw new ArgumentNullException(nameof(request));
-        }
-
-        if (artifactBytes == null)
-        {
-            throw new ArgumentNullException(nameof(artifactBytes));
-        }
+        request = ArgumentNullGuard.NotNull(request, nameof(request));
+        artifactBytes = ArgumentNullGuard.NotNull(artifactBytes, nameof(artifactBytes));
 
         using var hash = new CanonicalHashWriter();
         hash.Add(
@@ -139,10 +132,7 @@ internal static class CompilerManifestArtifactJson
 {
     internal static string Serialize(CompilerManifestArtifact artifact)
     {
-        if (artifact == null)
-        {
-            throw new ArgumentNullException(nameof(artifact));
-        }
+        artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
 
         WorkerProtocolJson.Canonicalize(artifact.Manifest);
         artifact.CompilerDiagnostics = [
@@ -160,10 +150,7 @@ internal static class CompilerManifestArtifactJson
 
     internal static CompilerManifestArtifact Deserialize(string json)
     {
-        if (json == null)
-        {
-            throw new ArgumentNullException(nameof(json));
-        }
+        json = ArgumentNullGuard.NotNull(json, nameof(json));
 
         var artifact = JsonSerializer.Deserialize<CompilerManifestArtifact>(
             json, WorkerProtocolJson.Options) ??

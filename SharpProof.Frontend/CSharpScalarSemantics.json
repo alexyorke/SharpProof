@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "integerConversionPolicy": "range-contained",
   "integers": [
     {
@@ -72,79 +72,105 @@
       "kind": "Add",
       "irOperator": "Add",
       "integerArithmetic": true,
-      "checkedArithmetic": true
+      "checkedArithmetic": true,
+      "reverseKind": null,
+      "negatedKind": null
     },
     {
       "kind": "Subtract",
       "irOperator": "Subtract",
       "integerArithmetic": true,
-      "checkedArithmetic": true
+      "checkedArithmetic": true,
+      "reverseKind": null,
+      "negatedKind": null
     },
     {
       "kind": "Multiply",
       "irOperator": "Multiply",
       "integerArithmetic": true,
-      "checkedArithmetic": true
+      "checkedArithmetic": true,
+      "reverseKind": null,
+      "negatedKind": null
     },
     {
       "kind": "Divide",
       "irOperator": "Divide",
       "integerArithmetic": true,
-      "checkedArithmetic": false
+      "checkedArithmetic": false,
+      "reverseKind": null,
+      "negatedKind": null
     },
     {
       "kind": "Remainder",
       "irOperator": "Remainder",
       "integerArithmetic": true,
-      "checkedArithmetic": false
+      "checkedArithmetic": false,
+      "reverseKind": null,
+      "negatedKind": null
     },
     {
       "kind": "ConditionalAnd",
       "irOperator": "AndAlso",
       "integerArithmetic": false,
-      "checkedArithmetic": false
+      "checkedArithmetic": false,
+      "reverseKind": null,
+      "negatedKind": null
     },
     {
       "kind": "ConditionalOr",
       "irOperator": "OrElse",
       "integerArithmetic": false,
-      "checkedArithmetic": false
+      "checkedArithmetic": false,
+      "reverseKind": null,
+      "negatedKind": null
     },
     {
       "kind": "Equals",
       "irOperator": "Equal",
       "integerArithmetic": false,
-      "checkedArithmetic": false
+      "checkedArithmetic": false,
+      "reverseKind": null,
+      "negatedKind": "NotEquals"
     },
     {
       "kind": "NotEquals",
       "irOperator": "NotEqual",
       "integerArithmetic": false,
-      "checkedArithmetic": false
+      "checkedArithmetic": false,
+      "reverseKind": null,
+      "negatedKind": "Equals"
     },
     {
       "kind": "LessThan",
       "irOperator": "LessThan",
       "integerArithmetic": false,
-      "checkedArithmetic": false
+      "checkedArithmetic": false,
+      "reverseKind": "GreaterThan",
+      "negatedKind": "GreaterThanOrEqual"
     },
     {
       "kind": "LessThanOrEqual",
       "irOperator": "LessThanOrEqual",
       "integerArithmetic": false,
-      "checkedArithmetic": false
+      "checkedArithmetic": false,
+      "reverseKind": "GreaterThanOrEqual",
+      "negatedKind": "GreaterThan"
     },
     {
       "kind": "GreaterThan",
       "irOperator": "GreaterThan",
       "integerArithmetic": false,
-      "checkedArithmetic": false
+      "checkedArithmetic": false,
+      "reverseKind": "LessThan",
+      "negatedKind": "LessThanOrEqual"
     },
     {
       "kind": "GreaterThanOrEqual",
       "irOperator": "GreaterThanOrEqual",
       "integerArithmetic": false,
-      "checkedArithmetic": false
+      "checkedArithmetic": false,
+      "reverseKind": "LessThanOrEqual",
+      "negatedKind": "LessThan"
     }
   ],
   "unaryOperators": [
@@ -175,6 +201,170 @@
       "kind": "Add",
       "resultType": "System_String",
       "irOperator": "StringConcat"
+    }
+  ],
+  "irTypeKinds": [
+    "Boolean",
+    "Integer",
+    "String",
+    "Reference",
+    "Sequence"
+  ],
+  "irBuiltInTypes": [
+    {
+      "kind": "Boolean",
+      "factoryProperty": "BooleanType"
+    },
+    {
+      "kind": "Integer",
+      "factoryProperty": "IntegerType"
+    },
+    {
+      "kind": "String",
+      "factoryProperty": "StringType"
+    }
+  ],
+  "nullableIrTypeKinds": [
+    "String",
+    "Reference",
+    "Sequence"
+  ],
+  "builtInSpecialTypes": [
+    {
+      "specialType": "System_Boolean",
+      "factoryProperty": "BooleanType"
+    },
+    {
+      "specialType": "System_String",
+      "factoryProperty": "StringType"
+    },
+    {
+      "specialType": "System_Object",
+      "factoryProperty": "ObjectType"
+    }
+  ],
+  "irUnaryOperators": [
+    {
+      "operator": "Not",
+      "key": 0,
+      "operandType": "Boolean",
+      "token": "!"
+    },
+    {
+      "operator": "Negate",
+      "key": 1,
+      "operandType": "Integer",
+      "token": "-"
+    }
+  ],
+  "irBinaryOperators": [
+    {
+      "operator": "Add",
+      "key": 0,
+      "operandType": "Integer",
+      "resultType": "Integer",
+      "token": "+"
+    },
+    {
+      "operator": "Subtract",
+      "key": 1,
+      "operandType": "Integer",
+      "resultType": "Integer",
+      "token": "-"
+    },
+    {
+      "operator": "Multiply",
+      "key": 2,
+      "operandType": "Integer",
+      "resultType": "Integer",
+      "token": "*"
+    },
+    {
+      "operator": "Divide",
+      "key": 3,
+      "operandType": "Integer",
+      "resultType": "Integer",
+      "token": "/"
+    },
+    {
+      "operator": "Remainder",
+      "key": 4,
+      "operandType": "Integer",
+      "resultType": "Integer",
+      "token": "%"
+    },
+    {
+      "operator": "AndAlso",
+      "key": 5,
+      "operandType": "Boolean",
+      "resultType": "Boolean",
+      "token": "&&"
+    },
+    {
+      "operator": "OrElse",
+      "key": 6,
+      "operandType": "Boolean",
+      "resultType": "Boolean",
+      "token": "||"
+    },
+    {
+      "operator": "Equal",
+      "key": 7,
+      "operandType": null,
+      "resultType": "Boolean",
+      "token": "=="
+    },
+    {
+      "operator": "NotEqual",
+      "key": 8,
+      "operandType": null,
+      "resultType": "Boolean",
+      "token": "!="
+    },
+    {
+      "operator": "LessThan",
+      "key": 9,
+      "operandType": "Integer",
+      "resultType": "Boolean",
+      "token": "<"
+    },
+    {
+      "operator": "LessThanOrEqual",
+      "key": 10,
+      "operandType": "Integer",
+      "resultType": "Boolean",
+      "token": "<="
+    },
+    {
+      "operator": "GreaterThan",
+      "key": 11,
+      "operandType": "Integer",
+      "resultType": "Boolean",
+      "token": ">"
+    },
+    {
+      "operator": "GreaterThanOrEqual",
+      "key": 12,
+      "operandType": "Integer",
+      "resultType": "Boolean",
+      "token": ">="
+    },
+    {
+      "operator": "StringConcat",
+      "key": 13,
+      "operandType": "String",
+      "resultType": "String",
+      "token": "++"
+    }
+  ],
+  "irOpaquePurities": [
+    {
+      "purity": "Pure",
+      "key": 0
+    },
+    {
+      "purity": "Impure",
+      "key": 1
     }
   ],
   "builtInEquality": {

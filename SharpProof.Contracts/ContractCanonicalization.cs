@@ -5,7 +5,7 @@ internal sealed class ContractCanonicalization(
     IrFactory factory)
 {
     private readonly Compilation _compilation =
-        compilation ?? throw new ArgumentNullException(nameof(compilation));
+        ArgumentNullGuard.NotNull(compilation, nameof(compilation));
     private readonly RoslynOperationLowerer _types = new(factory);
 
     internal Func<ITypeSymbol?, ITypeSymbol?> CreateTypeSpecializer(

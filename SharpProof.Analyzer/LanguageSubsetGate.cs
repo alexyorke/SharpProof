@@ -10,10 +10,7 @@ internal enum LanguageSubsetAbstentionReason
     UnsupportedOperationShape
 }
 
-internal readonly record struct LanguageSubsetDecision(
-    bool IsSupported,
-    LanguageSubsetAbstentionReason Reason,
-    OperationKind? OperationKind)
+internal readonly partial record struct LanguageSubsetDecision
 {
     internal static LanguageSubsetDecision Supported
     {

@@ -22,56 +22,20 @@ public abstract class ProofOutcome
     }
 }
 
-public sealed class ProvenOutcome : ProofOutcome
+public sealed partial class ProvenOutcome : ProofOutcome
 {
-    internal ProvenOutcome(ImmutableArray<ProofJustification> core)
-    {
-        Core = core;
-    }
-
-    public ImmutableArray<ProofJustification> Core
-    {
-        get;
-    }
 }
 
-public sealed class ValidatedModel
+public sealed partial class ValidatedModel
 {
-    internal ValidatedModel(ImmutableDictionary<IrVarId, IrValue> assignments)
-    {
-        Assignments = assignments;
-    }
-
-    public ImmutableDictionary<IrVarId, IrValue> Assignments
-    {
-        get;
-    }
 }
 
-public sealed class RefutedOutcome : ProofOutcome
+public sealed partial class RefutedOutcome : ProofOutcome
 {
-    internal RefutedOutcome(ValidatedModel model)
-    {
-        Model = model;
-    }
-
-    public ValidatedModel Model
-    {
-        get;
-    }
 }
 
-public sealed class UnknownOutcome : ProofOutcome
+public sealed partial class UnknownOutcome : ProofOutcome
 {
-    internal UnknownOutcome(AbstentionReason reason)
-    {
-        Reason = reason;
-    }
-
-    public AbstentionReason Reason
-    {
-        get;
-    }
 }
 
 public static class OutcomeCachePolicy

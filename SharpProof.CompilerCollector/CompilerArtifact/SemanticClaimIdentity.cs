@@ -1,6 +1,6 @@
 // Semantic claim identities are sealed by the build-time collector.
 namespace SharpProof.CompilerArtifact;
-internal static class SemanticClaimIdentity
+internal static partial class SemanticClaimIdentity
 {
     private const string ClaimDomain = "SharpProofClaim/v1";
     private const string AssumptionDomain = "SharpProofAssumption/v1";
@@ -24,11 +24,8 @@ internal static class SemanticClaimIdentity
         string prefix, string domain, string assemblyName, string callableId,
         string kind, string fingerprint, int duplicateRank)
     {
-        if (duplicateRank < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(duplicateRank));
-        }
-
+        duplicateRank = ArgumentNullGuard.RequireNonnegative(
+            duplicateRank, nameof(duplicateRank));
         using var writer = new CanonicalHashWriter();
         writer.Add(domain).Add(assemblyName).Add(callableId).Add(kind)
             .Add(fingerprint).Add(duplicateRank);
@@ -38,10 +35,7 @@ internal static class SemanticClaimIdentity
     internal static string CreateInvocationFingerprint(
         IInvocationOperation invocation, IMethodSymbol target, IMethodSymbol source, bool usesCompanion)
     {
-        if (invocation == null)
-        {
-            throw new ArgumentNullException(nameof(invocation));
-        }
+        invocation = ArgumentNullGuard.NotNull(invocation, nameof(invocation));
 
         if (invocation.Arguments.Length != 1)
         {
@@ -55,10 +49,7 @@ internal static class SemanticClaimIdentity
     internal static string CreateAttributeFingerprint(
         AttributeData attribute, IMethodSymbol target, IParameterSymbol? parameter = null)
     {
-        if (attribute == null)
-        {
-            throw new ArgumentNullException(nameof(attribute));
-        }
+        attribute = ArgumentNullGuard.NotNull(attribute, nameof(attribute));
 
         var context = new ClaimIdentityContext(target, target, false);
         using var writer = new CanonicalHashWriter();
@@ -76,15 +67,8 @@ internal static class SemanticClaimIdentity
 
     internal static string CreateTrustedFingerprint(AttributeData attribute, ISymbol scope, IMethodSymbol target)
     {
-        if (attribute == null)
-        {
-            throw new ArgumentNullException(nameof(attribute));
-        }
-
-        if (scope == null)
-        {
-            throw new ArgumentNullException(nameof(scope));
-        }
+        attribute = ArgumentNullGuard.NotNull(attribute, nameof(attribute));
+        scope = ArgumentNullGuard.NotNull(scope, nameof(scope));
 
         var context = new ClaimIdentityContext(target, target, false);
         using var writer = new CanonicalHashWriter();
@@ -97,10 +81,7 @@ internal static class SemanticClaimIdentity
 
     internal static string CreateCallableId(IMethodSymbol method)
     {
-        if (method == null)
-        {
-            throw new ArgumentNullException(nameof(method));
-        }
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
 
         method = NormalizePartial(method).OriginalDefinition;
         var documentationId = DocumentationCommentId.CreateDeclarationId(method);
@@ -117,26 +98,17 @@ internal static class SemanticClaimIdentity
     internal static string CreateNestedCallableId(
         string parentId, IMethodSymbol method, int siblingOrdinal)
     {
-        if (parentId == null)
-        {
-            throw new ArgumentNullException(nameof(parentId));
-        }
+        parentId = ArgumentNullGuard.NotNull(parentId, nameof(parentId));
 
-        if (parentId.Length == 0 || parentId.All(char.IsWhiteSpace))
+        if (string.IsNullOrWhiteSpace(parentId))
         {
             throw new ArgumentException("The value cannot be an empty string or composed entirely of whitespace.", nameof(parentId));
         }
 
-        if (method == null)
-        {
-            throw new ArgumentNullException(nameof(method));
-        }
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
 
-        if (siblingOrdinal < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(siblingOrdinal));
-        }
-
+        siblingOrdinal = ArgumentNullGuard.RequireNonnegative(
+            siblingOrdinal, nameof(siblingOrdinal));
         method = NormalizePartial(method).OriginalDefinition;
         using var writer = new CanonicalHashWriter();
         writer.Add("SharpProofCallable/v1").Add(parentId).Add(siblingOrdinal);
@@ -145,10 +117,7 @@ internal static class SemanticClaimIdentity
     }
     internal static string CreateContainerId(ISymbol symbol)
     {
-        if (symbol == null)
-        {
-            throw new ArgumentNullException(nameof(symbol));
-        }
+        symbol = ArgumentNullGuard.NotNull(symbol, nameof(symbol));
 
         var documentationId = DocumentationCommentId.CreateDeclarationId(symbol);
         if (!string.IsNullOrEmpty(documentationId))
@@ -535,6 +504,4 @@ internal static class SemanticClaimIdentity
         return left.SyntaxTree == right.SyntaxTree && left.Span == right.Span;
     }
 
-    private readonly record struct ClaimIdentityContext(
-        IMethodSymbol Target, IMethodSymbol Source, bool UsesCompanion);
 }

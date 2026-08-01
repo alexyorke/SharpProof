@@ -1,6 +1,6 @@
 namespace SharpProof.Analyzer;
 
-internal static class AnalyzerFeaturePipeline
+internal static partial class AnalyzerFeaturePipeline
 {
     internal static void AnalyzeUnselectedOperationBlock(
         OperationBlockAnalysisContext context,
@@ -330,17 +330,8 @@ internal static class AnalyzerFeaturePipeline
         ContractBindingFailure failure,
         bool isOld)
     {
-        return failure switch
-        {
-            ContractBindingFailure.NestedOld => (
-                "<nesting>", "Contract.Old cannot be nested inside Contract.Old"),
-            ContractBindingFailure.InvalidIntrinsicSignature => (
-                "<signature>",
-                isOld
-                    ? "expected exactly one value argument"
-                    : "expected a result type matching the callable return type"),
-            _ => ("<placement>", "expected use inside Contract.Ensures")
-        };
+        return AnalyzerDiagnosticCatalog.DescribeIntrinsicViolation(
+            failure, isOld);
     }
 
     private static void ReportInvalidClauses(
@@ -365,16 +356,7 @@ internal static class AnalyzerFeaturePipeline
 
     private static string DescribePlacement(ContractClausePlacement placement)
     {
-        return placement switch
-        {
-            ContractClausePlacement.Conditional =>
-                "expected an unconditional prologue statement",
-            ContractClausePlacement.Unreachable =>
-                "expected a reachable prologue statement",
-            ContractClausePlacement.Late =>
-                "expected the clause before every non-contract statement",
-            _ => "expected a direct prologue statement"
-        };
+        return AnalyzerDiagnosticCatalog.DescribePlacement(placement);
     }
 
     private static MethodSelection GetSelection(
@@ -428,9 +410,7 @@ internal static class AnalyzerFeaturePipeline
         };
     }
 
-    private readonly record struct MethodSelection(
-        ContractSelectionFeatures Features,
-        bool IsSuppressed)
+    private readonly partial record struct MethodSelection
     {
         internal bool Contracts => (Features & ContractSelectionFeatures.Contracts) != 0;
         internal bool Effects => (Features & ContractSelectionFeatures.Effects) != 0;
