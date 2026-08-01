@@ -733,6 +733,38 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task HardTimeoutReplacesWorkerOwnedMalformedOutput()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var worker = await project.CreateMalformedThenHangWorkerAsync();
+
+        var run = await project.BuildAsync(
+            verify: true,
+            ("SharpProofWorkerPath", worker),
+            ("SharpProofVerifyMethodWallTimeMilliseconds", "1"),
+            ("SharpProofVerifyProjectWallTimeMilliseconds", "100"),
+            ("SharpProofVerifyTerminationGraceMilliseconds", "1000"));
+
+        Assert.That(run.ExitCode, Is.Not.Zero, run.Output);
+        Assert.That(File.Exists(project.ResultPath), Is.True, run.Output);
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(project.ResultPath))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(run.Output, Does.Contain("ProjectTimeout"));
+            Assert.That(run.Output, Does.Not.Contain("worker.malformed_result"));
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.TimedOut));
+            Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
+            Assert.That(response.Summary.Versions.WorkerVersion,
+                Is.EqualTo("launcher"));
+            Assert.That(response.ClaimResults,
+                Has.All.Property(nameof(WorkerClaimResult.Reason))
+                    .EqualTo(WorkerClaimReason.ProjectTimeout));
+        }
+    }
+
+    [Test]
     public async Task PublicationFailureLeavesStableResultAbsent()
     {
         RequireWindowsWorker();
@@ -1763,6 +1795,57 @@ public sealed class WorkerMsBuildIntegrationTests
                 "Release",
                 "net8.0",
                 "MalformedWorker.dll");
+        }
+
+        internal async Task<string> CreateMalformedThenHangWorkerAsync()
+        {
+            var root = Path.Combine(
+                _root,
+                "obj",
+                "test-workers",
+                "malformed-hanging-worker");
+            Directory.CreateDirectory(root);
+            var project = Path.Combine(root, "MalformedHangingWorker.csproj");
+            await File.WriteAllTextAsync(
+                project,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <OutputType>Exe</OutputType>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """,
+                new System.Text.UTF8Encoding(false));
+            await File.WriteAllTextAsync(
+                Path.Combine(root, "Program.cs"),
+                """
+                using System;
+                using System.IO;
+                using System.Threading;
+                var result = args[Array.IndexOf(args, "--result") + 1];
+                var eventName = args[Array.IndexOf(args, "--start-event") + 1];
+                using var start = EventWaitHandle.OpenExisting(eventName);
+                start.WaitOne();
+                File.WriteAllText(result, "not-json");
+                Thread.Sleep(Timeout.Infinite);
+                """,
+                new System.Text.UTF8Encoding(false));
+            var build = await RunDotNetAsync([
+                "build", project, "-c", "Release", "--nologo",
+                "/nodeReuse:false", "-p:UseSharedCompilation=false"
+            ]);
+            if (build.ExitCode != 0)
+            {
+                throw new InvalidOperationException(build.Output);
+            }
+
+            return Path.Combine(
+                root,
+                "bin",
+                "Release",
+                "net8.0",
+                "MalformedHangingWorker.dll");
         }
 
         internal static ConsumerProject Create(

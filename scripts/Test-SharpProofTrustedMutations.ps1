@@ -534,6 +534,14 @@ $mutations = @(
         Mutated = 'NativeMethods.CreateNoWindow,'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~WorkerCannotReachModuleInitializerBeforeResume'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-timeout-owns-result'
+        File = 'SharpProof.Worker.Launcher\Program.cs'
+        Original = '        if (exitCode == 124)'
+        Mutated = '        if (exitCode != 124)'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~HardTimeoutReplacesWorkerOwnedMalformedOutput'
     }
 )
 

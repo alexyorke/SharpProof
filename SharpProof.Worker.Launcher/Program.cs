@@ -70,6 +70,10 @@ internal static class Program
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
                 failure.Status, failure.Reason, failure.Code, failure.Message).ConfigureAwait(false);
         }
+        if (exitCode == 124)
+        {
+            DeleteIfExists(arguments.ResultPath);
+        }
         if (!File.Exists(arguments.ResultPath))
         {
             LauncherFailure launcherFailure =
@@ -161,10 +165,12 @@ internal static class Program
         }
 
         job.Terminate(124);
-        if (!process.WaitForExit(arguments.TerminationGraceMilliseconds))
+        if (!SpinWait.SpinUntil(
+                job.HasNoActiveProcesses,
+                arguments.TerminationGraceMilliseconds))
         {
             throw new InvalidOperationException(
-                "The SharpProof worker did not terminate within its grace period.");
+                "The SharpProof worker job did not terminate within its grace period.");
         }
         return 124;
     }
@@ -683,7 +689,7 @@ internal sealed partial class WindowsJob : IDisposable
             }
         }
 
-        if (_handle == IntPtr.Zero |
+        if (_handle == IntPtr.Zero ||
             !NativeMethods.AssignProcessToJobObject(
                 _handle, processInformation.Process))
         {
@@ -709,6 +715,23 @@ internal sealed partial class WindowsJob : IDisposable
                 Marshal.GetLastWin32Error(),
                 "The SharpProof worker Job Object could not be terminated.");
         }
+    }
+
+    internal bool HasNoActiveProcesses()
+    {
+        var information = new NativeMethods.JobObjectBasicAccountingInformation();
+        var size = checked((uint)Marshal.SizeOf<
+            NativeMethods.JobObjectBasicAccountingInformation>());
+        if (_handle == IntPtr.Zero |
+            !NativeMethods.QueryInformationJobObject(
+                _handle, 1, ref information, size, IntPtr.Zero))
+        {
+            throw new System.ComponentModel.Win32Exception(
+                Marshal.GetLastWin32Error(),
+                "The SharpProof worker Job Object state is unavailable.");
+        }
+
+        return information.ActiveProcesses == 0;
     }
 
     private static string QuoteCommandLineArgument(string argument)
@@ -747,6 +770,12 @@ internal sealed partial class WindowsJob : IDisposable
             [FieldOffset(16)] internal JobObjectLimitFlags LimitFlags;
             [FieldOffset(40)] internal uint ActiveProcessLimit;
             [FieldOffset(120)] internal nuint JobMemoryLimit;
+        }
+
+        [StructLayout(LayoutKind.Explicit, Size = 48)]
+        internal struct JobObjectBasicAccountingInformation
+        {
+            [FieldOffset(40)] internal uint ActiveProcesses;
         }
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -790,6 +819,13 @@ internal sealed partial class WindowsJob : IDisposable
         internal static partial bool SetInformationJobObject(
             IntPtr job, int informationClass,
             ref JobObjectExtendedLimitInformation information, uint informationLength);
+
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static partial bool QueryInformationJobObject(
+            IntPtr job, int informationClass,
+            ref JobObjectBasicAccountingInformation information,
+            uint informationLength, IntPtr returnLength);
 
         [LibraryImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
