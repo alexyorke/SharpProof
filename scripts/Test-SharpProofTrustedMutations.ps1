@@ -458,8 +458,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'live-effect-bottom-entry-fails-closed'
         File = 'SharpProof.Analyzer\EffectContractDiagnostics.cs'
-        Original = "var declaredComplete = !entryIsBottom && !summary.IsBottom &&`n            projection.IsComplete &&"
-        Mutated = "var declaredComplete = projection.IsComplete &&"
+        Original = '        var declaredComplete = entrySummaryReachable && projection.IsComplete &&'
+        Mutated = '        var declaredComplete = projection.IsComplete &&'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~BottomEntryCannotDirectlyProveAnEffectContract'
     },
