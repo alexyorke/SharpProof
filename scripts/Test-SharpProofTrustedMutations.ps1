@@ -91,7 +91,7 @@ $mutations = @(
         Name = 'portable-codec-whitespace-name-fails-closed'
         File = 'SharpProof.CompilerArtifact\PortableIrGraphCodec.cs'
         Original = '                value == null || !string.IsNullOrWhiteSpace(value),'
-        Mutated = '                value == null || value != null,'
+        Mutated = '                value == null || !string.IsNullOrEmpty(value),'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~DecoderRejectsMalformedGraphs'
     },
