@@ -322,8 +322,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'external-precondition-screening'
         File = 'SharpProof.Analyzer\SharpProofAnalyzer.cs'
-        Original = '            "PositiveAttribute" or'
-        Mutated = '            "NotNullAttribute" or'
+        Original = '                    ContractApiMetadata.Positive),'
+        Mutated = '                    ContractApiMetadata.NotNull),'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~UnannotatedCallerStillChecksExternalClosedPreconditions'
     },
