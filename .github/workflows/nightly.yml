@@ -52,6 +52,7 @@ jobs:
           .\scripts\Test-SharpProofTrustedMutations.ps1
           -Configuration Release
           -OutputPath artifacts/nightly/mutations.json
+          -ExpectedCommit $env:GITHUB_SHA
 
       - name: Retain performance outcome
         shell: pwsh

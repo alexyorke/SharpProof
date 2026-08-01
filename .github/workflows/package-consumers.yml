@@ -620,7 +620,8 @@ jobs:
             -GateStatus running
           .\scripts\Test-SharpProofTrustedMutations.ps1 `
             -Configuration Release `
-            -OutputPath artifacts/release-qualification/mutations.json
+            -OutputPath artifacts/release-qualification/mutations.json `
+            -ExpectedCommit $env:SHARPPROOF_RELEASE_COMMIT
           if (-not $?) {
             throw 'Trusted-boundary mutation testing failed.'
           }
