@@ -227,13 +227,27 @@ internal sealed class ManagedAbstractFlow
 
     private ManagedAbstractValue Increment(IIncrementOrDecrementOperation operation, ManagedFlowState state)
     {
-        var prior = EvaluateCore(operation.Target, state);
-        var @operator = operation.Kind == OperationKind.Increment ? BinaryOperatorKind.Add : BinaryOperatorKind.Subtract;
-        return prior.TryGetInteger(out var interval) && ManagedAbstractValue.TryArithmetic(
-                   @operator, interval, IntervalValue.Constant(1), out var updated) &&
+        return TryIncrement(operation, state, out var updated) &&
                ManagedAbstractValue.FitsType(updated, operation.Type)
             ? ManagedAbstractValue.Integer(updated)
             : ManagedAbstractValue.TopForType(operation.Type);
+    }
+
+    private bool TryIncrement(
+        IIncrementOrDecrementOperation operation,
+        ManagedFlowState state,
+        out IntervalValue interval)
+    {
+        interval = default;
+        var @operator = operation.Kind == OperationKind.Increment
+            ? BinaryOperatorKind.Add
+            : BinaryOperatorKind.Subtract;
+        return EvaluateCore(operation.Target, state).TryGetInteger(out var target) &&
+            ManagedAbstractValue.TryArithmetic(
+                @operator,
+                target,
+                IntervalValue.Constant(1),
+                out interval);
     }
 
     private ManagedFlowState Assume(ManagedFlowState state, IOperation condition, bool expected)
@@ -602,12 +616,7 @@ internal sealed class ManagedAbstractFlow
                 type = unary.Type;
                 break;
             case IIncrementOrDecrementOperation increment:
-                var @operator = increment.Kind == OperationKind.Increment
-                    ? BinaryOperatorKind.Add
-                    : BinaryOperatorKind.Subtract;
-                if (!EvaluateCore(increment.Target, state).TryGetInteger(out var target) ||
-                    !ManagedAbstractValue.TryArithmetic(
-                        @operator, target, IntervalValue.Constant(1), out interval))
+                if (!TryIncrement(increment, state, out interval))
                 {
                     return false;
                 }

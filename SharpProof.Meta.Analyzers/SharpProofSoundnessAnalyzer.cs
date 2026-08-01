@@ -33,7 +33,12 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static readonly ImmutableDictionary<KnownType, ImmutableHashSet<string>> ForbiddenMethods =
         new Dictionary<KnownType, ImmutableHashSet<string>>
         {
-            [KnownType.Compilation] = Names("ReplaceSyntaxTree", "AddSyntaxTrees", "GetSymbolsWithName"),
+            [KnownType.Compilation] = Names(
+                "ReplaceSyntaxTree",
+                "AddSyntaxTrees",
+                "RemoveSyntaxTrees",
+                "RemoveAllSyntaxTrees",
+                "GetSymbolsWithName"),
             [KnownType.SemanticModel] = Names("TryGetSpeculativeSemanticModel", "GetSpeculativeTypeInfo", "GetDiagnostics"),
             [KnownType.SyntaxFactory] = Names("ParseStatement", "ParseExpression", "ParseTypeName")
         }.ToImmutableDictionary();

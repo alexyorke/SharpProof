@@ -351,17 +351,16 @@ $lines.Add('}')
 $lines.Add('')
 $lines.Add('internal static class ContractApiClauseProjection')
 $lines.Add('{')
-$lines.Add('    internal static int GetClauseOrdinal(string name)')
+$lines.Add('    internal static ContractApiClauseRole GetClauseRole(string name)')
 $lines.Add('    {')
 $lines.Add('        return name switch')
 $lines.Add('        {')
 foreach ($method in @($methods | Where-Object Shape -eq 'Clause')) {
-    $ordinal = @($methods | Where-Object Shape -eq 'Clause').IndexOf($method)
     $lines.Add(
         '            ContractApiCatalog.' + $method.Id +
-        'MethodName => ' + $ordinal + ',')
+        'MethodName => ContractApiClauseRole.' + $method.ClauseRole + ',')
 }
-$lines.Add('            _ => -1')
+$lines.Add('            _ => ContractApiClauseRole.None')
 $lines.Add('        };')
 $lines.Add('    }')
 $lines.Add('}')

@@ -344,6 +344,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~ContractCandidateActivationRunsClausePlacementValidation'
     },
     [pscustomobject]@{
+        Name = 'contract-clause-role-projection'
+        File = 'SharpProof.Frontend\ContractApiMetadata.generated.cs'
+        Original = 'ContractApiCatalog.RequiresMethodName => ContractApiClauseRole.Requires,'
+        Mutated = 'ContractApiCatalog.RequiresMethodName => ContractApiClauseRole.Ensures,'
+        Project = 'SharpProof.Contracts.Test\SharpProof.Contracts.Test.csproj'
+        Filter = 'FullyQualifiedName~InventoryClassifiesEveryPlacementInStableSourceOrder'
+    },
+    [pscustomobject]@{
         Name = 'advisory-full-activation-selection'
         File = 'SharpProof.Analyzer\SharpProofAnalyzer.cs'
         Original = 'return AdvisoryActivation.Full;'

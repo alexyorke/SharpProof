@@ -23,6 +23,49 @@ public sealed class SharpProofSoundnessAnalyzerTests
     [TestCase(
         """
         using Microsoft.CodeAnalysis;
+        namespace SharpProof.Frontend;
+        sealed class C {
+            Compilation M(Compilation compilation, SyntaxTree tree) =>
+                compilation.AddSyntaxTrees(tree);
+        }
+        """,
+        "SPMETA001")]
+    [TestCase(
+        """
+        using Microsoft.CodeAnalysis;
+        namespace SharpProof.Frontend;
+        sealed class C {
+            Compilation M(Compilation compilation, SyntaxTree tree) =>
+                compilation.RemoveSyntaxTrees(tree);
+        }
+        """,
+        "SPMETA001")]
+    [TestCase(
+        """
+        using System.Collections.Generic;
+        using Microsoft.CodeAnalysis;
+        namespace SharpProof.Frontend;
+        sealed class C {
+            Compilation M(
+                Compilation compilation,
+                IEnumerable<SyntaxTree> trees) =>
+                compilation.RemoveSyntaxTrees(trees);
+        }
+        """,
+        "SPMETA001")]
+    [TestCase(
+        """
+        using Microsoft.CodeAnalysis;
+        namespace SharpProof.Frontend;
+        sealed class C {
+            Compilation M(Compilation compilation) =>
+                compilation.RemoveAllSyntaxTrees();
+        }
+        """,
+        "SPMETA001")]
+    [TestCase(
+        """
+        using Microsoft.CodeAnalysis;
         namespace SharpProof.Frontend.Lowering;
         static class C {
             static string M(ISymbol symbol) => symbol.ToDisplayString();

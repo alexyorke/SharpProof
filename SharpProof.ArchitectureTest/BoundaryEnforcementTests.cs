@@ -103,8 +103,12 @@ public sealed class BoundaryEnforcementTests
         var text = File.ReadAllText(
             Path.Combine(RepositoryRoot(), "BannedSymbols.txt"));
         var required = new[] {
-            "Compilation.ReplaceSyntaxTree",
-            "Compilation.AddSyntaxTrees",
+            "Compilation.ReplaceSyntaxTree(Microsoft.CodeAnalysis.SyntaxTree,Microsoft.CodeAnalysis.SyntaxTree)",
+            "Compilation.AddSyntaxTrees(Microsoft.CodeAnalysis.SyntaxTree[])",
+            "Compilation.AddSyntaxTrees(System.Collections.Generic.IEnumerable{Microsoft.CodeAnalysis.SyntaxTree})",
+            "Compilation.RemoveSyntaxTrees(Microsoft.CodeAnalysis.SyntaxTree[])",
+            "Compilation.RemoveSyntaxTrees(System.Collections.Generic.IEnumerable{Microsoft.CodeAnalysis.SyntaxTree})",
+            "Compilation.RemoveAllSyntaxTrees",
             "Compilation.GetSymbolsWithName",
             "Compilation.GetSemanticModel",
             "SemanticModel.GetDiagnostics",

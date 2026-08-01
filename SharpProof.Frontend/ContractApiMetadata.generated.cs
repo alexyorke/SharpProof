@@ -197,14 +197,14 @@ internal static class ContractApiCatalog
 
 internal static class ContractApiClauseProjection
 {
-    internal static int GetClauseOrdinal(string name)
+    internal static ContractApiClauseRole GetClauseRole(string name)
     {
         return name switch
         {
-            ContractApiCatalog.RequiresMethodName => 0,
-            ContractApiCatalog.EnsuresMethodName => 1,
-            ContractApiCatalog.AssumeMethodName => 2,
-            _ => -1
+            ContractApiCatalog.RequiresMethodName => ContractApiClauseRole.Requires,
+            ContractApiCatalog.EnsuresMethodName => ContractApiClauseRole.Ensures,
+            ContractApiCatalog.AssumeMethodName => ContractApiClauseRole.Assume,
+            _ => ContractApiClauseRole.None
         };
     }
 }

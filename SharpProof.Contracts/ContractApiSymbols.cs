@@ -98,8 +98,12 @@ internal sealed class ContractClauseSymbols(INamedTypeSymbol contractType)
             return null;
         }
 
-        var ordinal = ContractApiClauseProjection.GetClauseOrdinal(
-            definition.Name);
-        return ordinal < 0 ? null : (BoundContractKind)ordinal;
+        return ContractApiClauseProjection.GetClauseRole(definition.Name) switch
+        {
+            ContractApiClauseRole.Requires => BoundContractKind.Requires,
+            ContractApiClauseRole.Ensures => BoundContractKind.Ensures,
+            ContractApiClauseRole.Assume => BoundContractKind.Assume,
+            _ => null
+        };
     }
 }
