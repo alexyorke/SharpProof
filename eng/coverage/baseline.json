@@ -6,6 +6,7 @@
     "SharpProof.Analyzer": 91.71,
     "SharpProof.Attributes": 55.88,
     "SharpProof.CompilerArtifact": 95.46,
+    "SharpProof.CompilerCollector": 91.19,
     "SharpProof.ContractForGenerator": 93.92,
     "SharpProof.Contracts": 88.96,
     "SharpProof.Dataflow": 91.47,

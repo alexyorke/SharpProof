@@ -1018,6 +1018,14 @@ public sealed class ArchitectureTests
             "eng",
             "coverage",
             "SharpProof.Managed.runsettings"));
+        using var coverageBaseline = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(root, "eng", "coverage", "baseline.json")));
+        Assert.That(
+            coverageBaseline.RootElement
+                .GetProperty("projects")
+                .TryGetProperty("SharpProof.CompilerCollector", out _),
+            Is.True,
+            "CompilerCollector must participate in project and aggregate coverage.");
         Assert.That(
             managedSettings,
             Does.Contain(
