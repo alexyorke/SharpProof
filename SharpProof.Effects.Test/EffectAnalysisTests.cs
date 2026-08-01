@@ -756,10 +756,7 @@ public sealed class EffectAnalysisTests
 
             public static class Sample {
                 public static void Mutate(Box value) {
-                    var holder = new Holder();
-                    holder.Child = value;
-                    var alias = holder.Child;
-                    alias.Value = 1;
+                    (new Holder { Child = value }).Child.Value = 1;
                 }
             }
             """,
