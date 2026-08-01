@@ -261,3 +261,55 @@ internal static class CompilerManifestArtifactJson
         return true;
     }
 }
+
+internal static class CompilerManifestArtifactFile
+{
+    internal const int MaximumBytes = 16 * 1024 * 1024;
+
+    internal static byte[] ReadAllBytes(string path)
+    {
+        using var stream = Open(path, out var length);
+        var bytes = new byte[length];
+        var offset = 0;
+        while (offset < bytes.Length)
+        {
+            var read = stream.Read(bytes, offset, bytes.Length - offset);
+            if (read == 0)
+            {
+                throw new InvalidDataException(
+                    "The compiler manifest changed while it was read.");
+            }
+
+            offset += read;
+        }
+        EnsureEndOfFile(stream.ReadByte());
+        return bytes;
+    }
+
+    private static FileStream Open(string path, out int length)
+    {
+        var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read);
+        if (stream.Length > MaximumBytes)
+        {
+            stream.Dispose();
+            throw new InvalidDataException(
+                "The compiler manifest exceeds the byte limit.");
+        }
+
+        length = checked((int)stream.Length);
+        return stream;
+    }
+
+    private static void EnsureEndOfFile(int extraByte)
+    {
+        if (extraByte != -1)
+        {
+            throw new InvalidDataException(
+                "The compiler manifest changed while it was read.");
+        }
+    }
+}

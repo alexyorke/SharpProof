@@ -456,7 +456,8 @@ internal static partial class LauncherPresentation
 
 internal sealed class LauncherArguments
 {
-    internal const int MaximumCompilerManifestBytes = 16 * 1024 * 1024;
+    internal const int MaximumCompilerManifestBytes =
+        CompilerManifestArtifactFile.MaximumBytes;
 
     private static readonly string[] s_required = [
         "worker", "request", "result", "compiler-manifest", "verify-policy", "assumption-policy"
@@ -562,17 +563,7 @@ internal sealed class LauncherArguments
 
     internal static byte[] ReadCompilerManifest(string path)
     {
-        using var stream = new FileStream(
-            path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        if (stream.Length > MaximumCompilerManifestBytes)
-        {
-            throw new InvalidDataException(
-                "The compiler manifest exceeds the launcher byte limit.");
-        }
-
-        var bytes = new byte[checked((int)stream.Length)];
-        stream.ReadExactly(bytes);
-        return bytes;
+        return CompilerManifestArtifactFile.ReadAllBytes(path);
     }
 
     private WorkerBudgets CreateBudgets()

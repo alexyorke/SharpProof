@@ -4,19 +4,26 @@ internal sealed partial record WorkerInputSnapshot
 {
     internal const string ManifestUnavailable = "The compiler manifest is unavailable.";
     internal const string ManifestInvalid = "The compiler manifest is invalid.";
-    internal static async Task<WorkerInputSnapshot> LoadAsync(WorkerVerifyRequest request,
+    internal static Task<WorkerInputSnapshot> LoadAsync(WorkerVerifyRequest request,
         WorkerCacheIdentity cacheIdentity, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(cacheIdentity);
+        cancellationToken.ThrowIfCancellationRequested();
         var manifestPath = Path.GetFullPath(request.CompilerManifest.Path);
         byte[] manifestBytes;
         try
         {
-            manifestBytes = await File.ReadAllBytesAsync(manifestPath, cancellationToken).ConfigureAwait(false);
+            manifestBytes = CompilerManifestArtifactFile.ReadAllBytes(manifestPath);
+            cancellationToken.ThrowIfCancellationRequested();
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is
+            IOException or InvalidDataException or UnauthorizedAccessException)
         {
-            throw new IOException(ManifestUnavailable, exception);
+            throw new IOException(
+                exception is InvalidDataException
+                    ? ManifestInvalid
+                    : ManifestUnavailable,
+                exception);
         }
         var digest = WorkerProtocolJson.ComputeSha256(manifestBytes);
         CompilerManifestArtifact manifest;
@@ -37,7 +44,7 @@ internal sealed partial record WorkerInputSnapshot
         var inputHash = CompilerArtifactInputHash.Compute(request, manifestBytes, cacheIdentity.ToolIdentity,
             cacheIdentity.ToolVersion, cacheIdentity.WorkerBinarySha256, cacheIdentity.ApiSpecIdentity,
             cacheIdentity.ApiSpecVersion, cacheIdentity.ApiSpecContentSha256);
-        return new WorkerInputSnapshot(manifest, inputHash);
+        return Task.FromResult(new WorkerInputSnapshot(manifest, inputHash));
     }
     private static string DecodeUtf8(byte[] bytes)
     {

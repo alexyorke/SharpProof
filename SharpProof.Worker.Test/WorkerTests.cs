@@ -1279,6 +1279,34 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task OversizedCompilerManifestIsTypedAndStopsBeforeWork()
+    {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using (var stream = File.OpenWrite(request.CompilerManifest.Path))
+        {
+            stream.SetLength(CompilerManifestArtifactFile.MaximumBytes + 1L);
+        }
+
+        using var worker = new SharpProofWorker(
+            () => throw new AssertionException(
+                "An oversized manifest must fail before backend creation."));
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.CompilerManifestMismatch));
+            Assert.That(
+                response.Errors.Single().Code,
+                Is.EqualTo("compiler_manifest.invalid"));
+            Assert.That(response.Manifest.Claims, Is.Empty);
+        }
+    }
+
+    [Test]
     public async Task CompilerVersionIsProvenanceRatherThanARuntimeGate()
     {
         using var project = TestProject.Create(TautologySource);
