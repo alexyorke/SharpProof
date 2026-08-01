@@ -138,7 +138,16 @@ public sealed class ArchitectureTests
     {
         var allowed = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
+            ["SharpProof.Analyzer"] = [
+                "SharpProof.Contracts",
+                "SharpProof.Effects",
+                "SharpProof.Frontend",
+                "SharpProof.Ir",
+                "SharpProof.Specs"
+            ],
+            ["SharpProof.Attributes"] = [],
             ["SharpProof.Ir"] = [],
+            ["SharpProof.Meta.Analyzers"] = [],
             ["SharpProof.PortableAnalyzer"] = ["SharpProof.Attributes"],
             ["SharpProof.CompilerArtifact"] = [
                 "SharpProof.Ir",

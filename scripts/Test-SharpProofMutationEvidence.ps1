@@ -33,6 +33,20 @@ function Write-Fixture {
     return $path
 }
 
+function Write-RawFixture {
+    param(
+        [string]$Name,
+        [string]$Xml
+    )
+
+    $path = Join-Path $fixtureRoot ($Name + '.trx')
+    [IO.File]::WriteAllText(
+        $path,
+        $Xml,
+        [Text.UTF8Encoding]::new($false))
+    return $path
+}
+
 function New-TestParts {
     param(
         [string]$Outcome,
@@ -59,16 +73,25 @@ function New-TestParts {
 function Assert-Throws {
     param(
         [scriptblock]$Action,
-        [string]$Because
+        [string]$Because,
+        [string]$ExpectedMessage
     )
 
+    $failure = $null
     try {
         & $Action
     }
     catch {
-        return
+        $failure = $_
     }
-    throw "Expected rejection: $Because"
+    if ($null -eq $failure) {
+        throw "Expected rejection: $Because"
+    }
+    if ($failure.Exception.Message -notlike "*$ExpectedMessage*") {
+        throw (
+            "Unexpected rejection for '$Because': " +
+            $failure.Exception.Message)
+    }
 }
 
 $zeroInfrastructure = 'error="0" timeout="0" aborted="0" inconclusive="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" passedButRunAborted="0"'
@@ -87,9 +110,25 @@ try {
         -TrxPath $passingPath `
         -EvidenceName baseline `
         -Mode Baseline `
+        -ProcessExitCode 0 `
         -ExpectedMethodName ExpectedTest
     if ($baseline.executedCount -ne 1 -or $baseline.failedCount -ne 0) {
         throw 'Passing baseline evidence was not projected correctly.'
+    }
+
+    $bomPath = Join-Path $fixtureRoot 'passing-bom.trx'
+    [IO.File]::WriteAllText(
+        $bomPath,
+        [IO.File]::ReadAllText($passingPath),
+        [Text.UTF8Encoding]::new($true))
+    $bomBaseline = Read-SharpProofMutationTestEvidence `
+        -TrxPath $bomPath `
+        -EvidenceName passing-bom `
+        -Mode Baseline `
+        -ProcessExitCode 0 `
+        -ExpectedMethodName ExpectedTest
+    if ($bomBaseline.executedCount -ne 1) {
+        throw 'UTF-8 BOM evidence was not projected correctly.'
     }
 
     $assertion = New-TestParts `
@@ -107,6 +146,7 @@ try {
         -TrxPath $assertionPath `
         -EvidenceName assertion `
         -Mode Mutation `
+        -ProcessExitCode 1 `
         -ExpectedMethodName ExpectedTest `
         -ExpectedLedger $baseline.testLedger
     if ($mutation.assertionFailureCount -ne 1) {
@@ -128,6 +168,7 @@ try {
         -TrxPath $collectionPath `
         -EvidenceName collection `
         -Mode Mutation `
+        -ProcessExitCode 1 `
         -ExpectedMethodName ExpectedTest `
         -ExpectedLedger $baseline.testLedger
     if ($collectionMutation.assertionFailureCount -ne 1) {
@@ -145,11 +186,15 @@ try {
         -Definitions $crash.Definition `
         -Entries $crash.Entry `
         -Results $crash.Result
-    Assert-Throws -Because 'a crash stack mentions Assert.That' -Action {
+    Assert-Throws `
+        -Because 'a crash stack mentions Assert.That' `
+        -ExpectedMessage 'not killed solely by assertions' `
+        -Action {
         Read-SharpProofMutationTestEvidence `
             -TrxPath $crashPath `
             -EvidenceName crash `
             -Mode Mutation `
+            -ProcessExitCode 1 `
             -ExpectedMethodName ExpectedTest `
             -ExpectedLedger $baseline.testLedger
     }
@@ -163,11 +208,15 @@ try {
         -Definitions $other.Definition `
         -Entries $other.Entry `
         -Results $other.Result
-    Assert-Throws -Because 'an unexpected selected test' -Action {
+    Assert-Throws `
+        -Because 'an unexpected selected test' `
+        -ExpectedMessage 'identity does not match' `
+        -Action {
         Read-SharpProofMutationTestEvidence `
             -TrxPath $wrongIdentityPath `
             -EvidenceName wrong `
             -Mode Baseline `
+            -ProcessExitCode 0 `
             -ExpectedMethodName ExpectedTest
     }
 
@@ -179,11 +228,15 @@ try {
         -Definitions $passing.Definition `
         -Entries $passing.Entry `
         -Results $passing.Result
-    Assert-Throws -Because 'partial execution counters' -Action {
+    Assert-Throws `
+        -Because 'partial execution counters' `
+        -ExpectedMessage 'counters disagree' `
+        -Action {
         Read-SharpProofMutationTestEvidence `
             -TrxPath $partialPath `
             -EvidenceName partial `
             -Mode Baseline `
+            -ProcessExitCode 0 `
             -ExpectedMethodName ExpectedTest
     }
 
@@ -194,11 +247,123 @@ try {
         -Definitions $passing.Definition `
         -Entries $passing.Entry `
         -Results $passing.Result
-    Assert-Throws -Because 'timeout infrastructure evidence' -Action {
+    Assert-Throws `
+        -Because 'timeout infrastructure evidence' `
+        -ExpectedMessage "non-test outcome 'timeout'" `
+        -Action {
         Read-SharpProofMutationTestEvidence `
             -TrxPath $timeoutPath `
             -EvidenceName timeout `
             -Mode Mutation `
+            -ProcessExitCode 1 `
+            -ExpectedMethodName ExpectedTest `
+            -ExpectedLedger $baseline.testLedger
+    }
+
+    Assert-Throws `
+        -Because 'an abnormal mutation process exit' `
+        -ExpectedMessage 'process exit code' `
+        -Action {
+        Read-SharpProofMutationTestEvidence `
+            -TrxPath $assertionPath `
+            -EvidenceName abnormal-exit `
+            -Mode Mutation `
+            -ProcessExitCode 2 `
+            -ExpectedMethodName ExpectedTest `
+            -ExpectedLedger $baseline.testLedger
+    }
+
+    Assert-Throws `
+        -Because 'mutation evidence without a baseline ledger' `
+        -ExpectedMessage 'requires a nonempty baseline ledger' `
+        -Action {
+        Read-SharpProofMutationTestEvidence `
+            -TrxPath $assertionPath `
+            -EvidenceName missing-ledger `
+            -Mode Mutation `
+            -ProcessExitCode 1 `
+            -ExpectedMethodName ExpectedTest
+    }
+
+    $mixed = New-TestParts `
+        -Outcome Failed `
+        -Message "Assert.That(actual, Is.EqualTo(expected))`n Expected: 1`n But was: 2`n System.NullReferenceException: teardown crash"
+    $mixedPath = Write-Fixture `
+        -Name mixed `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $mixed.Definition `
+        -Entries $mixed.Entry `
+        -Results $mixed.Result
+    Assert-Throws `
+        -Because 'assertion evidence with a trailing crash' `
+        -ExpectedMessage 'not killed solely by assertions' `
+        -Action {
+        Read-SharpProofMutationTestEvidence `
+            -TrxPath $mixedPath `
+            -EvidenceName mixed `
+            -Mode Mutation `
+            -ProcessExitCode 1 `
+            -ExpectedMethodName ExpectedTest `
+            -ExpectedLedger $baseline.testLedger
+    }
+
+    $foreignXml = [IO.File]::ReadAllText($passingPath).Replace(
+        '<Results>',
+        '<Results xmlns="urn:foreign">',
+        [StringComparison]::Ordinal)
+    $foreignPath = Write-RawFixture -Name foreign-results -Xml $foreignXml
+    Assert-Throws `
+        -Because 'a foreign-namespace result container' `
+        -ExpectedMessage "misplaced or duplicate 'Results'" `
+        -Action {
+        Read-SharpProofMutationTestEvidence `
+            -TrxPath $foreignPath `
+            -EvidenceName foreign `
+            -Mode Baseline `
+            -ProcessExitCode 0 `
+            -ExpectedMethodName ExpectedTest
+    }
+
+    $duplicateExecutionXml = [IO.File]::ReadAllText($passingPath).Replace(
+        '<Execution id=''execution-1''/>',
+        '<Execution id=''execution-1''/><Execution id=''execution-2''/>',
+        [StringComparison]::Ordinal)
+    $duplicateExecutionPath = Write-RawFixture `
+        -Name duplicate-execution `
+        -Xml $duplicateExecutionXml
+    Assert-Throws `
+        -Because 'duplicate execution identities' `
+        -ExpectedMessage 'malformed test definitions' `
+        -Action {
+        Read-SharpProofMutationTestEvidence `
+            -TrxPath $duplicateExecutionPath `
+            -EvidenceName duplicate-execution `
+            -Mode Baseline `
+            -ProcessExitCode 0 `
+            -ExpectedMethodName ExpectedTest
+    }
+
+    $nestedSummaryXml = [IO.File]::ReadAllText($passingPath).Replace(
+        '<ResultSummary outcome="Completed">',
+        '<Wrapper><ResultSummary outcome="Completed">',
+        [StringComparison]::Ordinal).Replace(
+        '</ResultSummary>',
+        '</ResultSummary></Wrapper>',
+        [StringComparison]::Ordinal)
+    $nestedSummaryPath = Write-RawFixture `
+        -Name nested-summary `
+        -Xml $nestedSummaryXml
+    Assert-Throws `
+        -Because 'a nested result summary' `
+        -ExpectedMessage 'exactly one result summary' `
+        -Action {
+        Read-SharpProofMutationTestEvidence `
+            -TrxPath $nestedSummaryPath `
+            -EvidenceName nested-summary `
+            -Mode Baseline `
+            -ProcessExitCode 0 `
             -ExpectedMethodName ExpectedTest
     }
 

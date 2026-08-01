@@ -787,6 +787,7 @@ try {
             -TrxPath $baselineTrx `
             -EvidenceName ($mutation.Name + ' baseline') `
             -Mode Baseline `
+            -ProcessExitCode $baselineExit `
             -ExpectedMethodName $expectedMethodName
         $mutation | Add-Member `
             -NotePropertyName BaselineLedger `
@@ -858,6 +859,7 @@ try {
                 -TrxPath $testTrx `
                 -EvidenceName $mutation.Name `
                 -Mode Mutation `
+                -ProcessExitCode $testExit `
                 -ExpectedMethodName $expectedMethodName `
                 -ExpectedLedger $mutation.BaselineLedger
             $results += [pscustomobject]@{

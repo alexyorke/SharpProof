@@ -34,44 +34,35 @@ function Test-NUnitAssertionMessage {
         return $false
     }
 
-    $normalized = $Message.Replace("`r`n", "`n").Trim()
-    if ($normalized -match '^Assert\.That\(') {
-        $scalarFailure = $normalized -match '(?m)^\s*Expected:' -and
-            $normalized -match '(?m)^\s*But was:'
-        $collectionFailure =
-            $normalized -match '(?m)^\s*Expected is\b' -and
-            $normalized -match '(?m)\bactual is\b'
-        return $scalarFailure -or $collectionFailure
+    $lines = @($Message.Replace("`r`n", "`n").Split("`n") |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_.Length -ne 0 })
+    $assertionIndex = if ($lines.Count -gt 0 -and
+        $lines[0] -match '^Assert\.That\(.*\)$') { 0 } else { 1 }
+    if ($assertionIndex -eq 1 -and
+        ($lines.Count -lt 2 -or
+         $lines[0] -match '(?i)\b(exception|error|warning)\b' -or
+         $lines[1] -notmatch '^Assert\.That\(.*\)$')) {
+        return $false
     }
-
-    if (-not $normalized.StartsWith(
-            'Multiple failures or warnings in test:',
-            [StringComparison]::Ordinal)) {
+    if ($lines.Count -le $assertionIndex + 1) {
         return $false
     }
 
-    $blocks = [regex]::Matches(
-        $normalized,
-        '(?ms)^\s*\d+\)\s+Assert\.That\(.*?(?=^\s*\d+\)|\z)')
-    if ($blocks.Count -eq 0) {
+    $details = @($lines[($assertionIndex + 1)..($lines.Count - 1)])
+    $allowedDetail = '^(Expected:|But was:|Expected is\b|Values differ at index\b|Missing:)'
+    if (@($details | Where-Object { $_ -notmatch $allowedDetail }).Count -ne 0) {
         return $false
     }
 
-    $withoutBlocks = [regex]::Replace(
-        $normalized,
-        '(?ms)^\s*\d+\)\s+Assert\.That\(.*?(?=^\s*\d+\)|\z)',
-        '')
-    $withoutHeader = $withoutBlocks.Replace(
-        'Multiple failures or warnings in test:',
-        '').Trim()
-    if ($withoutHeader.Length -ne 0) {
-        return $false
-    }
-
-    return @($blocks | Where-Object {
-            $_.Value -notmatch '(?m)^\s*Expected:' -or
-            $_.Value -notmatch '(?m)^\s*But was:'
-        }).Count -eq 0
+    $scalarFailure = @($details | Where-Object {
+            $_ -match '^Expected:'
+        }).Count -eq 1 -and
+        @($details | Where-Object { $_ -match '^But was:' }).Count -eq 1
+    $collectionFailure = @($details | Where-Object {
+            $_ -match '^Expected is\b.*\bactual is\b'
+        }).Count -eq 1
+    return $scalarFailure -or $collectionFailure
 }
 
 function Read-SharpProofMutationTestEvidence {
@@ -87,18 +78,56 @@ function Read-SharpProofMutationTestEvidence {
         [string]$Mode,
 
         [Parameter(Mandatory = $true)]
+        [int]$ProcessExitCode,
+
+        [Parameter(Mandatory = $true)]
         [string]$ExpectedMethodName,
 
         [AllowNull()]
         [string[]]$ExpectedLedger
     )
 
+    $expectedExitCode = if ($Mode -eq 'Baseline') { 0 } else { 1 }
+    if ($ProcessExitCode -ne $expectedExitCode) {
+        throw "Test process exit code '$ProcessExitCode' is invalid for '$EvidenceName'."
+    }
+    if ($Mode -eq 'Mutation' -and
+        ($null -eq $ExpectedLedger -or @($ExpectedLedger).Count -eq 0)) {
+        throw "Mutation '$EvidenceName' requires a nonempty baseline ledger."
+    }
+
     if (-not (Test-Path -LiteralPath $TrxPath -PathType Leaf)) {
         throw "Test evidence for '$EvidenceName' was not produced: $TrxPath"
     }
 
+    $maximumTrxBytes = 16MB
+    $trxFile = Get-Item -LiteralPath $TrxPath
+    if ($trxFile.Length -gt $maximumTrxBytes) {
+        throw "Test evidence for '$EvidenceName' exceeds the TRX byte limit."
+    }
+
     try {
-        [xml]$document = [IO.File]::ReadAllText($TrxPath)
+        $utf8 = [Text.UTF8Encoding]::new($false, $true)
+        $xmlText = $utf8.GetString([IO.File]::ReadAllBytes($TrxPath))
+        if ($xmlText.Length -gt 0 -and $xmlText[0] -eq [char]0xFEFF) {
+            $xmlText = $xmlText.Substring(1)
+        }
+        $settings = [Xml.XmlReaderSettings]::new()
+        $settings.DtdProcessing = [Xml.DtdProcessing]::Prohibit
+        $settings.XmlResolver = $null
+        $settings.MaxCharactersInDocument = $maximumTrxBytes
+        $settings.MaxCharactersFromEntities = 0
+        $stringReader = [IO.StringReader]::new($xmlText)
+        $reader = [Xml.XmlReader]::Create($stringReader, $settings)
+        try {
+            $document = [Xml.XmlDocument]::new()
+            $document.XmlResolver = $null
+            $document.Load($reader)
+        }
+        finally {
+            $reader.Dispose()
+            $stringReader.Dispose()
+        }
     }
     catch {
         throw "Test evidence for '$EvidenceName' is not valid XML: $($_.Exception.Message)"
@@ -111,13 +140,26 @@ function Read-SharpProofMutationTestEvidence {
         throw "Test evidence for '$EvidenceName' is not a supported TRX document."
     }
 
+    $namespaceManager = [Xml.XmlNamespaceManager]::new($document.NameTable)
+    $namespaceManager.AddNamespace('trx', $trxNamespace)
+    foreach ($containerName in @(
+            'ResultSummary', 'TestDefinitions', 'TestEntries', 'Results')) {
+        $namedNodes = @($document.SelectNodes(
+                "//*[local-name()='$containerName']"))
+        if ($namedNodes.Count -ne 1 -or
+            $namedNodes[0].NamespaceURI -ne $trxNamespace) {
+            throw "TRX for '$EvidenceName' has misplaced or duplicate '$containerName' records."
+        }
+    }
     $summaries = @($document.SelectNodes(
-            "//*[local-name()='ResultSummary']"))
+            '/trx:TestRun/trx:ResultSummary',
+            $namespaceManager))
     if ($summaries.Count -ne 1) {
         throw "TRX for '$EvidenceName' must contain exactly one result summary."
     }
     $counterNodes = @($summaries[0].SelectNodes(
-            "*[local-name()='Counters']"))
+            'trx:Counters',
+            $namespaceManager))
     if ($counterNodes.Count -ne 1) {
         throw "TRX counters are missing or duplicated for '$EvidenceName'."
     }
@@ -144,12 +186,40 @@ function Read-SharpProofMutationTestEvidence {
         }
     }
 
-    $definitions = @($document.SelectNodes(
-            "//*[local-name()='TestDefinitions']/*[local-name()='UnitTest']"))
-    $entries = @($document.SelectNodes(
-            "//*[local-name()='TestEntries']/*[local-name()='TestEntry']"))
-    $results = @($document.SelectNodes(
-            "//*[local-name()='Results']/*[local-name()='UnitTestResult']"))
+    $definitionContainers = @($document.SelectNodes(
+            '/trx:TestRun/trx:TestDefinitions',
+            $namespaceManager))
+    $entryContainers = @($document.SelectNodes(
+            '/trx:TestRun/trx:TestEntries',
+            $namespaceManager))
+    $resultContainers = @($document.SelectNodes(
+            '/trx:TestRun/trx:Results',
+            $namespaceManager))
+    if ($definitionContainers.Count -ne 1 -or
+        $entryContainers.Count -ne 1 -or
+        $resultContainers.Count -ne 1) {
+        throw "TRX for '$EvidenceName' has missing or duplicate result containers."
+    }
+    $definitions = @($definitionContainers[0].SelectNodes(
+            'trx:UnitTest',
+            $namespaceManager))
+    $entries = @($entryContainers[0].SelectNodes(
+            'trx:TestEntry',
+            $namespaceManager))
+    $results = @($resultContainers[0].SelectNodes(
+            'trx:UnitTestResult',
+            $namespaceManager))
+    if (@($definitionContainers[0].ChildNodes | Where-Object {
+                $_.NodeType -eq [Xml.XmlNodeType]::Element
+            }).Count -ne $definitions.Count -or
+        @($entryContainers[0].ChildNodes | Where-Object {
+                $_.NodeType -eq [Xml.XmlNodeType]::Element
+            }).Count -ne $entries.Count -or
+        @($resultContainers[0].ChildNodes | Where-Object {
+                $_.NodeType -eq [Xml.XmlNodeType]::Element
+            }).Count -ne $results.Count) {
+        throw "TRX for '$EvidenceName' contains unsupported result records."
+    }
     $structuralNodes = @($summaries + $counterNodes + $definitions +
         $entries + $results)
     if (@($structuralNodes | Where-Object {
@@ -168,25 +238,43 @@ function Read-SharpProofMutationTestEvidence {
         throw "TRX counters disagree with executed results for '$EvidenceName'."
     }
 
-    $definitionsById = @{}
+    $definitionsById =
+        [Collections.Generic.Dictionary[string, object]]::new(
+            [StringComparer]::Ordinal)
+    $definitionExecutionIds =
+        [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::Ordinal)
     foreach ($definition in $definitions) {
         $testId = $definition.GetAttribute('id')
-        $execution = $definition.SelectSingleNode("*[local-name()='Execution']")
-        $method = $definition.SelectSingleNode("*[local-name()='TestMethod']")
+        $executions = @($definition.SelectNodes(
+                'trx:Execution',
+                $namespaceManager))
+        $methods = @($definition.SelectNodes(
+                'trx:TestMethod',
+                $namespaceManager))
         if ([string]::IsNullOrWhiteSpace($testId) -or
-            $null -eq $execution -or $null -eq $method -or
+            $executions.Count -ne 1 -or $methods.Count -ne 1 -or
             $definitionsById.ContainsKey($testId)) {
             throw "TRX for '$EvidenceName' has malformed test definitions."
         }
+        $execution = $executions[0]
+        $method = $methods[0]
+        $executionId = $execution.GetAttribute('id')
+        if ([string]::IsNullOrWhiteSpace($executionId) -or
+            -not $definitionExecutionIds.Add($executionId)) {
+            throw "TRX for '$EvidenceName' has malformed execution identities."
+        }
         $definitionsById[$testId] = [pscustomobject]@{
-            executionId = $execution.GetAttribute('id')
+            executionId = $executionId
             className = $method.GetAttribute('className')
             methodName = $method.GetAttribute('name')
             displayName = $definition.GetAttribute('name')
         }
     }
 
-    $entriesById = @{}
+    $entriesById =
+        [Collections.Generic.Dictionary[string, string]]::new(
+            [StringComparer]::Ordinal)
     foreach ($entry in $entries) {
         $testId = $entry.GetAttribute('testId')
         if ([string]::IsNullOrWhiteSpace($testId) -or
@@ -198,23 +286,28 @@ function Read-SharpProofMutationTestEvidence {
 
     $ledger = @()
     $failedResults = @()
-    $seenResults = @{}
+    $seenResults =
+        [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::Ordinal)
     foreach ($result in $results) {
         $testId = $result.GetAttribute('testId')
         $executionId = $result.GetAttribute('executionId')
         if (-not $definitionsById.ContainsKey($testId) -or
             -not $entriesById.ContainsKey($testId) -or
-            $seenResults.ContainsKey($testId)) {
+            -not $seenResults.Add($testId)) {
             throw "TRX for '$EvidenceName' has unresolved or duplicate results."
         }
-        $seenResults[$testId] = $true
         $definition = $definitionsById[$testId]
         if ([string]::IsNullOrWhiteSpace($executionId) -or
-            $executionId -ne $definition.executionId -or
-            $executionId -ne $entriesById[$testId] -or
-            $definition.methodName -ne $ExpectedMethodName -or
+            -not [StringComparer]::Ordinal.Equals(
+                $executionId, $definition.executionId) -or
+            -not [StringComparer]::Ordinal.Equals(
+                $executionId, $entriesById[$testId]) -or
+            -not [StringComparer]::Ordinal.Equals(
+                $definition.methodName, $ExpectedMethodName) -or
             [string]::IsNullOrWhiteSpace($definition.className) -or
-            $result.GetAttribute('testName') -ne $definition.displayName) {
+            -not [StringComparer]::Ordinal.Equals(
+                $result.GetAttribute('testName'), $definition.displayName)) {
             throw "TRX test identity does not match '$ExpectedMethodName' for '$EvidenceName'."
         }
 
@@ -260,10 +353,17 @@ function Read-SharpProofMutationTestEvidence {
     }
 
     $assertionFailures = @($failedResults | Where-Object {
-            $message = $_.SelectSingleNode(
-                "*[local-name()='Output']/*[local-name()='ErrorInfo']/*[local-name()='Message']")
-            $null -ne $message -and
-                (Test-NUnitAssertionMessage -Message $message.InnerText)
+            $outputs = @($_.SelectNodes('trx:Output', $namespaceManager))
+            $errorInfos = @($_.SelectNodes(
+                    'trx:Output/trx:ErrorInfo',
+                    $namespaceManager))
+            $messages = @($_.SelectNodes(
+                    'trx:Output/trx:ErrorInfo/trx:Message',
+                    $namespaceManager))
+            $outputs.Count -eq 1 -and
+                $errorInfos.Count -eq 1 -and
+                $messages.Count -eq 1 -and
+                (Test-NUnitAssertionMessage -Message $messages[0].InnerText)
         })
     if ($Mode -eq 'Mutation' -and
         $assertionFailures.Count -ne $failedResults.Count) {
