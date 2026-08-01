@@ -94,6 +94,105 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void MinimalArgumentsProjectEveryRequestDefault()
+    {
+        Assert.That(
+            LauncherArguments.TryParse(ValidArguments(), out var parsed),
+            Is.True);
+        var compilerManifest = new WorkerFileReference
+        {
+            Path = "compiler-manifest.json",
+            Sha256 = new('a', 64)
+        };
+
+        var request = parsed.ProjectRequest(compilerManifest);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(request.CompilerManifest, Is.SameAs(compilerManifest));
+            Assert.That(request.VerifyPolicy, Is.EqualTo(WorkerVerifyPolicy.Advisory));
+            Assert.That(request.AssumptionPolicy, Is.EqualTo(WorkerAssumptionPolicy.Allow));
+            Assert.That(request.Budgets.QueryRlimit, Is.EqualTo(WorkerBudgets.DefaultQueryRlimit));
+            Assert.That(request.Budgets.MethodRlimit, Is.EqualTo(WorkerBudgets.DefaultMethodRlimit));
+            Assert.That(request.Budgets.MethodWallTimeMilliseconds,
+                Is.EqualTo(WorkerBudgets.DefaultMethodWallTimeMilliseconds));
+            Assert.That(request.Budgets.ProjectWallTimeMilliseconds,
+                Is.EqualTo(WorkerBudgets.DefaultProjectWallTimeMilliseconds));
+            Assert.That(request.Budgets.MaxParallelism, Is.EqualTo(WorkerBudgets.MaximumParallelism));
+            Assert.That(request.Budgets.MaximumExpressionDepth,
+                Is.EqualTo(WorkerBudgets.DefaultMaximumExpressionDepth));
+            Assert.That(request.Budgets.ProcessMemoryLimitBytes,
+                Is.EqualTo(WorkerBudgets.DefaultProcessMemoryLimitBytes));
+            Assert.That(request.Budgets.MaxWorkerProcesses,
+                Is.EqualTo(WorkerBudgets.MaximumParallelism));
+            Assert.That(request.Cache.Enabled, Is.True);
+            Assert.That(request.Cache.Directory, Is.Null);
+            Assert.That(request.Cache.MaximumBytes,
+                Is.EqualTo(WorkerCacheOptions.DefaultMaximumBytes));
+        }
+    }
+
+    [Test]
+    public void CustomArgumentsProjectEveryRequestValueExactly()
+    {
+        string[] arguments = [
+            .. ValidArguments(),
+            "--query-rlimit", "101",
+            "--method-rlimit", "102",
+            "--method-wall-ms", "103",
+            "--project-wall-ms", "104",
+            "--max-parallelism", "2",
+            "--max-expression-depth", "105",
+            "--process-memory-bytes", "106",
+            "--max-worker-processes", "3",
+            "--cache-enabled", "false",
+            "--cache-directory", "relative-cache",
+            "--cache-maximum-bytes", "107"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        var request = parsed.ProjectRequest(new WorkerFileReference());
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(request.Budgets.QueryRlimit, Is.EqualTo(101));
+            Assert.That(request.Budgets.MethodRlimit, Is.EqualTo(102));
+            Assert.That(request.Budgets.MethodWallTimeMilliseconds, Is.EqualTo(103));
+            Assert.That(request.Budgets.ProjectWallTimeMilliseconds, Is.EqualTo(104));
+            Assert.That(request.Budgets.MaxParallelism, Is.EqualTo(2));
+            Assert.That(request.Budgets.MaximumExpressionDepth, Is.EqualTo(105));
+            Assert.That(request.Budgets.ProcessMemoryLimitBytes, Is.EqualTo(106));
+            Assert.That(request.Budgets.MaxWorkerProcesses, Is.EqualTo(3));
+            Assert.That(request.Cache.Enabled, Is.False);
+            Assert.That(request.Cache.Directory, Is.EqualTo("relative-cache"));
+            Assert.That(request.Cache.MaximumBytes, Is.EqualTo(107));
+        }
+    }
+
+    [Test]
+    public void RequestProjectionRejectsCollidingIoPathsBeforeManifestRead()
+    {
+        string[] arguments = [
+            "verify",
+            "--worker", "worker.dll",
+            "--request", "request.json",
+            "--result", ".\\request.json",
+            "--compiler-manifest", "missing-compiler-manifest.json",
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
     public void CombinedTimeoutOverflowIsRejectedBeforeStartingWorker()
     {
         Action action = () => _ = Program.ComputeHardLimit(

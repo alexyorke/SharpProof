@@ -544,6 +544,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~StrictResponseValidationRequiresExactManifestAndResultSets'
     },
     [pscustomobject]@{
+        Name = 'launcher-argument-query-budget-projection'
+        File = 'SharpProof.Worker.Launcher\LauncherArguments.generated.cs'
+        Original = 'QueryRlimit = Number("query-rlimit", WorkerBudgets.DefaultQueryRlimit),'
+        Mutated = 'QueryRlimit = Number("method-rlimit", WorkerBudgets.DefaultQueryRlimit),'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~CustomArgumentsProjectEveryRequestValueExactly'
+    },
+    [pscustomobject]@{
         Name = 'launcher-kill-on-close'
         File = 'SharpProof.Worker.Launcher\Program.cs'
         Original = 'NativeMethods.JobObjectLimitFlags.KillOnJobClose |'

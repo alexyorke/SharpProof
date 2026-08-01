@@ -454,37 +454,17 @@ internal static partial class LauncherPresentation
 
 }
 
-internal sealed class LauncherArguments
+internal sealed partial class LauncherArguments
 {
     internal const int MaximumCompilerManifestBytes =
         CompilerManifestArtifactFile.MaximumBytes;
 
-    private static readonly string[] s_required = [
-        "worker", "request", "result", "compiler-manifest", "verify-policy", "assumption-policy"
-    ];
-    private static readonly string[] s_publication = ["publish-request", "publish-result", "publish-compiler-manifest"];
-    private static readonly HashSet<string> s_allowed = [
-        .. s_required, .. s_publication, "publish-sarif", "termination-grace-ms",
-        "query-rlimit", "method-rlimit", "method-wall-ms", "project-wall-ms",
-        "max-parallelism", "max-expression-depth", "process-memory-bytes", "max-worker-processes",
-        "cache-enabled", "cache-directory", "cache-maximum-bytes"
-    ];
     private readonly IReadOnlyDictionary<string, string> _values;
 
     private LauncherArguments(IReadOnlyDictionary<string, string> values)
     {
         _values = values;
     }
-
-    internal string WorkerPath => FullPath("worker");
-    internal string RequestPath => FullPath("request");
-    internal string ResultPath => FullPath("result");
-    internal string CompilerManifestPath => FullPath("compiler-manifest");
-    internal string? PublishRequestPath => OptionalFullPath("publish-request");
-    internal string? PublishResultPath => OptionalFullPath("publish-result");
-    internal string? PublishCompilerManifestPath => OptionalFullPath("publish-compiler-manifest");
-    internal string? PublishSarifPath => OptionalFullPath("publish-sarif");
-    internal int TerminationGraceMilliseconds => Number("termination-grace-ms", WorkerLauncherDefaults.TerminationGraceMilliseconds);
 
     internal static bool TryParse(string[] args, out LauncherArguments arguments)
     {
@@ -530,14 +510,10 @@ internal sealed class LauncherArguments
         out CompilerManifestArtifact artifact, out byte[] artifactBytes)
     {
         ValidateDistinctPaths();
-        return new WorkerVerifyRequest
-        {
-            CompilerManifest = CreateCompilerManifestReference(out artifact, out artifactBytes),
-            VerifyPolicy = LauncherPresentation.ParseVerifyPolicy(Required("verify-policy")),
-            AssumptionPolicy = LauncherPresentation.ParseAssumptionPolicy(Required("assumption-policy")),
-            Budgets = CreateBudgets(),
-            Cache = CreateCache()
-        };
+        var compilerManifest = CreateCompilerManifestReference(
+            out artifact,
+            out artifactBytes);
+        return ProjectRequest(compilerManifest);
     }
 
     private void ValidateDistinctPaths()
@@ -564,31 +540,6 @@ internal sealed class LauncherArguments
     internal static byte[] ReadCompilerManifest(string path)
     {
         return CompilerManifestArtifactFile.ReadAllBytes(path);
-    }
-
-    private WorkerBudgets CreateBudgets()
-    {
-        return new()
-        {
-            QueryRlimit = Number("query-rlimit", WorkerBudgets.DefaultQueryRlimit),
-            MethodRlimit = Number("method-rlimit", WorkerBudgets.DefaultMethodRlimit),
-            MethodWallTimeMilliseconds = Number("method-wall-ms", WorkerBudgets.DefaultMethodWallTimeMilliseconds),
-            ProjectWallTimeMilliseconds = Number("project-wall-ms", WorkerBudgets.DefaultProjectWallTimeMilliseconds),
-            MaxParallelism = Number("max-parallelism", WorkerBudgets.MaximumParallelism),
-            MaximumExpressionDepth = Number("max-expression-depth", WorkerBudgets.DefaultMaximumExpressionDepth),
-            ProcessMemoryLimitBytes = Number("process-memory-bytes", WorkerBudgets.DefaultProcessMemoryLimitBytes),
-            MaxWorkerProcesses = Number("max-worker-processes", WorkerBudgets.MaximumParallelism)
-        };
-    }
-
-    private WorkerCacheOptions CreateCache()
-    {
-        return new()
-        {
-            Enabled = Boolean("cache-enabled", true),
-            Directory = Optional("cache-directory"),
-            MaximumBytes = Number("cache-maximum-bytes", WorkerCacheOptions.DefaultMaximumBytes)
-        };
     }
 
     private string FullPath(string key)

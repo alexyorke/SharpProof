@@ -591,6 +591,11 @@ public sealed class ArchitectureTests
                 "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableProjections.generated.cs",
                 "SharpProof.Frontend/CompilerIdentityProjections.generated.cs"
             ],
+            ["launcherArgumentCatalog"] = [
+                "SharpProof.Worker.Launcher/LauncherArguments.catalog.json",
+                "scripts/Generate-LauncherArguments.ps1",
+                "SharpProof.Worker.Launcher/LauncherArguments.generated.cs"
+            ],
             ["declarativeModelsCatalog"] = [
                 "SharpProof.DeclarativeModels.catalog.json",
                 "scripts/Generate-DeclarativeModels.ps1",

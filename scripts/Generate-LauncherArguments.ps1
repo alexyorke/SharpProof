@@ -1,0 +1,314 @@
+[CmdletBinding()]
+param(
+    [Parameter()][string]$CatalogPath,
+    [Parameter()][string]$OutputPath,
+    [Parameter()][Alias('Check')][switch]$Verify
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
+
+$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+if ([string]::IsNullOrWhiteSpace($CatalogPath)) {
+    $CatalogPath = Join-Path $repositoryRoot `
+        'SharpProof.Worker.Launcher\LauncherArguments.catalog.json'
+}
+if ([string]::IsNullOrWhiteSpace($OutputPath)) {
+    $OutputPath = Join-Path $repositoryRoot `
+        'SharpProof.Worker.Launcher\LauncherArguments.generated.cs'
+}
+$CatalogPath = [IO.Path]::GetFullPath($CatalogPath)
+$OutputPath = [IO.Path]::GetFullPath($OutputPath)
+
+function Assert-Properties {
+    param([object]$Value, [string[]]$Names, [string]$Context)
+    $actual = @($Value.PSObject.Properties.Name)
+    foreach ($name in $actual) {
+        if ($name -notin $Names) {
+            throw "$Context contains unsupported property '$name'."
+        }
+    }
+    foreach ($name in $Names) {
+        if ($name -notin $actual) {
+            throw "$Context is missing required property '$name'."
+        }
+    }
+}
+
+function Assert-UniqueJsonProperties {
+    param([System.Text.Json.JsonElement]$Value, [string]$Context)
+    if ($Value.ValueKind -eq [System.Text.Json.JsonValueKind]::Array) {
+        $index = 0
+        foreach ($item in $Value.EnumerateArray()) {
+            Assert-UniqueJsonProperties $item "$Context[$index]"
+            $index++
+        }
+        return
+    }
+    if ($Value.ValueKind -ne [System.Text.Json.JsonValueKind]::Object) {
+        return
+    }
+    $names = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($property in $Value.EnumerateObject()) {
+        if (-not $names.Add($property.Name)) {
+            throw "$Context contains duplicate property '$($property.Name)'."
+        }
+        Assert-UniqueJsonProperties $property.Value `
+            "$Context.$($property.Name)"
+    }
+}
+
+function Quote-CSharpString([string]$Value) {
+    return '"' + $Value.Replace('\', '\\').Replace('"', '\"') + '"'
+}
+
+function Assert-Choice(
+    [object]$Value,
+    [string[]]$Allowed,
+    [string]$Context) {
+    if ($Value -isnot [string] -or [string]$Value -notin $Allowed) {
+        throw "$Context must be one of: $($Allowed -join ', ')."
+    }
+    return [string]$Value
+}
+
+$catalogJson = Get-Content -LiteralPath $CatalogPath -Raw
+$document = [System.Text.Json.JsonDocument]::Parse($catalogJson)
+try {
+    Assert-UniqueJsonProperties $document.RootElement `
+        'launcher argument catalog'
+}
+finally {
+    $document.Dispose()
+}
+$catalog = $catalogJson | ConvertFrom-Json
+Assert-Properties $catalog @('schemaVersion', 'options', 'budgets', 'cache') `
+    'launcher argument catalog'
+if ($catalog.schemaVersion -ne 1) {
+    throw 'Launcher argument catalog schemaVersion must be 1.'
+}
+
+$optionKeys = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal)
+$propertyNames = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal)
+foreach ($option in @($catalog.options)) {
+    Assert-Properties $option `
+        @('key', 'category', 'accessor', 'property', 'fallback') `
+        'launcher option'
+    if ($option.key -isnot [string] -or
+        [string]$option.key -cnotmatch '\A[a-z][a-z0-9-]*\z' -or
+        -not $optionKeys.Add([string]$option.key)) {
+        throw "Launcher option key is invalid or duplicated: '$($option.key)'."
+    }
+    $category = Assert-Choice $option.category `
+        @('required', 'publication', 'optional') `
+        "launcher option '$($option.key)' category"
+    $accessor = Assert-Choice $option.accessor `
+        @('none', 'fullPath', 'optionalFullPath', 'integer') `
+        "launcher option '$($option.key)' accessor"
+    if ($category -eq 'publication' -and $accessor -ne 'optionalFullPath') {
+        throw "Publication option '$($option.key)' must project an optional path."
+    }
+    if ($accessor -eq 'none') {
+        if ($option.property -ne '' -or $option.fallback -ne '') {
+            throw "Non-projecting option '$($option.key)' has projection metadata."
+        }
+        continue
+    }
+    if ($option.property -isnot [string] -or
+        [string]$option.property -cnotmatch '\A[A-Z][A-Za-z0-9]*\z' -or
+        -not $propertyNames.Add([string]$option.property)) {
+        throw "Launcher property is invalid or duplicated: '$($option.property)'."
+    }
+    if ($accessor -eq 'integer') {
+        if ($option.fallback -ne 'terminationGraceMilliseconds') {
+            throw "Integer option '$($option.key)' has an unknown fallback."
+        }
+    }
+    elseif ($option.fallback -ne '') {
+        throw "Path option '$($option.key)' cannot have a fallback."
+    }
+}
+
+$budgetDefaults = @{
+    QueryRlimit = 'WorkerBudgets.DefaultQueryRlimit'
+    MethodRlimit = 'WorkerBudgets.DefaultMethodRlimit'
+    MethodWallTimeMilliseconds = `
+        'WorkerBudgets.DefaultMethodWallTimeMilliseconds'
+    ProjectWallTimeMilliseconds = `
+        'WorkerBudgets.DefaultProjectWallTimeMilliseconds'
+    MaxParallelism = 'WorkerBudgets.MaximumParallelism'
+    MaximumExpressionDepth = `
+        'WorkerBudgets.DefaultMaximumExpressionDepth'
+    ProcessMemoryLimitBytes = `
+        'WorkerBudgets.DefaultProcessMemoryLimitBytes'
+    MaxWorkerProcesses = 'WorkerBudgets.MaximumParallelism'
+}
+$budgetFallbacks = @{
+    QueryRlimit = 'queryRlimit'
+    MethodRlimit = 'methodRlimit'
+    MethodWallTimeMilliseconds = 'methodWallTimeMilliseconds'
+    ProjectWallTimeMilliseconds = 'projectWallTimeMilliseconds'
+    MaxParallelism = 'maximumParallelism'
+    MaximumExpressionDepth = 'maximumExpressionDepth'
+    ProcessMemoryLimitBytes = 'processMemoryLimitBytes'
+    MaxWorkerProcesses = 'maximumParallelism'
+}
+$seenBudgets = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal)
+foreach ($budget in @($catalog.budgets)) {
+    Assert-Properties $budget @('property', 'key', 'fallback') `
+        'launcher budget projection'
+    $property = [string]$budget.property
+    if (-not $budgetDefaults.ContainsKey($property) -or
+        -not $seenBudgets.Add($property) -or
+        $budget.fallback -ne $budgetFallbacks[$property] -or
+        -not $optionKeys.Contains([string]$budget.key)) {
+        throw "Launcher budget projection '$property' is invalid."
+    }
+}
+if ($seenBudgets.Count -ne $budgetDefaults.Count) {
+    throw 'Launcher budget projections are incomplete.'
+}
+
+$cacheDefaults = @{
+    Enabled = 'true'
+    Directory = ''
+    MaximumBytes = 'WorkerCacheOptions.DefaultMaximumBytes'
+}
+$cacheKinds = @{
+    Enabled = 'boolean'
+    Directory = 'optional'
+    MaximumBytes = 'integer'
+}
+$cacheFallbacks = @{
+    Enabled = 'cacheEnabled'
+    Directory = 'none'
+    MaximumBytes = 'cacheMaximumBytes'
+}
+$seenCache = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal)
+foreach ($entry in @($catalog.cache)) {
+    Assert-Properties $entry @('property', 'key', 'projection', 'fallback') `
+        'launcher cache projection'
+    $property = [string]$entry.property
+    if (-not $cacheDefaults.ContainsKey($property) -or
+        -not $seenCache.Add($property) -or
+        $entry.projection -ne $cacheKinds[$property] -or
+        $entry.fallback -ne $cacheFallbacks[$property] -or
+        -not $optionKeys.Contains([string]$entry.key)) {
+        throw "Launcher cache projection '$property' is invalid."
+    }
+}
+if ($seenCache.Count -ne $cacheDefaults.Count) {
+    throw 'Launcher cache projections are incomplete.'
+}
+
+$lines = [Collections.Generic.List[string]]::new()
+$lines.Add('// <auto-generated>')
+$lines.Add('// Generated by scripts/Generate-LauncherArguments.ps1 from')
+$lines.Add('// SharpProof.Worker.Launcher/LauncherArguments.catalog.json.')
+$lines.Add('// Declarative option inventories and request projections only.')
+$lines.Add('// Parsing, validation, manifest I/O, and hashing remain handwritten.')
+$lines.Add('// Do not edit this file directly.')
+$lines.Add('// </auto-generated>')
+$lines.Add('#nullable enable')
+$lines.Add('')
+$lines.Add('using SharpProof.Worker.Protocol;')
+$lines.Add('')
+$lines.Add('namespace SharpProof.Worker.Launcher;')
+$lines.Add('')
+$lines.Add('internal sealed partial class LauncherArguments')
+$lines.Add('{')
+$required = @($catalog.options | Where-Object category -eq 'required')
+$publication = @($catalog.options | Where-Object category -eq 'publication')
+$lines.Add('    private static readonly string[] s_required = [')
+foreach ($entry in $required) {
+    $lines.Add("        $(Quote-CSharpString $entry.key),")
+}
+$lines.Add('    ];')
+$lines.Add('    private static readonly string[] s_publication = [')
+foreach ($entry in $publication) {
+    $lines.Add("        $(Quote-CSharpString $entry.key),")
+}
+$lines.Add('    ];')
+$lines.Add('    private static readonly HashSet<string> s_allowed = [')
+foreach ($entry in @($catalog.options)) {
+    $lines.Add("        $(Quote-CSharpString $entry.key),")
+}
+$lines.Add('    ];')
+$lines.Add('')
+foreach ($entry in @($catalog.options | Where-Object accessor -ne 'none')) {
+    $key = Quote-CSharpString $entry.key
+    $declaration = switch ($entry.accessor) {
+        'fullPath' { "internal string $($entry.property) => FullPath($key);" }
+        'optionalFullPath' {
+            "internal string? $($entry.property) => OptionalFullPath($key);"
+        }
+        'integer' {
+            "internal int $($entry.property) => Number($key, " +
+                'WorkerLauncherDefaults.TerminationGraceMilliseconds);'
+        }
+    }
+    $lines.Add("    $declaration")
+}
+$lines.Add('')
+$lines.Add('    internal WorkerVerifyRequest ProjectRequest(')
+$lines.Add('        WorkerFileReference compilerManifest)')
+$lines.Add('    {')
+$lines.Add('        return new()')
+$lines.Add('        {')
+$lines.Add('            CompilerManifest = compilerManifest,')
+$lines.Add('            VerifyPolicy = LauncherPresentation.ParseVerifyPolicy(')
+$lines.Add('                Required("verify-policy")),')
+$lines.Add('            AssumptionPolicy = LauncherPresentation.ParseAssumptionPolicy(')
+$lines.Add('                Required("assumption-policy")),')
+$lines.Add('            Budgets = CreateBudgets(),')
+$lines.Add('            Cache = CreateCache()')
+$lines.Add('        };')
+$lines.Add('    }')
+$lines.Add('')
+$lines.Add('    private WorkerBudgets CreateBudgets()')
+$lines.Add('    {')
+$lines.Add('        return new()')
+$lines.Add('        {')
+foreach ($entry in @($catalog.budgets)) {
+    $lines.Add("            $($entry.property) = Number(" +
+        "$(Quote-CSharpString $entry.key), " +
+        "$($budgetDefaults[[string]$entry.property])),")
+}
+$lines[$lines.Count - 1] = $lines[$lines.Count - 1].TrimEnd(',')
+$lines.Add('        };')
+$lines.Add('    }')
+$lines.Add('')
+$lines.Add('    private WorkerCacheOptions CreateCache()')
+$lines.Add('    {')
+$lines.Add('        return new()')
+$lines.Add('        {')
+foreach ($entry in @($catalog.cache)) {
+    $key = Quote-CSharpString $entry.key
+    $value = switch ($entry.projection) {
+        'boolean' { "Boolean($key, true)" }
+        'optional' { "Optional($key)" }
+        'integer' {
+            "Number($key, WorkerCacheOptions.DefaultMaximumBytes)"
+        }
+    }
+    $lines.Add("            $($entry.property) = $value,")
+}
+$lines[$lines.Count - 1] = $lines[$lines.Count - 1].TrimEnd(',')
+$lines.Add('        };')
+$lines.Add('    }')
+$lines.Add('}')
+
+Update-SharpProofGeneratedFile `
+    -Path $OutputPath `
+    -Content ($lines -join "`n") `
+    -DisplayPath $OutputPath `
+    -GeneratorCommand '.\scripts\Generate-LauncherArguments.ps1' `
+    -Verify:$Verify
+$verb = if ($Verify) { 'Verified' } else { 'Generated' }
+Write-Host "$verb deterministic launcher argument projections."

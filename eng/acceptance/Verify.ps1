@@ -21,6 +21,7 @@ $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
     & (Join-Path $repositoryRoot 'scripts\Generate-ContractApiCatalog.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-AnalyzerDiagnosticCatalog.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-ProjectionCatalog.ps1') -Verify
+    & (Join-Path $repositoryRoot 'scripts\Generate-LauncherArguments.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-BoundContractModel.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-EffectContractMappings.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-OperationSupportCatalog.ps1') -Verify
@@ -369,6 +370,7 @@ try {
         'contractApiCatalog',
         'analyzerDiagnosticCatalog',
         'projectionCatalog',
+        'launcherArgumentCatalog',
         'declarativeModelsCatalog',
         'boundContractModelCatalog',
         'effectContractCatalog',

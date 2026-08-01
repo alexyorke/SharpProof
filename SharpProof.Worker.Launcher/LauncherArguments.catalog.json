@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "options": [
+    { "key": "worker", "category": "required", "accessor": "fullPath", "property": "WorkerPath", "fallback": "" },
+    { "key": "request", "category": "required", "accessor": "fullPath", "property": "RequestPath", "fallback": "" },
+    { "key": "result", "category": "required", "accessor": "fullPath", "property": "ResultPath", "fallback": "" },
+    { "key": "compiler-manifest", "category": "required", "accessor": "fullPath", "property": "CompilerManifestPath", "fallback": "" },
+    { "key": "verify-policy", "category": "required", "accessor": "none", "property": "", "fallback": "" },
+    { "key": "assumption-policy", "category": "required", "accessor": "none", "property": "", "fallback": "" },
+    { "key": "publish-request", "category": "publication", "accessor": "optionalFullPath", "property": "PublishRequestPath", "fallback": "" },
+    { "key": "publish-result", "category": "publication", "accessor": "optionalFullPath", "property": "PublishResultPath", "fallback": "" },
+    { "key": "publish-compiler-manifest", "category": "publication", "accessor": "optionalFullPath", "property": "PublishCompilerManifestPath", "fallback": "" },
+    { "key": "publish-sarif", "category": "optional", "accessor": "optionalFullPath", "property": "PublishSarifPath", "fallback": "" },
+    { "key": "termination-grace-ms", "category": "optional", "accessor": "integer", "property": "TerminationGraceMilliseconds", "fallback": "terminationGraceMilliseconds" },
+    { "key": "query-rlimit", "category": "optional", "accessor": "none", "property": "", "fallback": "" },
+    { "key": "method-rlimit", "category": "optional", "accessor": "none", "property": "", "fallback": "" },
+    { "key": "method-wall-ms", "category": "optional", "accessor": "none", "property": "", "fallback": "" },
+    { "key": "project-wall-ms", "category": "optional", "accessor": "none", "property": "", "fallback": "" },
+    { "key": "max-parallelism", "category": "optional", "accessor": "none", "property": "", "fallback": "" },
+    { "key": "max-expression-depth", "category": "optional", "accessor": "none", "property": "", "fallback": "" },
+    { "key": "process-memory-bytes", "category": "optional", "accessor": "none", "property": "", "fallback": "" },
+    { "key": "max-worker-processes", "category": "optional", "accessor": "none", "property": "", "fallback": "" },
+    { "key": "cache-enabled", "category": "optional", "accessor": "none", "property": "", "fallback": "" },
+    { "key": "cache-directory", "category": "optional", "accessor": "none", "property": "", "fallback": "" },
+    { "key": "cache-maximum-bytes", "category": "optional", "accessor": "none", "property": "", "fallback": "" }
+  ],
+  "budgets": [
+    { "property": "QueryRlimit", "key": "query-rlimit", "fallback": "queryRlimit" },
+    { "property": "MethodRlimit", "key": "method-rlimit", "fallback": "methodRlimit" },
+    { "property": "MethodWallTimeMilliseconds", "key": "method-wall-ms", "fallback": "methodWallTimeMilliseconds" },
+    { "property": "ProjectWallTimeMilliseconds", "key": "project-wall-ms", "fallback": "projectWallTimeMilliseconds" },
+    { "property": "MaxParallelism", "key": "max-parallelism", "fallback": "maximumParallelism" },
+    { "property": "MaximumExpressionDepth", "key": "max-expression-depth", "fallback": "maximumExpressionDepth" },
+    { "property": "ProcessMemoryLimitBytes", "key": "process-memory-bytes", "fallback": "processMemoryLimitBytes" },
+    { "property": "MaxWorkerProcesses", "key": "max-worker-processes", "fallback": "maximumParallelism" }
+  ],
+  "cache": [
+    { "property": "Enabled", "key": "cache-enabled", "projection": "boolean", "fallback": "cacheEnabled" },
+    { "property": "Directory", "key": "cache-directory", "projection": "optional", "fallback": "none" },
+    { "property": "MaximumBytes", "key": "cache-maximum-bytes", "projection": "integer", "fallback": "cacheMaximumBytes" }
+  ]
+}
