@@ -439,10 +439,6 @@ public sealed class WorkerMsBuildIntegrationTests
                 project.CompilerManifestPath + ".missing-worker.dll"));
         await AssertInvalidatedAsync(
             ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
-            ("SharpProofNativeZ3Path",
-                project.CompilerManifestPath + ".missing-z3.dll"));
-        await AssertInvalidatedAsync(
-            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
             ("SharpProofVerifyPolicy", "invalid"));
         await AssertInvalidatedAsync(
             ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
@@ -1252,6 +1248,9 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(
                 s_reconstructionListArtifacts.Where(targetXml.Contains),
                 Is.Empty);
+            Assert.That(
+                targetXml,
+                Does.Not.Contain("SharpProofNativeZ3Path"));
             Assert.That(
                 verifyCore.Descendants("WriteLinesToFile"),
                 Is.Empty);
@@ -2069,10 +2068,6 @@ public sealed class WorkerMsBuildIntegrationTests
             var worker = SecurityElement.Escape(
                 Path.Combine(repository, "SharpProof.Worker", "bin",
                     testConfiguration, "net9.0", "SharpProof.Worker.dll"));
-            var nativeZ3 = SecurityElement.Escape(
-                Path.Combine(repository, "SharpProof.Worker", "bin",
-                    testConfiguration, "net9.0", "runtimes", "win-x64",
-                    "native", "libz3.dll"));
             var launcher = SecurityElement.Escape(
                 Path.Combine(repository, "SharpProof.Worker.Launcher", "bin",
                     testConfiguration, "net9.0",
@@ -2101,7 +2096,6 @@ public sealed class WorkerMsBuildIntegrationTests
                     <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
                     <SharpProofWorkerPath>{worker}</SharpProofWorkerPath>
                     <_SharpProofWorkerPath>$([System.IO.Path]::GetFullPath('$(SharpProofWorkerPath)'))</_SharpProofWorkerPath>
-                    <SharpProofNativeZ3Path>{nativeZ3}</SharpProofNativeZ3Path>
                     <SharpProofLauncherPath>{launcher}</SharpProofLauncherPath>
                     <_SharpProofLauncherPath>$([System.IO.Path]::GetFullPath('$(SharpProofLauncherPath)'))</_SharpProofLauncherPath>
                   </PropertyGroup>
