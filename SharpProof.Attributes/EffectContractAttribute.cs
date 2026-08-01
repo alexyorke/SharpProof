@@ -19,4 +19,8 @@ public sealed class EffectContractAttribute(SharpProofEffect effects) : Attribut
     {
         get; set;
     }
+    public bool PreconditionFree
+    {
+        get; set;
+    }
 }

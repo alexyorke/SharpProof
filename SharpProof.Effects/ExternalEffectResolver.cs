@@ -72,9 +72,14 @@ internal sealed class ExternalEffectResolver
         }
 
         EffectSummary? resolved = null;
+        var preconditionFree = true;
         foreach (var attribute in attributes)
         {
-            if (!TryDecodeContract(method, attribute, out var candidate))
+            if (!TryDecodeContract(
+                    method,
+                    attribute,
+                    out var candidate,
+                    out var candidatePreconditionFree))
             {
                 return Invalid(attribute, "expected a complete, internally consistent effect summary");
             }
@@ -83,6 +88,7 @@ internal sealed class ExternalEffectResolver
                 return Invalid(attribute, "expected duplicate declarations to describe identical effects");
             }
             resolved = candidate;
+            preconditionFree &= candidatePreconditionFree;
         }
         if (!_trustedBoundaries.AuthorizesDeclaredContracts(method))
         {
@@ -92,6 +98,18 @@ internal sealed class ExternalEffectResolver
         if (resolved!.Completeness != EffectCompleteness.Complete)
         {
             return new(EffectContractResolutionKind.Incomplete, EffectSummary.Top);
+        }
+
+        if (method.DeclaringSyntaxReferences.Length == 0 &&
+            !preconditionFree)
+        {
+            return new(
+                EffectContractResolutionKind.Incomplete,
+                EffectSummaryOperations.Join(
+                    resolved,
+                    EffectSummaryOperations.IncompleteAnalysis(
+                        EffectAnalysisIncompleteReason
+                            .CallPreconditionNotProven)));
         }
 
         return new(EffectContractResolutionKind.Valid, resolved!);
@@ -113,9 +131,13 @@ internal sealed class ExternalEffectResolver
     }
 
     private bool TryDecodeContract(
-        IMethodSymbol method, AttributeData attribute, out EffectSummary summary)
+        IMethodSymbol method,
+        AttributeData attribute,
+        out EffectSummary summary,
+        out bool preconditionFree)
     {
         summary = EffectSummary.Top;
+        preconditionFree = false;
         if (attribute.ConstructorArguments.Length != 1 ||
             attribute.ConstructorArguments[0].Value == null ||
             !TryConvertEffects(attribute.ConstructorArguments[0].Value!, out var effects) ||
@@ -157,6 +179,14 @@ internal sealed class ExternalEffectResolver
 
                     deterministic = deterministicValue;
                     break;
+                case EffectContractMetadata.PreconditionFreePropertyName:
+                    if (argument.Value.Value is not bool preconditionFreeValue)
+                    {
+                        return false;
+                    }
+
+                    preconditionFree = preconditionFreeValue;
+                    break;
                 case EffectContractMetadata.ThrownExceptionsPropertyName:
                     if (argument.Value.Kind != TypedConstantKind.Array ||
                         argument.Value.Values.IsDefault)
@@ -166,6 +196,8 @@ internal sealed class ExternalEffectResolver
 
                     thrown = argument.Value.Values;
                     break;
+                default:
+                    return false;
             }
         }
 
@@ -179,13 +211,13 @@ internal sealed class ExternalEffectResolver
 
             exceptionTypes.Add(type);
         }
-        if ((effects & EffectContractKind.Throws) != 0 && exceptionTypes.Count == 0 ||
-            (effects & EffectContractKind.Throws) == 0 && exceptionTypes.Count != 0)
+        if (((effects & EffectContractKind.Throws) != 0) !=
+            (exceptionTypes.Count != 0))
         {
             return false;
         }
 
-        if ((effects & (EffectContractKind.WritesReceiverState | EffectContractKind.ReadsReceiverState)) != 0 &&
+        if ((effects & (EffectContractKind.WritesReceiverState | EffectContractKind.ReadsReceiverState)) != 0 &
             method.IsStatic)
         {
             return false;

@@ -854,6 +854,7 @@ public sealed class EffectAnalysisTests
                     SharpProofEffect.ReadsAmbientState,
                     Capabilities = SharpProofCapability.Console,
                     IsDeterministic = true,
+                    PreconditionFree = true,
                     Complete = true)]
                 public static void Touch() {
                 }
@@ -983,6 +984,96 @@ public sealed class EffectAnalysisTests
             Assert.That(
                 result.Projection.IsComplete,
                 Is.False);
+        }
+    }
+
+    [Test]
+    public void SourceOnlyMetadataPreconditionsCannotDisappearIntoTrustedSummaries()
+    {
+        var externalReference = EffectTestHost.EmitReference(
+            """
+            using SharpProof.Attributes;
+
+            public static class DirectBoundary {
+                [SharpProofTrusted("reviewed external implementation")]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    IsDeterministic = true,
+                    Complete = true)]
+                public static void Restricted(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                [SharpProofTrusted("reviewed precondition-free implementation")]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    IsDeterministic = true,
+                    Complete = true,
+                    PreconditionFree = true)]
+                public static void Certified(int value) {
+                }
+            }
+
+            public sealed class Service {
+                [SharpProofTrusted("reviewed external implementation")]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    IsDeterministic = true,
+                    Complete = true)]
+                public void Restricted(int value) {
+                }
+            }
+
+            [ContractFor(typeof(Service))]
+            public static class ServiceContracts {
+                public static void Restricted(
+                    Service receiver,
+                    int value) {
+                    Contract.Requires(value > 0);
+                }
+            }
+            """,
+            "ExternalSourcePreconditionAssembly");
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static void InvokeDirect(int value) =>
+                    DirectBoundary.Restricted(value);
+
+                public static void InvokeCompanion(
+                    Service service,
+                    int value) =>
+                    service.Restricted(value);
+
+                public static void InvokeCertified(int value) =>
+                    DirectBoundary.Certified(value);
+            }
+            """,
+            externalReference);
+        var session = new EffectAnalysisSession(compilation);
+
+        var direct = session.Analyze(Method(compilation, "InvokeDirect"));
+        var companion = session.Analyze(Method(compilation, "InvokeCompanion"));
+        var certified = session.Analyze(Method(compilation, "InvokeCertified"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                direct.Summary.AnalysisIncompleteReason,
+                Is.EqualTo(
+                    EffectAnalysisIncompleteReason
+                        .CallPreconditionNotProven));
+            Assert.That(direct.Projection.IsComplete, Is.False);
+            Assert.That(
+                companion.Summary.AnalysisIncompleteReason,
+                Is.EqualTo(
+                    EffectAnalysisIncompleteReason
+                        .CallPreconditionNotProven));
+            Assert.That(companion.Projection.IsComplete, Is.False);
+            Assert.That(
+                certified.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(certified.Projection.IsComplete, Is.True);
         }
     }
 
@@ -1203,7 +1294,10 @@ public sealed class EffectAnalysisTests
                 }
 
                 [SharpProofTrusted("reviewed implementation")]
-                [EffectContract(SharpProofEffect.None, Complete = true)]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    Complete = true,
+                    PreconditionFree = true)]
                 public static void Both() {
                 }
 

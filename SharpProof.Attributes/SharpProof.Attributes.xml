@@ -99,6 +99,10 @@
       <summary>Gets or sets whether the declaration is a complete effect summary.</summary>
       <value>True when omitted effects are asserted absent; the default is false.</value>
     </member>
+    <member name="P:SharpProof.Attributes.EffectContractAttribute.PreconditionFree">
+      <summary>Gets or sets whether the reviewed boundary is certified to have no preconditions.</summary>
+      <value>True only when callers may use the summary without a separate precondition certificate; the default is false.</value>
+    </member>
     <member name="T:SharpProof.Attributes.EnforcePureAttribute">
       <summary>Requires a member to prove observable purity.</summary>
     </member>

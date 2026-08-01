@@ -60,8 +60,11 @@ for example, `Throws` does not imply `Allocates`. A complete
 `EffectContractAttribute` can describe a reviewed external boundary;
 `SharpProofTrustedAttribute` alone does not supply an effect fact. The
 attribute defaults are conservative:
-`Capabilities=None`, `ThrownExceptions=[]`, `IsDeterministic=false`, and
-`Complete=false`. Every stronger boundary fact must be written explicitly.
+`Capabilities=None`, `ThrownExceptions=[]`, `IsDeterministic=false`,
+`Complete=false`, and `PreconditionFree=false`. Metadata consumers accept a
+complete external summary only when `PreconditionFree=true` explicitly
+certifies that no source-only precondition envelope was erased during emit.
+Every stronger boundary fact must be written explicitly.
 
 ## Reporting and trust controls
 

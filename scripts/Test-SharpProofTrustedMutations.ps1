@@ -176,6 +176,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~FreshArrayContentsDoNotBecomeFreshOwnedAliases'
     },
     [pscustomobject]@{
+        Name = 'effect-metadata-precondition-certificate'
+        File = 'SharpProof.Effects\ExternalEffectResolver.cs'
+        Original = "        if (method.DeclaringSyntaxReferences.Length == 0 &&`n            !preconditionFree)"
+        Mutated = "        if (method.DeclaringSyntaxReferences.Length == 0 &&`n            preconditionFree)"
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~SourceOnlyMetadataPreconditionsCannotDisappearIntoTrustedSummaries'
+    },
+    [pscustomobject]@{
         Name = 'effect-region-contract-catalog'
         File = 'SharpProof.Effects\EffectContractMappings.generated.cs'
         Original = '        (EffectRegionKind.Receiver, EffectContractKind.ReadsReceiverState, EffectContractKind.WritesReceiverState, EffectRegionId.Receiver, false),'

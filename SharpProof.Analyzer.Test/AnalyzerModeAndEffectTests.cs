@@ -311,6 +311,7 @@ public sealed class AnalyzerModeAndEffectTests
                 [EffectContract(
                     SharpProofEffect.ReadsAmbientState,
                     Capabilities = SharpProofCapability.Synchronization,
+                    PreconditionFree = true,
                     Complete = true)]
                 public static void Synchronize() {
                 }
@@ -735,6 +736,7 @@ public sealed class AnalyzerModeAndEffectTests
                 [EffectContract(
                     SharpProofEffect.None,
                     IsDeterministic = true,
+                    PreconditionFree = true,
                     Complete = true)]
                 public static void Restricted(
                     [Positive] int value) {

@@ -1,1 +1,3 @@
 #nullable enable
+SharpProof.Attributes.EffectContractAttribute.PreconditionFree.get -> bool
+SharpProof.Attributes.EffectContractAttribute.PreconditionFree.set -> void
