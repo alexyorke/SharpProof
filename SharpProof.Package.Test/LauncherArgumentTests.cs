@@ -103,6 +103,39 @@ public sealed class LauncherArgumentTests
         Assert.That(action, Throws.TypeOf<OverflowException>());
     }
 
+    [Test]
+    public void DotNetHostMustBeAbsoluteInstalledAndOutsideProject()
+    {
+        var project = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N"));
+        var fakeRoot = Path.Combine(project, "fake-sdk");
+        var fakeHost = Path.Combine(fakeRoot, "dotnet.exe");
+        Directory.CreateDirectory(Path.Combine(fakeRoot, "host", "fxr"));
+        File.WriteAllBytes(fakeHost, []);
+        var actualHost = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ??
+            throw new InvalidOperationException(
+                "The test host did not disclose its dotnet host path.");
+        try
+        {
+            Assert.That(
+                Program.ValidateDotNetHostPath(actualHost, project),
+                Is.EqualTo(Path.GetFullPath(actualHost)));
+            Assert.That(
+                (Action)(() => _ = Program.ValidateDotNetHostPath(
+                    "dotnet.exe", project)),
+                Throws.TypeOf<InvalidOperationException>());
+            Assert.That(
+                (Action)(() => _ = Program.ValidateDotNetHostPath(
+                    fakeHost, project)),
+                Throws.TypeOf<InvalidOperationException>());
+        }
+        finally
+        {
+            Directory.Delete(project, recursive: true);
+        }
+    }
+
     [TestCase(1_000, 1_000, 1_900)]
     [TestCase(1_000, 100, 1_001)]
     public void CombinedTimeoutReservesCleanupTime(

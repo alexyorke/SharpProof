@@ -82,6 +82,44 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task WorkerCannotReachModuleInitializerBeforeResume()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var worker = await project.CreateResultlessWorkerAsync();
+        var marker = Path.Combine(
+            Path.GetDirectoryName(worker)!, "pre-main.marker");
+        var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ??
+            throw new InvalidOperationException(
+                "The test host did not disclose its dotnet host path.");
+        var eventName = "Local\\SharpProof.Worker.Test." +
+            Guid.NewGuid().ToString("N");
+        using var start = new EventWaitHandle(
+            false, EventResetMode.ManualReset, eventName);
+        using var boundary = WindowsJob.CreateRequired(
+            WorkerBudgets.DefaultProcessMemoryLimitBytes,
+            WorkerBudgets.MaximumParallelism);
+        using var process = boundary.StartSuspended(
+            host,
+            [worker, "verify", "--request", "unused-request.json",
+                "--result", "unused-result.json", "--start-event", eventName,
+                "--pre-main-marker", marker],
+            Path.GetDirectoryName(worker)!);
+
+        await Task.Delay(250);
+        Assert.That(File.Exists(marker), Is.False,
+            "A suspended worker must not execute its module initializer.");
+
+        process.Resume();
+        Assert.That(
+            SpinWait.SpinUntil(() => File.Exists(marker), 5_000),
+            Is.True,
+            "The worker did not execute after resume.");
+        boundary.Terminate(124);
+        Assert.That(process.WaitForExit(5_000), Is.True);
+    }
+
+    [Test]
     public void ManualConsumerImportsFollowSplitPackageOrder()
     {
         using var project = ConsumerProject.Create(IdentitySource);
@@ -1635,10 +1673,27 @@ public sealed class WorkerMsBuildIntegrationTests
                 Path.Combine(root, "Program.cs"),
                 """
                 using System;
+                using System.IO;
+                using System.Runtime.CompilerServices;
                 using System.Threading;
                 var eventName = args[Array.IndexOf(args, "--start-event") + 1];
                 using var start = EventWaitHandle.OpenExisting(eventName);
                 start.WaitOne();
+
+                internal static class PreMainProbe
+                {
+                    [ModuleInitializer]
+                    internal static void Initialize()
+                    {
+                        var arguments = Environment.GetCommandLineArgs();
+                        var markerIndex = Array.IndexOf(
+                            arguments, "--pre-main-marker");
+                        if (markerIndex >= 0)
+                        {
+                            File.WriteAllText(arguments[markerIndex + 1], "started");
+                        }
+                    }
+                }
                 """,
                 new System.Text.UTF8Encoding(false));
             var build = await RunDotNetAsync([

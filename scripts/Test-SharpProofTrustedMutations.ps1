@@ -526,6 +526,14 @@ $mutations = @(
         Mutated = 'NativeMethods.JobObjectLimitFlags.ActiveProcess |'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~WorkerContainmentIsMandatoryOnTheSupportedHost'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-create-suspended'
+        File = 'SharpProof.Worker.Launcher\Program.cs'
+        Original = 'NativeMethods.CreateSuspended | NativeMethods.CreateNoWindow,'
+        Mutated = 'NativeMethods.CreateNoWindow,'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~WorkerCannotReachModuleInitializerBeforeResume'
     }
 )
 
