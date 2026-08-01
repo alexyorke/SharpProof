@@ -611,6 +611,11 @@ public sealed class ArchitectureTests
                 "eng/generated/approved-outputs.v1.json",
                 "scripts/Test-ProductionCSharpComplexity.ps1"
             ],
+            ["mutationEvidencePolicy"] = [
+                "scripts/SharpProof.MutationEvidence.psm1",
+                "scripts/Test-SharpProofMutationEvidence.ps1",
+                "scripts/Test-SharpProofTrustedMutations.ps1"
+            ],
             ["declarativeModelsCatalog"] = [
                 "SharpProof.DeclarativeModels.catalog.json",
                 "scripts/Generate-DeclarativeModels.ps1",

@@ -7,11 +7,15 @@ param(
 
     [string[]]$MutationName = @(),
 
+    [string]$ExpectedCommit = '',
+
     [switch]$KeepWorkspace
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $output = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputPath))
@@ -19,6 +23,15 @@ if (-not $output.StartsWith(
         $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
         [StringComparison]::OrdinalIgnoreCase)) {
     throw "OutputPath must be inside the repository: $output"
+}
+
+$sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($sourceCommit)) {
+    throw 'Unable to resolve the mutation source commit.'
+}
+if (-not [string]::IsNullOrWhiteSpace($ExpectedCommit) -and
+    $sourceCommit -ne $ExpectedCommit) {
+    throw "Mutation source commit '$sourceCommit' does not match '$ExpectedCommit'."
 }
 
 & git -C $repositoryRoot diff --quiet --
@@ -656,8 +669,11 @@ $workspace = Join-Path $mutationRoot (
     'workspace-' + [Guid]::NewGuid().ToString('N'))
 $sourceRoot = Join-Path $workspace 'source'
 $archive = Join-Path $workspace 'source.zip'
-$logs = Join-Path (Split-Path -Parent $output) 'mutation-logs'
+$runId = $sourceCommit.Substring(0, 12) + '-' +
+    [Guid]::NewGuid().ToString('N')
+$logs = Join-Path (Join-Path (Split-Path -Parent $output) 'mutation-logs') $runId
 New-Item -ItemType Directory -Path $sourceRoot, $logs -Force | Out-Null
+Remove-Item -LiteralPath $output -Force -ErrorAction SilentlyContinue
 
 function Invoke-IsolatedDotnet {
     param(
@@ -679,69 +695,6 @@ function Invoke-IsolatedDotnet {
     }
     finally {
         Pop-Location
-    }
-}
-
-function Read-TestEvidence {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$TrxPath,
-
-        [Parameter(Mandatory = $true)]
-        [string]$MutationName,
-
-        [switch]$RequireAssertionFailure
-    )
-
-    if (-not (Test-Path -LiteralPath $TrxPath -PathType Leaf)) {
-        throw "Test evidence for '$MutationName' was not produced: $TrxPath"
-    }
-
-    [xml]$document = [IO.File]::ReadAllText($TrxPath)
-    $results = @($document.SelectNodes(
-            "//*[local-name()='UnitTestResult']"))
-    if ($results.Count -eq 0) {
-        throw "No selected tests executed for '$MutationName'."
-    }
-
-    $counters = $document.SelectSingleNode(
-        "//*[local-name()='ResultSummary']/*[local-name()='Counters']")
-    if ($null -eq $counters) {
-        throw "TRX counters are missing for '$MutationName'."
-    }
-    foreach ($counterName in @('error', 'aborted', 'timeout')) {
-        if ([int]$counters.GetAttribute($counterName) -ne 0) {
-            throw (
-                "Mutation '$MutationName' had infrastructure counter " +
-                "'$counterName'; it was not killed by an assertion.")
-        }
-    }
-
-    $failedResults = @($results | Where-Object {
-            $_.GetAttribute('outcome') -eq 'Failed'
-        })
-    $assertionFailures = @($failedResults | Where-Object {
-            $errorInfo = $_.SelectSingleNode(
-                "*[local-name()='Output']/*[local-name()='ErrorInfo']")
-            $null -ne $errorInfo -and
-                $errorInfo.InnerText -match
-                    ('NUnit\.Framework\.' +
-                    '(AssertionException|MultipleAssertException)|' +
-                    '(?m)^\s*Assert\.(That|Fail|Multiple|Pass)\(')
-        })
-    if ($RequireAssertionFailure -and $assertionFailures.Count -eq 0) {
-        throw (
-            "Mutation '$MutationName' did not produce an assertion failure; " +
-            'crashes and infrastructure failures do not count as kills.')
-    }
-
-    return [pscustomobject]@{
-        executedCount = $results.Count
-        failedCount = $failedResults.Count
-        assertionFailureCount = $assertionFailures.Count
-        selectedTests = @($results | ForEach-Object {
-                $_.GetAttribute('testName')
-            })
     }
 }
 
@@ -774,7 +727,7 @@ try {
     & git -C $repositoryRoot archive `
         --format=zip `
         --output=$archive `
-        HEAD
+        $sourceCommit
     if ($LASTEXITCODE -ne 0) {
         throw "git archive failed with exit code $LASTEXITCODE."
     }
@@ -812,12 +765,16 @@ try {
                 "Baseline for mutation '$($mutation.Name)' failed; see " +
                 "$logs\$($mutation.Name)-baseline.log.")
         }
-        $baselineEvidence = Read-TestEvidence `
+        $expectedMethodName = $mutation.Filter.Substring(
+            'FullyQualifiedName~'.Length)
+        $baselineEvidence = Read-SharpProofMutationTestEvidence `
             -TrxPath $baselineTrx `
-            -MutationName ($mutation.Name + ' baseline')
-        if ($baselineEvidence.failedCount -ne 0) {
-            throw "Baseline for mutation '$($mutation.Name)' contains failures."
-        }
+            -EvidenceName ($mutation.Name + ' baseline') `
+            -Mode Baseline `
+            -ExpectedMethodName $expectedMethodName
+        $mutation | Add-Member `
+            -NotePropertyName BaselineLedger `
+            -NotePropertyValue @($baselineEvidence.testLedger)
     }
 
     $results = @()
@@ -879,10 +836,14 @@ try {
                     "Mutation '$($mutation.Name)' timed out instead of being " +
                     "killed by an assertion.")
             }
-            $testEvidence = Read-TestEvidence `
+            $expectedMethodName = $mutation.Filter.Substring(
+                'FullyQualifiedName~'.Length)
+            $testEvidence = Read-SharpProofMutationTestEvidence `
                 -TrxPath $testTrx `
-                -MutationName $mutation.Name `
-                -RequireAssertionFailure
+                -EvidenceName $mutation.Name `
+                -Mode Mutation `
+                -ExpectedMethodName $expectedMethodName `
+                -ExpectedLedger $mutation.BaselineLedger
             $results += [pscustomobject]@{
                 name = $mutation.Name
                 file = $mutation.File.Replace('\', '/')
@@ -892,9 +853,9 @@ try {
                 executedCount = $testEvidence.executedCount
                 failedCount = $testEvidence.failedCount
                 assertionFailureCount = $testEvidence.assertionFailureCount
-                selectedTests = $testEvidence.selectedTests
-                log = "mutation-logs/$($mutation.Name)-test.log"
-                trx = "mutation-logs/$testTrxName"
+                selectedTests = $testEvidence.testLedger
+                log = "mutation-logs/$runId/$($mutation.Name)-test.log"
+                trx = "mutation-logs/$runId/$testTrxName"
             }
         }
         finally {
@@ -907,16 +868,26 @@ try {
 
     $outputDirectory = Split-Path -Parent $output
     New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
-    $sha = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+    $currentCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+    & git -C $repositoryRoot diff --quiet --
+    $trackedTreeChanged = $LASTEXITCODE -ne 0
+    & git -C $repositoryRoot diff --cached --quiet --
+    $trackedIndexChanged = $LASTEXITCODE -ne 0
+    if ($currentCommit -ne $sourceCommit -or
+        $trackedTreeChanged -or $trackedIndexChanged) {
+        throw 'Repository identity changed while mutation evidence was produced.'
+    }
+    $temporaryOutput = $output + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
     [pscustomobject]@{
         schemaVersion = 2
-        commit = $sha
+        commit = $sourceCommit
         configuration = $Configuration
         mutationCount = $results.Count
         killedCount = @($results | Where-Object killed).Count
         mutations = $results
     } | ConvertTo-Json -Depth 5 |
-        Set-Content -LiteralPath $output -Encoding utf8NoBOM
+        Set-Content -LiteralPath $temporaryOutput -Encoding utf8NoBOM
+    Move-Item -LiteralPath $temporaryOutput -Destination $output -Force
     Write-Host "Killed $($results.Count) trusted-boundary mutations."
     Write-Host "Evidence: $output"
 }

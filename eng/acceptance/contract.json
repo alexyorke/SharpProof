@@ -197,6 +197,14 @@
         ]
       },
       {
+        "name": "mutationEvidencePolicy",
+        "paths": [
+          "scripts/SharpProof.MutationEvidence.psm1",
+          "scripts/Test-SharpProofMutationEvidence.ps1",
+          "scripts/Test-SharpProofTrustedMutations.ps1"
+        ]
+      },
+      {
         "name": "declarativeModelsCatalog",
         "paths": [
           "SharpProof.DeclarativeModels.catalog.json",

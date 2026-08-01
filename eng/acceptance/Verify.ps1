@@ -30,6 +30,7 @@ $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 & (Join-Path $repositoryRoot 'scripts\Generate-ProtocolModel.ps1') -Verify
 & (Join-Path $repositoryRoot 'scripts\Generate-CompilerArtifactModel.ps1') -Verify
 & (Join-Path $repositoryRoot 'scripts\Test-CompilerArtifactModelGenerator.ps1')
+& (Join-Path $repositoryRoot 'scripts\Test-SharpProofMutationEvidence.ps1')
 & (Join-Path $repositoryRoot 'scripts\Generate-DeclarativeModels.ps1') -Verify
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
 $directoryBuildPropsPath = Join-Path `
@@ -373,6 +374,7 @@ try {
         'projectionCatalog',
         'launcherArgumentCatalog',
         'generatedOutputPolicy',
+        'mutationEvidencePolicy',
         'declarativeModelsCatalog',
         'boundContractModelCatalog',
         'effectContractCatalog',
