@@ -104,6 +104,30 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void CompilerManifestByteLimitIsEnforcedBeforeAllocation()
+    {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            using (var stream = File.Create(path))
+            {
+                stream.SetLength(
+                    LauncherArguments.MaximumCompilerManifestBytes + 1L);
+            }
+
+            Assert.That(
+                (Action)(() => LauncherArguments.ReadCompilerManifest(path)),
+                Throws.TypeOf<InvalidDataException>());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Test]
     public void DotNetHostMustBeAbsoluteInstalledAndOutsideProject()
     {
         var project = Path.Combine(

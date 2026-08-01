@@ -456,6 +456,8 @@ internal static partial class LauncherPresentation
 
 internal sealed class LauncherArguments
 {
+    internal const int MaximumCompilerManifestBytes = 16 * 1024 * 1024;
+
     private static readonly string[] s_required = [
         "worker", "request", "result", "compiler-manifest", "verify-policy", "assumption-policy"
     ];
@@ -553,9 +555,24 @@ internal sealed class LauncherArguments
         out CompilerManifestArtifact artifact, out byte[] bytes)
     {
         var path = FullPath("compiler-manifest");
-        bytes = File.ReadAllBytes(path);
+        bytes = ReadCompilerManifest(path);
         artifact = CompilerManifestArtifactJson.Deserialize(new UTF8Encoding(false, true).GetString(bytes));
         return new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) };
+    }
+
+    internal static byte[] ReadCompilerManifest(string path)
+    {
+        using var stream = new FileStream(
+            path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (stream.Length > MaximumCompilerManifestBytes)
+        {
+            throw new InvalidDataException(
+                "The compiler manifest exceeds the launcher byte limit.");
+        }
+
+        var bytes = new byte[checked((int)stream.Length)];
+        stream.ReadExactly(bytes);
+        return bytes;
     }
 
     private WorkerBudgets CreateBudgets()
