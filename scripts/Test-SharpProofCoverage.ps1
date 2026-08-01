@@ -238,6 +238,7 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
     $contract = Get-Content -LiteralPath $contractPath -Raw |
         ConvertFrom-Json
     $tcbPaths = @(
+        @($contract.trustedKernel.paths)
         $contract.trustedComputingBase.components |
             ForEach-Object { @($_.paths) } |
             ForEach-Object { ([string]$_).Replace('\', '/') } |

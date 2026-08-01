@@ -400,6 +400,11 @@ try {
     }
     $allTcbPaths = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::Ordinal)
+    foreach ($path in $kernelPaths) {
+        if (-not $allTcbPaths.Add([string]$path)) {
+            throw "Trusted-computing-base path is declared more than once: $path"
+        }
+    }
     foreach ($component in $tcbComponents) {
         $name = [string]$component.name
         $paths = @($component.paths)

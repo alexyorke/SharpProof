@@ -275,11 +275,10 @@
           "SharpProof.Specs/FrameworkTypeMetadataNames.cs"
         ]
       },
-      {
-        "name": "replay",
-        "paths": [
-          "SharpProof.Verify/ProofKernel.cs",
-          "SharpProof.Ir/IrInterpreter.cs",
+    {
+      "name": "replay",
+      "paths": [
+        "SharpProof.Ir/IrInterpreter.cs",
           "SharpProof.Ir/IrProgramInterpreter.cs",
           "SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs",
           "SharpProof.Worker/CallableCounterexampleReplayer.cs",
@@ -292,10 +291,16 @@
           "SharpProof.Worker/EffectClaimResultAssembler.cs"
         ]
       },
-      {
-        "name": "policy",
-        "paths": [
-          "SharpProof.Worker.Launcher/Program.cs",
+    {
+      "name": "policy",
+      "paths": [
+        "SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs",
+        "SharpProof.Analyzer/LanguageSubsetGate.cs",
+        "SharpProof.Analyzer/SharpProofControlAttributePolicy.cs",
+        "SharpProof.Effects/TrustedBoundaryPolicy.cs",
+        "SharpProof.Frontend/FrontendSubset.cs",
+        "SharpProof.Frontend/OperationSubsetClassifier.cs",
+        "SharpProof.Worker.Launcher/Program.cs",
           "SharpProof.Worker/CallableVerificationPolicy.cs"
         ]
       },

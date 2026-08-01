@@ -674,7 +674,6 @@ public sealed class ArchitectureTests
                 "SharpProof.Specs/FrameworkTypeMetadataNames.cs"
             ],
             ["replay"] = [
-                "SharpProof.Verify/ProofKernel.cs",
                 "SharpProof.Ir/IrInterpreter.cs",
                 "SharpProof.Ir/IrProgramInterpreter.cs",
                 "SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs",
@@ -685,6 +684,12 @@ public sealed class ArchitectureTests
                 "SharpProof.Worker/EffectClaimResultAssembler.cs"
             ],
             ["policy"] = [
+                "SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs",
+                "SharpProof.Analyzer/LanguageSubsetGate.cs",
+                "SharpProof.Analyzer/SharpProofControlAttributePolicy.cs",
+                "SharpProof.Effects/TrustedBoundaryPolicy.cs",
+                "SharpProof.Frontend/FrontendSubset.cs",
+                "SharpProof.Frontend/OperationSubsetClassifier.cs",
                 "SharpProof.Worker.Launcher/Program.cs",
                 "SharpProof.Worker/CallableVerificationPolicy.cs"
             ],
@@ -767,6 +772,38 @@ public sealed class ArchitectureTests
                     StringComparer.Ordinal)),
                 component.Key);
         }
+        var canonicalTcb = root.GetProperty("trustedKernel")
+            .GetProperty("paths")
+            .EnumerateArray()
+            .Select(static path => path.GetString() ?? "")
+            .Concat(actual.Values.SelectMany(static paths => paths))
+            .ToArray();
+        Assert.That(
+            canonicalTcb.Distinct(StringComparer.Ordinal).Count(),
+            Is.EqualTo(canonicalTcb.Length),
+            "The canonical TCB union must not contain duplicate ownership.");
+        Assert.That(
+            canonicalTcb,
+            Does.Contain("SharpProof.Verify/Evidence.cs")
+                .And.Contain("SharpProof.Verify/Outcomes.cs")
+                .And.Contain("SharpProof.Effects/TrustedBoundaryPolicy.cs")
+                .And.Contain("SharpProof.Analyzer/LanguageSubsetGate.cs")
+                .And.Contain("SharpProof.Frontend/OperationSubsetClassifier.cs")
+                .And.Contain("SharpProof.Frontend/FrontendSubset.cs")
+                .And.Contain("SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs")
+                .And.Contain("SharpProof.Analyzer/SharpProofControlAttributePolicy.cs"));
+        Assert.That(
+            File.ReadAllText(Path.Combine(
+                RepositoryRoot(),
+                "scripts",
+                "Get-SharpProofReleaseDigests.ps1")),
+            Does.Contain("$acceptanceJson.trustedKernel.paths"));
+        Assert.That(
+            File.ReadAllText(Path.Combine(
+                RepositoryRoot(),
+                "scripts",
+                "Test-SharpProofCoverage.ps1")),
+            Does.Contain("$contract.trustedKernel.paths"));
     }
 
     [Test]

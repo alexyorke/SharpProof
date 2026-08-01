@@ -393,13 +393,17 @@ public sealed class ReleaseCoverageBaselineTests
                 acceptancePath,
                 JsonSerializer.Serialize(new
                 {
+                    trustedKernel = new
+                    {
+                        paths = new[] { paths[0] }
+                    },
                     trustedComputingBase = new
                     {
                         components = new[]
                         {
                             new
                             {
-                                paths
+                                paths = paths.Skip(1).ToArray()
                             }
                         }
                     }
