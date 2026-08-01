@@ -371,6 +371,7 @@ try {
         'analyzerDiagnosticCatalog',
         'projectionCatalog',
         'launcherArgumentCatalog',
+        'generatedOutputPolicy',
         'declarativeModelsCatalog',
         'boundContractModelCatalog',
         'effectContractCatalog',
