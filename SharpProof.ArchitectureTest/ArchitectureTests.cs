@@ -516,8 +516,11 @@ public sealed class ArchitectureTests
                 "SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs",
                 "SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs",
                 "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
+                "SharpProof.Contracts/ContractClauseInventory.cs",
+                "SharpProof.Contracts/ContractForSymbolMatcher.cs",
                 "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
                 "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
+                "SharpProof.Frontend/CompilationModelProvider.cs",
                 "SharpProof.Frontend/ContractApiIdentityResolver.cs",
                 "SharpProof.Frontend/ContractApiMetadataRuntime.cs",
                 "SharpProof.Frontend/SharpProof.Frontend.csproj"
@@ -576,7 +579,9 @@ public sealed class ArchitectureTests
                 "SharpProof.Frontend/ContractApi.catalog.json",
                 "scripts/Generate-ContractApiCatalog.ps1",
                 "SharpProof.Frontend/ContractApiMetadata.generated.cs",
-                "SharpProof.Attributes/EffectContractAttribute.cs"
+                "SharpProof.Attributes/EffectContractAttribute.cs",
+                "SharpProof.Attributes/SharpProofEffect.cs",
+                "SharpProof.Attributes/SharpProofCapability.cs"
             ],
             ["analyzerDiagnosticCatalog"] = [
                 "SharpProof.Analyzer/AnalyzerDiagnostic.catalog.json",
@@ -807,7 +812,12 @@ public sealed class ArchitectureTests
                 .And.Contain("SharpProof.Verify/Backend.cs")
                 .And.Contain("SharpProof.Contracts/ContractApiSymbols.cs")
                 .And.Contain("SharpProof.Analyzer/AnalyzerGeneratedCodePolicy.cs")
-                .And.Contain("SharpProof.Attributes/EffectContractAttribute.cs"));
+                .And.Contain("SharpProof.Attributes/EffectContractAttribute.cs")
+                .And.Contain("SharpProof.Frontend/CompilationModelProvider.cs")
+                .And.Contain("SharpProof.Contracts/ContractForSymbolMatcher.cs")
+                .And.Contain("SharpProof.Contracts/ContractClauseInventory.cs")
+                .And.Contain("SharpProof.Attributes/SharpProofEffect.cs")
+                .And.Contain("SharpProof.Attributes/SharpProofCapability.cs"));
         Assert.That(
             File.ReadAllText(Path.Combine(
                 RepositoryRoot(),
