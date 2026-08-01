@@ -307,10 +307,8 @@ internal sealed class ManagedAbstractFlow
         var current = state.Get(storage);
         if (value.TryGetInteger(out var integer))
         {
-            var integerRefined = integer.IsSingleton
-                ? RefineInteger(current, @operator, integer.SingletonValue, expected)
-                : RefineInteger(current, @operator, integer, expected);
-            return state.Set(storage, integerRefined);
+            return state.Set(storage,
+                RefineInteger(current, @operator, integer, expected));
         }
 
         if (value.TryGetBoolean(out var boolean) && current.IsBoolean &&
@@ -343,34 +341,6 @@ internal sealed class ManagedAbstractFlow
     }
 
     private static ManagedAbstractValue RefineInteger(
-        ManagedAbstractValue current, BinaryOperatorKind @operator, long constant, bool expected)
-    {
-        if (!current.TryGetInteger(out var interval))
-        {
-            return current;
-        }
-
-        var normalized = expected
-            ? @operator
-            : CSharpScalarSemantics.NegateBinary(@operator);
-        var domain = IntervalDomain.Instance;
-        var refined = normalized switch
-        {
-            BinaryOperatorKind.Equals => domain.AssumeAtMost(domain.AssumeAtLeast(interval, constant), constant),
-            BinaryOperatorKind.NotEquals when interval.IsSingleton &&
-                interval.SingletonValue == constant => IntervalValue.Bottom,
-            BinaryOperatorKind.LessThan when constant > long.MinValue => domain.AssumeAtMost(interval, constant - 1),
-            BinaryOperatorKind.LessThanOrEqual => domain.AssumeAtMost(interval, constant),
-            BinaryOperatorKind.GreaterThan when constant < long.MaxValue => domain.AssumeAtLeast(interval, constant + 1),
-            BinaryOperatorKind.GreaterThanOrEqual => domain.AssumeAtLeast(interval, constant),
-            _ => interval
-        };
-        return refined.IsBottom
-            ? ManagedAbstractValue.Bottom : ManagedAbstractValue.Integer(refined,
-                current.ExcludesZero || normalized == BinaryOperatorKind.NotEquals && constant == 0);
-    }
-
-    private static ManagedAbstractValue RefineInteger(
         ManagedAbstractValue current,
         BinaryOperatorKind @operator,
         IntervalValue value,
@@ -385,44 +355,48 @@ internal sealed class ManagedAbstractFlow
             ? @operator
             : CSharpScalarSemantics.NegateBinary(@operator);
         var domain = IntervalDomain.Instance;
-        var refined = interval;
-        if (normalized == BinaryOperatorKind.Equals)
+        var refined = normalized switch
         {
-            if (value.LowerBound.HasValue)
-            {
-                refined = domain.AssumeAtLeast(refined, value.LowerBound.Value);
-            }
-            if (value.UpperBound.HasValue)
-            {
-                refined = domain.AssumeAtMost(refined, value.UpperBound.Value);
-            }
-        }
-        else if (normalized == BinaryOperatorKind.LessThan &&
-                 value.UpperBound is > long.MinValue)
-        {
-            refined = domain.AssumeAtMost(refined, value.UpperBound.Value - 1);
-        }
-        else if (normalized == BinaryOperatorKind.LessThanOrEqual &&
-                 value.UpperBound.HasValue)
-        {
-            refined = domain.AssumeAtMost(refined, value.UpperBound.Value);
-        }
-        else if (normalized == BinaryOperatorKind.GreaterThan &&
-                 value.LowerBound is < long.MaxValue)
-        {
-            refined = domain.AssumeAtLeast(refined, value.LowerBound.Value + 1);
-        }
-        else if (normalized == BinaryOperatorKind.GreaterThanOrEqual &&
-                 value.LowerBound.HasValue)
-        {
-            refined = domain.AssumeAtLeast(refined, value.LowerBound.Value);
-        }
+            BinaryOperatorKind.Equals => Intersect(interval, value),
+            BinaryOperatorKind.NotEquals when value.IsSingleton &&
+                interval.IsSingleton &&
+                interval.SingletonValue == value.SingletonValue =>
+                IntervalValue.Bottom,
+            BinaryOperatorKind.LessThan when
+                value.UpperBound is > long.MinValue =>
+                domain.AssumeAtMost(interval, value.UpperBound.Value - 1),
+            BinaryOperatorKind.LessThanOrEqual when
+                value.UpperBound.HasValue =>
+                domain.AssumeAtMost(interval, value.UpperBound.Value),
+            BinaryOperatorKind.GreaterThan when
+                value.LowerBound is < long.MaxValue =>
+                domain.AssumeAtLeast(interval, value.LowerBound.Value + 1),
+            BinaryOperatorKind.GreaterThanOrEqual when
+                value.LowerBound.HasValue =>
+                domain.AssumeAtLeast(interval, value.LowerBound.Value),
+            _ => interval
+        };
 
         return refined.IsBottom
             ? ManagedAbstractValue.Bottom
             : ManagedAbstractValue.Integer(
                 refined,
-                current.ExcludesZero || !refined.Contains(0));
+                current.ExcludesZero || (value.IsSingleton
+                    ? normalized == BinaryOperatorKind.NotEquals &&
+                      value.SingletonValue == 0
+                    : !refined.Contains(0)));
+    }
+
+    private static IntervalValue Intersect(
+        IntervalValue current, IntervalValue restriction)
+    {
+        var domain = IntervalDomain.Instance;
+        var refined = restriction.LowerBound is { } lower
+            ? domain.AssumeAtLeast(current, lower)
+            : current;
+        return restriction.UpperBound is { } upper
+            ? domain.AssumeAtMost(refined, upper)
+            : refined;
     }
 
     private ManagedAbstractValue EvaluateCore(IOperation operation, ManagedFlowState state)
