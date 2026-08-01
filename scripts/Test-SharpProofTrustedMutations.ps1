@@ -186,8 +186,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'frontend-default-subset-decision'
         File = 'SharpProof.Frontend\FrontendSubset.cs'
-        Original = '    Exact = 1,'
-        Mutated = '    Exact = 0,'
+        Original = '    public bool IsExact => Decision == FrontendSubsetDecision.Exact;'
+        Mutated = '    public bool IsExact => Decision is FrontendSubsetDecision.Unspecified or FrontendSubsetDecision.Exact;'
         Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
         Filter = 'FullyQualifiedName~DefaultAndUnknownSubsetDecisionsCannotBecomeExact'
     },
