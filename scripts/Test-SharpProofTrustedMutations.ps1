@@ -352,6 +352,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~InventoryClassifiesEveryPlacementInStableSourceOrder'
     },
     [pscustomobject]@{
+        Name = 'contract-api-duplicate-json-rejection'
+        File = 'scripts\Generate-ContractApiCatalog.ps1'
+        Original = 'if (-not $names.Add($property.Name)) {'
+        Mutated = 'if ($false) {'
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~GeneratorRejectsMalformedCatalogs'
+    },
+    [pscustomobject]@{
+        Name = 'contract-api-exported-attribute-parity'
+        File = 'SharpProof.Frontend\ContractApiMetadata.generated.cs'
+        Original = "            ContractFor,`n            EnforcePure,"
+        Mutated = "            EnforcePure,`n            EnforcePure,"
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~CatalogExactlyMatchesTheExportedContractApi'
+    },
+    [pscustomobject]@{
         Name = 'advisory-full-activation-selection'
         File = 'SharpProof.Analyzer\SharpProofAnalyzer.cs'
         Original = 'return AdvisoryActivation.Full;'

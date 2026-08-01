@@ -59,6 +59,41 @@ function Assert-Properties {
     }
 }
 
+function Assert-UniqueJsonProperties {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Text.Json.JsonElement]$Value,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    if ($Value.ValueKind -eq [System.Text.Json.JsonValueKind]::Array) {
+        $index = 0
+        foreach ($item in $Value.EnumerateArray()) {
+            Assert-UniqueJsonProperties `
+                -Value $item `
+                -Context "$Context[$index]"
+            $index++
+        }
+        return
+    }
+    if ($Value.ValueKind -ne [System.Text.Json.JsonValueKind]::Object) {
+        return
+    }
+
+    $names = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($property in $Value.EnumerateObject()) {
+        if (-not $names.Add($property.Name)) {
+            throw "$Context contains duplicate property '$($property.Name)'."
+        }
+        Assert-UniqueJsonProperties `
+            -Value $property.Value `
+            -Context "$Context.$($property.Name)"
+    }
+}
+
 function Assert-Identifier {
     param(
         [Parameter(Mandatory = $true)]
@@ -104,7 +139,17 @@ function ConvertTo-CSharpStringLiteral {
         '"'
 }
 
-$catalog = Get-Content -LiteralPath $CatalogPath -Raw | ConvertFrom-Json
+$catalogJson = Get-Content -LiteralPath $CatalogPath -Raw
+$catalogDocument = [System.Text.Json.JsonDocument]::Parse($catalogJson)
+try {
+    Assert-UniqueJsonProperties `
+        -Value $catalogDocument.RootElement `
+        -Context 'contract API catalog'
+}
+finally {
+    $catalogDocument.Dispose()
+}
+$catalog = $catalogJson | ConvertFrom-Json
 Assert-Properties `
     -Value $catalog `
     -Allowed @(
