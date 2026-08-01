@@ -29,6 +29,56 @@
       ]
     },
     {
+      "path": "SharpProof.Analyzer/EffectEvaluationProjections.generated.cs",
+      "namespace": "SharpProof.Analyzer",
+      "accessibility": "internal",
+      "modifiers": ["static"],
+      "name": "EffectEvaluationProjections",
+      "methods": [
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "(EffectEvaluationOutcome Outcome, EffectEvaluationReason Reason, EffectEvaluationCertainty Certainty)",
+          "name": "Classify",
+          "parameters": [
+            {"type": "bool", "name": "established"},
+            {"type": "bool", "name": "violated"},
+            {"type": "bool", "name": "valid"},
+            {"type": "bool", "name": "complete"},
+            {"type": "bool", "name": "trusted"},
+            {"type": "EffectEvaluationReason", "name": "incompleteReason"}
+          ],
+          "switchMode": "expression",
+          "target": "(established, violated, valid, complete, trusted)",
+          "cases": [
+            {"pattern": "(true, _, _, _, true)", "expression": "(EffectEvaluationOutcome.Proven, EffectEvaluationReason.None, EffectEvaluationCertainty.TrustedCompleteBoundary)"},
+            {"pattern": "(true, _, _, _, _)", "expression": "(EffectEvaluationOutcome.Proven, EffectEvaluationReason.None, EffectEvaluationCertainty.CompleteMayEffectSummary)"},
+            {"pattern": "(_, true, _, _, _)", "expression": "(EffectEvaluationOutcome.Refuted, EffectEvaluationReason.None, EffectEvaluationCertainty.DefiniteViolation)"},
+            {"pattern": "(_, _, false, _, _)", "expression": "(EffectEvaluationOutcome.Unknown, EffectEvaluationReason.UnsupportedContract, EffectEvaluationCertainty.Unavailable)"},
+            {"pattern": "(_, _, _, _, true)", "expression": "(EffectEvaluationOutcome.Unknown, complete ? EffectEvaluationReason.EffectContractNotEstablished : incompleteReason, EffectEvaluationCertainty.TrustedCompleteBoundary)"},
+            {"pattern": "(_, _, _, false, _)", "expression": "(EffectEvaluationOutcome.Unknown, incompleteReason, EffectEvaluationCertainty.IncompleteMayEffectSummary)"}
+          ],
+          "fallback": "(EffectEvaluationOutcome.Unknown, EffectEvaluationReason.EffectContractNotEstablished, EffectEvaluationCertainty.CompleteMayEffectSummary)"
+        },
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "EffectEvaluationReason",
+          "name": "MapIncompleteReason",
+          "parameters": [
+            {"type": "EffectAnalysisIncompleteReason", "name": "reason"}
+          ],
+          "switchMode": "expression",
+          "target": "((reason & (EffectAnalysisIncompleteReason.BlockBudgetExceeded | EffectAnalysisIncompleteReason.OperationBudgetExceeded)) != 0, (reason & EffectAnalysisIncompleteReason.CyclicControlFlow) != 0)",
+          "cases": [
+            {"pattern": "(true, _)", "expression": "EffectEvaluationReason.ResourceLimit"},
+            {"pattern": "(_, true)", "expression": "EffectEvaluationReason.UnsupportedBody"}
+          ],
+          "fallback": "EffectEvaluationReason.EffectSummaryIncomplete"
+        }
+      ]
+    },
+    {
       "path": "SharpProof.Worker/WorkerProjections.generated.cs",
       "namespace": "SharpProof.Worker",
       "accessibility": "internal",

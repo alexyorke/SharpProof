@@ -336,6 +336,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~StringConstructionDistinguishesKnownAndUnknownAllocation'
     },
     [pscustomobject]@{
+        Name = 'effect-incomplete-reason-projection'
+        File = 'SharpProof.Analyzer\EffectEvaluationProjections.generated.cs'
+        Original = '            (_, true) => EffectEvaluationReason.UnsupportedBody,'
+        Mutated = '            (_, true) => EffectEvaluationReason.ResourceLimit,'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~IncompleteReasonCoversEveryDefinedFlagCombination'
+    },
+    [pscustomobject]@{
         Name = 'advisory-contract-candidate-detection'
         File = 'SharpProof.Frontend\ContractApiMetadata.generated.cs'
         Original = '            "Ensures",'

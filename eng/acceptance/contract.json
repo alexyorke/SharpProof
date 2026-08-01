@@ -165,6 +165,7 @@
           "SharpProof.Projection.catalog.json",
           "scripts/Generate-ProjectionCatalog.ps1",
           "SharpProof.Verify/VerificationProjections.generated.cs",
+          "SharpProof.Analyzer/EffectEvaluationProjections.generated.cs",
           "SharpProof.Worker/WorkerProjections.generated.cs",
           "SharpProof.Contracts/ContractProjections.generated.cs",
           "SharpProof.Ir/IrPrinterProjections.generated.cs",
