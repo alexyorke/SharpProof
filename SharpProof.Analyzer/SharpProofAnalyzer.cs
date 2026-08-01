@@ -69,6 +69,7 @@ public sealed partial class SharpProofAnalyzer : DiagnosticAnalyzer
             context.RegisterCompilationEndAction(
                 CreateConfigurationReporter(
                     configurationDiagnostics));
+            return;
         }
 
         var activation = configuration.Profile == SharpProofProfile.Advisory
@@ -76,9 +77,10 @@ public sealed partial class SharpProofAnalyzer : DiagnosticAnalyzer
                 context.Compilation,
                 context.CancellationToken)
             : AdvisoryActivation.Full;
-        if (!activation.Any ||
-            !configuration.ContractsEnabled &&
-            !activation.RequiresFullOperationAnalysis)
+        var analysisEnabled = activation.Any &
+            (configuration.ContractsEnabled |
+             activation.RequiresFullOperationAnalysis);
+        if (!analysisEnabled)
         {
             return;
         }
@@ -499,24 +501,38 @@ public sealed partial class SharpProofAnalyzer : DiagnosticAnalyzer
             diagnostics.Add(
                 CreateInvalidConfigurationDiagnostic(invalidValue));
         }
-
-        foreach (var tree in compilation.SyntaxTrees)
+        if (!configuration.InvalidConfigurationValues.IsEmpty)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var options = analyzerOptions.AnalyzerConfigOptionsProvider
-                .GetOptions(tree);
-            var invalidValues =
-                AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
-                    options,
-                    analyzerOptions.AnalyzerConfigOptionsProvider.GlobalOptions);
-            var location = Location.Create(tree, new TextSpan(0, 0));
-            foreach (var invalidValue in invalidValues)
+            return diagnostics.ToImmutable();
+        }
+
+        try
+        {
+            foreach (var tree in compilation.SyntaxTrees)
             {
-                diagnostics.Add(
-                    CreateInvalidConfigurationDiagnostic(
-                        invalidValue,
-                        location));
+                cancellationToken.ThrowIfCancellationRequested();
+                var options = analyzerOptions.AnalyzerConfigOptionsProvider
+                    .GetOptions(tree);
+                var invalidValues =
+                    AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
+                        options,
+                        analyzerOptions.AnalyzerConfigOptionsProvider.GlobalOptions);
+                var location = Location.Create(tree, new TextSpan(0, 0));
+                foreach (var invalidValue in invalidValues)
+                {
+                    diagnostics.Add(
+                        CreateInvalidConfigurationDiagnostic(
+                            invalidValue,
+                            location));
+                }
             }
+        }
+        catch (Exception exception) when (
+            exception is not OperationCanceledException)
+        {
+            diagnostics.Add(
+                CreateInvalidConfigurationDiagnostic(
+                    AnalyzerConfiguration.ProviderFailure(exception)));
         }
 
         return diagnostics.ToImmutable();

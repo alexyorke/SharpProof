@@ -123,6 +123,25 @@ internal static class AnalyzerTestHost
             .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)];
     }
 
+    internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        CSharpCompilation compilation,
+        AnalyzerConfigOptionsProvider optionsProvider,
+        DiagnosticAnalyzer? analyzer = null)
+    {
+        var analyzerOptions = new AnalyzerOptions([], optionsProvider);
+        var withAnalyzers = compilation.WithAnalyzers(
+            [analyzer ?? new SharpProofAnalyzer()],
+            new CompilationWithAnalyzersOptions(
+                analyzerOptions,
+                onAnalyzerException: null,
+                concurrentAnalysis: true,
+                logAnalyzerExecutionTime: false,
+                reportSuppressedDiagnostics: false));
+        return [.. (await withAnalyzers.GetAnalyzerDiagnosticsAsync())
+            .OrderBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
+            .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)];
+    }
+
     internal static byte[] EmitImage(CSharpCompilation compilation)
     {
         using var stream = new MemoryStream();

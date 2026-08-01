@@ -672,11 +672,26 @@ if (@($mappedBinaryOperators | Select-Object -Unique).Count -ne
 
 Assert-Properties `
     -Value $catalog.builtInEquality `
-    -Allowed @('allowReferenceTypes', 'specialTypes') `
+    -Allowed @(
+        'allowReferenceTypes',
+        'excludedReferenceTypeKinds',
+        'specialTypes') `
     -Context 'builtInEquality'
 $allowReferenceEquality = Assert-Boolean `
     -Value $catalog.builtInEquality.allowReferenceTypes `
     -Context 'builtInEquality.allowReferenceTypes'
+$excludedReferenceTypeKinds = @(
+    $catalog.builtInEquality.excludedReferenceTypeKinds |
+        ForEach-Object {
+            Assert-EnumName `
+                -Value $_ `
+                -Allowed @('Delegate') `
+                -Context 'builtInEquality.excludedReferenceTypeKinds'
+        })
+if (@($excludedReferenceTypeKinds | Select-Object -Unique).Count -ne
+    $excludedReferenceTypeKinds.Count) {
+    throw 'builtInEquality.excludedReferenceTypeKinds contains duplicates.'
+}
 $equalityTypes = @(
     $catalog.builtInEquality.specialTypes |
         ForEach-Object {
@@ -965,7 +980,11 @@ Add-Lines -Lines $lines -Values @(
     '    private static bool SupportsBuiltInEquality(ITypeSymbol? type) =>',
     '        type == null ||')
 if ($allowReferenceEquality) {
-    $lines.Add('        type.IsReferenceType ||')
+    $referenceCondition = 'type.IsReferenceType'
+    foreach ($typeKind in $excludedReferenceTypeKinds) {
+        $referenceCondition += " && type.TypeKind != TypeKind.$typeKind"
+    }
+    $lines.Add("        $referenceCondition ||")
 }
 foreach ($type in $equalityTypes) {
     $lines.Add("        type.SpecialType == SpecialType.$type ||")

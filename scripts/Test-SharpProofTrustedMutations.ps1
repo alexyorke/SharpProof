@@ -184,6 +184,30 @@ $mutations = @(
         Filter = 'FullyQualifiedName~SourceOnlyMetadataPreconditionsCannotDisappearIntoTrustedSummaries'
     },
     [pscustomobject]@{
+        Name = 'frontend-default-subset-decision'
+        File = 'SharpProof.Frontend\FrontendSubset.cs'
+        Original = '    Exact = 1,'
+        Mutated = '    Exact = 0,'
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~DefaultAndUnknownSubsetDecisionsCannotBecomeExact'
+    },
+    [pscustomobject]@{
+        Name = 'frontend-delegate-reference-equality'
+        File = 'SharpProof.Frontend\CSharpScalarSemantics.generated.cs'
+        Original = '        type.IsReferenceType && type.TypeKind != TypeKind.Delegate ||'
+        Mutated = '        type.IsReferenceType ||'
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~UnsupportedValueDomainsCannotMasqueradeAsReferenceEquality'
+    },
+    [pscustomobject]@{
+        Name = 'analyzer-configuration-provider-failure'
+        File = 'SharpProof.Analyzer\Configuration\AnalyzerConfiguration.cs'
+        Original = '                [ProviderFailure(exception)]);'
+        Mutated = '                []);'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ConfigurationProviderFailureReportsAndSuppressesAnalysis'
+    },
+    [pscustomobject]@{
         Name = 'effect-region-contract-catalog'
         File = 'SharpProof.Effects\EffectContractMappings.generated.cs'
         Original = '        (EffectRegionKind.Receiver, EffectContractKind.ReadsReceiverState, EffectContractKind.WritesReceiverState, EffectRegionId.Receiver, false),'

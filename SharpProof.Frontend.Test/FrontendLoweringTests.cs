@@ -242,6 +242,35 @@ public sealed class FrontendLoweringTests
             """,
             FrontendSubsetDecision.ClosedAbstention,
             FrontendAbstention.UnsupportedType);
+        AssertClassification(
+            """
+            public delegate int Transformer(int value);
+            public static bool Target(
+                Transformer left,
+                Transformer right) => left == right;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+    }
+
+    [Test]
+    public void DefaultAndUnknownSubsetDecisionsCannotBecomeExact()
+    {
+        var classification = default(FrontendSubsetClassification);
+
+        Assert.That(classification.IsExact, Is.False);
+        Assert.Throws<ArgumentException>((Action)(() =>
+        {
+            _ = new FrontendSubsetClassification(
+                FrontendSubsetDecision.Unspecified,
+                FrontendAbstention.None);
+        }));
+        Assert.Throws<ArgumentException>((Action)(() =>
+        {
+            _ = new FrontendSubsetClassification(
+                (FrontendSubsetDecision)int.MaxValue,
+                FrontendAbstention.UnsupportedType);
+        }));
     }
 
     [Test]
