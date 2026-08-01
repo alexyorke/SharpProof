@@ -298,8 +298,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'advisory-contract-candidate-detection'
         File = 'SharpProof.Frontend\ContractApiMetadata.generated.cs'
-        Original = '                EnsuresMethodName,'
-        Mutated = '                RequiresMethodName,'
+        Original = '            "Ensures",'
+        Mutated = '            "Requires",'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~ContractCandidateActivationRunsClausePlacementValidation'
     },
