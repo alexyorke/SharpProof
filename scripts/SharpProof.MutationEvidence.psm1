@@ -36,8 +36,12 @@ function Test-NUnitAssertionMessage {
 
     $normalized = $Message.Replace("`r`n", "`n").Trim()
     if ($normalized -match '^Assert\.That\(') {
-        return $normalized -match '(?m)^\s*Expected:' -and
+        $scalarFailure = $normalized -match '(?m)^\s*Expected:' -and
             $normalized -match '(?m)^\s*But was:'
+        $collectionFailure =
+            $normalized -match '(?m)^\s*Expected is\b' -and
+            $normalized -match '(?m)\bactual is\b'
+        return $scalarFailure -or $collectionFailure
     }
 
     if (-not $normalized.StartsWith(

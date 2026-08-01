@@ -113,6 +113,27 @@ try {
         throw 'Assertion kill was not recognized.'
     }
 
+    $collectionAssertion = New-TestParts `
+        -Outcome Failed `
+        -Message "Assert.That(actual, Is.EqualTo(expected))`n Expected is <System.Int32[1]>, actual is <System.Int32[0]>`n Values differ at index [0]"
+    $collectionPath = Write-Fixture `
+        -Name collection-assertion `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $collectionAssertion.Definition `
+        -Entries $collectionAssertion.Entry `
+        -Results $collectionAssertion.Result
+    $collectionMutation = Read-SharpProofMutationTestEvidence `
+        -TrxPath $collectionPath `
+        -EvidenceName collection `
+        -Mode Mutation `
+        -ExpectedMethodName ExpectedTest `
+        -ExpectedLedger $baseline.testLedger
+    if ($collectionMutation.assertionFailureCount -ne 1) {
+        throw 'Collection assertion kill was not recognized.'
+    }
+
     $crash = New-TestParts `
         -Outcome Failed `
         -Message 'System.NullReferenceException: crash'
