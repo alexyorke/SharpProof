@@ -67,7 +67,7 @@ $mutations = @(
         Name = 'scalar-ir-binary-enum-value'
         File = 'SharpProof.Ir\IrOperatorCatalog.generated.cs'
         Original = '    LessThan = 9,'
-        Mutated = '    LessThan = 8,'
+        Mutated = '    LessThan = 14,'
         Project = 'SharpProof.Ir.Test\SharpProof.Ir.Test.csproj'
         Filter = 'FullyQualifiedName~BinaryMetadataIsExactAndExhaustive'
     },
