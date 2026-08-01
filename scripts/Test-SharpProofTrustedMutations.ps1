@@ -386,8 +386,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'effect-unsupported-candidate-downgrade'
         File = 'SharpProof.CompilerCollector\CompilerArtifact\ClaimManifestBuilder.cs'
-        Original = "        {`n            evidence.Outcome = WorkerClaimOutcome.Unknown;`n            evidence.Reason =`n                WorkerClaimReason.CounterexampleNotReplayable;"
-        Mutated = "        {`n            evidence.Outcome = WorkerClaimOutcome.Refuted;`n            evidence.Reason =`n                WorkerClaimReason.CounterexampleNotReplayable;"
+        Original = '        evidence.Outcome = WorkerClaimOutcome.Unknown;'
+        Mutated = '        evidence.Outcome = WorkerClaimOutcome.Refuted;'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~UnsupportedDefiniteEffectViolationFailsClosedWithoutReplay'
     },
