@@ -184,7 +184,7 @@ $mutations = @(
         Name = 'lowering-global-constant-bypass'
         File = 'SharpProof.Frontend\RoslynOperationLowerer.cs'
         Original = "            if (_owner._allowCompilerConstants &&`n                operation.ConstantValue.HasValue)"
-        Mutated = '            if (operation.ConstantValue.HasValue)'
+        Mutated = "            if (_owner._allowCompilerConstants ||`n                operation.ConstantValue.HasValue)"
         Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
         Filter = 'FullyQualifiedName~ConstantFoldingCannotBypassTheClosedOperationCatalog'
     },
