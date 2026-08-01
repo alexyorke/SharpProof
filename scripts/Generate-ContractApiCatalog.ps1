@@ -311,8 +311,7 @@ foreach ($attribute in $attributes) {
         'AttributesNamespace + ".' + $attribute.TypeName + '";')
 }
 $lines.Add('')
-$lines.Add('    internal static ImmutableArray<ContractApiMethodDescriptor>')
-$lines.Add('        Methods { get; } =')
+$lines.Add('    internal static ImmutableArray<ContractApiMethodDescriptor> Methods { get; } =')
 $lines.Add('        [')
 foreach ($method in $methods) {
     $lines.Add('            new(')
@@ -322,8 +321,7 @@ foreach ($method in $methods) {
 }
 $lines.Add('        ];')
 $lines.Add('')
-$lines.Add('    internal static ImmutableArray<ContractApiAttributeDescriptor>')
-$lines.Add('        Attributes { get; } =')
+$lines.Add('    internal static ImmutableArray<ContractApiAttributeDescriptor> Attributes { get; } =')
 $lines.Add('        [')
 foreach ($attribute in $attributes) {
     $lines.Add('            new(')
@@ -334,8 +332,7 @@ foreach ($attribute in $attributes) {
 }
 $lines.Add('        ];')
 $lines.Add('')
-$lines.Add('    internal static ImmutableArray<string>')
-$lines.Add('        ContractMethodCandidateNames { get; } =')
+$lines.Add('    internal static ImmutableArray<string> ContractMethodCandidateNames { get; } =')
 $lines.Add('        [')
 foreach ($method in $methods) {
     $lines.Add(
@@ -344,8 +341,7 @@ foreach ($method in $methods) {
 }
 $lines.Add('        ];')
 $lines.Add('')
-$lines.Add('    internal static ImmutableArray<string>')
-$lines.Add('        AttributeMetadataNames { get; } =')
+$lines.Add('    internal static ImmutableArray<string> AttributeMetadataNames { get; } =')
 $lines.Add('        [')
 foreach ($attribute in $attributes) {
     $lines.Add('            ' + $attribute.Id + ',')
@@ -393,15 +389,11 @@ foreach ($attribute in $attributes) {
     $lines.Add('        ContractApiCatalog.' + $attribute.Id + ';')
 }
 $lines.Add('')
-$lines.Add('    internal static ImmutableArray<ContractApiMethodDescriptor>')
-$lines.Add('        Methods { get; } = ContractApiCatalog.Methods;')
-$lines.Add('    internal static ImmutableArray<ContractApiAttributeDescriptor>')
-$lines.Add('        Attributes { get; } = ContractApiCatalog.Attributes;')
-$lines.Add('    internal static ImmutableArray<string>')
-$lines.Add('        ContractMethodCandidateNames { get; } =')
+$lines.Add('    internal static ImmutableArray<ContractApiMethodDescriptor> Methods { get; } = ContractApiCatalog.Methods;')
+$lines.Add('    internal static ImmutableArray<ContractApiAttributeDescriptor> Attributes { get; } = ContractApiCatalog.Attributes;')
+$lines.Add('    internal static ImmutableArray<string> ContractMethodCandidateNames { get; } =')
 $lines.Add('        ContractApiCatalog.ContractMethodCandidateNames;')
-$lines.Add('    internal static ImmutableArray<string>')
-$lines.Add('        AttributeMetadataNames { get; } =')
+$lines.Add('    internal static ImmutableArray<string> AttributeMetadataNames { get; } =')
 $lines.Add('        ContractApiCatalog.AttributeMetadataNames;')
 $lines.Add('}')
 

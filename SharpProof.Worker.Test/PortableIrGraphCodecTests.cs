@@ -511,8 +511,15 @@ public sealed class PortableIrGraphCodecTests
                 throw new AssertionException("Unknown mutation.");
         }
 
-        Assert.Throws<InvalidDataException>(
+        var exception = Assert.Throws<InvalidDataException>(
             (Action)(() => PortableIrGraphCodec.Decode(graph)));
+
+        if (mutation == MalformedMutation.WhitespaceOperationDescription)
+        {
+            Assert.That(
+                exception!.Message,
+                Is.EqualTo("Portable IR operation description cannot be whitespace."));
+        }
     }
 
     [TestCase(DeepGraphKind.Terms, false)]

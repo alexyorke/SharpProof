@@ -81,8 +81,7 @@ internal static class ContractApiCatalog
     internal const string Suppress = AttributesNamespace + ".SharpProofSuppressAttribute";
     internal const string Trusted = AttributesNamespace + ".SharpProofTrustedAttribute";
 
-    internal static ImmutableArray<ContractApiMethodDescriptor>
-        Methods { get; } =
+    internal static ImmutableArray<ContractApiMethodDescriptor> Methods { get; } =
         [
             new(
                 RequiresMethodName,
@@ -106,8 +105,7 @@ internal static class ContractApiCatalog
                 ContractApiClauseRole.None),
         ];
 
-    internal static ImmutableArray<ContractApiAttributeDescriptor>
-        Attributes { get; } =
+    internal static ImmutableArray<ContractApiAttributeDescriptor> Attributes { get; } =
         [
             new(
                 ContractFor,
@@ -171,8 +169,7 @@ internal static class ContractApiCatalog
                 ContractApiSelectionFeature.All),
         ];
 
-    internal static ImmutableArray<string>
-        ContractMethodCandidateNames { get; } =
+    internal static ImmutableArray<string> ContractMethodCandidateNames { get; } =
         [
             "Requires",
             "Ensures",
@@ -181,8 +178,7 @@ internal static class ContractApiCatalog
             "Result",
         ];
 
-    internal static ImmutableArray<string>
-        AttributeMetadataNames { get; } =
+    internal static ImmutableArray<string> AttributeMetadataNames { get; } =
         [
             ContractFor,
             EnforcePure,
@@ -260,14 +256,10 @@ internal static partial class ContractApiMetadata
     internal const string Trusted =
         ContractApiCatalog.Trusted;
 
-    internal static ImmutableArray<ContractApiMethodDescriptor>
-        Methods { get; } = ContractApiCatalog.Methods;
-    internal static ImmutableArray<ContractApiAttributeDescriptor>
-        Attributes { get; } = ContractApiCatalog.Attributes;
-    internal static ImmutableArray<string>
-        ContractMethodCandidateNames { get; } =
+    internal static ImmutableArray<ContractApiMethodDescriptor> Methods { get; } = ContractApiCatalog.Methods;
+    internal static ImmutableArray<ContractApiAttributeDescriptor> Attributes { get; } = ContractApiCatalog.Attributes;
+    internal static ImmutableArray<string> ContractMethodCandidateNames { get; } =
         ContractApiCatalog.ContractMethodCandidateNames;
-    internal static ImmutableArray<string>
-        AttributeMetadataNames { get; } =
+    internal static ImmutableArray<string> AttributeMetadataNames { get; } =
         ContractApiCatalog.AttributeMetadataNames;
 }
