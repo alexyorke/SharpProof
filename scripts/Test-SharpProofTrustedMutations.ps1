@@ -426,8 +426,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'effect-replay-exact-witness'
         File = 'SharpProof.Worker\EffectCounterexampleReplayer.cs'
-        Original = '            actual.Detail == claimed.Detail &&'
-        Mutated = '            actual.Detail != claimed.Detail &&'
+        Original = '        return (actual.Kind, actual.Detail, actual.Effects,'
+        Mutated = '        return (actual.Kind, claimed.Detail, actual.Effects,'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~SemanticWitnessMismatchRemainsTypedUnknown'
     },
