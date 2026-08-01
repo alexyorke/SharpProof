@@ -800,7 +800,7 @@ internal sealed class ManagedAbstractFlow
         };
         if (Regular(block.FallThroughSuccessor))
         {
-            yield return (block.FallThroughSuccessor!, expected.HasValue ? !expected : null);
+            yield return (block.FallThroughSuccessor!, !expected);
         }
 
         if (Regular(block.ConditionalSuccessor))
