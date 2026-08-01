@@ -65,6 +65,22 @@ function Test-NUnitAssertionMessage {
     return $scalarFailure -or $collectionFailure
 }
 
+function Test-NUnitMethodIdentity {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Actual,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Expected
+    )
+
+    return [StringComparer]::Ordinal.Equals($Actual, $Expected) -or
+        ($Actual.StartsWith(
+                $Expected + '(',
+                [StringComparison]::Ordinal) -and
+         $Actual.EndsWith(')', [StringComparison]::Ordinal))
+}
+
 function Read-SharpProofMutationTestEvidence {
     param(
         [Parameter(Mandatory = $true)]
@@ -303,8 +319,9 @@ function Read-SharpProofMutationTestEvidence {
                 $executionId, $definition.executionId) -or
             -not [StringComparer]::Ordinal.Equals(
                 $executionId, $entriesById[$testId]) -or
-            -not [StringComparer]::Ordinal.Equals(
-                $definition.methodName, $ExpectedMethodName) -or
+            -not (Test-NUnitMethodIdentity `
+                -Actual $definition.methodName `
+                -Expected $ExpectedMethodName) -or
             [string]::IsNullOrWhiteSpace($definition.className) -or
             -not [StringComparer]::Ordinal.Equals(
                 $result.GetAttribute('testName'), $definition.displayName)) {

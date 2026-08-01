@@ -131,6 +131,52 @@ try {
         throw 'UTF-8 BOM evidence was not projected correctly.'
     }
 
+    $parameterized = New-TestParts `
+        -Outcome Passed `
+        -Message '' `
+        -Method 'ExpectedTest(CaseOne)'
+    $parameterizedPath = Write-Fixture `
+        -Name parameterized `
+        -Summary Completed `
+        -Counters ('total="1" executed="1" passed="1" failed="0" ' +
+            $zeroInfrastructure) `
+        -Definitions $parameterized.Definition `
+        -Entries $parameterized.Entry `
+        -Results $parameterized.Result
+    $parameterizedBaseline = Read-SharpProofMutationTestEvidence `
+        -TrxPath $parameterizedPath `
+        -EvidenceName parameterized `
+        -Mode Baseline `
+        -ProcessExitCode 0 `
+        -ExpectedMethodName ExpectedTest
+    if ($parameterizedBaseline.executedCount -ne 1) {
+        throw 'Parameterized method evidence was not projected correctly.'
+    }
+
+    $renamed = New-TestParts `
+        -Outcome Passed `
+        -Message '' `
+        -Method ExpectedTestAfterRename
+    $renamedPath = Write-Fixture `
+        -Name renamed `
+        -Summary Completed `
+        -Counters ('total="1" executed="1" passed="1" failed="0" ' +
+            $zeroInfrastructure) `
+        -Definitions $renamed.Definition `
+        -Entries $renamed.Entry `
+        -Results $renamed.Result
+    Assert-Throws `
+        -Because 'a renamed method sharing the expected prefix' `
+        -ExpectedMessage 'identity does not match' `
+        -Action {
+        Read-SharpProofMutationTestEvidence `
+            -TrxPath $renamedPath `
+            -EvidenceName renamed `
+            -Mode Baseline `
+            -ProcessExitCode 0 `
+            -ExpectedMethodName ExpectedTest
+    }
+
     $assertion = New-TestParts `
         -Outcome Failed `
         -Message "Assert.That(actual, Is.EqualTo(expected))`n Expected: 1`n But was: 2"
