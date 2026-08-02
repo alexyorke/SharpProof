@@ -43,17 +43,18 @@ internal static class WorkerBinaryIdentity
     internal const long MaximumClosureBytes = 64L * 1024 * 1024;
     internal const long MaximumDependenciesBytes = 1024L * 1024;
     internal const long MaximumRuntimeConfigBytes = 64L * 1024;
-    private static readonly Dictionary<string, long>
-        s_componentLimitReductions = new Dictionary<string, long>(
-            StringComparer.Ordinal)
-        {
-            ["dependencies"] =
-                MaximumComponentBytes - MaximumDependenciesBytes,
-            ["runtimeConfig"] =
-                MaximumComponentBytes - MaximumRuntimeConfigBytes
-        };
 
     internal static string ComputeSha256(string workerPath)
+    {
+        var first = ComputeSha256Once(workerPath);
+        var second = ComputeSha256Once(workerPath);
+        return first == second
+            ? first
+            : throw new InvalidDataException(
+                "The worker runtime closure changed while it was hashed.");
+    }
+
+    private static string ComputeSha256Once(string workerPath)
     {
         var path = Path.GetFullPath(workerPath);
         if (!path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
@@ -64,7 +65,6 @@ internal static class WorkerBinaryIdentity
                 throw new FileNotFoundException("The managed worker binary is unavailable.", path);
             }
         }
-
         using var hash = new CanonicalHashWriter();
         hash.Add("SharpProof.WorkerBinarySet", 1);
         var components = RuntimeComponents(path);
@@ -81,7 +81,6 @@ internal static class WorkerBinaryIdentity
 
         return hash.Finish();
     }
-
     internal static void ValidateComponentCount(int count)
     {
         if (count > MaximumRuntimeComponents)
@@ -102,11 +101,13 @@ internal static class WorkerBinaryIdentity
                 "A worker runtime component identity is too long.");
         }
 
-        s_componentLimitReductions.TryGetValue(key, out var reduction);
-        var excess = Math.Max(
-            length - (MaximumComponentBytes - reduction),
-            totalBytes - (MaximumClosureBytes - length));
-        if (excess > 0)
+        var maximum = key switch
+        {
+            "dependencies" => MaximumDependenciesBytes,
+            "runtimeConfig" => MaximumRuntimeConfigBytes,
+            _ => MaximumComponentBytes
+        };
+        if (length > maximum || totalBytes > MaximumClosureBytes - length)
         {
             throw new InvalidDataException(
                 "The worker runtime closure exceeds its byte limits.");
@@ -117,8 +118,7 @@ internal static class WorkerBinaryIdentity
 
     private static SortedDictionary<string, string> RuntimeComponents(string workerPath)
     {
-        var directory = Path.GetDirectoryName(workerPath) ??
-            throw new InvalidDataException("The managed worker directory is unavailable.");
+        var directory = Path.GetDirectoryName(workerPath)!;
         var dependencies = Path.ChangeExtension(workerPath, ".deps.json");
         var result = new SortedDictionary<string, string>(StringComparer.Ordinal)
         {
@@ -126,6 +126,12 @@ internal static class WorkerBinaryIdentity
             ["dependencies"] = dependencies,
             ["runtimeConfig"] = Path.ChangeExtension(workerPath, ".runtimeconfig.json")
         };
+        var immutableName = typeof(ImmutableArray<>).Assembly.GetName().Name + ".dll";
+        var immutable = Path.Combine(directory, immutableName);
+        if (File.Exists(immutable))
+        {
+            result.Add("app-local/" + immutableName, immutable);
+        }
         using var dependencyStream = OpenRead(dependencies);
         long dependencyBytes = 0;
         ValidateComponentLength(
@@ -136,8 +142,7 @@ internal static class WorkerBinaryIdentity
             dependencyStream,
             new JsonDocumentOptions { MaxDepth = 32 });
         var root = document.RootElement;
-        var targetName = root.GetProperty("runtimeTarget").GetProperty("name").GetString() ??
-            throw new InvalidDataException("The worker runtime target is unavailable.");
+        var targetName = root.GetProperty("runtimeTarget").GetProperty("name").GetString()!;
         var target = root.GetProperty("targets").GetProperty(targetName);
         foreach (var library in target.EnumerateObject())
         {
@@ -161,20 +166,18 @@ internal static class WorkerBinaryIdentity
     {
         foreach (var group in new[] { "runtime", "native", "runtimeTargets" })
         {
-            if (!library.TryGetProperty(group, out var assets))
+            if (library.TryGetProperty(group, out var assets))
             {
-                continue;
-            }
-
-            foreach (var asset in assets.EnumerateObject())
-            {
-                if (group == "runtimeTargets" &&
-                    asset.Value.GetProperty("rid").GetString() is not ("win" or "win-x64"))
+                foreach (var asset in assets.EnumerateObject())
                 {
-                    continue;
-                }
+                    if (group == "runtimeTargets" &&
+                        asset.Value.GetProperty("rid").GetString() is not ("win" or "win-x64"))
+                    {
+                        continue;
+                    }
 
-                result.Add(group + "/" + asset.Name, ResolveAsset(directory, asset.Name));
+                    result.Add(group + "/" + asset.Name, ResolveAsset(directory, asset.Name));
+                }
             }
         }
     }
@@ -183,7 +186,7 @@ internal static class WorkerBinaryIdentity
     {
         var nested = Path.GetFullPath(Path.Combine(
             directory, relativePath.Replace('/', Path.DirectorySeparatorChar)));
-        var root = Path.GetFullPath(directory) + Path.DirectorySeparatorChar;
+        var root = directory + Path.DirectorySeparatorChar;
         if (!nested.StartsWith(root, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidDataException("A worker runtime asset escapes its package.");
@@ -199,6 +202,7 @@ internal static class WorkerBinaryIdentity
             ? flattened
             : throw new FileNotFoundException("A trusted worker runtime component is unavailable.", nested);
     }
+
 }
 
 internal static class CompilerManifestArtifactJson

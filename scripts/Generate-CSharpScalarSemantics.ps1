@@ -982,17 +982,24 @@ Add-Lines -Lines $lines -Values @(
     '    }',
     '',
     '    private static bool SupportsBuiltInEquality(ITypeSymbol? type) =>',
-    '        type == null ||')
+    '')
 if ($allowReferenceEquality) {
-    $referenceCondition = 'type.IsReferenceType'
-    foreach ($typeKind in $excludedReferenceTypeKinds) {
-        $referenceCondition += " && type.TypeKind != TypeKind.$typeKind"
+    $excludedKinds = @(
+        $excludedReferenceTypeKinds |
+            ForEach-Object { "TypeKind.$_" })
+    $excludedKindPattern = if ($excludedKinds.Count -eq 1) {
+        $excludedKinds[0]
+    } else {
+        "($($excludedKinds -join ' or '))"
     }
+    $referencePattern =
+        "{ IsReferenceType: true, TypeKind: not $excludedKindPattern }"
     if ($excludeAbstractReferenceTypes) {
-        $referenceCondition +=
-            ' && type is not INamedTypeSymbol { IsAbstract: true }'
+        $referencePattern = "($referencePattern and not INamedTypeSymbol { IsAbstract: true })"
     }
-    $lines.Add("        $referenceCondition ||")
+    $lines.Add("        type is null or $referencePattern ||")
+} else {
+    $lines.Add('        type is null ||')
 }
 foreach ($type in $equalityTypes) {
     $lines.Add("        type.SpecialType == SpecialType.$type ||")

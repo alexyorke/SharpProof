@@ -600,6 +600,13 @@ public sealed class ArchitectureTests
                 "scripts/Generate-AnalyzerDiagnosticCatalog.ps1",
                 "SharpProof.Analyzer/AnalyzerDiagnosticCatalog.generated.cs"
             ],
+            ["diagnosticDescriptorCatalog"] = [
+                "eng/diagnostics/diagnostic-descriptors.v1.json",
+                "scripts/Generate-DiagnosticDescriptors.ps1",
+                "SharpProof.Analyzer/GeneratedDiagnosticDescriptors.generated.cs",
+                "SharpProof.ContractForGenerator/GeneratedDiagnosticDescriptors.generated.cs",
+                "SharpProof.Meta.Analyzers/MetaDiagnosticDescriptors.generated.cs"
+            ],
             ["projectionCatalog"] = [
                 "SharpProof.Projection.catalog.json",
                 "scripts/Generate-ProjectionCatalog.ps1",

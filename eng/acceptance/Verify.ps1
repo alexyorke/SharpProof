@@ -371,6 +371,7 @@ try {
         'scalarSemanticsCatalog',
         'contractApiCatalog',
         'analyzerDiagnosticCatalog',
+        'diagnosticDescriptorCatalog',
         'projectionCatalog',
         'launcherArgumentCatalog',
         'generatedOutputPolicy',

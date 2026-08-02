@@ -103,12 +103,20 @@ public sealed class WorkerBinaryIdentityTests
                 WorkerBinaryIdentity.ComputeSha256(worker);
             Assert.That(dependencyChanged, Is.Not.EqualTo(baseline));
 
+            var appLocalAsset = Path.Combine(
+                temporaryDirectory,
+                "System.Collections.Immutable.dll");
+            File.AppendAllText(appLocalAsset, "mutated");
+            var appLocalChanged =
+                WorkerBinaryIdentity.ComputeSha256(worker);
+            Assert.That(appLocalChanged, Is.Not.EqualTo(dependencyChanged));
+
             File.WriteAllText(
                 Path.Combine(temporaryDirectory, "unrelated.dll"),
                 "ignored");
             Assert.That(
                 WorkerBinaryIdentity.ComputeSha256(worker),
-                Is.EqualTo(dependencyChanged));
+                Is.EqualTo(appLocalChanged));
 
             var nativeZ3 = Path.Combine(
                 temporaryDirectory,

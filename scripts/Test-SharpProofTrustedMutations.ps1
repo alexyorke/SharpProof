@@ -255,7 +255,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'frontend-delegate-reference-equality'
         File = 'SharpProof.Frontend\CSharpScalarSemantics.generated.cs'
-        Original = '        type.IsReferenceType && type.TypeKind != TypeKind.Delegate && type is not INamedTypeSymbol { IsAbstract: true } ||'
+        Original = '        type is null or ({ IsReferenceType: true, TypeKind: not TypeKind.Delegate } and not INamedTypeSymbol { IsAbstract: true }) ||'
         Mutated = '        type.IsReferenceType ||'
         Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
         Filter = 'FullyQualifiedName~UnsupportedValueDomainsCannotMasqueradeAsReferenceEquality'
@@ -267,6 +267,14 @@ $mutations = @(
         Mutated = '                []);'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~ConfigurationProviderFailureReportsAndSuppressesAnalysis'
+    },
+    [pscustomobject]@{
+        Name = 'compiler-collector-configuration-gate'
+        File = 'SharpProof.CompilerCollector\FinalCompilationCollector.cs'
+        Original = "            if (!SharpProofAnalyzer.GetConfigurationDiagnostics(`n                context.Compilation,`n                context.Options,`n                configuration,`n                context.CancellationToken)`n                .IsEmpty)"
+        Mutated = "            if (SharpProofAnalyzer.GetConfigurationDiagnostics(`n                context.Compilation,`n                context.Options,`n                configuration,`n                context.CancellationToken)`n                .IsEmpty)"
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~TreeLocalConfigurationPreventsArtifactEmission'
     },
     [pscustomobject]@{
         Name = 'effect-region-contract-catalog'
