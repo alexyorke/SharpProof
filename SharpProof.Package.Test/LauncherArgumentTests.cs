@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Runtime.InteropServices;
 using NUnit.Framework;
 using SharpProof.Worker.Launcher;
 using SharpProof.Worker.Protocol;
@@ -8,6 +9,39 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 public sealed class LauncherArgumentTests
 {
+    [Test]
+    [NonParallelizable]
+    public void WindowsJobContainsSuspendedDotNetProcessBeforeExecution()
+    {
+        if (!OperatingSystem.IsWindows() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            Assert.Ignore("Windows x64 Job Objects are required.");
+        }
+
+        var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ??
+            throw new InvalidOperationException(
+                "The test host did not disclose its dotnet host path.");
+        using var job = WindowsJob.CreateRequired(
+            256L * 1024L * 1024L,
+            activeProcessLimit: 1);
+        using var process = job.StartSuspended(
+            host,
+            ["--version"],
+            TestContext.CurrentContext.WorkDirectory);
+
+        process.Resume();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(process.WaitForExit(30_000), Is.True);
+            Assert.That(process.ExitCode, Is.Zero);
+            Assert.That(
+                SpinWait.SpinUntil(job.HasNoActiveProcesses, 5_000),
+                Is.True);
+        }
+    }
+
     [Test]
     public void UnknownOptionIsRejected()
     {
