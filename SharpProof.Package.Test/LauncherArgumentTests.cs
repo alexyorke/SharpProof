@@ -420,12 +420,14 @@ public sealed class LauncherArgumentTests
                 new WorkerVerifyRequest(),
                 null,
                 null,
-                out var validResponse);
+                out var validResponse,
+                out var validatedResponse);
 
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(exitCode, Is.EqualTo(3));
                 Assert.That(validResponse, Is.False);
+                Assert.That(validatedResponse, Is.Null);
                 Assert.That(error.ToString(), Does.Contain("unavailable or malformed"));
             }
         }
@@ -531,7 +533,7 @@ public sealed class LauncherArgumentTests
                 path, WorkerProtocolJson.SerializeResponse(response));
             Assert.That(
                 Program.ValidateAndReport(
-                    path, request, inputHash, manifest, out var valid),
+                    path, request, inputHash, manifest, out var valid, out _),
                 Is.EqualTo(3));
             Assert.That(valid, Is.False);
             Assert.That(capture.ToString(), Does.Contain(expectedError));
@@ -637,7 +639,8 @@ public sealed class LauncherArgumentTests
                 request,
                 inputHash,
                 manifest,
-                out var valid);
+                out var valid,
+                out _);
 
             using (Assert.EnterMultipleScope())
             {

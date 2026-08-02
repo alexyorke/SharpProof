@@ -83,20 +83,21 @@ internal static class Program
                 launcherFailure.Status, launcherFailure.Reason, launcherFailure.Code, launcherFailure.Message).ConfigureAwait(false);
         }
         var resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
-            artifact.Manifest, out var validResponse);
+            artifact.Manifest, out var validResponse, out var validatedResponse);
         if (!validResponse)
         {
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
                 WorkerRunStatus.Failed, WorkerRunFailureReason.MalformedResult, "worker.malformed_result",
                 "The worker result was unavailable or malformed.").ConfigureAwait(false);
             resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
-                artifact.Manifest, out validResponse);
+                artifact.Manifest, out validResponse, out validatedResponse);
         }
         if (validResponse)
         {
             try
             {
-                PublishOutputs(arguments, request, artifact, artifactBytes, expectedInputHash);
+                PublishOutputs(arguments, request, artifact, artifactBytes, expectedInputHash,
+                    validatedResponse!);
             }
             catch (Exception exception) when (
                 exception is IOException or InvalidDataException or
@@ -232,9 +233,11 @@ internal static class Program
 
     internal static int ValidateAndReport(
         string resultPath, WorkerVerifyRequest request,
-        string? expectedInputHash, WorkerClaimManifest? expectedManifest, out bool validResponse)
+        string? expectedInputHash, WorkerClaimManifest? expectedManifest,
+        out bool validResponse, out WorkerVerifyResponse? validatedResponse)
     {
         validResponse = false;
+        validatedResponse = null;
         WorkerVerifyResponse? response;
         try
         {
@@ -263,6 +266,7 @@ internal static class Program
         validResponse = true;
         ArgumentNullException.ThrowIfNull(response);
         WorkerProtocolJson.Canonicalize(response);
+        validatedResponse = response;
         WriteErrors(response.Errors, "SharpProof ");
 
         var manifestClaims = response.Manifest.Claims.ToDictionary(static claim => claim.ClaimId, StringComparer.Ordinal);
@@ -340,7 +344,8 @@ internal static class Program
 
     private static void PublishOutputs(
         LauncherArguments arguments, WorkerVerifyRequest request,
-        CompilerManifestArtifact artifact, byte[] artifactBytes, string expectedInputHash)
+        CompilerManifestArtifact artifact, byte[] artifactBytes, string expectedInputHash,
+        WorkerVerifyResponse response)
     {
         if (arguments.PublishRequestPath == null)
         {
@@ -372,9 +377,6 @@ internal static class Program
             request.CompilerManifest.Path = arguments.PublishCompilerManifestPath!;
             AtomicFile.WriteUtf8(
                 arguments.PublishRequestPath, WorkerProtocolJson.SerializeRequest(request));
-            var response = WorkerProtocolJson.DeserializeResponse(
-                WorkerProtocolJson.ReadUtf8File(arguments.ResultPath)) ??
-                throw new IOException("The worker response is missing.");
             response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
             if (!WorkerProtocolJson.ValidateForRequest(
                     response, response.RequestHash, expectedInputHash,

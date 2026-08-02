@@ -1309,12 +1309,14 @@ public sealed class WorkerMsBuildIntegrationTests
                 new WorkerVerifyRequest(),
                 null,
                 null,
-                out var validResponse);
+                out var validResponse,
+                out var validatedResponse);
 
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(exitCode, Is.EqualTo(3));
                 Assert.That(validResponse, Is.True);
+                Assert.That(validatedResponse, Is.Not.Null);
                 Assert.That(
                     error.ToString(),
                     Does.Contain("infrastructure.test"));
@@ -1330,11 +1332,13 @@ public sealed class WorkerMsBuildIntegrationTests
                 new WorkerVerifyRequest(),
                 null,
                 null,
-                out validResponse);
+                out validResponse,
+                out validatedResponse);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(exitCode, Is.EqualTo(3));
                 Assert.That(validResponse, Is.False);
+                Assert.That(validatedResponse, Is.Null);
                 Assert.That(
                     error.ToString(),
                     Does.Contain("unavailable or malformed"));
