@@ -337,7 +337,7 @@ internal static class CompilerManifestArtifactJson
 
 internal static class CompilerManifestArtifactFile
 {
-    internal const int MaximumBytes = 16 * 1024 * 1024;
+    internal const int MaximumBytes = WorkerProtocolJson.MaximumJsonBytes;
 
     internal static byte[] ReadAllBytes(string path)
     {

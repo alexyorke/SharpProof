@@ -798,6 +798,39 @@ public sealed class WorkerTcbEdgeCaseTests
         }
     }
 
+    [Test]
+    public async Task CacheRejectsOversizedJsonBeforeDeserialization()
+    {
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "worker-cache-size-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var inputHash = new string('d', 64);
+            var path = Path.Combine(directory, inputHash + ".json");
+            await File.WriteAllBytesAsync(
+                path, new byte[WorkerProtocolJson.MaximumJsonBytes + 1]);
+            var cache = new VerificationCache(
+                directory, WorkerProtocolJson.MaximumJsonBytes * 2L);
+            var manifest = new WorkerClaimManifest();
+            WorkerProtocolJson.SealManifest(manifest);
+
+            var response = await cache.TryReadAsync(
+                inputHash,
+                manifest,
+                [],
+                new WorkerBudgets(),
+                CancellationToken.None);
+
+            Assert.That(response, Is.Null);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static Task WriteCacheEnvelopeAsync(
         string directory,
         string inputHash,

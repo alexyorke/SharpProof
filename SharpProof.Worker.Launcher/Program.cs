@@ -50,7 +50,7 @@ internal static class Program
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or
                 ArgumentException or FormatException or OverflowException or
-                JsonException)
+                InvalidDataException or JsonException)
         {
             Console.Error.WriteLine(
                 "SharpProof launcher input is invalid: " +
@@ -98,7 +98,8 @@ internal static class Program
                 PublishOutputs(arguments, request, artifact, artifactBytes, expectedInputHash);
             }
             catch (Exception exception) when (
-                exception is IOException or UnauthorizedAccessException or ArgumentException)
+                exception is IOException or InvalidDataException or
+                    UnauthorizedAccessException or ArgumentException)
             {
                 Console.Error.WriteLine(
                     "SharpProof worker result could not be published.");
@@ -237,10 +238,11 @@ internal static class Program
         try
         {
             response = WorkerProtocolJson.DeserializeResponse(
-                File.ReadAllText(resultPath));
+                WorkerProtocolJson.ReadUtf8File(resultPath));
         }
         catch (Exception exception) when (
-            exception is IOException or UnauthorizedAccessException or JsonException)
+            exception is ArgumentException or IOException or InvalidDataException or
+                UnauthorizedAccessException or JsonException)
         {
             Console.Error.WriteLine(
                 "SharpProof worker result is unavailable or malformed.");
@@ -370,7 +372,7 @@ internal static class Program
             AtomicFile.WriteUtf8(
                 arguments.PublishRequestPath, WorkerProtocolJson.SerializeRequest(request));
             var response = WorkerProtocolJson.DeserializeResponse(
-                File.ReadAllText(arguments.ResultPath)) ??
+                WorkerProtocolJson.ReadUtf8File(arguments.ResultPath)) ??
                 throw new IOException("The worker response is missing.");
             response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
             if (!WorkerProtocolJson.ValidateForRequest(

@@ -8,10 +8,29 @@ namespace SharpProof.Worker.Protocol;
 
 public static partial class WorkerProtocolJson
 {
+    internal const int MaximumJsonBytes = 16 * 1024 * 1024;
     internal const int MaximumJsonDepth = 32;
+    private static readonly UTF8Encoding s_strictUtf8 = new(false, true);
     private static readonly JsonSerializerOptions s_options = CreateOptions();
 
     public static JsonSerializerOptions Options => new(s_options);
+
+    internal static string ReadUtf8File(string path)
+    {
+        using var reader = OpenJsonReader(path);
+        return reader.ReadToEnd().TrimStart('\uFEFF');
+    }
+
+    internal static async Task<string> ReadUtf8FileAsync(
+        string path, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using var reader = OpenJsonReader(path);
+        var text = await reader.ReadToEndAsync().ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return text.TrimStart('\uFEFF');
+    }
+
     public static WorkerVerifyRequest? DeserializeRequest(string json)
     {
         return Deserialize<WorkerVerifyRequest>(json, WorkerProtocolMetadata.WorkerVerifyRequestJsonProperties);
@@ -30,6 +49,25 @@ public static partial class WorkerProtocolJson
     public static string ComputeRequestHash(WorkerVerifyRequest request)
     {
         return ComputeSha256(Encoding.UTF8.GetBytes(SerializeRequest(request)));
+    }
+
+    private static StreamReader OpenJsonReader(string path)
+    {
+        var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 81920,
+            options: FileOptions.SequentialScan);
+        if (stream.Length > MaximumJsonBytes)
+        {
+            stream.Dispose();
+            throw new InvalidDataException(
+                $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
+        }
+
+        return new StreamReader(stream, s_strictUtf8, detectEncodingFromByteOrderMarks: false);
     }
 
     public static string SerializeResponse(WorkerVerifyResponse response)

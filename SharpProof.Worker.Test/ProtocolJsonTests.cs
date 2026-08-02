@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -21,6 +22,34 @@ public sealed class ProtocolJsonTests
         WorkerAssumptionKind.UserAssume,
         WorkerAssumptionKind.TrustedBoundary
     ];
+
+    [Test]
+    public void BoundedUtf8FileReaderRejectsOversizedAndInvalidFiles()
+    {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "protocol-json-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            File.WriteAllBytes(path, new byte[WorkerProtocolJson.MaximumJsonBytes + 1]);
+
+            Assert.Throws<InvalidDataException>(
+                (Action)(() => WorkerProtocolJson.ReadUtf8File(path)));
+            Func<Task> readAsync = () => WorkerProtocolJson.ReadUtf8FileAsync(path);
+            Assert.ThrowsAsync<InvalidDataException>(readAsync);
+
+            File.WriteAllBytes(path, [0xff]);
+            Assert.Throws<DecoderFallbackException>(
+                (Action)(() => WorkerProtocolJson.ReadUtf8File(path)));
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
 
     [Test]
     public void VersionNineRequestCarriesOnlyArtifactAndRuntimeControls()

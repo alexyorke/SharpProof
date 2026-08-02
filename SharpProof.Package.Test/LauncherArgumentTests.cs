@@ -291,6 +291,46 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void WorkerResultByteLimitIsEnforcedBeforeDeserialization()
+    {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N") + ".json");
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        try
+        {
+            using (var stream = File.Create(path))
+            {
+                stream.SetLength(WorkerProtocolJson.MaximumJsonBytes + 1L);
+            }
+
+            Console.SetError(error);
+            var exitCode = Program.ValidateAndReport(
+                path,
+                new WorkerVerifyRequest(),
+                null,
+                null,
+                out var validResponse);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exitCode, Is.EqualTo(3));
+                Assert.That(validResponse, Is.False);
+                Assert.That(error.ToString(), Does.Contain("unavailable or malformed"));
+            }
+        }
+        finally
+        {
+            Console.SetError(originalError);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Test]
     public void DotNetHostMustBeAbsoluteInstalledAndOutsideProject()
     {
         var project = Path.Combine(

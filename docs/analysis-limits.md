@@ -93,6 +93,11 @@ The worker rejects malformed budgets before analysis:
 - process memory must be positive;
 - cache size must be from 1 byte through 512 MiB.
 
+Worker request, result, and cache envelope JSON files are capped at 16 MiB
+before UTF-8 decoding and JSON deserialization. Oversized, invalid-UTF-8, or
+malformed files fail closed as invalid input, malformed output, or a cache
+miss; the cache's 512 MiB limit remains the aggregate eviction limit.
+
 The configured method and project wall values are fail-closed outer boundaries,
 not proof facts. Z3 queries use deterministic resource limits. The launcher
 uses the project wall limit plus the termination grace to enforce a final

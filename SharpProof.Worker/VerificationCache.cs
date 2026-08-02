@@ -15,14 +15,10 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         CancellationToken cancellationToken)
     {
         var path = GetPath(inputHash);
-        if (!File.Exists(path))
-        {
-            return null;
-        }
-
         try
         {
-            var json = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
+            var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)
+                .ConfigureAwait(false);
             var envelope = JsonSerializer.Deserialize<CacheEnvelope>(json, WorkerProtocolJson.Options);
             if (envelope == null || envelope.SchemaVersion != WorkerCacheVersions.Current ||
                 !string.Equals(envelope.InputHash, inputHash, StringComparison.Ordinal) ||
@@ -59,7 +55,8 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             return response;
         }
         catch (Exception exception) when (exception is
-            JsonException or IOException or UnauthorizedAccessException)
+            ArgumentException or JsonException or IOException or InvalidDataException or
+                UnauthorizedAccessException)
         {
             return null;
         }
