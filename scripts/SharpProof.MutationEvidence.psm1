@@ -39,7 +39,7 @@ function Test-NUnitAssertionMessage {
         Where-Object { $_.Length -ne 0 })
     $assertionIndex = -1
     for ($index = 0; $index -lt $lines.Count; $index++) {
-        if ($lines[$index] -match '^Assert\.That\(.*\)$') {
+        if ($lines[$index] -match '^Assert\.That\(') {
             $assertionIndex = $index
             break
         }
@@ -57,7 +57,30 @@ function Test-NUnitAssertionMessage {
         return $false
     }
 
-    $details = @($lines[($assertionIndex + 1)..($lines.Count - 1)])
+    $expectedIndex = -1
+    for ($index = $assertionIndex + 1; $index -lt $lines.Count; $index++) {
+        if ($lines[$index] -match '^Expected(:| is\b)') {
+            $expectedIndex = $index
+            break
+        }
+    }
+    if ($expectedIndex -lt 0) {
+        return $false
+    }
+
+    $assertionContinuation = if ($expectedIndex -gt $assertionIndex + 1) {
+        @($lines[($assertionIndex + 1)..($expectedIndex - 1)])
+    }
+    else {
+        @()
+    }
+    if (@($assertionContinuation | Where-Object {
+            $_ -match '(?i)\b(exception|error|warning|stack trace)\b'
+        }).Count -ne 0) {
+        return $false
+    }
+
+    $details = @($lines[$expectedIndex..($lines.Count - 1)])
     $allowedDetail = '^(Expected:|But was:|Expected is\b|Values differ at index\b|Missing:)'
     if (@($details | Where-Object { $_ -notmatch $allowedDetail }).Count -ne 0) {
         return $false

@@ -199,6 +199,34 @@ try {
         throw 'Assertion kill was not recognized.'
     }
 
+    $multilineAssertion = New-TestParts `
+        -Outcome Failed `
+        -Message ("reverse LessThan`n" +
+            "Assert.That(reverse, Is.EqualTo(`n" +
+            "    reversed.TryGetValue(kind, out var expectedReverse)`n" +
+            "        ? expectedReverse`n" +
+            "        : kind)`n" +
+            " Expected: GreaterThan`n" +
+            " But was: GreaterThanOrEqual")
+    $multilinePath = Write-Fixture `
+        -Name multiline-assertion `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $multilineAssertion.Definition `
+        -Entries $multilineAssertion.Entry `
+        -Results $multilineAssertion.Result
+    $multilineMutation = Read-SharpProofMutationTestEvidence `
+        -TrxPath $multilinePath `
+        -EvidenceName multiline-assertion `
+        -Mode Mutation `
+        -ProcessExitCode 1 `
+        -ExpectedMethodName ExpectedTest `
+        -ExpectedLedger $baseline.testLedger
+    if ($multilineMutation.assertionFailureCount -ne 1) {
+        throw 'Multiline assertion kill was not recognized.'
+    }
+
     $prefixedAssertion = New-TestParts `
         -Outcome Failed `
         -Message "Incomplete-reason flags 4 changed projection precedence.`n Assert.That(actual, Is.EqualTo(expected))`n Expected: 1`n But was: 2"
