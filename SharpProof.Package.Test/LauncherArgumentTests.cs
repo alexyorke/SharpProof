@@ -254,6 +254,115 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void RequestProjectionRejectsWorkerPathCollisionBeforeManifestRead()
+    {
+        string[] arguments = [
+            "verify",
+            "--worker", "request.json",
+            "--request", "request.json",
+            "--result", "result.json",
+            "--compiler-manifest", "missing-compiler-manifest.json",
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [TestCase(0)]
+    [TestCase(300_001)]
+    public void TerminationGraceIsBoundedBeforeWorkerStarts(int graceMilliseconds)
+    {
+        string[] arguments = [
+            .. ValidArguments(),
+            "--termination-grace-ms",
+            graceMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Assert.That(
+            (Action)parsed.ValidatePreflight,
+            Throws.TypeOf<ArgumentOutOfRangeException>());
+    }
+
+    [Test]
+    public void ProcessMemoryLimitHasFiniteProtocolBound()
+    {
+        var request = new WorkerVerifyRequest
+        {
+            CompilerManifest = new WorkerFileReference
+            {
+                Path = "compiler-manifest.json",
+                Sha256 = new('a', 64)
+            },
+            Budgets = new WorkerBudgets
+            {
+                ProcessMemoryLimitBytes = WorkerBudgets.MaximumProcessMemoryLimitBytes + 1
+            }
+        };
+
+        var validation = WorkerProtocolJson.Validate(request);
+
+        Assert.That(validation.IsValid, Is.False);
+        Assert.That(
+            validation.Errors.Select(static error => error.Code),
+            Does.Contain("budgets.process_memory"));
+    }
+
+    [Test]
+    [NonParallelizable]
+    public async Task MainLeavesRequestAndResultSentinelsWhenManifestIsMalformed()
+    {
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var worker = Path.Combine(directory, "worker.dll");
+        var request = Path.Combine(directory, "request.json");
+        var result = Path.Combine(directory, "result.json");
+        var manifest = Path.Combine(directory, "compiler-manifest.json");
+        const string requestSentinel = "request sentinel";
+        const string resultSentinel = "result sentinel";
+        try
+        {
+            await File.WriteAllTextAsync(request, requestSentinel);
+            await File.WriteAllTextAsync(result, resultSentinel);
+            await File.WriteAllTextAsync(manifest, "{ malformed manifest");
+
+            var exitCode = await Program.Main([
+                "verify",
+                "--worker", worker,
+                "--request", request,
+                "--result", result,
+                "--compiler-manifest", manifest,
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow"
+            ]);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exitCode, Is.EqualTo(2));
+                Assert.That(await File.ReadAllTextAsync(request), Is.EqualTo(requestSentinel));
+                Assert.That(await File.ReadAllTextAsync(result), Is.EqualTo(resultSentinel));
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Test]
     public void CombinedTimeoutOverflowIsRejectedBeforeStartingWorker()
     {
         Action action = () => _ = Program.ComputeHardLimit(

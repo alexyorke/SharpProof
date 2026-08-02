@@ -35,6 +35,7 @@ internal static class Program
         string expectedInputHash;
         try
         {
+            arguments.ValidatePreflight();
             request = arguments.CreateRequest(out artifact, out artifactBytes);
             expectedInputHash = ComputeExpectedInputHash(arguments.WorkerPath, request, artifactBytes);
             var validation = WorkerProtocolJson.Validate(request);
@@ -521,7 +522,7 @@ internal sealed partial class LauncherArguments
 
     private void ValidateDistinctPaths()
     {
-        string?[] candidates = [RequestPath, ResultPath, CompilerManifestPath,
+        string?[] candidates = [WorkerPath, RequestPath, ResultPath, CompilerManifestPath,
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath];
         var paths = candidates.OfType<string>().ToArray();
@@ -529,6 +530,17 @@ internal sealed partial class LauncherArguments
         {
             throw new ArgumentException("SharpProof I/O paths must be distinct.");
         }
+    }
+
+    internal void ValidatePreflight()
+    {
+        var graceMilliseconds = TerminationGraceMilliseconds;
+        ArgumentOutOfRangeException.ThrowIfLessThan(
+            graceMilliseconds, 1, "termination-grace-ms");
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(
+            graceMilliseconds,
+            WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds,
+            "termination-grace-ms");
     }
 
     private WorkerFileReference CreateCompilerManifestReference(
