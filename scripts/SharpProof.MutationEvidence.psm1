@@ -59,7 +59,7 @@ function Test-NUnitAssertionMessage {
 
     $expectedIndex = -1
     for ($index = $assertionIndex + 1; $index -lt $lines.Count; $index++) {
-        if ($lines[$index] -match '^Expected(:| is\b)') {
+        if ($lines[$index] -match '^Expected(:| is\b| and actual are both\b)') {
             $expectedIndex = $index
             break
         }
@@ -81,7 +81,7 @@ function Test-NUnitAssertionMessage {
     }
 
     $details = @($lines[$expectedIndex..($lines.Count - 1)])
-    $allowedDetail = '^(Expected:|But was:|Expected is\b|Values differ at index\b|Missing:)'
+    $allowedDetail = '^(Expected:|But was:|Expected is\b|Expected and actual are both\b|Values differ at index\b|String lengths are both\b|Missing:|-+\^$)'
     if (@($details | Where-Object { $_ -notmatch $allowedDetail }).Count -ne 0) {
         return $false
     }

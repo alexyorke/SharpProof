@@ -271,6 +271,34 @@ try {
         throw 'Collection assertion kill was not recognized.'
     }
 
+    $nunitCollectionAssertion = New-TestParts `
+        -Outcome Failed `
+        -Message ("Assert.That(actual, Is.EqualTo(expected))`n" +
+            " Expected and actual are both <System.Linq.Enumerable+SelectArrayIterator>`n" +
+            " Values differ at index [0]`n" +
+            " String lengths are both 18. Strings differ at index 0.`n" +
+            " Expected: ConsoleApplication`n" +
+            " But was: WindowsApplication`n" +
+            " -----------^")
+    $nunitCollectionPath = Write-Fixture `
+        -Name nunit-collection-assertion `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $nunitCollectionAssertion.Definition `
+        -Entries $nunitCollectionAssertion.Entry `
+        -Results $nunitCollectionAssertion.Result
+    $nunitCollectionMutation = Read-SharpProofMutationTestEvidence `
+        -TrxPath $nunitCollectionPath `
+        -EvidenceName nunit-collection `
+        -Mode Mutation `
+        -ProcessExitCode 1 `
+        -ExpectedMethodName ExpectedTest `
+        -ExpectedLedger $baseline.testLedger
+    if ($nunitCollectionMutation.assertionFailureCount -ne 1) {
+        throw 'NUnit collection assertion kill was not recognized.'
+    }
+
     $crash = New-TestParts `
         -Outcome Failed `
         -Message 'System.NullReferenceException: crash'
