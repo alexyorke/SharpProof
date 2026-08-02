@@ -294,6 +294,23 @@ public sealed class FinalCompilationCollectorTests
     }
 
     [Test]
+    public async Task TreeLocalConfigurationGateDoesNotEmitAnArtifact()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("tree-configuration-gate");
+        _ = await AnalyzeCollectorAsync(
+            CreateCompilation(),
+            new TreeOptionsProvider(
+                Options(path),
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["sharpproof_profile"] = "strict"
+                }));
+
+        Assert.That(File.Exists(path), Is.False);
+    }
+
+    [Test]
     public async Task TreeConfigurationProviderFailureFailsArtifactEmission()
     {
         using var workspace = new CollectorWorkspace();
