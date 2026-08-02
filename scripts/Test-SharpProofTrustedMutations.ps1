@@ -87,8 +87,16 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'portable-codec-unknown-wire-fails-closed'
         File = 'SharpProof.CompilerArtifact\PortableIrGraphCodec.cs'
-        Original = '        return value >= 0 && value < values.Length'
-        Mutated = '        return value >= 0'
+        Original = (@'
+        return value >= 0 && value < values.Length
+            ? values[value]
+            : throw Bad("Portable IR contains an unknown enum value.");
+'@).Trim()
+        Mutated = (@'
+        return value >= 0
+            ? values[0]
+            : throw Bad("Portable IR contains an unknown enum value.");
+'@).Trim()
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~DecoderRejectsUnknownWireEnumCodes'
     },
