@@ -129,7 +129,7 @@ function Test-NUnitAssertionMessage {
     }
 
     $details = @($lines[$expectedIndex..($lines.Count - 1)])
-    $allowedDetail = '^(Expected:|But was:|Expected is\b|Expected and actual are both\b|Values differ at index\b|String lengths are both\b|Missing:|-+\^$)'
+    $allowedDetail = '^(Expected:|But was:|Expected is\b|Expected and actual are both\b|Values differ at index\b|String lengths are both\b|Missing:|Extra:|-+\^$)'
     if (@($details | Where-Object { $_ -notmatch $allowedDetail }).Count -ne 0) {
         return $false
     }

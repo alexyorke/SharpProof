@@ -279,6 +279,7 @@ try {
             " String lengths are both 18. Strings differ at index 0.`n" +
             " Expected: ConsoleApplication`n" +
             " But was: WindowsApplication`n" +
+            " Extra: item`n" +
             " -----------^")
     $nunitCollectionPath = Write-Fixture `
         -Name nunit-collection-assertion `
