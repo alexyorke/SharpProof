@@ -474,13 +474,11 @@ public sealed class ApiSpecTests
         var resolved = new ApiSpecResolver(ApiSpecTable.Create([declaration]))
             .Resolve(compilation);
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(resolved.Specs, Is.Empty);
-            Assert.That(
-                resolved.Failures.Single().Kind,
-                Is.EqualTo(ApiSpecResolutionFailureKind.UnapprovedContainingAssembly));
-        });
+        Assert.That(resolved.Specs, Is.Empty);
+        Assert.That(resolved.Failures, Has.One.Items);
+        Assert.That(
+            resolved.Failures[0].Kind,
+            Is.EqualTo(ApiSpecResolutionFailureKind.UnapprovedContainingAssembly));
     }
 
     [Test]
