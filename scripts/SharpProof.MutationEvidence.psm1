@@ -37,12 +37,20 @@ function Test-NUnitAssertionMessage {
     $lines = @($Message.Replace("`r`n", "`n").Split("`n") |
         ForEach-Object { $_.Trim() } |
         Where-Object { $_.Length -ne 0 })
-    $assertionIndex = if ($lines.Count -gt 0 -and
-        $lines[0] -match '^Assert\.That\(.*\)$') { 0 } else { 1 }
-    if ($assertionIndex -eq 1 -and
-        ($lines.Count -lt 2 -or
-         $lines[0] -match '(?i)\b(exception|error|warning)\b' -or
-         $lines[1] -notmatch '^Assert\.That\(.*\)$')) {
+    $assertionIndex = -1
+    for ($index = 0; $index -lt $lines.Count; $index++) {
+        if ($lines[$index] -match '^Assert\.That\(.*\)$') {
+            $assertionIndex = $index
+            break
+        }
+    }
+    if ($assertionIndex -lt 0) {
+        return $false
+    }
+    if ($assertionIndex -gt 0 -and
+        @($lines[0..($assertionIndex - 1)] | Where-Object {
+            $_ -match '(?i)\b(exception|error|warning|stack trace)\b'
+        }).Count -ne 0) {
         return $false
     }
     if ($lines.Count -le $assertionIndex + 1) {

@@ -199,6 +199,28 @@ try {
         throw 'Assertion kill was not recognized.'
     }
 
+    $prefixedAssertion = New-TestParts `
+        -Outcome Failed `
+        -Message "Incomplete-reason flags 4 changed projection precedence.`n Assert.That(actual, Is.EqualTo(expected))`n Expected: 1`n But was: 2"
+    $prefixedPath = Write-Fixture `
+        -Name prefixed-assertion `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $prefixedAssertion.Definition `
+        -Entries $prefixedAssertion.Entry `
+        -Results $prefixedAssertion.Result
+    $prefixedMutation = Read-SharpProofMutationTestEvidence `
+        -TrxPath $prefixedPath `
+        -EvidenceName prefixed-assertion `
+        -Mode Mutation `
+        -ProcessExitCode 1 `
+        -ExpectedMethodName ExpectedTest `
+        -ExpectedLedger $baseline.testLedger
+    if ($prefixedMutation.assertionFailureCount -ne 1) {
+        throw 'Prefixed assertion kill was not recognized.'
+    }
+
     $collectionAssertion = New-TestParts `
         -Outcome Failed `
         -Message "Assert.That(actual, Is.EqualTo(expected))`n Expected is <System.Int32[1]>, actual is <System.Int32[0]>`n Values differ at index [0]"
