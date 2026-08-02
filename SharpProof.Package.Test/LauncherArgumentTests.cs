@@ -178,7 +178,7 @@ public sealed class LauncherArgumentTests
             "verify",
             "--worker", "worker.dll",
             "--request", "request.json",
-            "--result", ".\\request.json",
+            "--result", Path.Combine(".", "request.json"),
             "--compiler-manifest", "missing-compiler-manifest.json",
             "--verify-policy", "advisory",
             "--assumption-policy", "allow"

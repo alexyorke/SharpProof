@@ -189,8 +189,9 @@ internal static class Program
         var hostRoot = Path.GetDirectoryName(hostPath) ?? string.Empty;
         var projectRoot = Path.TrimEndingDirectorySeparator(
             Path.GetFullPath(projectDirectory)) + Path.DirectorySeparatorChar;
+        var hostFileName = OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet";
         if (!Path.IsPathFullyQualified(candidate) |
-            !string.Equals(Path.GetFileName(hostPath), "dotnet.exe",
+            !string.Equals(Path.GetFileName(hostPath), hostFileName,
                 StringComparison.OrdinalIgnoreCase) |
             !File.Exists(hostPath) |
             !Directory.Exists(Path.Combine(hostRoot, "host", "fxr")) |
