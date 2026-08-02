@@ -299,6 +299,64 @@ try {
         throw 'NUnit collection assertion kill was not recognized.'
     }
 
+    $multipleAssertion = New-TestParts `
+        -Outcome Failed `
+        -Message ("Multiple failures or warnings in test:`n" +
+            " 1) Assert.That(first, Is.EqualTo(expected))`n" +
+            " Expected: 1`n" +
+            " But was: 2`n" +
+            " at test.cs:10`n" +
+            " 2) Assert.That(second, Is.True)`n" +
+            " Expected: True`n" +
+            " But was: False`n" +
+            " at test.cs:11")
+    $multiplePath = Write-Fixture `
+        -Name multiple-assertion `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $multipleAssertion.Definition `
+        -Entries $multipleAssertion.Entry `
+        -Results $multipleAssertion.Result
+    $multipleMutation = Read-SharpProofMutationTestEvidence `
+        -TrxPath $multiplePath `
+        -EvidenceName multiple-assertion `
+        -Mode Mutation `
+        -ProcessExitCode 1 `
+        -ExpectedMethodName ExpectedTest `
+        -ExpectedLedger $baseline.testLedger
+    if ($multipleMutation.assertionFailureCount -ne 1) {
+        throw 'Multiple assertion kill was not recognized.'
+    }
+
+    $multipleMixed = New-TestParts `
+        -Outcome Failed `
+        -Message ("Multiple failures or warnings in test:`n" +
+            " 1) Assert.That(first, Is.EqualTo(expected))`n" +
+            " Expected: 1`n" +
+            " But was: 2`n" +
+            " 2) System.InvalidOperationException : crash")
+    $multipleMixedPath = Write-Fixture `
+        -Name multiple-mixed `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $multipleMixed.Definition `
+        -Entries $multipleMixed.Entry `
+        -Results $multipleMixed.Result
+    Assert-Throws `
+        -Because 'a mixed Assert.Multiple failure and exception' `
+        -ExpectedMessage 'not killed solely by assertions' `
+        -Action {
+        Read-SharpProofMutationTestEvidence `
+            -TrxPath $multipleMixedPath `
+            -EvidenceName multiple-mixed `
+            -Mode Mutation `
+            -ProcessExitCode 1 `
+            -ExpectedMethodName ExpectedTest `
+            -ExpectedLedger $baseline.testLedger
+    }
+
     $crash = New-TestParts `
         -Outcome Failed `
         -Message 'System.NullReferenceException: crash'

@@ -1,6 +1,51 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Test-NUnitMultipleAssertionLines {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Lines
+    )
+
+    if ($Lines.Count -lt 3 -or
+        $Lines[0] -ne 'Multiple failures or warnings in test:') {
+        return $false
+    }
+
+    $failureIndexes = @(
+        for ($index = 1; $index -lt $Lines.Count; $index++) {
+            if ($Lines[$index] -match '^\d+\)\s+') {
+                $index
+            }
+        })
+    if ($failureIndexes.Count -eq 0 -or $failureIndexes[0] -ne 1) {
+        return $false
+    }
+
+    for ($failure = 0; $failure -lt $failureIndexes.Count; $failure++) {
+        $start = $failureIndexes[$failure]
+        $end = if ($failure + 1 -lt $failureIndexes.Count) {
+            $failureIndexes[$failure + 1]
+        }
+        else {
+            $Lines.Count
+        }
+        $block = @($Lines[$start..($end - 1)])
+        if ($block[0] -notmatch '^\d+\)\s+Assert\.That\(' -or
+            @($block | Where-Object {
+                $_ -match '(?i)\bSystem\.[A-Za-z]+Exception\b'
+            }).Count -ne 0 -or
+            @($block | Where-Object {
+                $_ -match '^Expected(:| is\b| and actual are both\b)'
+            }).Count -eq 0 -or
+            @($block | Where-Object { $_ -match '^But was:' }).Count -eq 0) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
 function Get-RequiredIntegerAttribute {
     param(
         [Parameter(Mandatory = $true)]
@@ -37,6 +82,9 @@ function Test-NUnitAssertionMessage {
     $lines = @($Message.Replace("`r`n", "`n").Split("`n") |
         ForEach-Object { $_.Trim() } |
         Where-Object { $_.Length -ne 0 })
+    if (Test-NUnitMultipleAssertionLines -Lines $lines) {
+        return $true
+    }
     $assertionIndex = -1
     for ($index = 0; $index -lt $lines.Count; $index++) {
         if ($lines[$index] -match '^Assert\.That\(') {
