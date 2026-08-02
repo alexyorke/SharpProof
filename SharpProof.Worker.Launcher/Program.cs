@@ -524,7 +524,11 @@ internal sealed partial class LauncherArguments
 
     private void ValidateDistinctPaths()
     {
-        string?[] candidates = [WorkerPath, RequestPath, ResultPath, CompilerManifestPath,
+        var workerPath = WorkerPath;
+        string?[] candidates = [workerPath,
+            Path.ChangeExtension(workerPath, ".deps.json"),
+            Path.ChangeExtension(workerPath, ".runtimeconfig.json"),
+            RequestPath, ResultPath, CompilerManifestPath,
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath];
         var paths = candidates.OfType<string>().ToArray();

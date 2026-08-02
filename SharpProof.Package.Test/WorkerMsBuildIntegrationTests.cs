@@ -863,6 +863,44 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task WorkerRuntimeCompanionAliasIsRejectedBeforeInvalidationDeletesIt()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var sourceWorker = WorkerOutputPath();
+        var collisionWorker = project.CollisionWorkerPath;
+        Directory.CreateDirectory(Path.GetDirectoryName(collisionWorker)!);
+        File.Copy(sourceWorker, collisionWorker, overwrite: true);
+        foreach (var extension in new[] { ".deps.json", ".runtimeconfig.json" })
+        {
+            File.Copy(
+                Path.ChangeExtension(sourceWorker, extension),
+                Path.ChangeExtension(collisionWorker, extension),
+                overwrite: true);
+        }
+
+        var collisionCompanion = Path.ChangeExtension(
+            collisionWorker, ".deps.json");
+        var failed = await project.RunVerificationTargetAsync(
+            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+            ("SharpProofWorkerPath", collisionWorker),
+            ("SharpProofVerifyResultFile", collisionCompanion));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(failed.ExitCode, Is.Not.Zero);
+            Assert.That(
+                failed.Output,
+                Does.Contain("SharpProof launcher input is invalid: ArgumentException"));
+            Assert.That(File.Exists(collisionWorker), Is.True);
+            Assert.That(File.Exists(collisionCompanion), Is.True);
+        }
+    }
+
+    [Test]
     public async Task AssumptionSeverityIncludesUsedAndDeclaredEvidence()
     {
         RequireWindowsWorker();
@@ -1666,6 +1704,11 @@ public sealed class WorkerMsBuildIntegrationTests
                 "net8.0",
                 "SharpProof",
                 "compiler-manifest.json");
+            CollisionWorkerPath = Path.Combine(
+                root,
+                "obj",
+                "collision-worker",
+                "SharpProof.Worker.dll");
         }
 
         internal string ProjectPath
@@ -1681,6 +1724,10 @@ public sealed class WorkerMsBuildIntegrationTests
             get;
         }
         internal string CompilerManifestPath
+        {
+            get;
+        }
+        internal string CollisionWorkerPath
         {
             get;
         }

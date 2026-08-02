@@ -60,7 +60,7 @@ public sealed class ArchitectureTests
         {
             Assert.That(
                 sdk.GetProperty("version").GetString(),
-                Is.EqualTo("9.0.315"));
+                Is.EqualTo("9.0.316"));
             Assert.That(
                 sdk.GetProperty("rollForward").GetString(),
                 Is.EqualTo("disable"));
@@ -748,6 +748,8 @@ public sealed class ArchitectureTests
                 "SharpProof.Ir/CanonicalHashWriter.cs"
             ],
             ["protocolValidation"] = [
+                "SharpProof.Worker.Protocol/ProtocolModel.schema.json",
+                "scripts/Generate-ProtocolModel.ps1",
                 "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
                 "SharpProof.Worker.Protocol/ProtocolManifest.cs",
                 "SharpProof.Worker.Protocol/ProtocolManifestPayload.cs",

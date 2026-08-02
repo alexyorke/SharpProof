@@ -13,6 +13,8 @@
       <InvocationRequestPath ParameterType="System.String" />
       <InvocationResultPath ParameterType="System.String" />
       <InvocationManifestPath ParameterType="System.String" />
+      <WorkerPath ParameterType="System.String" />
+      <LauncherPath ParameterType="System.String" />
     </ParameterGroup>
     <Task>
       <Using Namespace="System.Linq" />
@@ -30,11 +32,19 @@
         var aliasesOutput = outputPaths
             .Distinct(System.StringComparer.OrdinalIgnoreCase)
             .Count() != outputPaths.Length;
+        var toolPaths = new[] { WorkerPath, LauncherPath }
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .SelectMany(path => new[] {
+                path,
+                System.IO.Path.ChangeExtension(path, ".deps.json"),
+                System.IO.Path.ChangeExtension(path, ".runtimeconfig.json")
+            });
         var protectedPaths = new[] {
             RequestPath, ManifestPath, InvocationRequestPath,
             InvocationResultPath, InvocationManifestPath
         }.Where(path => !string.IsNullOrWhiteSpace(path))
             .Select(resolvePath)
+            .Concat(toolPaths.Select(resolvePath))
             .ToArray();
         var aliasesInput = outputPaths
             .Any(output => protectedPaths.Any(input => string.Equals(
@@ -104,7 +114,9 @@
         SarifPath="$(SharpProofVerifySarifFile)"
         InvocationRequestPath="$(_SharpProofInvocationRequestFile)"
         InvocationResultPath="$(_SharpProofInvocationResultFile)"
-        InvocationManifestPath="$(_SharpProofCompilerManifestPath)" />
+        InvocationManifestPath="$(_SharpProofCompilerManifestPath)"
+        WorkerPath="$(_SharpProofWorkerPath)"
+        LauncherPath="$(_SharpProofLauncherPath)" />
   </Target>
 
   <Target Name="_SharpProofVerifyCore"

@@ -365,13 +365,15 @@
       {
         "name": "protocolValidation",
         "paths": [
+          "SharpProof.Worker.Protocol/ProtocolModel.schema.json",
+          "scripts/Generate-ProtocolModel.ps1",
           "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
           "SharpProof.Worker.Protocol/ProtocolManifest.cs",
           "SharpProof.Worker.Protocol/ProtocolManifestPayload.cs",
           "SharpProof.Worker.Protocol/ProtocolJson.cs",
           "SharpProof.Worker.Protocol/ProtocolJsonSupport.cs"
         ],
-        "rationale": "The checked-in generated model and runtime validator are the reviewed, coverlet-visible runtime protocol boundary; CI separately verifies the schema projection is current."
+        "rationale": "The protocol schema and generator define the declarative security vocabulary; the checked-in generated model and runtime validator are the reviewed, coverlet-visible runtime boundary, and CI verifies the projection is current."
       },
       {
         "name": "cacheValidation",

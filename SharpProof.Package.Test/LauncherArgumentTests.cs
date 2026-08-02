@@ -274,6 +274,29 @@ public sealed class LauncherArgumentTests
             Throws.TypeOf<ArgumentException>());
     }
 
+    [TestCase("worker.deps.json")]
+    [TestCase("worker.runtimeconfig.json")]
+    public void RequestProjectionRejectsWorkerRuntimeCompanionCollisionBeforeManifestRead(
+        string resultPath)
+    {
+        string[] arguments = [
+            "verify",
+            "--worker", "worker.dll",
+            "--request", "request.json",
+            "--result", resultPath,
+            "--compiler-manifest", "missing-compiler-manifest.json",
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
     [TestCase(0)]
     [TestCase(300_001)]
     public void TerminationGraceIsBoundedBeforeWorkerStarts(int graceMilliseconds)

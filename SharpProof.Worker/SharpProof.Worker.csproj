@@ -9,6 +9,14 @@
   <ItemGroup>
     <PackageReference Include="System.Text.Json" />
   </ItemGroup>
+  <Target Name="_SharpProofCopyRuntimeDependencies" AfterTargets="ResolvePackageAssets">
+    <ItemGroup>
+      <_SharpProofImmutableRuntime Include="@(RuntimeCopyLocalItems)"
+                                   Condition="'%(RuntimeCopyLocalItems.NuGetPackageId)' == 'System.Collections.Immutable'" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_SharpProofImmutableRuntime)"
+          DestinationFiles="@(_SharpProofImmutableRuntime->'$(TargetDir)%(Filename)%(Extension)')" />
+  </Target>
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.CompilerArtifact\SharpProof.CompilerArtifact.csproj" />
     <ProjectReference Include="..\SharpProof.Dataflow\SharpProof.Dataflow.csproj" />

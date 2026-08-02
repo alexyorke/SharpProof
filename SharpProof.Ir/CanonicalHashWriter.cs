@@ -55,10 +55,18 @@ internal sealed class CanonicalHashWriter : IDisposable
         var length = checked((int)(stream.Length - stream.Position));
         AddFrameHeader(ValueKind.Bytes, length);
         var buffer = new byte[Math.Min(length, 81920)];
+        var bytesRead = 0;
         int read;
         while ((read = stream.Read(buffer, 0, buffer.Length)) != 0)
         {
+            bytesRead += read;
             _hash.AppendData(buffer, 0, read);
+        }
+
+        if (bytesRead != length)
+        {
+            throw new InvalidDataException(
+                "The canonical hash stream ended before its declared length.");
         }
 
         return this;

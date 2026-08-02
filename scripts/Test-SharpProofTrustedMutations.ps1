@@ -655,7 +655,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'launcher-manifest-byte-limit'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
-        Original = 'MaximumBytes = 16 * 1024 * 1024;'
+        Original = 'MaximumBytes = WorkerProtocolJson.MaximumJsonBytes;'
         Mutated = 'MaximumBytes = 32 * 1024 * 1024;'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~CompilerManifestByteLimitIsEnforcedBeforeAllocation'
