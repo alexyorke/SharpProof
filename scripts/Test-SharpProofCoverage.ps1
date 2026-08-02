@@ -332,10 +332,27 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
             continue
         }
         $fileHits = $lineHits[$changedPath]
+        $sourcePath = Join-Path $repositoryRoot ($changedPath.Replace('/', '\'))
+        $sourceLines = if (Test-Path -LiteralPath $sourcePath -PathType Leaf) {
+            @(Get-Content -LiteralPath $sourcePath)
+        }
+        else {
+            @()
+        }
         foreach ($number in $changedLines[$changedPath]) {
+            if ($number -gt 0 -and
+                $number -le $sourceLines.Count -and
+                $sourceLines[$number - 1].Trim() -in @('{', '}')) {
+                # Coverlet may attach a sequence point to a brace-only line
+                # for generated cleanup code. Braces are not executable
+                # source and do not participate in the changed-TCB ratchet.
+                continue
+            }
             if (-not $fileHits.ContainsKey($number)) {
-                $uncoveredChangedLines.Add(
-                    "${changedPath}:$number (not present in coverage report)")
+                # A changed source line without a sequence point is
+                # non-executable syntax such as a declaration or brace.
+                # Coverlet emits sequence points for executable lines; only
+                # those lines participate in the changed-TCB ratchet.
                 continue
             }
             $changedCoverable++
@@ -343,7 +360,7 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
                 $changedCovered++
             }
             else {
-                $uncoveredChangedLines.Add("$($entry.Key):$number")
+                $uncoveredChangedLines.Add("${changedPath}:$number")
             }
         }
     }

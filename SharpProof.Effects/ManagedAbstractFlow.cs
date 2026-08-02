@@ -1205,7 +1205,7 @@ internal sealed class ManagedFlowState
         }
 
         var result = NoValues.ToBuilder();
-        foreach (var key in left._values.Keys.Concat(right._values.Keys).Distinct(Comparer))
+        foreach (var key in left._values.Keys.Union(right._values.Keys, Comparer))
         {
             result[key] = ManagedAbstractValue.Join(left.Get(key), right.Get(key));
         }
@@ -1225,7 +1225,7 @@ internal sealed class ManagedFlowState
             return false;
         }
 
-        return left._values.Keys.Concat(right._values.Keys).Distinct(Comparer).All(key =>
+        return left._values.Keys.Union(right._values.Keys, Comparer).All(key =>
             ManagedAbstractValue.Join(left.Get(key), right.Get(key)) == right.Get(key));
     }
 }

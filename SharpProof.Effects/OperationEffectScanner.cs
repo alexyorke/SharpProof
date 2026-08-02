@@ -133,10 +133,7 @@ internal sealed class OperationEffectScanner
                 Scan(increment.Target, EffectAccess.Read),
                 ScanWriteTarget(increment.Target, increment.Target, valueIsStoredDirectly: false),
                 CheckedOverflow(increment.IsChecked, increment),
-                _callResolver.ResolveOperator(increment.OperatorMethod, EffectRegionSet.Empty,
-                    [ClassifyRegion(increment.Target)],
-                    [increment.Target],
-                    increment)),
+                ResolveOperatorEffects(increment.OperatorMethod, [increment.Target], increment)),
             IInvocationOperation invocation => ScanInvocation(invocation),
             IObjectCreationOperation creation => ScanObjectCreation(creation),
             IArrayCreationOperation array => EffectSummaryOperations.Join(ScanChildren(array),
@@ -309,10 +306,8 @@ internal sealed class OperationEffectScanner
 
     private EffectSummary ScanCompoundAssignment(ICompoundAssignmentOperation assignment)
     {
-        var operatorCall = _callResolver.ResolveOperator(
+        var operatorCall = ResolveOperatorEffects(
             assignment.OperatorMethod,
-            EffectRegionSet.Empty,
-            [ClassifyRegion(assignment.Target), ClassifyRegion(assignment.Value)],
             [assignment.Target, assignment.Value],
             assignment);
         var exceptions = IntegralDivisionExceptions(assignment.OperatorKind, assignment.Type,
@@ -454,8 +449,8 @@ internal sealed class OperationEffectScanner
             IntegralDivisionExceptions(binary.OperatorKind, binary.Type,
                 binary.LeftOperand, binary.RightOperand, binary),
             CheckedOverflow(binary.IsChecked, binary),
-            _callResolver.ResolveOperator(binary.OperatorMethod, EffectRegionSet.Empty,
-                [ClassifyRegion(binary.LeftOperand), ClassifyRegion(binary.RightOperand)],
+            ResolveOperatorEffects(
+                binary.OperatorMethod,
                 [binary.LeftOperand, binary.RightOperand],
                 binary));
     }
@@ -465,10 +460,7 @@ internal sealed class OperationEffectScanner
         return EffectSummaryOperations.Join(
             Scan(unary.Operand),
             CheckedOverflow(unary.IsChecked, unary),
-            _callResolver.ResolveOperator(unary.OperatorMethod, EffectRegionSet.Empty,
-                [ClassifyRegion(unary.Operand)],
-                [unary.Operand],
-                unary));
+            ResolveOperatorEffects(unary.OperatorMethod, [unary.Operand], unary));
     }
 
     private EffectSummary ScanConversion(IConversionOperation operation)
@@ -484,10 +476,20 @@ internal sealed class OperationEffectScanner
         return EffectSummaryOperations.Join(
             Scan(operation.Operand),
             ClassifyConversion(operation, conversion),
-            _callResolver.ResolveOperator(operation.OperatorMethod, EffectRegionSet.Empty,
-                [ClassifyRegion(operation.Operand)],
-                [operation.Operand],
-                operation));
+            ResolveOperatorEffects(operation.OperatorMethod, [operation.Operand], operation));
+    }
+
+    private EffectSummary ResolveOperatorEffects(
+        IMethodSymbol? method,
+        ImmutableArray<IOperation?> operands,
+        IOperation origin)
+    {
+        return _callResolver.ResolveOperator(
+            method,
+            EffectRegionSet.Empty,
+            [.. operands.Select(operand => ClassifyRegion(operand))],
+            operands,
+            origin);
     }
 
     private EffectSummary ClassifyConversion(

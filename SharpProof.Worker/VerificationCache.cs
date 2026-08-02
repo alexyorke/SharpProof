@@ -146,11 +146,14 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             ClaimResults: { } claims
         } &&
         callables.All(static result =>
-            result != null && result.Coverage == WorkerCallableCoverage.Complete &&
-            result.Reason == WorkerCallableCoverageReason.None) &&
+            result is
+            {
+                Coverage: WorkerCallableCoverage.Complete,
+                Reason: WorkerCallableCoverageReason.None
+            }) &&
         claims.Length != 0 &&
         claims.All(static result =>
-            result != null && result.Outcome == WorkerClaimOutcome.Refuted) &&
+            result is { Outcome: WorkerClaimOutcome.Refuted }) &&
         expectedManifest.Claims.Length == claims.Length &&
         expectedManifest.Claims.All(static claim =>
             claim.Kind == WorkerClaimKind.Postcondition) &&

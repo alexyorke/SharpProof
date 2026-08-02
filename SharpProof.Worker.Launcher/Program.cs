@@ -33,14 +33,22 @@ internal static class Program
         CompilerManifestArtifact artifact;
         byte[] artifactBytes;
         string expectedInputHash;
+        WorkerRuntimeClosureSnapshot? runtimeSnapshot = null;
         try
         {
             arguments.ValidatePreflight();
             request = arguments.CreateRequest(out artifact, out artifactBytes);
-            expectedInputHash = ComputeExpectedInputHash(arguments.WorkerPath, request, artifactBytes);
+            runtimeSnapshot = WorkerBinaryIdentity.CreateSnapshot(
+                arguments.WorkerPath);
+            expectedInputHash = ComputeExpectedInputHash(
+                request,
+                artifactBytes,
+                runtimeSnapshot);
             var validation = WorkerProtocolJson.Validate(request);
             if (!validation.IsValid)
             {
+                runtimeSnapshot.Dispose();
+                runtimeSnapshot = null;
                 WriteErrors(validation.Errors, string.Empty);
                 return 2;
             }
@@ -53,6 +61,8 @@ internal static class Program
                 ArgumentException or FormatException or OverflowException or
                 InvalidDataException or JsonException)
         {
+            runtimeSnapshot?.Dispose();
+            runtimeSnapshot = null;
             Console.Error.WriteLine(
                 "SharpProof launcher input is invalid: " +
                 exception.GetType().Name + ": " + exception.Message);
@@ -62,7 +72,10 @@ internal static class Program
         int exitCode;
         try
         {
-            exitCode = RunWorker(arguments, request, artifact.Compilation.ProjectDirectory);
+            using (runtimeSnapshot)
+            {
+                exitCode = RunWorker(arguments, request, artifact.Compilation.ProjectDirectory);
+            }
         }
         catch (Exception exception) when (ClassifyLauncherFailure(exception) is { } failure)
         {
@@ -217,11 +230,24 @@ internal static class Program
     internal static string ComputeExpectedInputHash(
         string workerPath, WorkerVerifyRequest request, byte[] artifactBytes)
     {
-        var version = FileVersionInfo.GetVersionInfo(Path.GetFullPath(workerPath));
+        using var snapshot = WorkerBinaryIdentity.CreateSnapshot(workerPath);
+        return ComputeExpectedInputHash(
+            request,
+            artifactBytes,
+            snapshot);
+    }
+
+    internal static string ComputeExpectedInputHash(
+        WorkerVerifyRequest request,
+        byte[] artifactBytes,
+        WorkerRuntimeClosureSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        var version = FileVersionInfo.GetVersionInfo(snapshot.WorkerPath);
         return CompilerArtifactInputHash.Compute(
             request, artifactBytes, RequiredVersion(version.ProductName, "product name"),
             RequiredVersion(version.ProductVersion, "product version"),
-            WorkerBinaryIdentity.ComputeSha256(workerPath),
+            snapshot.Sha256,
             ApiSpecTable.DefaultTableIdentity, ApiSpecTable.DefaultTableVersion,
             ApiSpecTable.Default.ContentSha256);
     }

@@ -44,17 +44,62 @@ internal static class WorkerBinaryIdentity
     internal const long MaximumDependenciesBytes = 1024L * 1024;
     internal const long MaximumRuntimeConfigBytes = 64L * 1024;
 
-    internal static string ComputeSha256(string workerPath)
+    internal static WorkerRuntimeClosureSnapshot CreateSnapshot(
+        string workerPath)
     {
-        var first = ComputeSha256Once(workerPath);
-        var second = ComputeSha256Once(workerPath);
-        return first == second
-            ? first
-            : throw new InvalidDataException(
-                "The worker runtime closure changed while it was hashed.");
+        var path = NormalizeWorkerPath(workerPath);
+        var streams = new List<FileStream>();
+        try
+        {
+            using var dependency = OpenRead(Path.ChangeExtension(path, ".deps.json"));
+            var components = RuntimeComponents(path, dependency);
+            ValidateComponentCount(components.Count);
+            using var hash = new CanonicalHashWriter();
+            hash.Add("SharpProof.WorkerBinarySet", 1);
+            long totalBytes = 0;
+            foreach (var component in components)
+            {
+                var stream = OpenRead(component.Value);
+                try
+                {
+                    ValidateComponentLength(
+                        component.Key,
+                        stream.Length,
+                        ref totalBytes);
+                    stream.Position = 0;
+                    hash.Add(component.Key).Add(stream);
+                    streams.Add(stream);
+                }
+                catch
+                {
+                    stream.Dispose();
+                    throw;
+                }
+            }
+
+            return new WorkerRuntimeClosureSnapshot(
+                path,
+                streams,
+                hash.Finish());
+        }
+        catch
+        {
+            foreach (var stream in streams)
+            {
+                stream.Dispose();
+            }
+
+            throw;
+        }
     }
 
-    private static string ComputeSha256Once(string workerPath)
+    internal static string ComputeSha256(string workerPath)
+    {
+        using var snapshot = CreateSnapshot(workerPath);
+        return snapshot.Sha256;
+    }
+
+    private static string NormalizeWorkerPath(string workerPath)
     {
         var path = Path.GetFullPath(workerPath);
         if (!path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
@@ -62,24 +107,13 @@ internal static class WorkerBinaryIdentity
             path = Path.ChangeExtension(path, ".dll");
             if (!File.Exists(path))
             {
-                throw new FileNotFoundException("The managed worker binary is unavailable.", path);
+                throw new FileNotFoundException(
+                    "The managed worker binary is unavailable.",
+                    path);
             }
         }
-        using var hash = new CanonicalHashWriter();
-        hash.Add("SharpProof.WorkerBinarySet", 1);
-        var components = RuntimeComponents(path);
-        ValidateComponentCount(components.Count);
 
-        long totalBytes = 0;
-        foreach (var component in components)
-        {
-            using var stream = OpenRead(component.Value);
-            var length = stream.Length;
-            ValidateComponentLength(component.Key, length, ref totalBytes);
-            hash.Add(component.Key).Add(stream);
-        }
-
-        return hash.Finish();
+        return path;
     }
     internal static void ValidateComponentCount(int count)
     {
@@ -116,7 +150,9 @@ internal static class WorkerBinaryIdentity
         totalBytes += length;
     }
 
-    private static SortedDictionary<string, string> RuntimeComponents(string workerPath)
+    private static SortedDictionary<string, string> RuntimeComponents(
+        string workerPath,
+        FileStream dependencyStream)
     {
         var directory = Path.GetDirectoryName(workerPath)!;
         var dependencies = Path.ChangeExtension(workerPath, ".deps.json");
@@ -132,7 +168,6 @@ internal static class WorkerBinaryIdentity
         {
             result.Add("app-local/" + immutableName, immutable);
         }
-        using var dependencyStream = OpenRead(dependencies);
         long dependencyBytes = 0;
         ValidateComponentLength(
             "dependencies",
@@ -162,7 +197,9 @@ internal static class WorkerBinaryIdentity
     }
 
     private static void AddLibraryAssets(
-        SortedDictionary<string, string> result, string directory, JsonElement library)
+        SortedDictionary<string, string> result,
+        string directory,
+        JsonElement library)
     {
         foreach (var group in new[] { "runtime", "native", "runtimeTargets" })
         {
@@ -203,6 +240,23 @@ internal static class WorkerBinaryIdentity
             : throw new FileNotFoundException("A trusted worker runtime component is unavailable.", nested);
     }
 
+}
+
+internal sealed class WorkerRuntimeClosureSnapshot(
+    string workerPath,
+    IReadOnlyList<FileStream> components,
+    string sha256) : IDisposable
+{
+    internal string WorkerPath { get; } = workerPath;
+    internal string Sha256 { get; } = sha256;
+
+    public void Dispose()
+    {
+        foreach (var stream in components)
+        {
+            stream.Dispose();
+        }
+    }
 }
 
 internal static class CompilerManifestArtifactJson

@@ -416,10 +416,10 @@ public static partial class WorkerProtocolJson
         var expected = values.GroupBy(static value => value)
             .ToDictionary(static group => group.Key, static group => group.Count());
         return actual != null &&
-            actual.All(value => value != null && count(value) > 0 &&
-                IsDefined(kind(value), unspecified)) &&
             actual.Length == expected.Count &&
-            actual.All(value => expected.TryGetValue(kind(value), out var expectedCount) &&
+            actual.All(value => value != null && count(value) > 0 &&
+                IsDefined(kind(value), unspecified) &&
+                expected.TryGetValue(kind(value), out var expectedCount) &&
                 count(value) == expectedCount);
     }
     private static WorkerProtocolError[] ValidateProtocolErrors(WorkerProtocolError[]? values, Validator errors)
@@ -540,12 +540,15 @@ public static partial class WorkerProtocolJson
     private static bool SameAssumptionDeclarations(
             WorkerAssumptionEvidence[]? actual, WorkerAssumptionEvidence[]? expected)
     {
-        return (actual ?? []).Where(static value => value != null)
+        static IEnumerable<(string Id, WorkerAssumptionKind Kind)> Normalize(
+            WorkerAssumptionEvidence[]? values)
+        {
+            return (values ?? []).Where(static value => value != null)
                 .OrderBy(static value => value.Id, StringComparer.Ordinal)
-                .Select(static value => (value.Id, value.Kind))
-                .SequenceEqual((expected ?? []).Where(static value => value != null)
-                    .OrderBy(static value => value.Id, StringComparer.Ordinal)
-                    .Select(static value => (value.Id, value.Kind)));
+                .Select(static value => (value.Id, value.Kind));
+        }
+
+        return Normalize(actual).SequenceEqual(Normalize(expected));
     }
 
     private static string ManifestName<T>(T value) where T : struct, Enum

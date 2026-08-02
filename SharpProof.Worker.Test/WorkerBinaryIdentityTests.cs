@@ -95,7 +95,63 @@ public sealed class WorkerBinaryIdentityTests
             var worker = Path.Combine(
                 temporaryDirectory,
                 "SharpProof.Worker.dll");
+            var dependency = Path.Combine(
+                temporaryDirectory,
+                "SharpProof.Worker.deps.json");
+            var runtimeConfig = Path.Combine(
+                temporaryDirectory,
+                "SharpProof.Worker.runtimeconfig.json");
             var baseline = WorkerBinaryIdentity.ComputeSha256(worker);
+            var heldComponent = Path.Combine(
+                temporaryDirectory,
+                "SharpProof.Verify.dll");
+            var appLocalAsset = Path.Combine(
+                temporaryDirectory,
+                "System.Collections.Immutable.dll");
+            var nativeZ3 = Path.Combine(
+                temporaryDirectory,
+                "runtimes",
+                "win-x64",
+                "native",
+                "libz3.dll");
+            var lockedComponents = new[] {
+                worker, dependency, runtimeConfig, heldComponent,
+                Path.Combine(temporaryDirectory, "SharpProof.Smt.dll"),
+                appLocalAsset, nativeZ3
+            };
+            using (var oversized = new FileStream(
+                       heldComponent,
+                       FileMode.Create,
+                       FileAccess.Write,
+                       FileShare.Read))
+            {
+                oversized.SetLength(WorkerBinaryIdentity.MaximumComponentBytes + 1);
+            }
+            Assert.That(
+                (Action)(() => WorkerBinaryIdentity.CreateSnapshot(worker)),
+                Throws.TypeOf<InvalidDataException>());
+            File.Copy(
+                Path.Combine(sourceDirectory, "SharpProof.Verify.dll"),
+                heldComponent,
+                overwrite: true);
+            using (var snapshot = WorkerBinaryIdentity.CreateSnapshot(worker))
+            {
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(snapshot.WorkerPath, Is.EqualTo(worker));
+                    Assert.That(snapshot.Sha256, Is.EqualTo(baseline));
+                    foreach (var component in lockedComponents)
+                    {
+                        Assert.That(
+                            (Action)(() => File.AppendAllText(component, "blocked")),
+                            Throws.InstanceOf<IOException>());
+                    }
+                }
+            }
+            File.AppendAllText(heldComponent, "released");
+            Assert.That(
+                WorkerBinaryIdentity.ComputeSha256(worker),
+                Is.Not.EqualTo(baseline));
             File.AppendAllText(
                 Path.Combine(temporaryDirectory, "SharpProof.Smt.dll"),
                 "mutated");
@@ -103,9 +159,6 @@ public sealed class WorkerBinaryIdentityTests
                 WorkerBinaryIdentity.ComputeSha256(worker);
             Assert.That(dependencyChanged, Is.Not.EqualTo(baseline));
 
-            var appLocalAsset = Path.Combine(
-                temporaryDirectory,
-                "System.Collections.Immutable.dll");
             File.AppendAllText(appLocalAsset, "mutated");
             var appLocalChanged =
                 WorkerBinaryIdentity.ComputeSha256(worker);
@@ -118,12 +171,6 @@ public sealed class WorkerBinaryIdentityTests
                 WorkerBinaryIdentity.ComputeSha256(worker),
                 Is.EqualTo(appLocalChanged));
 
-            var nativeZ3 = Path.Combine(
-                temporaryDirectory,
-                "runtimes",
-                "win-x64",
-                "native",
-                "libz3.dll");
             Assert.That(File.Exists(nativeZ3), Is.True);
             File.AppendAllText(nativeZ3, "mutated");
             var nativeChanged = WorkerBinaryIdentity.ComputeSha256(worker);

@@ -837,8 +837,9 @@ public sealed class RoslynOperationLowerer
             params LoweredExpression[] expressions)
         {
             return expressions
-                .Select(static expression => expression.Classification.Abstention)
-                .First(static abstention => abstention != FrontendAbstention.None);
+                .First(static expression =>
+                    expression.Classification.Abstention != FrontendAbstention.None)
+                .Classification.Abstention;
         }
 
         private LoweredExpression OpaqueOperand(

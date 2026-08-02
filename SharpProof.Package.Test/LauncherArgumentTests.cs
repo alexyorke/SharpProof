@@ -274,6 +274,21 @@ public sealed class LauncherArgumentTests
             Throws.TypeOf<ArgumentException>());
     }
 
+    [Test]
+    public void MissingWorkerWithoutDllSuffixIsRejectedBeforeHashing()
+    {
+        var worker = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "missing-worker-" + Guid.NewGuid().ToString("N"));
+
+        Assert.That(
+            (Action)(() => Program.ComputeExpectedInputHash(
+                worker,
+                new WorkerVerifyRequest(),
+                [])),
+            Throws.TypeOf<FileNotFoundException>());
+    }
+
     [TestCase("worker.deps.json")]
     [TestCase("worker.runtimeconfig.json")]
     public void RequestProjectionRejectsWorkerRuntimeCompanionCollisionBeforeManifestRead(
