@@ -829,6 +829,40 @@ public sealed class FrontendLoweringTests
             FrontendAbstention.UncheckedOverflowSemantics);
     }
 
+    [Test]
+    public void CatalogIntegerBoundariesRemainExactConstants()
+    {
+        AssertClassification(
+            """
+            public static long Target() => long.MinValue;
+            """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
+        AssertClassification(
+            """
+            public static int Target() => int.MaxValue;
+            """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
+    }
+
+    [Test]
+    public void NegativeIntegerLiteralsRemainExactConstants()
+    {
+        AssertClassification(
+            """
+            public static long Target() => -1L;
+            """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
+        AssertClassification(
+            """
+            public static long Target(long input) => unchecked(-input);
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UncheckedOverflowSemantics);
+    }
+
     private static void AssertClassification(
         string members,
         FrontendSubsetDecision decision,

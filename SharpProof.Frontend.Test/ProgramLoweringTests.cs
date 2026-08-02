@@ -12,6 +12,31 @@ namespace SharpProof.Frontend.Test;
 public sealed class ProgramLoweringTests
 {
     [Test]
+    public void NegativeLiteralReturnsRemainExact()
+    {
+        var lowered = Lower(
+            """
+            public static int Target(int left, int right) {
+                if (left < right) {
+                    return -1;
+                }
+                return 1;
+            }
+            """);
+
+        Assert.That(
+            lowered.Result.IsExact,
+            Is.True,
+            string.Join(
+                Environment.NewLine,
+                lowered.Result.Abstentions.Select(value =>
+                    lowered.Factory.GetString(
+                        lowered.Factory.GetOperationInfo(value.Operation)
+                            .Description!.Value) +
+                    ":" + value.Reason)));
+    }
+
+    [Test]
     public void CfgLowersAssignmentsBranchesCallsAndReturns()
     {
         var lowered = Lower(

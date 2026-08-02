@@ -6,6 +6,16 @@ namespace SharpProof.Effects.Test;
 public sealed class ApiSpecResolutionCoverageTests
 {
     [Test]
+    public void NuGetRestoredFrameworkReferencePackIsApproved()
+    {
+        Assert.That(
+            EffectContractMappingCatalog.ReferenceFamilyMarkers,
+            Does.Contain((
+                "/MICROSOFT.NETCORE.APP.REF/",
+                ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack)));
+    }
+
+    [Test]
     public void ReferenceFamilyWithoutAssemblyMetadataFailsClosed()
     {
         Assert.That(

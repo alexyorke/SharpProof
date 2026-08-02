@@ -750,22 +750,41 @@ public sealed class PackageLayoutSmokeTests
                 .EnumerateArray()
                 .SelectMany(static callable => callable
                     .GetProperty("effectClaims")
-                    .EnumerateArray())
+                    .EnumerateArray()
+                    .Select(claim => new
+                    {
+                        CallableId = callable
+                            .GetProperty("callableId")
+                            .GetString() ?? string.Empty,
+                        Claim = claim
+                    }))
                 .ToArray();
             Assert.That(effectClaims, Has.Length.EqualTo(2));
             Assert.That(
-                effectClaims.Select(static claim => claim
+                effectClaims.Select(static item => item.Claim
                     .GetProperty("claimId")
                     .GetString()),
                 Is.Unique.And.All.Not.Empty);
-            var eventKinds = effectClaims
-                .Select(static claim =>
+            var expectedClaims = new[]
+            {
+                (Callable: "AllocateArray",
+                    Event: "ManagedArrayAllocation"),
+                (Callable: "AllocateObject",
+                    Event: "ManagedObjectAllocation")
+            };
+            var eventKinds = expectedClaims
+                .Select(expected =>
                 {
+                    var item = effectClaims.Single(candidate =>
+                        candidate.CallableId.Contains(
+                            expected.Callable,
+                            StringComparison.Ordinal));
+                    var claim = item.Claim;
                     var replay = claim.GetProperty("replay");
                     Assert.That(
                         replay.ValueKind,
                         Is.EqualTo(JsonValueKind.Object),
-                        claim.GetRawText());
+                        item.CallableId + ":" + claim.GetRawText());
                     var events = replay
                         .GetProperty("events")
                         .EnumerateArray()
@@ -773,8 +792,15 @@ public sealed class PackageLayoutSmokeTests
                     Assert.That(
                         events,
                         Has.Length.EqualTo(1),
-                        claim.GetProperty("claimId").GetString());
-                    return events[0].GetProperty("kind").GetString();
+                        item.CallableId);
+                    var eventKind = events[0]
+                        .GetProperty("kind")
+                        .GetString();
+                    Assert.That(
+                        eventKind,
+                        Is.EqualTo(expected.Event),
+                        item.CallableId);
+                    return eventKind;
                 })
                 .OrderBy(static kind => kind, StringComparer.Ordinal)
                 .ToArray();

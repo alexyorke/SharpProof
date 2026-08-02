@@ -428,6 +428,14 @@ public sealed class RoslynOperationLowerer
             return _owner.LowerConstant(operation);
         }
 
+        public override LoweredExpression VisitFieldReference(
+            IFieldReferenceOperation operation, LoweringContext argument)
+        {
+            return CompilerConstantAdmission.IsCatalogIntegerBoundary(operation)
+                ? _owner.LowerConstant(operation)
+                : DefaultVisit(operation, argument);
+        }
+
         public override LoweredExpression VisitLocalReference(
             ILocalReferenceOperation operation, LoweringContext argument)
         {
@@ -529,6 +537,11 @@ public sealed class RoslynOperationLowerer
                 }
 
                 return operand;
+            }
+
+            if (CompilerConstantAdmission.IsLiteralIntegerNegation(operation))
+            {
+                return _owner.LowerConstant(operation);
             }
 
             if (semantics.RequiresExactIntegerDomain &&
