@@ -271,8 +271,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'compiler-collector-configuration-gate'
         File = 'SharpProof.CompilerCollector\FinalCompilationCollector.cs'
-        Original = "            if (!SharpProofAnalyzer.GetConfigurationDiagnostics(`n                context.Compilation,`n                context.Options,`n                configuration,`n                context.CancellationToken)`n                .IsEmpty)"
-        Mutated = "            if (SharpProofAnalyzer.GetConfigurationDiagnostics(`n                context.Compilation,`n                context.Options,`n                configuration,`n                context.CancellationToken)`n                .IsEmpty)"
+        Original = '            if (!SharpProofAnalyzer.GetConfigurationDiagnostics('
+        Mutated = '            if (SharpProofAnalyzer.GetConfigurationDiagnostics('
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~TreeLocalConfigurationPreventsArtifactEmission'
     },
