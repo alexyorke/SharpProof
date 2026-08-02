@@ -30,6 +30,7 @@ public sealed class LauncherArgumentTests
             ["--version"],
             TestContext.CurrentContext.WorkDirectory);
 
+        Assert.That(process.WaitForExit(0), Is.False);
         process.Resume();
 
         using (Assert.EnterMultipleScope())
