@@ -256,7 +256,7 @@ $mutations = @(
         Name = 'frontend-delegate-reference-equality'
         File = 'SharpProof.Frontend\CSharpScalarSemantics.generated.cs'
         Original = '        type is null or ({ IsReferenceType: true, TypeKind: not TypeKind.Delegate } and not INamedTypeSymbol { IsAbstract: true }) ||'
-        Mutated = '        type.IsReferenceType ||'
+        Mutated = '        type is null or { IsReferenceType: true } ||'
         Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
         Filter = 'FullyQualifiedName~UnsupportedValueDomainsCannotMasqueradeAsReferenceEquality'
     },
