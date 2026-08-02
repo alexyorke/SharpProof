@@ -31,14 +31,21 @@ function Test-NUnitMultipleAssertionLines {
             $Lines.Count
         }
         $block = @($Lines[$start..($end - 1)])
+        $hasExpected = @($block | Where-Object {
+                $_ -match '^Expected(:| is\b| and actual are both\b)'
+            }).Count -ne 0
+        $hasActual = @($block | Where-Object {
+                $_ -match '^Expected is\b.*\bactual is\b'
+            }).Count -eq 1
+        $hasButWas = @($block | Where-Object {
+                $_ -match '^But was:'
+            }).Count -eq 1
         if ($block[0] -notmatch '^\d+\)\s+Assert\.That\(' -or
             @($block | Where-Object {
                 $_ -match '(?i)\bSystem\.[A-Za-z]+Exception\b'
             }).Count -ne 0 -or
-            @($block | Where-Object {
-                $_ -match '^Expected(:| is\b| and actual are both\b)'
-            }).Count -eq 0 -or
-            @($block | Where-Object { $_ -match '^But was:' }).Count -eq 0) {
+            -not $hasExpected -or
+            (-not $hasActual -and -not $hasButWas)) {
             return $false
         }
     }

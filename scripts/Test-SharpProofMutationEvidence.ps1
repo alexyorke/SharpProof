@@ -331,6 +331,34 @@ try {
         throw 'Multiple assertion kill was not recognized.'
     }
 
+    $multipleCollectionAssertion = New-TestParts `
+        -Outcome Failed `
+        -Message ("Multiple failures or warnings in test:`n" +
+            " 1) Assert.That(first, Is.EqualTo(expected))`n" +
+            " Expected is <System.String[1]>, actual is <System.Linq.EmptyPartition`1[System.String]>`n" +
+            " Values differ at index [0]`n" +
+            " 2) Assert.That(second, Is.EqualTo(expected))`n" +
+            " Expected: 1`n" +
+            " But was: 2")
+    $multipleCollectionPath = Write-Fixture `
+        -Name multiple-collection-assertion `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $multipleCollectionAssertion.Definition `
+        -Entries $multipleCollectionAssertion.Entry `
+        -Results $multipleCollectionAssertion.Result
+    $multipleCollectionMutation = Read-SharpProofMutationTestEvidence `
+        -TrxPath $multipleCollectionPath `
+        -EvidenceName multiple-collection-assertion `
+        -Mode Mutation `
+        -ProcessExitCode 1 `
+        -ExpectedMethodName ExpectedTest `
+        -ExpectedLedger $baseline.testLedger
+    if ($multipleCollectionMutation.assertionFailureCount -ne 1) {
+        throw 'Multiple collection assertion kill was not recognized.'
+    }
+
     $multipleMixed = New-TestParts `
         -Outcome Failed `
         -Message ("Multiple failures or warnings in test:`n" +
