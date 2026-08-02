@@ -489,7 +489,7 @@ public sealed partial class SharpProofAnalyzer : DiagnosticAnalyzer
             SyntaxKind.ModuleKeyword;
     }
 
-    private static ImmutableArray<Diagnostic> GetConfigurationDiagnostics(
+    internal static ImmutableArray<Diagnostic> GetConfigurationDiagnostics(
         Compilation compilation,
         AnalyzerOptions analyzerOptions,
         AnalyzerConfiguration configuration,

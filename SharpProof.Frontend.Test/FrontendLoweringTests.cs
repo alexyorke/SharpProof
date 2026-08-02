@@ -251,6 +251,14 @@ public sealed class FrontendLoweringTests
             """,
             FrontendSubsetDecision.ClosedAbstention,
             FrontendAbstention.UnsupportedType);
+        AssertClassification(
+            """
+            public static bool Target(
+                System.Delegate left,
+                System.Delegate right) => left == right;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
     }
 
     [Test]

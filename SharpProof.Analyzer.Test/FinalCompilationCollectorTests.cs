@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -269,6 +270,47 @@ public sealed class FinalCompilationCollectorTests
             Is.EqualTo(["SP0049"]));
     }
 
+    [Test]
+    public async Task TreeLocalConfigurationPreventsArtifactEmission()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("tree-configuration");
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation(),
+            new TreeOptionsProvider(
+                Options(path),
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["sharpproof_profile"] = "strict"
+                }));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0049"]));
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task TreeConfigurationProviderFailureFailsArtifactEmission()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("tree-provider-failure");
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation(),
+            new ThrowingTreeOptionsProvider(Options(path)));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0049"]));
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
     private static async Task<string> EmitHash(
         CSharpCompilation compilation,
         string path,
@@ -310,6 +352,16 @@ public sealed class FinalCompilationCollectorTests
             compilation,
             values,
             additionalFiles,
+            new FinalCompilationCollectorAnalyzer());
+    }
+
+    private static Task<ImmutableArray<Diagnostic>> AnalyzeCollectorAsync(
+        CSharpCompilation compilation,
+        AnalyzerConfigOptionsProvider optionsProvider)
+    {
+        return AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            optionsProvider,
             new FinalCompilationCollectorAnalyzer());
     }
 
@@ -355,6 +407,65 @@ public sealed class FinalCompilationCollectorTests
             CancellationToken cancellationToken = default)
         {
             return SourceText.From(content, Encoding.UTF8);
+        }
+    }
+
+    private sealed class TreeOptionsProvider(
+        IReadOnlyDictionary<string, string> globalValues,
+        IReadOnlyDictionary<string, string> treeValues)
+        : AnalyzerConfigOptionsProvider
+    {
+        private readonly AnalyzerConfigOptions _global =
+            new DictionaryOptions(globalValues);
+        private readonly AnalyzerConfigOptions _tree =
+            new DictionaryOptions(treeValues);
+
+        public override AnalyzerConfigOptions GlobalOptions => _global;
+
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
+        {
+            return _tree;
+        }
+
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
+        {
+            return _tree;
+        }
+    }
+
+    private sealed class ThrowingTreeOptionsProvider(
+        IReadOnlyDictionary<string, string> globalValues)
+        : AnalyzerConfigOptionsProvider
+    {
+        private readonly AnalyzerConfigOptions _global =
+            new DictionaryOptions(globalValues);
+
+        public override AnalyzerConfigOptions GlobalOptions => _global;
+
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
+        {
+            throw new InvalidOperationException("tree options unavailable");
+        }
+
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
+        {
+            throw new InvalidOperationException("additional options unavailable");
+        }
+    }
+
+    private sealed class DictionaryOptions(
+        IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
+    {
+        public override bool TryGetValue(string key, out string value)
+        {
+            if (values.TryGetValue(key, out var found))
+            {
+                value = found;
+                return true;
+            }
+
+            value = string.Empty;
+            return false;
         }
     }
 

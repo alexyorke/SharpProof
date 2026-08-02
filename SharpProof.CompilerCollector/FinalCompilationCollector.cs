@@ -11,15 +11,25 @@ internal static class FinalCompilationCollector
             "build_property.SharpProofVerifyMaximumExpressionDepth";
     internal static void Collect(CompilationAnalysisContext context, AnalyzerConfiguration configuration)
     {
-        var options = context.Options.AnalyzerConfigOptionsProvider.GlobalOptions;
-        if (!options.TryGetValue(OutputOption, out var path) ||
-            string.IsNullOrWhiteSpace(path))
-        {
-            return;
-        }
-
         try
         {
+            var options = context.Options.AnalyzerConfigOptionsProvider.GlobalOptions;
+            if (!options.TryGetValue(OutputOption, out var path) ||
+                string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            if (!SharpProofAnalyzer.GetConfigurationDiagnostics(
+                    context.Compilation,
+                    context.Options,
+                    configuration,
+                    context.CancellationToken)
+                .IsEmpty)
+            {
+                throw new InvalidOperationException(
+                    "analyzer configuration is invalid");
+            }
             AtomicFile.WriteUtf8(path, Create(context, options, configuration));
         }
 #pragma warning disable CA1031
@@ -34,6 +44,7 @@ internal static class FinalCompilationCollector
                 exception.GetType().Name + ": " + exception.Message));
         }
     }
+
     private static string Create(
         CompilationAnalysisContext context,
         AnalyzerConfigOptions options, AnalyzerConfiguration configuration)

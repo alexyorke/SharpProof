@@ -255,7 +255,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'frontend-delegate-reference-equality'
         File = 'SharpProof.Frontend\CSharpScalarSemantics.generated.cs'
-        Original = '        type.IsReferenceType && type.TypeKind != TypeKind.Delegate ||'
+        Original = '        type.IsReferenceType && type.TypeKind != TypeKind.Delegate && type is not INamedTypeSymbol { IsAbstract: true } ||'
         Mutated = '        type.IsReferenceType ||'
         Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
         Filter = 'FullyQualifiedName~UnsupportedValueDomainsCannotMasqueradeAsReferenceEquality'
