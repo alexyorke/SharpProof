@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Runtime.InteropServices;
 using NUnit.Framework;
 using SharpProof.Worker.Launcher;
 using SharpProof.Worker.Protocol;
@@ -8,6 +9,66 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 public sealed class LauncherArgumentTests
 {
+    [Test]
+    [NonParallelizable]
+    public void WindowsJobContainsSuspendedDotNetProcessBeforeExecution()
+    {
+        if (!OperatingSystem.IsWindows() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            Assert.Ignore("Windows x64 Job Objects are required.");
+        }
+
+        var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ??
+            throw new InvalidOperationException(
+                "The test host did not disclose its dotnet host path.");
+        using var job = WindowsJob.CreateRequired(
+            256L * 1024L * 1024L,
+            activeProcessLimit: 1);
+        using var process = job.StartSuspended(
+            host,
+            ["--version"],
+            TestContext.CurrentContext.WorkDirectory);
+
+        Assert.That(process.WaitForExit(0), Is.False);
+        process.Resume();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(process.WaitForExit(30_000), Is.True);
+            Assert.That(process.ExitCode, Is.Zero);
+            Assert.That(
+                SpinWait.SpinUntil(job.HasNoActiveProcesses, 5_000),
+                Is.True);
+        }
+    }
+
+    [Test]
+    public void InvalidSuspendedProcessHandlesFailClosed()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("Windows process handles are required.");
+        }
+
+        using var process = new SuspendedProcess(
+            IntPtr.Zero,
+            IntPtr.Zero);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                (Func<int>)(() => process.ExitCode),
+                Throws.TypeOf<System.ComponentModel.Win32Exception>());
+            Assert.That(
+                (Action)process.Resume,
+                Throws.TypeOf<System.ComponentModel.Win32Exception>());
+            Assert.That(
+                (Func<bool>)(() => process.WaitForExit(0)),
+                Throws.TypeOf<System.ComponentModel.Win32Exception>());
+        }
+    }
+
     [Test]
     public void UnknownOptionIsRejected()
     {
@@ -94,6 +155,105 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void MinimalArgumentsProjectEveryRequestDefault()
+    {
+        Assert.That(
+            LauncherArguments.TryParse(ValidArguments(), out var parsed),
+            Is.True);
+        var compilerManifest = new WorkerFileReference
+        {
+            Path = "compiler-manifest.json",
+            Sha256 = new('a', 64)
+        };
+
+        var request = parsed.ProjectRequest(compilerManifest);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(request.CompilerManifest, Is.SameAs(compilerManifest));
+            Assert.That(request.VerifyPolicy, Is.EqualTo(WorkerVerifyPolicy.Advisory));
+            Assert.That(request.AssumptionPolicy, Is.EqualTo(WorkerAssumptionPolicy.Allow));
+            Assert.That(request.Budgets.QueryRlimit, Is.EqualTo(WorkerBudgets.DefaultQueryRlimit));
+            Assert.That(request.Budgets.MethodRlimit, Is.EqualTo(WorkerBudgets.DefaultMethodRlimit));
+            Assert.That(request.Budgets.MethodWallTimeMilliseconds,
+                Is.EqualTo(WorkerBudgets.DefaultMethodWallTimeMilliseconds));
+            Assert.That(request.Budgets.ProjectWallTimeMilliseconds,
+                Is.EqualTo(WorkerBudgets.DefaultProjectWallTimeMilliseconds));
+            Assert.That(request.Budgets.MaxParallelism, Is.EqualTo(WorkerBudgets.MaximumParallelism));
+            Assert.That(request.Budgets.MaximumExpressionDepth,
+                Is.EqualTo(WorkerBudgets.DefaultMaximumExpressionDepth));
+            Assert.That(request.Budgets.ProcessMemoryLimitBytes,
+                Is.EqualTo(WorkerBudgets.DefaultProcessMemoryLimitBytes));
+            Assert.That(request.Budgets.MaxWorkerProcesses,
+                Is.EqualTo(WorkerBudgets.MaximumParallelism));
+            Assert.That(request.Cache.Enabled, Is.True);
+            Assert.That(request.Cache.Directory, Is.Null);
+            Assert.That(request.Cache.MaximumBytes,
+                Is.EqualTo(WorkerCacheOptions.DefaultMaximumBytes));
+        }
+    }
+
+    [Test]
+    public void CustomArgumentsProjectEveryRequestValueExactly()
+    {
+        string[] arguments = [
+            .. ValidArguments(),
+            "--query-rlimit", "101",
+            "--method-rlimit", "102",
+            "--method-wall-ms", "103",
+            "--project-wall-ms", "104",
+            "--max-parallelism", "2",
+            "--max-expression-depth", "105",
+            "--process-memory-bytes", "106",
+            "--max-worker-processes", "3",
+            "--cache-enabled", "false",
+            "--cache-directory", "relative-cache",
+            "--cache-maximum-bytes", "107"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        var request = parsed.ProjectRequest(new WorkerFileReference());
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(request.Budgets.QueryRlimit, Is.EqualTo(101));
+            Assert.That(request.Budgets.MethodRlimit, Is.EqualTo(102));
+            Assert.That(request.Budgets.MethodWallTimeMilliseconds, Is.EqualTo(103));
+            Assert.That(request.Budgets.ProjectWallTimeMilliseconds, Is.EqualTo(104));
+            Assert.That(request.Budgets.MaxParallelism, Is.EqualTo(2));
+            Assert.That(request.Budgets.MaximumExpressionDepth, Is.EqualTo(105));
+            Assert.That(request.Budgets.ProcessMemoryLimitBytes, Is.EqualTo(106));
+            Assert.That(request.Budgets.MaxWorkerProcesses, Is.EqualTo(3));
+            Assert.That(request.Cache.Enabled, Is.False);
+            Assert.That(request.Cache.Directory, Is.EqualTo("relative-cache"));
+            Assert.That(request.Cache.MaximumBytes, Is.EqualTo(107));
+        }
+    }
+
+    [Test]
+    public void RequestProjectionRejectsCollidingIoPathsBeforeManifestRead()
+    {
+        string[] arguments = [
+            "verify",
+            "--worker", "worker.dll",
+            "--request", "request.json",
+            "--result", Path.Combine(".", "request.json"),
+            "--compiler-manifest", "missing-compiler-manifest.json",
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
     public void CombinedTimeoutOverflowIsRejectedBeforeStartingWorker()
     {
         Action action = () => _ = Program.ComputeHardLimit(
@@ -101,6 +261,66 @@ public sealed class LauncherArgumentTests
             WorkerLauncherDefaults.TerminationGraceMilliseconds);
 
         Assert.That(action, Throws.TypeOf<OverflowException>());
+    }
+
+    [Test]
+    public void CompilerManifestByteLimitIsEnforcedBeforeAllocation()
+    {
+        const int expectedLimit = 16 * 1024 * 1024;
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            Assert.That(
+                LauncherArguments.MaximumCompilerManifestBytes,
+                Is.EqualTo(expectedLimit));
+            using (var stream = File.Create(path))
+            {
+                stream.SetLength(expectedLimit + 1L);
+            }
+
+            Assert.That(
+                (Action)(() => LauncherArguments.ReadCompilerManifest(path)),
+                Throws.TypeOf<InvalidDataException>());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Test]
+    public void DotNetHostMustBeAbsoluteInstalledAndOutsideProject()
+    {
+        var project = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N"));
+        var fakeRoot = Path.Combine(project, "fake-sdk");
+        var fakeHost = Path.Combine(fakeRoot, "dotnet.exe");
+        Directory.CreateDirectory(Path.Combine(fakeRoot, "host", "fxr"));
+        File.WriteAllBytes(fakeHost, []);
+        var actualHost = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ??
+            throw new InvalidOperationException(
+                "The test host did not disclose its dotnet host path.");
+        try
+        {
+            Assert.That(
+                Program.ValidateDotNetHostPath(actualHost, project),
+                Is.EqualTo(Path.GetFullPath(actualHost)));
+            Assert.That(
+                (Action)(() => _ = Program.ValidateDotNetHostPath(
+                    "dotnet.exe", project)),
+                Throws.TypeOf<InvalidOperationException>());
+            Assert.That(
+                (Action)(() => _ = Program.ValidateDotNetHostPath(
+                    fakeHost, project)),
+                Throws.TypeOf<InvalidOperationException>());
+        }
+        finally
+        {
+            Directory.Delete(project, recursive: true);
+        }
     }
 
     [TestCase(1_000, 1_000, 1_900)]

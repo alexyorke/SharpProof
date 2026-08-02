@@ -193,16 +193,18 @@ public static class ExternalBoundary {
     [EffectContract(
         SharpProofEffect.ReadsAmbientState,
         Complete = true,
+        PreconditionFree = true,
         IsDeterministic = true)]
     public static extern int ReadExternalState();
 }
 ```
 
 `EffectContractAttribute` defaults to no declared capability or escaping
-exception, `Complete=false`, and `IsDeterministic=false`. A reviewed boundary
-must explicitly opt into every stronger fact, and its effects describe the
-whole observable call boundary. Trust without an explicit complete contract
-proves nothing. A
+exception, `Complete=false`, `IsDeterministic=false`, and
+`PreconditionFree=false`. A reviewed boundary must explicitly certify a
+precondition-free metadata envelope before another assembly can consume the
+summary, opt into every stronger fact, and describe the whole observable call
+boundary. Trust without an explicit complete contract proves nothing. A
 `[SharpProofSuppress("reason")]` changes reporting only; it does not add facts.
 
 The analyzer admits a checked subset of ordinary methods, explicit

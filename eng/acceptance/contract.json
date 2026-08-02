@@ -61,8 +61,11 @@
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs",
           "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
+          "SharpProof.Contracts/ContractClauseInventory.cs",
+          "SharpProof.Contracts/ContractForSymbolMatcher.cs",
           "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
           "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
+          "SharpProof.Frontend/CompilationModelProvider.cs",
           "SharpProof.Frontend/ContractApiIdentityResolver.cs",
           "SharpProof.Frontend/ContractApiMetadataRuntime.cs",
           "SharpProof.Frontend/SharpProof.Frontend.csproj"
@@ -80,6 +83,7 @@
           "SharpProof.Contracts/ContractCanonicalization.cs",
           "SharpProof.Contracts/ContractExpressionBinder.cs",
           "SharpProof.Contracts/ContractIntrinsicValidator.cs",
+          "SharpProof.Contracts/ContractApiSymbols.cs",
           "SharpProof.Frontend/RoslynOperationLowerer.cs",
           "SharpProof.Frontend/RoslynProgramLowerer.cs",
           "SharpProof.Frontend/OperationSupportCatalog.cs"
@@ -105,7 +109,8 @@
       {
         "name": "encoding",
         "paths": [
-          "SharpProof.Smt/IrSmtBackend.cs"
+          "SharpProof.Smt/IrSmtBackend.cs",
+          "SharpProof.Verify/Backend.cs"
         ]
       },
       {
@@ -145,7 +150,10 @@
         "paths": [
           "SharpProof.Frontend/ContractApi.catalog.json",
           "scripts/Generate-ContractApiCatalog.ps1",
-          "SharpProof.Frontend/ContractApiMetadata.generated.cs"
+          "SharpProof.Frontend/ContractApiMetadata.generated.cs",
+          "SharpProof.Attributes/EffectContractAttribute.cs",
+          "SharpProof.Attributes/SharpProofEffect.cs",
+          "SharpProof.Attributes/SharpProofCapability.cs"
         ]
       },
       {
@@ -162,6 +170,7 @@
           "SharpProof.Projection.catalog.json",
           "scripts/Generate-ProjectionCatalog.ps1",
           "SharpProof.Verify/VerificationProjections.generated.cs",
+          "SharpProof.Analyzer/EffectEvaluationProjections.generated.cs",
           "SharpProof.Worker/WorkerProjections.generated.cs",
           "SharpProof.Contracts/ContractProjections.generated.cs",
           "SharpProof.Ir/IrPrinterProjections.generated.cs",
@@ -170,6 +179,29 @@
           "SharpProof.Worker.Launcher/LauncherProjections.generated.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableProjections.generated.cs",
           "SharpProof.Frontend/CompilerIdentityProjections.generated.cs"
+        ]
+      },
+      {
+        "name": "launcherArgumentCatalog",
+        "paths": [
+          "SharpProof.Worker.Launcher/LauncherArguments.catalog.json",
+          "scripts/Generate-LauncherArguments.ps1",
+          "SharpProof.Worker.Launcher/LauncherArguments.generated.cs"
+        ]
+      },
+      {
+        "name": "generatedOutputPolicy",
+        "paths": [
+          "eng/generated/approved-outputs.v1.json",
+          "scripts/Test-ProductionCSharpComplexity.ps1"
+        ]
+      },
+      {
+        "name": "mutationEvidencePolicy",
+        "paths": [
+          "scripts/SharpProof.MutationEvidence.psm1",
+          "scripts/Test-SharpProofMutationEvidence.ps1",
+          "scripts/Test-SharpProofTrustedMutations.ps1"
         ]
       },
       {
@@ -230,6 +262,7 @@
         "paths": [
           "SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json",
           "scripts/Generate-CompilerArtifactModel.ps1",
+          "scripts/Test-CompilerArtifactModelGenerator.ps1",
           "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerWireMappings.generated.cs"
         ]
@@ -275,11 +308,10 @@
           "SharpProof.Specs/FrameworkTypeMetadataNames.cs"
         ]
       },
-      {
-        "name": "replay",
-        "paths": [
-          "SharpProof.Verify/ProofKernel.cs",
-          "SharpProof.Ir/IrInterpreter.cs",
+    {
+      "name": "replay",
+      "paths": [
+        "SharpProof.Ir/IrInterpreter.cs",
           "SharpProof.Ir/IrProgramInterpreter.cs",
           "SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs",
           "SharpProof.Worker/CallableCounterexampleReplayer.cs",
@@ -292,10 +324,17 @@
           "SharpProof.Worker/EffectClaimResultAssembler.cs"
         ]
       },
-      {
-        "name": "policy",
-        "paths": [
-          "SharpProof.Worker.Launcher/Program.cs",
+    {
+      "name": "policy",
+      "paths": [
+        "SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs",
+        "SharpProof.Analyzer/AnalyzerGeneratedCodePolicy.cs",
+        "SharpProof.Analyzer/LanguageSubsetGate.cs",
+        "SharpProof.Analyzer/SharpProofControlAttributePolicy.cs",
+        "SharpProof.Effects/TrustedBoundaryPolicy.cs",
+        "SharpProof.Frontend/FrontendSubset.cs",
+        "SharpProof.Frontend/OperationSubsetClassifier.cs",
+        "SharpProof.Worker.Launcher/Program.cs",
           "SharpProof.Worker/CallableVerificationPolicy.cs"
         ]
       },

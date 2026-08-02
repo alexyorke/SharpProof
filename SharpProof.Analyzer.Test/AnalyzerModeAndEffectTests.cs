@@ -208,6 +208,29 @@ public sealed class AnalyzerModeAndEffectTests
         Assert.That(factory.CreateCount, Is.Zero);
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task ConfigurationProviderFailureReportsAndSuppressesAnalysis(
+        bool failGlobalOptions)
+    {
+        var factory = new ThrowingSessionFactory();
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            ModeFixture,
+            ["SP0025", "SP0045"]);
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            new FailingOptionsProvider(failGlobalOptions),
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0025"]));
+        Assert.That(
+            diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+            Does.Contain("configuration provider failed"));
+        Assert.That(factory.CreateCount, Is.Zero);
+    }
+
     [TestCase("off", null)]
     [TestCase(null, "contracts")]
     [TestCase("strict", "all")]
@@ -311,6 +334,7 @@ public sealed class AnalyzerModeAndEffectTests
                 [EffectContract(
                     SharpProofEffect.ReadsAmbientState,
                     Capabilities = SharpProofCapability.Synchronization,
+                    PreconditionFree = true,
                     Complete = true)]
                 public static void Synchronize() {
                 }
@@ -735,6 +759,7 @@ public sealed class AnalyzerModeAndEffectTests
                 [EffectContract(
                     SharpProofEffect.None,
                     IsDeterministic = true,
+                    PreconditionFree = true,
                     Complete = true)]
                 public static void Restricted(
                     [Positive] int value) {
@@ -1005,6 +1030,39 @@ public sealed class AnalyzerModeAndEffectTests
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EquivalentTo(["SP0002", "SP0016"]));
+    }
+
+    [Test]
+    public async Task FreshAggregateBorrowedContentCannotProvePurity()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Box {
+                public int Value;
+            }
+
+            public static class Fixture {
+                [EnforcePure]
+                public static void Mutate(Box box) {
+                    var holder = new[] { box };
+                    var alias = holder[0];
+                    alias.Value = 1;
+                }
+            }
+            """,
+            "effects",
+            ["SP0002"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0002"]));
+        Assert.That(
+            factory.Outcomes["Mutate"],
+            Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
     }
 
     [Test]
@@ -2465,6 +2523,52 @@ public sealed class AnalyzerModeAndEffectTests
             Interlocked.Increment(ref _createCount);
             throw new InvalidOperationException(
                 "The profile-off analyzer must not construct a session.");
+        }
+    }
+
+    private sealed class FailingOptionsProvider(bool failGlobalOptions)
+        : AnalyzerConfigOptionsProvider
+    {
+        private static readonly AnalyzerConfigOptions Empty =
+            new EmptyOptions();
+        private static readonly AnalyzerConfigOptions Failing =
+            new FailingOptions();
+
+        public override AnalyzerConfigOptions GlobalOptions =>
+            failGlobalOptions ? Failing : Empty;
+
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
+        {
+            return failGlobalOptions ? Empty : Failing;
+        }
+
+        public override AnalyzerConfigOptions GetOptions(
+            AdditionalText textFile)
+        {
+            return Empty;
+        }
+    }
+
+    private sealed class EmptyOptions : AnalyzerConfigOptions
+    {
+        public override bool TryGetValue(string key, out string value)
+        {
+            value = string.Empty;
+            return false;
+        }
+    }
+
+    private sealed class FailingOptions : AnalyzerConfigOptions
+    {
+        public override bool TryGetValue(string key, out string value)
+        {
+            if (key.Contains("sharpproof", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("options lookup failed");
+            }
+
+            value = string.Empty;
+            return false;
         }
     }
 

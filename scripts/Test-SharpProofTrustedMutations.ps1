@@ -7,11 +7,15 @@ param(
 
     [string[]]$MutationName = @(),
 
+    [string]$ExpectedCommit = '',
+
     [switch]$KeepWorkspace
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $output = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputPath))
@@ -19,6 +23,15 @@ if (-not $output.StartsWith(
         $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
         [StringComparison]::OrdinalIgnoreCase)) {
     throw "OutputPath must be inside the repository: $output"
+}
+
+$sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($sourceCommit)) {
+    throw 'Unable to resolve the mutation source commit.'
+}
+if (-not [string]::IsNullOrWhiteSpace($ExpectedCommit) -and
+    $sourceCommit -ne $ExpectedCommit) {
+    throw "Mutation source commit '$sourceCommit' does not match '$ExpectedCommit'."
 }
 
 & git -C $repositoryRoot diff --quiet --
@@ -101,7 +114,39 @@ $mutations = @(
         Original = "                row.A,`n                row.B,`n                row.C,`n                row.D,"
         Mutated = "                row.A,`n                -1,`n                row.C,`n                row.D,"
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
-        Filter = 'FullyQualifiedName~DecoderRejectsNonCanonicalSlots'
+        Filter = 'FullyQualifiedName~DecoderRejectsNonCanonicalSlotsAfterSerialization'
+    },
+    [pscustomobject]@{
+        Name = 'portable-codec-metadata-optional-type-index'
+        File = 'SharpProof.CompilerArtifact\PortableIrModel.generated.cs'
+        Original = '                value.ElementType.HasValue ? TypeIndex(value.ElementType.Value) : -1);'
+        Mutated = '                -1);'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~MetadataRowsProjectEveryDeclaredValue'
+    },
+    [pscustomobject]@{
+        Name = 'portable-codec-metadata-member-identity'
+        File = 'SharpProof.CompilerArtifact\PortableIrModel.generated.cs'
+        Original = '                _identities.Add(value.Identity),'
+        Mutated = '                -1,'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~MetadataRowsProjectEveryDeclaredValue'
+    },
+    [pscustomobject]@{
+        Name = 'portable-codec-metadata-parameter-types'
+        File = 'SharpProof.CompilerArtifact\PortableIrModel.generated.cs'
+        Original = '                [.. value.ParameterTypes.Select(TypeIndex)]);'
+        Mutated = '                []);'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~MetadataRowsProjectEveryDeclaredValue'
+    },
+    [pscustomobject]@{
+        Name = 'portable-codec-metadata-operation-description'
+        File = 'SharpProof.CompilerArtifact\PortableIrModel.generated.cs'
+        Original = '                value.Description.HasValue ? _factory.GetString(value.Description.Value) : null);'
+        Mutated = '                null);'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~MetadataRowsProjectEveryDeclaredValue'
     },
     [pscustomobject]@{
         Name = 'collector-option-output-kind'
@@ -136,6 +181,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~OverflowAndConversionShapesAreExactOnlyWhenRepresentable'
     },
     [pscustomobject]@{
+        Name = 'lowering-global-constant-bypass'
+        File = 'SharpProof.Frontend\RoslynOperationLowerer.cs'
+        Original = "            if (_owner._allowCompilerConstants &&`n                operation.ConstantValue.HasValue)"
+        Mutated = "            if (_owner._allowCompilerConstants ||`n                operation.ConstantValue.HasValue)"
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~ConstantFoldingCannotBypassTheClosedOperationCatalog'
+    },
+    [pscustomobject]@{
+        Name = 'requires-concrete-compiler-constant-replay'
+        File = 'SharpProof.Analyzer\RequiresCallSiteAnalyzer.cs'
+        Original = "            var lowerer = RoslynOperationLowerer.CreateForConcreteReplay(`n                _factory,`n                session.IsKnownPure);"
+        Mutated = '            var lowerer = new RoslynOperationLowerer(_factory, session.IsKnownPure);'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~UncheckedOverflowFailsClosedButConcreteViolationsReport'
+    },
+    [pscustomobject]@{
         Name = 'smt-strict-less-than'
         File = 'SharpProof.Smt\IrSmtBackend.cs'
         Original = '_context.MkLt(Integer(left), Integer(right)),'
@@ -166,6 +227,46 @@ $mutations = @(
         Mutated = '            OperationSupportStage.ContractExpressionLowering,'
         Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
         Filter = 'FullyQualifiedName~CatchVariableFlowUsesTheEffectDiscoveryCatalog'
+    },
+    [pscustomobject]@{
+        Name = 'effect-fresh-array-content-provenance'
+        File = 'SharpProof.Effects\OperationEffectScanner.cs'
+        Original = '            IArrayElementReferenceOperation => EffectRegionSet.Unknown,'
+        Mutated = '            IArrayElementReferenceOperation element => ClassifyRegion(element.ArrayReference, aliasSource),'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~FreshArrayContentsDoNotBecomeFreshOwnedAliases'
+    },
+    [pscustomobject]@{
+        Name = 'effect-metadata-precondition-certificate'
+        File = 'SharpProof.Effects\ExternalEffectResolver.cs'
+        Original = "        if (method.DeclaringSyntaxReferences.Length == 0 &&`n            !preconditionFree)"
+        Mutated = "        if (method.DeclaringSyntaxReferences.Length == 0 &&`n            preconditionFree)"
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~SourceOnlyMetadataPreconditionsCannotDisappearIntoTrustedSummaries'
+    },
+    [pscustomobject]@{
+        Name = 'frontend-default-subset-decision'
+        File = 'SharpProof.Frontend\FrontendSubset.cs'
+        Original = '    public bool IsExact => Decision == FrontendSubsetDecision.Exact;'
+        Mutated = '    public bool IsExact => Decision is FrontendSubsetDecision.Unspecified or FrontendSubsetDecision.Exact;'
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~DefaultAndUnknownSubsetDecisionsCannotBecomeExact'
+    },
+    [pscustomobject]@{
+        Name = 'frontend-delegate-reference-equality'
+        File = 'SharpProof.Frontend\CSharpScalarSemantics.generated.cs'
+        Original = '        type.IsReferenceType && type.TypeKind != TypeKind.Delegate ||'
+        Mutated = '        type.IsReferenceType ||'
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~UnsupportedValueDomainsCannotMasqueradeAsReferenceEquality'
+    },
+    [pscustomobject]@{
+        Name = 'analyzer-configuration-provider-failure'
+        File = 'SharpProof.Analyzer\Configuration\AnalyzerConfiguration.cs'
+        Original = '                [ProviderFailure(exception)]);'
+        Mutated = '                []);'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ConfigurationProviderFailureReportsAndSuppressesAnalysis'
     },
     [pscustomobject]@{
         Name = 'effect-region-contract-catalog'
@@ -296,12 +397,44 @@ $mutations = @(
         Filter = 'FullyQualifiedName~StringConstructionDistinguishesKnownAndUnknownAllocation'
     },
     [pscustomobject]@{
+        Name = 'effect-incomplete-reason-projection'
+        File = 'SharpProof.Analyzer\EffectEvaluationProjections.generated.cs'
+        Original = '            (_, true) => EffectEvaluationReason.UnsupportedBody,'
+        Mutated = '            (_, true) => EffectEvaluationReason.ResourceLimit,'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~IncompleteReasonCoversEveryDefinedFlagCombination'
+    },
+    [pscustomobject]@{
         Name = 'advisory-contract-candidate-detection'
         File = 'SharpProof.Frontend\ContractApiMetadata.generated.cs'
         Original = '            "Ensures",'
         Mutated = '            "Requires",'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~ContractCandidateActivationRunsClausePlacementValidation'
+    },
+    [pscustomobject]@{
+        Name = 'contract-clause-role-projection'
+        File = 'SharpProof.Frontend\ContractApiMetadata.generated.cs'
+        Original = 'ContractApiCatalog.RequiresMethodName => ContractApiClauseRole.Requires,'
+        Mutated = 'ContractApiCatalog.RequiresMethodName => ContractApiClauseRole.Ensures,'
+        Project = 'SharpProof.Contracts.Test\SharpProof.Contracts.Test.csproj'
+        Filter = 'FullyQualifiedName~InventoryClassifiesEveryPlacementInStableSourceOrder'
+    },
+    [pscustomobject]@{
+        Name = 'contract-api-duplicate-json-rejection'
+        File = 'scripts\Generate-ContractApiCatalog.ps1'
+        Original = 'if (-not $names.Add($property.Name)) {'
+        Mutated = 'if ($false) {'
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~GeneratorRejectsMalformedCatalogs'
+    },
+    [pscustomobject]@{
+        Name = 'contract-api-exported-attribute-parity'
+        File = 'SharpProof.Frontend\ContractApiMetadata.generated.cs'
+        Original = "            ContractFor,`n            EnforcePure,"
+        Mutated = "            EnforcePure,`n            EnforcePure,"
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~CatalogExactlyMatchesTheExportedContractApi'
     },
     [pscustomobject]@{
         Name = 'advisory-full-activation-selection'
@@ -480,12 +613,60 @@ $mutations = @(
         Filter = 'FullyQualifiedName~StrictResponseValidationRequiresExactManifestAndResultSets'
     },
     [pscustomobject]@{
+        Name = 'worker-runtime-component-byte-limit'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = 'internal const long MaximumComponentBytes = 32L * 1024 * 1024;'
+        Mutated = 'internal const long MaximumComponentBytes = 64L * 1024 * 1024;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~RuntimeClosureLimitsFailClosedAtEveryBoundary'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-argument-query-budget-projection'
+        File = 'SharpProof.Worker.Launcher\LauncherArguments.generated.cs'
+        Original = 'QueryRlimit = Number("query-rlimit", WorkerBudgets.DefaultQueryRlimit),'
+        Mutated = 'QueryRlimit = Number("method-rlimit", WorkerBudgets.DefaultQueryRlimit),'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~CustomArgumentsProjectEveryRequestValueExactly'
+    },
+    [pscustomobject]@{
         Name = 'launcher-kill-on-close'
         File = 'SharpProof.Worker.Launcher\Program.cs'
         Original = 'NativeMethods.JobObjectLimitFlags.KillOnJobClose |'
         Mutated = 'NativeMethods.JobObjectLimitFlags.ActiveProcess |'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~WorkerContainmentIsMandatoryOnTheSupportedHost'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-create-suspended'
+        File = 'SharpProof.Worker.Launcher\Program.cs'
+        Original = 'NativeMethods.CreateSuspended | NativeMethods.CreateNoWindow,'
+        Mutated = 'NativeMethods.CreateNoWindow,'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~WorkerCannotReachModuleInitializerBeforeResume'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-timeout-owns-result'
+        File = 'SharpProof.Worker.Launcher\Program.cs'
+        Original = '        if (exitCode == 124)'
+        Mutated = '        if (exitCode != 124)'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~HardTimeoutReplacesWorkerOwnedMalformedOutput'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-manifest-byte-limit'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = 'MaximumBytes = 16 * 1024 * 1024;'
+        Mutated = 'MaximumBytes = 32 * 1024 * 1024;'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~CompilerManifestByteLimitIsEnforcedBeforeAllocation'
+    },
+    [pscustomobject]@{
+        Name = 'protocol-json-depth-limit'
+        File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
+        Original = 'MaximumJsonDepth = 32;'
+        Mutated = 'MaximumJsonDepth = 64;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~DeserializationRejectsDocumentsBeyondTheDeclaredDepth'
     }
 )
 
@@ -504,8 +685,11 @@ $workspace = Join-Path $mutationRoot (
     'workspace-' + [Guid]::NewGuid().ToString('N'))
 $sourceRoot = Join-Path $workspace 'source'
 $archive = Join-Path $workspace 'source.zip'
-$logs = Join-Path (Split-Path -Parent $output) 'mutation-logs'
+$runId = $sourceCommit.Substring(0, 12) + '-' +
+    [Guid]::NewGuid().ToString('N')
+$logs = Join-Path (Join-Path (Split-Path -Parent $output) 'mutation-logs') $runId
 New-Item -ItemType Directory -Path $sourceRoot, $logs -Force | Out-Null
+Remove-Item -LiteralPath $output -Force -ErrorAction SilentlyContinue
 
 function Invoke-IsolatedDotnet {
     param(
@@ -559,7 +743,7 @@ try {
     & git -C $repositoryRoot archive `
         --format=zip `
         --output=$archive `
-        HEAD
+        $sourceCommit
     if ($LASTEXITCODE -ne 0) {
         throw "git archive failed with exit code $LASTEXITCODE."
     }
@@ -573,6 +757,9 @@ try {
     }
 
     foreach ($mutation in $mutations) {
+        $baselineTrxName = $mutation.Name + '-baseline.trx'
+        $baselineTrx = Join-Path $logs $baselineTrxName
+        Remove-Item -LiteralPath $baselineTrx -Force -ErrorAction SilentlyContinue
         $baselineExit = Invoke-IsolatedDotnet `
             -Arguments @(
                 'test',
@@ -583,13 +770,28 @@ try {
                 '--filter',
                 $mutation.Filter,
                 '--logger',
-                'console;verbosity=minimal') `
+                'console;verbosity=minimal',
+                '--logger',
+                "trx;LogFileName=$baselineTrxName",
+                '--results-directory',
+                $logs) `
             -LogName ($mutation.Name + '-baseline.log')
         if ($baselineExit -ne 0) {
             throw (
                 "Baseline for mutation '$($mutation.Name)' failed; see " +
                 "$logs\$($mutation.Name)-baseline.log.")
         }
+        $expectedMethodName = $mutation.Filter.Substring(
+            'FullyQualifiedName~'.Length)
+        $baselineEvidence = Read-SharpProofMutationTestEvidence `
+            -TrxPath $baselineTrx `
+            -EvidenceName ($mutation.Name + ' baseline') `
+            -Mode Baseline `
+            -ProcessExitCode $baselineExit `
+            -ExpectedMethodName $expectedMethodName
+        $mutation | Add-Member `
+            -NotePropertyName BaselineLedger `
+            -NotePropertyValue @($baselineEvidence.testLedger)
     }
 
     $results = @()
@@ -622,6 +824,9 @@ try {
                     "Mutation '$($mutation.Name)' did not compile; see " +
                     "$logs\$($mutation.Name)-build.log.")
             }
+            $testTrxName = $mutation.Name + '-test.trx'
+            $testTrx = Join-Path $logs $testTrxName
+            Remove-Item -LiteralPath $testTrx -Force -ErrorAction SilentlyContinue
             $testExit = Invoke-IsolatedDotnet `
                 -Arguments @(
                     'test',
@@ -632,7 +837,11 @@ try {
                     '--filter',
                     $mutation.Filter,
                     '--logger',
-                    'console;verbosity=minimal') `
+                    'console;verbosity=minimal',
+                    '--logger',
+                    "trx;LogFileName=$testTrxName",
+                    '--results-directory',
+                    $logs) `
                 -LogName ($mutation.Name + '-test.log')
             if ($testExit -eq 0) {
                 throw (
@@ -644,11 +853,27 @@ try {
                     "Mutation '$($mutation.Name)' timed out instead of being " +
                     "killed by an assertion.")
             }
+            $expectedMethodName = $mutation.Filter.Substring(
+                'FullyQualifiedName~'.Length)
+            $testEvidence = Read-SharpProofMutationTestEvidence `
+                -TrxPath $testTrx `
+                -EvidenceName $mutation.Name `
+                -Mode Mutation `
+                -ProcessExitCode $testExit `
+                -ExpectedMethodName $expectedMethodName `
+                -ExpectedLedger $mutation.BaselineLedger
             $results += [pscustomobject]@{
                 name = $mutation.Name
                 file = $mutation.File.Replace('\', '/')
                 test = $mutation.Filter
                 killed = $true
+                exitCode = $testExit
+                executedCount = $testEvidence.executedCount
+                failedCount = $testEvidence.failedCount
+                assertionFailureCount = $testEvidence.assertionFailureCount
+                selectedTests = $testEvidence.testLedger
+                log = "mutation-logs/$runId/$($mutation.Name)-test.log"
+                trx = "mutation-logs/$runId/$testTrxName"
             }
         }
         finally {
@@ -661,16 +886,26 @@ try {
 
     $outputDirectory = Split-Path -Parent $output
     New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
-    $sha = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+    $currentCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+    & git -C $repositoryRoot diff --quiet --
+    $trackedTreeChanged = $LASTEXITCODE -ne 0
+    & git -C $repositoryRoot diff --cached --quiet --
+    $trackedIndexChanged = $LASTEXITCODE -ne 0
+    if ($currentCommit -ne $sourceCommit -or
+        $trackedTreeChanged -or $trackedIndexChanged) {
+        throw 'Repository identity changed while mutation evidence was produced.'
+    }
+    $temporaryOutput = $output + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
     [pscustomobject]@{
-        schemaVersion = 1
-        commit = $sha
+        schemaVersion = 2
+        commit = $sourceCommit
         configuration = $Configuration
         mutationCount = $results.Count
         killedCount = @($results | Where-Object killed).Count
         mutations = $results
     } | ConvertTo-Json -Depth 5 |
-        Set-Content -LiteralPath $output -Encoding utf8NoBOM
+        Set-Content -LiteralPath $temporaryOutput -Encoding utf8NoBOM
+    Move-Item -LiteralPath $temporaryOutput -Destination $output -Force
     Write-Host "Killed $($results.Count) trusted-boundary mutations."
     Write-Host "Evidence: $output"
 }

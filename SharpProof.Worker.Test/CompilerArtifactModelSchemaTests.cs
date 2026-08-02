@@ -163,6 +163,45 @@ public sealed class CompilerArtifactModelSchemaTests
             }
         }
         Assert.That(PortableIrGraphCodec.HasCompleteSlotCatalogs, Is.True);
+
+        var encoder = typeof(PortableIrGraphCodec).GetNestedType(
+            "Encoder",
+            BindingFlags.NonPublic)!;
+        foreach (var mapping in schema.RootElement
+                     .GetProperty("portableIrMetadataRowMappings")
+                     .EnumerateArray())
+        {
+            var methodName = mapping.GetProperty("method").GetString()!;
+            var sourceType = mapping.GetProperty("sourceType").GetString() switch
+            {
+                "IrTypeId" => typeof(IrTypeId),
+                "IrVarId" => typeof(IrVarId),
+                "IrMemberId" => typeof(IrMemberId),
+                "OperationId" => typeof(OperationId),
+                var value => throw new AssertionException(
+                    "Unknown metadata-row source type: " + value)
+            };
+            var rowType = s_artifactAssembly.GetType(
+                "SharpProof.CompilerArtifact." +
+                mapping.GetProperty("rowType").GetString(),
+                throwOnError: true)!;
+            var method = encoder.GetMethod(
+                methodName,
+                BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(method.ReturnType, Is.EqualTo(rowType), methodName);
+                Assert.That(
+                    method.GetParameters().Select(static parameter => parameter.ParameterType),
+                    Is.EqualTo([sourceType]),
+                    methodName);
+                Assert.That(
+                    mapping.GetProperty("arguments").GetArrayLength(),
+                    Is.EqualTo(rowType.GetConstructors().Single().GetParameters().Length),
+                    methodName);
+            }
+        }
     }
 
     [Test]

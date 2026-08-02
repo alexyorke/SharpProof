@@ -70,6 +70,10 @@ internal static class Program
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
                 failure.Status, failure.Reason, failure.Code, failure.Message).ConfigureAwait(false);
         }
+        if (exitCode == 124)
+        {
+            DeleteIfExists(arguments.ResultPath);
+        }
         if (!File.Exists(arguments.ResultPath))
         {
             LauncherFailure launcherFailure =
@@ -106,7 +110,7 @@ internal static class Program
             return resultExitCode;
         }
 
-        if (validResponse && resultExitCode != 0)
+        if (validResponse & resultExitCode != 0)
         {
             return resultExitCode;
         }
@@ -143,45 +147,61 @@ internal static class Program
     {
         var hardLimit = ComputeHardLimit(
             request.Budgets.ProjectWallTimeMilliseconds, arguments.TerminationGraceMilliseconds);
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = Environment.ProcessPath ??
-                throw new InvalidOperationException("The dotnet host path is unavailable."),
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            WorkingDirectory = projectDirectory
-        };
-        foreach (var argument in new[] {
-                     arguments.WorkerPath, "verify",
-                     "--request", arguments.RequestPath,
-                     "--result", arguments.ResultPath
-                 })
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
         using var job = WindowsJob.CreateRequired(
             request.Budgets.ProcessMemoryLimitBytes, request.Budgets.MaxWorkerProcesses);
         var startEventName = "Local\\SharpProof.Worker." + Guid.NewGuid().ToString("N");
         using var startEvent = new EventWaitHandle(false, EventResetMode.ManualReset,
             startEventName);
-        startInfo.ArgumentList.Add("--start-event");
-        startInfo.ArgumentList.Add(startEventName);
-        using var process = Process.Start(startInfo) ??
-            throw new InvalidOperationException("The SharpProof worker could not be started.");
-        if (!job.TryAssign(process))
-        {
-            Terminate(process, entireTree: true);
-            return 125;
-        }
+        using var process = job.StartSuspended(
+            ResolveDotNetHostPath(projectDirectory),
+            [arguments.WorkerPath, "verify", "--request", arguments.RequestPath,
+                "--result", arguments.ResultPath, "--start-event", startEventName],
+            projectDirectory);
+        process.Resume();
         startEvent.Set();
         if (process.WaitForExit(hardLimit))
         {
             return process.ExitCode;
         }
 
-        Terminate(process);
+        job.Terminate(124);
+        if (!SpinWait.SpinUntil(
+                job.HasNoActiveProcesses,
+                arguments.TerminationGraceMilliseconds))
+        {
+            throw new InvalidOperationException(
+                "The SharpProof worker job did not terminate within its grace period.");
+        }
         return 124;
+    }
+
+    internal static string ResolveDotNetHostPath(string projectDirectory)
+    {
+        return ValidateDotNetHostPath(Environment.ProcessPath ??
+            throw new InvalidOperationException(
+                "The dotnet host path is unavailable."), projectDirectory);
+    }
+
+    internal static string ValidateDotNetHostPath(
+        string candidate, string projectDirectory)
+    {
+        var hostPath = Path.GetFullPath(candidate);
+        var hostRoot = Path.GetDirectoryName(hostPath) ?? string.Empty;
+        var projectRoot = Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(projectDirectory)) + Path.DirectorySeparatorChar;
+        var hostFileName = OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet";
+        if (!Path.IsPathFullyQualified(candidate) |
+            !string.Equals(Path.GetFileName(hostPath), hostFileName,
+                StringComparison.OrdinalIgnoreCase) |
+            !File.Exists(hostPath) |
+            !Directory.Exists(Path.Combine(hostRoot, "host", "fxr")) |
+            hostPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "The current process is not hosted by a trusted absolute .NET installation.");
+        }
+
+        return hostPath;
     }
 
     internal static int ComputeHardLimit(
@@ -206,15 +226,6 @@ internal static class Program
     private static string RequiredVersion(string? value, string name)
     {
         return !string.IsNullOrWhiteSpace(value) ? value : throw new InvalidDataException("The worker " + name + " is unavailable.");
-    }
-
-    private static void Terminate(Process process, bool entireTree = false)
-    {
-        try
-        {
-            process.Kill(entireProcessTree: entireTree);
-        }
-        catch (InvalidOperationException) { }
     }
 
     internal static int ValidateAndReport(
@@ -272,7 +283,7 @@ internal static class Program
                     $"Selected analysis is incomplete: callables={incomplete.Length}, unknown-claims={unknownClaims}."));
         }
 
-        var incompleteError = incomplete.Length != 0 &&
+        var incompleteError = incomplete.Length != 0 &
             request.VerifyPolicy == WorkerVerifyPolicy.RequireProven;
         var assumptionError = ReportAssumptions(request.AssumptionPolicy, response);
         Console.WriteLine("SharpProof summary " + JsonSerializer.Serialize(
@@ -294,7 +305,7 @@ internal static class Program
             return 3;
         }
 
-        return refuted ? 5 : incompleteError || assumptionError ? 6 : 0;
+        return refuted ? 5 : incompleteError | assumptionError ? 6 : 0;
     }
     private static bool ReportAssumptions(
         WorkerAssumptionPolicy policy, WorkerVerifyResponse response)
@@ -444,34 +455,17 @@ internal static partial class LauncherPresentation
 
 }
 
-internal sealed class LauncherArguments
+internal sealed partial class LauncherArguments
 {
-    private static readonly string[] s_required = [
-        "worker", "request", "result", "compiler-manifest", "verify-policy", "assumption-policy"
-    ];
-    private static readonly string[] s_publication = ["publish-request", "publish-result", "publish-compiler-manifest"];
-    private static readonly HashSet<string> s_allowed = [
-        .. s_required, .. s_publication, "publish-sarif", "termination-grace-ms",
-        "query-rlimit", "method-rlimit", "method-wall-ms", "project-wall-ms",
-        "max-parallelism", "max-expression-depth", "process-memory-bytes", "max-worker-processes",
-        "cache-enabled", "cache-directory", "cache-maximum-bytes"
-    ];
+    internal const int MaximumCompilerManifestBytes =
+        CompilerManifestArtifactFile.MaximumBytes;
+
     private readonly IReadOnlyDictionary<string, string> _values;
 
     private LauncherArguments(IReadOnlyDictionary<string, string> values)
     {
         _values = values;
     }
-
-    internal string WorkerPath => FullPath("worker");
-    internal string RequestPath => FullPath("request");
-    internal string ResultPath => FullPath("result");
-    internal string CompilerManifestPath => FullPath("compiler-manifest");
-    internal string? PublishRequestPath => OptionalFullPath("publish-request");
-    internal string? PublishResultPath => OptionalFullPath("publish-result");
-    internal string? PublishCompilerManifestPath => OptionalFullPath("publish-compiler-manifest");
-    internal string? PublishSarifPath => OptionalFullPath("publish-sarif");
-    internal int TerminationGraceMilliseconds => Number("termination-grace-ms", WorkerLauncherDefaults.TerminationGraceMilliseconds);
 
     internal static bool TryParse(string[] args, out LauncherArguments arguments)
     {
@@ -491,12 +485,12 @@ internal sealed class LauncherArguments
             }
 
             key = key.Substring(2);
-            if (!s_allowed.Contains(key) || !values.TryAdd(key, args[index + 1]))
+            if (!s_allowed.Contains(key) | !values.TryAdd(key, args[index + 1]))
             {
                 return false;
             }
         }
-        if (s_required.Any(key => !values.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value)))
+        if (s_required.Any(key => !values.TryGetValue(key, out var value) | string.IsNullOrWhiteSpace(value)))
         {
             return false;
         }
@@ -517,14 +511,10 @@ internal sealed class LauncherArguments
         out CompilerManifestArtifact artifact, out byte[] artifactBytes)
     {
         ValidateDistinctPaths();
-        return new WorkerVerifyRequest
-        {
-            CompilerManifest = CreateCompilerManifestReference(out artifact, out artifactBytes),
-            VerifyPolicy = LauncherPresentation.ParseVerifyPolicy(Required("verify-policy")),
-            AssumptionPolicy = LauncherPresentation.ParseAssumptionPolicy(Required("assumption-policy")),
-            Budgets = CreateBudgets(),
-            Cache = CreateCache()
-        };
+        var compilerManifest = CreateCompilerManifestReference(
+            out artifact,
+            out artifactBytes);
+        return ProjectRequest(compilerManifest);
     }
 
     private void ValidateDistinctPaths()
@@ -543,34 +533,14 @@ internal sealed class LauncherArguments
         out CompilerManifestArtifact artifact, out byte[] bytes)
     {
         var path = FullPath("compiler-manifest");
-        bytes = File.ReadAllBytes(path);
+        bytes = ReadCompilerManifest(path);
         artifact = CompilerManifestArtifactJson.Deserialize(new UTF8Encoding(false, true).GetString(bytes));
         return new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) };
     }
 
-    private WorkerBudgets CreateBudgets()
+    internal static byte[] ReadCompilerManifest(string path)
     {
-        return new()
-        {
-            QueryRlimit = Number("query-rlimit", WorkerBudgets.DefaultQueryRlimit),
-            MethodRlimit = Number("method-rlimit", WorkerBudgets.DefaultMethodRlimit),
-            MethodWallTimeMilliseconds = Number("method-wall-ms", WorkerBudgets.DefaultMethodWallTimeMilliseconds),
-            ProjectWallTimeMilliseconds = Number("project-wall-ms", WorkerBudgets.DefaultProjectWallTimeMilliseconds),
-            MaxParallelism = Number("max-parallelism", WorkerBudgets.MaximumParallelism),
-            MaximumExpressionDepth = Number("max-expression-depth", WorkerBudgets.DefaultMaximumExpressionDepth),
-            ProcessMemoryLimitBytes = Number("process-memory-bytes", WorkerBudgets.DefaultProcessMemoryLimitBytes),
-            MaxWorkerProcesses = Number("max-worker-processes", WorkerBudgets.MaximumParallelism)
-        };
-    }
-
-    private WorkerCacheOptions CreateCache()
-    {
-        return new()
-        {
-            Enabled = Boolean("cache-enabled", true),
-            Directory = Optional("cache-directory"),
-            MaximumBytes = Number("cache-maximum-bytes", WorkerCacheOptions.DefaultMaximumBytes)
-        };
+        return CompilerManifestArtifactFile.ReadAllBytes(path);
     }
 
     private string FullPath(string key)
@@ -621,7 +591,7 @@ internal sealed partial class WindowsJob : IDisposable
     internal static WindowsJob CreateRequired(
         long memoryLimitBytes, int activeProcessLimit)
     {
-        if (!OperatingSystem.IsWindows() || RuntimeInformation.ProcessArchitecture != Architecture.X64 ||
+        if (!OperatingSystem.IsWindows() | RuntimeInformation.ProcessArchitecture != Architecture.X64 |
             RuntimeInformation.OSArchitecture != Architecture.X64)
         {
             throw new PlatformNotSupportedException("The SharpProof verifier requires Windows x64.");
@@ -648,9 +618,85 @@ internal sealed partial class WindowsJob : IDisposable
         throw new InvalidOperationException("The SharpProof worker Job Object could not be configured.");
     }
 
-    internal bool TryAssign(Process process)
+    internal unsafe SuspendedProcess StartSuspended(
+        string applicationPath, IReadOnlyList<string> arguments,
+        string workingDirectory)
     {
-        return _handle != IntPtr.Zero && NativeMethods.AssignProcessToJobObject(_handle, process.Handle);
+        var startupInfo = new NativeMethods.StartupInfo
+        {
+            Size = checked((uint)Marshal.SizeOf<NativeMethods.StartupInfo>())
+        };
+        var commandLine = new StringBuilder(QuoteCommandLineArgument(applicationPath));
+        foreach (var argument in arguments)
+        {
+            commandLine.Append(' ').Append(QuoteCommandLineArgument(argument));
+        }
+
+        var commandLineCharacters = (commandLine.ToString() + '\0').ToCharArray();
+        NativeMethods.ProcessInformation processInformation;
+        fixed (char* commandLinePointer = commandLineCharacters)
+        {
+            if (!NativeMethods.CreateProcess(
+                    applicationPath, commandLinePointer, IntPtr.Zero, IntPtr.Zero,
+                    inheritHandles: true,
+                    NativeMethods.CreateSuspended | NativeMethods.CreateNoWindow,
+                    IntPtr.Zero, workingDirectory,
+                    &startupInfo, &processInformation))
+            {
+                throw new System.ComponentModel.Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "The SharpProof worker could not be created suspended.");
+            }
+        }
+
+        if (_handle == IntPtr.Zero ||
+            !NativeMethods.AssignProcessToJobObject(
+                _handle, processInformation.Process))
+        {
+            var error = Marshal.GetLastWin32Error();
+            NativeMethods.TerminateProcess(processInformation.Process, 125);
+            NativeMethods.CloseHandle(processInformation.Thread);
+            NativeMethods.CloseHandle(processInformation.Process);
+            throw new System.ComponentModel.Win32Exception(
+                error,
+                "The SharpProof worker could not be assigned to its Job Object.");
+        }
+
+        return new SuspendedProcess(
+            processInformation.Process, processInformation.Thread);
+    }
+
+    internal void Terminate(uint exitCode)
+    {
+        if (_handle == IntPtr.Zero |
+            !NativeMethods.TerminateJobObject(_handle, exitCode))
+        {
+            throw new System.ComponentModel.Win32Exception(
+                Marshal.GetLastWin32Error(),
+                "The SharpProof worker Job Object could not be terminated.");
+        }
+    }
+
+    internal bool HasNoActiveProcesses()
+    {
+        var information = new NativeMethods.JobObjectBasicAccountingInformation();
+        var size = checked((uint)Marshal.SizeOf<
+            NativeMethods.JobObjectBasicAccountingInformation>());
+        if (_handle == IntPtr.Zero |
+            !NativeMethods.QueryInformationJobObject(
+                _handle, 1, ref information, size, IntPtr.Zero))
+        {
+            throw new System.ComponentModel.Win32Exception(
+                Marshal.GetLastWin32Error(),
+                "The SharpProof worker Job Object state is unavailable.");
+        }
+
+        return information.ActiveProcesses == 0;
+    }
+
+    private static string QuoteCommandLineArgument(string argument)
+    {
+        return "\"" + argument.Replace("\"", "\\\"", StringComparison.Ordinal) + "\"";
     }
 
     internal static bool KillsProcessesOnDispose =>
@@ -665,8 +711,10 @@ internal sealed partial class WindowsJob : IDisposable
         }
     }
 
-    private static partial class NativeMethods
+    internal static partial class NativeMethods
     {
+        internal const uint CreateSuspended = 0x00000004;
+        internal const uint CreateNoWindow = 0x08000000;
         [Flags]
         internal enum JobObjectLimitFlags : uint
         {
@@ -684,6 +732,44 @@ internal sealed partial class WindowsJob : IDisposable
             [FieldOffset(120)] internal nuint JobMemoryLimit;
         }
 
+        [StructLayout(LayoutKind.Explicit, Size = 48)]
+        internal struct JobObjectBasicAccountingInformation
+        {
+            [FieldOffset(40)] internal uint ActiveProcesses;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        internal struct StartupInfo
+        {
+            internal uint Size;
+            internal IntPtr Reserved;
+            internal IntPtr Desktop;
+            internal IntPtr Title;
+            internal uint X;
+            internal uint Y;
+            internal uint XSize;
+            internal uint YSize;
+            internal uint XCountChars;
+            internal uint YCountChars;
+            internal uint FillAttribute;
+            internal uint Flags;
+            internal ushort ShowWindow;
+            internal ushort ReservedBytes;
+            internal IntPtr ReservedPointer;
+            internal IntPtr StandardInput;
+            internal IntPtr StandardOutput;
+            internal IntPtr StandardError;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct ProcessInformation
+        {
+            internal IntPtr Process;
+            internal IntPtr Thread;
+            internal uint ProcessId;
+            internal uint ThreadId;
+        }
+
         [LibraryImport("kernel32.dll", EntryPoint = "CreateJobObjectW",
             SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
         internal static partial IntPtr CreateJobObject(IntPtr jobAttributes, string? name);
@@ -696,10 +782,107 @@ internal sealed partial class WindowsJob : IDisposable
 
         [LibraryImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
+        internal static partial bool QueryInformationJobObject(
+            IntPtr job, int informationClass,
+            ref JobObjectBasicAccountingInformation information,
+            uint informationLength, IntPtr returnLength);
+
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
         internal static partial bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+
+        [LibraryImport("kernel32.dll", EntryPoint = "CreateProcessW",
+            SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static unsafe partial bool CreateProcess(
+            string applicationName, char* commandLine,
+            IntPtr processAttributes, IntPtr threadAttributes,
+            [MarshalAs(UnmanagedType.Bool)] bool inheritHandles,
+            uint creationFlags, IntPtr environment, string currentDirectory,
+            StartupInfo* startupInfo, ProcessInformation* processInformation);
+
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        internal static partial uint ResumeThread(IntPtr thread);
+
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static partial bool TerminateProcess(IntPtr process, uint exitCode);
+
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static partial bool TerminateJobObject(IntPtr job, uint exitCode);
+
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        internal static partial uint WaitForSingleObject(IntPtr handle, uint milliseconds);
+
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static partial bool GetExitCodeProcess(IntPtr process, out uint exitCode);
 
         [LibraryImport("kernel32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         internal static partial bool CloseHandle(IntPtr handle);
+    }
+}
+
+internal sealed class SuspendedProcess : IDisposable
+{
+    private IntPtr _process;
+    private IntPtr _thread;
+
+    internal SuspendedProcess(IntPtr process, IntPtr thread)
+    {
+        _process = process;
+        _thread = thread;
+    }
+
+    internal int ExitCode
+    {
+        get
+        {
+            if (_process == IntPtr.Zero |
+                !WindowsJob.NativeMethods.GetExitCodeProcess(
+                    _process, out var exitCode))
+            {
+                throw new System.ComponentModel.Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "The SharpProof worker exit code is unavailable.");
+            }
+
+            return unchecked((int)exitCode);
+        }
+    }
+
+    internal void Resume()
+    {
+        if (_thread == IntPtr.Zero |
+            WindowsJob.NativeMethods.ResumeThread(_thread) == uint.MaxValue)
+        {
+            throw new System.ComponentModel.Win32Exception(
+                Marshal.GetLastWin32Error(),
+                "The SharpProof worker could not be resumed.");
+        }
+    }
+
+    internal bool WaitForExit(int milliseconds)
+    {
+        var result = WindowsJob.NativeMethods.WaitForSingleObject(
+            _process, checked((uint)milliseconds));
+        return result switch
+        {
+            0 => true,
+            258 => false,
+            _ => throw new System.ComponentModel.Win32Exception(
+                Marshal.GetLastWin32Error(),
+                "Waiting for the SharpProof worker failed.")
+        };
+    }
+
+    public void Dispose()
+    {
+        var thread = Interlocked.Exchange(ref _thread, IntPtr.Zero);
+        var process = Interlocked.Exchange(ref _process, IntPtr.Zero);
+        WindowsJob.NativeMethods.CloseHandle(thread);
+        WindowsJob.NativeMethods.CloseHandle(process);
     }
 }

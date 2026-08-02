@@ -369,6 +369,9 @@
   ],
   "builtInEquality": {
     "allowReferenceTypes": true,
+    "excludedReferenceTypeKinds": [
+      "Delegate"
+    ],
     "specialTypes": [
       "System_Boolean"
     ]

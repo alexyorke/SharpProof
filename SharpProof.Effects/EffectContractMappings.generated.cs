@@ -232,6 +232,7 @@ internal static class EffectContractMappingCatalog
 
     internal static readonly (string Marker, ApiSpecReferenceFamily Family)[] ReferenceFamilyMarkers = [
         ("/PACKS/MICROSOFT.NETCORE.APP.REF/", ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack),
+        ("/MICROSOFT.NETCORE.APP.REF/", ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack),
         ("/PACKS/NETSTANDARD.LIBRARY.REF/", ApiSpecReferenceFamily.NetStandardReferencePack),
         ("/PACKAGES/NETSTANDARD.LIBRARY/", ApiSpecReferenceFamily.NetStandardReferencePack),
         ("/REFERENCEPACKS/NETSTANDARD", ApiSpecReferenceFamily.NetStandardReferencePack),

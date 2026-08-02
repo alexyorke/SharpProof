@@ -166,29 +166,40 @@ public sealed class DependencyAutomationTests
     [Test]
     public void RepositorySecurityKeepsCodeQlDisabled()
     {
-        var workflows = new[]
-        {
-            "security-reusable.yml",
-            "security.yml",
-            "package-consumers.yml"
-        };
+        var workflowDirectory = Path.Combine(
+            RepositoryRoot(),
+            ".github",
+            "workflows");
+        var workflows = Directory.EnumerateFiles(workflowDirectory)
+            .Where(static path =>
+                string.Equals(
+                    Path.GetExtension(path),
+                    ".yml",
+                    StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(
+                    Path.GetExtension(path),
+                    ".yaml",
+                    StringComparison.OrdinalIgnoreCase))
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .ToArray();
 
-        foreach (var workflowName in workflows)
+        Assert.That(workflows, Is.Not.Empty);
+
+        foreach (var workflowPath in workflows)
         {
-            var workflow = File.ReadAllText(Path.Combine(
-                RepositoryRoot(),
-                ".github",
-                "workflows",
-                workflowName));
+            var workflowName = Path.GetFileName(workflowPath);
+            var workflow = File.ReadAllText(workflowPath).ToUpperInvariant();
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(
                     workflow,
-                    Does.Not.Contain("github/codeql-action"),
+                    Does.Not.Contain("GITHUB/CODEQL-ACTION"),
                     workflowName);
                 Assert.That(
-                    workflow,
-                    Does.Not.Contain("security-events: write"),
+                    System.Text.RegularExpressions.Regex.IsMatch(
+                        workflow,
+                        @"(?m)^\s*SECURITY-EVENTS\s*:\s*WRITE\s*(?:#.*)?$"),
+                    Is.False,
                     workflowName);
             }
         }

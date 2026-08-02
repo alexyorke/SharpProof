@@ -49,6 +49,21 @@ internal sealed class CanonicalHashWriter : IDisposable
             ArgumentNullGuard.NotNull(bytes, nameof(bytes)));
     }
 
+    internal CanonicalHashWriter Add(Stream stream)
+    {
+        stream = ArgumentNullGuard.NotNull(stream, nameof(stream));
+        var length = checked((int)(stream.Length - stream.Position));
+        AddFrameHeader(ValueKind.Bytes, length);
+        var buffer = new byte[Math.Min(length, 81920)];
+        int read;
+        while ((read = stream.Read(buffer, 0, buffer.Length)) != 0)
+        {
+            _hash.AppendData(buffer, 0, read);
+        }
+
+        return this;
+    }
+
     private CanonicalHashWriter Add(Enum value)
     {
         var name = value.ToString();
@@ -72,18 +87,22 @@ internal sealed class CanonicalHashWriter : IDisposable
 
     private CanonicalHashWriter AddFrame(ValueKind kind, byte[] bytes)
     {
+        AddFrameHeader(kind, bytes.Length);
+        _hash.AppendData(bytes);
+        return this;
+    }
+
+    private void AddFrameHeader(ValueKind kind, int length)
+    {
         if (_finished)
         {
             throw new ObjectDisposedException(nameof(CanonicalHashWriter));
         }
 
-        var length = bytes.Length;
         _hash.AppendData([
             (byte)kind, (byte)length, (byte)(length >> 8),
             (byte)(length >> 16), (byte)(length >> 24)
         ]);
-        _hash.AppendData(bytes);
-        return this;
     }
 
     internal CanonicalHashWriter Add(params object?[] values)

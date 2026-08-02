@@ -242,6 +242,35 @@ public sealed class FrontendLoweringTests
             """,
             FrontendSubsetDecision.ClosedAbstention,
             FrontendAbstention.UnsupportedType);
+        AssertClassification(
+            """
+            public delegate int Transformer(int value);
+            public static bool Target(
+                Transformer left,
+                Transformer right) => left == right;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+    }
+
+    [Test]
+    public void DefaultAndUnknownSubsetDecisionsCannotBecomeExact()
+    {
+        var classification = default(FrontendSubsetClassification);
+
+        Assert.That(classification.IsExact, Is.False);
+        Assert.Throws<ArgumentException>((Action)(() =>
+        {
+            _ = new FrontendSubsetClassification(
+                FrontendSubsetDecision.Unspecified,
+                FrontendAbstention.None);
+        }));
+        Assert.Throws<ArgumentException>((Action)(() =>
+        {
+            _ = new FrontendSubsetClassification(
+                (FrontendSubsetDecision)int.MaxValue,
+                FrontendAbstention.UnsupportedType);
+        }));
     }
 
     [Test]
@@ -736,6 +765,102 @@ public sealed class FrontendLoweringTests
                 OperationSupportStage.EffectDiscovery,
                 OperationKind.InterpolatedString).Abstention,
             Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
+    }
+
+    [Test]
+    public void ConstantFoldingCannotBypassTheClosedOperationCatalog()
+    {
+        AssertClassification(
+            """
+            private const long Value = 7L;
+            public static long Target() => Value;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedOperationKind);
+        AssertClassification(
+            """
+            public static string Target() => nameof(Subject);
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedOperationKind);
+        AssertClassification(
+            """
+            public static int Target() => sizeof(int);
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedOperationKind);
+        AssertClassification(
+            """
+            public static string Target() => $"proof";
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedOperationKind);
+        AssertClassification(
+            """
+            public static string Target() =>
+                true ? nameof(Subject) : "other";
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedOperationKind);
+        AssertClassification(
+            """
+            private const long Value = 7L;
+            public static long Target(long input) => Value + input;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedOperationKind);
+        AssertClassification(
+            """
+            public static bool Target(string input) =>
+                nameof(Subject) == input;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedOperationKind);
+    }
+
+    [Test]
+    public void ConstantFoldingCannotBypassOperatorSemantics()
+    {
+        AssertClassification(
+            """
+            public static long Target() => unchecked(1L + 2L);
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UncheckedOverflowSemantics);
+    }
+
+    [Test]
+    public void CatalogIntegerBoundariesRemainExactConstants()
+    {
+        AssertClassification(
+            """
+            public static long Target() => long.MinValue;
+            """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
+        AssertClassification(
+            """
+            public static int Target() => int.MaxValue;
+            """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
+    }
+
+    [Test]
+    public void NegativeIntegerLiteralsRemainExactConstants()
+    {
+        AssertClassification(
+            """
+            public static long Target() => -1L;
+            """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
+        AssertClassification(
+            """
+            public static long Target(long input) => unchecked(-input);
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UncheckedOverflowSemantics);
     }
 
     private static void AssertClassification(

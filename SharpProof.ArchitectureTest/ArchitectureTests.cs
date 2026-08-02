@@ -23,7 +23,10 @@ public sealed class ArchitectureTests
         };
 
     private static readonly string[] ProductionProjects = [
+        "SharpProof.Analyzer",
+        "SharpProof.Attributes",
         "SharpProof.Ir",
+        "SharpProof.Meta.Analyzers",
         "SharpProof.PortableAnalyzer",
         "SharpProof.CompilerArtifact",
         "SharpProof.CompilerCollector",
@@ -135,7 +138,16 @@ public sealed class ArchitectureTests
     {
         var allowed = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
+            ["SharpProof.Analyzer"] = [
+                "SharpProof.Contracts",
+                "SharpProof.Effects",
+                "SharpProof.Frontend",
+                "SharpProof.Ir",
+                "SharpProof.Specs"
+            ],
+            ["SharpProof.Attributes"] = [],
             ["SharpProof.Ir"] = [],
+            ["SharpProof.Meta.Analyzers"] = [],
             ["SharpProof.PortableAnalyzer"] = ["SharpProof.Attributes"],
             ["SharpProof.CompilerArtifact"] = [
                 "SharpProof.Ir",
@@ -516,8 +528,11 @@ public sealed class ArchitectureTests
                 "SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs",
                 "SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs",
                 "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
+                "SharpProof.Contracts/ContractClauseInventory.cs",
+                "SharpProof.Contracts/ContractForSymbolMatcher.cs",
                 "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
                 "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
+                "SharpProof.Frontend/CompilationModelProvider.cs",
                 "SharpProof.Frontend/ContractApiIdentityResolver.cs",
                 "SharpProof.Frontend/ContractApiMetadataRuntime.cs",
                 "SharpProof.Frontend/SharpProof.Frontend.csproj"
@@ -532,6 +547,7 @@ public sealed class ArchitectureTests
                 "SharpProof.Contracts/ContractCanonicalization.cs",
                 "SharpProof.Contracts/ContractExpressionBinder.cs",
                 "SharpProof.Contracts/ContractIntrinsicValidator.cs",
+                "SharpProof.Contracts/ContractApiSymbols.cs",
                 "SharpProof.Frontend/OperationSupportCatalog.cs",
                 "SharpProof.Frontend/RoslynOperationLowerer.cs",
                 "SharpProof.Frontend/RoslynProgramLowerer.cs"
@@ -547,7 +563,10 @@ public sealed class ArchitectureTests
             ["obligationGeneration"] = [
                 "SharpProof.Worker/PostconditionObligationBuilder.cs"
             ],
-            ["encoding"] = ["SharpProof.Smt/IrSmtBackend.cs"],
+            ["encoding"] = [
+                "SharpProof.Smt/IrSmtBackend.cs",
+                "SharpProof.Verify/Backend.cs"
+            ],
             ["apiSpecifications"] = [
                 "SharpProof.Specs/ApiSpecTable.cs",
                 "SharpProof.Specs/ApiSpecTermValidator.cs",
@@ -571,7 +590,10 @@ public sealed class ArchitectureTests
             ["contractApiCatalog"] = [
                 "SharpProof.Frontend/ContractApi.catalog.json",
                 "scripts/Generate-ContractApiCatalog.ps1",
-                "SharpProof.Frontend/ContractApiMetadata.generated.cs"
+                "SharpProof.Frontend/ContractApiMetadata.generated.cs",
+                "SharpProof.Attributes/EffectContractAttribute.cs",
+                "SharpProof.Attributes/SharpProofEffect.cs",
+                "SharpProof.Attributes/SharpProofCapability.cs"
             ],
             ["analyzerDiagnosticCatalog"] = [
                 "SharpProof.Analyzer/AnalyzerDiagnostic.catalog.json",
@@ -582,6 +604,7 @@ public sealed class ArchitectureTests
                 "SharpProof.Projection.catalog.json",
                 "scripts/Generate-ProjectionCatalog.ps1",
                 "SharpProof.Verify/VerificationProjections.generated.cs",
+                "SharpProof.Analyzer/EffectEvaluationProjections.generated.cs",
                 "SharpProof.Worker/WorkerProjections.generated.cs",
                 "SharpProof.Contracts/ContractProjections.generated.cs",
                 "SharpProof.Ir/IrPrinterProjections.generated.cs",
@@ -590,6 +613,20 @@ public sealed class ArchitectureTests
                 "SharpProof.Worker.Launcher/LauncherProjections.generated.cs",
                 "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableProjections.generated.cs",
                 "SharpProof.Frontend/CompilerIdentityProjections.generated.cs"
+            ],
+            ["launcherArgumentCatalog"] = [
+                "SharpProof.Worker.Launcher/LauncherArguments.catalog.json",
+                "scripts/Generate-LauncherArguments.ps1",
+                "SharpProof.Worker.Launcher/LauncherArguments.generated.cs"
+            ],
+            ["generatedOutputPolicy"] = [
+                "eng/generated/approved-outputs.v1.json",
+                "scripts/Test-ProductionCSharpComplexity.ps1"
+            ],
+            ["mutationEvidencePolicy"] = [
+                "scripts/SharpProof.MutationEvidence.psm1",
+                "scripts/Test-SharpProofMutationEvidence.ps1",
+                "scripts/Test-SharpProofTrustedMutations.ps1"
             ],
             ["declarativeModelsCatalog"] = [
                 "SharpProof.DeclarativeModels.catalog.json",
@@ -632,6 +669,7 @@ public sealed class ArchitectureTests
             ["compilerWireCatalog"] = [
                 "SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json",
                 "scripts/Generate-CompilerArtifactModel.ps1",
+                "scripts/Test-CompilerArtifactModelGenerator.ps1",
                 "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
                 "SharpProof.CompilerCollector/CompilerArtifact/CompilerWireMappings.generated.cs"
             ],
@@ -674,7 +712,6 @@ public sealed class ArchitectureTests
                 "SharpProof.Specs/FrameworkTypeMetadataNames.cs"
             ],
             ["replay"] = [
-                "SharpProof.Verify/ProofKernel.cs",
                 "SharpProof.Ir/IrInterpreter.cs",
                 "SharpProof.Ir/IrProgramInterpreter.cs",
                 "SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs",
@@ -685,6 +722,13 @@ public sealed class ArchitectureTests
                 "SharpProof.Worker/EffectClaimResultAssembler.cs"
             ],
             ["policy"] = [
+                "SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs",
+                "SharpProof.Analyzer/AnalyzerGeneratedCodePolicy.cs",
+                "SharpProof.Analyzer/LanguageSubsetGate.cs",
+                "SharpProof.Analyzer/SharpProofControlAttributePolicy.cs",
+                "SharpProof.Effects/TrustedBoundaryPolicy.cs",
+                "SharpProof.Frontend/FrontendSubset.cs",
+                "SharpProof.Frontend/OperationSubsetClassifier.cs",
                 "SharpProof.Worker.Launcher/Program.cs",
                 "SharpProof.Worker/CallableVerificationPolicy.cs"
             ],
@@ -767,6 +811,47 @@ public sealed class ArchitectureTests
                     StringComparer.Ordinal)),
                 component.Key);
         }
+        var canonicalTcb = root.GetProperty("trustedKernel")
+            .GetProperty("paths")
+            .EnumerateArray()
+            .Select(static path => path.GetString() ?? "")
+            .Concat(actual.Values.SelectMany(static paths => paths))
+            .ToArray();
+        Assert.That(
+            canonicalTcb.Distinct(StringComparer.Ordinal).Count(),
+            Is.EqualTo(canonicalTcb.Length),
+            "The canonical TCB union must not contain duplicate ownership.");
+        Assert.That(
+            canonicalTcb,
+            Does.Contain("SharpProof.Verify/Evidence.cs")
+                .And.Contain("SharpProof.Verify/Outcomes.cs")
+                .And.Contain("SharpProof.Effects/TrustedBoundaryPolicy.cs")
+                .And.Contain("SharpProof.Analyzer/LanguageSubsetGate.cs")
+                .And.Contain("SharpProof.Frontend/OperationSubsetClassifier.cs")
+                .And.Contain("SharpProof.Frontend/FrontendSubset.cs")
+                .And.Contain("SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs")
+                .And.Contain("SharpProof.Analyzer/SharpProofControlAttributePolicy.cs")
+                .And.Contain("SharpProof.Verify/Backend.cs")
+                .And.Contain("SharpProof.Contracts/ContractApiSymbols.cs")
+                .And.Contain("SharpProof.Analyzer/AnalyzerGeneratedCodePolicy.cs")
+                .And.Contain("SharpProof.Attributes/EffectContractAttribute.cs")
+                .And.Contain("SharpProof.Frontend/CompilationModelProvider.cs")
+                .And.Contain("SharpProof.Contracts/ContractForSymbolMatcher.cs")
+                .And.Contain("SharpProof.Contracts/ContractClauseInventory.cs")
+                .And.Contain("SharpProof.Attributes/SharpProofEffect.cs")
+                .And.Contain("SharpProof.Attributes/SharpProofCapability.cs"));
+        Assert.That(
+            File.ReadAllText(Path.Combine(
+                RepositoryRoot(),
+                "scripts",
+                "Get-SharpProofReleaseDigests.ps1")),
+            Does.Contain("$acceptanceJson.trustedKernel.paths"));
+        Assert.That(
+            File.ReadAllText(Path.Combine(
+                RepositoryRoot(),
+                "scripts",
+                "Test-SharpProofCoverage.ps1")),
+            Does.Contain("$contract.trustedKernel.paths"));
     }
 
     [Test]
@@ -951,6 +1036,14 @@ public sealed class ArchitectureTests
             "eng",
             "coverage",
             "SharpProof.Managed.runsettings"));
+        using var coverageBaseline = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(root, "eng", "coverage", "baseline.json")));
+        Assert.That(
+            coverageBaseline.RootElement
+                .GetProperty("projects")
+                .TryGetProperty("SharpProof.CompilerCollector", out _),
+            Is.True,
+            "CompilerCollector must participate in project and aggregate coverage.");
         Assert.That(
             managedSettings,
             Does.Contain(

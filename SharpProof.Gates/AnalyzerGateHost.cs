@@ -212,6 +212,7 @@ internal static class AnalyzerGateHost
                     SharpProofEffect.Synchronizes,
                     Capabilities = SharpProofCapability.Synchronization,
                     IsDeterministic = true,
+                    PreconditionFree = true,
                     Complete = true)]
                 public static void Synchronize() {
                 }

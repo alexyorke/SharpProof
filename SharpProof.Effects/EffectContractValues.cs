@@ -8,6 +8,7 @@ internal static class EffectContractMetadata
     internal const string CapabilitiesPropertyName = "Capabilities";
     internal const string CompletePropertyName = "Complete";
     internal const string IsDeterministicPropertyName = "IsDeterministic";
+    internal const string PreconditionFreePropertyName = "PreconditionFree";
     internal const string ThrownExceptionsPropertyName = "ThrownExceptions";
 
     internal const EffectContractKind AllEffects =

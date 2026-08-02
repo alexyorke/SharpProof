@@ -21,6 +21,7 @@ $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
     & (Join-Path $repositoryRoot 'scripts\Generate-ContractApiCatalog.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-AnalyzerDiagnosticCatalog.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-ProjectionCatalog.ps1') -Verify
+    & (Join-Path $repositoryRoot 'scripts\Generate-LauncherArguments.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-BoundContractModel.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-EffectContractMappings.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-OperationSupportCatalog.ps1') -Verify
@@ -28,6 +29,8 @@ $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 & (Join-Path $repositoryRoot 'scripts\Generate-ApiSpecCatalog.ps1') -Verify
 & (Join-Path $repositoryRoot 'scripts\Generate-ProtocolModel.ps1') -Verify
 & (Join-Path $repositoryRoot 'scripts\Generate-CompilerArtifactModel.ps1') -Verify
+& (Join-Path $repositoryRoot 'scripts\Test-CompilerArtifactModelGenerator.ps1')
+& (Join-Path $repositoryRoot 'scripts\Test-SharpProofMutationEvidence.ps1')
 & (Join-Path $repositoryRoot 'scripts\Generate-DeclarativeModels.ps1') -Verify
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
 $directoryBuildPropsPath = Join-Path `
@@ -369,6 +372,9 @@ try {
         'contractApiCatalog',
         'analyzerDiagnosticCatalog',
         'projectionCatalog',
+        'launcherArgumentCatalog',
+        'generatedOutputPolicy',
+        'mutationEvidencePolicy',
         'declarativeModelsCatalog',
         'boundContractModelCatalog',
         'effectContractCatalog',
@@ -400,6 +406,11 @@ try {
     }
     $allTcbPaths = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::Ordinal)
+    foreach ($path in $kernelPaths) {
+        if (-not $allTcbPaths.Add([string]$path)) {
+            throw "Trusted-computing-base path is declared more than once: $path"
+        }
+    }
     foreach ($component in $tcbComponents) {
         $name = [string]$component.name
         $paths = @($component.paths)

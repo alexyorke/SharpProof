@@ -109,7 +109,7 @@ internal sealed class OperationEffectScanner
 
     private EffectSummary Scan(IOperation operation, EffectAccess access)
     {
-        if (ReferenceEquals(operation, _directOperation))
+        if (ManagedFlowResult.HasSameIdentity(operation, _directOperation))
         {
             RecordDirect(operation);
         }
@@ -602,7 +602,7 @@ internal sealed class OperationEffectScanner
             OperationSupportStage.EffectDiscovery,
             operation.Kind);
         var children = ScanChildren(operation);
-        return classification.IsExact || IsEffectNeutralContainer(operation)
+        return classification.IsExact
             ? children
             : EffectSummaryOperations.Join(children, EffectSummaryOperations.Unsupported());
     }
@@ -920,8 +920,8 @@ internal sealed class OperationEffectScanner
             IParameterReferenceOperation parameter => ClassifyParameter(parameter.Parameter),
             ILocalReferenceOperation local => ClassifyLocal(local.Local),
             IFieldReferenceOperation { Field.IsStatic: true } => EffectRegionSet.Create(EffectRegionId.Static()),
-            IFieldReferenceOperation field => ClassifyRegion(field.Instance, aliasSource),
-            IArrayElementReferenceOperation element => ClassifyRegion(element.ArrayReference, aliasSource),
+            IFieldReferenceOperation => EffectRegionSet.Unknown,
+            IArrayElementReferenceOperation => EffectRegionSet.Unknown,
             IObjectCreationOperation creation => EffectRegionSet.Create(EffectRegionId.Fresh(creation.Syntax.SpanStart)),
             IArrayCreationOperation creation => EffectRegionSet.Create(EffectRegionId.Fresh(creation.Syntax.SpanStart)),
             IConditionalOperation conditional when aliasSource =>
@@ -1136,18 +1136,6 @@ internal sealed class OperationEffectScanner
     {
         return CSharpScalarSemantics.TryGetInteger(
             UnwrapNullable(type)?.SpecialType ?? SpecialType.None, out semantics);
-    }
-
-    private static bool IsEffectNeutralContainer(IOperation operation)
-    {
-        return operation is
-        IBlockOperation or IExpressionStatementOperation or IReturnOperation or
-        IConditionalOperation or IConditionalAccessOperation or IConditionalAccessInstanceOperation or
-        IVariableDeclarationGroupOperation or IVariableDeclarationOperation or IVariableDeclaratorOperation or
-        IVariableInitializerOperation or IObjectOrCollectionInitializerOperation or IMemberInitializerOperation or
-        IArrayInitializerOperation or IArgumentOperation or IParenthesizedOperation or IFlowCaptureOperation or
-        IFlowCaptureReferenceOperation or IBranchOperation or IEmptyOperation or IMethodBodyOperation or
-        IConstructorBodyOperation;
     }
 
     private enum EffectAccess

@@ -1972,6 +1972,9 @@ public sealed partial class HumanReleaseGateScriptTests
         private const string FixtureAcceptance =
             """
             {
+              "trustedKernel": {
+                "paths": []
+              },
               "trustedComputingBase": {
                 "components": [
                   {

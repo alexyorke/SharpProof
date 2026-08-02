@@ -118,6 +118,14 @@ input cannot reuse an answer produced under a different identity.
 Verification and assumption policy are reporting/build policies, not semantic
 proof inputs, so they do not alter the semantic cache payload.
 
+Before launch, runtime-closure identity is also bounded and streamed. The
+closure permits at most 64 logical components and 64 MiB in total. A component
+identity is limited to 256 characters; an ordinary component is limited to
+32 MiB, the worker dependency manifest to 1 MiB, and the runtime configuration
+to 64 KiB. Dependency JSON depth is limited to 32. The launcher opens each
+component read-only without write sharing while hashing it, and any missing,
+oversized, escaping, or malformed closure fails before worker execution.
+
 `SharpProofFeatures` is a semantic compiler-artifact input. `contracts` excludes
 effect-only annotations from the manifest; `effects` excludes postcondition
 claims and contract assumptions; `all` includes both.

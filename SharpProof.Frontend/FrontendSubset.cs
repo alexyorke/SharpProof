@@ -2,8 +2,9 @@ namespace SharpProof.Frontend;
 
 public enum FrontendSubsetDecision
 {
-    Exact,
-    ClosedAbstention
+    Unspecified = 0,
+    Exact = 1,
+    ClosedAbstention = 2
 }
 
 public enum FrontendAbstention
@@ -31,20 +32,19 @@ public readonly struct FrontendSubsetClassification
         FrontendSubsetDecision decision,
         FrontendAbstention abstention)
     {
-        if (decision == FrontendSubsetDecision.Exact &&
-            abstention != FrontendAbstention.None)
+        var valid = decision switch
+        {
+            FrontendSubsetDecision.Exact =>
+                abstention == FrontendAbstention.None,
+            FrontendSubsetDecision.ClosedAbstention =>
+                abstention != FrontendAbstention.None,
+            _ => false
+        };
+        if (!valid)
         {
             throw new ArgumentException(
-                "An exact classification cannot carry an abstention.",
-                nameof(abstention));
-        }
-
-        if (decision == FrontendSubsetDecision.ClosedAbstention &&
-            abstention == FrontendAbstention.None)
-        {
-            throw new ArgumentException(
-                "A closed abstention requires a reason.",
-                nameof(abstention));
+                "The subset decision and abstention must form a valid classification.",
+                nameof(decision));
         }
 
         Decision = decision;

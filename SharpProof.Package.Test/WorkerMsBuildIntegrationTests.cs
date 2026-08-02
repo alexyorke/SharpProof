@@ -82,6 +82,50 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task WorkerCannotReachModuleInitializerBeforeResume()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var worker = await project.CreateResultlessWorkerAsync();
+        var marker = Path.Combine(
+            Path.GetDirectoryName(worker)!, "pre-main.marker");
+        var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ??
+            throw new InvalidOperationException(
+                "The test host did not disclose its dotnet host path.");
+        var eventName = "Local\\SharpProof.Worker.Test." +
+            Guid.NewGuid().ToString("N");
+        using var start = new EventWaitHandle(
+            false, EventResetMode.ManualReset, eventName);
+        using var boundary = WindowsJob.CreateRequired(
+            WorkerBudgets.DefaultProcessMemoryLimitBytes,
+            WorkerBudgets.MaximumParallelism);
+        using var process = boundary.StartSuspended(
+            host,
+            [worker, "verify", "--request", "unused-request.json",
+                "--result", "unused-result.json", "--start-event", eventName,
+                "--pre-main-marker", marker],
+            Path.GetDirectoryName(worker)!);
+
+        try
+        {
+            await Task.Delay(250);
+            Assert.That(File.Exists(marker), Is.False,
+                "A suspended worker must not execute its module initializer.");
+
+            process.Resume();
+            Assert.That(
+                SpinWait.SpinUntil(() => File.Exists(marker), 5_000),
+                Is.True,
+                "The worker did not execute after resume.");
+        }
+        finally
+        {
+            boundary.Terminate(124);
+            Assert.That(process.WaitForExit(5_000), Is.True);
+        }
+    }
+
+    [Test]
     public void ManualConsumerImportsFollowSplitPackageOrder()
     {
         using var project = ConsumerProject.Create(IdentitySource);
@@ -395,10 +439,6 @@ public sealed class WorkerMsBuildIntegrationTests
                 project.CompilerManifestPath + ".missing-worker.dll"));
         await AssertInvalidatedAsync(
             ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
-            ("SharpProofNativeZ3Path",
-                project.CompilerManifestPath + ".missing-z3.dll"));
-        await AssertInvalidatedAsync(
-            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
             ("SharpProofVerifyPolicy", "invalid"));
         await AssertInvalidatedAsync(
             ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
@@ -685,6 +725,38 @@ public sealed class WorkerMsBuildIntegrationTests
                 invocation.GetProperty("toolExecutionNotifications")[0]
                     .GetProperty("descriptor").GetProperty("id").GetString(),
                 Is.EqualTo("worker.malformed_result"));
+        }
+    }
+
+    [Test]
+    public async Task HardTimeoutReplacesWorkerOwnedMalformedOutput()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var worker = await project.CreateMalformedThenHangWorkerAsync();
+
+        var run = await project.BuildAsync(
+            verify: true,
+            ("SharpProofWorkerPath", worker),
+            ("SharpProofVerifyMethodWallTimeMilliseconds", "1"),
+            ("SharpProofVerifyProjectWallTimeMilliseconds", "100"),
+            ("SharpProofVerifyTerminationGraceMilliseconds", "1000"));
+
+        Assert.That(run.ExitCode, Is.Not.Zero, run.Output);
+        Assert.That(File.Exists(project.ResultPath), Is.True, run.Output);
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(project.ResultPath))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(run.Output, Does.Contain("ProjectTimeout"));
+            Assert.That(run.Output, Does.Not.Contain("worker.malformed_result"));
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.TimedOut));
+            Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
+            Assert.That(response.Summary.Versions.WorkerVersion,
+                Is.EqualTo("launcher"));
+            Assert.That(response.ClaimResults,
+                Has.All.Property(nameof(WorkerClaimResult.Reason))
+                    .EqualTo(WorkerClaimReason.ProjectTimeout));
         }
     }
 
@@ -1177,6 +1249,9 @@ public sealed class WorkerMsBuildIntegrationTests
                 s_reconstructionListArtifacts.Where(targetXml.Contains),
                 Is.Empty);
             Assert.That(
+                targetXml,
+                Does.Not.Contain("SharpProofNativeZ3Path"));
+            Assert.That(
                 verifyCore.Descendants("WriteLinesToFile"),
                 Is.Empty);
             Assert.That(
@@ -1635,10 +1710,27 @@ public sealed class WorkerMsBuildIntegrationTests
                 Path.Combine(root, "Program.cs"),
                 """
                 using System;
+                using System.IO;
+                using System.Runtime.CompilerServices;
                 using System.Threading;
                 var eventName = args[Array.IndexOf(args, "--start-event") + 1];
                 using var start = EventWaitHandle.OpenExisting(eventName);
                 start.WaitOne();
+
+                internal static class PreMainProbe
+                {
+                    [ModuleInitializer]
+                    internal static void Initialize()
+                    {
+                        var arguments = Environment.GetCommandLineArgs();
+                        var markerIndex = Array.IndexOf(
+                            arguments, "--pre-main-marker");
+                        if (markerIndex >= 0)
+                        {
+                            File.WriteAllText(arguments[markerIndex + 1], "started");
+                        }
+                    }
+                }
                 """,
                 new System.Text.UTF8Encoding(false));
             var build = await RunDotNetAsync([
@@ -1702,6 +1794,57 @@ public sealed class WorkerMsBuildIntegrationTests
                 "Release",
                 "net8.0",
                 "MalformedWorker.dll");
+        }
+
+        internal async Task<string> CreateMalformedThenHangWorkerAsync()
+        {
+            var root = Path.Combine(
+                _root,
+                "obj",
+                "test-workers",
+                "malformed-hanging-worker");
+            Directory.CreateDirectory(root);
+            var project = Path.Combine(root, "MalformedHangingWorker.csproj");
+            await File.WriteAllTextAsync(
+                project,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <OutputType>Exe</OutputType>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """,
+                new System.Text.UTF8Encoding(false));
+            await File.WriteAllTextAsync(
+                Path.Combine(root, "Program.cs"),
+                """
+                using System;
+                using System.IO;
+                using System.Threading;
+                var result = args[Array.IndexOf(args, "--result") + 1];
+                var eventName = args[Array.IndexOf(args, "--start-event") + 1];
+                using var start = EventWaitHandle.OpenExisting(eventName);
+                start.WaitOne();
+                File.WriteAllText(result, "not-json");
+                Thread.Sleep(Timeout.Infinite);
+                """,
+                new System.Text.UTF8Encoding(false));
+            var build = await RunDotNetAsync([
+                "build", project, "-c", "Release", "--nologo",
+                "/nodeReuse:false", "-p:UseSharedCompilation=false"
+            ]);
+            if (build.ExitCode != 0)
+            {
+                throw new InvalidOperationException(build.Output);
+            }
+
+            return Path.Combine(
+                root,
+                "bin",
+                "Release",
+                "net8.0",
+                "MalformedHangingWorker.dll");
         }
 
         internal static ConsumerProject Create(
@@ -1925,10 +2068,6 @@ public sealed class WorkerMsBuildIntegrationTests
             var worker = SecurityElement.Escape(
                 Path.Combine(repository, "SharpProof.Worker", "bin",
                     testConfiguration, "net9.0", "SharpProof.Worker.dll"));
-            var nativeZ3 = SecurityElement.Escape(
-                Path.Combine(repository, "SharpProof.Worker", "bin",
-                    testConfiguration, "net9.0", "runtimes", "win-x64",
-                    "native", "libz3.dll"));
             var launcher = SecurityElement.Escape(
                 Path.Combine(repository, "SharpProof.Worker.Launcher", "bin",
                     testConfiguration, "net9.0",
@@ -1957,7 +2096,6 @@ public sealed class WorkerMsBuildIntegrationTests
                     <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
                     <SharpProofWorkerPath>{worker}</SharpProofWorkerPath>
                     <_SharpProofWorkerPath>$([System.IO.Path]::GetFullPath('$(SharpProofWorkerPath)'))</_SharpProofWorkerPath>
-                    <SharpProofNativeZ3Path>{nativeZ3}</SharpProofNativeZ3Path>
                     <SharpProofLauncherPath>{launcher}</SharpProofLauncherPath>
                     <_SharpProofLauncherPath>$([System.IO.Path]::GetFullPath('$(SharpProofLauncherPath)'))</_SharpProofLauncherPath>
                   </PropertyGroup>

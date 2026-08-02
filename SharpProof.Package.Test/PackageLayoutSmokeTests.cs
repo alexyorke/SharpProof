@@ -745,17 +745,63 @@ public sealed class PackageLayoutSmokeTests
                     .GetProperty("schemaVersion")
                     .GetInt32(),
                 Is.EqualTo(9));
-            var eventKinds = manifest.RootElement
+            var effectClaims = manifest.RootElement
                 .GetProperty("callables")
                 .EnumerateArray()
                 .SelectMany(static callable => callable
                     .GetProperty("effectClaims")
-                    .EnumerateArray())
-                .Select(static claim => claim
-                    .GetProperty("replay")
-                    .GetProperty("events")[0]
-                    .GetProperty("kind")
-                    .GetString())
+                    .EnumerateArray()
+                    .Select(claim => new
+                    {
+                        CallableId = callable
+                            .GetProperty("callableId")
+                            .GetString() ?? string.Empty,
+                        Claim = claim
+                    }))
+                .ToArray();
+            Assert.That(effectClaims, Has.Length.EqualTo(2));
+            Assert.That(
+                effectClaims.Select(static item => item.Claim
+                    .GetProperty("claimId")
+                    .GetString()),
+                Is.Unique.And.All.Not.Empty);
+            var expectedClaims = new[]
+            {
+                (Callable: "AllocateArray",
+                    Event: "ManagedArrayAllocation"),
+                (Callable: "AllocateObject",
+                    Event: "ManagedObjectAllocation")
+            };
+            var eventKinds = expectedClaims
+                .Select(expected =>
+                {
+                    var item = effectClaims.Single(candidate =>
+                        candidate.CallableId.Contains(
+                            expected.Callable,
+                            StringComparison.Ordinal));
+                    var claim = item.Claim;
+                    var replay = claim.GetProperty("replay");
+                    Assert.That(
+                        replay.ValueKind,
+                        Is.EqualTo(JsonValueKind.Object),
+                        item.CallableId + ":" + claim.GetRawText());
+                    var events = replay
+                        .GetProperty("events")
+                        .EnumerateArray()
+                        .ToArray();
+                    Assert.That(
+                        events,
+                        Has.Length.EqualTo(1),
+                        item.CallableId);
+                    var eventKind = events[0]
+                        .GetProperty("kind")
+                        .GetString();
+                    Assert.That(
+                        eventKind,
+                        Is.EqualTo(expected.Event),
+                        item.CallableId);
+                    return eventKind;
+                })
                 .OrderBy(static kind => kind, StringComparer.Ordinal)
                 .ToArray();
             Assert.That(

@@ -7,6 +7,56 @@ namespace SharpProof.Worker.Test;
 public sealed class WorkerBinaryIdentityTests
 {
     [Test]
+    public void RuntimeClosureLimitsFailClosedAtEveryBoundary()
+    {
+        const long expectedMaximumComponentBytes = 32L * 1024 * 1024;
+        long total = 0;
+        WorkerBinaryIdentity.ValidateComponentCount(
+            WorkerBinaryIdentity.MaximumRuntimeComponents);
+        WorkerBinaryIdentity.ValidateComponentLength(
+            "worker",
+            WorkerBinaryIdentity.MaximumComponentBytes,
+            ref total);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                WorkerBinaryIdentity.MaximumComponentBytes,
+                Is.EqualTo(expectedMaximumComponentBytes));
+            Assert.That(
+                (Action)(() => WorkerBinaryIdentity.ValidateComponentCount(
+                    WorkerBinaryIdentity.MaximumRuntimeComponents + 1)),
+                Throws.TypeOf<InvalidDataException>());
+            Assert.That(
+                (Action)(() => ValidateLength(
+                    "dependencies",
+                    WorkerBinaryIdentity.MaximumDependenciesBytes + 1)),
+                Throws.TypeOf<InvalidDataException>());
+            Assert.That(
+                (Action)(() => ValidateLength(
+                    "runtimeConfig",
+                    WorkerBinaryIdentity.MaximumRuntimeConfigBytes + 1)),
+                Throws.TypeOf<InvalidDataException>());
+            Assert.That(
+                (Action)(() => ValidateLength(
+                    "runtime/large.dll",
+                    expectedMaximumComponentBytes + 1)),
+                Throws.TypeOf<InvalidDataException>());
+            Assert.That(
+                (Action)(() => ValidateLength(new('a',
+                    WorkerBinaryIdentity.MaximumComponentKeyCharacters + 1),
+                    0)),
+                Throws.TypeOf<InvalidDataException>());
+        }
+
+        total = WorkerBinaryIdentity.MaximumClosureBytes;
+        Assert.That(
+            (Action)(() => WorkerBinaryIdentity.ValidateComponentLength(
+                "runtime/extra.dll", 1, ref total)),
+            Throws.TypeOf<InvalidDataException>());
+    }
+
+    [Test]
     public void IdentityCoversTheCompleteTrustedRuntimeClosure()
     {
         Assert.That(
@@ -81,5 +131,11 @@ public sealed class WorkerBinaryIdentityTests
         {
             Directory.Delete(temporaryDirectory, recursive: true);
         }
+    }
+
+    private static void ValidateLength(string key, long length)
+    {
+        long total = 0;
+        WorkerBinaryIdentity.ValidateComponentLength(key, length, ref total);
     }
 }

@@ -188,10 +188,9 @@ internal static class CompilerLoweredArtifact
             if (row == null ||
                 !Enum.IsDefined(typeof(CompilerContractKind), row.Kind) ||
                 !Enum.IsDefined(typeof(CompilerContractEvidence), row.Evidence) || row.Root != index ||
-                row.Kind == CompilerContractKind.Ensures != !string.IsNullOrWhiteSpace(row.ClaimId) ||
-                row.Kind != CompilerContractKind.Ensures != !string.IsNullOrWhiteSpace(row.AssumptionId) ||
-                row.Kind != CompilerContractKind.Ensures && row.ClaimId != null ||
-                row.Kind == CompilerContractKind.Ensures && row.AssumptionId != null ||
+                (row.Kind == CompilerContractKind.Ensures
+                    ? string.IsNullOrWhiteSpace(row.ClaimId) || row.AssumptionId != null
+                    : row.ClaimId != null || string.IsNullOrWhiteSpace(row.AssumptionId)) ||
                 !WorkerProtocolJson.IsSha256(row.PredicateSha256))
             {
                 throw new InvalidDataException("A lowered contract clause is invalid.");

@@ -34,20 +34,30 @@ internal sealed class AnalyzerConfiguration
 
     public static AnalyzerConfiguration FromOptions(AnalyzerOptions options)
     {
-        var invalidConfigurationValues = GetInvalidGlobalConfigurationValues(options);
-        if (!invalidConfigurationValues.IsEmpty)
+        try
         {
-            return new(SharpProofProfile.Off, SharpProofFeatures.All, invalidConfigurationValues);
-        }
+            var invalidConfigurationValues = GetInvalidGlobalConfigurationValues(options);
+            if (!invalidConfigurationValues.IsEmpty)
+            {
+                return new(SharpProofProfile.Off, SharpProofFeatures.All, invalidConfigurationValues);
+            }
 
-        var optionsByKind = AnalyzerConfigurationOptionRegistry.All;
-        var hasProfile = TryGet(options, optionsByKind[0], out var profile);
-        var hasFeatures = TryGet(options, optionsByKind[1], out var features);
-        var hasLegacy = TryGet(options, optionsByKind[2], out var legacy);
-        return new(
-            ParseProfile(hasProfile ? profile : hasLegacy && Is(legacy, "off") ? "off" : "advisory"),
-            ParseFeatures(hasFeatures ? features : hasLegacy ? legacy : "all"),
-            invalidConfigurationValues);
+            var optionsByKind = AnalyzerConfigurationOptionRegistry.All;
+            var hasProfile = TryGet(options, optionsByKind[0], out var profile);
+            var hasFeatures = TryGet(options, optionsByKind[1], out var features);
+            var hasLegacy = TryGet(options, optionsByKind[2], out var legacy);
+            return new(
+                ParseProfile(hasProfile ? profile : hasLegacy && Is(legacy, "off") ? "off" : "advisory"),
+                ParseFeatures(hasFeatures ? features : hasLegacy ? legacy : "all"),
+                invalidConfigurationValues);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return new(
+                SharpProofProfile.Off,
+                SharpProofFeatures.All,
+                [ProviderFailure(exception)]);
+        }
     }
 
     private static ImmutableArray<InvalidAnalyzerConfigurationValue>
@@ -92,16 +102,17 @@ internal sealed class AnalyzerConfiguration
         AnalyzerConfigurationOption option,
         out string value)
     {
-        try
-        {
-            return TryGet(
-                options.AnalyzerConfigOptionsProvider.GlobalOptions, option, out value);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            value = string.Empty;
-            return false;
-        }
+        return TryGet(
+            options.AnalyzerConfigOptionsProvider.GlobalOptions, option, out value);
+    }
+
+    internal static InvalidAnalyzerConfigurationValue ProviderFailure(
+        Exception exception)
+    {
+        return new(
+            "AnalyzerConfigOptionsProvider",
+            exception.GetType().Name,
+            "configuration provider failed; analysis was disabled");
     }
 
     private static bool IsLegacyEquivalent(string legacy, string profile, string features)

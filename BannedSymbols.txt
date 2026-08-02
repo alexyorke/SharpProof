@@ -3,6 +3,9 @@
 M:Microsoft.CodeAnalysis.Compilation.ReplaceSyntaxTree(Microsoft.CodeAnalysis.SyntaxTree,Microsoft.CodeAnalysis.SyntaxTree);Do not mutate a compilation during analysis.
 M:Microsoft.CodeAnalysis.Compilation.AddSyntaxTrees(Microsoft.CodeAnalysis.SyntaxTree[]);Do not synthesize syntax trees during analysis.
 M:Microsoft.CodeAnalysis.Compilation.AddSyntaxTrees(System.Collections.Generic.IEnumerable{Microsoft.CodeAnalysis.SyntaxTree});Do not synthesize syntax trees during analysis.
+M:Microsoft.CodeAnalysis.Compilation.RemoveSyntaxTrees(Microsoft.CodeAnalysis.SyntaxTree[]);Do not remove syntax trees during analysis.
+M:Microsoft.CodeAnalysis.Compilation.RemoveSyntaxTrees(System.Collections.Generic.IEnumerable{Microsoft.CodeAnalysis.SyntaxTree});Do not remove syntax trees during analysis.
+M:Microsoft.CodeAnalysis.Compilation.RemoveAllSyntaxTrees;Do not remove syntax trees during analysis.
 M:Microsoft.CodeAnalysis.Compilation.GetSymbolsWithName(System.Func{System.String,System.Boolean},Microsoft.CodeAnalysis.SymbolFilter,System.Threading.CancellationToken);Use compiler-bound symbols reachable from the analyzed operation.
 M:Microsoft.CodeAnalysis.Compilation.GetSymbolsWithName(System.String,Microsoft.CodeAnalysis.SymbolFilter,System.Threading.CancellationToken);Use compiler-bound symbols reachable from the analyzed operation.
 

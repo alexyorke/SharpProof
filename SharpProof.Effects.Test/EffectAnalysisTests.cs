@@ -708,6 +708,140 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void FreshArrayContentsDoNotBecomeFreshOwnedAliases()
+    {
+        var result = Analyze(
+            """
+            public sealed class Box {
+                public int Value;
+            }
+
+            public static class Sample {
+                public static void Mutate(Box value) {
+                    var holder = new[] { value };
+                    var alias = holder[0];
+                    alias.Value = 1;
+                }
+            }
+            """,
+            "Sample",
+            "Mutate");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Summary.Writes.IsEmpty, Is.False);
+            Assert.That(
+                result.Summary.Writes.IsUnknown ||
+                result.Summary.Writes.Regions.Any(
+                    static region => region.Kind != EffectRegionKind.Fresh),
+                Is.True);
+            Assert.That(
+                EffectContractMappings.IsObservablePure(result.Summary),
+                Is.False);
+        }
+    }
+
+    [Test]
+    public void FreshObjectContentsDoNotBecomeFreshOwnedAliases()
+    {
+        var result = Analyze(
+            """
+            public sealed class Box {
+                public int Value;
+            }
+
+            public sealed class Holder {
+                public Box Child = null!;
+            }
+
+            public static class Sample {
+                public static void Mutate(Box value) {
+                    (new Holder { Child = value }).Child.Value = 1;
+                }
+            }
+            """,
+            "Sample",
+            "Mutate");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Summary.Writes.IsEmpty, Is.False);
+            Assert.That(
+                result.Summary.Writes.IsUnknown ||
+                result.Summary.Writes.Regions.Any(
+                    static region => region.Kind != EffectRegionKind.Fresh),
+                Is.True);
+            Assert.That(
+                EffectContractMappings.IsObservablePure(result.Summary),
+                Is.False);
+        }
+    }
+
+    [Test]
+    public void NestedFreshContainerContentsDoNotBecomeFreshOwnedAliases()
+    {
+        var result = Analyze(
+            """
+            public sealed class Box {
+                public int Value;
+            }
+
+            public static class Sample {
+                public static void Mutate(Box value) {
+                    var inner = new[] { value };
+                    var outer = new[] { inner };
+                    outer[0][0].Value = 1;
+                }
+            }
+            """,
+            "Sample",
+            "Mutate");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Summary.Writes.IsEmpty, Is.False);
+            Assert.That(
+                result.Summary.Writes.IsUnknown ||
+                result.Summary.Writes.Regions.Any(
+                    static region => region.Kind != EffectRegionKind.Fresh),
+                Is.True);
+            Assert.That(
+                EffectContractMappings.IsObservablePure(result.Summary),
+                Is.False);
+        }
+    }
+
+    [Test]
+    public void FreshValueArrayStorageRemainsFreshOwned()
+    {
+        var result = Analyze(
+            """
+            public static class Sample {
+                public static void Mutate() {
+                    var values = new int[1];
+                    values[0] = 1;
+                }
+            }
+            """,
+            "Sample",
+            "Mutate");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Summary.Writes.IsUnknown, Is.False);
+            Assert.That(result.Summary.Writes.IsEmpty, Is.False);
+            Assert.That(
+                result.Summary.Writes.Regions,
+                Has.All.Property(nameof(EffectRegionId.Kind))
+                    .EqualTo(EffectRegionKind.Fresh));
+            Assert.That(result.Projection.IsComplete, Is.True);
+            Assert.That(
+                EffectContractMappings.IsObservablePure(result.Summary),
+                Is.True);
+        }
+    }
+
+    [Test]
     public void TrustedCompleteExternalContractIsTheCapabilityOverride()
     {
         var externalReference = EffectTestHost.EmitReference(
@@ -720,6 +854,7 @@ public sealed class EffectAnalysisTests
                     SharpProofEffect.ReadsAmbientState,
                     Capabilities = SharpProofCapability.Console,
                     IsDeterministic = true,
+                    PreconditionFree = true,
                     Complete = true)]
                 public static void Touch() {
                 }
@@ -849,6 +984,96 @@ public sealed class EffectAnalysisTests
             Assert.That(
                 result.Projection.IsComplete,
                 Is.False);
+        }
+    }
+
+    [Test]
+    public void SourceOnlyMetadataPreconditionsCannotDisappearIntoTrustedSummaries()
+    {
+        var externalReference = EffectTestHost.EmitReference(
+            """
+            using SharpProof.Attributes;
+
+            public static class DirectBoundary {
+                [SharpProofTrusted("reviewed external implementation")]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    IsDeterministic = true,
+                    Complete = true)]
+                public static void Restricted(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                [SharpProofTrusted("reviewed precondition-free implementation")]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    IsDeterministic = true,
+                    Complete = true,
+                    PreconditionFree = true)]
+                public static void Certified(int value) {
+                }
+            }
+
+            public sealed class Service {
+                [SharpProofTrusted("reviewed external implementation")]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    IsDeterministic = true,
+                    Complete = true)]
+                public void Restricted(int value) {
+                }
+            }
+
+            [ContractFor(typeof(Service))]
+            public static class ServiceContracts {
+                public static void Restricted(
+                    Service receiver,
+                    int value) {
+                    Contract.Requires(value > 0);
+                }
+            }
+            """,
+            "ExternalSourcePreconditionAssembly");
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static void InvokeDirect(int value) =>
+                    DirectBoundary.Restricted(value);
+
+                public static void InvokeCompanion(
+                    Service service,
+                    int value) =>
+                    service.Restricted(value);
+
+                public static void InvokeCertified(int value) =>
+                    DirectBoundary.Certified(value);
+            }
+            """,
+            externalReference);
+        var session = new EffectAnalysisSession(compilation);
+
+        var direct = session.Analyze(Method(compilation, "InvokeDirect"));
+        var companion = session.Analyze(Method(compilation, "InvokeCompanion"));
+        var certified = session.Analyze(Method(compilation, "InvokeCertified"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                direct.Summary.AnalysisIncompleteReason,
+                Is.EqualTo(
+                    EffectAnalysisIncompleteReason
+                        .CallPreconditionNotProven));
+            Assert.That(direct.Projection.IsComplete, Is.False);
+            Assert.That(
+                companion.Summary.AnalysisIncompleteReason,
+                Is.EqualTo(
+                    EffectAnalysisIncompleteReason
+                        .CallPreconditionNotProven));
+            Assert.That(companion.Projection.IsComplete, Is.False);
+            Assert.That(
+                certified.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(certified.Projection.IsComplete, Is.True);
         }
     }
 
@@ -1069,7 +1294,10 @@ public sealed class EffectAnalysisTests
                 }
 
                 [SharpProofTrusted("reviewed implementation")]
-                [EffectContract(SharpProofEffect.None, Complete = true)]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    Complete = true,
+                    PreconditionFree = true)]
                 public static void Both() {
                 }
 

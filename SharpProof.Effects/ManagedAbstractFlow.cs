@@ -227,13 +227,27 @@ internal sealed class ManagedAbstractFlow
 
     private ManagedAbstractValue Increment(IIncrementOrDecrementOperation operation, ManagedFlowState state)
     {
-        var prior = EvaluateCore(operation.Target, state);
-        var @operator = operation.Kind == OperationKind.Increment ? BinaryOperatorKind.Add : BinaryOperatorKind.Subtract;
-        return prior.TryGetInteger(out var interval) && ManagedAbstractValue.TryArithmetic(
-                   @operator, interval, IntervalValue.Constant(1), out var updated) &&
+        return TryIncrement(operation, state, out var updated) &&
                ManagedAbstractValue.FitsType(updated, operation.Type)
             ? ManagedAbstractValue.Integer(updated)
             : ManagedAbstractValue.TopForType(operation.Type);
+    }
+
+    private bool TryIncrement(
+        IIncrementOrDecrementOperation operation,
+        ManagedFlowState state,
+        out IntervalValue interval)
+    {
+        interval = default;
+        var @operator = operation.Kind == OperationKind.Increment
+            ? BinaryOperatorKind.Add
+            : BinaryOperatorKind.Subtract;
+        return EvaluateCore(operation.Target, state).TryGetInteger(out var target) &&
+            ManagedAbstractValue.TryArithmetic(
+                @operator,
+                target,
+                IntervalValue.Constant(1),
+                out interval);
     }
 
     private ManagedFlowState Assume(ManagedFlowState state, IOperation condition, bool expected)
@@ -307,10 +321,8 @@ internal sealed class ManagedAbstractFlow
         var current = state.Get(storage);
         if (value.TryGetInteger(out var integer))
         {
-            var integerRefined = integer.IsSingleton
-                ? RefineInteger(current, @operator, integer.SingletonValue, expected)
-                : RefineInteger(current, @operator, integer, expected);
-            return state.Set(storage, integerRefined);
+            return state.Set(storage,
+                RefineInteger(current, @operator, integer, expected));
         }
 
         if (value.TryGetBoolean(out var boolean) && current.IsBoolean &&
@@ -330,44 +342,16 @@ internal sealed class ManagedAbstractFlow
             return state;
         }
 
-        var equals = @operator == BinaryOperatorKind.Equals ? expected
-            : @operator == BinaryOperatorKind.NotEquals ? !expected : (bool?)null;
-        if (!equals.HasValue)
+        if (@operator is not (
+            BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals))
         {
             return state;
         }
 
-        var refined = equals.Value ? NullnessDomain.Instance.AssumeNull(nullness)
+        var equals = expected == (@operator == BinaryOperatorKind.Equals);
+        var refined = equals ? NullnessDomain.Instance.AssumeNull(nullness)
             : NullnessDomain.Instance.AssumeNonNull(nullness);
         return state.Set(storage, ManagedAbstractValue.Reference(refined, current.Cardinality));
-    }
-
-    private static ManagedAbstractValue RefineInteger(
-        ManagedAbstractValue current, BinaryOperatorKind @operator, long constant, bool expected)
-    {
-        if (!current.TryGetInteger(out var interval))
-        {
-            return current;
-        }
-
-        var normalized = expected
-            ? @operator
-            : CSharpScalarSemantics.NegateBinary(@operator);
-        var domain = IntervalDomain.Instance;
-        var refined = normalized switch
-        {
-            BinaryOperatorKind.Equals => domain.AssumeAtMost(domain.AssumeAtLeast(interval, constant), constant),
-            BinaryOperatorKind.NotEquals when interval.IsSingleton &&
-                interval.SingletonValue == constant => IntervalValue.Bottom,
-            BinaryOperatorKind.LessThan when constant > long.MinValue => domain.AssumeAtMost(interval, constant - 1),
-            BinaryOperatorKind.LessThanOrEqual => domain.AssumeAtMost(interval, constant),
-            BinaryOperatorKind.GreaterThan when constant < long.MaxValue => domain.AssumeAtLeast(interval, constant + 1),
-            BinaryOperatorKind.GreaterThanOrEqual => domain.AssumeAtLeast(interval, constant),
-            _ => interval
-        };
-        return refined.IsBottom
-            ? ManagedAbstractValue.Bottom : ManagedAbstractValue.Integer(refined,
-                current.ExcludesZero || normalized == BinaryOperatorKind.NotEquals && constant == 0);
     }
 
     private static ManagedAbstractValue RefineInteger(
@@ -385,44 +369,48 @@ internal sealed class ManagedAbstractFlow
             ? @operator
             : CSharpScalarSemantics.NegateBinary(@operator);
         var domain = IntervalDomain.Instance;
-        var refined = interval;
-        if (normalized == BinaryOperatorKind.Equals)
+        var refined = normalized switch
         {
-            if (value.LowerBound.HasValue)
-            {
-                refined = domain.AssumeAtLeast(refined, value.LowerBound.Value);
-            }
-            if (value.UpperBound.HasValue)
-            {
-                refined = domain.AssumeAtMost(refined, value.UpperBound.Value);
-            }
-        }
-        else if (normalized == BinaryOperatorKind.LessThan &&
-                 value.UpperBound is > long.MinValue)
-        {
-            refined = domain.AssumeAtMost(refined, value.UpperBound.Value - 1);
-        }
-        else if (normalized == BinaryOperatorKind.LessThanOrEqual &&
-                 value.UpperBound.HasValue)
-        {
-            refined = domain.AssumeAtMost(refined, value.UpperBound.Value);
-        }
-        else if (normalized == BinaryOperatorKind.GreaterThan &&
-                 value.LowerBound is < long.MaxValue)
-        {
-            refined = domain.AssumeAtLeast(refined, value.LowerBound.Value + 1);
-        }
-        else if (normalized == BinaryOperatorKind.GreaterThanOrEqual &&
-                 value.LowerBound.HasValue)
-        {
-            refined = domain.AssumeAtLeast(refined, value.LowerBound.Value);
-        }
+            BinaryOperatorKind.Equals => Intersect(interval, value),
+            BinaryOperatorKind.NotEquals when value.IsSingleton &&
+                interval.IsSingleton &&
+                interval.SingletonValue == value.SingletonValue =>
+                IntervalValue.Bottom,
+            BinaryOperatorKind.LessThan when
+                value.UpperBound is > long.MinValue =>
+                domain.AssumeAtMost(interval, value.UpperBound.Value - 1),
+            BinaryOperatorKind.LessThanOrEqual when
+                value.UpperBound.HasValue =>
+                domain.AssumeAtMost(interval, value.UpperBound.Value),
+            BinaryOperatorKind.GreaterThan when
+                value.LowerBound is < long.MaxValue =>
+                domain.AssumeAtLeast(interval, value.LowerBound.Value + 1),
+            BinaryOperatorKind.GreaterThanOrEqual when
+                value.LowerBound.HasValue =>
+                domain.AssumeAtLeast(interval, value.LowerBound.Value),
+            _ => interval
+        };
 
         return refined.IsBottom
             ? ManagedAbstractValue.Bottom
             : ManagedAbstractValue.Integer(
                 refined,
-                current.ExcludesZero || !refined.Contains(0));
+                current.ExcludesZero || (value.IsSingleton
+                    ? normalized == BinaryOperatorKind.NotEquals &&
+                      value.SingletonValue == 0
+                    : !refined.Contains(0)));
+    }
+
+    private static IntervalValue Intersect(
+        IntervalValue current, IntervalValue restriction)
+    {
+        var domain = IntervalDomain.Instance;
+        var refined = restriction.LowerBound is { } lower
+            ? domain.AssumeAtLeast(current, lower)
+            : current;
+        return restriction.UpperBound is { } upper
+            ? domain.AssumeAtMost(refined, upper)
+            : refined;
     }
 
     private ManagedAbstractValue EvaluateCore(IOperation operation, ManagedFlowState state)
@@ -628,12 +616,7 @@ internal sealed class ManagedAbstractFlow
                 type = unary.Type;
                 break;
             case IIncrementOrDecrementOperation increment:
-                var @operator = increment.Kind == OperationKind.Increment
-                    ? BinaryOperatorKind.Add
-                    : BinaryOperatorKind.Subtract;
-                if (!EvaluateCore(increment.Target, state).TryGetInteger(out var target) ||
-                    !ManagedAbstractValue.TryArithmetic(
-                        @operator, target, IntervalValue.Constant(1), out interval))
+                if (!TryIncrement(increment, state, out interval))
                 {
                     return false;
                 }
@@ -817,7 +800,7 @@ internal sealed class ManagedAbstractFlow
         };
         if (Regular(block.FallThroughSuccessor))
         {
-            yield return (block.FallThroughSuccessor!, expected.HasValue ? !expected : null);
+            yield return (block.FallThroughSuccessor!, !expected);
         }
 
         if (Regular(block.ConditionalSuccessor))
@@ -1133,6 +1116,11 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
     private void Add(object key, ManagedFlowState state)
     {
         _states[key] = _states.TryGetValue(key, out var current) ? ManagedFlowState.Join(current, state) : state;
+    }
+
+    internal static bool HasSameIdentity(IOperation operation, IOperation? candidate)
+    {
+        return candidate is not null && Key(operation).Equals(Key(candidate));
     }
 
     private static (SyntaxTree, int, int, OperationKind) Key(IOperation operation)
@@ -1561,7 +1549,9 @@ internal readonly record struct ManagedAbstractValue(
                 equal = false;
             }
         }
-        return equal.HasValue ? Boolean(negate ? !equal.Value : equal.Value) : unknown;
+        return equal is bool established
+            ? Boolean(negate != established)
+            : unknown;
     }
 
     private static ManagedAbstractValue Compare(

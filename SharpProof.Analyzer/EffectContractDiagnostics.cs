@@ -230,7 +230,7 @@ internal static class EffectContractDiagnostics
 
             var established = valid && complete && isEstablished;
             var violation = valid && !established ? candidateViolation : null;
-            var (outcome, reason, certainty) = Classify(
+            var (outcome, reason, certainty) = EffectEvaluationProjections.Classify(
                 established, violation != null, valid, complete, trusted, incompleteReason);
             var claimDiagnostic =
                 summary.AnalysisIncompleteReason != EffectAnalysisIncompleteReason.None &&
@@ -245,48 +245,11 @@ internal static class EffectContractDiagnostics
         }
     }
 
-    private static (
-        EffectEvaluationOutcome Outcome,
-        EffectEvaluationReason Reason,
-        EffectEvaluationCertainty Certainty) Classify(
-        bool established, bool violated, bool valid, bool complete, bool trusted,
-        EffectEvaluationReason incompleteReason)
-    {
-        return (established, violated, valid, complete, trusted) switch
-        {
-            (true, _, _, _, true) => (EffectEvaluationOutcome.Proven, EffectEvaluationReason.None,
-                EffectEvaluationCertainty.TrustedCompleteBoundary),
-            (true, _, _, _, _) => (EffectEvaluationOutcome.Proven, EffectEvaluationReason.None,
-                EffectEvaluationCertainty.CompleteMayEffectSummary),
-            (_, true, _, _, _) => (EffectEvaluationOutcome.Refuted, EffectEvaluationReason.None,
-                EffectEvaluationCertainty.DefiniteViolation),
-            (_, _, false, _, _) => (EffectEvaluationOutcome.Unknown, EffectEvaluationReason.UnsupportedContract,
-                EffectEvaluationCertainty.Unavailable),
-            (_, _, _, _, true) => (EffectEvaluationOutcome.Unknown,
-                complete
-                    ? EffectEvaluationReason.EffectContractNotEstablished
-                    : incompleteReason,
-                EffectEvaluationCertainty.TrustedCompleteBoundary),
-            (_, _, _, false, _) => (EffectEvaluationOutcome.Unknown, incompleteReason,
-                EffectEvaluationCertainty.IncompleteMayEffectSummary),
-            _ => (EffectEvaluationOutcome.Unknown, EffectEvaluationReason.EffectContractNotEstablished,
-                EffectEvaluationCertainty.CompleteMayEffectSummary)
-        };
-    }
-
     private static EffectEvaluationReason MapIncompleteReason(
         EffectSummary summary)
     {
-        var reason = summary.AnalysisIncompleteReason;
-        if ((reason & (EffectAnalysisIncompleteReason.BlockBudgetExceeded |
-                       EffectAnalysisIncompleteReason.OperationBudgetExceeded)) != 0)
-        {
-            return EffectEvaluationReason.ResourceLimit;
-        }
-
-        return (reason & EffectAnalysisIncompleteReason.CyclicControlFlow) != 0
-            ? EffectEvaluationReason.UnsupportedBody
-            : EffectEvaluationReason.EffectSummaryIncomplete;
+        return EffectEvaluationProjections.MapIncompleteReason(
+            summary.AnalysisIncompleteReason);
     }
 
     private static (EffectContractCapabilityKind Value, bool IsValid) DecodeCapabilities(

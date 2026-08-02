@@ -149,6 +149,7 @@ internal sealed class ContractApiTests
             Assert.That(contract.ThrownExceptions, Is.Empty);
             Assert.That(contract.IsDeterministic, Is.False);
             Assert.That(contract.Complete, Is.False);
+            Assert.That(contract.PreconditionFree, Is.False);
         }
     }
 

@@ -110,8 +110,6 @@
   <Target Name="_SharpProofVerifyCore"
           DependsOnTargets="_SharpProofInitializeVerify;ResolveReferences">
     <PropertyGroup>
-      <SharpProofNativeZ3Path Condition="'$(SharpProofNativeZ3Path)' == ''">$([System.IO.Path]::GetDirectoryName('$(_SharpProofWorkerPath)'))/runtimes/win-x64/native/libz3.dll</SharpProofNativeZ3Path>
-      <_SharpProofNativeZ3Path>$([System.IO.Path]::GetFullPath('$(SharpProofNativeZ3Path)'))</_SharpProofNativeZ3Path>
       <_SharpProofVerifySarifArgument Condition="'$(SharpProofVerifySarifFile)' != ''"> --publish-sarif &quot;$(SharpProofVerifySarifFile)&quot;</_SharpProofVerifySarifArgument>
     </PropertyGroup>
     <Error Condition="'$(_SharpProofVerifierHostSupported)' != 'true'"
@@ -127,8 +125,6 @@
            Text="SharpProof verifier launcher was not found at '$(_SharpProofLauncherPath)'." />
     <Error Condition="!Exists('$(_SharpProofWorkerPath)')"
            Text="SharpProof verifier worker was not found at '$(_SharpProofWorkerPath)'." />
-    <Error Condition="!Exists('$(_SharpProofNativeZ3Path)')"
-           Text="SharpProof verifier native Z3 payload was not found at '$(_SharpProofNativeZ3Path)'." />
     <MakeDir Directories="$(_SharpProofInvocationDirectory)" />
     <Exec Command="&quot;$(SharpProofDotNetHost)&quot; &quot;$(_SharpProofLauncherPath)&quot; verify --worker &quot;$(_SharpProofWorkerPath)&quot; --request &quot;$(_SharpProofInvocationRequestFile)&quot; --result &quot;$(_SharpProofInvocationResultFile)&quot; --publish-request &quot;$(SharpProofVerifyRequestFile)&quot; --publish-result &quot;$(SharpProofVerifyResultFile)&quot; --compiler-manifest &quot;$(_SharpProofCompilerManifestPath)&quot; --publish-compiler-manifest &quot;$(SharpProofCompilerManifestFile)&quot; --verify-policy &quot;$(_SharpProofVerifyPolicyNormalized)&quot; --assumption-policy &quot;$(_SharpProofAssumptionPolicyNormalized)&quot; --query-rlimit &quot;$(SharpProofVerifyQueryRlimit)&quot; --method-rlimit &quot;$(SharpProofVerifyMethodRlimit)&quot; --method-wall-ms &quot;$(SharpProofVerifyMethodWallTimeMilliseconds)&quot; --project-wall-ms &quot;$(SharpProofVerifyProjectWallTimeMilliseconds)&quot; --max-parallelism &quot;$(SharpProofVerifyMaxParallelism)&quot; --max-expression-depth &quot;$(SharpProofVerifyMaximumExpressionDepth)&quot; --process-memory-bytes &quot;$(SharpProofVerifyProcessMemoryLimitBytes)&quot; --max-worker-processes &quot;$(SharpProofVerifyMaxWorkerProcesses)&quot; --termination-grace-ms &quot;$(SharpProofVerifyTerminationGraceMilliseconds)&quot; --cache-enabled &quot;$(SharpProofVerifyCacheEnabled)&quot; --cache-directory &quot;$(SharpProofVerifyCacheDirectory)&quot; --cache-maximum-bytes &quot;$(SharpProofVerifyCacheMaximumBytes)&quot;$(_SharpProofVerifySarifArgument)"
           WorkingDirectory="$(MSBuildProjectDirectory)"

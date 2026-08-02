@@ -8,6 +8,7 @@ namespace SharpProof.Worker.Protocol;
 
 public static partial class WorkerProtocolJson
 {
+    internal const int MaximumJsonDepth = 32;
     private static readonly JsonSerializerOptions s_options = CreateOptions();
 
     public static JsonSerializerOptions Options => new(s_options);
