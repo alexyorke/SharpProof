@@ -43,6 +43,32 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void InvalidSuspendedProcessHandlesFailClosed()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("Windows process handles are required.");
+        }
+
+        using var process = new SuspendedProcess(
+            IntPtr.Zero,
+            IntPtr.Zero);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                (Func<int>)(() => process.ExitCode),
+                Throws.TypeOf<System.ComponentModel.Win32Exception>());
+            Assert.That(
+                (Action)process.Resume,
+                Throws.TypeOf<System.ComponentModel.Win32Exception>());
+            Assert.That(
+                (Func<bool>)(() => process.WaitForExit(0)),
+                Throws.TypeOf<System.ComponentModel.Win32Exception>());
+        }
+    }
+
+    [Test]
     public void UnknownOptionIsRejected()
     {
         string[] arguments = [
