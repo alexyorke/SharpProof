@@ -279,6 +279,7 @@ try {
             " Expected string length 24 but was 20. Strings differ at index 0.`n" +
             " Expected: ConsoleApplication`n" +
             " But was: WindowsApplication`n" +
+            " First non-matching item at index [0]: item`n" +
             " Extra: item`n" +
             " -----------^")
     $nunitCollectionPath = Write-Fixture `
