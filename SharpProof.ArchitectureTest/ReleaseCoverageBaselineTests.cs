@@ -436,7 +436,42 @@ public sealed class ReleaseCoverageBaselineTests
                 repository,
                 regularCommit,
                 "tr-TR");
-            Assert.That(turkish, Is.EqualTo(english));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(turkish, Is.EqualTo(english));
+                Assert.That(
+                    english.TrustedComputingBaseFileCount,
+                    Is.EqualTo(paths.Length + 1));
+            }
+
+            var componentPath = Path.Combine(
+                repository,
+                paths[1].Replace('/', Path.DirectorySeparatorChar));
+            await File.WriteAllTextAsync(
+                componentPath,
+                "changed component\n");
+            await AssertSuccessAsync(RunAsync(
+                repository,
+                "git",
+                "add",
+                "--",
+                paths[1]));
+            await AssertSuccessAsync(RunAsync(
+                repository,
+                "git",
+                "commit",
+                "-m",
+                "component change"));
+            var componentCommit = (await AssertSuccessAsync(RunAsync(
+                repository,
+                "git",
+                "rev-parse",
+                "HEAD"))).Output.Trim();
+            var component = await RunReleaseDigestAsync(
+                root,
+                repository,
+                componentCommit,
+                "en-US");
 
             await AssertSuccessAsync(RunAsync(
                 repository,
@@ -504,7 +539,13 @@ public sealed class ReleaseCoverageBaselineTests
                     Is.EqualTo(english.ProductionFileCount));
                 Assert.That(
                     executable.TrustedComputingBaseFileCount,
-                    Is.EqualTo(english.TrustedComputingBaseFileCount));
+                    Is.EqualTo(paths.Length + 1));
+                Assert.That(
+                    component.TrustedComputingBaseDigest,
+                    Is.Not.EqualTo(english.TrustedComputingBaseDigest));
+                Assert.That(
+                    component.TrustedComputingBaseFileCount,
+                    Is.EqualTo(paths.Length + 1));
                 Assert.That(
                     symbolicLink.ProductionDigest,
                     Is.Not.EqualTo(executable.ProductionDigest));
@@ -517,7 +558,7 @@ public sealed class ReleaseCoverageBaselineTests
                     Is.EqualTo(english.ProductionFileCount));
                 Assert.That(
                     symbolicLink.TrustedComputingBaseFileCount,
-                    Is.EqualTo(english.TrustedComputingBaseFileCount));
+                    Is.EqualTo(paths.Length + 1));
             }
         }
         finally

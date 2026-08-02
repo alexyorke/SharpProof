@@ -755,6 +755,7 @@ public sealed class ArchitectureTests
                 "SharpProof.Ir/CanonicalHashWriter.cs"
             ],
             ["protocolValidation"] = [
+                "SharpProof.Worker/Program.cs",
                 "SharpProof.Worker.Protocol/ProtocolModel.schema.json",
                 "scripts/Generate-ProtocolModel.ps1",
                 "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
@@ -848,7 +849,8 @@ public sealed class ArchitectureTests
                 .And.Contain("SharpProof.Contracts/ContractForSymbolMatcher.cs")
                 .And.Contain("SharpProof.Contracts/ContractClauseInventory.cs")
                 .And.Contain("SharpProof.Attributes/SharpProofEffect.cs")
-                .And.Contain("SharpProof.Attributes/SharpProofCapability.cs"));
+                .And.Contain("SharpProof.Attributes/SharpProofCapability.cs")
+                .And.Contain("SharpProof.Worker/Program.cs"));
         Assert.That(
             File.ReadAllText(Path.Combine(
                 RepositoryRoot(),
@@ -860,7 +862,10 @@ public sealed class ArchitectureTests
                 RepositoryRoot(),
                 "scripts",
                 "Test-SharpProofCoverage.ps1")),
-            Does.Contain("$contract.trustedKernel.paths"));
+            Does.Contain("$contract.trustedKernel.paths")
+                .And.Contain("$changedTcbFiles")
+                .And.Contain("ComparisonRef is required")
+                .And.Contain("contract.json"));
     }
 
     [Test]

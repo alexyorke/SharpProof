@@ -375,6 +375,7 @@
       {
         "name": "protocolValidation",
         "paths": [
+          "SharpProof.Worker/Program.cs",
           "SharpProof.Worker.Protocol/ProtocolModel.schema.json",
           "scripts/Generate-ProtocolModel.ps1",
           "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
