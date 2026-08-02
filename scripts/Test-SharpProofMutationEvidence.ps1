@@ -276,7 +276,7 @@ try {
         -Message ("Assert.That(actual, Is.EqualTo(expected))`n" +
             " Expected and actual are both <System.Linq.Enumerable+SelectArrayIterator>`n" +
             " Values differ at index [0]`n" +
-            " String lengths are both 18. Strings differ at index 0.`n" +
+            " Expected string length 24 but was 20. Strings differ at index 0.`n" +
             " Expected: ConsoleApplication`n" +
             " But was: WindowsApplication`n" +
             " Extra: item`n" +
