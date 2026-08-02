@@ -227,6 +227,31 @@ try {
         throw 'Multiline assertion kill was not recognized.'
     }
 
+    $identifierContinuation = New-TestParts `
+        -Outcome Failed `
+        -Message ("Assert.That(WorkerProtocolJson.Validate(response).Errors`n" +
+            "                .Select(static error => error.Code), Does.Contain(""response.claim_set""))`n" +
+            " Expected: some item equal to ""response.claim_set""`n" +
+            " But was:  < ""summary.totals"" >")
+    $identifierContinuationPath = Write-Fixture `
+        -Name identifier-continuation `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $identifierContinuation.Definition `
+        -Entries $identifierContinuation.Entry `
+        -Results $identifierContinuation.Result
+    $identifierContinuationMutation = Read-SharpProofMutationTestEvidence `
+        -TrxPath $identifierContinuationPath `
+        -EvidenceName identifier-continuation `
+        -Mode Mutation `
+        -ProcessExitCode 1 `
+        -ExpectedMethodName ExpectedTest `
+        -ExpectedLedger $baseline.testLedger
+    if ($identifierContinuationMutation.assertionFailureCount -ne 1) {
+        throw 'Assertion code identifier continuation was not recognized.'
+    }
+
     $prefixedAssertion = New-TestParts `
         -Outcome Failed `
         -Message "Incomplete-reason flags 4 changed projection precedence.`n Assert.That(actual, Is.EqualTo(expected))`n Expected: 1`n But was: 2"

@@ -104,7 +104,7 @@ function Test-NUnitAssertionMessage {
     }
     if ($assertionIndex -gt 0 -and
         @($lines[0..($assertionIndex - 1)] | Where-Object {
-            $_ -match '(?i)\b(exception|error|warning|stack trace)\b'
+            $_ -match '(?i)^\s*(?:[A-Za-z0-9_.]*Exception\b|(?:error|warning|stack trace)\s*:|(?:fatal|unhandled)\s+exception\b)'
         }).Count -ne 0) {
         return $false
     }
@@ -130,7 +130,7 @@ function Test-NUnitAssertionMessage {
         @()
     }
     if (@($assertionContinuation | Where-Object {
-            $_ -match '(?i)\b(exception|error|warning|stack trace)\b'
+            $_ -match '(?i)^\s*(?:[A-Za-z0-9_.]*Exception\b|(?:error|warning|stack trace)\s*:|(?:fatal|unhandled)\s+exception\b)'
         }).Count -ne 0) {
         return $false
     }
