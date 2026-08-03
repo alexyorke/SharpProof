@@ -797,6 +797,14 @@ $mutations = @(
         Mutated = '            ..Array.Empty<string>(),'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~RequestProjectionRejectsLauncherRuntimeCollisionBeforeManifestRead'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-normalizes-malformed-worker-deps'
+        File = 'SharpProof.Worker.Launcher\Program.cs'
+        Original = '                InvalidDataException or JsonException or KeyNotFoundException or'
+        Mutated = '                InvalidDataException or JsonException or'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~MainFailsClosedWhenWorkerDependencyManifestIsMalformed'
     }
 )
 

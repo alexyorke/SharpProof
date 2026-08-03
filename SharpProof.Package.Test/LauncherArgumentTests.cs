@@ -508,16 +508,30 @@ public sealed class LauncherArgumentTests
             await File.WriteAllTextAsync(
                 Path.ChangeExtension(worker, ".deps.json"), "{}");
 
-            var exitCode = await Program.Main([
-                "verify",
-                "--worker", worker,
-                "--request", Path.Combine(directory, "request.json"),
-                "--result", Path.Combine(directory, "result.json"),
-                "--compiler-manifest", Path.Combine(directory, "missing.json"),
-                "--verify-policy", "advisory",
-                "--assumption-policy", "allow"
-            ]);
+            var escaped = false;
+            var exitCode = 0;
+            try
+            {
+                exitCode = await Program.Main([
+                    "verify",
+                    "--worker", worker,
+                    "--request", Path.Combine(directory, "request.json"),
+                    "--result", Path.Combine(directory, "result.json"),
+                    "--compiler-manifest", Path.Combine(directory, "missing.json"),
+                    "--verify-policy", "advisory",
+                    "--assumption-policy", "allow"
+                ]);
+            }
+            catch (KeyNotFoundException)
+            {
+                escaped = true;
+            }
+            catch (InvalidOperationException)
+            {
+                escaped = true;
+            }
 
+            Assert.That(escaped, Is.False);
             Assert.That(exitCode, Is.EqualTo(2));
         }
         finally
