@@ -143,12 +143,12 @@ internal sealed class OperationEffectScanner
                 EffectSummaryOperations.Join(
                     ScanChildren(allocation),
                     EffectSummaryOperations.Allocate(EffectAllocationKind.Managed)),
-            IInterpolatedStringOperation { ConstantValue.HasValue: true } => EffectSummary.Empty,
             IThrowOperation thrown when IsSourceThrow(thrown) => EffectSummaryOperations.Join(
                 ScanChildren(thrown),
                 EffectSummaryOperations.Throw(
                     ResolveThrownException(thrown))),
-            IThrowOperation => EffectSummary.Empty,
+            IInterpolatedStringOperation { ConstantValue.HasValue: true } or IThrowOperation =>
+                EffectSummary.Empty,
             IBinaryOperation binary => ScanBinary(binary),
             IUnaryOperation unary => ScanUnary(unary),
             IConversionOperation conversion => ScanConversion(conversion),
@@ -922,8 +922,8 @@ internal sealed class OperationEffectScanner
             IParameterReferenceOperation parameter => ClassifyParameter(parameter.Parameter),
             ILocalReferenceOperation local => ClassifyLocal(local.Local),
             IFieldReferenceOperation { Field.IsStatic: true } => EffectRegionSet.Create(EffectRegionId.Static()),
-            IFieldReferenceOperation => EffectRegionSet.Unknown,
-            IArrayElementReferenceOperation => EffectRegionSet.Unknown,
+            IFieldReferenceOperation or IArrayElementReferenceOperation =>
+                EffectRegionSet.Unknown,
             IOperation creation when creation is
                 IObjectCreationOperation or IArrayCreationOperation =>
                 EffectRegionSet.Create(EffectRegionId.Fresh(creation.Syntax.SpanStart)),
@@ -988,9 +988,7 @@ internal sealed class OperationEffectScanner
                 {
                     IVariableDeclaratorOperation declarator =>
                         (declarator.Symbol, declarator.Initializer?.Value),
-                    ISimpleAssignmentOperation { Target: ILocalReferenceOperation local } assignment =>
-                        (local.Local, assignment.Value),
-                    ICoalesceAssignmentOperation { Target: ILocalReferenceOperation local } assignment =>
+                    IAssignmentOperation { Target: ILocalReferenceOperation local } assignment =>
                         (local.Local, assignment.Value),
                     _ => default
                 };
