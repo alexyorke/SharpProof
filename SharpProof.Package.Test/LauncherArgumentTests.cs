@@ -332,6 +332,15 @@ public sealed class LauncherArgumentTests
             "--verify-policy", "advisory",
             "--assumption-policy", "allow"
         ];
+        var nonCollidingArguments = arguments.ToArray();
+        nonCollidingArguments[6] = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory, "safe-result.json");
+        Assert.That(
+            LauncherArguments.TryParse(nonCollidingArguments, out var nonColliding),
+            Is.True);
+        Assert.That(
+            (Action)(() => nonColliding.CreateRequest(snapshot, out _, out _)),
+            Throws.TypeOf<FileNotFoundException>());
         Assert.That(
             LauncherArguments.TryParse(arguments, out var parsed),
             Is.True);
