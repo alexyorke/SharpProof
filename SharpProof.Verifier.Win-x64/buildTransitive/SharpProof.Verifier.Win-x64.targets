@@ -15,6 +15,7 @@
       <InvocationManifestPath ParameterType="System.String" />
       <WorkerPath ParameterType="System.String" />
       <LauncherPath ParameterType="System.String" />
+      <CachePath ParameterType="System.String" />
     </ParameterGroup>
     <Task>
       <Using Namespace="System.Linq" />
@@ -62,7 +63,22 @@
             outputPaths.Any(output => output.StartsWith(
                 workerDirectory + System.IO.Path.DirectorySeparatorChar,
                 System.StringComparison.OrdinalIgnoreCase));
-        if (!aliasesInput && !aliasesOutput && !aliasesWorkerTree) {
+        var resolvedCachePath = string.IsNullOrWhiteSpace(CachePath)
+            ? null
+            : resolvePath(CachePath);
+        var aliasesCache = resolvedCachePath != null &&
+            (outputPaths.Any(output => string.Equals(
+                output, resolvedCachePath,
+                System.StringComparison.OrdinalIgnoreCase)) ||
+             protectedPaths.Any(input => string.Equals(
+                input, resolvedCachePath,
+                System.StringComparison.OrdinalIgnoreCase)) ||
+             workerTreeExists &&
+             !string.IsNullOrWhiteSpace(workerDirectory) &&
+             resolvedCachePath.StartsWith(
+                 workerDirectory + System.IO.Path.DirectorySeparatorChar,
+                 System.StringComparison.OrdinalIgnoreCase));
+        if (!aliasesInput && !aliasesOutput && !aliasesWorkerTree && !aliasesCache) {
             using (var publication =
                 new System.Threading.Mutex(false, @"Local\SharpProof.Publish")) {
                 var ownsPublication = false;
@@ -129,7 +145,8 @@
         InvocationResultPath="$(_SharpProofInvocationResultFile)"
         InvocationManifestPath="$(_SharpProofCompilerManifestPath)"
         WorkerPath="$(_SharpProofWorkerPath)"
-        LauncherPath="$(_SharpProofLauncherPath)" />
+        LauncherPath="$(_SharpProofLauncherPath)"
+        CachePath="$(SharpProofVerifyCacheDirectory)" />
   </Target>
 
   <Target Name="_SharpProofVerifyCore"

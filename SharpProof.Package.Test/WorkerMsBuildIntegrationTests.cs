@@ -904,6 +904,62 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task WorkerCacheDirectoryAliasIsRejectedBeforeInvalidationDeletesIt()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var stableRequest = await File.ReadAllBytesAsync(project.RequestPath);
+        var stableResult = await File.ReadAllBytesAsync(project.ResultPath);
+        var stableManifest = await File.ReadAllBytesAsync(
+            project.CompilerManifestPath);
+        foreach (var cachePath in new[] {
+            project.ResultPath,
+            project.RequestPath,
+            project.CompilerManifestPath
+        })
+        {
+            var failed = await project.RunVerificationTargetAsync(
+                ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+                ("SharpProofVerifyCacheDirectory", cachePath));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(failed.ExitCode, Is.Not.Zero, cachePath);
+                Assert.That(
+                    failed.Output,
+                    Does.Contain(
+                        "SharpProof launcher input is invalid: ArgumentException"),
+                    cachePath);
+                Assert.That(
+                    failed.Output,
+                    Does.Contain("SharpProof I/O paths must be distinct."),
+                    cachePath);
+                Assert.That(File.Exists(project.RequestPath), Is.True, cachePath);
+                Assert.That(File.Exists(project.ResultPath), Is.True, cachePath);
+                Assert.That(
+                    File.Exists(project.CompilerManifestPath),
+                    Is.True,
+                    cachePath);
+                Assert.That(
+                    await File.ReadAllBytesAsync(project.RequestPath),
+                    Is.EqualTo(stableRequest),
+                    cachePath);
+                Assert.That(
+                    await File.ReadAllBytesAsync(project.ResultPath),
+                    Is.EqualTo(stableResult),
+                    cachePath);
+                Assert.That(
+                    await File.ReadAllBytesAsync(project.CompilerManifestPath),
+                    Is.EqualTo(stableManifest),
+                    cachePath);
+            }
+        }
+    }
+
+    [Test]
     public async Task WorkerRuntimeAssetAliasIsRejectedBeforeInvalidationDeletesIt()
     {
         RequireWindowsWorker();
