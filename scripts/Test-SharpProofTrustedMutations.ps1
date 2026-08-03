@@ -761,7 +761,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'launcher-validates-static-alias-before-snapshot'
         File = 'SharpProof.Worker.Launcher\Program.cs'
-        Original = '            arguments.ValidateDistinctPaths();'
+        Original = '            arguments.ValidateDistinctPaths(runtimeSnapshot);'
         Mutated = '            arguments.ValidatePreflight();'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~WorkerRuntimeCompanionAliasIsRejectedBeforeInvalidationDeletesIt'
