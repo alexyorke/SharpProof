@@ -959,6 +959,50 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task MissingWorkerDoesNotAllowInvalidationToDeleteWorkerTreeOutput()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var directory = Path.Combine(
+            Path.GetDirectoryName(project.ProjectPath)!,
+            "missing-worker-output");
+        Directory.CreateDirectory(directory);
+        var worker = Path.Combine(directory, "worker.dll");
+        var result = Path.Combine(directory, "result.json");
+        const string sentinel = "worker-tree-result-sentinel";
+        File.Copy(
+            Path.ChangeExtension(WorkerOutputPath(), ".deps.json"),
+            Path.ChangeExtension(worker, ".deps.json"));
+        await File.WriteAllTextAsync(result, sentinel);
+        try
+        {
+            var failed = await project.RunVerificationTargetAsync(
+                ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+                ("SharpProofWorkerPath", worker),
+                ("SharpProofVerifyResultFile", result));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(failed.ExitCode, Is.Not.Zero, failed.Output);
+                Assert.That(File.Exists(result), Is.True, failed.Output);
+                Assert.That(
+                    await File.ReadAllTextAsync(result),
+                    Is.EqualTo(sentinel));
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Test]
     public async Task AssumptionSeverityIncludesUsedAndDeclaredEvidence()
     {
         RequireWindowsWorker();
