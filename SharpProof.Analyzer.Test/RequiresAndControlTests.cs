@@ -96,7 +96,8 @@ public sealed class RequiresAndControlTests
                     [SharpProofTrusted("reviewed external implementation")]
                     [EffectContract(
                         SharpProofEffect.None,
-                        Complete = true)]
+                        Complete = true,
+                        PreconditionFree = true)]
                     public void Restricted(int value) {
                     }
                 }

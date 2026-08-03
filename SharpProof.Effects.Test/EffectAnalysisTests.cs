@@ -1019,7 +1019,8 @@ public sealed class EffectAnalysisTests
                 [EffectContract(
                     SharpProofEffect.None,
                     IsDeterministic = true,
-                    Complete = true)]
+                    Complete = true,
+                    PreconditionFree = true)]
                 public void Restricted(int value) {
                 }
             }
