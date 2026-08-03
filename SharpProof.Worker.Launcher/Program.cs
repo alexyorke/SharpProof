@@ -684,7 +684,7 @@ internal sealed partial class WindowsJob : IDisposable
         {
             if (!NativeMethods.CreateProcess(
                     applicationPath, commandLinePointer, IntPtr.Zero, IntPtr.Zero,
-                    inheritHandles: true,
+                    inheritHandles: false,
                     NativeMethods.CreateSuspended | NativeMethods.CreateNoWindow,
                     IntPtr.Zero, workingDirectory,
                     &startupInfo, &processInformation))

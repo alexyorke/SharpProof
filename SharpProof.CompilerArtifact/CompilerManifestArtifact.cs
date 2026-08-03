@@ -104,13 +104,9 @@ internal static class WorkerBinaryIdentity
         var path = Path.GetFullPath(workerPath);
         if (!path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
         {
-            path = Path.ChangeExtension(path, ".dll");
-            if (!File.Exists(path))
-            {
-                throw new FileNotFoundException(
-                    "The managed worker binary is unavailable.",
-                    path);
-            }
+            throw new FileNotFoundException(
+                "The managed worker binary must be a .dll.",
+                path);
         }
 
         return path;

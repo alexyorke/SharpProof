@@ -281,12 +281,12 @@ public sealed class LauncherArgumentTests
             TestContext.CurrentContext.WorkDirectory,
             "missing-worker-" + Guid.NewGuid().ToString("N"));
 
-        Assert.That(
-            (Action)(() => Program.ComputeExpectedInputHash(
+        var exception = Assert.Throws<FileNotFoundException>((Action)(() =>
+            Program.ComputeExpectedInputHash(
                 worker,
                 new WorkerVerifyRequest(),
-                [])),
-            Throws.TypeOf<FileNotFoundException>());
+                [])));
+        Assert.That(exception!.Message, Does.Contain("must be a .dll"));
     }
 
     [TestCase("worker.deps.json")]

@@ -717,6 +717,22 @@ $mutations = @(
         Mutated = "                NotNull,`n                `"NotNullAttribute`",`n                ContractApiAttributeCategory.Closed,`n                ContractApiSelectionFeature.Effects),"
         Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
         Filter = 'FullyQualifiedName~CatalogAttributeMetadataMatchesDeclarations'
+    },
+    [pscustomobject]@{
+        Name = 'worker-rejects-implicit-worker-path'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '        if (!path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))'
+        Mutated = '        if (path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~MissingWorkerWithoutDllSuffixIsRejectedBeforeHashing'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-disables-inherited-handles'
+        File = 'SharpProof.Worker.Launcher\Program.cs'
+        Original = '                    inheritHandles: false,'
+        Mutated = '                    inheritHandles: true,'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~WorkerProcessCreationDisablesHandleInheritance'
     }
 )
 

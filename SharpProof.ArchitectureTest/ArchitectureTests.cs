@@ -919,6 +919,21 @@ public sealed class ArchitectureTests
     }
 
     [Test]
+    public void WorkerProcessCreationDisablesHandleInheritance()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "SharpProof.Worker.Launcher",
+            "Program.cs"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(source, Does.Contain("inheritHandles: false"));
+            Assert.That(source, Does.Not.Contain("inheritHandles: true"));
+        }
+    }
+
+    [Test]
     public void PerformanceContractIsIsolatedFromBroadTestAndCoverageRuns()
     {
         var root = RepositoryRoot();
