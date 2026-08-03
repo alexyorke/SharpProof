@@ -266,7 +266,8 @@ internal sealed class WorkerRuntimeClosureSnapshot(
     string sha256) : IDisposable
 {
     internal string WorkerPath { get; } = workerPath;
-    internal IReadOnlyList<string> ComponentPaths { get; } = componentPaths;
+    internal IReadOnlyList<string> ComponentPaths { get; } =
+        ImmutableArray.CreateRange(componentPaths);
     internal string Sha256 { get; } = sha256;
 
     public void Dispose()

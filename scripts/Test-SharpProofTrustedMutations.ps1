@@ -767,6 +767,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~IdentityCoversTheCompleteTrustedRuntimeClosure'
     },
     [pscustomobject]@{
+        Name = 'closure-component-paths-immutable'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '        ImmutableArray.CreateRange(componentPaths);'
+        Mutated = '        componentPaths;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~RuntimeClosureComponentPathsAreImmutable'
+    },
+    [pscustomobject]@{
         Name = 'launcher-checks-discovered-runtime-paths'
         File = 'SharpProof.Worker.Launcher\Program.cs'
         Original = "            runtimeSnapshot?.ComponentPaths.Any(path =>`n                !runtimeRoots.Contains(path, StringComparer.OrdinalIgnoreCase) &&`n                !paths.Add(path)) == true)"

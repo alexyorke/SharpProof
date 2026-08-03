@@ -58,6 +58,17 @@ public sealed class WorkerBinaryIdentityTests
     }
 
     [Test]
+    public void RuntimeClosureComponentPathsAreImmutable()
+    {
+        using var snapshot = WorkerBinaryIdentity.CreateSnapshot(
+            typeof(SharpProofWorker).Assembly.Location);
+
+        Assert.That(
+            snapshot.ComponentPaths.GetType(),
+            Is.EqualTo(typeof(ImmutableArray<string>)));
+    }
+
+    [Test]
     public void IdentityCoversTheCompleteTrustedRuntimeClosure()
     {
         Assert.That(
