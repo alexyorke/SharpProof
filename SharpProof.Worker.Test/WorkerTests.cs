@@ -3482,6 +3482,36 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task CacheEvictionLeavesLegacyJsonFilesUntouched()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        Directory.CreateDirectory(project.CacheDirectory);
+        var legacyPath = Path.Combine(
+            project.CacheDirectory,
+            new string('a', 64) + ".json");
+        const string legacyContents = "legacy cache entry";
+        await File.WriteAllTextAsync(legacyPath, legacyContents);
+
+        var request = project.CreateRequest(cacheEnabled: true);
+        request.Cache.MaximumBytes = 1;
+        using var worker = new SharpProofWorker(new SpuriousModelBackend());
+        await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(legacyPath), Is.True);
+            Assert.That(
+                await File.ReadAllTextAsync(legacyPath),
+                Is.EqualTo(legacyContents));
+            Assert.That(
+                Directory.GetFiles(
+                    project.CacheDirectory,
+                    "*.sharp-proof-cache.json"),
+                Is.Empty);
+        }
+    }
+
+    [Test]
     public async Task ReplayValidatedRefutationIsCacheable()
     {
         using var project = TestProject.Create(

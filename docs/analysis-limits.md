@@ -49,6 +49,10 @@ both generated C# projections before building.
 `SharpProofVerifyCacheDirectory` is initialized by the verifier targets beneath
 the project's intermediate output, normally
 `obj/<Configuration>/<TargetFramework>/SharpProof/cache`.
+Configured cache directories should be dedicated to SharpProof. Active entries
+use the `*.sharp-proof-cache.json` filename namespace; older `<hash>.json`
+files and other JSON files are intentionally ignored and are not removed by
+cache eviction. Historical files require user-managed cleanup.
 `SharpProofVerifyRequestFile` and `SharpProofVerifyResultFile` are initialized
 beside it. Concurrent builds use isolated invocation paths beneath
 `SharpProof/runs`. Validated writers are serialized by a cross-process mutex.
@@ -91,12 +95,15 @@ The worker rejects malformed budgets before analysis:
 - parallelism and the Job Object process limit must each be from 1 through 4;
 - expression depth must be from 1 through 256;
 - process memory must be from 1 byte through 16 GiB;
-- cache size must be from 1 byte through 512 MiB.
+- cache size must be from 1 byte through 512 MiB for active
+  `*.sharp-proof-cache.json` entries.
 
 Worker request, result, and cache envelope JSON files are capped at 16 MiB
 before UTF-8 decoding and JSON deserialization. Oversized, invalid-UTF-8, or
 malformed files fail closed as invalid input, malformed output, or a cache
-miss; the cache's 512 MiB limit remains the aggregate eviction limit.
+miss; the cache's 512 MiB limit remains the aggregate eviction limit for
+active `*.sharp-proof-cache.json` entries, not every file in the configured
+directory.
 
 The configured termination grace must be from 1 through 300000 milliseconds.
 The configured method and project wall values are fail-closed outer boundaries,
