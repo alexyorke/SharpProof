@@ -1532,7 +1532,9 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(response.InputHash, Is.EqualTo(expectedInputHash));
             Assert.That(
                 response.Summary.Versions.WorkerBinarySha256,
-                Is.EqualTo(workerBinarySha256));
+                Is.EqualTo(response.RunStatus == WorkerRunStatus.Complete
+                    ? workerBinarySha256
+                    : WorkerProtocolVersions.EmptySha256));
             Assert.That(
                 artifact.ManifestHash,
                 Is.EqualTo(response.Manifest.Hash));
