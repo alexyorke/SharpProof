@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Runtime.InteropServices;
 using NUnit.Framework;
+using SharpProof.CompilerArtifact;
+using SharpProof.Worker;
 using SharpProof.Worker.Launcher;
 using SharpProof.Worker.Protocol;
 
@@ -309,6 +311,33 @@ public sealed class LauncherArgumentTests
 
         Assert.That(
             (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
+    public void RequestProjectionRejectsDiscoveredRuntimeAssetCollisionBeforeManifestRead()
+    {
+        var worker = typeof(SharpProofWorker).Assembly.Location;
+        using var snapshot = WorkerBinaryIdentity.CreateSnapshot(worker);
+        var runtimeAsset = snapshot.ComponentPaths.First(
+            path => !string.Equals(path, worker, StringComparison.OrdinalIgnoreCase) &&
+                !path.EndsWith(".deps.json", StringComparison.OrdinalIgnoreCase) &&
+                !path.EndsWith(".runtimeconfig.json", StringComparison.OrdinalIgnoreCase));
+        string[] arguments = [
+            "verify",
+            "--worker", worker,
+            "--request", Path.Combine(TestContext.CurrentContext.WorkDirectory, "request.json"),
+            "--result", runtimeAsset,
+            "--compiler-manifest", Path.Combine(TestContext.CurrentContext.WorkDirectory, "missing-compiler-manifest.json"),
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(snapshot, out _, out _)),
             Throws.TypeOf<ArgumentException>());
     }
 

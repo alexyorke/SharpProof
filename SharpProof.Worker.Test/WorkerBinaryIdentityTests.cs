@@ -140,6 +140,12 @@ public sealed class WorkerBinaryIdentityTests
                 {
                     Assert.That(snapshot.WorkerPath, Is.EqualTo(worker));
                     Assert.That(snapshot.Sha256, Is.EqualTo(baseline));
+                    Assert.That(
+                        snapshot.ComponentPaths,
+                        Is.Unique);
+                    Assert.That(
+                        snapshot.ComponentPaths,
+                        Does.Contain(worker));
                     foreach (var component in lockedComponents)
                     {
                         Assert.That(
@@ -193,4 +199,5 @@ public sealed class WorkerBinaryIdentityTests
         long total = 0;
         WorkerBinaryIdentity.ValidateComponentLength(key, length, ref total);
     }
+
 }

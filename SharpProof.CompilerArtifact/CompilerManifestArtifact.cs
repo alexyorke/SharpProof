@@ -88,6 +88,7 @@ internal static class WorkerBinaryIdentity
             return new WorkerRuntimeClosureSnapshot(
                 path,
                 streams,
+                components.Values.ToArray(),
                 hash.Finish());
         }
         catch
@@ -168,10 +169,6 @@ internal static class WorkerBinaryIdentity
         };
         var immutableName = typeof(ImmutableArray<>).Assembly.GetName().Name + ".dll";
         var immutable = Path.Combine(directory, immutableName);
-        if (File.Exists(immutable))
-        {
-            result.Add("app-local/" + immutableName, immutable);
-        }
         long dependencyBytes = 0;
         ValidateComponentLength(
             "dependencies",
@@ -186,6 +183,11 @@ internal static class WorkerBinaryIdentity
         foreach (var library in target.EnumerateObject())
         {
             AddLibraryAssets(result, directory, library.Value);
+        }
+
+        if (File.Exists(immutable))
+        {
+            AddComponent(result, "app-local/" + immutableName, immutable);
         }
 
         return result;
@@ -217,9 +219,20 @@ internal static class WorkerBinaryIdentity
                         continue;
                     }
 
-                    result.Add(group + "/" + asset.Name, ResolveAsset(directory, asset.Name));
+                    AddComponent(
+                        result, group + "/" + asset.Name,
+                        ResolveAsset(directory, asset.Name));
                 }
             }
+        }
+    }
+
+    private static void AddComponent(
+        SortedDictionary<string, string> result, string key, string path)
+    {
+        if (!result.Values.Contains(path, StringComparer.OrdinalIgnoreCase))
+        {
+            result.Add(key, path);
         }
     }
 
@@ -249,9 +262,11 @@ internal static class WorkerBinaryIdentity
 internal sealed class WorkerRuntimeClosureSnapshot(
     string workerPath,
     IReadOnlyList<FileStream> components,
+    IReadOnlyList<string> componentPaths,
     string sha256) : IDisposable
 {
     internal string WorkerPath { get; } = workerPath;
+    internal IReadOnlyList<string> ComponentPaths { get; } = componentPaths;
     internal string Sha256 { get; } = sha256;
 
     public void Dispose()

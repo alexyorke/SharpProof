@@ -103,12 +103,6 @@ internal sealed class ManagedAbstractFlow
             ArgumentNullGuard.NotNull(state, nameof(state)));
     }
 
-    internal static ManagedFlowState Refine(
-        ManagedFlowState state, ISymbol symbol, BinaryOperatorKind @operator, ManagedAbstractValue value, bool expected)
-    {
-        return Refine(state, (object)symbol, @operator, value, expected);
-    }
-
     private DataflowGraph<ManagedFlowState> CreateDataflowGraph(
         ControlFlowGraph graph, ManagedFlowResult result, CancellationToken cancellationToken)
     {
@@ -315,7 +309,7 @@ internal sealed class ManagedAbstractFlow
             : state;
     }
 
-    private static ManagedFlowState Refine(
+    internal static ManagedFlowState Refine(
         ManagedFlowState state, object storage, BinaryOperatorKind @operator, ManagedAbstractValue value, bool expected)
     {
         var current = state.Get(storage);
@@ -758,8 +752,8 @@ internal sealed class ManagedAbstractFlow
             return true;
         }
 
-        return IntegerType(conversion.Operand.Type, out var source) &&
-               IntegerType(conversion.Type, out var target) &&
+        return ManagedAbstractValue.IntegerType(conversion.Operand.Type, out var source) &&
+               ManagedAbstractValue.IntegerType(conversion.Type, out var target) &&
                source.Minimum >= target.Minimum && source.Maximum <= target.Maximum;
     }
 
@@ -853,11 +847,6 @@ internal sealed class ManagedAbstractFlow
         }
         result = IntervalValue.Range(-value.UpperBound.Value, -value.LowerBound.Value);
         return true;
-    }
-
-    private static bool IntegerType(ITypeSymbol? type, out CSharpIntegerSemantics semantics)
-    {
-        return CSharpScalarSemantics.TryGetInteger(type?.SpecialType ?? SpecialType.None, out semantics);
     }
 
     private sealed class FlowDomain : ClosedAbstractDomain<ManagedFlowState>
@@ -1144,16 +1133,6 @@ internal sealed class ManagedFlowState
     internal static ManagedFlowState Bottom { get; } = new(null);
     internal static ManagedFlowState Empty { get; } = new(NoValues);
     internal bool IsBottom => _values == null;
-    internal ManagedAbstractValue Get(ISymbol symbol)
-    {
-        return Get((object)symbol);
-    }
-
-    internal ManagedAbstractValue Get(CaptureId capture)
-    {
-        return Get((object)capture);
-    }
-
     internal ManagedAbstractValue Get(object storage)
     {
         if (_values == null)
@@ -1170,16 +1149,6 @@ internal sealed class ManagedFlowState
             ? ManagedAbstractValue.TopForType(symbol is IParameterSymbol parameter ? parameter.Type :
                 symbol is ILocalSymbol local ? local.Type : null)
             : ManagedAbstractValue.Unknown;
-    }
-
-    internal ManagedFlowState Set(ISymbol symbol, ManagedAbstractValue value)
-    {
-        return Set((object)symbol, value);
-    }
-
-    internal ManagedFlowState Set(CaptureId capture, ManagedAbstractValue value)
-    {
-        return Set((object)capture, value);
     }
 
     internal ManagedFlowState Set(object storage, ManagedAbstractValue value)
@@ -1578,7 +1547,7 @@ internal readonly record struct ManagedAbstractValue(
         right.UpperBound.HasValue && left.LowerBound.HasValue && right.UpperBound.Value < left.LowerBound.Value;
     }
 
-    private static bool IntegerType(ITypeSymbol? type, out CSharpIntegerSemantics semantics)
+    internal static bool IntegerType(ITypeSymbol? type, out CSharpIntegerSemantics semantics)
     {
         return CSharpScalarSemantics.TryGetInteger(type?.SpecialType ?? SpecialType.None, out semantics);
     }

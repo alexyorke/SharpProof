@@ -37,9 +37,10 @@ internal static class Program
         try
         {
             arguments.ValidatePreflight();
-            request = arguments.CreateRequest(out artifact, out artifactBytes);
             runtimeSnapshot = WorkerBinaryIdentity.CreateSnapshot(
                 arguments.WorkerPath);
+            request = arguments.CreateRequest(
+                runtimeSnapshot, out artifact, out artifactBytes);
             expectedInputHash = ComputeExpectedInputHash(
                 request,
                 artifactBytes,
@@ -541,14 +542,22 @@ internal sealed partial class LauncherArguments
     internal WorkerVerifyRequest CreateRequest(
         out CompilerManifestArtifact artifact, out byte[] artifactBytes)
     {
-        ValidateDistinctPaths();
+        return CreateRequest(null, out artifact, out artifactBytes);
+    }
+
+    internal WorkerVerifyRequest CreateRequest(
+        WorkerRuntimeClosureSnapshot? runtimeSnapshot,
+        out CompilerManifestArtifact artifact, out byte[] artifactBytes)
+    {
+        ValidateDistinctPaths(runtimeSnapshot);
         var compilerManifest = CreateCompilerManifestReference(
             out artifact,
             out artifactBytes);
         return ProjectRequest(compilerManifest);
     }
 
-    private void ValidateDistinctPaths()
+    private void ValidateDistinctPaths(
+        WorkerRuntimeClosureSnapshot? runtimeSnapshot)
     {
         var workerPath = WorkerPath;
         string?[] candidates = [workerPath,
@@ -557,8 +566,9 @@ internal sealed partial class LauncherArguments
             RequestPath, ResultPath, CompilerManifestPath,
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath];
-        var paths = candidates.OfType<string>().ToArray();
-        if (paths.Distinct(StringComparer.OrdinalIgnoreCase).Count() != paths.Length)
+        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (candidates.OfType<string>().Any(path => !paths.Add(path)) ||
+            runtimeSnapshot?.ComponentPaths.Any(path => !paths.Add(path)) == true)
         {
             throw new ArgumentException("SharpProof I/O paths must be distinct.");
         }

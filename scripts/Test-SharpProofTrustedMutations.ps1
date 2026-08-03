@@ -741,6 +741,22 @@ $mutations = @(
         Mutated = '                var stream = OpenRead(component.Value);'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~WorkerClosureHashesTheParsedDependencyStream'
+    },
+    [pscustomobject]@{
+        Name = 'closure-retains-each-component-path-once'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '        if (!result.Values.Contains(path, StringComparer.OrdinalIgnoreCase))'
+        Mutated = '        if (true)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~IdentityCoversTheCompleteTrustedRuntimeClosure'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-checks-discovered-runtime-paths'
+        File = 'SharpProof.Worker.Launcher\Program.cs'
+        Original = '            runtimeSnapshot?.ComponentPaths.Any(path => !paths.Add(path)) == true)'
+        Mutated = '            false)'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~RequestProjectionRejectsDiscoveredRuntimeAssetCollisionBeforeManifestRead'
     }
 )
 
