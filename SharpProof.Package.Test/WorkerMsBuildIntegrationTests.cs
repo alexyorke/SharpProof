@@ -904,6 +904,61 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task WorkerRuntimeAssetAliasIsRejectedBeforeInvalidationDeletesIt()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var sourceWorker = WorkerOutputPath();
+        var sourceDirectory = Path.GetDirectoryName(sourceWorker)!;
+        var collisionWorker = project.CollisionWorkerPath;
+        var collisionDirectory = Path.GetDirectoryName(collisionWorker)!;
+        string collisionAsset;
+        using (var sourceSnapshot = WorkerBinaryIdentity.CreateSnapshot(
+                   sourceWorker))
+        {
+            foreach (var component in sourceSnapshot.ComponentPaths)
+            {
+                var relative = Path.GetRelativePath(sourceDirectory, component);
+                var destination = Path.Combine(collisionDirectory, relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                File.Copy(component, destination, overwrite: true);
+            }
+        }
+
+        using (var collisionSnapshot = WorkerBinaryIdentity.CreateSnapshot(
+                   collisionWorker))
+        {
+            var workerCompanions = new[] {
+                collisionWorker,
+                Path.ChangeExtension(collisionWorker, ".deps.json"),
+                Path.ChangeExtension(collisionWorker, ".runtimeconfig.json")
+            };
+            collisionAsset = collisionSnapshot.ComponentPaths.First(
+                path => !workerCompanions.Contains(
+                    path, StringComparer.OrdinalIgnoreCase));
+        }
+
+        var failed = await project.RunVerificationTargetAsync(
+            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+            ("SharpProofWorkerPath", collisionWorker),
+            ("SharpProofVerifyResultFile", collisionAsset));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(failed.ExitCode, Is.Not.Zero);
+            Assert.That(
+                failed.Output.Contains(
+                    "SharpProof launcher input is invalid: ArgumentException",
+                    StringComparison.Ordinal),
+                Is.True);
+            Assert.That(File.Exists(collisionAsset), Is.True);
+        }
+    }
+
+    [Test]
     public async Task AssumptionSeverityIncludesUsedAndDeclaredEvidence()
     {
         RequireWindowsWorker();

@@ -39,6 +39,8 @@
                 System.IO.Path.ChangeExtension(path, ".deps.json"),
                 System.IO.Path.ChangeExtension(path, ".runtimeconfig.json")
             });
+        var workerDirectory = System.IO.Path.GetDirectoryName(
+            resolvePath(WorkerPath));
         var protectedPaths = new[] {
             RequestPath, ManifestPath, InvocationRequestPath,
             InvocationResultPath, InvocationManifestPath
@@ -49,7 +51,12 @@
         var aliasesInput = outputPaths
             .Any(output => protectedPaths.Any(input => string.Equals(
                 output, input, System.StringComparison.OrdinalIgnoreCase)));
-        if (!aliasesInput && !aliasesOutput) {
+        var aliasesWorkerTree = System.IO.File.Exists(resolvePath(WorkerPath)) &&
+            !string.IsNullOrWhiteSpace(workerDirectory) &&
+            outputPaths.Any(output => output.StartsWith(
+                workerDirectory + System.IO.Path.DirectorySeparatorChar,
+                System.StringComparison.OrdinalIgnoreCase));
+        if (!aliasesInput && !aliasesOutput && !aliasesWorkerTree) {
             using (var publication =
                 new System.Threading.Mutex(false, @"Local\SharpProof.Publish")) {
                 var ownsPublication = false;
