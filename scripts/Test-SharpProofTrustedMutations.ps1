@@ -244,8 +244,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'effect-fresh-array-content-provenance'
         File = 'SharpProof.Effects\OperationEffectScanner.cs'
-        Original = '            IArrayElementReferenceOperation => EffectRegionSet.Unknown,'
-        Mutated = '            IArrayElementReferenceOperation element => ClassifyRegion(element.ArrayReference, aliasSource),'
+        Original = "            IFieldReferenceOperation or IArrayElementReferenceOperation =>`n                EffectRegionSet.Unknown,"
+        Mutated = "            IFieldReferenceOperation => EffectRegionSet.Unknown,`n            IArrayElementReferenceOperation element => ClassifyRegion(element.ArrayReference, aliasSource),"
         Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
         Filter = 'FullyQualifiedName~FreshArrayContentsDoNotBecomeFreshOwnedAliases'
     },
