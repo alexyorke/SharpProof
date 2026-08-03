@@ -58,6 +58,7 @@ internal static class WorkerBinaryIdentity
             using var hash = new CanonicalHashWriter();
             hash.Add("SharpProof.WorkerBinarySet", 1);
             long totalBytes = 0;
+#pragma warning disable CA2000 // Stream ownership transfers to the retained snapshot list.
             foreach (var component in components)
             {
                 var isDependency = component.Key == "dependencies";
@@ -72,7 +73,10 @@ internal static class WorkerBinaryIdentity
                         ref totalBytes);
                     stream.Position = 0;
                     hash.Add(component.Key).Add(stream);
-                    streams.Add(stream);
+                    if (!isDependency)
+                    {
+                        streams.Add(stream);
+                    }
                 }
                 catch
                 {
@@ -80,6 +84,7 @@ internal static class WorkerBinaryIdentity
                     throw;
                 }
             }
+#pragma warning restore CA2000
             return new WorkerRuntimeClosureSnapshot(
                 path,
                 streams,
