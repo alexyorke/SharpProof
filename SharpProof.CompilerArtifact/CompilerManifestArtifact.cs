@@ -190,7 +190,8 @@ internal static class WorkerBinaryIdentity
         var result = new SortedDictionary<string, string>(StringComparer.Ordinal);
         foreach (var path in files.Where(path =>
                      names.Contains(Path.GetFileName(path)) ||
-                     path.EndsWith("System.Collections.Immutable.dll",
+                     path.EndsWith(
+                         Path.GetFileName(typeof(ImmutableArray<>).Assembly.Location),
                          StringComparison.OrdinalIgnoreCase)))
         {
             result.Add(
