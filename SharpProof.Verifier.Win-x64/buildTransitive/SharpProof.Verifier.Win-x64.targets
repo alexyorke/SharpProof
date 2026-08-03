@@ -75,9 +75,13 @@
                 System.StringComparison.OrdinalIgnoreCase)) ||
              workerTreeExists &&
              !string.IsNullOrWhiteSpace(workerDirectory) &&
-             resolvedCachePath.StartsWith(
-                 workerDirectory + System.IO.Path.DirectorySeparatorChar,
-                 System.StringComparison.OrdinalIgnoreCase));
+             (string.Equals(
+                  resolvedCachePath,
+                  workerDirectory,
+                  System.StringComparison.OrdinalIgnoreCase) ||
+              resolvedCachePath.StartsWith(
+                  workerDirectory + System.IO.Path.DirectorySeparatorChar,
+                  System.StringComparison.OrdinalIgnoreCase)));
         if (!aliasesInput && !aliasesOutput && !aliasesWorkerTree && !aliasesCache) {
             using (var publication =
                 new System.Threading.Mutex(false, @"Local\SharpProof.Publish")) {

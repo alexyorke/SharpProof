@@ -918,7 +918,8 @@ public sealed class WorkerMsBuildIntegrationTests
         foreach (var cachePath in new[] {
             project.ResultPath,
             project.RequestPath,
-            project.CompilerManifestPath
+            project.CompilerManifestPath,
+            WorkerOutputPath()
         })
         {
             var failed = await project.RunVerificationTargetAsync(
