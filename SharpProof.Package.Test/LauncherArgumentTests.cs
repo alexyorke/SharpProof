@@ -314,6 +314,34 @@ public sealed class LauncherArgumentTests
             Throws.TypeOf<ArgumentException>());
     }
 
+    [TestCase("launcher")]
+    [TestCase(".deps.json")]
+    [TestCase(".runtimeconfig.json")]
+    public void RequestProjectionRejectsLauncherRuntimeCollisionBeforeManifestRead(
+        string extension)
+    {
+        var launcher = typeof(Program).Assembly.Location;
+        var resultPath = extension == "launcher"
+            ? launcher
+            : Path.ChangeExtension(launcher, extension);
+        string[] arguments = [
+            "verify",
+            "--worker", "worker.dll",
+            "--request", "request.json",
+            "--result", resultPath,
+            "--compiler-manifest", "missing-compiler-manifest.json",
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
     [Test]
     public void RequestProjectionRejectsDiscoveredRuntimeAssetCollisionBeforeManifestRead()
     {

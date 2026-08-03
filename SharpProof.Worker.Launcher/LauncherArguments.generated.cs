@@ -51,6 +51,19 @@ internal sealed partial class LauncherArguments
         "cache-maximum-bytes",
     ];
 
+    internal static string[] LauncherRuntimePaths
+    {
+        get
+        {
+            var path = typeof(LauncherArguments).Assembly.Location;
+            return [
+                path,
+                System.IO.Path.ChangeExtension(path, ".deps.json"),
+                System.IO.Path.ChangeExtension(path, ".runtimeconfig.json")
+            ];
+        }
+    }
+
     internal string WorkerPath => FullPath("worker");
     internal string RequestPath => FullPath("request");
     internal string ResultPath => FullPath("result");

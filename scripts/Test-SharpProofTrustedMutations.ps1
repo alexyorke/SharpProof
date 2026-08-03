@@ -790,6 +790,14 @@ $mutations = @(
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~WorkerRuntimeCompanionAliasIsRejectedBeforeInvalidationDeletesIt'
     }
+    [pscustomobject]@{
+        Name = 'launcher-checks-launcher-runtime-paths'
+        File = 'SharpProof.Worker.Launcher\Program.cs'
+        Original = '            ..LauncherArguments.LauncherRuntimePaths,'
+        Mutated = '            ..Array.Empty<string>(),'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~RequestProjectionRejectsLauncherRuntimeCollisionBeforeManifestRead'
+    }
 )
 
 $acceptanceContract = Get-Content -LiteralPath (

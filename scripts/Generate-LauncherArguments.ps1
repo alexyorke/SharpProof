@@ -84,10 +84,18 @@ finally {
     $document.Dispose()
 }
 $catalog = $catalogJson | ConvertFrom-Json
-Assert-Properties $catalog @('schemaVersion', 'options', 'budgets', 'cache') `
+Assert-Properties $catalog @(
+    'schemaVersion', 'runtimeCompanionExtensions', 'options', 'budgets', 'cache') `
     'launcher argument catalog'
 if ($catalog.schemaVersion -ne 1) {
     throw 'Launcher argument catalog schemaVersion must be 1.'
+}
+$runtimeCompanionExtensions = @($catalog.runtimeCompanionExtensions)
+$expectedRuntimeCompanionExtensions = @(
+    '.deps.json', '.runtimeconfig.json')
+if (($runtimeCompanionExtensions -join '|') -ne
+    ($expectedRuntimeCompanionExtensions -join '|')) {
+    throw 'Launcher runtime companion extensions are invalid.'
 }
 
 $optionKeys = [Collections.Generic.HashSet[string]]::new(
@@ -240,6 +248,23 @@ foreach ($entry in @($catalog.options)) {
     $lines.Add("        $(Quote-CSharpString $entry.key),")
 }
 $lines.Add('    ];')
+$lines.Add('')
+$lines.Add('    internal static string[] LauncherRuntimePaths')
+$lines.Add('    {')
+$lines.Add('        get')
+$lines.Add('        {')
+$lines.Add('            var path = typeof(LauncherArguments).Assembly.Location;')
+$lines.Add('            return [')
+$lines.Add('                path,')
+foreach ($extension in $runtimeCompanionExtensions) {
+    $lines.Add(
+        "                System.IO.Path.ChangeExtension(path, " +
+        "$(Quote-CSharpString $extension)),")
+}
+$lines[$lines.Count - 1] = $lines[$lines.Count - 1].TrimEnd(',')
+$lines.Add('            ];')
+$lines.Add('        }')
+$lines.Add('    }')
 $lines.Add('')
 foreach ($entry in @($catalog.options | Where-Object accessor -ne 'none')) {
     $key = Quote-CSharpString $entry.key

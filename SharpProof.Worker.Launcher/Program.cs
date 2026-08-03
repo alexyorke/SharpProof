@@ -567,6 +567,7 @@ internal sealed partial class LauncherArguments
             Path.ChangeExtension(workerPath, ".runtimeconfig.json")
         };
         string?[] candidates = [..runtimeRoots,
+            ..LauncherArguments.LauncherRuntimePaths,
             RequestPath, ResultPath, CompilerManifestPath,
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath];

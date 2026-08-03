@@ -15,31 +15,22 @@ internal sealed class CanonicalHashWriter : IDisposable
 
     internal CanonicalHashWriter Add(bool value)
     {
-        return AddFrame(ValueKind.Boolean, [value ? (byte)1 : (byte)0]);
+        return AddFrame(ValueKind.Boolean, BitConverter.GetBytes(value));
     }
 
     internal CanonicalHashWriter Add(int value)
     {
-        return AddFrame(
-            ValueKind.Int32,
-            Encoding.UTF8.GetBytes(
-                value.ToString(CultureInfo.InvariantCulture)));
+        return AddNumber(ValueKind.Int32, value);
     }
 
     internal CanonicalHashWriter Add(uint value)
     {
-        return AddFrame(
-            ValueKind.UInt32,
-            Encoding.UTF8.GetBytes(
-                value.ToString(CultureInfo.InvariantCulture)));
+        return AddNumber(ValueKind.UInt32, value);
     }
 
     internal CanonicalHashWriter Add(long value)
     {
-        return AddFrame(
-            ValueKind.Int64,
-            Encoding.UTF8.GetBytes(
-                value.ToString(CultureInfo.InvariantCulture)));
+        return AddNumber(ValueKind.Int64, value);
     }
 
     internal CanonicalHashWriter Add(byte[] bytes)
@@ -57,16 +48,17 @@ internal sealed class CanonicalHashWriter : IDisposable
         var buffer = new byte[Math.Min(length, 81920)];
         var bytesRead = 0;
         int read;
-        while ((read = stream.Read(buffer, 0, buffer.Length)) != 0)
+        while ((read = stream.Read(
+                   buffer, 0, Math.Min(buffer.Length, length - bytesRead))) != 0)
         {
             bytesRead += read;
             _hash.AppendData(buffer, 0, read);
         }
 
-        if (bytesRead != length)
+        if (bytesRead != length || stream.ReadByte() != -1)
         {
             throw new InvalidDataException(
-                "The canonical hash stream ended before its declared length.");
+                "The canonical hash stream does not match its declared length.");
         }
 
         return this;
@@ -91,6 +83,15 @@ internal sealed class CanonicalHashWriter : IDisposable
                 (type.FullName ?? type.Name) +
                 "\n" +
                 name));
+    }
+
+    private CanonicalHashWriter AddNumber<T>(ValueKind kind, T value)
+        where T : struct, IFormattable
+    {
+        return AddFrame(
+            kind,
+            Encoding.UTF8.GetBytes(
+                value.ToString(null, CultureInfo.InvariantCulture)));
     }
 
     private CanonicalHashWriter AddFrame(ValueKind kind, byte[] bytes)
