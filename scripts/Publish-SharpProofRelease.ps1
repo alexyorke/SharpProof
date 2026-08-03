@@ -63,6 +63,18 @@ function Get-RequiredProperty {
     return $property.Value
 }
 
+function Get-RepositoryHead {
+    $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    if ($null -eq (Get-Command git -ErrorAction SilentlyContinue)) {
+        throw 'Git is required to verify the release checkout commit.'
+    }
+    $head = (& git -C $repositoryRoot rev-parse --verify HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or $head -notmatch '^[0-9a-f]{40}$') {
+        throw 'Could not resolve the release checkout commit.'
+    }
+    return $head
+}
+
 function Get-PackageIdentity {
     param(
         [Parameter(Mandatory = $true)]
@@ -101,12 +113,27 @@ function Get-PackageIdentity {
         }
         $id = $metadata.SelectSingleNode('n:id', $namespaces)
         $version = $metadata.SelectSingleNode('n:version', $namespaces)
-        if ($null -eq $id -or $null -eq $version) {
+        $repository = $metadata.SelectSingleNode(
+            'n:repository',
+            $namespaces)
+        if ($null -eq $id -or
+            $null -eq $version -or
+            $null -eq $repository) {
             throw "Package '$Path' has incomplete identity metadata."
+        }
+        $repositoryType = $repository.GetAttribute('type')
+        $repositoryUrl = $repository.GetAttribute('url')
+        $repositoryCommit = $repository.GetAttribute('commit')
+        if ($repositoryType -ne 'git' -or
+            $repositoryUrl -ne
+                'https://github.com/alexyorke/SharpProof' -or
+            $repositoryCommit -notmatch '^[0-9a-fA-F]{40}$') {
+            throw "Package '$Path' has invalid repository metadata."
         }
         return [pscustomobject][ordered]@{
             id = $id.InnerText
             version = $version.InnerText
+            repositoryCommit = $repositoryCommit.ToLowerInvariant()
         }
     }
     finally {
@@ -146,7 +173,10 @@ function Get-ArtifactPath {
 function Get-ValidatedRelease {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$Directory
+        [string]$Directory,
+
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryCommit
     )
 
     $manifestPath = Join-Path $Directory 'SharpProof.release.json'
@@ -176,6 +206,10 @@ function Get-ValidatedRelease {
         $manifest `
         'repository' `
         'Release manifest'
+    $manifestCommit = [string](Get-RequiredProperty `
+        $repository `
+        'commit' `
+        'Release repository')
     if ([string](Get-RequiredProperty `
             $repository `
             'type' `
@@ -185,11 +219,13 @@ function Get-ValidatedRelease {
             'url' `
             'Release repository') -ne
                 'https://github.com/alexyorke/SharpProof' -or
-        [string](Get-RequiredProperty `
-            $repository `
-            'commit' `
-            'Release repository') -notmatch '^[0-9a-f]{40}$') {
+        $manifestCommit -notmatch '^[0-9a-f]{40}$') {
         throw 'Release manifest repository identity is invalid.'
+    }
+    if ($manifestCommit -ne $RepositoryCommit) {
+        throw (
+            "Release manifest repository commit '$manifestCommit' does not " +
+            "match checkout '$RepositoryCommit'.")
     }
 
     $artifacts = @(
@@ -300,6 +336,12 @@ function Get-ValidatedRelease {
             $mainIdentity.version -ne $version -or
             $symbolsIdentity.version -ne $version) {
             throw "Release package identity is invalid for '$packageId'."
+        }
+        if ($mainIdentity.repositoryCommit -ne $RepositoryCommit -or
+            $symbolsIdentity.repositoryCommit -ne $RepositoryCommit) {
+            throw (
+                "Release package repository commit does not match checkout " +
+                "'$RepositoryCommit' for '$packageId'.")
         }
         $packages.Add([pscustomobject][ordered]@{
             packageId = $packageId
@@ -604,7 +646,10 @@ if (-not $PlanOnly -and
     throw "DotNetPath is not executable: '$DotNetPath'."
 }
 
-$release = Get-ValidatedRelease -Directory $resolvedPackageSource
+$repositoryHead = Get-RepositoryHead
+$release = Get-ValidatedRelease `
+    -Directory $resolvedPackageSource `
+    -RepositoryCommit $repositoryHead
 $baseAddress = $null
 if (-not $PlanOnly) {
     $baseAddress = Get-V3PackageBaseAddress -ServiceIndex $Source

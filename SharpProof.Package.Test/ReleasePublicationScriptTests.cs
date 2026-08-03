@@ -1,6 +1,9 @@
 using System.Diagnostics;
+using System.IO.Compression;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using NUnit.Framework;
 
 namespace SharpProof.Package.Test;
@@ -162,6 +165,71 @@ public sealed class ReleasePublicationScriptTests
             {
                 File.Delete(remotePath);
             }
+        }
+    }
+
+    [Test]
+    public async Task OfflinePlanRejectsPackagesFromDifferentCheckoutCommit()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PublicationWorkspace.Create();
+        foreach (var package in feed.Packages.Concat(feed.SymbolPackages))
+        {
+            var destination = Path.Combine(
+                workspace.PackageSource,
+                Path.GetFileName(package.Path));
+            File.Copy(package.Path, destination);
+        }
+
+        var previousRevision = await RunProcessAsync(
+            FindRepositoryRoot(),
+            "git",
+            "rev-parse",
+            "HEAD^");
+        Assert.That(
+            previousRevision.ExitCode,
+            Is.Zero,
+            previousRevision.Output);
+        var staleCommit = previousRevision.Output.Trim();
+        Assert.That(staleCommit, Does.Match("^[0-9a-f]{40}$"));
+
+        foreach (var path in Directory.EnumerateFiles(
+                     workspace.PackageSource,
+                     "*",
+                     SearchOption.TopDirectoryOnly))
+        {
+            if (Path.GetExtension(path) is ".nupkg" or ".snupkg")
+            {
+                RewriteRepositoryCommit(path, staleCommit);
+            }
+        }
+
+        var evidence = await RunProcessAsync(
+            FindRepositoryRoot(),
+            "pwsh",
+            "-NoLogo",
+            "-NoProfile",
+            "-File",
+            Path.Combine(
+                FindRepositoryRoot(),
+                "scripts",
+                "New-SharpProofReleaseEvidence.ps1"),
+            "-PackageSource",
+            workspace.PackageSource);
+        Assert.That(evidence.ExitCode, Is.Zero, evidence.Output);
+
+        var result = await RunPublicationScriptAsync(
+            workspace,
+            Path.Combine(workspace.Root, "stale-commit-plan.json"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
+            Assert.That(
+                result.Output,
+                Does.Contain("does not match checkout"));
+            Assert.That(
+                Directory.EnumerateFiles(workspace.RemoteSource),
+                Is.Empty);
         }
     }
 
@@ -334,6 +402,36 @@ public sealed class ReleasePublicationScriptTests
             process.ExitCode,
             (await standardOutput) + Environment.NewLine +
             (await standardError));
+    }
+
+    private static void RewriteRepositoryCommit(
+        string packagePath,
+        string commit)
+    {
+        using var archive = ZipFile.Open(
+            packagePath,
+            ZipArchiveMode.Update);
+        var nuspec = archive.Entries.Single(entry =>
+            entry.FullName.EndsWith(
+                ".nuspec",
+                StringComparison.OrdinalIgnoreCase));
+        var entryName = nuspec.FullName;
+        XDocument document;
+        using (var stream = nuspec.Open())
+        {
+            document = XDocument.Load(stream);
+        }
+        var repository = document.Descendants().Single(element =>
+            element.Name.LocalName == "repository");
+        repository.SetAttributeValue("commit", commit);
+        nuspec.Delete();
+        var replacement = archive.CreateEntry(
+            entryName,
+            CompressionLevel.Optimal);
+        using var output = new StreamWriter(
+            replacement.Open(),
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        document.Save(output);
     }
 
     private static string FindRepositoryRoot()
