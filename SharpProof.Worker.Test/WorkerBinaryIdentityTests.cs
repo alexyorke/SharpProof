@@ -146,6 +146,9 @@ public sealed class WorkerBinaryIdentityTests
                     Assert.That(
                         snapshot.ComponentPaths,
                         Does.Contain(worker));
+                    Assert.That(
+                        snapshot.ComponentPaths,
+                        Does.Contain(appLocalAsset));
                     foreach (var component in lockedComponents)
                     {
                         Assert.That(
