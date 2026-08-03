@@ -337,9 +337,21 @@ public sealed class LauncherArgumentTests
             LauncherArguments.TryParse(arguments, out var parsed),
             Is.True);
 
-        Assert.That(
-            (Action)(() => parsed.CreateRequest(out _, out _)),
-            Throws.TypeOf<ArgumentException>());
+        Exception? collision = null;
+        try
+        {
+            parsed.CreateRequest(out _, out _);
+        }
+        catch (ArgumentException exception)
+        {
+            collision = exception;
+        }
+        catch (FileNotFoundException exception)
+        {
+            collision = exception;
+        }
+
+        Assert.That(collision?.GetType(), Is.EqualTo(typeof(ArgumentException)));
     }
 
     [Test]
