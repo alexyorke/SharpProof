@@ -216,16 +216,11 @@ public sealed class ReleasePublicationScriptTests
                 "New-SharpProofReleaseEvidence.ps1"),
             "-PackageSource",
             workspace.PackageSource);
-        Assert.That(evidence.ExitCode, Is.Zero, evidence.Output);
-
-        var result = await RunPublicationScriptAsync(
-            workspace,
-            Path.Combine(workspace.Root, "stale-commit-plan.json"));
+        Assert.That(evidence.ExitCode, Is.Not.Zero, evidence.Output);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
             Assert.That(
-                result.Output,
+                evidence.Output,
                 Does.Contain("does not match checkout"));
             Assert.That(
                 Directory.EnumerateFiles(workspace.RemoteSource),
