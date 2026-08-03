@@ -934,6 +934,22 @@ public sealed class ArchitectureTests
     }
 
     [Test]
+    public void WorkerClosureHashesTheParsedDependencyStream()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "SharpProof.CompilerArtifact",
+            "CompilerManifestArtifact.cs"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(source, Does.Contain(
+                "component.Key == \"dependencies\""));
+            Assert.That(source, Does.Contain("? dependency"));
+        }
+    }
+
+    [Test]
     public void PerformanceContractIsIsolatedFromBroadTestAndCoverageRuns()
     {
         var root = RepositoryRoot();

@@ -51,7 +51,8 @@ internal static class WorkerBinaryIdentity
         var streams = new List<FileStream>();
         try
         {
-            using var dependency = OpenRead(Path.ChangeExtension(path, ".deps.json"));
+            var dependency = OpenRead(Path.ChangeExtension(path, ".deps.json"));
+            streams.Add(dependency);
             var components = RuntimeComponents(path, dependency);
             ValidateComponentCount(components.Count);
             using var hash = new CanonicalHashWriter();
@@ -59,7 +60,10 @@ internal static class WorkerBinaryIdentity
             long totalBytes = 0;
             foreach (var component in components)
             {
-                var stream = OpenRead(component.Value);
+                var isDependency = component.Key == "dependencies";
+                var stream = isDependency
+                    ? dependency
+                    : OpenRead(component.Value);
                 try
                 {
                     ValidateComponentLength(
@@ -76,7 +80,6 @@ internal static class WorkerBinaryIdentity
                     throw;
                 }
             }
-
             return new WorkerRuntimeClosureSnapshot(
                 path,
                 streams,
