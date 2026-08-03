@@ -369,7 +369,8 @@ public sealed class ReleaseCoverageBaselineTests
                 "src/I-alpha.txt",
                 "src/i-beta.txt",
                 "src/\u0130-gamma.txt",
-                "src/\u0131-delta.txt"
+                "src/\u0131-delta.txt",
+                "scripts/Get-SharpProofTcbPaths.ps1"
             };
             foreach (var path in paths)
             {
@@ -381,6 +382,16 @@ public sealed class ReleaseCoverageBaselineTests
                     absolutePath,
                     "same blob\n");
             }
+            File.Copy(
+                Path.Combine(
+                    root,
+                    "scripts",
+                    "Get-SharpProofTcbPaths.ps1"),
+                Path.Combine(
+                    repository,
+                    "scripts",
+                    "Get-SharpProofTcbPaths.ps1"),
+                overwrite: true);
 
             var acceptancePath = Path.Combine(
                 repository,

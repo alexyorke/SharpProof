@@ -17,7 +17,20 @@ $ErrorActionPreference = 'Stop'
 $resolvedRepository = (Resolve-Path `
     -LiteralPath $RepositoryPath `
     -ErrorAction Stop).Path
-. (Join-Path $resolvedRepository 'scripts\Get-SharpProofTcbPaths.ps1')
+$tcbHelperRevision =
+    $Commit + ':scripts/Get-SharpProofTcbPaths.ps1'
+$tcbHelper = @(
+    & git -C $resolvedRepository show `
+        '--format=' `
+        '--no-ext-diff' `
+        $tcbHelperRevision `
+        2>$null)
+if ($LASTEXITCODE -ne 0 -or $tcbHelper.Count -eq 0) {
+    throw (
+        "Reading '$tcbHelperRevision' from commit '$Commit' failed. " +
+        'The release digest helper must be present in the committed tree.')
+}
+Invoke-Expression ($tcbHelper -join [Environment]::NewLine)
 $approvedMetadataRootFiles =
     [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)
