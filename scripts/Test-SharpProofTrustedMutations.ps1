@@ -761,8 +761,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'closure-retains-each-component-path-once'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
-        Original = '        if (!result.Values.Contains(path, StringComparer.OrdinalIgnoreCase))'
-        Mutated = '        if (true)'
+        Original = '                components.Values.ToArray(),'
+        Mutated = '                components.Values.Take(1).ToArray(),'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~IdentityCoversTheCompleteTrustedRuntimeClosure'
     },
