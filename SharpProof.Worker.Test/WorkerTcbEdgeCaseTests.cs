@@ -808,7 +808,9 @@ public sealed class WorkerTcbEdgeCaseTests
         try
         {
             var inputHash = new string('d', 64);
-            var path = Path.Combine(directory, inputHash + ".json");
+            var path = Path.Combine(
+                directory,
+                inputHash + ".sharp-proof-cache.json");
             await File.WriteAllBytesAsync(
                 path, new byte[WorkerProtocolJson.MaximumJsonBytes + 1]);
             var cache = new VerificationCache(
@@ -861,7 +863,9 @@ public sealed class WorkerTcbEdgeCaseTests
             },
             WorkerProtocolJson.Options);
         return File.WriteAllTextAsync(
-            Path.Combine(directory, inputHash + ".json"),
+            Path.Combine(
+                directory,
+                inputHash + ".sharp-proof-cache.json"),
             envelope);
     }
 

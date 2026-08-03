@@ -37,6 +37,7 @@ internal static class Program
         try
         {
             arguments.ValidatePreflight();
+            arguments.ValidateDistinctPaths(runtimeSnapshot);
             runtimeSnapshot = WorkerBinaryIdentity.CreateSnapshot(
                 arguments.WorkerPath);
             request = arguments.CreateRequest(
@@ -554,7 +555,7 @@ internal sealed partial class LauncherArguments
         WorkerRuntimeClosureSnapshot? runtimeSnapshot,
         out CompilerManifestArtifact artifact, out byte[] artifactBytes)
     {
-        ValidateDistinctPaths(runtimeSnapshot);
+        ValidateDistinctPaths(runtimeSnapshot, Optional("cache-directory"));
         var compilerManifest = CreateCompilerManifestReference(
             out artifact,
             out artifactBytes);
@@ -562,7 +563,8 @@ internal sealed partial class LauncherArguments
     }
 
     internal void ValidateDistinctPaths(
-        WorkerRuntimeClosureSnapshot? runtimeSnapshot)
+        WorkerRuntimeClosureSnapshot? runtimeSnapshot,
+        string? cacheDirectory = null)
     {
         var workerPath = WorkerPath;
         var runtimeRoots = new[] {
@@ -570,7 +572,6 @@ internal sealed partial class LauncherArguments
             Path.ChangeExtension(workerPath, ".deps.json"),
             Path.ChangeExtension(workerPath, ".runtimeconfig.json")
         };
-        var cacheDirectory = Optional("cache-directory");
         string?[] candidates = [..runtimeRoots,
             ..LauncherArguments.LauncherRuntimePaths,
             cacheDirectory, RequestPath, ResultPath, CompilerManifestPath,
