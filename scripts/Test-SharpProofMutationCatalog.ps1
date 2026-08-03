@@ -3,12 +3,16 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$EvidencePath,
 
-    [Parameter()]
-    [string]$ExpectedCommit = ''
+    [Parameter(Mandatory = $true)]
+    [string]$ExpectedCommit
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+if ($ExpectedCommit -notmatch '^[0-9a-f]{40}$') {
+    throw "ExpectedCommit must be a 40-character commit SHA: '$ExpectedCommit'."
+}
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $contractPath = Join-Path $repositoryRoot 'eng\acceptance\contract.json'
@@ -63,8 +67,7 @@ if ([int]$evidence.schemaVersion -ne 2 -or
         'Mutation evidence does not prove a complete current trusted-boundary ' +
         'catalog run.')
 }
-if (-not [string]::IsNullOrWhiteSpace($ExpectedCommit) -and
-    [string]$evidence.commit -ne $ExpectedCommit) {
+if ([string]$evidence.commit -ne $ExpectedCommit) {
     throw (
         "Mutation evidence commit '$($evidence.commit)' does not match " +
         "expected commit '$ExpectedCommit'.")

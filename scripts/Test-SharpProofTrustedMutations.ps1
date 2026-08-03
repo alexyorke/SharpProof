@@ -7,7 +7,8 @@ param(
 
     [string[]]$MutationName = @(),
 
-    [string]$ExpectedCommit = '',
+    [Parameter(Mandatory = $true)]
+    [string]$ExpectedCommit,
 
     [switch]$KeepWorkspace
 )
@@ -29,8 +30,10 @@ $sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($sourceCommit)) {
     throw 'Unable to resolve the mutation source commit.'
 }
-if (-not [string]::IsNullOrWhiteSpace($ExpectedCommit) -and
-    $sourceCommit -ne $ExpectedCommit) {
+if ($ExpectedCommit -notmatch '^[0-9a-f]{40}$') {
+    throw "ExpectedCommit must be a 40-character commit SHA: '$ExpectedCommit'."
+}
+if ($sourceCommit -ne $ExpectedCommit) {
     throw "Mutation source commit '$sourceCommit' does not match '$ExpectedCommit'."
 }
 
