@@ -705,16 +705,16 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'contract-api-closed-category-parity'
         File = 'SharpProof.Frontend\ContractApiMetadata.generated.cs'
-        Original = "                ContractApiCatalog.NotNull,`n                \"NotNullAttribute\",`n                ContractApiAttributeCategory.Closed,"
-        Mutated = "                ContractApiCatalog.NotNull,`n                \"NotNullAttribute\",`n                ContractApiAttributeCategory.Effect,"
+        Original = "                ContractApiCatalog.NotNull,`n                `"NotNullAttribute`",`n                ContractApiAttributeCategory.Closed,"
+        Mutated = "                ContractApiCatalog.NotNull,`n                `"NotNullAttribute`",`n                ContractApiAttributeCategory.Effect,"
         Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
         Filter = 'FullyQualifiedName~CatalogAttributeMetadataMatchesDeclarations'
     },
     [pscustomobject]@{
         Name = 'contract-api-closed-selection-parity'
         File = 'SharpProof.Frontend\ContractApiMetadata.generated.cs'
-        Original = "                ContractApiCatalog.NotNull,`n                \"NotNullAttribute\",`n                ContractApiAttributeCategory.Closed,`n                ContractApiSelectionFeature.Contracts),"
-        Mutated = "                ContractApiCatalog.NotNull,`n                \"NotNullAttribute\",`n                ContractApiAttributeCategory.Closed,`n                ContractApiSelectionFeature.Effects),"
+        Original = "                ContractApiCatalog.NotNull,`n                `"NotNullAttribute`",`n                ContractApiAttributeCategory.Closed,`n                ContractApiSelectionFeature.Contracts),"
+        Mutated = "                ContractApiCatalog.NotNull,`n                `"NotNullAttribute`",`n                ContractApiAttributeCategory.Closed,`n                ContractApiSelectionFeature.Effects),"
         Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
         Filter = 'FullyQualifiedName~CatalogAttributeMetadataMatchesDeclarations'
     }
