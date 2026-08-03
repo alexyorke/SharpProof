@@ -138,13 +138,12 @@ internal sealed class OperationEffectScanner
             IObjectCreationOperation creation => ScanObjectCreation(creation),
             IArrayCreationOperation array => EffectSummaryOperations.Join(ScanChildren(array),
                 EffectSummaryOperations.Allocate(EffectAllocationKind.Managed), ArrayCreationExceptions(array)),
-            IDelegateCreationOperation delegateCreation => EffectSummaryOperations.Join(
-                ScanChildren(delegateCreation),
-                EffectSummaryOperations.Allocate(EffectAllocationKind.Managed)),
+            IOperation allocation when allocation is
+                IDelegateCreationOperation or IAnonymousObjectCreationOperation =>
+                EffectSummaryOperations.Join(
+                    ScanChildren(allocation),
+                    EffectSummaryOperations.Allocate(EffectAllocationKind.Managed)),
             IInterpolatedStringOperation { ConstantValue.HasValue: true } => EffectSummary.Empty,
-            IAnonymousObjectCreationOperation anonymousObject => EffectSummaryOperations.Join(
-                ScanChildren(anonymousObject),
-                EffectSummaryOperations.Allocate(EffectAllocationKind.Managed)),
             IThrowOperation thrown when IsSourceThrow(thrown) => EffectSummaryOperations.Join(
                 ScanChildren(thrown),
                 EffectSummaryOperations.Throw(
@@ -925,8 +924,9 @@ internal sealed class OperationEffectScanner
             IFieldReferenceOperation { Field.IsStatic: true } => EffectRegionSet.Create(EffectRegionId.Static()),
             IFieldReferenceOperation => EffectRegionSet.Unknown,
             IArrayElementReferenceOperation => EffectRegionSet.Unknown,
-            IObjectCreationOperation creation => EffectRegionSet.Create(EffectRegionId.Fresh(creation.Syntax.SpanStart)),
-            IArrayCreationOperation creation => EffectRegionSet.Create(EffectRegionId.Fresh(creation.Syntax.SpanStart)),
+            IOperation creation when creation is
+                IObjectCreationOperation or IArrayCreationOperation =>
+                EffectRegionSet.Create(EffectRegionId.Fresh(creation.Syntax.SpanStart)),
             IConditionalOperation conditional when aliasSource =>
                 ClassifyRegion(conditional.WhenTrue, true).Union(
                     ClassifyRegion(conditional.WhenFalse, true)),
