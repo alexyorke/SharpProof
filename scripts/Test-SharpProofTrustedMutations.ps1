@@ -778,7 +778,7 @@ $mutations = @(
         Name = 'closure-executes-staged-worker'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
         Original = '    internal string ExecutionWorkerPath { get; } = executionWorkerPath;'
-        Mutated = '    internal string ExecutionWorkerPath { get; } = workerPath;'
+        Mutated = '    internal string ExecutionWorkerPath { get; } = string.IsNullOrEmpty(executionWorkerPath) ? workerPath : workerPath;'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~RuntimeClosureComponentPathsAreImmutable'
     },
