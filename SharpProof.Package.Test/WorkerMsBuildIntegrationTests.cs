@@ -894,8 +894,10 @@ public sealed class WorkerMsBuildIntegrationTests
         {
             Assert.That(failed.ExitCode, Is.Not.Zero);
             Assert.That(
-                failed.Output,
-                Does.Contain("SharpProof launcher input is invalid: ArgumentException"));
+                failed.Output.Contains(
+                    "SharpProof launcher input is invalid: ArgumentException",
+                    StringComparison.Ordinal),
+                Is.True);
             Assert.That(File.Exists(collisionWorker), Is.True);
             Assert.That(File.Exists(collisionCompanion), Is.True);
         }
