@@ -22,8 +22,8 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 80,
-    "expectedCatalogSha256": "a792bffed2750f2864e0d520d38c44ef98bdccad8f14f6058456868085ab521c"
+    "expectedCatalogCount": 83,
+    "expectedCatalogSha256": "65e427b92728f52213286cbf8af1c6feba7ece65a8e3757a427a8109ab35d0af"
   },
   "worker": {
     "protocolVersion": 9,
@@ -156,7 +156,17 @@
           "SharpProof.Frontend/ContractApi.catalog.json",
           "scripts/Generate-ContractApiCatalog.ps1",
           "SharpProof.Frontend/ContractApiMetadata.generated.cs",
+          "SharpProof.Attributes/Contract.cs",
+          "SharpProof.Attributes/ContractForAttribute.cs",
+          "SharpProof.Attributes/ClosedContractAttributes.cs",
+          "SharpProof.Attributes/AllowedCapabilitiesAttribute.cs",
+          "SharpProof.Attributes/AllowedExceptionsAttribute.cs",
+          "SharpProof.Attributes/DoesNotThrowAttribute.cs",
+          "SharpProof.Attributes/EnforcePureAttribute.cs",
           "SharpProof.Attributes/EffectContractAttribute.cs",
+          "SharpProof.Attributes/SharpProofSuppressAttribute.cs",
+          "SharpProof.Attributes/SharpProofTrustedAttribute.cs",
+          "SharpProof.Attributes/ZeroAllocationsAttribute.cs",
           "SharpProof.Attributes/SharpProofEffect.cs",
           "SharpProof.Attributes/SharpProofCapability.cs"
         ]

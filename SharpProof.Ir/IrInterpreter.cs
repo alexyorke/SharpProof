@@ -265,7 +265,11 @@ public sealed class IrInterpreter(IrFactory factory)
     {
         if (left.Kind != IrValueKind.Integer || right.Kind != IrValueKind.Integer)
         {
-            return InvalidValue(IsComparison(@operator)
+            return InvalidValue(@operator is
+                IrBinaryOperator.LessThan or
+                IrBinaryOperator.LessThanOrEqual or
+                IrBinaryOperator.GreaterThan or
+                IrBinaryOperator.GreaterThanOrEqual
                 ? "Integer comparison requires integer values."
                 : "Integer arithmetic requires integer values.");
         }
@@ -488,12 +492,6 @@ public sealed class IrInterpreter(IrFactory factory)
     private static IrEvaluationResult Fault(IrExceptionKind kind, string detail)
     {
         return IrEvaluationResult.FromException(kind, detail);
-    }
-
-    private static bool IsComparison(IrBinaryOperator @operator)
-    {
-        return @operator is IrBinaryOperator.LessThan or IrBinaryOperator.LessThanOrEqual
-            or IrBinaryOperator.GreaterThan or IrBinaryOperator.GreaterThanOrEqual;
     }
 
     private sealed class EvaluationState(

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Reflection;
+using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.Attributes;
 
@@ -40,6 +41,87 @@ public sealed class ContractApiCatalogParityTests
             var method = methods.Single(candidate =>
                 candidate.Name == descriptor.Name);
             AssertMethodShape(method, descriptor);
+            Assert.That(
+                ContractApiClauseProjection.GetClauseRole(method.Name),
+                Is.EqualTo(descriptor.ClauseRole),
+                method.Name);
+        }
+    }
+
+    [Test]
+    public void CatalogIdentityMatchesTheExportedContractDeclaration()
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "SharpProof.Frontend",
+            "ContractApi.catalog.json")));
+        var root = document.RootElement;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                root.GetProperty("namespace").GetString() + "." +
+                    root.GetProperty("contractType").GetString(),
+                Is.EqualTo(typeof(Contract).FullName));
+            Assert.That(
+                root.GetProperty("conditionalSymbol").GetString(),
+                Is.EqualTo(Contract.ConditionalSymbol));
+        }
+    }
+
+    [Test]
+    public void CatalogAttributeMetadataMatchesDeclarations()
+    {
+        foreach (var descriptor in ContractApiMetadata.Attributes)
+        {
+            var attributeType = typeof(Contract).Assembly.GetType(
+                descriptor.MetadataName,
+                throwOnError: true)!;
+            var usage = attributeType.GetCustomAttribute<AttributeUsageAttribute>();
+            Assert.That(usage, Is.Not.Null, descriptor.TypeName);
+            switch (descriptor.Category)
+            {
+                case ContractApiAttributeCategory.Companion:
+                    Assert.That(
+                        usage!.ValidOn,
+                        Is.EqualTo(AttributeTargets.Class));
+                    Assert.That(
+                        descriptor.Selection,
+                        Is.EqualTo(ContractApiSelectionFeature.None));
+                    break;
+                case ContractApiAttributeCategory.Closed:
+                    Assert.That(
+                        usage!.ValidOn,
+                        Is.EqualTo(AttributeTargets.Parameter |
+                            AttributeTargets.ReturnValue));
+                    Assert.That(
+                        descriptor.Selection,
+                        Is.EqualTo(ContractApiSelectionFeature.Contracts));
+                    break;
+                case ContractApiAttributeCategory.Effect:
+                    Assert.That(
+                        usage!.ValidOn,
+                        Is.EqualTo(AttributeTargets.Method |
+                            AttributeTargets.Constructor |
+                            AttributeTargets.Property));
+                    Assert.That(
+                        descriptor.Selection,
+                        Is.EqualTo(ContractApiSelectionFeature.Effects));
+                    break;
+                case ContractApiAttributeCategory.Control:
+                    Assert.That(
+                        usage!.ValidOn.HasFlag(AttributeTargets.Assembly),
+                        Is.True);
+                    Assert.That(
+                        usage.ValidOn.HasFlag(AttributeTargets.Method),
+                        Is.True);
+                    Assert.That(
+                        descriptor.Selection,
+                        Is.EqualTo(ContractApiSelectionFeature.All));
+                    break;
+                default:
+                    Assert.Fail("The catalog contains an unknown attribute category.");
+                    break;
+            }
         }
     }
 

@@ -675,7 +675,7 @@ internal sealed class ManagedAbstractFlow
         {
             IsStatic: true,
             ReturnsVoid: true,
-            Name: "Requires",
+            Name: ContractApiCatalog.RequiresMethodName,
             Parameters.Length: 1
         } method &&
         method.Parameters[0].Type.SpecialType == SpecialType.System_Boolean &&

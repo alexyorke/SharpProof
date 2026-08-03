@@ -253,6 +253,46 @@ public sealed class ManagedAbstractFlowTests
     }
 
     [Test]
+    public void ContractRequiresRefinesSubsequentFacts()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                private static void Sink(int value) {
+                }
+
+                public static void Calls(int value) {
+                    SharpProof.Attributes.Contract.Requires(value > 0);
+                    Sink(value);
+                }
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Calls");
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var sink = root.Descendants().OfType<IInvocationOperation>()
+            .Single(static invocation => invocation.TargetMethod.Name == "Sink");
+
+        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
+            .Analyze(method, ControlFlowGraph.Create(root), null, default);
+
+        Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
+        Assert.That(
+            analysis.Result!.TryEvaluate(
+                sink,
+                sink.Arguments[0].Value,
+                out var value),
+            Is.True);
+        Assert.That(value.TryGetInteger(out var interval), Is.True);
+        Assert.That(
+            interval,
+            Is.EqualTo(IntervalValue.Range(1, int.MaxValue)));
+    }
+
+    [Test]
     public void SourceShadowedContractClauseDoesNotRefineScalarFacts()
     {
         var compilation = EffectTestHost.CreateCompilation(

@@ -693,6 +693,30 @@ $mutations = @(
         Mutated = 'MaximumJsonDepth = 64;'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~DeserializationRejectsDocumentsBeyondTheDeclaredDepth'
+    },
+    [pscustomobject]@{
+        Name = 'contract-api-consumer-requires-identity'
+        File = 'SharpProof.Effects\ManagedAbstractFlow.cs'
+        Original = '            Name: ContractApiCatalog.RequiresMethodName,'
+        Mutated = '            Name: ContractApiCatalog.EnsuresMethodName,'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~ContractRequiresRefinesSubsequentFacts'
+    },
+    [pscustomobject]@{
+        Name = 'contract-api-closed-category-parity'
+        File = 'SharpProof.Frontend\ContractApiMetadata.generated.cs'
+        Original = "                ContractApiCatalog.NotNull,`n                \"NotNullAttribute\",`n                ContractApiAttributeCategory.Closed,"
+        Mutated = "                ContractApiCatalog.NotNull,`n                \"NotNullAttribute\",`n                ContractApiAttributeCategory.Effect,"
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~CatalogAttributeMetadataMatchesDeclarations'
+    },
+    [pscustomobject]@{
+        Name = 'contract-api-closed-selection-parity'
+        File = 'SharpProof.Frontend\ContractApiMetadata.generated.cs'
+        Original = "                ContractApiCatalog.NotNull,`n                \"NotNullAttribute\",`n                ContractApiAttributeCategory.Closed,`n                ContractApiSelectionFeature.Contracts),"
+        Mutated = "                ContractApiCatalog.NotNull,`n                \"NotNullAttribute\",`n                ContractApiAttributeCategory.Closed,`n                ContractApiSelectionFeature.Effects),"
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~CatalogAttributeMetadataMatchesDeclarations'
     }
 )
 
