@@ -224,6 +224,29 @@ public sealed class WorkerBinaryIdentityTests
                     Assert.That(
                         snapshot.ComponentPaths,
                         Does.Contain(appLocalAsset));
+
+                    foreach (var componentPath in snapshot.ComponentPaths)
+                    {
+                        var relativePath = Path.GetRelativePath(
+                            sourceDirectory,
+                            componentPath);
+                        var stagedPath = Path.Combine(
+                            Path.GetDirectoryName(snapshot.ExecutionWorkerPath)!,
+                            relativePath);
+                        Assert.That(
+                            File.Exists(stagedPath),
+                            Is.True,
+                            relativePath);
+                        Assert.That(
+                            File.ReadAllBytes(stagedPath),
+                            Is.EqualTo(File.ReadAllBytes(componentPath)),
+                            relativePath);
+                    }
+
+                    Assert.That(
+                        WorkerBinaryIdentity.ComputeSha256(
+                            snapshot.ExecutionWorkerPath),
+                        Is.EqualTo(snapshot.Sha256));
                 }
 
                 var stagedBytes = File.ReadAllBytes(snapshot.ExecutionWorkerPath);
