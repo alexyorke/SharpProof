@@ -37,6 +37,7 @@ internal static class Program
         try
         {
             arguments.ValidatePreflight();
+            arguments.ValidateDistinctPaths(runtimeSnapshot);
             runtimeSnapshot = WorkerBinaryIdentity.CreateSnapshot(
                 arguments.WorkerPath);
             request = arguments.CreateRequest(
@@ -556,7 +557,7 @@ internal sealed partial class LauncherArguments
         return ProjectRequest(compilerManifest);
     }
 
-    private void ValidateDistinctPaths(
+    internal void ValidateDistinctPaths(
         WorkerRuntimeClosureSnapshot? runtimeSnapshot)
     {
         var workerPath = WorkerPath;
@@ -565,9 +566,7 @@ internal sealed partial class LauncherArguments
             Path.ChangeExtension(workerPath, ".deps.json"),
             Path.ChangeExtension(workerPath, ".runtimeconfig.json")
         };
-        string?[] candidates = [workerPath,
-            Path.ChangeExtension(workerPath, ".deps.json"),
-            Path.ChangeExtension(workerPath, ".runtimeconfig.json"),
+        string?[] candidates = [..runtimeRoots,
             RequestPath, ResultPath, CompilerManifestPath,
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath];

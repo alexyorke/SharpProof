@@ -231,7 +231,7 @@ Assert-Equal $contract.analyzer.unsupportedUnannotatedCallableBehavior 'silent' 
 Assert-Equal $contract.analyzer.unsupportedSelectedCallableDiagnostic 'SP0047' 'analyzer.unsupportedSelectedCallableDiagnostic'
 Assert-Equal $contract.automation.solutionBuildWallSeconds 600 'automation.solutionBuildWallSeconds'
 Assert-Equal $contract.mutationEvidence.schemaVersion 1 'mutationEvidence.schemaVersion'
-Assert-Equal $contract.mutationEvidence.expectedCatalogCount 88 'mutationEvidence.expectedCatalogCount'
+Assert-Equal $contract.mutationEvidence.expectedCatalogCount 89 'mutationEvidence.expectedCatalogCount'
 if ([string]$contract.mutationEvidence.expectedCatalogSha256 -notmatch '^[0-9a-f]{64}$') {
     throw 'mutationEvidence.expectedCatalogSha256 must be a lowercase SHA-256 digest.'
 }

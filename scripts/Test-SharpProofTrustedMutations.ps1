@@ -757,6 +757,14 @@ $mutations = @(
         Mutated = '            runtimeSnapshot?.ComponentPaths.Any(path => path.Length == 0) == true)'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~RequestProjectionRejectsDiscoveredRuntimeAssetCollisionBeforeManifestRead'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-validates-static-alias-before-snapshot'
+        File = 'SharpProof.Worker.Launcher\Program.cs'
+        Original = '            arguments.ValidateDistinctPaths();'
+        Mutated = '            arguments.ValidatePreflight();'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~WorkerRuntimeCompanionAliasIsRejectedBeforeInvalidationDeletesIt'
     }
 )
 
