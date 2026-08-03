@@ -205,6 +205,67 @@ public sealed class DependencyAutomationTests
         }
     }
 
+    [Test]
+    public void RepositorySecurityPinsExternalWorkflowActionsToImmutableShas()
+    {
+        var workflowDirectory = Path.Combine(
+            RepositoryRoot(),
+            ".github",
+            "workflows");
+        var references = Directory.EnumerateFiles(workflowDirectory)
+            .Where(static path =>
+                string.Equals(
+                    Path.GetExtension(path),
+                    ".yml",
+                    StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(
+                    Path.GetExtension(path),
+                    ".yaml",
+                    StringComparison.OrdinalIgnoreCase))
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .SelectMany(path => File.ReadLines(path)
+                .Select((line, index) => new
+                {
+                    Path = path,
+                    Line = line,
+                    Number = index + 1
+                }))
+            .Where(static entry => entry.Line.TrimStart().StartsWith(
+                "uses:",
+                StringComparison.Ordinal))
+            .ToArray();
+
+        Assert.That(references, Is.Not.Empty);
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var reference in references)
+            {
+                var value = reference.Line.TrimStart()["uses:".Length..]
+                    .Trim();
+                if (value.StartsWith("./", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var at = value.LastIndexOf('@');
+                Assert.That(
+                    at,
+                    Is.GreaterThan(0),
+                    $"{reference.Path}:{reference.Number}");
+                if (at <= 0)
+                {
+                    continue;
+                }
+
+                var revision = value[(at + 1)..].Split('#')[0].Trim();
+                Assert.That(
+                    revision,
+                    Does.Match("^[0-9a-fA-F]{40}$"),
+                    $"{reference.Path}:{reference.Number}");
+            }
+        }
+    }
+
     private static void AssertCompilerCeiling(string block)
     {
         using (Assert.EnterMultipleScope())
