@@ -150,7 +150,8 @@ public sealed class WorkerBinaryIdentityTests
                     {
                         Assert.That(
                             (Action)(() => File.AppendAllText(component, "blocked")),
-                            Throws.InstanceOf<IOException>());
+                            Throws.InstanceOf<IOException>(),
+                            component);
                     }
                 }
             }
