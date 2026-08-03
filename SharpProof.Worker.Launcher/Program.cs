@@ -77,6 +77,14 @@ internal static class Program
         {
             using (runtimeSnapshot)
             {
+                if (WorkerBinaryIdentity.ComputeSha256(
+                        runtimeSnapshot.ExecutionWorkerPath) !=
+                    runtimeSnapshot.Sha256)
+                {
+                    throw new InvalidOperationException(
+                        "The staged worker runtime closure changed before launch.");
+                }
+
                 exitCode = RunWorker(
                     arguments,
                     request,
