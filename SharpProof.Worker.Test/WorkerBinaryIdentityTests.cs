@@ -95,13 +95,18 @@ public sealed class WorkerBinaryIdentityTests
                 {
                     exception = observed;
                 }
+                catch (FileNotFoundException observed)
+                {
+                    exception = observed;
+                }
 
                 Assert.That(
                     exception?.GetType(),
                     Is.AnyOf(
                         typeof(InvalidDataException),
                         typeof(KeyNotFoundException),
-                        typeof(InvalidOperationException)));
+                        typeof(InvalidOperationException),
+                        typeof(FileNotFoundException)));
             }
         }
         finally
@@ -160,12 +165,6 @@ public sealed class WorkerBinaryIdentityTests
             var worker = Path.Combine(
                 temporaryDirectory,
                 "SharpProof.Worker.dll");
-            var dependency = Path.Combine(
-                temporaryDirectory,
-                "SharpProof.Worker.deps.json");
-            var runtimeConfig = Path.Combine(
-                temporaryDirectory,
-                "SharpProof.Worker.runtimeconfig.json");
             var appLocalAsset = Path.Combine(
                 temporaryDirectory,
                 "System.Collections.Immutable.dll");
@@ -183,11 +182,6 @@ public sealed class WorkerBinaryIdentityTests
                 "win-x64",
                 "native",
                 "libz3.dll");
-            var lockedComponents = new[] {
-                worker, dependency, runtimeConfig, heldComponent,
-                Path.Combine(temporaryDirectory, "SharpProof.Smt.dll"),
-                appLocalAsset, nativeZ3
-            };
             using (var oversized = new FileStream(
                        heldComponent,
                        FileMode.Create,
@@ -203,11 +197,15 @@ public sealed class WorkerBinaryIdentityTests
                 Path.Combine(sourceDirectory, "SharpProof.Verify.dll"),
                 heldComponent,
                 overwrite: true);
+            string stagedWorker;
             using (var snapshot = WorkerBinaryIdentity.CreateSnapshot(worker))
             {
+                stagedWorker = snapshot.ExecutionWorkerPath;
                 using (Assert.EnterMultipleScope())
                 {
                     Assert.That(snapshot.WorkerPath, Is.EqualTo(worker));
+                    Assert.That(snapshot.ExecutionWorkerPath, Is.Not.EqualTo(worker));
+                    Assert.That(File.Exists(snapshot.ExecutionWorkerPath), Is.True);
                     Assert.That(snapshot.Sha256, Is.EqualTo(baseline));
                     Assert.That(
                         new HashSet<string>(
@@ -220,16 +218,14 @@ public sealed class WorkerBinaryIdentityTests
                     Assert.That(
                         snapshot.ComponentPaths,
                         Does.Contain(appLocalAsset));
-                    foreach (var component in lockedComponents)
-                    {
-                        Assert.That(
-                            (Action)(() => File.AppendAllText(component, "blocked")),
-                            Throws.InstanceOf<IOException>(),
-                            component);
-                    }
                 }
+
+                var stagedBytes = File.ReadAllBytes(snapshot.ExecutionWorkerPath);
+                File.AppendAllText(heldComponent, "source-mutated");
+                Assert.That(File.ReadAllBytes(snapshot.ExecutionWorkerPath),
+                    Is.EqualTo(stagedBytes));
             }
-            File.AppendAllText(heldComponent, "released");
+            Assert.That(File.Exists(stagedWorker), Is.False);
             Assert.That(
                 WorkerBinaryIdentity.ComputeSha256(worker),
                 Is.Not.EqualTo(baseline));

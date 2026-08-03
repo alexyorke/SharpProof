@@ -77,7 +77,11 @@ internal static class Program
         {
             using (runtimeSnapshot)
             {
-                exitCode = RunWorker(arguments, request, artifact.Compilation.ProjectDirectory);
+                exitCode = RunWorker(
+                    arguments,
+                    request,
+                    artifact.Compilation.ProjectDirectory,
+                    runtimeSnapshot.ExecutionWorkerPath);
             }
         }
         catch (Exception exception) when (ClassifyLauncherFailure(exception) is { } failure)
@@ -162,7 +166,7 @@ internal static class Program
 
     private static int RunWorker(
         LauncherArguments arguments, WorkerVerifyRequest request,
-        string projectDirectory)
+        string projectDirectory, string workerPath)
     {
         var hardLimit = ComputeHardLimit(
             request.Budgets.ProjectWallTimeMilliseconds, arguments.TerminationGraceMilliseconds);
@@ -173,7 +177,7 @@ internal static class Program
             startEventName);
         using var process = job.StartSuspended(
             ResolveDotNetHostPath(projectDirectory),
-            [arguments.WorkerPath, "verify", "--request", arguments.RequestPath,
+            [workerPath, "verify", "--request", arguments.RequestPath,
                 "--result", arguments.ResultPath, "--start-event", startEventName],
             projectDirectory);
         process.Resume();
@@ -246,7 +250,7 @@ internal static class Program
         WorkerRuntimeClosureSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
-        var version = FileVersionInfo.GetVersionInfo(snapshot.WorkerPath);
+        var version = FileVersionInfo.GetVersionInfo(snapshot.ExecutionWorkerPath);
         return CompilerArtifactInputHash.Compute(
             request, artifactBytes, RequiredVersion(version.ProductName, "product name"),
             RequiredVersion(version.ProductVersion, "product version"),
