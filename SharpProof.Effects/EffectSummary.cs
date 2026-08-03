@@ -207,7 +207,9 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary>
             left.Reads.Union(right.Reads), left.Writes.Union(right.Writes),
             left.Allocation | right.Allocation, left.Capabilities.Union(right.Capabilities),
             left.Throws.Union(right.Throws),
-            JoinTermination(left.Termination, right.Termination),
+            left.Termination > right.Termination
+                ? left.Termination
+                : right.Termination,
             left.Completeness > right.Completeness
                 ? left.Completeness
                 : right.Completeness,
@@ -233,9 +235,4 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary>
         return (left & ~right) == 0;
     }
 
-    private static EffectTermination JoinTermination(
-        EffectTermination left, EffectTermination right)
-    {
-        return left > right ? left : right;
-    }
 }
