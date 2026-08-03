@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Xml.Linq;
 using NUnit.Framework;
+using SharpProof.CompilerArtifact;
 using SharpProof.Worker;
 using SharpProof.Worker.Launcher;
 using SharpProof.Worker.Protocol;
@@ -1520,6 +1521,7 @@ public sealed class WorkerMsBuildIntegrationTests
             static value => value.ToString(
                 "x2", CultureInfo.InvariantCulture)));
         workerPath ??= WorkerOutputPath();
+        var workerBinarySha256 = WorkerBinaryIdentity.ComputeSha256(workerPath);
         var expectedInputHash = Program.ComputeExpectedInputHash(
             workerPath, request, artifact.Bytes);
         using (Assert.EnterMultipleScope())
@@ -1528,6 +1530,9 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(response.RequestHash,
                 Is.EqualTo(WorkerProtocolJson.ComputeRequestHash(request)));
             Assert.That(response.InputHash, Is.EqualTo(expectedInputHash));
+            Assert.That(
+                response.Summary.Versions.WorkerBinarySha256,
+                Is.EqualTo(workerBinarySha256));
             Assert.That(
                 artifact.ManifestHash,
                 Is.EqualTo(response.Manifest.Hash));
