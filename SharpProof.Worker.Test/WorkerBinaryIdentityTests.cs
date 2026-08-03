@@ -250,9 +250,18 @@ public sealed class WorkerBinaryIdentityTests
                 }
 
                 var stagedBytes = File.ReadAllBytes(snapshot.ExecutionWorkerPath);
+                var stagedHeldComponent = Path.Combine(
+                    Path.GetDirectoryName(snapshot.ExecutionWorkerPath)!,
+                    Path.GetRelativePath(
+                        Path.GetDirectoryName(worker)!,
+                        heldComponent));
+                var stagedHeldBytes = File.ReadAllBytes(stagedHeldComponent);
                 File.AppendAllText(heldComponent, "source-mutated");
                 Assert.That(File.ReadAllBytes(snapshot.ExecutionWorkerPath),
                     Is.EqualTo(stagedBytes));
+                Assert.That(
+                    File.ReadAllBytes(stagedHeldComponent),
+                    Is.EqualTo(stagedHeldBytes));
             }
             Assert.That(File.Exists(stagedWorker), Is.False);
             Assert.That(
