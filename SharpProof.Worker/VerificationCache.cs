@@ -90,7 +90,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
     {
         cancellationToken.ThrowIfCancellationRequested();
         var files = new DirectoryInfo(_directory)
-            .EnumerateFiles("*.json", SearchOption.TopDirectoryOnly)
+            .EnumerateFiles("*.sharp-proof-cache.json", SearchOption.TopDirectoryOnly)
             .OrderBy(static file => file.LastWriteTimeUtc)
             .ThenBy(static file => file.Name, StringComparer.Ordinal)
             .ToArray();
@@ -123,7 +123,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             throw new ArgumentException("A SHA-256 input hash is required.", nameof(inputHash));
         }
 
-        return Path.Combine(_directory, inputHash + ".json");
+        return Path.Combine(_directory, inputHash + ".sharp-proof-cache.json");
     }
 
     private static string HashText(string value)

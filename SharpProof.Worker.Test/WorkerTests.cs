@@ -1515,7 +1515,7 @@ public sealed class WorkerTests
 
         Assert.That(backend.CallCount, Is.EqualTo(requests.Count));
         Assert.That(
-            Directory.GetFiles(project.CacheDirectory, "*.json"),
+            Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
             Has.Length.EqualTo(requests.Count));
 
         void Add(
@@ -3125,7 +3125,7 @@ public sealed class WorkerTests
         AssertSemanticallyEquivalent(first, second);
         Assert.That(
             Directory.Exists(project.CacheDirectory)
-                ? Directory.GetFiles(project.CacheDirectory, "*.json")
+                ? Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json")
                 : [],
             Is.Empty);
     }
@@ -3411,7 +3411,7 @@ public sealed class WorkerTests
         var first = await worker.VerifyAsync(request);
         var cacheFile = Directory.GetFiles(
             project.CacheDirectory,
-            "*.json").Single();
+            "*.sharp-proof-cache.json").Single();
         await File.WriteAllTextAsync(cacheFile, "{corrupt");
         var second = await worker.VerifyAsync(request);
 
@@ -3429,7 +3429,7 @@ public sealed class WorkerTests
         var first = await worker.VerifyAsync(request);
         var cacheFile = Directory.GetFiles(
             project.CacheDirectory,
-            "*.json").Single();
+            "*.sharp-proof-cache.json").Single();
         var current = "\"schemaVersion\":" +
             WorkerCacheVersions.Current.ToString(
                 System.Globalization.CultureInfo.InvariantCulture);
@@ -3461,8 +3461,24 @@ public sealed class WorkerTests
 
         Assert.That(backend.CallCount, Is.EqualTo(2));
         Assert.That(
-            Directory.GetFiles(project.CacheDirectory, "*.json"),
+            Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
             Is.Empty);
+    }
+
+    [Test]
+    public async Task CacheEvictionPreservesUnrelatedJsonFiles()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        Directory.CreateDirectory(project.CacheDirectory);
+        var unrelatedPath = Path.Combine(project.CacheDirectory, "unrelated.json");
+        await File.WriteAllTextAsync(unrelatedPath, "not a cache entry");
+
+        var request = project.CreateRequest(cacheEnabled: true);
+        request.Cache.MaximumBytes = 1;
+        using var worker = new SharpProofWorker(new SpuriousModelBackend());
+        await worker.VerifyAsync(request);
+
+        Assert.That(File.Exists(unrelatedPath), Is.True);
     }
 
     [Test]
@@ -3495,7 +3511,7 @@ public sealed class WorkerTests
                 cached.Summary.CacheStatus,
                 Is.EqualTo(WorkerCacheStatus.Hit));
             Assert.That(
-                Directory.GetFiles(project.CacheDirectory, "*.json"),
+                Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
                 Has.Length.EqualTo(1));
         }
     }
@@ -3942,7 +3958,7 @@ public sealed class WorkerTests
         Assert.That(backend.CallCount, Is.EqualTo(2));
         Assert.That(second.InputHash, Is.Not.EqualTo(first.InputHash));
         Assert.That(
-            Directory.GetFiles(project.CacheDirectory, "*.json"),
+            Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
             Has.Length.EqualTo(2));
     }
 
@@ -3974,7 +3990,7 @@ public sealed class WorkerTests
         }
         Assert.That(
             Directory.Exists(project.CacheDirectory)
-                ? Directory.GetFiles(project.CacheDirectory, "*.json")
+                ? Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json")
                 : [],
             Is.Empty);
     }
@@ -4170,7 +4186,7 @@ public sealed class WorkerTests
     private static string[] CacheFiles(TestProject project)
     {
         return Directory.Exists(project.CacheDirectory)
-            ? Directory.GetFiles(project.CacheDirectory, "*.json")
+            ? Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json")
             : [];
     }
 

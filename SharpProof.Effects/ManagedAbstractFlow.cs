@@ -806,20 +806,17 @@ internal sealed class ManagedAbstractFlow
             ControlFlowConditionKind.WhenFalse => false,
             _ => null
         };
-        if (Regular(block.FallThroughSuccessor))
+        if (block.FallThroughSuccessor is
+            { Semantics: ControlFlowBranchSemantics.Regular, Destination: not null })
         {
             yield return (block.FallThroughSuccessor!, !expected);
         }
 
-        if (Regular(block.ConditionalSuccessor))
+        if (block.ConditionalSuccessor is
+            { Semantics: ControlFlowBranchSemantics.Regular, Destination: not null })
         {
             yield return (block.ConditionalSuccessor!, expected);
         }
-    }
-
-    private static bool Regular(ControlFlowBranch? branch)
-    {
-        return branch is { Semantics: ControlFlowBranchSemantics.Regular, Destination: not null };
     }
 
     private static EffectAnalysisIncompleteReason CheckBudget(
