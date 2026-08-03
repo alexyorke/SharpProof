@@ -256,6 +256,33 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void RequestProjectionRejectsCachePathCollisionBeforeManifestRead()
+    {
+        var requestPath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "request.json");
+        string[] arguments = [
+            "verify",
+            "--worker", "worker.dll",
+            "--request", requestPath,
+            "--result", Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "result.json"),
+            "--compiler-manifest", "missing-compiler-manifest.json",
+            "--cache-directory", requestPath,
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
     public void RequestProjectionRejectsWorkerPathCollisionBeforeManifestRead()
     {
         string[] arguments = [

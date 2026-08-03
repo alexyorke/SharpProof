@@ -37,7 +37,6 @@ internal static class Program
         try
         {
             arguments.ValidatePreflight();
-            arguments.ValidateDistinctPaths(runtimeSnapshot);
             runtimeSnapshot = WorkerBinaryIdentity.CreateSnapshot(
                 arguments.WorkerPath);
             request = arguments.CreateRequest(
@@ -571,16 +570,17 @@ internal sealed partial class LauncherArguments
             Path.ChangeExtension(workerPath, ".deps.json"),
             Path.ChangeExtension(workerPath, ".runtimeconfig.json")
         };
+        var cacheDirectory = Optional("cache-directory");
         string?[] candidates = [..runtimeRoots,
             ..LauncherArguments.LauncherRuntimePaths,
-            RequestPath, ResultPath, CompilerManifestPath,
+            cacheDirectory, RequestPath, ResultPath, CompilerManifestPath,
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath];
         var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (candidates.OfType<string>().Any(path => !paths.Add(path)) ||
             runtimeSnapshot?.ComponentPaths.Any(path =>
                 !runtimeRoots.Contains(path, StringComparer.OrdinalIgnoreCase) &&
-                !paths.Add(path)) == true)
+                !paths.Add(path)) is true)
         {
             throw new ArgumentException("SharpProof I/O paths must be distinct.");
         }

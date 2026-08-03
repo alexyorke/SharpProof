@@ -1282,7 +1282,7 @@ internal readonly record struct ManagedAbstractValue(
             return Integer(IntervalValue.Range(integer.Minimum, integer.Maximum));
         }
 
-        return type?.IsReferenceType == true ? Reference(NullnessValue.MaybeNull) : Unknown;
+        return type?.IsReferenceType is true ? Reference(NullnessValue.MaybeNull) : Unknown;
     }
 
     internal static ManagedAbstractValue DefaultForType(ITypeSymbol? type)
@@ -1297,7 +1297,7 @@ internal readonly record struct ManagedAbstractValue(
             return Integer(IntervalValue.Constant(0));
         }
 
-        return type?.IsReferenceType == true ? Null : Unknown;
+        return type?.IsReferenceType is true ? Null : Unknown;
     }
 
     internal static ManagedAbstractValue FromConstant(object? value, ITypeSymbol? type)
@@ -1728,7 +1728,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
          conversion.Conversion.IsImplicit) &&
         conversion.Operand.Type?.TypeKind != TypeKind.Dynamic &&
         conversion.Type?.TypeKind != TypeKind.Dynamic &&
-        !(conversion.Operand.Type?.IsValueType == true && conversion.Type?.IsReferenceType == true);
+        !(conversion.Operand.Type?.IsValueType is true && conversion.Type?.IsReferenceType is true);
     }
 
     private static SyntaxNode? GetBody(SyntaxNode declaration)
