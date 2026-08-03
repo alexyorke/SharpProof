@@ -11,5 +11,6 @@
     <EnablePackageValidation>true</EnablePackageValidation>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryCommit Condition="'$(RepositoryCommit)' == ''">$(GITHUB_SHA)</RepositoryCommit>
   </PropertyGroup>
 </Project>

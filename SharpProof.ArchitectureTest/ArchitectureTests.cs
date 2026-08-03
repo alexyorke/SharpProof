@@ -915,7 +915,24 @@ public sealed class ArchitectureTests
             "Use /p: and /m: in workflow PowerShell commands so script " +
             "parameter binding cannot consume MSBuild switches." +
             Environment.NewLine +
-            string.Join(Environment.NewLine, violations));
+                string.Join(Environment.NewLine, violations));
+    }
+
+    [Test]
+    public void ReleasePackageWorkflowBindsTheExactRepositoryCommit()
+    {
+        var workflow = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            ".github",
+            "workflows",
+            "package-consumers.yml"));
+        var bindings = Regex.Matches(
+                workflow,
+                @"/p:RepositoryCommit=\$env:GITHUB_SHA",
+                RegexOptions.CultureInvariant)
+            .Count;
+
+        Assert.That(bindings, Is.EqualTo(3));
     }
 
     [Test]

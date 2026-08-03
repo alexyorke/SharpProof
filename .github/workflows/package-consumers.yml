@@ -75,6 +75,7 @@ jobs:
           restore SharpProof.sln
           --locked-mode
           /p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION
+          /p:RepositoryCommit=$env:GITHUB_SHA
 
       - name: Build package payloads
         shell: pwsh
@@ -84,6 +85,7 @@ jobs:
           --configuration Release
           --no-restore
           /p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION
+          /p:RepositoryCommit=$env:GITHUB_SHA
 
       - name: Pack and validate the three-package graph
         shell: pwsh
@@ -106,7 +108,8 @@ jobs:
               --configuration Release `
               --no-build `
               --output nupkgs `
-              /p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION
+              /p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION `
+              /p:RepositoryCommit=$env:GITHUB_SHA
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
