@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 
@@ -101,13 +102,17 @@ public sealed class WorkerBinaryIdentityTests
             var runtimeConfig = Path.Combine(
                 temporaryDirectory,
                 "SharpProof.Worker.runtimeconfig.json");
+            var appLocalAsset = Path.Combine(
+                temporaryDirectory,
+                "System.Collections.Immutable.dll");
+            File.Copy(
+                typeof(ImmutableArray<>).Assembly.Location,
+                appLocalAsset,
+                overwrite: true);
             var baseline = WorkerBinaryIdentity.ComputeSha256(worker);
             var heldComponent = Path.Combine(
                 temporaryDirectory,
                 "SharpProof.Verify.dll");
-            var appLocalAsset = Path.Combine(
-                temporaryDirectory,
-                "System.Collections.Immutable.dll");
             var nativeZ3 = Path.Combine(
                 temporaryDirectory,
                 "runtimes",
