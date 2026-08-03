@@ -266,6 +266,65 @@ public sealed class DependencyAutomationTests
         }
     }
 
+    [Test]
+    public void RepositoryWorkflowsUseThePinnedRepositorySdk()
+    {
+        var workflowDirectory = Path.Combine(
+            RepositoryRoot(),
+            ".github",
+            "workflows");
+        var versions = Directory.EnumerateFiles(workflowDirectory)
+            .Where(static path =>
+                string.Equals(
+                    Path.GetExtension(path),
+                    ".yml",
+                    StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(
+                    Path.GetExtension(path),
+                    ".yaml",
+                    StringComparison.OrdinalIgnoreCase))
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .SelectMany(path => File.ReadLines(path)
+                .Select((line, index) => new
+                {
+                    Path = path,
+                    Value = line,
+                    Number = index + 1
+                }))
+            .Where(static entry => entry.Value.TrimStart().StartsWith(
+                "dotnet-version:",
+                StringComparison.Ordinal))
+            .Select(static entry => new
+            {
+                entry.Path,
+                entry.Number,
+                Value = entry.Value.TrimStart()["dotnet-version:".Length..]
+                    .Split('#')[0]
+                    .Trim()
+                    .Trim('"', '\'')
+            })
+            .ToArray();
+
+        Assert.That(versions, Is.Not.Empty);
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var version in versions)
+            {
+                Assert.That(
+                    version.Value,
+                    Is.AnyOf("9.0.316", "9.0.300"),
+                    $"{version.Path}:{version.Number}");
+            }
+
+            Assert.That(
+                versions.Count(static version => version.Value == "9.0.316"),
+                Is.GreaterThan(0));
+            Assert.That(
+                versions.Count(static version => version.Value == "9.0.300"),
+                Is.EqualTo(1));
+        }
+    }
+
     private static void AssertCompilerCeiling(string block)
     {
         using (Assert.EnterMultipleScope())

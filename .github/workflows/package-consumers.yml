@@ -33,7 +33,7 @@ jobs:
       - name: Setup required .NET SDKs
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "9.0.316"
           global-json-file: global.json
 
       - name: Select the artifact version
@@ -200,7 +200,7 @@ jobs:
       - name: Setup required .NET SDKs
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "9.0.316"
           global-json-file: global.json
 
       - name: Prime the framework-only package cache
@@ -411,7 +411,7 @@ jobs:
       - name: Setup required .NET SDKs
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "9.0.316"
           global-json-file: global.json
 
       - name: Resolve the immutable release coverage baseline
@@ -1005,7 +1005,7 @@ jobs:
       - name: Setup required .NET SDKs
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "9.0.316"
           global-json-file: global.json
 
       - name: Download the tested private-preview bytes
@@ -1065,7 +1065,7 @@ jobs:
       - name: Setup required .NET SDKs
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "9.0.316"
           global-json-file: global.json
 
       - name: Download the tested release bytes
