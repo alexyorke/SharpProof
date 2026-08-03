@@ -559,7 +559,13 @@ internal sealed partial class LauncherArguments
         var compilerManifest = CreateCompilerManifestReference(
             out artifact,
             out artifactBytes);
-        return ProjectRequest(compilerManifest);
+        var request = ProjectRequest(compilerManifest);
+        ValidateDistinctPaths(
+            runtimeSnapshot,
+            WorkerCachePath.Resolve(
+                Optional("cache-directory"),
+                artifact.Compilation.ProjectDirectory));
+        return request;
     }
 
     internal void ValidateDistinctPaths(

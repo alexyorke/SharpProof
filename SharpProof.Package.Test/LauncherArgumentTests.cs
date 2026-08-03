@@ -235,6 +235,40 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void CachePathResolutionUsesTheManifestProjectDirectory()
+    {
+        var projectDirectory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "cache-project");
+        var defaultPath = Path.Combine(
+            projectDirectory,
+            "obj",
+            "SharpProof",
+            "cache");
+        var relativePath = Path.Combine("nested", "cache");
+        var absolutePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "absolute-cache");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                WorkerCachePath.Resolve(null, projectDirectory),
+                Is.EqualTo(Path.GetFullPath(defaultPath)));
+            Assert.That(
+                WorkerCachePath.Resolve(" ", projectDirectory),
+                Is.EqualTo(Path.GetFullPath(defaultPath)));
+            Assert.That(
+                WorkerCachePath.Resolve(relativePath, projectDirectory),
+                Is.EqualTo(Path.GetFullPath(
+                    Path.Combine(projectDirectory, relativePath))));
+            Assert.That(
+                WorkerCachePath.Resolve(absolutePath, projectDirectory),
+                Is.EqualTo(Path.GetFullPath(absolutePath)));
+        }
+    }
+
+    [Test]
     public void RequestProjectionRejectsCollidingIoPathsBeforeManifestRead()
     {
         string[] arguments = [

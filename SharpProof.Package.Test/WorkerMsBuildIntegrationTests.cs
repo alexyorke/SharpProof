@@ -961,6 +961,37 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task DirectLauncherRejectsRelativeCacheAliasAfterManifestResolution()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var projectDirectory = Path.GetDirectoryName(project.ProjectPath)!;
+        var relativeManifest = Path.GetRelativePath(
+            projectDirectory,
+            project.CompilerManifestPath);
+        string[] arguments = [
+            "verify",
+            "--worker", WorkerOutputPath(),
+            "--request", project.RequestPath,
+            "--result", project.ResultPath,
+            "--compiler-manifest", project.CompilerManifestPath,
+            "--cache-directory", relativeManifest,
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
     public async Task WorkerRuntimeAssetAliasIsRejectedBeforeInvalidationDeletesIt()
     {
         RequireWindowsWorker();
