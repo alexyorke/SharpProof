@@ -256,11 +256,22 @@ internal sealed class ManagedAbstractFlow
         {
             IUnaryOperation { OperatorKind: UnaryOperatorKind.Not } unary =>
                 Assume(state, unary.Operand, !expected),
-            IBinaryOperation { OperatorKind: BinaryOperatorKind.ConditionalAnd } binary when expected =>
+            IBinaryOperation
+            {
+                OperatorKind: BinaryOperatorKind.ConditionalAnd,
+                OperatorMethod: null,
+                IsLifted: false
+            } binary when expected =>
                 Assume(Assume(state, binary.LeftOperand, true), binary.RightOperand, true),
-            IBinaryOperation { OperatorKind: BinaryOperatorKind.ConditionalOr } binary when !expected =>
+            IBinaryOperation
+            {
+                OperatorKind: BinaryOperatorKind.ConditionalOr,
+                OperatorMethod: null,
+                IsLifted: false
+            } binary when !expected =>
                 Assume(Assume(state, binary.LeftOperand, false), binary.RightOperand, false),
-            IBinaryOperation binary => AssumeComparison(state, binary.LeftOperand, binary.RightOperand,
+            IBinaryOperation { OperatorMethod: null, IsLifted: false } binary =>
+                AssumeComparison(state, binary.LeftOperand, binary.RightOperand,
                 binary.OperatorKind, expected),
             IIsNullOperation isNull when TryStorage(isNull.Operand, out var storage) =>
                 Refine(state, storage, BinaryOperatorKind.Equals, ManagedAbstractValue.Null, expected),
@@ -429,7 +440,8 @@ internal sealed class ManagedAbstractFlow
             IIsNullOperation isNull => NullTest(isNull, state),
             IConversionOperation conversion => ConvertValue(conversion, state),
             IUnaryOperation unary => EvaluateUnary(unary, state),
-            IBinaryOperation binary => ManagedAbstractValue.Binary(binary.OperatorKind,
+            IBinaryOperation { OperatorMethod: null, IsLifted: false } binary =>
+                ManagedAbstractValue.Binary(binary.OperatorKind,
                 EvaluateCore(binary.LeftOperand, state), EvaluateCore(binary.RightOperand, state), binary.Type),
             IConditionalOperation conditional => EvaluateConditional(conditional, state),
             ICoalesceOperation coalesce => EvaluateCoalesce(coalesce, state),
@@ -741,13 +753,15 @@ internal sealed class ManagedAbstractFlow
 
     private static bool ValuePreserving(IConversionOperation conversion)
     {
-        if (conversion.OperatorMethod != null || conversion.Conversion.IsUserDefined || conversion.IsTryCast)
+        if (conversion is { OperatorMethod: not null } or
+            { Conversion: { IsUserDefined: true } } or
+            { IsTryCast: true })
         {
             return false;
         }
 
-        if (conversion.Conversion.IsIdentity ||
-            conversion.Conversion.IsImplicit && conversion.Conversion.IsReference)
+        if (conversion.Conversion is { IsIdentity: true } or
+            { IsImplicit: true, IsReference: true })
         {
             return true;
         }

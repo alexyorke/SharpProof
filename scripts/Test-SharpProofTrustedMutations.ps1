@@ -703,6 +703,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~ContractRequiresRefinesSubsequentFacts'
     },
     [pscustomobject]@{
+        Name = 'effect-managed-flow-binary-refinement-guard'
+        File = 'SharpProof.Effects\ManagedAbstractFlow.cs'
+        Original = "            IBinaryOperation { OperatorMethod: null, IsLifted: false } binary =>`n                AssumeComparison(state, binary.LeftOperand, binary.RightOperand,"
+        Mutated = "            IBinaryOperation binary =>`n                AssumeComparison(state, binary.LeftOperand, binary.RightOperand,"
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~UserDefinedEqualityDoesNotRefineNullness'
+    },
+    [pscustomobject]@{
+        Name = 'effect-managed-flow-binary-evaluation-guard'
+        File = 'SharpProof.Effects\ManagedAbstractFlow.cs'
+        Original = "            IBinaryOperation { OperatorMethod: null, IsLifted: false } binary =>`n                ManagedAbstractValue.Binary(binary.OperatorKind,"
+        Mutated = "            IBinaryOperation binary =>`n                ManagedAbstractValue.Binary(binary.OperatorKind,"
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~UserDefinedEqualityEvaluatesAsUnknown'
+    },
+    [pscustomobject]@{
         Name = 'contract-api-closed-category-parity'
         File = 'SharpProof.Frontend\ContractApiMetadata.generated.cs'
         Original = "                NotNull,`n                `"NotNullAttribute`",`n                ContractApiAttributeCategory.Closed,"

@@ -219,6 +219,70 @@ public sealed class ManagedAbstractFlowTests
     }
 
     [Test]
+    public void UserDefinedEqualityDoesNotRefineNullness()
+    {
+        var (analysis, call) = AnalyzeSingleCall(
+            """
+            public sealed class Token {
+                public static bool operator ==(Token left, Token right) => true;
+                public static bool operator !=(Token left, Token right) => false;
+                public override bool Equals(object other) => true;
+                public override int GetHashCode() => 0;
+            }
+
+            public static class Sample {
+                private static void Sink(Token value) {
+                }
+
+                public static void Calls(Token value) {
+                    if (value == null)
+                        Sink(value);
+                }
+            }
+            """);
+
+        Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
+        Assert.That(
+            analysis.Result!.TryEvaluate(
+                call,
+                call.Arguments[0].Value,
+                out var value),
+            Is.True);
+        Assert.That(value.TryGetNullness(out var nullness), Is.True);
+        Assert.That(nullness, Is.EqualTo(NullnessValue.MaybeNull));
+    }
+
+    [Test]
+    public void UserDefinedEqualityEvaluatesAsUnknown()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class Token {
+                public static bool operator ==(Token left, Token right) => true;
+                public static bool operator !=(Token left, Token right) => false;
+                public override bool Equals(object other) => true;
+                public override int GetHashCode() => 0;
+            }
+
+            public static class Sample {
+                public static bool Calls() => new Token() == null;
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Calls");
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        var binary = root.Descendants().OfType<IBinaryOperation>().Single();
+
+        var value = ManagedAbstractFlow.ForCompilation(compilation)
+            .Evaluate(binary, ManagedFlowState.Empty);
+
+        Assert.That(value.IsBoolean, Is.True);
+        Assert.That(value.TryGetBoolean(out _), Is.False);
+    }
+
+    [Test]
     public void SharedEdgeRefinementPreservesBooleanFactsAcrossOperationIdentity()
     {
         var compilation = EffectTestHost.CreateCompilation(
