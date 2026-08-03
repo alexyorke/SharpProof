@@ -58,6 +58,59 @@ public sealed class WorkerBinaryIdentityTests
     }
 
     [Test]
+    public void MalformedRuntimeDependencyManifestsFailClosed()
+    {
+        var sourceWorker = typeof(SharpProofWorker).Assembly.Location;
+        var temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.MalformedWorkerDeps." + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temporaryDirectory);
+        try
+        {
+            var worker = Path.Combine(temporaryDirectory, "SharpProof.Worker.dll");
+            var dependency = Path.ChangeExtension(worker, ".deps.json");
+            File.Copy(sourceWorker, worker);
+            foreach (var json in new[] {
+                         "{}",
+                         "{\"runtimeTarget\":1,\"targets\":{}}",
+                         "{\"runtimeTarget\":{\"name\":\"missing\"},\"targets\":{}}",
+                         "{\"runtimeTarget\":{\"name\":\"app\"},\"targets\":{\"app\":{\"lib\":{\"runtimeTargets\":{\"asset.dll\":{}}}}}}"
+                     })
+            {
+                File.WriteAllText(dependency, json);
+                Exception? exception = null;
+                try
+                {
+                    using var snapshot = WorkerBinaryIdentity.CreateSnapshot(worker);
+                }
+                catch (InvalidDataException observed)
+                {
+                    exception = observed;
+                }
+                catch (KeyNotFoundException observed)
+                {
+                    exception = observed;
+                }
+                catch (InvalidOperationException observed)
+                {
+                    exception = observed;
+                }
+
+                Assert.That(
+                    exception?.GetType(),
+                    Is.AnyOf(
+                        typeof(InvalidDataException),
+                        typeof(KeyNotFoundException),
+                        typeof(InvalidOperationException)));
+            }
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    [Test]
     public void RuntimeClosureComponentPathsAreImmutable()
     {
         using var snapshot = WorkerBinaryIdentity.CreateSnapshot(

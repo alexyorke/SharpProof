@@ -61,7 +61,8 @@ internal static class Program
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or
                 ArgumentException or FormatException or OverflowException or
-                InvalidDataException or JsonException)
+                InvalidDataException or JsonException or KeyNotFoundException or
+                InvalidOperationException)
         {
             runtimeSnapshot?.Dispose();
             runtimeSnapshot = null;

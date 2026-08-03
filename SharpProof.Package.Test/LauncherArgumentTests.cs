@@ -490,6 +490,46 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    [NonParallelizable]
+    public async Task MainFailsClosedWhenWorkerDependencyManifestIsMalformed()
+    {
+        var sourceWorker = typeof(SharpProofWorker).Assembly.Location;
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var worker = Path.Combine(directory, "worker.dll");
+        try
+        {
+            File.Copy(sourceWorker, worker);
+            File.Copy(
+                Path.ChangeExtension(sourceWorker, ".runtimeconfig.json"),
+                Path.ChangeExtension(worker, ".runtimeconfig.json"));
+            await File.WriteAllTextAsync(
+                Path.ChangeExtension(worker, ".deps.json"), "{}");
+
+            var exitCode = await Program.Main([
+                "verify",
+                "--worker", worker,
+                "--request", Path.Combine(directory, "request.json"),
+                "--result", Path.Combine(directory, "result.json"),
+                "--compiler-manifest", Path.Combine(directory, "missing.json"),
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow"
+            ]);
+
+            Assert.That(exitCode, Is.EqualTo(2));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Test]
     public void CombinedTimeoutOverflowIsRejectedBeforeStartingWorker()
     {
         Action action = () => _ = Program.ComputeHardLimit(
