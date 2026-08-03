@@ -753,7 +753,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'launcher-checks-discovered-runtime-paths'
         File = 'SharpProof.Worker.Launcher\Program.cs'
-        Original = '            runtimeSnapshot?.ComponentPaths.Any(path => !paths.Add(path)) == true)'
+        Original = "            runtimeSnapshot?.ComponentPaths.Any(path =>`n                !runtimeRoots.Contains(path, StringComparer.OrdinalIgnoreCase) &&`n                !paths.Add(path)) == true)"
         Mutated = '            false)'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~RequestProjectionRejectsDiscoveredRuntimeAssetCollisionBeforeManifestRead'

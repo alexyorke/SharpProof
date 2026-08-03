@@ -560,6 +560,11 @@ internal sealed partial class LauncherArguments
         WorkerRuntimeClosureSnapshot? runtimeSnapshot)
     {
         var workerPath = WorkerPath;
+        var runtimeRoots = new[] {
+            workerPath,
+            Path.ChangeExtension(workerPath, ".deps.json"),
+            Path.ChangeExtension(workerPath, ".runtimeconfig.json")
+        };
         string?[] candidates = [workerPath,
             Path.ChangeExtension(workerPath, ".deps.json"),
             Path.ChangeExtension(workerPath, ".runtimeconfig.json"),
@@ -568,7 +573,9 @@ internal sealed partial class LauncherArguments
             PublishSarifPath];
         var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (candidates.OfType<string>().Any(path => !paths.Add(path)) ||
-            runtimeSnapshot?.ComponentPaths.Any(path => !paths.Add(path)) == true)
+            runtimeSnapshot?.ComponentPaths.Any(path =>
+                !runtimeRoots.Contains(path, StringComparer.OrdinalIgnoreCase) &&
+                !paths.Add(path)) == true)
         {
             throw new ArgumentException("SharpProof I/O paths must be distinct.");
         }
