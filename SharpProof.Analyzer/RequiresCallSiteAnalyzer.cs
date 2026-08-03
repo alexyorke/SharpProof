@@ -103,15 +103,17 @@ internal static partial class RequiresCallSiteAnalyzer
             var contractTarget =
                 candidate.TargetMethod.ReducedFrom ??
                 candidate.TargetMethod;
-            if ((contractTarget.IsStatic ||
-                 contractTarget.MethodKind == MethodKind.Constructor) &&
-                contractTarget.ContainingType.StaticConstructors.Length != 0)
+            if ((contractTarget is
+            { IsStatic: true } or
+            { MethodKind: MethodKind.Constructor }) &&
+                contractTarget.ContainingType.StaticConstructors is
+                { Length: > 0 })
             {
                 return AnalyzerSemanticOutcome.Unknown;
             }
 
             var binding = session.BindRequires(contractTarget);
-            if (!binding.IsSuccess || binding.Contracts == null)
+            if (binding is not { IsSuccess: true, Contracts: not null })
             {
                 return AnalyzerSemanticOutcome.Unknown;
             }
@@ -121,7 +123,9 @@ internal static partial class RequiresCallSiteAnalyzer
                 .ToImmutableArray();
             if (requires.IsDefaultOrEmpty)
             {
-                return AnalyzerSemanticOutcome.NotApplicable;
+                return session.HasPotentialCallPreconditions(contractTarget)
+                    ? AnalyzerSemanticOutcome.Unknown
+                    : AnalyzerSemanticOutcome.NotApplicable;
             }
 
             if (!candidate.CanReplay)

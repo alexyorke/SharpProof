@@ -130,14 +130,17 @@ internal sealed class AnalyzerSession
         IMethodSymbol method)
     {
         method = EffectAnalysisSession.NormalizeMethod(method);
-        if (_callPreconditions.Value.HasPotentialPreconditions(
-                method))
+        if (_callPreconditions.Value.HasPotentialPreconditions(method) ||
+            ResolveEffectContract(method).Kind is
+                > EffectContractResolutionKind.Missing and
+                < EffectContractResolutionKind.Valid)
         {
             return true;
         }
 
-        if ((method.IsStatic ||
-             method.MethodKind == MethodKind.Constructor) &&
+        if ((method is
+        { IsStatic: true } or
+        { MethodKind: MethodKind.Constructor }) &&
             method.ContainingType.StaticConstructors.Length != 0)
         {
             return true;
@@ -145,8 +148,8 @@ internal sealed class AnalyzerSession
 
         var binding = BindRequires(method);
         return !binding.IsSuccess ||
-            binding.Contracts == null ||
-            binding.Contracts.Clauses.Any(static clause =>
+            binding.Contracts is not { } contracts ||
+            contracts.Clauses.Any(static clause =>
                 clause.Kind == BoundContractKind.Requires);
     }
 

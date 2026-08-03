@@ -479,6 +479,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~UnannotatedCallerStillChecksExternalClosedPreconditions'
     },
     [pscustomobject]@{
+        Name = 'effect-metadata-callsite-certificate'
+        File = 'SharpProof.Analyzer\AnalyzerSession.cs'
+        Original = '                < EffectContractResolutionKind.Valid)'
+        Mutated = '                <= EffectContractResolutionKind.Valid)'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ExternalMetadataPreconditionEnvelopeCannotBeAssumed'
+    },
+    [pscustomobject]@{
         Name = 'compilation-reference-model-owner'
         File = 'SharpProof.Frontend\CompilationModelProvider.cs'
         Original = '        return owner.GetSemanticModel(tree, ignoreAccessibility: false);'
