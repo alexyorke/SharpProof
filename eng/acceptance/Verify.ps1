@@ -15,6 +15,7 @@ $acceptanceRoot = $PSScriptRoot
 $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
+. (Join-Path $repositoryRoot 'scripts\Get-SharpProofTcbPaths.ps1')
 . (Join-Path $repositoryRoot 'scripts\CSharpSourceMetrics.ps1')
     & (Join-Path $repositoryRoot 'scripts\Generate-DiagnosticDescriptors.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-CSharpScalarSemantics.ps1') -Verify
@@ -405,26 +406,16 @@ try {
         throw "Trusted-computing-base components must be exactly: " +
             ($requiredTcbComponents -join ', ') + "."
     }
-    $allTcbPaths = [Collections.Generic.HashSet[string]]::new(
-        [StringComparer]::Ordinal)
-    foreach ($path in $kernelPaths) {
-        if (-not $allTcbPaths.Add([string]$path)) {
-            throw "Trusted-computing-base path is declared more than once: $path"
-        }
-    }
+    $canonicalTcbPaths = @(Get-SharpProofTcbPaths -Contract $contract)
     foreach ($component in $tcbComponents) {
         $name = [string]$component.name
         $paths = @($component.paths)
         Assert-RepositoryPaths `
             -Paths $paths `
             -Scope "trusted-computing-base component '$name'"
-        foreach ($path in $paths) {
-            if (-not $allTcbPaths.Add([string]$path)) {
-                throw "Trusted-computing-base path belongs to multiple components: $path"
-            }
-        }
         Write-Host "Trusted-computing-base $name paths: $($paths.Count)"
     }
+    Write-Host "Trusted-computing-base union paths: $($canonicalTcbPaths.Count)"
 
     $coordinatorComplexity = $contract.productionCoordinatorComplexity
     $layers = @($coordinatorComplexity.layers)

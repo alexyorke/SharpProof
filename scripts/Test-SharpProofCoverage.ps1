@@ -23,6 +23,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Get-SharpProofTcbPaths.ps1')
 $resolvedCoverageRoot = (Resolve-Path `
     -LiteralPath $CoverageRoot `
     -ErrorAction Stop).Path
@@ -240,15 +241,9 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
     $contractPath = Join-Path $repositoryRoot 'eng\acceptance\contract.json'
     $contract = Get-Content -LiteralPath $contractPath -Raw |
         ConvertFrom-Json
-    $tcbPaths = @(
-        @($contract.trustedKernel.paths)
-        $contract.trustedComputingBase.components |
-            ForEach-Object { @($_.paths) }
-        'eng/acceptance/contract.json' |
-            ForEach-Object { ([string]$_).Replace('\', '/') } |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-            Sort-Object -Unique
-    )
+    $tcbPaths = @(Get-SharpProofTcbPaths `
+        -Contract $contract `
+        -IncludeAcceptanceContract)
     $diffTarget = if ($IncludeWorkingTree) {
         $ComparisonRef
     }

@@ -345,7 +345,8 @@
         "SharpProof.Frontend/FrontendSubset.cs",
         "SharpProof.Frontend/OperationSubsetClassifier.cs",
         "SharpProof.Worker.Launcher/Program.cs",
-          "SharpProof.Worker/CallableVerificationPolicy.cs"
+        "SharpProof.Worker/CallableVerificationPolicy.cs",
+        "scripts/Get-SharpProofTcbPaths.ps1"
         ]
       },
       {

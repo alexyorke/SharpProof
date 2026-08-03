@@ -737,7 +737,8 @@ public sealed class ArchitectureTests
                 "SharpProof.Frontend/FrontendSubset.cs",
                 "SharpProof.Frontend/OperationSubsetClassifier.cs",
                 "SharpProof.Worker.Launcher/Program.cs",
-                "SharpProof.Worker/CallableVerificationPolicy.cs"
+                "SharpProof.Worker/CallableVerificationPolicy.cs",
+                "scripts/Get-SharpProofTcbPaths.ps1"
             ],
             ["resultAssembly"] = [
                 "SharpProof.Worker/CallableClaimResultAssembler.cs",
@@ -856,13 +857,13 @@ public sealed class ArchitectureTests
                 RepositoryRoot(),
                 "scripts",
                 "Get-SharpProofReleaseDigests.ps1")),
-            Does.Contain("$acceptanceJson.trustedKernel.paths"));
+            Does.Contain("Get-SharpProofTcbPaths"));
         Assert.That(
             File.ReadAllText(Path.Combine(
                 RepositoryRoot(),
                 "scripts",
                 "Test-SharpProofCoverage.ps1")),
-            Does.Contain("$contract.trustedKernel.paths")
+            Does.Contain("Get-SharpProofTcbPaths")
                 .And.Contain("$changedTcbFiles")
                 .And.Contain("ComparisonRef is required")
                 .And.Contain("contract.json"));

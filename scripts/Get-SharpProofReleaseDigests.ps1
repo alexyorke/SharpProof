@@ -17,6 +17,7 @@ $ErrorActionPreference = 'Stop'
 $resolvedRepository = (Resolve-Path `
     -LiteralPath $RepositoryPath `
     -ErrorAction Stop).Path
+. (Join-Path $resolvedRepository 'scripts\Get-SharpProofTcbPaths.ps1')
 $approvedMetadataRootFiles =
     [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)
@@ -378,36 +379,20 @@ $acceptanceJson = [Text.UTF8Encoding]::new(
     ConvertFrom-Json
 $tcbPaths = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)
-$null = $tcbPaths.Add($acceptancePath)
 $tcbEntries = [Collections.Generic.List[object]]::new()
-$tcbEntries.Add($acceptanceEntry)
-foreach ($path in @($acceptanceJson.trustedKernel.paths)) {
-    $canonicalPath = [string]$path
-    if (-not $tcbPaths.Add($canonicalPath)) {
-        throw "TCB path is declared more than once: '$path'."
-    }
+foreach ($canonicalPath in @(Get-SharpProofTcbPaths `
+        -Contract $acceptanceJson `
+        -IncludeAcceptanceContract)) {
     [object]$tcbEntry = $null
     if (-not $trackedEntriesByPath.TryGetValue(
             $canonicalPath,
             [ref]$tcbEntry)) {
         throw "TCB path is not tracked: '$canonicalPath'."
     }
-    $tcbEntries.Add($tcbEntry)
-}
-foreach ($component in @($acceptanceJson.trustedComputingBase.components)) {
-    foreach ($path in @($component.paths)) {
-        $canonicalPath = [string]$path
-        if (-not $tcbPaths.Add($canonicalPath)) {
-            throw "TCB path is declared more than once: '$path'."
-        }
-        [object]$tcbEntry = $null
-        if (-not $trackedEntriesByPath.TryGetValue(
-                $canonicalPath,
-                [ref]$tcbEntry)) {
-            throw "TCB path is not tracked: '$canonicalPath'."
-        }
-        $tcbEntries.Add($tcbEntry)
+    if (-not $tcbPaths.Add($canonicalPath)) {
+        throw "TCB path is declared more than once: '$canonicalPath'."
     }
+    $tcbEntries.Add($tcbEntry)
 }
 
 $result = [pscustomobject][ordered]@{
