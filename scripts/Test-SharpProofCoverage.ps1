@@ -242,8 +242,7 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
     $contract = Get-Content -LiteralPath $contractPath -Raw |
         ConvertFrom-Json
     $tcbPaths = @(Get-SharpProofTcbPaths `
-        -Contract $contract `
-        -IncludeAcceptanceContract)
+        -Contract $contract)
     $diffTarget = if ($IncludeWorkingTree) {
         $ComparisonRef
     }

@@ -877,7 +877,9 @@ public sealed class ArchitectureTests
             Does.Contain("Get-SharpProofTcbPaths")
                 .And.Contain("$changedTcbFiles")
                 .And.Contain("ComparisonRef is required")
-                .And.Contain("contract.json"));
+                .And.Contain("contract.json")
+                .And.Contain("-Contract $contract")
+                .And.Not.Contain("-IncludeAcceptanceContract"));
     }
 
     [Test]
