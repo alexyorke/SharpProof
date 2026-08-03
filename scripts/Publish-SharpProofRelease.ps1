@@ -75,6 +75,68 @@ function Get-RepositoryHead {
     return $head
 }
 
+function Get-RepositorySdkVersion {
+    $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    $globalJsonPath = Join-Path $repositoryRoot 'global.json'
+    if (-not (Test-Path -LiteralPath $globalJsonPath -PathType Leaf)) {
+        throw "The repository SDK policy is missing: $globalJsonPath"
+    }
+
+    $globalJson = Get-Content -LiteralPath $globalJsonPath -Raw |
+        ConvertFrom-Json
+    $sdk = $globalJson.PSObject.Properties['sdk']
+    $version = if ($null -eq $sdk) {
+        $null
+    }
+    else {
+        [string]$sdk.Value.version
+    }
+    if ($version -notmatch '^9\.0\.[0-9]+$') {
+        throw "The repository SDK policy is invalid: '$version'."
+    }
+    return $version
+}
+
+function Resolve-ReleaseDotNet {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Candidate,
+
+        [Parameter(Mandatory = $true)]
+        [string]$SdkVersion
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Candidate) -or
+        (-not [IO.Path]::IsPathRooted($Candidate) -and
+         $Candidate -ne 'dotnet')) {
+        throw (
+            "DotNetPath must be the default 'dotnet' command or an " +
+            "absolute trusted host path: '$Candidate'.")
+    }
+    $command = Get-Command $Candidate -ErrorAction SilentlyContinue
+    if ($null -eq $command -or $command.CommandType -ne 'Application') {
+        throw "DotNetPath is not an executable application: '$Candidate'."
+    }
+    $path = [IO.Path]::GetFullPath([string]$command.Path)
+    $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    if (-not [IO.Path]::IsPathRooted($path) -or
+        [IO.Path]::GetFileNameWithoutExtension($path) -ne 'dotnet') {
+        throw "DotNetPath did not resolve to a trusted absolute host: '$path'."
+    }
+    if ($path.StartsWith(
+            $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
+            [StringComparison]::OrdinalIgnoreCase)) {
+        throw "DotNetPath cannot use a project-local host: '$path'."
+    }
+    $actualVersion = (& $path --version 2>&1).Trim()
+    if ($LASTEXITCODE -ne 0 -or $actualVersion -ne $SdkVersion) {
+        throw (
+            "DotNetPath resolved SDK '$actualVersion'; repository policy " +
+            "requires '$SdkVersion'.")
+    }
+    return $path
+}
+
 function Get-PackageIdentity {
     param(
         [Parameter(Mandatory = $true)]
@@ -641,9 +703,10 @@ if (-not $PlanOnly -and
      [string]::IsNullOrWhiteSpace($ApiKey))) {
     throw 'Source and ApiKey are required for publication.'
 }
-if (-not $PlanOnly -and
-    $null -eq (Get-Command $DotNetPath -ErrorAction SilentlyContinue)) {
-    throw "DotNetPath is not executable: '$DotNetPath'."
+if (-not $PlanOnly) {
+    $DotNetPath = Resolve-ReleaseDotNet `
+        -Candidate $DotNetPath `
+        -SdkVersion (Get-RepositorySdkVersion)
 }
 
 $repositoryHead = Get-RepositoryHead

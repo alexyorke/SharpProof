@@ -37,6 +37,25 @@ public sealed class ReleasePublicationScriptTests
     }
 
     [Test]
+    public async Task PublisherUsesTheRepositorySdkPolicyForRealPushes()
+    {
+        var root = FindRepositoryRoot();
+        var script = await File.ReadAllTextAsync(
+            Path.Combine(root, "scripts", "Publish-SharpProofRelease.ps1"));
+        var globalJson = await File.ReadAllTextAsync(
+            Path.Combine(root, "global.json"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(script, Does.Contain("Get-RepositorySdkVersion"));
+            Assert.That(script, Does.Contain("Resolve-ReleaseDotNet"));
+            Assert.That(script, Does.Contain("--version"));
+            Assert.That(script, Does.Contain("project-local"));
+            Assert.That(globalJson, Does.Contain("9.0.316"));
+        }
+    }
+
+    [Test]
     public async Task PublicationDocumentationDescribesFailClosedDuplicates()
     {
         var root = FindRepositoryRoot();

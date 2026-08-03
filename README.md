@@ -597,6 +597,10 @@ simulation are available through:
   -PlanOnly
 ```
 
+For a real publication, the publisher resolves an absolute `dotnet` host and
+requires its SDK version to match the repository's `global.json`; project-local
+host shadowing and arbitrary relative overrides are rejected before any push.
+
 ## Closed compiler artifact and remaining release gaps
 
 The build-only collector now emits compiler artifact schema version 9 from the
