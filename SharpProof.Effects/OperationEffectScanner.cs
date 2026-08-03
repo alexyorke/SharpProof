@@ -341,7 +341,8 @@ internal sealed class OperationEffectScanner
         BinaryOperatorKind operatorKind, ITypeSymbol? type, IOperation left, IOperation right, IOperation origin)
     {
         if (operatorKind is not (BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder) ||
-            !IsIntegral(type))
+            !TryGetIntegralDivisionSemantics(
+                type, out var isSigned, out var hasMinimum, out var minimum))
         {
             return EffectSummary.Empty;
         }
@@ -349,9 +350,9 @@ internal sealed class OperationEffectScanner
         var result = _abstractFlow?.ProvesNonZero(origin, right) == true
             ? EffectSummary.Empty
             : Throw(FrameworkTypeMetadataNames.DivideByZeroException);
-        if (IsSignedIntegral(type))
+        if (isSigned)
         {
-            var overflowProvenAbsent = TryGetIntegerMinimum(type, out var minimum) &&
+            var overflowProvenAbsent = hasMinimum &&
                 _abstractFlow?.ProvesNoSignedDivisionOverflow(origin, left, right, minimum) == true;
             if (!overflowProvenAbsent)
             {
@@ -1097,47 +1098,29 @@ internal sealed class OperationEffectScanner
         CompilerIdentityBridge.IsIntrinsicSequenceLength(property);
     }
 
-    private static bool IsIntegral(ITypeSymbol? type)
+    private static bool TryGetIntegralDivisionSemantics(
+        ITypeSymbol? type, out bool isSigned, out bool hasMinimum, out long minimum)
     {
-        return TryGetIntegerSemantics(type, out _) ||
-        UnwrapNullable(type)?.SpecialType is
-            SpecialType.System_UInt64 or SpecialType.System_IntPtr or SpecialType.System_UIntPtr;
-    }
-
-    private static bool IsSignedIntegral(ITypeSymbol? type)
-    {
-        return TryGetIntegerSemantics(type, out var semantics)
-            ? semantics.IsSigned
-            : UnwrapNullable(type)?.SpecialType == SpecialType.System_IntPtr;
-    }
-
-    private static bool TryGetIntegerMinimum(ITypeSymbol? type, out long minimum)
-    {
-        if (TryGetIntegerSemantics(type, out var semantics) && semantics.IsSigned)
-        {
-            minimum = semantics.Minimum;
-            return true;
-        }
-        minimum = 0;
-        return false;
-    }
-
-    private static ITypeSymbol? UnwrapNullable(ITypeSymbol? type)
-    {
-        return type is INamedTypeSymbol
+        var specialType = type is INamedTypeSymbol
         {
             OriginalDefinition.SpecialType: SpecialType.System_Nullable_T,
             TypeArguments.Length: 1
         } nullable
-            ? nullable.TypeArguments[0]
-            : type;
-    }
+            ? nullable.TypeArguments[0].SpecialType
+            : type?.SpecialType ?? SpecialType.None;
+        if (CSharpScalarSemantics.TryGetInteger(specialType, out var semantics))
+        {
+            isSigned = semantics.IsSigned;
+            hasMinimum = isSigned;
+            minimum = semantics.Minimum;
+            return true;
+        }
 
-    private static bool TryGetIntegerSemantics(
-        ITypeSymbol? type, out CSharpIntegerSemantics semantics)
-    {
-        return CSharpScalarSemantics.TryGetInteger(
-            UnwrapNullable(type)?.SpecialType ?? SpecialType.None, out semantics);
+        isSigned = specialType == SpecialType.System_IntPtr;
+        hasMinimum = false;
+        minimum = 0;
+        return specialType is
+            SpecialType.System_UInt64 or SpecialType.System_IntPtr or SpecialType.System_UIntPtr;
     }
 
     private enum EffectAccess
