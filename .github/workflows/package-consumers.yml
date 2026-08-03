@@ -625,6 +625,9 @@ jobs:
           if (-not $?) {
             throw 'Trusted-boundary mutation testing failed.'
           }
+          .\scripts\Test-SharpProofMutationCatalog.ps1 `
+            -EvidencePath artifacts/release-qualification/mutations.json `
+            -ExpectedCommit $env:SHARPPROOF_RELEASE_COMMIT
           .\scripts\Write-SharpProofReleaseQualification.ps1 `
             -Status running `
             -Tag $env:GITHUB_REF_NAME `

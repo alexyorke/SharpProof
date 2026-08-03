@@ -20,6 +20,11 @@
   "automation": {
     "solutionBuildWallSeconds": 600
   },
+  "mutationEvidence": {
+    "schemaVersion": 1,
+    "expectedCatalogCount": 80,
+    "expectedCatalogSha256": "a792bffed2750f2864e0d520d38c44ef98bdccad8f14f6058456868085ab521c"
+  },
   "worker": {
     "protocolVersion": 9,
     "manifestSchemaVersion": 4,
@@ -211,7 +216,8 @@
         "paths": [
           "scripts/SharpProof.MutationEvidence.psm1",
           "scripts/Test-SharpProofMutationEvidence.ps1",
-          "scripts/Test-SharpProofTrustedMutations.ps1"
+          "scripts/Test-SharpProofTrustedMutations.ps1",
+          "scripts/Test-SharpProofMutationCatalog.ps1"
         ]
       },
       {

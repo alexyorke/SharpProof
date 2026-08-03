@@ -696,7 +696,36 @@ $mutations = @(
     }
 )
 
+$acceptanceContract = Get-Content -LiteralPath (
+    Join-Path $repositoryRoot 'eng\acceptance\contract.json') -Raw |
+    ConvertFrom-Json
+$mutationPolicy = $acceptanceContract.mutationEvidence
+$catalogCount = @($mutations).Count
+$catalogLines = @(
+    $mutations |
+        ForEach-Object {
+            $file = $_.File.Replace('\', '/')
+            "$($_.Name)`t$file`t$($_.Filter)"
+        })
+$catalogText = [string]::Join("`n", $catalogLines) + "`n"
+$catalogHasher = [Security.Cryptography.SHA256]::Create()
+try {
+    $catalogBytes = [Text.UTF8Encoding]::new($false).GetBytes($catalogText)
+    $catalogSha256 = [Convert]::ToHexString(
+        $catalogHasher.ComputeHash($catalogBytes)).ToLowerInvariant()
+}
+finally {
+    $catalogHasher.Dispose()
+}
+if ($catalogCount -ne [int]$mutationPolicy.expectedCatalogCount -or
+    $catalogSha256 -ne [string]$mutationPolicy.expectedCatalogSha256) {
+    throw (
+        'Trusted mutation registrations do not match the acceptance ' +
+        'catalog policy.')
+}
+
 if ($MutationName.Count -gt 0) {
+    $selection = 'selected'
     $knownNames = @($mutations.Name)
     $requestedNames = @($MutationName | Select-Object -Unique)
     $unknownNames = @($requestedNames | Where-Object { $_ -notin $knownNames })
@@ -704,6 +733,9 @@ if ($MutationName.Count -gt 0) {
         throw "Unknown mutation name(s): $($unknownNames -join ', ')."
     }
     $mutations = @($mutations | Where-Object { $_.Name -in $requestedNames })
+}
+else {
+    $selection = 'full'
 }
 
 $mutationRoot = Join-Path ([IO.Path]::GetTempPath()) 'SharpProof-mutation'
@@ -926,6 +958,9 @@ try {
         schemaVersion = 2
         commit = $sourceCommit
         configuration = $Configuration
+        selection = $selection
+        catalogCount = $catalogCount
+        catalogSha256 = $catalogSha256
         mutationCount = $results.Count
         killedCount = @($results | Where-Object killed).Count
         mutations = $results

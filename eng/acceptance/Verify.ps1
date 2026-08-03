@@ -230,6 +230,11 @@ Assert-Equal $contract.analyzer.diagnosticsEnabledByDefault $true 'analyzer.diag
 Assert-Equal $contract.analyzer.unsupportedUnannotatedCallableBehavior 'silent' 'analyzer.unsupportedUnannotatedCallableBehavior'
 Assert-Equal $contract.analyzer.unsupportedSelectedCallableDiagnostic 'SP0047' 'analyzer.unsupportedSelectedCallableDiagnostic'
 Assert-Equal $contract.automation.solutionBuildWallSeconds 600 'automation.solutionBuildWallSeconds'
+Assert-Equal $contract.mutationEvidence.schemaVersion 1 'mutationEvidence.schemaVersion'
+Assert-Equal $contract.mutationEvidence.expectedCatalogCount 80 'mutationEvidence.expectedCatalogCount'
+if ([string]$contract.mutationEvidence.expectedCatalogSha256 -notmatch '^[0-9a-f]{64}$') {
+    throw 'mutationEvidence.expectedCatalogSha256 must be a lowercase SHA-256 digest.'
+}
 Assert-Equal `
     (Get-MsBuildDefault $portableTargets 'SharpProofProfile' 'portable package') `
     $contract.analyzer.defaultProfile `

@@ -633,7 +633,8 @@ public sealed class ArchitectureTests
             ["mutationEvidencePolicy"] = [
                 "scripts/SharpProof.MutationEvidence.psm1",
                 "scripts/Test-SharpProofMutationEvidence.ps1",
-                "scripts/Test-SharpProofTrustedMutations.ps1"
+                "scripts/Test-SharpProofTrustedMutations.ps1",
+                "scripts/Test-SharpProofMutationCatalog.ps1"
             ],
             ["declarativeModelsCatalog"] = [
                 "SharpProof.DeclarativeModels.catalog.json",
