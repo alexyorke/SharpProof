@@ -121,9 +121,15 @@ public sealed class WorkerBinaryIdentityTests
         using var snapshot = WorkerBinaryIdentity.CreateSnapshot(
             typeof(SharpProofWorker).Assembly.Location);
 
-        Assert.That(
-            snapshot.ComponentPaths.GetType(),
-            Is.EqualTo(typeof(ImmutableArray<string>)));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                snapshot.ComponentPaths.GetType(),
+                Is.EqualTo(typeof(ImmutableArray<string>)));
+            Assert.That(
+                snapshot.ExecutionWorkerPath,
+                Is.Not.EqualTo(snapshot.WorkerPath));
+        }
     }
 
     [Test]

@@ -777,10 +777,10 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'closure-executes-staged-worker'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
-        Original = '                Path.Combine(stagingDirectory, Path.GetFileName(path)),'
-        Mutated = '                path,'
+        Original = '    internal string ExecutionWorkerPath { get; } = executionWorkerPath;'
+        Mutated = '    internal string ExecutionWorkerPath { get; } = workerPath;'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
-        Filter = 'FullyQualifiedName~IdentityCoversTheCompleteTrustedRuntimeClosure'
+        Filter = 'FullyQualifiedName~RuntimeClosureComponentPathsAreImmutable'
     },
     [pscustomobject]@{
         Name = 'launcher-checks-discovered-runtime-paths'
