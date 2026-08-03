@@ -146,8 +146,10 @@ public sealed class WorkerBinaryIdentityTests
                     Assert.That(snapshot.WorkerPath, Is.EqualTo(worker));
                     Assert.That(snapshot.Sha256, Is.EqualTo(baseline));
                     Assert.That(
-                        snapshot.ComponentPaths,
-                        Is.Unique);
+                        new HashSet<string>(
+                            snapshot.ComponentPaths,
+                            StringComparer.OrdinalIgnoreCase).Count,
+                        Is.EqualTo(snapshot.ComponentPaths.Count));
                     Assert.That(
                         snapshot.ComponentPaths,
                         Does.Contain(worker));
