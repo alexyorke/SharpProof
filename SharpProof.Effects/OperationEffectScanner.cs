@@ -538,7 +538,7 @@ internal sealed class OperationEffectScanner
             return ClassifyNullableAndCheckedConversion(operation);
         }
 
-        if (conversion.IsNumeric || conversion.IsEnumeration)
+        if (conversion is { IsNumeric: true } or { IsEnumeration: true })
         {
             return CheckedOverflow(operation.IsChecked, operation);
         }
@@ -548,19 +548,22 @@ internal sealed class OperationEffectScanner
             return EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
         }
 
-        if (conversion.IsAnonymousFunction || conversion.IsMethodGroup)
+        if (conversion is
+        { IsAnonymousFunction: true } or
+        { IsMethodGroup: true })
         {
             return EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
         }
 
-        if (conversion.IsIdentity ||
-            conversion.IsNullLiteral ||
-            conversion.IsDefaultLiteral ||
-            conversion.IsConstantExpression ||
-            conversion.IsThrow ||
-            conversion.IsObjectCreation ||
-            conversion.IsSwitchExpression ||
-            conversion.IsConditionalExpression)
+        if (conversion is
+        { IsIdentity: true } or
+        { IsNullLiteral: true } or
+        { IsDefaultLiteral: true } or
+        { IsConstantExpression: true } or
+        { IsThrow: true } or
+        { IsObjectCreation: true } or
+        { IsSwitchExpression: true } or
+        { IsConditionalExpression: true })
         {
             return EffectSummary.Empty;
         }

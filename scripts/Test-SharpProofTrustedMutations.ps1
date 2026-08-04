@@ -820,8 +820,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'launcher-rejects-cache-inside-worker-tree'
         File = 'SharpProof.Worker.Launcher\Program.cs'
-        Original = '            cacheDirectory != null &&'
-        Mutated = '            false &&'
+        Original = "            candidates`n                .Skip(runtimeRoots.Length +`n                    LauncherArguments.LauncherRuntimePaths.Length)`n                .OfType<string>()`n                .Any(path => WorkerCachePath.IsSameOrDescendant(`n                    Path.GetFullPath(path),`n                    Path.GetDirectoryName(workerPath)!))"
+        Mutated = '            false'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~DirectLauncherRejectsCacheInsideWorkerRuntimeDirectory'
     }

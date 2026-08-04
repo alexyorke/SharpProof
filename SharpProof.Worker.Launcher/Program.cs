@@ -596,10 +596,13 @@ internal sealed partial class LauncherArguments
             runtimeSnapshot?.ComponentPaths.Any(path =>
                 !runtimeRoots.Contains(path, StringComparer.OrdinalIgnoreCase) &&
                 !paths.Add(path)) is true ||
-            cacheDirectory != null &&
-            WorkerCachePath.IsSameOrDescendant(
-                cacheDirectory,
-                Path.GetDirectoryName(workerPath)!))
+            candidates
+                .Skip(runtimeRoots.Length +
+                    LauncherArguments.LauncherRuntimePaths.Length)
+                .OfType<string>()
+                .Any(path => WorkerCachePath.IsSameOrDescendant(
+                    Path.GetFullPath(path),
+                    Path.GetDirectoryName(workerPath)!)))
         {
             throw new ArgumentException("SharpProof I/O paths must be distinct.");
         }

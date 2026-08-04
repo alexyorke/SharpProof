@@ -317,6 +317,34 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void RequestProjectionRejectsWorkerTreeOutputBeforeManifestRead()
+    {
+        var worker = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "worker-tree-worker.dll");
+        string[] arguments = [
+            "verify",
+            "--worker", worker,
+            "--request", Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "worker-tree-request.json"),
+            "--result", Path.Combine(
+                Path.GetDirectoryName(worker)!,
+                "worker-tree-output.json"),
+            "--compiler-manifest", "missing-compiler-manifest.json",
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
     public void RequestProjectionRejectsWorkerPathCollisionBeforeManifestRead()
     {
         string[] arguments = [
