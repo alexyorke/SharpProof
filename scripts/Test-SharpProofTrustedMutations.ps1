@@ -188,8 +188,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'lowering-unchecked-arithmetic'
         File = 'SharpProof.Frontend\RoslynOperationLowerer.cs'
-        Original = "CSharpScalarSemantics.RequiresCheckedArithmetic(operation.OperatorKind) &&`n                !operation.IsChecked)"
-        Mutated = "CSharpScalarSemantics.RequiresCheckedArithmetic(operation.OperatorKind) &&`n                operation.IsChecked)"
+        Original = "CSharpScalarSemantics.RequiresCheckedArithmetic(`n                        operation.OperatorKind) && !operation.IsChecked)"
+        Mutated = "CSharpScalarSemantics.RequiresCheckedArithmetic(`n                        operation.OperatorKind) && operation.IsChecked)"
         Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
         Filter = 'FullyQualifiedName~OverflowAndConversionShapesAreExactOnlyWhenRepresentable'
     },
@@ -788,8 +788,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'launcher-checks-discovered-runtime-paths'
         File = 'SharpProof.Worker.Launcher\Program.cs'
-        Original = "            runtimeSnapshot?.ComponentPaths.Any(path =>`n                !runtimeRoots.Contains(path, StringComparer.OrdinalIgnoreCase) &&`n                !paths.Add(path)) is true)"
-        Mutated = '            runtimeSnapshot?.ComponentPaths.Any(path => path.Length == 0) == true)'
+        Original = "            runtimeSnapshot?.ComponentPaths.Any(path =>`n                !runtimeRoots.Contains(path, StringComparer.OrdinalIgnoreCase) &&`n                !paths.Add(path)) is true"
+        Mutated = '            runtimeSnapshot?.ComponentPaths.Any(path => path.Length == 0) == true'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~RequestProjectionRejectsDiscoveredRuntimeAssetCollisionBeforeManifestRead'
     },
