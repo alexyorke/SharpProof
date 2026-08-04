@@ -19,4 +19,31 @@ internal static class WorkerCachePath
             directory + Path.DirectorySeparatorChar,
             StringComparison.OrdinalIgnoreCase);
     }
+
+    internal static void ValidateNoReparsePoints(IEnumerable<string> paths)
+    {
+        foreach (var path in paths)
+        {
+            for (string? current = Path.GetFullPath(path);
+                 current is not null;
+                 current = Path.GetDirectoryName(current))
+            {
+                try
+                {
+                    if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                    {
+                        throw new ArgumentException(
+                            "SharpProof paths must not traverse reparse points.",
+                            nameof(paths));
+                    }
+                }
+                catch (FileNotFoundException)
+                {
+                }
+                catch (DirectoryNotFoundException)
+                {
+                }
+            }
+        }
+    }
 }

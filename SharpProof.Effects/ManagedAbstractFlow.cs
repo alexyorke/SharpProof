@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using static SharpProof.Effects.ManagedAbstractValue;
 
 namespace SharpProof.Effects;
 
@@ -61,7 +62,7 @@ internal sealed class ManagedAbstractFlow
         var state = ManagedFlowState.Empty;
         foreach (var parameter in method.Parameters)
         {
-            var value = ManagedAbstractValue.TopForType(parameter.Type);
+            var value = TopForType(parameter.Type);
             if (parameter.RefKind != RefKind.Out)
             {
                 value = ApplyAttributes(value, parameter.GetAttributes());
@@ -154,7 +155,7 @@ internal sealed class ManagedAbstractFlow
             case IVariableDeclaratorOperation declarator:
                 if (declarator.Initializer == null)
                 {
-                    state = state.Set(declarator.Symbol, ManagedAbstractValue.TopForType(declarator.Symbol.Type));
+                    state = state.Set(declarator.Symbol, TopForType(declarator.Symbol.Type));
                 }
                 else
                 {
@@ -172,7 +173,7 @@ internal sealed class ManagedAbstractFlow
                 break;
             case ICompoundAssignmentOperation compound:
                 state = TransferMany(state, compound.ChildOperations, result, cancellationToken);
-                state = SetStorage(state, compound.Target, ManagedAbstractValue.TopForType(compound.Type));
+                state = SetStorage(state, compound.Target, TopForType(compound.Type));
                 break;
             case IIncrementOrDecrementOperation increment:
                 state = Transfer(state, increment.Target, result, cancellationToken);
@@ -222,9 +223,9 @@ internal sealed class ManagedAbstractFlow
     private ManagedAbstractValue Increment(IIncrementOrDecrementOperation operation, ManagedFlowState state)
     {
         return TryIncrement(operation, state, out var updated) &&
-               ManagedAbstractValue.FitsType(updated, operation.Type)
-            ? ManagedAbstractValue.Integer(updated)
-            : ManagedAbstractValue.TopForType(operation.Type);
+               FitsType(updated, operation.Type)
+            ? Integer(updated)
+            : TopForType(operation.Type);
     }
 
     private bool TryIncrement(
@@ -237,7 +238,7 @@ internal sealed class ManagedAbstractFlow
             ? BinaryOperatorKind.Add
             : BinaryOperatorKind.Subtract;
         return EvaluateCore(operation.Target, state).TryGetInteger(out var target) &&
-            ManagedAbstractValue.TryArithmetic(
+            TryArithmetic(
                 @operator,
                 target,
                 IntervalValue.Constant(1),
@@ -274,10 +275,10 @@ internal sealed class ManagedAbstractFlow
                 AssumeComparison(state, binary.LeftOperand, binary.RightOperand,
                 binary.OperatorKind, expected),
             IIsNullOperation isNull when TryStorage(isNull.Operand, out var storage) =>
-                Refine(state, storage, BinaryOperatorKind.Equals, ManagedAbstractValue.Null, expected),
+                Refine(state, storage, BinaryOperatorKind.Equals, Null, expected),
             IIsPatternOperation pattern => AssumeNullPattern(state, pattern, expected),
             _ when TryStorage(condition, out var storage) =>
-                state.Set(storage, ManagedAbstractValue.Boolean(expected)),
+                state.Set(storage, Boolean(expected)),
             _ => state
         };
     }
@@ -316,7 +317,7 @@ internal sealed class ManagedAbstractFlow
         }
         return pattern is IConstantPatternOperation { Value.ConstantValue: { HasValue: true, Value: null } } &&
                TryStorage(operation.Value, out var storage)
-            ? Refine(state, storage, BinaryOperatorKind.Equals, ManagedAbstractValue.Null, expected != negated)
+            ? Refine(state, storage, BinaryOperatorKind.Equals, Null, expected != negated)
             : state;
     }
 
@@ -334,7 +335,7 @@ internal sealed class ManagedAbstractFlow
             @operator is BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals)
         {
             var booleanEquals = @operator == BinaryOperatorKind.Equals;
-            return state.Set(storage, ManagedAbstractValue.Boolean(
+            return state.Set(storage, Boolean(
                 expected == booleanEquals ? boolean : !boolean));
         }
         if (!value.IsDefinitelyNull)
@@ -356,7 +357,7 @@ internal sealed class ManagedAbstractFlow
         var equals = expected == (@operator == BinaryOperatorKind.Equals);
         var refined = equals ? NullnessDomain.Instance.AssumeNull(nullness)
             : NullnessDomain.Instance.AssumeNonNull(nullness);
-        return state.Set(storage, ManagedAbstractValue.Reference(refined, current.Cardinality));
+        return state.Set(storage, Reference(refined, current.Cardinality));
     }
 
     private static ManagedAbstractValue RefineInteger(
@@ -398,7 +399,7 @@ internal sealed class ManagedAbstractFlow
 
         return refined.IsBottom
             ? ManagedAbstractValue.Bottom
-            : ManagedAbstractValue.Integer(
+            : Integer(
                 refined,
                 current.ExcludesZero || (value.IsSingleton
                     ? normalized == BinaryOperatorKind.NotEquals &&
@@ -423,7 +424,7 @@ internal sealed class ManagedAbstractFlow
         operation = Unwrap(operation);
         if (operation.ConstantValue.HasValue)
         {
-            return ManagedAbstractValue.FromConstant(operation.ConstantValue.Value, operation.Type);
+            return FromConstant(operation.ConstantValue.Value, operation.Type);
         }
 
         return operation switch
@@ -431,9 +432,9 @@ internal sealed class ManagedAbstractFlow
             IParameterReferenceOperation parameter => state.Get(parameter.Parameter),
             ILocalReferenceOperation local => state.Get(local.Local),
             IFlowCaptureReferenceOperation capture => state.Get(capture.Id),
-            IDefaultValueOperation value => ManagedAbstractValue.DefaultForType(value.Type),
+            IDefaultValueOperation value => DefaultForType(value.Type),
             IInstanceReferenceOperation or IConditionalAccessInstanceOperation or IObjectCreationOperation or
-                ITypeOfOperation => ManagedAbstractValue.NonNull,
+                ITypeOfOperation => NonNull,
             IArrayCreationOperation array => EvaluateArray(array, state),
             IPropertyReferenceOperation property => EvaluateProperty(property, state),
             IInvocationOperation invocation => ReturnValue(invocation.TargetMethod, invocation.Type),
@@ -441,13 +442,13 @@ internal sealed class ManagedAbstractFlow
             IConversionOperation conversion => ConvertValue(conversion, state),
             IUnaryOperation unary => EvaluateUnary(unary, state),
             IBinaryOperation { OperatorMethod: null, IsLifted: false } binary =>
-                ManagedAbstractValue.Binary(binary.OperatorKind,
+                Binary(binary.OperatorKind,
                 EvaluateCore(binary.LeftOperand, state), EvaluateCore(binary.RightOperand, state), binary.Type),
             IConditionalOperation conditional => EvaluateConditional(conditional, state),
             ICoalesceOperation coalesce => EvaluateCoalesce(coalesce, state),
             ISimpleAssignmentOperation assignment => EvaluateCore(assignment.Value, state),
             IFlowCaptureOperation capture => EvaluateCore(capture.Value, state),
-            _ => ManagedAbstractValue.TopForType(operation.Type)
+            _ => TopForType(operation.Type)
         };
     }
 
@@ -456,10 +457,10 @@ internal sealed class ManagedAbstractFlow
         if (array.DimensionSizes.Length != 1 ||
             !EvaluateCore(array.DimensionSizes[0], state).TryGetInteger(out var size))
         {
-            return ManagedAbstractValue.NonNull;
+            return NonNull;
         }
 
-        return ManagedAbstractValue.Reference(NullnessValue.NonNull, IntervalDomain.Instance.AssumeAtLeast(size, 0));
+        return Reference(NullnessValue.NonNull, IntervalDomain.Instance.AssumeAtLeast(size, 0));
     }
 
     private ManagedAbstractValue EvaluateProperty(IPropertyReferenceOperation property, ManagedFlowState state)
@@ -470,13 +471,13 @@ internal sealed class ManagedAbstractFlow
             var receiver = EvaluateCore(instance, state);
             if (receiver.TryGetCardinality(out var length))
             {
-                return ManagedAbstractValue.Integer(length);
+                return Integer(length);
             }
 
             if (instance.Type is IArrayTypeSymbol ||
                 instance.Type?.SpecialType == SpecialType.System_String)
             {
-                return ManagedAbstractValue.Integer(IntervalValue.Range(
+                return Integer(IntervalValue.Range(
                     0, property.Type?.SpecialType == SpecialType.System_Int64 ? long.MaxValue : int.MaxValue));
             }
         }
@@ -485,7 +486,7 @@ internal sealed class ManagedAbstractFlow
 
     private ManagedAbstractValue ReturnValue(IMethodSymbol? method, ITypeSymbol? type)
     {
-        var value = ManagedAbstractValue.TopForType(type);
+        var value = TopForType(type);
         if (method != null &&
             _trustedBoundaries.AuthorizesDeclaredContracts(method))
         {
@@ -509,7 +510,7 @@ internal sealed class ManagedAbstractFlow
         };
         if (nullness == NullnessValue.Null)
         {
-            return ManagedAbstractValue.Null;
+            return Null;
         }
 
         var cardinality = spec.Template.Facets.Cardinality.Result switch
@@ -521,7 +522,7 @@ internal sealed class ManagedAbstractFlow
                 IntervalValue.Constant(count),
             _ => value.Cardinality
         };
-        return ManagedAbstractValue.Reference(nullness, cardinality);
+        return Reference(nullness, cardinality);
     }
 
     private ManagedAbstractValue NullTest(IIsNullOperation operation, ManagedFlowState state)
@@ -529,11 +530,11 @@ internal sealed class ManagedAbstractFlow
         return EvaluateCore(operation.Operand, state).TryGetNullness(out var value)
             ? value switch
             {
-                NullnessValue.Null => ManagedAbstractValue.Boolean(true),
-                NullnessValue.NonNull => ManagedAbstractValue.Boolean(false),
-                _ => ManagedAbstractValue.BooleanUnknown
+                NullnessValue.Null => Boolean(true),
+                NullnessValue.NonNull => Boolean(false),
+                _ => BooleanUnknown
             }
-            : ManagedAbstractValue.BooleanUnknown;
+            : BooleanUnknown;
     }
 
     private ManagedAbstractValue ConvertValue(IConversionOperation conversion, ManagedFlowState state)
@@ -546,8 +547,8 @@ internal sealed class ManagedAbstractFlow
 
         return !conversion.IsTryCast && conversion.OperatorMethod == null && conversion.Conversion.IsReference &&
                operand.TryGetNullness(out var nullness)
-            ? ManagedAbstractValue.Reference(nullness, operand.Cardinality)
-            : ManagedAbstractValue.TopForType(conversion.Type);
+            ? Reference(nullness, operand.Cardinality)
+            : TopForType(conversion.Type);
     }
 
     private ManagedAbstractValue EvaluateUnary(IUnaryOperation unary, ManagedFlowState state)
@@ -555,13 +556,13 @@ internal sealed class ManagedAbstractFlow
         var operand = EvaluateCore(unary.Operand, state);
         if (unary.OperatorKind == UnaryOperatorKind.Not)
         {
-            return ManagedAbstractValue.NegateBoolean(operand);
+            return NegateBoolean(operand);
         }
 
         return unary.OperatorKind == UnaryOperatorKind.Minus && operand.TryGetInteger(out var interval) &&
                TryNegate(interval, out var negated)
-            ? ManagedAbstractValue.KeepWithinType(negated, unary.Type)
-            : ManagedAbstractValue.TopForType(unary.Type);
+            ? KeepWithinType(negated, unary.Type)
+            : TopForType(unary.Type);
     }
 
     private ManagedAbstractValue EvaluateConditional(IConditionalOperation operation, ManagedFlowState state)
@@ -572,7 +573,7 @@ internal sealed class ManagedAbstractFlow
         }
 
         return operation.WhenFalse == null
-            ? ManagedAbstractValue.Unknown
+            ? Unknown
             : ManagedAbstractValue.Join(
                 EvaluateCore(operation.WhenTrue, Assume(state, operation.Condition, true)),
                 EvaluateCore(operation.WhenFalse, Assume(state, operation.Condition, false)));
@@ -591,7 +592,7 @@ internal sealed class ManagedAbstractFlow
             return EvaluateCore(operation.WhenNull, state);
         }
 
-        return ManagedAbstractValue.Join(value, EvaluateCore(operation.WhenNull, state));
+        return Join(value, EvaluateCore(operation.WhenNull, state));
     }
 
     internal bool ProvesNoOverflow(IOperation operation, ManagedFlowState state)
@@ -605,7 +606,7 @@ internal sealed class ManagedAbstractFlow
                 BinaryOperatorKind.Add or BinaryOperatorKind.Subtract or BinaryOperatorKind.Multiply:
                 if (!EvaluateCore(binary.LeftOperand, state).TryGetInteger(out var left) ||
                     !EvaluateCore(binary.RightOperand, state).TryGetInteger(out var right) ||
-                    !ManagedAbstractValue.TryArithmetic(binary.OperatorKind, left, right, out interval))
+                    !TryArithmetic(binary.OperatorKind, left, right, out interval))
                 {
                     return false;
                 }
@@ -640,7 +641,7 @@ internal sealed class ManagedAbstractFlow
             default:
                 return false;
         }
-        return ManagedAbstractValue.FitsType(interval, type);
+        return FitsType(interval, type);
     }
 
     private ManagedAbstractValue ApplyAttributes(
@@ -650,19 +651,19 @@ internal sealed class ManagedAbstractFlow
         {
             if (Matches(attribute, _notNullAttribute) && value.TryGetNullness(out var nullness))
             {
-                value = ManagedAbstractValue.Reference(
+                value = Reference(
                     NullnessDomain.Instance.AssumeNonNull(nullness), value.Cardinality);
             }
             else if (Matches(attribute, _positiveAttribute) && value.TryGetInteger(out var positive))
             {
-                value = ManagedAbstractValue.Integer(IntervalDomain.Instance.AssumeAtLeast(positive, 1));
+                value = Integer(IntervalDomain.Instance.AssumeAtLeast(positive, 1));
             }
             else if (Matches(attribute, _inRangeAttribute) && value.TryGetInteger(out var range) &&
                      attribute.ConstructorArguments.Length == 2 &&
                      attribute.ConstructorArguments[0].Value is long minimum &&
                      attribute.ConstructorArguments[1].Value is long maximum && minimum <= maximum)
             {
-                value = ManagedAbstractValue.Integer(IntervalDomain.Instance.AssumeAtMost(
+                value = Integer(IntervalDomain.Instance.AssumeAtMost(
                     IntervalDomain.Instance.AssumeAtLeast(range, minimum), maximum));
             }
         }
@@ -706,7 +707,7 @@ internal sealed class ManagedAbstractFlow
             if (argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out &&
                 TryStorage(argument.Value, out var storage))
             {
-                state = state.Set(storage, ManagedAbstractValue.TopForType(argument.Value.Type));
+                state = state.Set(storage, TopForType(argument.Value.Type));
             }
         }
 
@@ -766,8 +767,8 @@ internal sealed class ManagedAbstractFlow
             return true;
         }
 
-        return ManagedAbstractValue.IntegerType(conversion.Operand.Type, out var source) &&
-               ManagedAbstractValue.IntegerType(conversion.Type, out var target) &&
+        return IntegerType(conversion.Operand.Type, out var source) &&
+               IntegerType(conversion.Type, out var target) &&
                source.Minimum >= target.Minimum && source.Maximum <= target.Maximum;
     }
 
@@ -1032,7 +1033,7 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
             return true;
         }
 
-        result = ManagedAbstractValue.Unknown;
+        result = Unknown;
         return false;
     }
 
@@ -1047,7 +1048,7 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
             result = flow.Evaluate(value, state);
             return true;
         }
-        result = ManagedAbstractValue.Unknown;
+        result = Unknown;
         return false;
     }
 
@@ -1157,9 +1158,9 @@ internal sealed class ManagedFlowState
         }
 
         return storage is ISymbol symbol
-            ? ManagedAbstractValue.TopForType(symbol is IParameterSymbol parameter ? parameter.Type :
+            ? TopForType(symbol is IParameterSymbol parameter ? parameter.Type :
                 symbol is ILocalSymbol local ? local.Type : null)
-            : ManagedAbstractValue.Unknown;
+            : Unknown;
     }
 
     internal ManagedFlowState Set(object storage, ManagedAbstractValue value)

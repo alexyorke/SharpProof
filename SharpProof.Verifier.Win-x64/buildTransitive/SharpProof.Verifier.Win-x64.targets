@@ -60,6 +60,41 @@
             .Select(resolvePath)
             .Concat(toolPaths.Select(resolvePath))
             .ToArray();
+        var resolvedCachePath = string.IsNullOrWhiteSpace(CachePath)
+            ? null
+            : resolvePath(CachePath);
+        System.Func<string, bool> traversesReparsePoint = path => {
+            try {
+                var current = resolvePath(path);
+                while (!string.IsNullOrWhiteSpace(current)) {
+                    try {
+                        if ((System.IO.File.GetAttributes(current) &
+                             System.IO.FileAttributes.ReparsePoint) != 0)
+                            return true;
+                    }
+                    catch (System.IO.FileNotFoundException) { }
+                    catch (System.IO.DirectoryNotFoundException) { }
+                    var parent = System.IO.Path.GetDirectoryName(current);
+                    if (string.IsNullOrWhiteSpace(parent) ||
+                        System.String.Equals(parent, current,
+                            System.StringComparison.OrdinalIgnoreCase))
+                        break;
+                    current = parent;
+                }
+                return false;
+            }
+            catch {
+                return true;
+            }
+        };
+        var aliasesReparse = outputPaths.Concat(protectedPaths)
+            .Concat(resolvedCachePath != null
+                ? new[] { resolvedCachePath }
+                : System.Array.Empty<string>())
+            .Any(traversesReparsePoint);
+        if (aliasesReparse)
+            Log.LogError(
+                "SharpProof output paths must not traverse reparse points.");
         var aliasesInput = outputPaths
             .Any(output => protectedPaths.Any(input => string.Equals(
                 output, input, System.StringComparison.OrdinalIgnoreCase)));
@@ -68,9 +103,6 @@
             outputPaths.Any(output => output.StartsWith(
                 workerDirectory + System.IO.Path.DirectorySeparatorChar,
                 System.StringComparison.OrdinalIgnoreCase));
-        var resolvedCachePath = string.IsNullOrWhiteSpace(CachePath)
-            ? null
-            : resolvePath(CachePath);
         var aliasesCache = resolvedCachePath != null &&
             (outputPaths.Any(output => string.Equals(
                 output, resolvedCachePath,
@@ -87,7 +119,8 @@
               resolvedCachePath.StartsWith(
                   workerDirectory + System.IO.Path.DirectorySeparatorChar,
                   System.StringComparison.OrdinalIgnoreCase)));
-        if (!aliasesInput && !aliasesOutput && !aliasesWorkerTree && !aliasesCache) {
+        if (!aliasesReparse && !aliasesInput && !aliasesOutput &&
+            !aliasesWorkerTree && !aliasesCache) {
             using (var publication =
                 new System.Threading.Mutex(false, @"Local\SharpProof.Publish")) {
                 var ownsPublication = false;

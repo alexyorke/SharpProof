@@ -55,6 +55,11 @@ internal static class WorkerBinaryIdentity
         var stagedCount = 0;
         try
         {
+            Directory.CreateDirectory(stagingDirectory);
+            WorkerCachePath.ValidateNoReparsePoints([
+                stagingDirectory,
+                path,
+                ChangeExtension(path, ".deps.json")]);
             using var dependency = OpenRead(ChangeExtension(path, ".deps.json"));
             var components = RuntimeComponents(path, dependency);
             stagedHandles = new FileStream[components.Count];
@@ -213,6 +218,7 @@ internal static class WorkerBinaryIdentity
                 Combine(directory, name.Replace('/', DirectorySeparatorChar)));
         }
 
+        WorkerCachePath.ValidateNoReparsePoints(result.Values);
         return result;
     }
 

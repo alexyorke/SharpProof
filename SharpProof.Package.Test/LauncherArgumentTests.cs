@@ -269,6 +269,63 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void RequestProjectionRejectsReparsePointPathBeforeManifestRead()
+    {
+        var root = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "reparse-path-" + Guid.NewGuid().ToString("N"));
+        var target = Path.Combine(root, "target");
+        var alias = Path.Combine(root, "alias");
+        Directory.CreateDirectory(target);
+        try
+        {
+            try
+            {
+                Directory.CreateSymbolicLink(alias, target);
+            }
+            catch (IOException exception)
+            {
+                Assert.Ignore("The test host cannot create directory links: " + exception.Message);
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                Assert.Ignore("The test host cannot create directory links: " + exception.Message);
+            }
+            catch (PlatformNotSupportedException exception)
+            {
+                Assert.Ignore("The test host does not support directory links: " + exception.Message);
+            }
+
+            string[] arguments = [
+                "verify",
+                "--worker", Path.Combine(root, "worker.dll"),
+                "--request", Path.Combine(root, "request.json"),
+                "--result", Path.Combine(alias, "result.json"),
+                "--compiler-manifest", Path.Combine(root, "missing.json"),
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow"
+            ];
+            Assert.That(
+                LauncherArguments.TryParse(arguments, out var parsed),
+                Is.True);
+            Assert.That(
+                (Action)(() => parsed.ValidateDistinctPaths(null)),
+                Throws.TypeOf<ArgumentException>());
+        }
+        finally
+        {
+            if (Directory.Exists(alias))
+            {
+                Directory.Delete(alias);
+            }
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Test]
     public void RequestProjectionRejectsCollidingIoPathsBeforeManifestRead()
     {
         string[] arguments = [

@@ -181,7 +181,7 @@ internal sealed class OperationEffectScanner
         var accessSummary = access == EffectAccess.Write
             ? EffectSummaryOperations.Write(region) : EffectSummaryOperations.Read(region);
         return EffectSummaryOperations.Join(
-            field.Instance == null ? EffectSummary.Empty : Scan(field.Instance),
+            ScanInstance(field.Instance),
             PotentialNullReceiver(field.Instance, field),
             accessSummary,
             field.Field.IsVolatile
@@ -199,8 +199,7 @@ internal sealed class OperationEffectScanner
             IsIntrinsicArrayCardinalityProperty(property))
         {
             return EffectSummaryOperations.Join(
-                property.Instance == null
-                    ? EffectSummary.Empty : Scan(property.Instance),
+                ScanInstance(property.Instance),
                 PotentialNullReceiver(property.Instance, property),
                 EffectSummaryOperations.Read(
                     ClassifyRegion(property.Instance, aliasSource: true)));
@@ -249,8 +248,7 @@ internal sealed class OperationEffectScanner
         var accessSummary = access == EffectAccess.Write
             ? EffectSummaryOperations.Write(region) : EffectSummaryOperations.Read(region);
         var exceptions = EffectSummary.Empty;
-        if (!DefiniteOperationFacts.IsDefinitelyNonNull(element.ArrayReference) &&
-            _abstractFlow?.ProvesNonNull(element, element.ArrayReference) != true)
+        if (!IsProvenNonNull(element.ArrayReference, element))
         {
             exceptions = EffectSummaryOperations.Join(exceptions, Throw(FrameworkTypeMetadataNames.NullReferenceException));
         }
@@ -366,7 +364,7 @@ internal sealed class OperationEffectScanner
         if (invocation.IsImplicit &&
             invocation.Syntax.AncestorsAndSelf().Any(static syntax => syntax is LockStatementSyntax))
         {
-            return ScanMany(invocation.Arguments.Select(static argument => argument.Value));
+            return ScanArgumentValues(invocation.Arguments);
         }
 
         if (_session.IsConditionallyElided(invocation))
@@ -413,16 +411,27 @@ internal sealed class OperationEffectScanner
         IOperation? instance, IEnumerable<IArgumentOperation> arguments, IOperation origin)
     {
         return EffectSummaryOperations.Join(
-            instance == null ? EffectSummary.Empty : Scan(instance),
-            ScanMany(arguments.Select(static argument => argument.Value)),
+            ScanInstance(instance),
+            ScanArgumentValues(arguments),
             PotentialNullReceiver(instance, origin));
+    }
+
+    private EffectSummary ScanInstance(IOperation? instance)
+    {
+        return instance == null ? EffectSummary.Empty : Scan(instance);
+    }
+
+    private EffectSummary ScanArgumentValues(
+        IEnumerable<IArgumentOperation> arguments)
+    {
+        return ScanMany(arguments.Select(static argument => argument.Value));
     }
 
     private EffectSummary ScanObjectCreation(IObjectCreationOperation creation)
     {
         var receiver = EffectRegionSet.Create(EffectRegionId.Fresh(creation.Syntax.SpanStart));
         return EffectSummaryOperations.Join(
-            ScanMany(creation.Arguments.Select(static argument => argument.Value)),
+            ScanArgumentValues(creation.Arguments),
             creation.Initializer == null
                 ? EffectSummary.Empty
                 : ScanChildren(creation.Initializer),
@@ -624,11 +633,7 @@ internal sealed class OperationEffectScanner
 
     private EffectSummary PotentialNullReceiver(IOperation? instance, IOperation access)
     {
-        if (instance == null ||
-            instance is IInstanceReferenceOperation ||
-            instance.Type is { IsValueType: true } ||
-            DefiniteOperationFacts.IsDefinitelyNonNull(instance) ||
-            _abstractFlow?.ProvesNonNull(access, instance) == true)
+        if (IsProvenNonNull(instance, access))
         {
             return EffectSummary.Empty;
         }
@@ -638,10 +643,18 @@ internal sealed class OperationEffectScanner
 
     private EffectSummary PotentialNullLock(IOperation value, IOperation origin)
     {
-        return DefiniteOperationFacts.IsDefinitelyNonNull(value) ||
-        _abstractFlow?.ProvesNonNull(origin, value) == true
+        return IsProvenNonNull(value, origin)
             ? EffectSummary.Empty
             : Throw(FrameworkTypeMetadataNames.ArgumentNullException);
+    }
+
+    private bool IsProvenNonNull(IOperation? value, IOperation access)
+    {
+        return value == null ||
+            value is IInstanceReferenceOperation ||
+            value.Type is { IsValueType: true } ||
+            DefiniteOperationFacts.IsDefinitelyNonNull(value) ||
+            _abstractFlow?.ProvesNonNull(access, value) == true;
     }
 
     private EffectSummary ArrayCreationExceptions(
@@ -662,8 +675,7 @@ internal sealed class OperationEffectScanner
         }
 
         var exceptions = _session.ResolveThrownException(thrown.Exception);
-        if (DefiniteOperationFacts.IsDefinitelyNonNull(thrown.Exception) ||
-            _abstractFlow?.ProvesNonNull(thrown, thrown.Exception) == true)
+        if (IsProvenNonNull(thrown.Exception, thrown))
         {
             return exceptions;
         }

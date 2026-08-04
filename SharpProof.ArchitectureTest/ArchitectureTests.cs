@@ -780,6 +780,7 @@ public sealed class ArchitectureTests
             ["cacheValidation"] = [
                 "SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs",
                 "SharpProof.CompilerArtifact/CompilerManifestArtifact.cs",
+                "SharpProof.Worker.Protocol/WorkerCachePath.cs",
                 "SharpProof.Worker/WorkerInputSnapshot.cs",
                 "SharpProof.Worker/VerificationCache.cs"
             ],

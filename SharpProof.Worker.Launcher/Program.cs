@@ -591,6 +591,8 @@ internal sealed partial class LauncherArguments
             cacheDirectory, RequestPath, ResultPath, CompilerManifestPath,
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath];
+        WorkerCachePath.ValidateNoReparsePoints(
+            candidates.OfType<string>());
         var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (candidates.OfType<string>().Any(path => !paths.Add(path)) ||
             runtimeSnapshot?.ComponentPaths.Any(path =>
