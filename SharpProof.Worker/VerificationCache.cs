@@ -101,7 +101,8 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             return Evict(cancellationToken);
         }
         catch (Exception exception) when (exception is
-            ArgumentException or IOException or UnauthorizedAccessException)
+            ArgumentException or IOException or UnauthorizedAccessException or
+            OverflowException)
         {
             // Cache failures never change semantic verifier outcomes.
             return false;
@@ -143,7 +144,10 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         foreach (var file in files)
         {
             ValidatePath(file.FullName);
-            total += file.Length;
+            checked
+            {
+                total += file.Length;
+            }
         }
         foreach (var file in files)
         {

@@ -88,7 +88,7 @@ internal static class EffectContractDiagnostics
             allowedExceptions, session.Compilation, location, session, reportDiagnostic);
         cancellationToken.ThrowIfCancellationRequested();
         var contract = session.ResolveEffectContract(method);
-        var bodyless = method.IsAbstract || method.IsExtern;
+        var bodyless = method is { IsAbstract: true } or { IsExtern: true };
         var bodylessTrusted = bodyless && contract.Kind == EffectContractResolutionKind.Valid;
         var result = session.AnalyzeEffects(method, cancellationToken);
         var summary = result.Summary;
