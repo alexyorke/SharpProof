@@ -258,6 +258,18 @@ public sealed class WorkerBinaryIdentityTests
                 typeof(System.Text.Encodings.Web.HtmlEncoder).Assembly.Location,
                 unsupportedRidLeaf,
                 overwrite: true);
+            var unsupportedRidPath = Path.Combine(
+                temporaryDirectory,
+                "runtimes",
+                "browser",
+                "lib",
+                "net8.0",
+                "OnlyBrowser.dll");
+            Directory.CreateDirectory(Path.GetDirectoryName(unsupportedRidPath)!);
+            File.Copy(
+                unsupportedRidLeaf,
+                unsupportedRidPath,
+                overwrite: true);
             var baseline = WorkerBinaryIdentity.ComputeSha256(worker);
             var nestedAppLocalAsset = Path.Combine(
                 temporaryDirectory,
