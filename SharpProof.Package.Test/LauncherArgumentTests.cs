@@ -428,22 +428,9 @@ public sealed class LauncherArgumentTests
         Assert.That(
             LauncherArguments.TryParse(arguments, out var parsed),
             Is.True);
-
-        Exception? collision = null;
-        try
-        {
-            parsed.CreateRequest(out _, out _);
-        }
-        catch (ArgumentException exception)
-        {
-            collision = exception;
-        }
-        catch (FileNotFoundException exception)
-        {
-            collision = exception;
-        }
-
-        Assert.That(collision?.GetType(), Is.EqualTo(typeof(ArgumentException)));
+        Assert.That(
+            (Action)(() => parsed.ValidateDistinctPaths(null)),
+            Throws.TypeOf<ArgumentException>());
     }
 
     [Test]
