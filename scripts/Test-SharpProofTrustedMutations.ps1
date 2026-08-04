@@ -668,7 +668,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'protocol-manifest-result-equality'
         File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
-        Original = "actual.OrderBy(static value => value, StringComparer.Ordinal)`n            .SequenceEqual(expected.OrderBy(static value => value, StringComparer.Ordinal),`n                StringComparer.Ordinal)"
+        Original = "actual.OrderBy(static value => value, s_ordinal)`n            .SequenceEqual(expected.OrderBy(static value => value, s_ordinal),`n                s_ordinal)"
         Mutated = 'actual.Concat(expected).All(static _ => true)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~StrictResponseValidationRequiresExactManifestAndResultSets'
@@ -756,8 +756,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'effect-managed-flow-binary-evaluation-guard'
         File = 'SharpProof.Effects\ManagedAbstractFlow.cs'
-        Original = "            IBinaryOperation { OperatorMethod: null, IsLifted: false } binary =>`n                ManagedAbstractValue.Binary(binary.OperatorKind,"
-        Mutated = "            IBinaryOperation binary =>`n                ManagedAbstractValue.Binary(binary.OperatorKind,"
+        Original = "            IBinaryOperation { OperatorMethod: null, IsLifted: false } binary =>`n                Binary(binary.OperatorKind,"
+        Mutated = "            IBinaryOperation binary =>`n                Binary(binary.OperatorKind,"
         Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
         Filter = 'FullyQualifiedName~UserDefinedEqualityEvaluatesAsUnknown'
     },

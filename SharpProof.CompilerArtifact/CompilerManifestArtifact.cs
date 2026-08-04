@@ -66,13 +66,15 @@ internal static class WorkerBinaryIdentity
             using var hash = new CanonicalHashWriter();
             hash.Add("SharpProof.WorkerBinarySet", 1);
             long totalBytes = 0;
+#pragma warning disable CA2000 // Stream ownership transfers to the retained snapshot list.
             foreach (var component in components)
             {
                 using (var stream = OpenRead(component.Value))
                 {
+                    var sourceLength = stream.Length;
                     ValidateComponentLength(
                         component.Key,
-                        stream.Length,
+                        sourceLength,
                         ref totalBytes);
                     var stagedPath = Combine(
                         stagingDirectory,
@@ -84,11 +86,25 @@ internal static class WorkerBinaryIdentity
                     {
                         stream.CopyTo(staged);
                     }
-                    using var stagedRead = OpenRead(stagedPath);
-                    hash.Add(component.Key).Add(stagedRead);
+                    using (var stagedRead = OpenRead(stagedPath))
+                    {
+                        var stagedTotalBytes = totalBytes - sourceLength;
+                        ValidateComponentLength(
+                            component.Key,
+                            stagedRead.Length,
+                            ref stagedTotalBytes);
+                        if (stagedRead.Length != sourceLength ||
+                            stream.Length != sourceLength)
+                        {
+                            throw new InvalidDataException(
+                                "A worker runtime component changed during staging.");
+                        }
+                        hash.Add(component.Key).Add(stagedRead);
+                    }
                     stagedHandles[stagedCount++] = OpenRead(stagedPath);
                 }
             }
+#pragma warning restore CA2000
             return new WorkerRuntimeClosureSnapshot(
                 path,
                 Combine(stagingDirectory, GetFileName(path)),
