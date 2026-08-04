@@ -652,7 +652,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'cache-read-lock-coordination'
         File = 'SharpProof.Worker\VerificationCache.cs'
-        Original = "            using var cacheLock = AcquireLock(_directory);`n            var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)"
+        Original = "            using var cacheLock = AcquireLock(_directory);`n            ValidatePath(path);`n            var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)"
         Mutated = '            var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~CacheDirectoryLockMakesReadMissAndWriteUnavailable'
