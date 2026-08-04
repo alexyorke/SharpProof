@@ -1019,7 +1019,7 @@ public sealed class ArchitectureTests
                 Is.True);
             Assert.That(
                 source.Contains(
-                    "stream.CopyTo(staged);",
+                    "staged.Write(sourceBytes, 0, sourceBytes.Length);",
                     StringComparison.Ordinal),
                 Is.True);
             Assert.That(
