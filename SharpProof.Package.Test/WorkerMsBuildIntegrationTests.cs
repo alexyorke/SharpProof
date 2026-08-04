@@ -929,21 +929,36 @@ public sealed class WorkerMsBuildIntegrationTests
         var baseline = await project.BuildAsync(verify: true);
         Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
 
-        var protocolPath = LauncherProtocolOutputPath();
-        Assert.That(File.Exists(protocolPath), Is.True, protocolPath);
-        var failed = await project.RunVerificationTargetAsync(
-            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
-            ("SharpProofVerifyResultFile", protocolPath));
-
-        using (Assert.EnterMultipleScope())
+        var launcherDirectory = Path.GetDirectoryName(
+            LauncherProtocolOutputPath())!;
+        foreach (var fileName in new[] {
+                     "SharpProof.CompilerArtifact.dll",
+                     "SharpProof.Ir.dll",
+                     "SharpProof.Specs.dll",
+                     "SharpProof.Worker.Protocol.dll",
+                     "SharpProof.Worker.Launcher.exe",
+                     "System.IO.Pipelines.dll",
+                     "System.Text.Encodings.Web.dll",
+                     "System.Text.Json.dll"
+                 })
         {
-            Assert.That(failed.ExitCode, Is.Not.Zero);
-            Assert.That(
-                failed.Output.Contains(
-                    "SharpProof launcher input is invalid: ArgumentException",
-                    StringComparison.Ordinal),
-                Is.True);
-            Assert.That(File.Exists(protocolPath), Is.True);
+            var collisionPath = Path.Combine(launcherDirectory, fileName);
+            Assert.That(File.Exists(collisionPath), Is.True, collisionPath);
+            var failed = await project.RunVerificationTargetAsync(
+                ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+                ("SharpProofVerifyResultFile", collisionPath));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(failed.ExitCode, Is.Not.Zero, collisionPath);
+                Assert.That(
+                    failed.Output.Contains(
+                        "SharpProof launcher input is invalid: ArgumentException",
+                        StringComparison.Ordinal),
+                    Is.True,
+                    collisionPath);
+                Assert.That(File.Exists(collisionPath), Is.True, collisionPath);
+            }
         }
     }
 

@@ -463,13 +463,25 @@ public sealed class LauncherArgumentTests
     [TestCase("launcher")]
     [TestCase(".deps.json")]
     [TestCase(".runtimeconfig.json")]
+    [TestCase("SharpProof.CompilerArtifact.dll")]
+    [TestCase("SharpProof.Ir.dll")]
+    [TestCase("SharpProof.Specs.dll")]
+    [TestCase("SharpProof.Worker.Protocol.dll")]
+    [TestCase("SharpProof.Worker.Launcher.exe")]
+    [TestCase("System.IO.Pipelines.dll")]
+    [TestCase("System.Text.Encodings.Web.dll")]
+    [TestCase("System.Text.Json.dll")]
     public void RequestProjectionRejectsLauncherRuntimeCollisionBeforeManifestRead(
         string extension)
     {
         var launcher = LauncherArguments.LauncherRuntimePaths[0];
-        var resultPath = extension == "launcher"
-            ? launcher
-            : Path.ChangeExtension(launcher, extension);
+        var resultPath = extension switch
+        {
+            "launcher" => launcher,
+            _ when extension.Length > 0 && extension[0] == '.' =>
+                Path.ChangeExtension(launcher, extension),
+            _ => Path.Combine(Path.GetDirectoryName(launcher)!, extension)
+        };
         string[] arguments = [
             "verify",
             "--worker", Path.Combine(

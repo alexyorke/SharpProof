@@ -43,7 +43,28 @@
             .Concat(new[] {
                 System.IO.Path.Combine(
                     System.IO.Path.GetDirectoryName(resolvePath(LauncherPath)),
-                    "SharpProof.Worker.Protocol.dll")
+                    "SharpProof.CompilerArtifact.dll"),
+                System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(resolvePath(LauncherPath)),
+                    "SharpProof.Ir.dll"),
+                System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(resolvePath(LauncherPath)),
+                    "SharpProof.Specs.dll"),
+                System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(resolvePath(LauncherPath)),
+                    "SharpProof.Worker.Protocol.dll"),
+                System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(resolvePath(LauncherPath)),
+                    "SharpProof.Worker.Launcher.exe"),
+                System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(resolvePath(LauncherPath)),
+                    "System.IO.Pipelines.dll"),
+                System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(resolvePath(LauncherPath)),
+                    "System.Text.Encodings.Web.dll"),
+                System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(resolvePath(LauncherPath)),
+                    "System.Text.Json.dll")
             });
         var resolvedWorkerPath = resolvePath(WorkerPath);
         var workerDirectory = System.IO.Path.GetDirectoryName(

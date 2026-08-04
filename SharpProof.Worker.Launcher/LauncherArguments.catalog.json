@@ -5,7 +5,14 @@
     ".runtimeconfig.json"
   ],
   "runtimeCompanionFiles": [
-    "SharpProof.Worker.Protocol.dll"
+    "SharpProof.CompilerArtifact.dll",
+    "SharpProof.Ir.dll",
+    "SharpProof.Specs.dll",
+    "SharpProof.Worker.Protocol.dll",
+    "SharpProof.Worker.Launcher.exe",
+    "System.IO.Pipelines.dll",
+    "System.Text.Encodings.Web.dll",
+    "System.Text.Json.dll"
   ],
   "options": [
     { "key": "worker", "category": "required", "accessor": "fullPath", "property": "WorkerPath", "fallback": "" },
