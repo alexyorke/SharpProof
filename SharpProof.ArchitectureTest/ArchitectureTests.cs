@@ -790,6 +790,11 @@ public sealed class ArchitectureTests
                 "SharpProof.Package/buildTransitive/SharpProof.props",
                 "SharpProof.Package/buildTransitive/SharpProof.targets",
                 "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.targets"
+            ],
+            ["releaseContainment"] = [
+                "scripts/Invoke-SharpProofDotnet.ps1",
+                "scripts/JobObjectHelpers.ps1",
+                "scripts/Test-SharpProofPackageConsumers.ps1"
             ]
         };
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(

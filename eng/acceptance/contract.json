@@ -423,6 +423,14 @@
           "SharpProof.Package/buildTransitive/SharpProof.targets",
           "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.targets"
         ]
+      },
+      {
+        "name": "releaseContainment",
+        "paths": [
+          "scripts/Invoke-SharpProofDotnet.ps1",
+          "scripts/JobObjectHelpers.ps1",
+          "scripts/Test-SharpProofPackageConsumers.ps1"
+        ]
       }
     ]
   },

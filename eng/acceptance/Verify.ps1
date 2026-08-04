@@ -397,7 +397,8 @@ try {
         'canonicalIdentityEncoding',
         'protocolValidation',
         'cacheValidation',
-        'portableShippingBoundary'
+        'portableShippingBoundary',
+        'releaseContainment'
     )
     $tcbComponents = @($contract.trustedComputingBase.components)
     $actualTcbComponents = @(
