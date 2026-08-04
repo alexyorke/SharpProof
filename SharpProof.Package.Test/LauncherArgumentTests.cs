@@ -447,11 +447,17 @@ public sealed class LauncherArgumentTests
     public void RequestProjectionRejectsDiscoveredRuntimeAssetCollisionBeforeManifestRead()
     {
         var worker = typeof(SharpProofWorker).Assembly.Location;
-        using var snapshot = WorkerBinaryIdentity.CreateSnapshot(worker);
-        var runtimeAsset = snapshot.ComponentPaths.First(
-            path => !string.Equals(path, worker, StringComparison.OrdinalIgnoreCase) &&
-                !path.EndsWith(".deps.json", StringComparison.OrdinalIgnoreCase) &&
-                !path.EndsWith(".runtimeconfig.json", StringComparison.OrdinalIgnoreCase));
+        var runtimeAsset = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof-discovered-runtime-asset.bin");
+        using var snapshot = new WorkerRuntimeClosureSnapshot(
+            worker,
+            Path.Combine(
+                Path.GetTempPath(),
+                "SharpProof-snapshot-" + Guid.NewGuid().ToString("N"),
+                Path.GetFileName(worker)),
+            [runtimeAsset],
+            "snapshot");
         string[] arguments = [
             "verify",
             "--worker", worker,
