@@ -213,7 +213,7 @@ internal static class WorkerBinaryIdentity
         };
         foreach (Match match in Regex.Matches(
                      root.GetRawText(),
-                     @"(?:runtimes/(?:win-x64|win)/[^""\r\n]+\.dll|[A-Za-z0-9_.-]+\.dll)"))
+                     @"(?:runtimes/(?:win-x64|win)/[^""\r\n]+\.dll|(?<![A-Za-z0-9_./-])(?!runtimes/)(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.dll)"))
         {
             var name = match.Value;
             names.Add(name.StartsWith(

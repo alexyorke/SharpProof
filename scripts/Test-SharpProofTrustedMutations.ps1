@@ -698,6 +698,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~RuntimeClosureLimitsFailClosedAtEveryBoundary'
     },
     [pscustomobject]@{
+        Name = 'worker-rejects-unsupported-runtime-rid-leaf'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '(?!runtimes/)'
+        Mutated = '(?=runtimes/)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~IdentityCoversTheCompleteTrustedRuntimeClosure'
+    },
+    [pscustomobject]@{
         Name = 'worker-runtime-target-selection'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
         Original = '        foreach (var name in names)'
