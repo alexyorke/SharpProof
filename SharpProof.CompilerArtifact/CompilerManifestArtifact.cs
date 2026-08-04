@@ -66,29 +66,16 @@ internal static class WorkerBinaryIdentity
             {
                 using (var stream = OpenRead(component.Value))
                 {
-                    var sourceTotalBytes = totalBytes;
                     ValidateComponentLength(
                         component.Key,
                         stream.Length,
-                        ref sourceTotalBytes);
+                        ref totalBytes);
                     var stagedPath = Combine(
                         stagingDirectory,
                         component.Key.Replace('/', DirectorySeparatorChar));
                     Directory.CreateDirectory(GetDirectoryName(stagedPath)!);
-                    stream.Position = 0;
-                    using (var destination = new FileStream(
-                               stagedPath,
-                               FileMode.CreateNew,
-                               FileAccess.Write,
-                               FileShare.Read))
-                    {
-                        stream.CopyTo(destination);
-                    }
+                    File.Copy(component.Value, stagedPath);
                     using var staged = OpenRead(stagedPath);
-                    ValidateComponentLength(
-                        component.Key,
-                        staged.Length,
-                        ref totalBytes);
                     hash.Add(component.Key).Add(staged);
                     stagedHandles[stagedCount++] = OpenRead(stagedPath);
                 }
@@ -199,13 +186,15 @@ internal static class WorkerBinaryIdentity
                 StringComparison.OrdinalIgnoreCase) ? name : GetFileName(name));
         }
         var result = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        var optionalFrameworkAssembly = GetFileName(
+            typeof(ImmutableArray<>).Assembly.Location);
         foreach (var path in Directory.GetFiles(directory, "*", SearchOption.AllDirectories))
         {
             var relativePath = path.Substring(directory.Length + 1)
                 .Replace(DirectorySeparatorChar, '/');
             if (names.Contains(relativePath) ||
                 relativePath.EndsWith(
-                    "System.Collections.Immutable.dll",
+                    optionalFrameworkAssembly,
                     StringComparison.OrdinalIgnoreCase))
             {
                 result.Add(relativePath, path);

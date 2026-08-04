@@ -972,8 +972,17 @@ public sealed class ArchitectureTests
                 Is.True);
             Assert.That(
                 source.Contains(
-                    "stagedHandles[stagedCount++] = " +
-                    "OpenRead(StageComponent(",
+                    "File.Copy(component.Value, stagedPath);",
+                    StringComparison.Ordinal),
+                Is.True);
+            Assert.That(
+                source.Contains(
+                    "hash.Add(component.Key).Add(staged);",
+                    StringComparison.Ordinal),
+                Is.True);
+            Assert.That(
+                source.Contains(
+                    "stagedHandles[stagedCount++] = OpenRead(stagedPath);",
                     StringComparison.Ordinal),
                 Is.True);
             Assert.That(
