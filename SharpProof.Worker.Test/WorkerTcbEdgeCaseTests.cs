@@ -849,7 +849,7 @@ public sealed class WorkerTcbEdgeCaseTests
         foreach (var maximumBytes in new[]
         {
             1L,
-            (long)WorkerProtocolJson.MaximumJsonBytes + 1
+            (long)WorkerProtocolJson.MaximumJsonBytes * 2
         })
         {
             var directory = Path.Combine(
