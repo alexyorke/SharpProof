@@ -805,7 +805,7 @@ $mutations = @(
         Name = 'launcher-checks-launcher-runtime-paths'
         File = 'SharpProof.Worker.Launcher\Program.cs'
         Original = '            ..LauncherArguments.LauncherRuntimePaths,'
-        Mutated = '            ..Array.Empty<string>(),'
+        Mutated = '            ..LauncherArguments.LauncherRuntimePaths[1..],'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~RequestProjectionRejectsLauncherRuntimeCollisionBeforeManifestRead'
     },
