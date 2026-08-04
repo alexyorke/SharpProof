@@ -4,6 +4,9 @@
     ".deps.json",
     ".runtimeconfig.json"
   ],
+  "runtimeCompanionFiles": [
+    "SharpProof.Worker.Protocol.dll"
+  ],
   "options": [
     { "key": "worker", "category": "required", "accessor": "fullPath", "property": "WorkerPath", "fallback": "" },
     { "key": "request", "category": "required", "accessor": "fullPath", "property": "RequestPath", "fallback": "" },

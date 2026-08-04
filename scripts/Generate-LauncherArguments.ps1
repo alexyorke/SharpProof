@@ -85,7 +85,8 @@ finally {
 }
 $catalog = $catalogJson | ConvertFrom-Json
 Assert-Properties $catalog @(
-    'schemaVersion', 'runtimeCompanionExtensions', 'options', 'budgets', 'cache') `
+    'schemaVersion', 'runtimeCompanionExtensions', 'runtimeCompanionFiles',
+    'options', 'budgets', 'cache') `
     'launcher argument catalog'
 if ($catalog.schemaVersion -ne 1) {
     throw 'Launcher argument catalog schemaVersion must be 1.'
@@ -96,6 +97,20 @@ $expectedRuntimeCompanionExtensions = @(
 if (($runtimeCompanionExtensions -join '|') -ne
     ($expectedRuntimeCompanionExtensions -join '|')) {
     throw 'Launcher runtime companion extensions are invalid.'
+}
+$runtimeCompanionFiles = @($catalog.runtimeCompanionFiles)
+$runtimeCompanionFileNames = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::OrdinalIgnoreCase)
+foreach ($file in $runtimeCompanionFiles) {
+    if ($file -isnot [string] -or
+        [string]::IsNullOrWhiteSpace($file) -or
+        [IO.Path]::GetFileName([string]$file) -cne [string]$file -or
+        -not $runtimeCompanionFileNames.Add([string]$file)) {
+        throw "Launcher runtime companion file is invalid or duplicated: '$file'."
+    }
+}
+if ($runtimeCompanionFiles.Count -eq 0) {
+    throw 'Launcher runtime companion files are incomplete.'
 }
 
 $optionKeys = [Collections.Generic.HashSet[string]]::new(
@@ -260,6 +275,11 @@ foreach ($extension in $runtimeCompanionExtensions) {
     $lines.Add(
         "                System.IO.Path.ChangeExtension(path, " +
         "$(Quote-CSharpString $extension)),")
+}
+foreach ($file in $runtimeCompanionFiles) {
+    $lines.Add(
+        "                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, " +
+        "$(Quote-CSharpString $file)),")
 }
 $lines[$lines.Count - 1] = $lines[$lines.Count - 1].TrimEnd(',')
 $lines.Add('            ];')

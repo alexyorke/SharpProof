@@ -59,7 +59,8 @@ internal sealed partial class LauncherArguments
             return [
                 path,
                 System.IO.Path.ChangeExtension(path, ".deps.json"),
-                System.IO.Path.ChangeExtension(path, ".runtimeconfig.json")
+                System.IO.Path.ChangeExtension(path, ".runtimeconfig.json"),
+                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Worker.Protocol.dll")
             ];
         }
     }

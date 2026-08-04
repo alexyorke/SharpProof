@@ -434,6 +434,33 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void RequestProjectionRejectsLauncherProtocolRuntimeCollisionBeforeManifestRead()
+    {
+        var launcher = LauncherArguments.LauncherRuntimePaths[0];
+        var protocol = Path.Combine(
+            Path.GetDirectoryName(launcher)!,
+            "SharpProof.Worker.Protocol.dll");
+        string[] arguments = [
+            "verify",
+            "--worker", Path.Combine(
+                Path.GetTempPath(),
+                "SharpProof-isolated-worker-" + Guid.NewGuid().ToString("N"),
+                "worker.dll"),
+            "--request", "request.json",
+            "--result", protocol,
+            "--compiler-manifest", "missing-compiler-manifest.json",
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+        Assert.That(
+            (Action)(() => parsed.ValidateDistinctPaths(null)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
     public void RequestProjectionRejectsDiscoveredRuntimeAssetCollisionBeforeManifestRead()
     {
         var worker = typeof(SharpProofWorker).Assembly.Location;

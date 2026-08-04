@@ -39,6 +39,11 @@
                 path,
                 System.IO.Path.ChangeExtension(path, ".deps.json"),
                 System.IO.Path.ChangeExtension(path, ".runtimeconfig.json")
+            })
+            .Concat(new[] {
+                System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(resolvePath(LauncherPath)),
+                    "SharpProof.Worker.Protocol.dll")
             });
         var resolvedWorkerPath = resolvePath(WorkerPath);
         var workerDirectory = System.IO.Path.GetDirectoryName(

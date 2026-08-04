@@ -31,7 +31,10 @@ are not implemented.
 ## Install and enable
 
 The portable analyzer and generator require a compiler host with Roslyn 4.14
-or newer. For command-line builds, use .NET SDK 9.0.300 or newer. The
+or newer. Repository development and command-line builds require the exact
+.NET SDK version pinned in `global.json` (currently 9.0.316; roll-forward is
+disabled). The package-consumer compatibility lane separately validates the
+`netstandard2.0` contract API with its minimum SDK, currently 9.0.300. The
 `SharpProof.Attributes` contract API alone remains a `netstandard2.0` library,
 and `SharpProofProfile=off` omits analyzer/generator loading on an older host.
 Visual Studio and Rider qualification with Roslyn 4.14 or newer remains a
