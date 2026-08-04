@@ -69,38 +69,32 @@ internal static class WorkerBinaryIdentity
 #pragma warning disable CA2000 // Stream ownership transfers to the retained snapshot list.
             foreach (var component in components)
             {
-                using (var stream = OpenRead(component.Value))
+                var sourceBytes = CompilerManifestArtifactFile.ReadAllBytes(component.Value);
+                var sourceLength = sourceBytes.LongLength;
+                ValidateComponentLength(component.Key, sourceLength, ref totalBytes);
+                var stagedPath = Combine(
+                    stagingDirectory,
+                    component.Key.Replace('/', DirectorySeparatorChar));
+                Directory.CreateDirectory(GetDirectoryName(stagedPath)!);
+                using (var staged = new FileStream(
+                           stagedPath,
+                           FileMode.CreateNew))
                 {
-                    var sourceLength = stream.Length;
+                    staged.Write(sourceBytes, 0, sourceBytes.Length);
+                }
+                using (var stagedRead = OpenRead(stagedPath))
+                {
+                    var stagedTotalBytes = totalBytes - sourceLength;
                     ValidateComponentLength(
                         component.Key,
-                        sourceLength,
-                        ref totalBytes);
-                    var stagedPath = Combine(
-                        stagingDirectory,
-                        component.Key.Replace('/', DirectorySeparatorChar));
-                    Directory.CreateDirectory(GetDirectoryName(stagedPath)!);
-                    using (var staged = new FileStream(
-                               stagedPath,
-                               FileMode.CreateNew))
-                    {
-                        stream.CopyTo(staged);
-                    }
-                    using (var stagedRead = OpenRead(stagedPath))
-                    {
-                        var stagedTotalBytes = totalBytes - sourceLength;
-                        ValidateComponentLength(
-                            component.Key,
-                            stagedRead.Length,
-                            ref stagedTotalBytes);
-                        EnsureStagedComponentLengthsMatch(
-                            sourceLength,
-                            stagedRead.Length,
-                            stream.Length);
-                        hash.Add(component.Key).Add(stagedRead);
-                    }
-                    stagedHandles[stagedCount++] = OpenRead(stagedPath);
+                        stagedRead.Length,
+                        ref stagedTotalBytes);
+                    EnsureStagedComponentConsistency(
+                        component.Value,
+                        stagedPath);
+                    hash.Add(component.Key).Add(stagedRead);
                 }
+                stagedHandles[stagedCount++] = OpenRead(stagedPath);
             }
 #pragma warning restore CA2000
             return new WorkerRuntimeClosureSnapshot(
@@ -179,13 +173,12 @@ internal static class WorkerBinaryIdentity
         totalBytes += length;
     }
 
-    internal static void EnsureStagedComponentLengthsMatch(
-        long sourceLength,
-        long stagedLength,
-        long currentSourceLength)
+    internal static void EnsureStagedComponentConsistency(
+        string sourcePath,
+        string stagedPath)
     {
-        if (stagedLength != sourceLength ||
-            currentSourceLength != sourceLength)
+        if (!CompilerManifestArtifactFile.ReadAllBytes(sourcePath).SequenceEqual(
+                CompilerManifestArtifactFile.ReadAllBytes(stagedPath)))
         {
             throw new InvalidDataException(
                 "A worker runtime component changed during staging.");
@@ -383,20 +376,18 @@ internal static class CompilerManifestArtifactJson
 
     private static bool HasValidDiagnostics(CompilerDiagnosticArtifact[]? diagnostics)
     {
-        return diagnostics != null &&
-        diagnostics.All(static item =>
+        return diagnostics?.All(static item =>
             item != null &&
             !string.IsNullOrWhiteSpace(item.Code) &&
             !string.IsNullOrWhiteSpace(item.Message) &&
-            item.Location is { Start: >= 0, Length: >= 0, Line: >= 0, Column: >= 0 });
+            item.Location is { Start: >= 0, Length: >= 0, Line: >= 0, Column: >= 0 }) == true;
     }
 
     private static bool HasMatchingCallables(
         CompilerCallableArtifact[]? callables,
         WorkerClaimManifest manifest)
     {
-        return callables != null &&
-        callables.Length == manifest.Callables.Length &&
+        return callables?.Length == manifest.Callables.Length &&
         callables.Select(static item => item?.CallableId).SequenceEqual(
             manifest.Callables.Select(static item => item.CallableId),
             StringComparer.Ordinal);
@@ -406,15 +397,15 @@ internal static class CompilerManifestArtifactJson
         CompilerCallableArtifact[]? callables,
         CompilerCompilationSnapshot? compilation)
     {
-        if (callables == null || compilation?.SyntaxTrees == null)
+        if (callables is null || compilation is not { SyntaxTrees: not null })
         {
             return false;
         }
 
         foreach (var effectEvent in callables
-                     .Where(static callable => callable != null)
+                     .OfType<CompilerCallableArtifact>()
                      .SelectMany(static callable => callable.EffectClaims ?? [])
-                     .Where(static claim => claim != null)
+                     .OfType<CompilerEffectClaimArtifact>()
                      .SelectMany(static claim => claim.Replay?.Events ?? []))
         {
             if (effectEvent == null ||

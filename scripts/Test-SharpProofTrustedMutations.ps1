@@ -500,8 +500,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'effect-metadata-callsite-certificate'
         File = 'SharpProof.Analyzer\AnalyzerSession.cs'
-        Original = '                < EffectContractResolutionKind.Valid)'
-        Mutated = '                <= EffectContractResolutionKind.Valid)'
+        Original = "            ResolveEffectContract(method) is`n            { Kind: > EffectContractResolutionKind.Missing and < EffectContractResolutionKind.Valid })"
+        Mutated = "            ResolveEffectContract(method) is`n            { Kind: > EffectContractResolutionKind.Missing and <= EffectContractResolutionKind.Valid })"
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~ExternalMetadataPreconditionEnvelopeCannotBeAssumed'
     },
@@ -914,12 +914,20 @@ $mutations = @(
         Filter = 'FullyQualifiedName~CompanionPreconditionDoesNotContaminateOtherMember'
     },
     [pscustomobject]@{
+        Name = 'closure-staging-content-consistency'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = "        if (!CompilerManifestArtifactFile.ReadAllBytes(sourcePath).SequenceEqual("
+        Mutated = "        if (CompilerManifestArtifactFile.ReadAllBytes(sourcePath).SequenceEqual("
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~StagedComponentConsistencyIsFailClosed'
+    },
+    [pscustomobject]@{
         Name = 'closure-staging-length-consistency'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
-        Original = '        if (stagedLength != sourceLength ||'
-        Mutated = '        if (stagedLength != sourceLength &&'
+        Original = '        if (length > maximum || totalBytes > MaximumClosureBytes - length)'
+        Mutated = '        if (length > maximum && totalBytes > MaximumClosureBytes - length)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
-        Filter = 'FullyQualifiedName~StagedComponentLengthValidationIsFailClosed'
+        Filter = 'FullyQualifiedName~RuntimeClosureLimitsFailClosedAtEveryBoundary'
     }
 )
 

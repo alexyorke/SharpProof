@@ -8,28 +8,31 @@ namespace SharpProof.Worker.Test;
 public sealed class WorkerBinaryIdentityTests
 {
     [Test]
-    public void StagedComponentLengthValidationIsFailClosed()
+    public void StagedComponentConsistencyIsFailClosed()
     {
-        Assert.Multiple((Action)(() =>
+        var temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.StagedComponent." + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temporaryDirectory);
+        try
         {
+            var source = Path.Combine(temporaryDirectory, "source.dll");
+            var staged = Path.Combine(temporaryDirectory, "staged.dll");
+            File.WriteAllBytes(source, [1, 2]);
+            File.WriteAllBytes(staged, [1, 3]);
             Assert.That(
-                (Action)(() => WorkerBinaryIdentity.EnsureStagedComponentLengthsMatch(
-                    4,
-                    3,
-                    4)),
+                (Action)(() => WorkerBinaryIdentity.EnsureStagedComponentConsistency(
+                    source, staged)),
                 Throws.TypeOf<InvalidDataException>());
-            Assert.That(
-                (Action)(() => WorkerBinaryIdentity.EnsureStagedComponentLengthsMatch(
-                    4,
-                    4,
-                    3)),
-                Throws.TypeOf<InvalidDataException>());
+            File.WriteAllBytes(staged, [1, 2]);
             Assert.DoesNotThrow((Action)(() =>
-                WorkerBinaryIdentity.EnsureStagedComponentLengthsMatch(
-                    4,
-                    4,
-                    4)));
-        }));
+                WorkerBinaryIdentity.EnsureStagedComponentConsistency(
+                    source, staged)));
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
     }
 
     [Test]
