@@ -772,8 +772,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'closure-retains-staged-component-handles'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
-        Original = "                stagedHandles[stagedCount++] = OpenRead(StageComponent(`n                    stagingDirectory,`n                    path,`n                    component.Value));"
-        Mutated = "                StageComponent(`n                    stagingDirectory,`n                    path,`n                    component.Value);"
+        Original = '                    stagedHandles[stagedCount++] = OpenRead(stagedPath);'
+        Mutated = '                    stagedHandles[stagedCount++] = OpenRead(component.Value);'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~WorkerClosureRetainsStagedComponentsUntilSnapshotDisposal'
     },
