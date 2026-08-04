@@ -297,17 +297,18 @@ internal sealed class CompilerCallableLowerer
 
     private int? FindExecutableBodyStart(ManifestCallableTarget target)
     {
-        if (target.VerifierDeclaration.ExpressionBody != null)
+        var declaration = target.VerifierDeclaration;
+        if (declaration.ExpressionBody is { } expressionBody)
         {
-            return target.VerifierDeclaration.ExpressionBody.Expression.SpanStart;
+            return expressionBody.Expression.SpanStart;
         }
 
-        if (target.VerifierDeclaration.Body == null)
+        if (declaration.Body is not { } body)
         {
             return null;
         }
 
-        foreach (var statement in target.VerifierDeclaration.Body.Statements)
+        foreach (var statement in body.Statements)
         {
             if (statement is EmptyStatementSyntax || IsContractStatement(target, statement))
             {
@@ -444,8 +445,8 @@ internal sealed class CompilerCallableLowerer
 
     private bool ContainsOnlyContractStatements(ManifestCallableTarget target)
     {
-        return target.VerifierDeclaration.Body != null &&
-        target.VerifierDeclaration.Body.Statements.All(statement => IsContractStatement(target, statement));
+        return target.VerifierDeclaration.Body is { } body &&
+            body.Statements.All(statement => IsContractStatement(target, statement));
     }
 
     private bool IsContractStatement(ManifestCallableTarget target, StatementSyntax statement)
