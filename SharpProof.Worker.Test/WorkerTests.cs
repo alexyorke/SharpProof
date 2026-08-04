@@ -3456,13 +3456,18 @@ public sealed class WorkerTests
         request.Cache.MaximumBytes = 1;
         var backend = new SpuriousModelBackend();
         using var worker = new SharpProofWorker(backend);
-        await worker.VerifyAsync(request);
-        await worker.VerifyAsync(request);
+        var first = await worker.VerifyAsync(request);
+        var second = await worker.VerifyAsync(request);
 
-        Assert.That(backend.CallCount, Is.EqualTo(2));
-        Assert.That(
-            Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
-            Is.Empty);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
+            Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
+            Assert.That(
+                Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
+                Is.Empty);
+        }
     }
 
     [Test]

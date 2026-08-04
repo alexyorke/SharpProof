@@ -833,6 +833,52 @@ public sealed class WorkerTcbEdgeCaseTests
         }
     }
 
+    [Test]
+    public async Task CacheWriteLimitsAreRejectedBeforePublication()
+    {
+        var inputHash = new string('e', 64);
+        var manifest = new WorkerClaimManifest();
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = new WorkerVerifyResponse
+        {
+            ClaimResults = [new WorkerClaimResult
+            {
+                ProofCore = [new string('x', WorkerProtocolJson.MaximumJsonBytes)]
+            }]
+        };
+        foreach (var maximumBytes in new[]
+        {
+            1L,
+            (long)WorkerProtocolJson.MaximumJsonBytes + 1
+        })
+        {
+            var directory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "worker-cache-write-size-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var cache = new VerificationCache(directory, maximumBytes);
+                Assert.That(
+                    await cache.TryWriteAsync(
+                        response,
+                        inputHash,
+                        manifest,
+                        CancellationToken.None),
+                    Is.False,
+                    maximumBytes.ToString(CultureInfo.InvariantCulture));
+                Assert.That(
+                    Directory.GetFiles(directory, "*.sharp-proof-cache.json"),
+                    Is.Empty,
+                    maximumBytes.ToString(CultureInfo.InvariantCulture));
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
     private static Task WriteCacheEnvelopeAsync(
         string directory,
         string inputHash,

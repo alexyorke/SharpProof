@@ -642,6 +642,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~RehashedCacheSealedForDifferentManifestMissesAndRecomputes'
     },
     [pscustomobject]@{
+        Name = 'cache-write-size-admission'
+        File = 'SharpProof.Worker\VerificationCache.cs'
+        Original = '            if (Encoding.UTF8.GetByteCount(json) >`n                Math.Min(_maximumBytes, WorkerProtocolJson.MaximumJsonBytes))'
+        Mutated = '            if (false)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~CacheWriteLimitsAreRejectedBeforePublication'
+    },
+    [pscustomobject]@{
         Name = 'protocol-manifest-result-equality'
         File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
         Original = "actual.OrderBy(static value => value, StringComparer.Ordinal)`n            .SequenceEqual(expected.OrderBy(static value => value, StringComparer.Ordinal),`n                StringComparer.Ordinal)"

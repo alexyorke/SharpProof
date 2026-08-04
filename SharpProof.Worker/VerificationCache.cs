@@ -20,10 +20,15 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)
                 .ConfigureAwait(false);
             var envelope = JsonSerializer.Deserialize<CacheEnvelope>(json, WorkerProtocolJson.Options);
-            if (envelope == null || envelope.SchemaVersion != WorkerCacheVersions.Current ||
-                !string.Equals(envelope.InputHash, inputHash, StringComparison.Ordinal) ||
-                string.IsNullOrEmpty(envelope.Payload) ||
-                !string.Equals(envelope.PayloadHash, HashText(envelope.Payload), StringComparison.Ordinal))
+            if (envelope is not
+                {
+                    SchemaVersion: WorkerCacheVersions.Current,
+                    InputHash: var envelopeInputHash,
+                    Payload: { Length: > 0 } envelopePayload,
+                    PayloadHash: var payloadHash
+                } ||
+                !string.Equals(envelopeInputHash, inputHash, StringComparison.Ordinal) ||
+                !string.Equals(payloadHash, HashText(envelopePayload), StringComparison.Ordinal))
             {
                 return null;
             }
@@ -74,6 +79,12 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             var envelope = new CacheEnvelope(WorkerCacheVersions.Current,
                 inputHash, HashText(payload), payload);
             var json = JsonSerializer.Serialize(envelope, WorkerProtocolJson.Options);
+            if (Encoding.UTF8.GetByteCount(json) >
+                Math.Min(_maximumBytes, WorkerProtocolJson.MaximumJsonBytes))
+            {
+                return false;
+            }
+
             var path = GetPath(inputHash);
             await AtomicFile.WriteUtf8Async(path, json, cancellationToken).ConfigureAwait(false);
             Evict(cancellationToken);
