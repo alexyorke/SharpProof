@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using static System.IO.Path;
 
 namespace SharpProof.CompilerArtifact;
 
@@ -50,49 +51,44 @@ internal static class WorkerBinaryIdentity
     {
         var path = NormalizeWorkerPath(workerPath);
         var stagingDirectory = CreateStagingDirectory();
+        FileStream[] stagedHandles = [];
+        var stagedCount = 0;
         try
         {
-            using var dependency = OpenRead(Path.ChangeExtension(path, ".deps.json"));
+            using var dependency = OpenRead(ChangeExtension(path, ".deps.json"));
             var components = RuntimeComponents(path, dependency);
             ValidateComponentCount(components.Count);
+            stagedHandles = new FileStream[components.Count];
             using var hash = new CanonicalHashWriter();
             hash.Add("SharpProof.WorkerBinarySet", 1);
             long totalBytes = 0;
-#pragma warning disable CA2000 // Stream ownership transfers to the retained snapshot list.
             foreach (var component in components)
             {
-                var isDependency = component.Value ==
-                    Path.ChangeExtension(path, ".deps.json");
-                var stream = isDependency
-                    ? dependency
-                    : OpenRead(component.Value);
-                try
-                {
-                    ValidateComponentLength(
-                        component.Key,
-                        stream.Length,
-                        ref totalBytes);
-                    stream.Position = 0;
-                    hash.Add(component.Key).Add(stream);
-                    StageComponent(stagingDirectory, path, component.Value);
-                }
-                finally
-                {
-                    if (!isDependency)
-                    {
-                        stream.Dispose();
-                    }
-                }
+                using var stream = OpenRead(component.Value);
+                ValidateComponentLength(
+                    component.Key,
+                    stream.Length,
+                    ref totalBytes);
+                stream.Position = 0;
+                hash.Add(component.Key).Add(stream);
+                stagedHandles[stagedCount++] = OpenRead(StageComponent(
+                    stagingDirectory,
+                    path,
+                    component.Value));
             }
-#pragma warning restore CA2000
             return new WorkerRuntimeClosureSnapshot(
                 path,
-                Path.Combine(stagingDirectory, Path.GetFileName(path)),
+                Combine(stagingDirectory, GetFileName(path)),
                 components.Values.ToArray(),
-                hash.Finish());
+                hash.Finish(),
+                stagedHandles);
         }
         catch
         {
+            for (var index = 0; index < stagedCount; index++)
+            {
+                stagedHandles[index].Dispose();
+            }
             DeleteStagingDirectory(stagingDirectory);
 
             throw;
@@ -107,7 +103,7 @@ internal static class WorkerBinaryIdentity
 
     private static string NormalizeWorkerPath(string workerPath)
     {
-        var path = Path.GetFullPath(workerPath);
+        var path = GetFullPath(workerPath);
         if (!path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
         {
             throw new FileNotFoundException(
@@ -160,7 +156,7 @@ internal static class WorkerBinaryIdentity
         string workerPath,
         FileStream dependencyStream)
     {
-        var directory = Path.GetDirectoryName(workerPath)!;
+        var directory = GetDirectoryName(workerPath)!;
         long dependencyBytes = 0;
         ValidateComponentLength(
             "dependencies",
@@ -174,9 +170,9 @@ internal static class WorkerBinaryIdentity
             root.GetProperty("runtimeTarget").GetProperty("name").GetString()!);
         var names = new HashSet<string>
         {
-            Path.GetFileName(workerPath),
-            Path.GetFileName(Path.ChangeExtension(workerPath, ".deps.json")),
-            Path.GetFileName(Path.ChangeExtension(workerPath, ".runtimeconfig.json"))
+            GetFileName(workerPath),
+            GetFileName(ChangeExtension(workerPath, ".deps.json")),
+            GetFileName(ChangeExtension(workerPath, ".runtimeconfig.json"))
         };
         foreach (Match match in Regex.Matches(
                      root.GetRawText(),
@@ -190,17 +186,17 @@ internal static class WorkerBinaryIdentity
             SearchOption.AllDirectories);
         var result = new SortedDictionary<string, string>(StringComparer.Ordinal);
         foreach (var path in files.Where(path =>
-                     names.Contains(Path.GetFileName(path)) ||
+                     names.Contains(GetFileName(path)) ||
                      path.EndsWith(
-                         Path.GetFileName(typeof(ImmutableArray<>).Assembly.Location),
+                         GetFileName(typeof(ImmutableArray<>).Assembly.Location),
                          StringComparison.OrdinalIgnoreCase)))
         {
             result.Add(
                 path.Substring(directory.Length + 1)
-                    .Replace(Path.DirectorySeparatorChar, '/'),
+                    .Replace(DirectorySeparatorChar, '/'),
                 path);
         }
-        if (!names.IsSubsetOf(result.Values.Select(Path.GetFileName)))
+        if (!names.IsSubsetOf(result.Values.Select(GetFileName)))
         {
             throw new FileNotFoundException(
                 "A trusted worker runtime component is unavailable.");
@@ -218,23 +214,24 @@ internal static class WorkerBinaryIdentity
             FileShare.Read);
     }
 
-    private static void StageComponent(
+    private static string StageComponent(
         string stagingDirectory,
         string workerPath,
         string componentPath)
     {
         var stagedPath = componentPath.Replace(
-            Path.GetDirectoryName(workerPath)!,
+            GetDirectoryName(workerPath)!,
             stagingDirectory);
-        Directory.CreateDirectory(Path.GetDirectoryName(stagedPath)!);
+        Directory.CreateDirectory(GetDirectoryName(stagedPath)!);
         File.Copy(componentPath, stagedPath);
+        return stagedPath;
     }
 
     private static string CreateStagingDirectory()
     {
-        return Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.Worker.Runtime." + Path.GetRandomFileName());
+        return Combine(
+            GetTempPath(),
+            "SharpProof.Worker.Runtime." + GetRandomFileName());
     }
 
     internal static void DeleteStagingDirectory(string path)
@@ -257,18 +254,24 @@ internal sealed class WorkerRuntimeClosureSnapshot(
     string workerPath,
     string executionWorkerPath,
     IReadOnlyList<string> componentPaths,
-    string sha256) : IDisposable
+    string sha256,
+    IReadOnlyList<FileStream> stagedHandles) : IDisposable
 {
     internal string WorkerPath { get; } = workerPath;
     internal string ExecutionWorkerPath { get; } = executionWorkerPath;
     internal IReadOnlyList<string> ComponentPaths { get; } =
         ImmutableArray.CreateRange(componentPaths);
     internal string Sha256 { get; } = sha256;
+    private IReadOnlyList<FileStream> StagedHandles { get; } = stagedHandles;
 
     public void Dispose()
     {
+        foreach (var handle in StagedHandles)
+        {
+            handle.Dispose();
+        }
         WorkerBinaryIdentity.DeleteStagingDirectory(
-            Path.GetDirectoryName(ExecutionWorkerPath)!);
+            GetDirectoryName(ExecutionWorkerPath)!);
     }
 }
 

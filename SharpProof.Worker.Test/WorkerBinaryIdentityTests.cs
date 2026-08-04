@@ -130,6 +130,13 @@ public sealed class WorkerBinaryIdentityTests
                 snapshot.ExecutionWorkerPath,
                 Is.Not.EqualTo(snapshot.WorkerPath));
         }
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.That(
+                (Action)(() => File.Delete(snapshot.ExecutionWorkerPath)),
+                Throws.TypeOf<IOException>());
+        }
     }
 
     [Test]

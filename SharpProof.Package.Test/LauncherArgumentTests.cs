@@ -447,7 +447,8 @@ public sealed class LauncherArgumentTests
                 "SharpProof-snapshot-" + Guid.NewGuid().ToString("N"),
                 Path.GetFileName(worker)),
             [runtimeAsset],
-            "snapshot");
+            "snapshot",
+            Array.Empty<FileStream>());
         string[] arguments = [
             "verify",
             "--worker", worker,
