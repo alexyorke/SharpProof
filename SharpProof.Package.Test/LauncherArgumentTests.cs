@@ -273,10 +273,7 @@ public sealed class LauncherArgumentTests
     {
         string[] arguments = [
             "verify",
-            "--worker", Path.Combine(
-                Path.GetTempPath(),
-                "SharpProof-isolated-worker-" + Guid.NewGuid().ToString("N"),
-                "worker.dll"),
+            "--worker", "worker.dll",
             "--request", "request.json",
             "--result", Path.Combine(".", "request.json"),
             "--compiler-manifest", "missing-compiler-manifest.json",
@@ -418,7 +415,10 @@ public sealed class LauncherArgumentTests
             : Path.ChangeExtension(launcher, extension);
         string[] arguments = [
             "verify",
-            "--worker", "worker.dll",
+            "--worker", Path.Combine(
+                Path.GetTempPath(),
+                "SharpProof-isolated-worker-" + Guid.NewGuid().ToString("N"),
+                "worker.dll"),
             "--request", "request.json",
             "--result", resultPath,
             "--compiler-manifest", "missing-compiler-manifest.json",
