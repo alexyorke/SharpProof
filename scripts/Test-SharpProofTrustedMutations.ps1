@@ -812,8 +812,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'closure-retains-staged-component-handles'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
-        Original = '                    stagedHandles[stagedCount++] = OpenRead(stagedPath);'
-        Mutated = '                    stagedHandles[stagedCount++] = OpenRead(component.Value);'
+        Original = '                stagedHandles[stagedCount++] = OpenRead(stagedPath);'
+        Mutated = '                stagedHandles[stagedCount++] = OpenRead(component.Value);'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~WorkerClosureRetainsStagedComponentsUntilSnapshotDisposal'
     },
@@ -916,8 +916,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'closure-staging-content-consistency'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
-        Original = "        if (!CompilerManifestArtifactFile.ReadAllBytes(sourcePath).SequenceEqual("
-        Mutated = "        if (CompilerManifestArtifactFile.ReadAllBytes(sourcePath).SequenceEqual("
+        Original = "        if (!CompilerManifestArtifactFile.ReadAllBytes(`n                    sourcePath,`n                    MaximumComponentBytes).SequenceEqual("
+        Mutated = "        if (CompilerManifestArtifactFile.ReadAllBytes(`n                    sourcePath,`n                    MaximumComponentBytes).SequenceEqual("
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~StagedComponentConsistencyIsFailClosed'
     },

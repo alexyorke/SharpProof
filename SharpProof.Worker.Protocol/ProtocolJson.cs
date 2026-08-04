@@ -120,7 +120,7 @@ public static partial class WorkerProtocolJson
         }
 
         response.CallableResults = SortOrdinal(response.CallableResults, static value => value?.CallableId);
-        foreach (var result in response.CallableResults.Where(static value => value != null))
+        foreach (var result in response.CallableResults.OfType<WorkerCallableResult>())
         {
             result.Assumptions = CanonicalizeAssumptions(result.Assumptions);
         }
@@ -129,7 +129,7 @@ public static partial class WorkerProtocolJson
             .OrderBy(value => FindClaimCallableId(response.Manifest, value?.ClaimId), s_ordinal)
             .ThenBy(value => FindClaimOrdinal(response.Manifest, value?.ClaimId))
             .ThenBy(static value => value?.ClaimId, s_ordinal)];
-        foreach (var result in response.ClaimResults.Where(static value => value != null))
+        foreach (var result in response.ClaimResults.OfType<WorkerClaimResult>())
         {
             Canonicalize(result);
         }

@@ -36,6 +36,36 @@ public sealed class WorkerBinaryIdentityTests
     }
 
     [Test]
+    public void RuntimeComponentReadsRetainTheDeclaredSizeBoundary()
+    {
+        const int aboveManifestLimit = 16 * 1024 * 1024 + 1;
+        var temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.RuntimeComponentLimit." + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temporaryDirectory);
+        try
+        {
+            var path = Path.Combine(temporaryDirectory, "runtime.dll");
+            using (var stream = File.Create(path))
+            {
+                stream.SetLength(aboveManifestLimit);
+            }
+
+            Assert.That(
+                (Action)(() => CompilerManifestArtifactFile.ReadAllBytes(path)),
+                Throws.TypeOf<InvalidDataException>());
+            var bytes = CompilerManifestArtifactFile.ReadAllBytes(
+                path,
+                WorkerBinaryIdentity.MaximumComponentBytes);
+            Assert.That(bytes, Has.Length.EqualTo(aboveManifestLimit));
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    [Test]
     public void RuntimeClosureLimitsFailClosedAtEveryBoundary()
     {
         const long expectedMaximumComponentBytes = 32L * 1024 * 1024;

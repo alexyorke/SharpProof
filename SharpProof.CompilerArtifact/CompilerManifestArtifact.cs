@@ -41,7 +41,7 @@ internal static class WorkerBinaryIdentity
 {
     internal const int MaximumComponentKeyCharacters = 256;
     internal const int MaximumRuntimeComponents = 64;
-    internal const long MaximumComponentBytes = 32L * 1024 * 1024;
+    internal const int MaximumComponentBytes = 32 * 1024 * 1024;
     internal const long MaximumClosureBytes = 64L * 1024 * 1024;
     internal const long MaximumDependenciesBytes = 1024L * 1024;
     internal const long MaximumRuntimeConfigBytes = 64L * 1024;
@@ -69,7 +69,9 @@ internal static class WorkerBinaryIdentity
 #pragma warning disable CA2000 // Stream ownership transfers to the retained snapshot list.
             foreach (var component in components)
             {
-                var sourceBytes = CompilerManifestArtifactFile.ReadAllBytes(component.Value);
+                var sourceBytes = CompilerManifestArtifactFile.ReadAllBytes(
+                    component.Value,
+                    MaximumComponentBytes);
                 var sourceLength = sourceBytes.LongLength;
                 ValidateComponentLength(component.Key, sourceLength, ref totalBytes);
                 var stagedPath = Combine(
@@ -177,8 +179,12 @@ internal static class WorkerBinaryIdentity
         string sourcePath,
         string stagedPath)
     {
-        if (!CompilerManifestArtifactFile.ReadAllBytes(sourcePath).SequenceEqual(
-                CompilerManifestArtifactFile.ReadAllBytes(stagedPath)))
+        if (!CompilerManifestArtifactFile.ReadAllBytes(
+                    sourcePath,
+                    MaximumComponentBytes).SequenceEqual(
+                CompilerManifestArtifactFile.ReadAllBytes(
+                    stagedPath,
+                    MaximumComponentBytes)))
         {
             throw new InvalidDataException(
                 "A worker runtime component changed during staging.");
@@ -435,9 +441,11 @@ internal static class CompilerManifestArtifactFile
 {
     internal const int MaximumBytes = WorkerProtocolJson.MaximumJsonBytes;
 
-    internal static byte[] ReadAllBytes(string path)
+    internal static byte[] ReadAllBytes(
+        string path,
+        int maximumBytes = MaximumBytes)
     {
-        using var stream = Open(path, out var length);
+        using var stream = Open(path, out var length, maximumBytes);
         var bytes = new byte[length];
         var offset = 0;
         while (offset < bytes.Length)
@@ -455,14 +463,17 @@ internal static class CompilerManifestArtifactFile
         return bytes;
     }
 
-    private static FileStream Open(string path, out int length)
+    private static FileStream Open(
+        string path,
+        out int length,
+        int maximumBytes)
     {
         var stream = new FileStream(
             path,
             FileMode.Open,
             FileAccess.Read,
             FileShare.Read);
-        if (stream.Length > MaximumBytes)
+        if (stream.Length > maximumBytes)
         {
             stream.Dispose();
             throw new InvalidDataException(
