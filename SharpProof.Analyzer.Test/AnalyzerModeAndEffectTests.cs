@@ -867,6 +867,49 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public void DirectExternalAnalyzerAnalysisAppliesClosedEntryPreconditions()
+    {
+        var external = AnalyzerTestHost.EmitReference(
+            """
+            using SharpProof.Attributes;
+
+            public static class ExternalFixture {
+                [SharpProofTrusted("reviewed external implementation")]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    IsDeterministic = true,
+                    PreconditionFree = true,
+                    Complete = true)]
+                public static void Restricted([Positive] int value) {
+                }
+            }
+            """,
+            "DirectExternalAnalyzerPreconditionAssembly");
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            "public static class Fixture { }",
+            ["SP0045"],
+            additionalReferences: [external]);
+        var session = new AnalyzerSession(
+            compilation,
+            AnalyzerConfiguration.AdvisoryAll,
+            CancellationToken.None);
+        var method = compilation.GetTypeByMetadataName("ExternalFixture")!
+            .GetMembers("Restricted")
+            .OfType<IMethodSymbol>()
+            .Single();
+
+        var result = session.AnalyzeEffects(
+            method,
+            CancellationToken.None);
+
+        Assert.That(
+            result.Summary.AnalysisIncompleteReason,
+            Is.EqualTo(
+                SharpProof.Effects.EffectAnalysisIncompleteReason
+                    .CallPreconditionNotProven));
+    }
+
+    [Test]
     public async Task InvalidlyPlacedCallerRequiresCannotCleanEffectSummary()
     {
         var factory = new RecordingSessionFactory();

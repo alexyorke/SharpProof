@@ -508,7 +508,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'analyzer-bodyless-entry-precondition'
         File = 'SharpProof.Analyzer\EffectCallPreconditionPolicy.cs'
-        Original = "        if (method is { IsAbstract: false, IsExtern: false } &&`n            binding.Contracts.Clauses.Any(`n                static clause =>`n                    clause.Kind ==`n                    BoundContractKind.Requires))"
+        Original = "        if (method is`n            {`n                IsAbstract: false,`n                IsExtern: false,`n                DeclaringSyntaxReferences: { IsEmpty: false }`n            } &&`n            binding.Contracts.Clauses.Any(`n                static clause =>`n                    clause.Kind ==`n                    BoundContractKind.Requires))"
         Mutated = "        if (method.IsAbstract || method.IsExtern)"
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~BodylessContractWithClosedPreconditionRemainsUnknown'
@@ -904,6 +904,14 @@ $mutations = @(
         Mutated = '            false'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~DirectLauncherRejectsCacheInsideWorkerRuntimeDirectory'
+    },
+    [pscustomobject]@{
+        Name = 'analyzer-source-companion-fallback'
+        File = 'SharpProof.Analyzer\AnalyzerSession.cs'
+        Original = '                        includeSourceCompanions: false'
+        Mutated = '                        includeSourceCompanions: true'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~CompanionPreconditionDoesNotContaminateOtherMember'
     },
     [pscustomobject]@{
         Name = 'closure-staging-length-consistency'

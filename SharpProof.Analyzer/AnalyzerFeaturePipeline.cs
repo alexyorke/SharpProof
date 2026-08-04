@@ -91,7 +91,8 @@ internal static partial class AnalyzerFeaturePipeline
         }
         if (!selection.Contracts &&
             selection.Effects &&
-            session.ResolveEffectContract(method).Kind == EffectContractResolutionKind.Valid)
+            session.ResolveEffectContract(method) is
+            { Kind: EffectContractResolutionKind.Valid })
         {
             var outcome = EffectContractDiagnostics.Analyze(
                 method,

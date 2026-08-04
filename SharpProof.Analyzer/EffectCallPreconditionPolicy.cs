@@ -39,7 +39,7 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
                 clause.Kind ==
                 BoundContractKind.Requires)
             .ToImmutableArray();
-        if (requires.IsDefaultOrEmpty)
+        if (requires.IsEmpty)
         {
             return _fallback
                 .HasPotentialDirectOrClosedPreconditions(
@@ -95,7 +95,7 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
 
             if (variable.Role ==
                     BoundContractVariableRole.Receiver &&
-                actual.Type?.IsReferenceType == true &&
+                actual.Type is { IsReferenceType: true } &&
                 !value.IsDefinitelyNonNull)
             {
                 return EffectCallPreconditionStatus
@@ -239,8 +239,8 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
         }
 
         var binding = _binder.BindRequires(method);
-        if (!binding.IsSuccess ||
-            binding.Contracts == null)
+        if (binding is not
+            { IsSuccess: true, Contracts: { } })
         {
             return _fallback.HasPotentialPreconditions(
                     method)
@@ -248,7 +248,12 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
                 : EffectCallPreconditionStatus.None;
         }
 
-        if (method is { IsAbstract: false, IsExtern: false } &&
+        if (method is
+            {
+                IsAbstract: false,
+                IsExtern: false,
+                DeclaringSyntaxReferences: { IsEmpty: false }
+            } &&
             binding.Contracts.Clauses.Any(
                 static clause =>
                     clause.Kind ==

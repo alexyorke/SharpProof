@@ -19,7 +19,7 @@ internal static class EffectContractDiagnostics
 
         var contract = session.ResolveEffectContract(method);
         var invalid = contract.InvalidAttribute;
-        if (contract.Kind == EffectContractResolutionKind.Invalid &&
+        if (contract is { Kind: EffectContractResolutionKind.Invalid } &&
             invalid != null)
         {
             ReportInvalidOnce(
@@ -97,7 +97,8 @@ internal static class EffectContractDiagnostics
             .ForCompilation(session.Compilation)
             .CreateEntryState(method)
             .IsBottom;
-        if (summary.AnalysisIncompleteReason != EffectAnalysisIncompleteReason.None &&
+        if (summary is
+            { AnalysisIncompleteReason: not EffectAnalysisIncompleteReason.None } &&
             summaryContracts.IsDefaultOrEmpty)
         {
             reportDiagnostic(Diagnostic.Create(
@@ -113,8 +114,8 @@ internal static class EffectContractDiagnostics
             ? result.DirectWitnesses
             : [];
         var summaryEvidence = CreateSummaryEvidence(summary);
-        var flowComplete =
-            summary.AnalysisIncompleteReason == EffectAnalysisIncompleteReason.None;
+        var flowComplete = summary is
+        { AnalysisIncompleteReason: EffectAnalysisIncompleteReason.None };
         var entrySummaryReachable = !entryIsBottom && !summary.IsBottom;
         var facetComplete = flowComplete && entrySummaryReachable;
         var purityComplete = facetComplete && !summary.Reads.IsUnknown &&
@@ -194,7 +195,8 @@ internal static class EffectContractDiagnostics
                 : null,
             [method.Name, contract.Kind == EffectContractResolutionKind.Incomplete
                 ? "IncompleteEffectContract"
-                : summary.AnalysisIncompleteReason != EffectAnalysisIncompleteReason.None
+                : summary is
+                    { AnalysisIncompleteReason: not EffectAnalysisIncompleteReason.None }
                     ? "ManagedAbstractFlow:" +
                       EffectContractMappings.EvidenceName(summary.AnalysisIncompleteReason)
                     : "EffectContractDoesNotCoverBodySummary"],
@@ -231,7 +233,8 @@ internal static class EffectContractDiagnostics
             var (outcome, reason, certainty) = EffectEvaluationProjections.Classify(
                 established, violation != null, valid, complete, trusted, incompleteReason);
             var claimDiagnostic =
-                summary.AnalysisIncompleteReason != EffectAnalysisIncompleteReason.None &&
+                summary is
+                { AnalysisIncompleteReason: not EffectAnalysisIncompleteReason.None } &&
                 violation == null &&
                 diagnostic != GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule
                     ? null
@@ -336,7 +339,7 @@ internal static class EffectContractDiagnostics
     private static string FormatUnknown(EffectSummary summary, string facet)
     {
         return facet + ": " +
-        (summary.AnalysisIncompleteReason != EffectAnalysisIncompleteReason.None
+        (summary is { AnalysisIncompleteReason: not EffectAnalysisIncompleteReason.None }
             ? EffectContractMappings.EvidenceName(summary.AnalysisIncompleteReason)
             : summary.Uncertainty != EffectUncertainty.None
             ? EffectContractMappings.EvidenceName(summary.Uncertainty)

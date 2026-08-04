@@ -20,6 +20,7 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
         Lazy<ImmutableHashSet<INamedTypeSymbol>>>
         CompanionTypes = new();
     private readonly Compilation _compilation;
+    private readonly bool _includeSourceCompanions;
     private readonly INamedTypeSymbol? _contract;
     private readonly INamedTypeSymbol? _inRange;
     private readonly INamedTypeSymbol? _notNull;
@@ -35,10 +36,12 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
             new(SymbolEqualityComparer.Default);
 
     internal ConservativeEffectCallPreconditionPolicy(
-        Compilation compilation)
+        Compilation compilation,
+        bool includeSourceCompanions = true)
     {
         _compilation = ArgumentNullGuard.NotNull(
             compilation, nameof(compilation));
+        _includeSourceCompanions = includeSourceCompanions;
         var identity =
             ContractApiIdentityResolver.ForCompilation(compilation);
         _contract = identity.Contract;
@@ -99,6 +102,8 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
         IMethodSymbol method)
     {
         return HasPotentialDirectOrClosedPreconditions(method) ||
+            (_includeSourceCompanions ||
+             method.DeclaringSyntaxReferences.IsEmpty) &&
             _typesWithCompanions.Value.Contains(
                 method.ContainingType.OriginalDefinition);
     }
