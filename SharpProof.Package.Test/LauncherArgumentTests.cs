@@ -624,7 +624,8 @@ public sealed class LauncherArgumentTests
                 Path.ChangeExtension(sourceWorker, ".runtimeconfig.json"),
                 Path.ChangeExtension(worker, ".runtimeconfig.json"));
             await File.WriteAllTextAsync(
-                Path.ChangeExtension(worker, ".deps.json"), "{}");
+                Path.ChangeExtension(worker, ".deps.json"),
+                "{ malformed dependency manifest");
 
             var escaped = false;
             var exitCode = 0;
@@ -639,6 +640,10 @@ public sealed class LauncherArgumentTests
                     "--verify-policy", "advisory",
                     "--assumption-policy", "allow"
                 ]);
+            }
+            catch (JsonException)
+            {
+                escaped = true;
             }
             catch (KeyNotFoundException)
             {
