@@ -961,7 +961,8 @@ public sealed class ArchitectureTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(source, Does.Contain(
-                "component.Key == \"dependencies\""));
+                "Path.ChangeExtension(path, \".deps.json\")"));
+            Assert.That(source, Does.Contain("var stream = isDependency"));
             Assert.That(source, Does.Contain("? dependency"));
         }
     }

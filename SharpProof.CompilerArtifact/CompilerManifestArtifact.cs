@@ -61,7 +61,8 @@ internal static class WorkerBinaryIdentity
 #pragma warning disable CA2000 // Stream ownership transfers to the retained snapshot list.
             foreach (var component in components)
             {
-                var isDependency = component.Key == "dependencies";
+                var isDependency = component.Value ==
+                    Path.ChangeExtension(path, ".deps.json");
                 var stream = isDependency
                     ? dependency
                     : OpenRead(component.Value);

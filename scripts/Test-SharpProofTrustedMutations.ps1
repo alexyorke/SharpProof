@@ -756,7 +756,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'closure-hashes-parsed-dependency-stream'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
-        Original = "                var isDependency = component.Key == `"dependencies`";`n                var stream = isDependency`n                    ? dependency`n                    : OpenRead(component.Value);"
+        Original = "                var isDependency = component.Value ==`n                    Path.ChangeExtension(path, `".deps.json`");`n                var stream = isDependency`n                    ? dependency`n                    : OpenRead(component.Value);"
         Mutated = '                var stream = OpenRead(component.Value);'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~WorkerClosureHashesTheParsedDependencyStream'
