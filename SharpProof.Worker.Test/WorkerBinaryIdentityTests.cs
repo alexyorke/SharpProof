@@ -228,7 +228,7 @@ public sealed class WorkerBinaryIdentityTests
                     foreach (var componentPath in snapshot.ComponentPaths)
                     {
                         var relativePath = Path.GetRelativePath(
-                            sourceDirectory,
+                            Path.GetDirectoryName(worker)!,
                             componentPath);
                         var stagedPath = Path.Combine(
                             Path.GetDirectoryName(snapshot.ExecutionWorkerPath)!,
