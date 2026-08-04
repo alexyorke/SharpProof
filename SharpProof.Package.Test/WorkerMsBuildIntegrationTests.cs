@@ -922,12 +922,15 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
-    public async Task LauncherProtocolAssetIsPublishedByTargets()
+    public async Task LauncherProtocolAssetRemainsProtectedByTargets()
     {
         RequireWindowsWorker();
         using var project = ConsumerProject.Create(IdentitySource);
         var build = await project.BuildAsync(verify: true);
         Assert.That(build.ExitCode, Is.Zero, build.Output);
+        _ = await project.RunVerificationTargetAsync(
+            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+            ("SharpProofVerifyResultFile", LauncherProtocolOutputPath()));
         Assert.That(File.Exists(LauncherProtocolOutputPath()), Is.True);
     }
 
