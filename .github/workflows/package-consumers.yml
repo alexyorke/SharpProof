@@ -207,7 +207,7 @@ jobs:
         shell: pwsh
         working-directory: ${{ runner.temp }}
         run: >-
-          dotnet restore
+          & "$env:GITHUB_WORKSPACE/scripts/Invoke-SharpProofDotnet.ps1" restore
           "$env:GITHUB_WORKSPACE/SharpProof.Attributes/SharpProof.Attributes.csproj"
           --source https://api.nuget.org/v3/index.json
           --nologo
@@ -252,7 +252,7 @@ jobs:
         shell: pwsh
         working-directory: ${{ runner.temp }}
         run: >-
-          dotnet restore
+          & "$env:GITHUB_WORKSPACE/scripts/Invoke-SharpProofDotnet.ps1" restore
           "$env:GITHUB_WORKSPACE/SharpProof.Attributes/SharpProof.Attributes.csproj"
           --source https://api.nuget.org/v3/index.json
           --nologo

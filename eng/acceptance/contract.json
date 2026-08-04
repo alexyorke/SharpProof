@@ -68,6 +68,7 @@
           "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
           "SharpProof.Contracts/ContractClauseInventory.cs",
           "SharpProof.Contracts/ContractForSymbolMatcher.cs",
+          "SharpProof.Frontend/ReferencedTypeSymbols.cs",
           "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
           "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
           "SharpProof.Frontend/CompilationModelProvider.cs",

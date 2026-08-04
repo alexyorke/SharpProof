@@ -530,6 +530,7 @@ public sealed class ArchitectureTests
                 "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
                 "SharpProof.Contracts/ContractClauseInventory.cs",
                 "SharpProof.Contracts/ContractForSymbolMatcher.cs",
+                "SharpProof.Frontend/ReferencedTypeSymbols.cs",
                 "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
                 "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
                 "SharpProof.Frontend/CompilationModelProvider.cs",
@@ -972,12 +973,17 @@ public sealed class ArchitectureTests
                 Is.True);
             Assert.That(
                 source.Contains(
-                    "File.Copy(component.Value, stagedPath);",
+                    "FileMode.CreateNew))",
                     StringComparison.Ordinal),
                 Is.True);
             Assert.That(
                 source.Contains(
-                    "hash.Add(component.Key).Add(staged);",
+                    "stream.CopyTo(staged);",
+                    StringComparison.Ordinal),
+                Is.True);
+            Assert.That(
+                source.Contains(
+                    "hash.Add(component.Key).Add(stagedRead);",
                     StringComparison.Ordinal),
                 Is.True);
             Assert.That(
@@ -985,6 +991,11 @@ public sealed class ArchitectureTests
                     "stagedHandles[stagedCount++] = OpenRead(stagedPath);",
                     StringComparison.Ordinal),
                 Is.True);
+            Assert.That(
+                source.Contains(
+                    "File.Copy(component.Value, stagedPath);",
+                    StringComparison.Ordinal),
+                Is.False);
             Assert.That(
                 source.Contains(
                     "foreach (var handle in StagedHandles)",

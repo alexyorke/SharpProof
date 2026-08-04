@@ -57,7 +57,6 @@ internal static class WorkerBinaryIdentity
         {
             using var dependency = OpenRead(ChangeExtension(path, ".deps.json"));
             var components = RuntimeComponents(path, dependency);
-            ValidateComponentCount(components.Count);
             stagedHandles = new FileStream[components.Count];
             using var hash = new CanonicalHashWriter();
             hash.Add("SharpProof.WorkerBinarySet", 1);
@@ -74,9 +73,14 @@ internal static class WorkerBinaryIdentity
                         stagingDirectory,
                         component.Key.Replace('/', DirectorySeparatorChar));
                     Directory.CreateDirectory(GetDirectoryName(stagedPath)!);
-                    File.Copy(component.Value, stagedPath);
-                    using var staged = OpenRead(stagedPath);
-                    hash.Add(component.Key).Add(staged);
+                    using (var staged = new FileStream(
+                               stagedPath,
+                               FileMode.CreateNew))
+                    {
+                        stream.CopyTo(staged);
+                    }
+                    using var stagedRead = OpenRead(stagedPath);
+                    hash.Add(component.Key).Add(stagedRead);
                     stagedHandles[stagedCount++] = OpenRead(stagedPath);
                 }
             }
@@ -185,6 +189,13 @@ internal static class WorkerBinaryIdentity
                 "runtimes/",
                 StringComparison.OrdinalIgnoreCase) ? name : GetFileName(name));
         }
+        var optionalFrameworkAssembly = GetFileName(
+            typeof(ImmutableArray<>).Assembly.Location);
+        if (File.Exists(Combine(directory, optionalFrameworkAssembly)))
+        {
+            names.Add(optionalFrameworkAssembly);
+        }
+
         ValidateComponentCount(names.Count);
         var result = new SortedDictionary<string, string>(
             StringComparer.OrdinalIgnoreCase);
@@ -200,16 +211,6 @@ internal static class WorkerBinaryIdentity
             result.Add(
                 name,
                 Combine(directory, name.Replace('/', DirectorySeparatorChar)));
-        }
-
-        var optionalFrameworkAssembly = GetFileName(
-            typeof(ImmutableArray<>).Assembly.Location);
-        var optionalFrameworkPath = Combine(
-            directory,
-            optionalFrameworkAssembly);
-        if (File.Exists(optionalFrameworkPath))
-        {
-            result[optionalFrameworkAssembly] = optionalFrameworkPath;
         }
 
         return result;
