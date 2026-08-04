@@ -275,7 +275,8 @@ public sealed class LauncherArgumentTests
             "verify",
             "--worker", Path.Combine(
                 Path.GetTempPath(),
-                "SharpProof-launcher-collision-worker.dll"),
+                "SharpProof-isolated-worker-" + Guid.NewGuid().ToString("N"),
+                "worker.dll"),
             "--request", "request.json",
             "--result", Path.Combine(".", "request.json"),
             "--compiler-manifest", "missing-compiler-manifest.json",
