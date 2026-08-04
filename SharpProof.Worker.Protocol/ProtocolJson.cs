@@ -270,7 +270,7 @@ public static partial class WorkerProtocolJson
         WorkerClaimManifest? manifest, Validator errors)
     {
         var valid = ValidateResultSet(values,
-            manifest?.Callables?.Where(static value => value != null)
+            manifest?.Callables?.OfType<WorkerCallableManifestEntry>()
                 .Select(static value => value.CallableId) ?? [],
             static value => value.CallableId, "response.callable_results",
             "response.callable_id", "response.callable_set", errors);
@@ -288,7 +288,7 @@ public static partial class WorkerProtocolJson
     private static WorkerClaimResult[] ValidateClaimResults(WorkerClaimResult[]? values, WorkerClaimManifest? manifest, Validator errors)
     {
         var valid = ValidateResultSet(values,
-            manifest?.Claims?.Where(static value => value != null)
+            manifest?.Claims?.OfType<WorkerClaimManifestEntry>()
                 .Select(static value => value.ClaimId) ?? [],
             static value => value.ClaimId, "response.claim_results",
             "response.result_claim_id", "response.claim_set", errors);
