@@ -926,7 +926,7 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireWindowsWorker();
         using var project = ConsumerProject.Create(IdentitySource);
-        var build = await project.BuildAsync(verify: false);
+        var build = await project.BuildAsync(verify: true);
         Assert.That(build.ExitCode, Is.Zero, build.Output);
         Assert.That(File.Exists(LauncherProtocolOutputPath()), Is.True);
     }
