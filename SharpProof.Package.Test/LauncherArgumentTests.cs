@@ -533,13 +533,15 @@ public sealed class LauncherArgumentTests
     public void RequestProjectionRejectsDiscoveredRuntimeAssetCollisionBeforeManifestRead()
     {
         var worker = typeof(SharpProofWorker).Assembly.Location;
+        var testRoot = Path.GetDirectoryName(Path.GetDirectoryName(worker)!)!;
+        var testId = Guid.NewGuid().ToString("N");
         var runtimeAsset = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof-discovered-runtime-asset.bin");
+            testRoot,
+            "SharpProof-discovered-runtime-asset-" + testId + ".bin");
         using var snapshot = new WorkerRuntimeClosureSnapshot(
             worker,
             Path.Combine(
-                Path.GetTempPath(),
+                testRoot,
                 "SharpProof-snapshot-" + Guid.NewGuid().ToString("N"),
                 Path.GetFileName(worker)),
             [runtimeAsset],
@@ -548,16 +550,16 @@ public sealed class LauncherArgumentTests
         string[] arguments = [
             "verify",
             "--worker", worker,
-            "--request", Path.Combine(Path.GetTempPath(), "SharpProof-safe-request.json"),
+            "--request", Path.Combine(testRoot, "SharpProof-safe-request-" + testId + ".json"),
             "--result", runtimeAsset,
             "--compiler-manifest", Path.Combine(
-                Path.GetTempPath(), "SharpProof-safe-missing-manifest.json"),
+                testRoot, "SharpProof-safe-missing-manifest-" + testId + ".json"),
             "--verify-policy", "advisory",
             "--assumption-policy", "allow"
         ];
         var nonCollidingArguments = arguments.ToArray();
         nonCollidingArguments[6] = Path.Combine(
-            Path.GetTempPath(), "SharpProof-safe-result.json");
+            testRoot, "SharpProof-safe-result-" + testId + ".json");
         Assert.That(
             LauncherArguments.TryParse(nonCollidingArguments, out var nonColliding),
             Is.True);
