@@ -273,7 +273,9 @@ public sealed class LauncherArgumentTests
     {
         string[] arguments = [
             "verify",
-            "--worker", "worker.dll",
+            "--worker", Path.Combine(
+                Path.GetTempPath(),
+                "SharpProof-launcher-collision-worker.dll"),
             "--request", "request.json",
             "--result", Path.Combine(".", "request.json"),
             "--compiler-manifest", "missing-compiler-manifest.json",
