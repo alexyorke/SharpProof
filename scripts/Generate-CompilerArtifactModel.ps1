@@ -587,55 +587,33 @@ $portableLines.Add('    internal string Kind { get; } = kind;')
 $portableLines.Add('    internal string[] Slots { get; } = slots;')
 $portableLines.Add('}')
 $slotDomains = @(
-    [pscustomobject]@{
-        Key = 'terms'
-        Name = 'Terms'
-        Enum = 'IrTermKind'
-        Kinds = @(
-            'Boolean', 'Integer', 'String', 'Null', 'Variable', 'Opaque',
-            'Unary', 'Binary', 'Conditional', 'Cast', 'Length', 'SequenceAccess')
-        Slots = @('a', 'b', 'c', 'd', 'number', 'text', 'items')
-    },
-    [pscustomobject]@{
-        Key = 'locations'
-        Name = 'Locations'
-        Enum = 'IrLocationKind'
-        Kinds = @('Member', 'Sequence')
-        Slots = @('a', 'b', 'c', 'd', 'items')
-    },
-    [pscustomobject]@{
-        Key = 'instructions'
-        Name = 'Instructions'
-        Enum = 'IrInstructionKind'
-        Kinds = @(
-            'Assign', 'Load', 'Store', 'Call', 'Assume', 'Assert', 'Havoc',
-            'Branch', 'Goto', 'Return')
-        Slots = @('a', 'b', 'c', 'd', 'items', 'location')
-    })
+    Get-RequiredMember $schema 'portableIrSlotDomains' 'schema' |
+        ForEach-Object {
+            Assert-Properties -Object $_ -Allowed @('key', 'name', 'enum', 'kinds', 'slots') `
+                -Context 'portable IR slot domain'
+            [pscustomobject]@{
+                Key = [string](Get-RequiredMember $_ 'key' 'portable IR slot domain')
+                Name = [string](Get-RequiredMember $_ 'name' 'portable IR slot domain')
+                Enum = [string](Get-RequiredMember $_ 'enum' 'portable IR slot domain')
+                Kinds = @((Get-RequiredMember $_ 'kinds' 'portable IR slot domain') |
+                    ForEach-Object { [string]$_ })
+                Slots = @((Get-RequiredMember $_ 'slots' 'portable IR slot domain') |
+                    ForEach-Object { [string]$_ })
+            }
+        })
 $allowedSlotRoles = @(
-    'unused',
-    'empty',
-    'booleanValue',
-    'integerValue',
-    'stringValue',
-    'variableIndex',
-    'variableIndices',
-    'optionalVariableIndex',
-    'memberIndex',
-    'optionalTermIndex',
-    'termIndex',
-    'termIndices',
-    'operationWhenImpure',
-    'blockIndex',
-    'location',
-    'wire:OpaquePurities',
-    'wire:UnaryOperators',
-    'wire:BinaryOperators',
-    'wire:HavocKinds')
+    Get-RequiredMember $schema 'portableIrSlotRoles' 'schema' |
+        ForEach-Object { [string]$_ })
 $actualSlotDomains = @($slotMappings.PSObject.Properties.Name)
+$declaredSlotDomains = @($slotDomains | ForEach-Object { $_.Key })
 foreach ($domainName in $actualSlotDomains) {
-    if ($domainName -notin $slotDomains.Key) {
+    if ($domainName -notin $declaredSlotDomains) {
         throw "Portable IR slot mappings contain unsupported domain '$domainName'."
+    }
+}
+foreach ($domainName in $declaredSlotDomains) {
+    if ($domainName -notin $actualSlotDomains) {
+        throw "Portable IR slot mappings are missing domain '$domainName'."
     }
 }
 $slotDomainNames = [Collections.Generic.HashSet[string]]::new(
@@ -647,6 +625,11 @@ foreach ($domain in $slotDomains) {
     }
     $rows = @(Get-RequiredMember $slotMappings $domain.Key `
         "portable IR slot domain '$($domain.Key)'")
+    Assert-Identifier $domain.Name "Portable IR slot domain '$($domain.Key)' name"
+    Assert-Identifier $domain.Enum "Portable IR slot domain '$($domain.Key)' enum"
+    if ($domain.Kinds.Count -eq 0 -or $domain.Slots.Count -eq 0) {
+        throw "Portable IR slot domain '$($domain.Key)' must declare kinds and slots."
+    }
     if ($rows.Count -ne $domain.Kinds.Count) {
         throw (
             "Portable IR slot domain '$($domain.Key)' must contain " +
@@ -704,39 +687,8 @@ $portableLines.Add('}')
 
 $metadataRowMappings = @(
     Get-RequiredMember $schema 'portableIrMetadataRowMappings' 'schema')
-$expectedMetadataRows = @(
-    [pscustomobject]@{
-        Method = 'TypeRow'
-        SourceType = 'IrTypeId'
-        RowType = 'PortableIrType'
-        InfoMethod = 'GetTypeInfo'
-        ArgumentCount = 3
-    },
-    [pscustomobject]@{
-        Method = 'VariableRow'
-        SourceType = 'IrVarId'
-        RowType = 'PortableIrVariable'
-        InfoMethod = 'GetVariableInfo'
-        ArgumentCount = 2
-    },
-    [pscustomobject]@{
-        Method = 'MemberRow'
-        SourceType = 'IrMemberId'
-        RowType = 'PortableIrMember'
-        InfoMethod = 'GetMemberInfo'
-        ArgumentCount = 6
-    },
-    [pscustomobject]@{
-        Method = 'OperationRow'
-        SourceType = 'OperationId'
-        RowType = 'PortableIrOperation'
-        InfoMethod = 'GetOperationInfo'
-        ArgumentCount = 1
-    })
-if ($metadataRowMappings.Count -ne $expectedMetadataRows.Count) {
-    throw (
-        'Portable IR metadata-row mappings must contain exactly ' +
-        "$($expectedMetadataRows.Count) rows.")
+if ($metadataRowMappings.Count -eq 0) {
+    throw 'Portable IR metadata-row mappings must contain at least one row.'
 }
 $metadataMethods = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)
@@ -749,7 +701,6 @@ for ($mappingIndex = 0;
     $mappingIndex -lt $metadataRowMappings.Count;
     $mappingIndex++) {
     $mapping = $metadataRowMappings[$mappingIndex]
-    $expected = $expectedMetadataRows[$mappingIndex]
     Assert-Properties `
         -Object $mapping `
         -Allowed @('method', 'sourceType', 'rowType', 'infoMethod', 'arguments') `
@@ -764,20 +715,11 @@ for ($mappingIndex = 0;
     if (-not $metadataMethods.Add($method)) {
         throw "Duplicate portable IR metadata-row method '$method'."
     }
-    if ($method -cne $expected.Method -or
-        $sourceType -cne $expected.SourceType -or
-        $rowType -cne $expected.RowType -or
-        $infoMethod -cne $expected.InfoMethod) {
-        throw (
-            "Portable IR metadata-row mapping $mappingIndex must be " +
-            "'$($expected.Method)($($expected.SourceType)) -> " +
-            "$($expected.RowType)' using '$($expected.InfoMethod)'.")
-    }
     $arguments = @($mapping.arguments)
-    if ($arguments.Count -ne $expected.ArgumentCount) {
+    if ($arguments.Count -eq 0) {
         throw (
             "Portable IR metadata-row method '$method' must define " +
-            "$($expected.ArgumentCount) arguments.")
+            'at least one argument.')
     }
     $expressions = [Collections.Generic.List[string]]::new()
     foreach ($argument in $arguments) {

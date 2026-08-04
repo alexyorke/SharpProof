@@ -2633,6 +2633,74 @@
       ]
     }
   ],
+  "portableIrSlotDomains": [
+    {
+      "key": "terms",
+      "name": "Terms",
+      "enum": "IrTermKind",
+      "kinds": [
+        "Boolean",
+        "Integer",
+        "String",
+        "Null",
+        "Variable",
+        "Opaque",
+        "Unary",
+        "Binary",
+        "Conditional",
+        "Cast",
+        "Length",
+        "SequenceAccess"
+      ],
+      "slots": ["a", "b", "c", "d", "number", "text", "items"]
+    },
+    {
+      "key": "locations",
+      "name": "Locations",
+      "enum": "IrLocationKind",
+      "kinds": ["Member", "Sequence"],
+      "slots": ["a", "b", "c", "d", "items"]
+    },
+    {
+      "key": "instructions",
+      "name": "Instructions",
+      "enum": "IrInstructionKind",
+      "kinds": [
+        "Assign",
+        "Load",
+        "Store",
+        "Call",
+        "Assume",
+        "Assert",
+        "Havoc",
+        "Branch",
+        "Goto",
+        "Return"
+      ],
+      "slots": ["a", "b", "c", "d", "items", "location"]
+    }
+  ],
+  "portableIrSlotRoles": [
+    "unused",
+    "empty",
+    "booleanValue",
+    "integerValue",
+    "stringValue",
+    "variableIndex",
+    "variableIndices",
+    "optionalVariableIndex",
+    "memberIndex",
+    "optionalTermIndex",
+    "termIndex",
+    "termIndices",
+    "operationWhenImpure",
+    "blockIndex",
+    "location",
+    "wire:OpaquePurities",
+    "wire:UnaryOperators",
+    "wire:BinaryOperators",
+    "wire:HavocKinds"
+  ],
   "portableIrSlotMappings": {
     "terms": [
       { "kind": "Boolean", "slots": ["booleanValue", "unused", "unused", "unused", "unused", "unused", "empty"] },

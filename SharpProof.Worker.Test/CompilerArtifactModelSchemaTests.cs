@@ -164,6 +164,38 @@ public sealed class CompilerArtifactModelSchemaTests
         }
         Assert.That(PortableIrGraphCodec.HasCompleteSlotCatalogs, Is.True);
 
+        foreach (var domain in schema.RootElement
+                     .GetProperty("portableIrSlotDomains")
+                     .EnumerateArray())
+        {
+            var key = domain.GetProperty("key").GetString()!;
+            var field = slotCatalog.GetField(
+                domain.GetProperty("name").GetString()!,
+                BindingFlags.NonPublic |
+                BindingFlags.Static)!;
+            var enumType = typeof(IrTermKind).Assembly.GetType(
+                "SharpProof.Ir." + domain.GetProperty("enum").GetString(),
+                throwOnError: true)!;
+            var expectedKinds = domain.GetProperty("kinds")
+                .EnumerateArray()
+                .Select(static value => value.GetString())
+                .ToArray();
+            var expectedSlots = domain.GetProperty("slots")
+                .EnumerateArray()
+                .Select(static value => value.GetString())
+                .ToArray();
+            var actual = (PortableIrSlotMapping[])field.GetValue(null)!;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(enumType.IsEnum, Is.True, key);
+                Assert.That(Enum.GetNames(enumType), Is.EqualTo(expectedKinds), key);
+                Assert.That(actual, Is.Not.Empty, key);
+                Assert.That(actual.Select(static mapping => mapping.Slots.Length),
+                    Is.All.EqualTo(expectedSlots.Length), key);
+            }
+        }
+
         var encoder = typeof(PortableIrGraphCodec).GetNestedType(
             "Encoder",
             BindingFlags.NonPublic)!;
