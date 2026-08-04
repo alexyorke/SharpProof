@@ -660,8 +660,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'worker-runtime-target-selection'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
-        Original = 'win-x64|win)/'
-        Mutated = 'win-x64|win|browser)/'
+        Original = '        foreach (var name in names)'
+        Mutated = '        foreach (var name in Array.Empty<string>())'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~IdentityCoversTheCompleteTrustedRuntimeClosure'
     },

@@ -75,6 +75,8 @@ public sealed class WorkerBinaryIdentityTests
                          "{\"runtimeTarget\":1,\"targets\":{}}",
                          "{\"runtimeTarget\":{\"name\":\"missing\"},\"targets\":{}}",
                          "{\"runtimeTarget\":{\"name\":\"app\"},\"targets\":{\"app\":{\"lib\":{\"runtimeTargets\":{\"asset.dll\":{}}}}}}"
+                         ,
+                         "{\"runtimes/win/../outside.dll\":{}}"
                      })
             {
                 File.WriteAllText(dependency, json);
@@ -186,6 +188,21 @@ public sealed class WorkerBinaryIdentityTests
                 appLocalAsset,
                 overwrite: true);
             var baseline = WorkerBinaryIdentity.ComputeSha256(worker);
+            var nestedAppLocalAsset = Path.Combine(
+                temporaryDirectory,
+                "runtimes",
+                "win",
+                "lib",
+                "net9.0",
+                "System.Collections.Immutable.dll");
+            Directory.CreateDirectory(Path.GetDirectoryName(nestedAppLocalAsset)!);
+            File.Copy(
+                appLocalAsset,
+                nestedAppLocalAsset,
+                overwrite: true);
+            Assert.That(
+                WorkerBinaryIdentity.ComputeSha256(worker),
+                Is.EqualTo(baseline));
             var heldComponent = Path.Combine(
                 temporaryDirectory,
                 "SharpProof.Verify.dll");

@@ -185,25 +185,31 @@ internal static class WorkerBinaryIdentity
                 "runtimes/",
                 StringComparison.OrdinalIgnoreCase) ? name : GetFileName(name));
         }
-        var result = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        ValidateComponentCount(names.Count);
+        var result = new SortedDictionary<string, string>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var name in names)
+        {
+            if (name.IndexOf('\\') >= 0 ||
+                name.IndexOf("..", StringComparison.Ordinal) >= 0)
+            {
+                throw new InvalidDataException(
+                    "A worker runtime component identity is invalid.");
+            }
+
+            result.Add(
+                name,
+                Combine(directory, name.Replace('/', DirectorySeparatorChar)));
+        }
+
         var optionalFrameworkAssembly = GetFileName(
             typeof(ImmutableArray<>).Assembly.Location);
-        foreach (var path in Directory.GetFiles(directory, "*", SearchOption.AllDirectories))
+        var optionalFrameworkPath = Combine(
+            directory,
+            optionalFrameworkAssembly);
+        if (File.Exists(optionalFrameworkPath))
         {
-            var relativePath = path.Substring(directory.Length + 1)
-                .Replace(DirectorySeparatorChar, '/');
-            if (names.Contains(relativePath) ||
-                relativePath.EndsWith(
-                    optionalFrameworkAssembly,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                result.Add(relativePath, path);
-            }
-        }
-        if (!names.IsSubsetOf(result.Keys))
-        {
-            throw new FileNotFoundException(
-                "A trusted worker runtime component is unavailable.");
+            result[optionalFrameworkAssembly] = optionalFrameworkPath;
         }
 
         return result;
