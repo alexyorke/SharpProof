@@ -663,7 +663,7 @@ $mutations = @(
         Original = 'win-x64|win)/'
         Mutated = 'win-x64|win|browser)/'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
-        Filter = 'FullyQualifiedName~WorkerBinaryIdentityTests'
+        Filter = 'FullyQualifiedName~IdentityCoversTheCompleteTrustedRuntimeClosure'
     },
     [pscustomobject]@{
         Name = 'launcher-argument-query-budget-projection'
