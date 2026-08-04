@@ -595,6 +595,8 @@ internal sealed partial class LauncherArguments
         if (candidates.OfType<string>().Any(path => !paths.Add(path)) ||
             runtimeSnapshot?.ComponentPaths.Any(path =>
                 !runtimeRoots.Contains(path, StringComparer.OrdinalIgnoreCase) &&
+                !LauncherArguments.LauncherRuntimePaths.Contains(
+                    path, StringComparer.OrdinalIgnoreCase) &&
                 !paths.Add(path)) is true ||
             candidates
                 .Skip(runtimeRoots.Length +

@@ -166,8 +166,6 @@ internal static class WorkerBinaryIdentity
             dependencyStream,
             new JsonDocumentOptions { MaxDepth = 32 });
         var root = document.RootElement;
-        root.GetProperty("targets").GetProperty(
-            root.GetProperty("runtimeTarget").GetProperty("name").GetString()!);
         var names = new HashSet<string>
         {
             GetFileName(workerPath),
@@ -176,27 +174,25 @@ internal static class WorkerBinaryIdentity
         };
         foreach (Match match in Regex.Matches(
                      root.GetRawText(),
-                     @"[A-Za-z0-9_.-]+\.dll"))
+                     @"(?:runtimes/(?:win-x64|win)/[^""\r\n]+\.dll|[A-Za-z0-9_.-]+\.dll)"))
         {
-            names.Add(match.Value);
+            var name = match.Value;
+            names.Add(name.StartsWith(
+                "runtimes/",
+                StringComparison.OrdinalIgnoreCase) ? name : GetFileName(name));
         }
-        var files = Directory.GetFiles(
-            directory,
-            "*",
-            SearchOption.AllDirectories);
+        names.Add("System.Collections.Immutable.dll");
         var result = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        foreach (var path in files.Where(path =>
-                     names.Contains(GetFileName(path)) ||
-                     path.EndsWith(
-                         GetFileName(typeof(ImmutableArray<>).Assembly.Location),
-                         StringComparison.OrdinalIgnoreCase)))
+        foreach (var path in Directory.GetFiles(directory, "*", SearchOption.AllDirectories))
         {
-            result.Add(
-                path.Substring(directory.Length + 1)
-                    .Replace(DirectorySeparatorChar, '/'),
-                path);
+            var relativePath = path.Substring(directory.Length + 1)
+                .Replace(DirectorySeparatorChar, '/');
+            if (names.Contains(relativePath))
+            {
+                result.Add(relativePath, path);
+            }
         }
-        if (!names.IsSubsetOf(result.Values.Select(GetFileName)))
+        if (!names.IsSubsetOf(result.Keys))
         {
             throw new FileNotFoundException(
                 "A trusted worker runtime component is unavailable.");

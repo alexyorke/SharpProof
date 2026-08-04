@@ -231,6 +231,27 @@ public sealed class WorkerBinaryIdentityTests
                     Assert.That(
                         snapshot.ComponentPaths,
                         Does.Contain(appLocalAsset));
+                    Assert.That(
+                        snapshot.ComponentPaths,
+                        Does.Not.Contain(Path.Combine(
+                            temporaryDirectory, "libz3.dll")));
+                    Assert.That(
+                        snapshot.ComponentPaths,
+                        Does.Not.Contain(Path.Combine(
+                            temporaryDirectory,
+                            "runtimes", "browser", "lib", "net8.0",
+                            "System.Text.Encodings.Web.dll")));
+                    Assert.That(
+                        snapshot.ComponentPaths,
+                        Does.Contain(Path.Combine(
+                            temporaryDirectory,
+                            "runtimes", "win-x64", "native", "libz3.dll")));
+                    Assert.That(
+                        snapshot.ComponentPaths,
+                        Does.Contain(Path.Combine(
+                            temporaryDirectory,
+                            "runtimes", "win", "lib", "net9.0",
+                            "System.Text.Encodings.Web.dll")));
 
                     foreach (var componentPath in snapshot.ComponentPaths)
                     {

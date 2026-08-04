@@ -658,6 +658,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~RuntimeClosureLimitsFailClosedAtEveryBoundary'
     },
     [pscustomobject]@{
+        Name = 'worker-runtime-target-selection'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = 'win-x64|win)/'
+        Mutated = 'win-x64|win|browser)/'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~WorkerBinaryIdentityTests'
+    },
+    [pscustomobject]@{
         Name = 'launcher-argument-query-budget-projection'
         File = 'SharpProof.Worker.Launcher\LauncherArguments.generated.cs'
         Original = 'QueryRlimit = Number("query-rlimit", WorkerBudgets.DefaultQueryRlimit),'
@@ -796,7 +804,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'launcher-checks-discovered-runtime-paths'
         File = 'SharpProof.Worker.Launcher\Program.cs'
-        Original = "            runtimeSnapshot?.ComponentPaths.Any(path =>`n                !runtimeRoots.Contains(path, StringComparer.OrdinalIgnoreCase) &&`n                !paths.Add(path)) is true"
+        Original = "            runtimeSnapshot?.ComponentPaths.Any(path =>`n                !runtimeRoots.Contains(path, StringComparer.OrdinalIgnoreCase) &&`n                !LauncherArguments.LauncherRuntimePaths.Contains(`n                    path, StringComparer.OrdinalIgnoreCase) &&`n                !paths.Add(path)) is true"
         Mutated = '            runtimeSnapshot?.ComponentPaths.Any(path => path.Length == 0) == true'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~RequestProjectionRejectsDiscoveredRuntimeAssetCollisionBeforeManifestRead'
