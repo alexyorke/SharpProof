@@ -361,6 +361,24 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task WhitespaceCacheDirectoryUsesFrameworkScopedDefault()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var build = await project.BuildAsync(
+            verify: true,
+            ("SharpProofVerifyCacheDirectory", " "));
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+
+        var request = WorkerProtocolJson.DeserializeRequest(
+            await File.ReadAllTextAsync(project.RequestPath))!;
+        Assert.That(
+            request.Cache.Directory,
+            Is.EqualTo(Path.Combine(
+                Path.GetDirectoryName(project.RequestPath)!, "cache")));
+    }
+
+    [Test]
     public async Task MultiTargetVerificationPublishesOneBoundTriplePerFramework()
     {
         RequireWindowsWorker();

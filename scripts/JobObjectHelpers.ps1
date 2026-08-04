@@ -143,6 +143,13 @@ namespace SharpProof
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool CloseHandle(IntPtr hObject);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetHandleInformation(
+            IntPtr hObject,
+            uint dwMask,
+            uint dwFlags);
     }
 }
 '@
@@ -194,7 +201,9 @@ function Invoke-ProcessUnderJobObject {
         [ValidateRange(0, 86400)]
         [int]$TimeoutSeconds = 0,
 
-        [string]$WorkingDirectory = (Get-Location).Path
+        [string]$WorkingDirectory = (Get-Location).Path,
+
+        [string]$OutputPath
     )
 
     Initialize-SharpProofJobObjectInterop
@@ -228,6 +237,7 @@ function Invoke-ProcessUnderJobObject {
     $processHandleOwned = $false
     $threadHandleOwned = $false
     $processAssignedToJob = $false
+    $outputStream = $null
     try {
         [Runtime.InteropServices.Marshal]::StructureToPtr($limitInfo, $limitInfoBuffer, $false)
         if (-not [SharpProof.JobObjectNative]::SetInformationJobObject(
@@ -243,6 +253,25 @@ function Invoke-ProcessUnderJobObject {
         $commandLineBuilder = [System.Text.StringBuilder]::new($commandLine)
         $startupInfo = New-Object SharpProof.JobObjectNative+STARTUPINFO
         $startupInfo.cb = [uint32][Runtime.InteropServices.Marshal]::SizeOf([type][SharpProof.JobObjectNative+STARTUPINFO])
+        if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
+            $outputStream = [System.IO.FileStream]::new(
+                $OutputPath,
+                [System.IO.FileMode]::Create,
+                [System.IO.FileAccess]::Write,
+                [System.IO.FileShare]::ReadWrite)
+            $outputHandle = $outputStream.SafeFileHandle.DangerousGetHandle()
+            if (-not [SharpProof.JobObjectNative]::SetHandleInformation(
+                    $outputHandle,
+                    [uint32]1,
+                    [uint32]1)) {
+                $win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+                throw "SetHandleInformation failed with Win32 error $win32Error."
+            }
+
+            $startupInfo.dwFlags = [uint32]0x00000100
+            $startupInfo.hStdOutput = $outputHandle
+            $startupInfo.hStdError = $outputHandle
+        }
         if (-not [SharpProof.JobObjectNative]::CreateProcess(
                 $resolvedFilePath,
                 $commandLineBuilder,
@@ -315,6 +344,10 @@ function Invoke-ProcessUnderJobObject {
 
         if ($processHandleOwned) {
             [void][SharpProof.JobObjectNative]::CloseHandle($processInformation.hProcess)
+        }
+
+        if ($null -ne $outputStream) {
+            $outputStream.Dispose()
         }
 
         [void][SharpProof.JobObjectNative]::CloseHandle($jobHandle)

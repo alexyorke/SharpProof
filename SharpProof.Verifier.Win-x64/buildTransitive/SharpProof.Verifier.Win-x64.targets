@@ -165,7 +165,9 @@
       <SharpProofVerifyRequestFile Condition="'$(SharpProofVerifyRequestFile)' == ''">$(_SharpProofVerifyDirectory)\request.json</SharpProofVerifyRequestFile>
       <SharpProofVerifyResultFile Condition="'$(SharpProofVerifyResultFile)' == ''">$(_SharpProofVerifyDirectory)\result.json</SharpProofVerifyResultFile>
       <SharpProofCompilerManifestFile Condition="'$(SharpProofCompilerManifestFile)' == ''">$(_SharpProofVerifyDirectory)\compiler-manifest.json</SharpProofCompilerManifestFile>
-      <SharpProofVerifyCacheDirectory Condition="'$(SharpProofVerifyCacheDirectory)' == ''">$(_SharpProofVerifyDirectory)\cache</SharpProofVerifyCacheDirectory>
+      <_SharpProofVerifyCacheDirectoryNormalized>$([System.String]::Copy('$(SharpProofVerifyCacheDirectory)').Trim())</_SharpProofVerifyCacheDirectoryNormalized>
+      <_SharpProofEffectiveCacheDirectory Condition="'$(_SharpProofVerifyCacheDirectoryNormalized)' == ''">$(_SharpProofVerifyDirectory)\cache</_SharpProofEffectiveCacheDirectory>
+      <_SharpProofEffectiveCacheDirectory Condition="'$(_SharpProofVerifyCacheDirectoryNormalized)' != ''">$(SharpProofVerifyCacheDirectory)</_SharpProofEffectiveCacheDirectory>
       <_SharpProofInvocationId Condition="'$(_SharpProofInvocationId)' == ''">$([System.Guid]::NewGuid().ToString('N'))</_SharpProofInvocationId>
       <_SharpProofInvocationDirectory>$(_SharpProofVerifyDirectory)\runs\$(_SharpProofInvocationId)</_SharpProofInvocationDirectory>
       <_SharpProofInvocationRequestFile>$(_SharpProofInvocationDirectory)\request.json</_SharpProofInvocationRequestFile>
@@ -188,7 +190,7 @@
         InvocationManifestPath="$(_SharpProofCompilerManifestPath)"
         WorkerPath="$(_SharpProofWorkerPath)"
         LauncherPath="$(_SharpProofLauncherPath)"
-        CachePath="$(SharpProofVerifyCacheDirectory)" />
+        CachePath="$(_SharpProofEffectiveCacheDirectory)" />
   </Target>
 
   <Target Name="_SharpProofVerifyCore"
@@ -210,7 +212,7 @@
     <Error Condition="!Exists('$(_SharpProofWorkerPath)')"
            Text="SharpProof verifier worker was not found at '$(_SharpProofWorkerPath)'." />
     <MakeDir Directories="$(_SharpProofInvocationDirectory)" />
-    <Exec Command="&quot;$(SharpProofDotNetHost)&quot; &quot;$(_SharpProofLauncherPath)&quot; verify --worker &quot;$(_SharpProofWorkerPath)&quot; --request &quot;$(_SharpProofInvocationRequestFile)&quot; --result &quot;$(_SharpProofInvocationResultFile)&quot; --publish-request &quot;$(SharpProofVerifyRequestFile)&quot; --publish-result &quot;$(SharpProofVerifyResultFile)&quot; --compiler-manifest &quot;$(_SharpProofCompilerManifestPath)&quot; --publish-compiler-manifest &quot;$(SharpProofCompilerManifestFile)&quot; --verify-policy &quot;$(_SharpProofVerifyPolicyNormalized)&quot; --assumption-policy &quot;$(_SharpProofAssumptionPolicyNormalized)&quot; --query-rlimit &quot;$(SharpProofVerifyQueryRlimit)&quot; --method-rlimit &quot;$(SharpProofVerifyMethodRlimit)&quot; --method-wall-ms &quot;$(SharpProofVerifyMethodWallTimeMilliseconds)&quot; --project-wall-ms &quot;$(SharpProofVerifyProjectWallTimeMilliseconds)&quot; --max-parallelism &quot;$(SharpProofVerifyMaxParallelism)&quot; --max-expression-depth &quot;$(SharpProofVerifyMaximumExpressionDepth)&quot; --process-memory-bytes &quot;$(SharpProofVerifyProcessMemoryLimitBytes)&quot; --max-worker-processes &quot;$(SharpProofVerifyMaxWorkerProcesses)&quot; --termination-grace-ms &quot;$(SharpProofVerifyTerminationGraceMilliseconds)&quot; --cache-enabled &quot;$(SharpProofVerifyCacheEnabled)&quot; --cache-directory &quot;$(SharpProofVerifyCacheDirectory)&quot; --cache-maximum-bytes &quot;$(SharpProofVerifyCacheMaximumBytes)&quot;$(_SharpProofVerifySarifArgument)"
+    <Exec Command="&quot;$(SharpProofDotNetHost)&quot; &quot;$(_SharpProofLauncherPath)&quot; verify --worker &quot;$(_SharpProofWorkerPath)&quot; --request &quot;$(_SharpProofInvocationRequestFile)&quot; --result &quot;$(_SharpProofInvocationResultFile)&quot; --publish-request &quot;$(SharpProofVerifyRequestFile)&quot; --publish-result &quot;$(SharpProofVerifyResultFile)&quot; --compiler-manifest &quot;$(_SharpProofCompilerManifestPath)&quot; --publish-compiler-manifest &quot;$(SharpProofCompilerManifestFile)&quot; --verify-policy &quot;$(_SharpProofVerifyPolicyNormalized)&quot; --assumption-policy &quot;$(_SharpProofAssumptionPolicyNormalized)&quot; --query-rlimit &quot;$(SharpProofVerifyQueryRlimit)&quot; --method-rlimit &quot;$(SharpProofVerifyMethodRlimit)&quot; --method-wall-ms &quot;$(SharpProofVerifyMethodWallTimeMilliseconds)&quot; --project-wall-ms &quot;$(SharpProofVerifyProjectWallTimeMilliseconds)&quot; --max-parallelism &quot;$(SharpProofVerifyMaxParallelism)&quot; --max-expression-depth &quot;$(SharpProofVerifyMaximumExpressionDepth)&quot; --process-memory-bytes &quot;$(SharpProofVerifyProcessMemoryLimitBytes)&quot; --max-worker-processes &quot;$(SharpProofVerifyMaxWorkerProcesses)&quot; --termination-grace-ms &quot;$(SharpProofVerifyTerminationGraceMilliseconds)&quot; --cache-enabled &quot;$(SharpProofVerifyCacheEnabled)&quot; --cache-directory &quot;$(_SharpProofEffectiveCacheDirectory)&quot; --cache-maximum-bytes &quot;$(SharpProofVerifyCacheMaximumBytes)&quot;$(_SharpProofVerifySarifArgument)"
           WorkingDirectory="$(MSBuildProjectDirectory)"
           StandardOutputImportance="High"
           StandardErrorImportance="High"
