@@ -988,6 +988,50 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void DirectExternalAnalysisAppliesClosedEntryPreconditions()
+    {
+        var externalReference = EffectTestHost.EmitReference(
+            """
+            using SharpProof.Attributes;
+
+            public static class ExternalFixture {
+                [SharpProofTrusted("reviewed external implementation")]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    IsDeterministic = true,
+                    PreconditionFree = true,
+                    Complete = true)]
+                public static void Restricted([Positive] int value) {
+                }
+            }
+            """,
+            "DirectExternalPreconditionAssembly");
+        var compilation = EffectTestHost.CreateCompilation(
+            "public static class Sample { }",
+            externalReference);
+        var session = new EffectAnalysisSession(compilation);
+
+        var result = session.Analyze(
+            EffectTestHost.RequireMethod(
+                compilation,
+                "ExternalFixture",
+                "Restricted"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(
+                result.Summary.AnalysisIncompleteReason,
+                Is.EqualTo(
+                    EffectAnalysisIncompleteReason
+                        .CallPreconditionNotProven));
+            Assert.That(result.Projection.IsComplete, Is.False);
+        }
+    }
+
+    [Test]
     public void SourceOnlyMetadataPreconditionsCannotDisappearIntoTrustedSummaries()
     {
         var externalReference = EffectTestHost.EmitReference(

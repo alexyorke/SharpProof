@@ -90,9 +90,7 @@ internal static class EffectContractDiagnostics
         var contract = session.ResolveEffectContract(method);
         var bodyless = method.IsAbstract || method.IsExtern;
         var bodylessTrusted = bodyless && contract.Kind == EffectContractResolutionKind.Valid;
-        var result = bodylessTrusted
-            ? new EffectMethodResult(method, contract.Summary)
-            : session.AnalyzeEffects(method, cancellationToken);
+        var result = session.AnalyzeEffects(method, cancellationToken);
         var summary = result.Summary;
         var projection = result.Projection;
         var entryIsBottom = ManagedAbstractFlow

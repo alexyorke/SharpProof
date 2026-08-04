@@ -86,7 +86,7 @@ finally {
 $catalog = $catalogJson | ConvertFrom-Json
 Assert-Properties $catalog @(
     'schemaVersion', 'runtimeCompanionExtensions', 'runtimeCompanionFiles',
-    'options', 'budgets', 'cache') `
+    'runtimeCompanionAssemblyTypes', 'options', 'budgets', 'cache') `
     'launcher argument catalog'
 if ($catalog.schemaVersion -ne 1) {
     throw 'Launcher argument catalog schemaVersion must be 1.'
@@ -111,6 +111,15 @@ foreach ($file in $runtimeCompanionFiles) {
 }
 if ($runtimeCompanionFiles.Count -eq 0) {
     throw 'Launcher runtime companion files are incomplete.'
+}
+$runtimeCompanionAssemblyTypes = $catalog.runtimeCompanionAssemblyTypes
+foreach ($property in $runtimeCompanionAssemblyTypes.PSObject.Properties) {
+    if ($property.Name -notin $runtimeCompanionFiles -or
+        $property.Value -isnot [string] -or
+        [string]$property.Value -cnotmatch
+            '\A[A-Za-z_][A-Za-z0-9_.]*\z') {
+        throw "Launcher runtime companion assembly type is invalid: '$($property.Name)'."
+    }
 }
 
 $optionKeys = [Collections.Generic.HashSet[string]]::new(
@@ -277,9 +286,23 @@ foreach ($extension in $runtimeCompanionExtensions) {
         "$(Quote-CSharpString $extension)),")
 }
 foreach ($file in $runtimeCompanionFiles) {
+    $assemblyProperty = $runtimeCompanionAssemblyTypes.PSObject.Properties[
+        $file]
+    $assemblyType = if ($null -ne $assemblyProperty) {
+        $assemblyProperty.Value
+    }
+    else {
+        $null
+    }
+    $fileExpression = if ($null -ne $assemblyType) {
+        "System.IO.Path.GetFileName(typeof($assemblyType).Assembly.Location)"
+    }
+    else {
+        Quote-CSharpString $file
+    }
     $lines.Add(
         "                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, " +
-        "$(Quote-CSharpString $file)),")
+        "$fileExpression),")
 }
 $lines[$lines.Count - 1] = $lines[$lines.Count - 1].TrimEnd(',')
 $lines.Add('            ];')

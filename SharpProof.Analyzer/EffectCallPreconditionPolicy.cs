@@ -25,8 +25,8 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
 
         var binding = _binder.BindRequires(
             context.Target);
-        if (!binding.IsSuccess ||
-            binding.Contracts == null)
+        if (binding is not
+            { IsSuccess: true, Contracts: { } contracts })
         {
             return _fallback.HasPotentialPreconditions(
                     context.Target)
@@ -34,7 +34,7 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
                 : EffectCallPreconditionStatus.None;
         }
 
-        var requires = binding.Contracts.Clauses
+        var requires = contracts.Clauses
             .Where(static clause =>
                 clause.Kind ==
                 BoundContractKind.Requires)
@@ -248,7 +248,8 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
                 : EffectCallPreconditionStatus.None;
         }
 
-        if (binding.Contracts.Clauses.Any(
+        if (method is { IsAbstract: false, IsExtern: false } &&
+            binding.Contracts.Clauses.Any(
                 static clause =>
                     clause.Kind ==
                     BoundContractKind.Requires))
@@ -256,8 +257,7 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
             return EffectCallPreconditionStatus.Proven;
         }
 
-        return _fallback
-            .HasPotentialDirectOrClosedPreconditions(method)
+        return _fallback.HasPotentialPreconditions(method)
             ? EffectCallPreconditionStatus.NotProven
             : EffectCallPreconditionStatus.None;
     }

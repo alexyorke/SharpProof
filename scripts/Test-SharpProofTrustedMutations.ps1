@@ -266,6 +266,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~SourceOnlyMetadataPreconditionsCannotDisappearIntoTrustedSummaries'
     },
     [pscustomobject]@{
+        Name = 'external-contract-closed-precondition-boundary'
+        File = 'SharpProof.Effects\EffectAnalysisSession.cs'
+        Original = "                EffectSummaryOperations.Join(`n                    _external.Resolve(normalized),`n                    ResolveEntryPreconditions(normalized)));"
+        Mutated = '                _external.Resolve(normalized));'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~DirectExternalAnalysisAppliesClosedEntryPreconditions'
+    },
+    [pscustomobject]@{
         Name = 'frontend-default-subset-decision'
         File = 'SharpProof.Frontend\FrontendSubset.cs'
         Original = '    public bool IsExact => Decision == FrontendSubsetDecision.Exact;'
@@ -496,6 +504,14 @@ $mutations = @(
         Mutated = '                <= EffectContractResolutionKind.Valid)'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~ExternalMetadataPreconditionEnvelopeCannotBeAssumed'
+    },
+    [pscustomobject]@{
+        Name = 'analyzer-bodyless-entry-precondition'
+        File = 'SharpProof.Analyzer\EffectCallPreconditionPolicy.cs'
+        Original = "        if (method is { IsAbstract: false, IsExtern: false } &&`n            binding.Contracts.Clauses.Any(`n                static clause =>`n                    clause.Kind ==`n                    BoundContractKind.Requires))"
+        Mutated = "        if (method.IsAbstract || method.IsExtern)"
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~BodylessContractWithClosedPreconditionRemainsUnknown'
     },
     [pscustomobject]@{
         Name = 'compilation-reference-model-owner'

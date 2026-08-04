@@ -810,6 +810,63 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public void BodylessContractWithClosedPreconditionRemainsUnknown()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            public abstract class Fixture {
+                [EnforcePure]
+                [SharpProofTrusted("reviewed bodyless implementation")]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    IsDeterministic = true,
+                    PreconditionFree = true,
+                    Complete = true)]
+                public abstract void Restricted([Positive] int value);
+            }
+            """,
+            ["SP0045"]);
+        var session = new AnalyzerSession(
+            compilation,
+            AnalyzerConfiguration.AdvisoryAll,
+            CancellationToken.None);
+        var method = compilation.GetTypeByMetadataName("Fixture")!
+            .GetMembers("Restricted")
+            .OfType<IMethodSymbol>()
+            .Single();
+        Assert.That(session.HasPotentialCallPreconditions(method), Is.True);
+        var analyzed = session.AnalyzeEffects(method, CancellationToken.None);
+        Assert.That(
+            analyzed.Summary.AnalysisIncompleteReason,
+            Is.EqualTo(
+                SharpProof.Effects.EffectAnalysisIncompleteReason
+                    .CallPreconditionNotProven));
+        var evaluation = EffectContractDiagnostics.Evaluate(
+            method,
+            Location.None,
+            session,
+            static _ => { },
+            CancellationToken.None)
+            .Single(static item =>
+                item.Kind == EffectEvaluationContractKind.EnforcePure);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                evaluation.Outcome,
+                Is.EqualTo(EffectEvaluationOutcome.Unknown));
+            Assert.That(
+                evaluation.Evidence,
+                Does.Contain("CallPreconditionNotProven"));
+            Assert.That(
+                evaluation.Reason,
+                Is.EqualTo(EffectEvaluationReason.EffectSummaryIncomplete));
+        }
+    }
+
+    [Test]
     public async Task InvalidlyPlacedCallerRequiresCannotCleanEffectSummary()
     {
         var factory = new RecordingSessionFactory();

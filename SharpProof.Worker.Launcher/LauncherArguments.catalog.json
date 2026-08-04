@@ -14,6 +14,11 @@
     "System.Text.Encodings.Web.dll",
     "System.Text.Json.dll"
   ],
+  "runtimeCompanionAssemblyTypes": {
+    "System.IO.Pipelines.dll": "System.IO.Pipelines.Pipe",
+    "System.Text.Encodings.Web.dll": "System.Text.Encodings.Web.HtmlEncoder",
+    "System.Text.Json.dll": "System.Text.Json.JsonSerializer"
+  },
   "options": [
     { "key": "worker", "category": "required", "accessor": "fullPath", "property": "WorkerPath", "fallback": "" },
     { "key": "request", "category": "required", "accessor": "fullPath", "property": "RequestPath", "fallback": "" },

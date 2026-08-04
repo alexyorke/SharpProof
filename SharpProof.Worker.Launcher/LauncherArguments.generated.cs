@@ -65,9 +65,9 @@ internal sealed partial class LauncherArguments
                 System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Specs.dll"),
                 System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Worker.Protocol.dll"),
                 System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Worker.Launcher.exe"),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "System.IO.Pipelines.dll"),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "System.Text.Encodings.Web.dll"),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "System.Text.Json.dll")
+                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, System.IO.Path.GetFileName(typeof(System.IO.Pipelines.Pipe).Assembly.Location)),
+                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, System.IO.Path.GetFileName(typeof(System.Text.Encodings.Web.HtmlEncoder).Assembly.Location)),
+                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, System.IO.Path.GetFileName(typeof(System.Text.Json.JsonSerializer).Assembly.Location))
             ];
         }
     }
