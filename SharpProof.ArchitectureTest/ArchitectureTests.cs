@@ -948,6 +948,41 @@ public sealed class ArchitectureTests
     }
 
     [Test]
+    public void CrossPlatformPackageCachePrimingUsesTheNativeDotnetPath()
+    {
+        var workflow = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            ".github",
+            "workflows",
+            "package-consumers.yml"));
+        var primeStart = workflow.IndexOf(
+            "      - name: Prime the framework-only package cache",
+            StringComparison.Ordinal);
+        var primeEnd = workflow.IndexOf(
+            "      - name: Download exact NuGet artifacts",
+            primeStart,
+            StringComparison.Ordinal);
+
+        Assert.That(primeStart, Is.GreaterThanOrEqualTo(0));
+        Assert.That(primeEnd, Is.GreaterThan(primeStart));
+        var primeStep = workflow[primeStart..primeEnd];
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(primeStep, Does.Contain("if ($IsWindows)"));
+            Assert.That(
+                primeStep,
+                Does.Contain(
+                    "Invoke-SharpProofDotnet.ps1\" @restoreArguments"));
+            Assert.That(primeStep, Does.Contain("& dotnet @restoreArguments"));
+            Assert.That(
+                primeStep,
+                Does.Contain(
+                    "Framework-only package cache restore failed"));
+        }
+    }
+
+    [Test]
     public void WorkerProcessCreationDisablesHandleInheritance()
     {
         var source = File.ReadAllText(Path.Combine(

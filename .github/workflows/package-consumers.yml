@@ -206,11 +206,23 @@ jobs:
       - name: Prime the framework-only package cache
         shell: pwsh
         working-directory: ${{ runner.temp }}
-        run: >-
-          & "$env:GITHUB_WORKSPACE/scripts/Invoke-SharpProofDotnet.ps1" restore
-          "$env:GITHUB_WORKSPACE/SharpProof.Attributes/SharpProof.Attributes.csproj"
-          --source https://api.nuget.org/v3/index.json
-          --nologo
+        run: |
+          $restoreProject = "$env:GITHUB_WORKSPACE/SharpProof.Attributes/SharpProof.Attributes.csproj"
+          $restoreArguments = @(
+            'restore',
+            $restoreProject,
+            '--source',
+            'https://api.nuget.org/v3/index.json',
+            '--nologo')
+          if ($IsWindows) {
+            & "$env:GITHUB_WORKSPACE/scripts/Invoke-SharpProofDotnet.ps1" @restoreArguments
+          }
+          else {
+            & dotnet @restoreArguments
+          }
+          if ($LASTEXITCODE -ne 0) {
+            throw "Framework-only package cache restore failed with exit code $LASTEXITCODE."
+          }
 
       - name: Download exact NuGet artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
