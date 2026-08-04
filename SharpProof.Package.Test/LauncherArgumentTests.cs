@@ -455,15 +455,16 @@ public sealed class LauncherArgumentTests
         string[] arguments = [
             "verify",
             "--worker", worker,
-            "--request", Path.Combine(TestContext.CurrentContext.WorkDirectory, "request.json"),
+            "--request", Path.Combine(Path.GetTempPath(), "SharpProof-safe-request.json"),
             "--result", runtimeAsset,
-            "--compiler-manifest", Path.Combine(TestContext.CurrentContext.WorkDirectory, "missing-compiler-manifest.json"),
+            "--compiler-manifest", Path.Combine(
+                Path.GetTempPath(), "SharpProof-safe-missing-manifest.json"),
             "--verify-policy", "advisory",
             "--assumption-policy", "allow"
         ];
         var nonCollidingArguments = arguments.ToArray();
         nonCollidingArguments[6] = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory, "safe-result.json");
+            Path.GetTempPath(), "SharpProof-safe-result.json");
         Assert.That(
             LauncherArguments.TryParse(nonCollidingArguments, out var nonColliding),
             Is.True);
