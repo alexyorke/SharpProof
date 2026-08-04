@@ -195,8 +195,8 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
             return result.ToImmutable();
         }
 
-        foreach (var type in GetAllTypes(
-                     compilation.Assembly.GlobalNamespace))
+        foreach (var type in SharpProof.Frontend.ReferencedTypeSymbols
+                     .GetAll(compilation))
         {
             foreach (var attribute in type.GetAttributes())
             {
@@ -205,7 +205,7 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
                             ?.OriginalDefinition,
                         contractFor.OriginalDefinition) ||
                     attribute.ConstructorArguments.Length !=
-                    1 ||
+                        1 ||
                     attribute.ConstructorArguments[0]
                         .Value is not INamedTypeSymbol
                         target ||
@@ -223,35 +223,4 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
         return result.ToImmutable();
     }
 
-    private static IEnumerable<INamedTypeSymbol>
-        GetAllTypes(
-            INamespaceOrTypeSymbol container)
-    {
-        foreach (var type in
-                 container.GetTypeMembers())
-        {
-            yield return type;
-            foreach (var nested in
-                     GetAllTypes(type))
-            {
-                yield return nested;
-            }
-        }
-
-        if (container is not INamespaceSymbol
-            @namespace)
-        {
-            yield break;
-        }
-
-        foreach (var child in
-                 @namespace.GetNamespaceMembers())
-        {
-            foreach (var type in
-                     GetAllTypes(child))
-            {
-                yield return type;
-            }
-        }
-    }
 }
