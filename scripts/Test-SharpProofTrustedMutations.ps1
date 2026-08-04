@@ -692,8 +692,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'worker-runtime-component-byte-limit'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
-        Original = 'internal const long MaximumComponentBytes = 32L * 1024 * 1024;'
-        Mutated = 'internal const long MaximumComponentBytes = 64L * 1024 * 1024;'
+        Original = 'internal const int MaximumComponentBytes = 32 * 1024 * 1024;'
+        Mutated = 'internal const int MaximumComponentBytes = 64 * 1024 * 1024;'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~RuntimeClosureLimitsFailClosedAtEveryBoundary'
     },
