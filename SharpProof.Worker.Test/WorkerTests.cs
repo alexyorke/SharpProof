@@ -3517,6 +3517,46 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task CacheEvictionFailurePreservesHeldCacheEntry()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("Cache sharing violations are Windows-specific.");
+        }
+
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        request.Cache.MaximumBytes = 1024 * 1024;
+        var backend = new SpuriousModelBackend();
+        using var worker = new SharpProofWorker(backend);
+        var first = await worker.VerifyAsync(request);
+        Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+
+        var firstCacheFile = Directory.GetFiles(
+            project.CacheDirectory,
+            "*.sharp-proof-cache.json").Single();
+        var maximumBytes = new FileInfo(firstCacheFile).Length + 1;
+        using var held = new FileStream(
+            firstCacheFile,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read);
+
+        var secondRequest = project.CreateRequest(
+            cacheEnabled: true,
+            targetFramework: "net8.0-windows");
+        secondRequest.Cache.MaximumBytes = maximumBytes;
+        var second = await worker.VerifyAsync(secondRequest);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(second.Errors, Is.Empty);
+            Assert.That(File.Exists(firstCacheFile), Is.True);
+        }
+    }
+
+    [Test]
     public async Task CacheDirectoryLockMakesReadMissAndWriteUnavailable()
     {
         using var project = TestProject.Create(RefutationSource);

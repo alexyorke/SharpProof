@@ -93,12 +93,10 @@ internal static class WorkerBinaryIdentity
                             component.Key,
                             stagedRead.Length,
                             ref stagedTotalBytes);
-                        if (stagedRead.Length != sourceLength ||
-                            stream.Length != sourceLength)
-                        {
-                            throw new InvalidDataException(
-                                "A worker runtime component changed during staging.");
-                        }
+                        EnsureStagedComponentLengthsMatch(
+                            sourceLength,
+                            stagedRead.Length,
+                            stream.Length);
                         hash.Add(component.Key).Add(stagedRead);
                     }
                     stagedHandles[stagedCount++] = OpenRead(stagedPath);
@@ -179,6 +177,19 @@ internal static class WorkerBinaryIdentity
         }
 
         totalBytes += length;
+    }
+
+    internal static void EnsureStagedComponentLengthsMatch(
+        long sourceLength,
+        long stagedLength,
+        long currentSourceLength)
+    {
+        if (stagedLength != sourceLength ||
+            currentSourceLength != sourceLength)
+        {
+            throw new InvalidDataException(
+                "A worker runtime component changed during staging.");
+        }
     }
 
     private static SortedDictionary<string, string> RuntimeComponents(

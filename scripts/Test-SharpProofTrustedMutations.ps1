@@ -888,6 +888,14 @@ $mutations = @(
         Mutated = '            false'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~DirectLauncherRejectsCacheInsideWorkerRuntimeDirectory'
+    },
+    [pscustomobject]@{
+        Name = 'closure-staging-length-consistency'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '        if (stagedLength != sourceLength ||`n            currentSourceLength != sourceLength)'
+        Mutated = '        if (stagedLength != sourceLength &&`n            currentSourceLength != sourceLength)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~StagedComponentLengthValidationIsFailClosed'
     }
 )
 

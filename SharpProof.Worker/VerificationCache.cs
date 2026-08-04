@@ -6,6 +6,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         ArgumentNullGuard.NotNull(directory, nameof(directory)));
     private readonly long _maximumBytes = ArgumentNullGuard.RequirePositive(
         maximumBytes, nameof(maximumBytes));
+    internal static Action<string, string>? PathValidationOverride;
 
     internal async Task<WorkerVerifyResponse?> TryReadAsync(
         string inputHash,
@@ -176,6 +177,12 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
 
     private static void ValidatePath(string directory, string path)
     {
+        if (PathValidationOverride is { } validator)
+        {
+            validator(directory, path);
+            return;
+        }
+
         WorkerCachePath.ValidateNoReparsePoints([directory, path]);
     }
 

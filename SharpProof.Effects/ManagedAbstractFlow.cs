@@ -155,7 +155,7 @@ internal sealed class ManagedAbstractFlow
             case IVariableDeclaratorOperation declarator:
                 if (declarator.Initializer == null)
                 {
-                    state = state.Set(declarator.Symbol, TopForType(declarator.Symbol.Type));
+                    state = state.Set(declarator.Symbol, ManagedAbstractValue.TopForType(declarator.Symbol.Type));
                 }
                 else
                 {
@@ -398,7 +398,7 @@ internal sealed class ManagedAbstractFlow
         };
 
         return refined.IsBottom
-            ? ManagedAbstractValue.Bottom
+            ? Bottom
             : Integer(
                 refined,
                 current.ExcludesZero || (value.IsSingleton

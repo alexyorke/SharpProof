@@ -1,12 +1,323 @@
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Dataflow;
+using SharpProof.Ir;
+using SharpProof.Specs;
 
 namespace SharpProof.Effects.Test;
 
 [TestFixture]
 public sealed class ManagedAbstractFlowTests
 {
+    [Test]
+    public void UninitializedLocalsAreTrackedBeforeAssignment()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static void Calls() {
+                    try {
+                    }
+                    catch (System.Exception error) {
+                    }
+                }
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Calls");
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        Assert.That(
+            root.Descendants().OfType<IVariableDeclaratorOperation>()
+                .Any(static declarator => declarator.Initializer == null),
+            Is.True);
+
+        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
+            .Analyze(method, ControlFlowGraph.Create(root), null, default);
+
+        Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
+    }
+
+    [Test]
+    public void MultidimensionalArrayEvaluationRemainsNonNull()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static int[,] Calls() => new int[1, 2];
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var creation = (IArrayCreationOperation)model.GetOperation(
+            syntax.ExpressionBody!.Expression)!;
+
+        var value = ManagedAbstractFlow.ForCompilation(compilation)
+            .Evaluate(creation, ManagedFlowState.Empty);
+
+        Assert.That(value.IsDefinitelyNonNull, Is.True);
+    }
+
+    [Test]
+    public void IntrinsicArrayLengthUsesTheReceiverTypeWhenCardinalityIsUnknown()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static int Calls(int[] value) => value.Length;
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var property = (IPropertyReferenceOperation)model.GetOperation(
+            syntax.ExpressionBody!.Expression)!;
+        var value = ManagedAbstractFlow.ForCompilation(compilation)
+            .Evaluate(
+                property,
+                ManagedFlowState.Empty.Set(
+                    method.Parameters.Single(),
+                    ManagedAbstractValue.NonNull));
+
+        Assert.That(value.TryGetInteger(out var interval), Is.True);
+        Assert.That(
+            interval,
+            Is.EqualTo(IntervalValue.Range(0, int.MaxValue)));
+    }
+
+    [Test]
+    public void UnaryBooleanNegationUsesTheBooleanAbstractValue()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static bool Calls(bool value) => !value;
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var unary = (IUnaryOperation)model.GetOperation(
+            syntax.ExpressionBody!.Expression)!;
+        var value = ManagedAbstractFlow.ForCompilation(compilation)
+            .Evaluate(
+                unary,
+                ManagedFlowState.Empty.Set(
+                    method.Parameters.Single(),
+                    ManagedAbstractValue.Boolean(true)));
+
+        Assert.That(value.TryGetBoolean(out var result), Is.True);
+        Assert.That(result, Is.False);
+    }
+
+    [Test]
+    public void UnaryIntegerNegationOfUnknownUsesTheTypeTopValue()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static int Calls(int value) => -value;
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var unary = (IUnaryOperation)model.GetOperation(
+            syntax.ExpressionBody!.Expression)!;
+        var value = ManagedAbstractFlow.ForCompilation(compilation)
+            .Evaluate(
+                unary,
+                ManagedFlowState.Empty.Set(
+                    method.Parameters.Single(),
+                    ManagedAbstractValue.Unknown));
+
+        Assert.That(value.TryGetInteger(out var interval), Is.True);
+        Assert.That(
+            interval,
+            Is.EqualTo(IntervalValue.Range(int.MinValue, int.MaxValue)));
+    }
+
+    [Test]
+    public void NullTestsUseKnownReferenceFacts()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static string? Calls(object value) => value?.ToString();
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        var graph = ControlFlowGraph.Create(root);
+        var operation = graph.Blocks
+            .SelectMany(static block => block.Operations.Append(block.BranchValue)
+                .Where(static operation => operation != null)!)
+            .SelectMany(static operation => operation!.DescendantsAndSelf())
+            .OfType<IIsNullOperation>()
+            .Single();
+        var flow = ManagedAbstractFlow.ForCompilation(compilation);
+        ManagedFlowState State(ManagedAbstractValue value)
+        {
+            return operation.Operand is IFlowCaptureReferenceOperation capture
+                ? ManagedFlowState.Empty.Set(capture.Id, value)
+                : ManagedFlowState.Empty.Set(method.Parameters.Single(), value);
+        }
+
+        var nullResult = flow.Evaluate(
+            operation,
+            State(ManagedAbstractValue.Null));
+        var nonNullResult = flow.Evaluate(
+            operation,
+            State(ManagedAbstractValue.NonNull));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(nullResult.TryGetBoolean(out var nullTest), Is.True);
+            Assert.That(nullTest, Is.True);
+            Assert.That(nonNullResult.TryGetBoolean(out var nonNullTest), Is.True);
+            Assert.That(nonNullTest, Is.False);
+        }
+    }
+
+    [Test]
+    public void UnknownConditionalAndMaybeNullCoalesceRemainExplicit()
+    {
+        var conditionalCompilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static void Calls(bool condition) {
+                    if (condition) {
+                    }
+                }
+            }
+            """);
+        var conditionalSyntax = conditionalCompilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var conditionalModel = conditionalCompilation.GetSemanticModel(
+            conditionalSyntax.SyntaxTree);
+        var conditional = conditionalModel.GetOperation(conditionalSyntax)!
+            .Descendants().OfType<IConditionalOperation>().Single();
+        var conditionalValue = ManagedAbstractFlow.ForCompilation(conditionalCompilation)
+            .Evaluate(conditional, ManagedFlowState.Empty);
+
+        var coalesceCompilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static object Calls(object value) => value ?? new object();
+            }
+            """);
+        var coalesceSyntax = coalesceCompilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var coalesceModel = coalesceCompilation.GetSemanticModel(
+            coalesceSyntax.SyntaxTree);
+        var coalesce = (ICoalesceOperation)coalesceModel.GetOperation(
+            coalesceSyntax.ExpressionBody!.Expression)!;
+        var coalesceMethod = (IMethodSymbol)coalesceModel.GetDeclaredSymbol(
+            coalesceSyntax)!;
+        var coalesceValue = ManagedAbstractFlow.ForCompilation(coalesceCompilation)
+            .Evaluate(
+                coalesce,
+                ManagedFlowState.Empty.Set(
+                    coalesceMethod.Parameters.Single(),
+                    ManagedAbstractValue.Reference(NullnessValue.MaybeNull)));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(conditionalValue.IsUnknown, Is.True);
+            Assert.That(coalesceValue.IsDefinitelyNull, Is.False);
+            Assert.That(coalesceValue.IsDefinitelyNonNull, Is.False);
+        }
+    }
+
+    [Test]
+    public void MutatedValuesCannotBeEvaluatedAtTheirOrigin()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static void Calls(int value) {
+                    value = 1;
+                }
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        var assignment = root.Descendants()
+            .OfType<ISimpleAssignmentOperation>().Single();
+        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
+            .Analyze(method, ControlFlowGraph.Create(root), null, default);
+
+        Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
+        Assert.That(
+            analysis.Result!.TryEvaluateAtOrigin(assignment, assignment, out _),
+            Is.False);
+    }
+
+    [Test]
+    public void NullResultApiSpecificationProducesNullFact()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static string Return() => null!;
+                public static string Calls() => Return();
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Calls");
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var invocation = (IInvocationOperation)model.GetOperation(
+            syntax.ExpressionBody!.Expression)!;
+        var evidence = new SpecEvidence(SpecEvidenceKind.Observed, "flow-test");
+        var table = ApiSpecTable.Create([
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "flow.null-result",
+                    "M:Sample.Return",
+                    "Sample",
+                    SpecTargetMemberKind.Method,
+                    "Return",
+                    true,
+                    0,
+                    null,
+                    [],
+                    IrTypeKind.Reference,
+                    [new ApiSpecAssemblyIdentity("EffectsTest", string.Empty)]),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.None, evidence),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidence),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidence),
+                    new SpecNullnessFacet(SpecNullness.Null, evidence),
+                    new SpecCardinalityFacet(
+                        SpecCardinality.NotApplicable,
+                        null,
+                        evidence)),
+                [])
+        ]);
+        var resolved = new ApiSpecResolver(table).Resolve(compilation);
+        var value = ManagedAbstractFlow.Create(compilation, resolved)
+            .Evaluate(invocation, ManagedFlowState.Empty);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(resolved.IsComplete, Is.True);
+            Assert.That(value.IsDefinitelyNull, Is.True);
+        }
+    }
+
     [Test]
     public void OperationBudgetExhaustionFailsClosed()
     {

@@ -8,6 +8,31 @@ namespace SharpProof.Worker.Test;
 public sealed class WorkerBinaryIdentityTests
 {
     [Test]
+    public void StagedComponentLengthValidationIsFailClosed()
+    {
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(
+                (Action)(() => WorkerBinaryIdentity.EnsureStagedComponentLengthsMatch(
+                    4,
+                    3,
+                    4)),
+                Throws.TypeOf<InvalidDataException>());
+            Assert.That(
+                (Action)(() => WorkerBinaryIdentity.EnsureStagedComponentLengthsMatch(
+                    4,
+                    4,
+                    3)),
+                Throws.TypeOf<InvalidDataException>());
+            Assert.DoesNotThrow((Action)(() =>
+                WorkerBinaryIdentity.EnsureStagedComponentLengthsMatch(
+                    4,
+                    4,
+                    4)));
+        }));
+    }
+
+    [Test]
     public void RuntimeClosureLimitsFailClosedAtEveryBoundary()
     {
         const long expectedMaximumComponentBytes = 32L * 1024 * 1024;

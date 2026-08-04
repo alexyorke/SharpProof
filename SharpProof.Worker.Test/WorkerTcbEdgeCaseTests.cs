@@ -17,6 +17,20 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class WorkerTcbEdgeCaseTests
 {
+    [Test]
+    public void KnownWindowsReparsePointIsRejectedBeforeTraversal()
+    {
+        if (!OperatingSystem.IsWindows() ||
+            !Directory.Exists(@"C:\Users\All Users"))
+        {
+            Assert.Ignore("The qualification host has no stable system junction.");
+        }
+
+        Action validate = () => WorkerCachePath.ValidateNoReparsePoints([
+            Path.Combine(@"C:\Users\All Users", "SharpProof", "cache")]);
+        Assert.Throws<ArgumentException>(validate);
+    }
+
     [TestCase(
         BackendFailureReason.Timeout,
         WorkerClaimReason.MethodTimeout)]
@@ -876,6 +890,53 @@ public sealed class WorkerTcbEdgeCaseTests
             {
                 Directory.Delete(directory, recursive: true);
             }
+        }
+    }
+
+    [Test]
+    public void CacheLockDisposesHandleWhenPostOpenValidationFails()
+    {
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "worker-cache-lock-validation-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var calls = 0;
+            Action<string, string> validatePath = (_, _) =>
+            {
+                calls++;
+                if (calls == 3)
+                {
+                    throw new ArgumentException("synthetic validation failure");
+                }
+            };
+
+            VerificationCache.PathValidationOverride = validatePath;
+            var acquireLock = typeof(VerificationCache)
+                .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
+                .Single(method => method.Name == "AcquireLock" &&
+                    method.GetParameters().Length == 1);
+            Action failValidation = () => acquireLock.Invoke(
+                null,
+                [directory]);
+            var invocation = Assert.Throws<TargetInvocationException>(
+                failValidation);
+            Assert.That(
+                invocation!.InnerException,
+                Is.TypeOf<ArgumentException>());
+
+            using var reopened = new FileStream(
+                Path.Combine(directory, ".sharp-proof-cache.lock"),
+                FileMode.OpenOrCreate,
+                FileAccess.ReadWrite,
+                FileShare.None);
+            Assert.That(calls, Is.EqualTo(3));
+        }
+        finally
+        {
+            VerificationCache.PathValidationOverride = null;
+            Directory.Delete(directory, recursive: true);
         }
     }
 
