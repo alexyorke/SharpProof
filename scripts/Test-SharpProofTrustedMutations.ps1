@@ -636,7 +636,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'cache-manifest-binding'
         File = 'SharpProof.Worker\VerificationCache.cs'
-        Original = '!string.Equals(payload.ManifestHash, manifest.Hash, StringComparison.Ordinal) ||'
+        Original = '                !string.Equals(payloadManifestHash, manifest.Hash, StringComparison.Ordinal) ||'
         Mutated = 'false ||'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~RehashedCacheSealedForDifferentManifestMissesAndRecomputes'
