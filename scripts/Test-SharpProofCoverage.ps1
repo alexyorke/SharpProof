@@ -228,7 +228,11 @@ $aggregatePassed =
 
 $changedTcb = [pscustomobject][ordered]@{
     comparisonRef = $ComparisonRef
+    canonicalFiles = 0
     changedFiles = 0
+    coverageFiles = 0
+    metadataFiles = 0
+    changedMetadataFiles = @()
     coveredLines = 0
     coverableLines = 0
     linePercent = 100.0
@@ -241,8 +245,19 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
     $contractPath = Join-Path $repositoryRoot 'eng\acceptance\contract.json'
     $contract = Get-Content -LiteralPath $contractPath -Raw |
         ConvertFrom-Json
-    $tcbPaths = @(Get-SharpProofTcbPaths `
-        -Contract $contract)
+    $canonicalTcbPaths = @(Get-SharpProofTcbPaths `
+        -Contract $contract `
+        -IncludeAcceptanceContract)
+    $coverageTcbPaths = @(
+        $canonicalTcbPaths |
+            Where-Object {
+                $_.EndsWith('.cs', [StringComparison]::OrdinalIgnoreCase)
+            })
+    $coverageTcbFiles = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::OrdinalIgnoreCase)
+    foreach ($coveragePath in $coverageTcbPaths) {
+        [void]$coverageTcbFiles.Add($coveragePath)
+    }
     $diffTarget = if ($IncludeWorkingTree) {
         $ComparisonRef
     }
@@ -254,7 +269,7 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
         --no-renames `
         $diffTarget `
         -- `
-        @tcbPaths
+        @canonicalTcbPaths
     if ($LASTEXITCODE -ne 0) {
         throw "git diff failed for comparison ref '$ComparisonRef'."
     }
@@ -265,7 +280,7 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
         --no-renames `
         $diffTarget `
         -- `
-        @tcbPaths
+        @canonicalTcbPaths
     if ($LASTEXITCODE -ne 0) {
         throw "git changed-file enumeration failed for comparison ref '$ComparisonRef'."
     }
@@ -310,10 +325,22 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
     }
     $changedCovered = 0
     $changedCoverable = 0
+    $changedMetadataFiles = @(
+        $changedTcbFiles |
+            Where-Object { -not $coverageTcbFiles.Contains($_) } |
+            Sort-Object)
     $nonCoverableChangedFiles =
         [Collections.Generic.List[string]]::new()
     $uncoveredChangedLines = [Collections.Generic.List[string]]::new()
     foreach ($changedPath in $changedTcbFiles) {
+        if (-not $coverageTcbFiles.Contains($changedPath)) {
+            # The canonical union also contains metadata, such as the
+            # acceptance contract. Metadata changes participate in the
+            # changed-TCB selection and release digest, but have no C# line
+            # sequence points. Record them explicitly instead of treating
+            # them as missing coverage or silently dropping them.
+            continue
+        }
         if (-not $changedLines.ContainsKey($changedPath) -or
             $changedLines[$changedPath].Count -eq 0 -or
             -not $lineHits.ContainsKey($changedPath)) {
@@ -367,7 +394,11 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
     $changedPercent = [Math]::Round($changedPercent, 2)
     $changedTcb = [pscustomobject][ordered]@{
         comparisonRef = $ComparisonRef
+        canonicalFiles = $canonicalTcbPaths.Count
         changedFiles = $changedTcbFiles.Count
+        coverageFiles = $coverageTcbPaths.Count
+        metadataFiles = $canonicalTcbPaths.Count - $coverageTcbPaths.Count
+        changedMetadataFiles = $changedMetadataFiles
         coveredLines = $changedCovered
         coverableLines = $changedCoverable
         linePercent = $changedPercent

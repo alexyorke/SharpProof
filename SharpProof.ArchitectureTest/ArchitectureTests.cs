@@ -875,11 +875,15 @@ public sealed class ArchitectureTests
                 "scripts",
                 "Test-SharpProofCoverage.ps1")),
             Does.Contain("Get-SharpProofTcbPaths")
+                .And.Contain("$canonicalTcbPaths")
+                .And.Contain("$coverageTcbPaths")
                 .And.Contain("$changedTcbFiles")
                 .And.Contain("ComparisonRef is required")
                 .And.Contain("contract.json")
                 .And.Contain("-Contract $contract")
-                .And.Not.Contain("-IncludeAcceptanceContract"));
+                .And.Contain("-IncludeAcceptanceContract")
+                .And.Contain("EndsWith('.cs'")
+                .And.Contain("changedMetadataFiles"));
     }
 
     [Test]
