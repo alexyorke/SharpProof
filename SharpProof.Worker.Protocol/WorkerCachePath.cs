@@ -12,4 +12,11 @@ internal static class WorkerCachePath
                 ? Path.Combine(root, "obj", "SharpProof", "cache")
                 : Path.Combine(root, configuredDirectory!));
     }
+
+    internal static bool IsSameOrDescendant(string path, string directory)
+    {
+        return (path + Path.DirectorySeparatorChar).StartsWith(
+            directory + Path.DirectorySeparatorChar,
+            StringComparison.OrdinalIgnoreCase);
+    }
 }

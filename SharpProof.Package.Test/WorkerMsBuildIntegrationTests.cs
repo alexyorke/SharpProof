@@ -991,6 +991,39 @@ public sealed class WorkerMsBuildIntegrationTests
             Throws.TypeOf<ArgumentException>());
     }
 
+    [TestCase("")]
+    [TestCase("cache")]
+    public async Task DirectLauncherRejectsCacheInsideWorkerRuntimeDirectory(
+        string relativeCacheSuffix)
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var workerDirectory = Path.GetDirectoryName(WorkerOutputPath())!;
+        var cachePath = Path.Combine(workerDirectory, relativeCacheSuffix);
+        var projectDirectory = Path.GetDirectoryName(project.ProjectPath)!;
+        var relativeCache = Path.GetRelativePath(projectDirectory, cachePath);
+        string[] arguments = [
+            "verify",
+            "--worker", WorkerOutputPath(),
+            "--request", project.RequestPath,
+            "--result", project.ResultPath,
+            "--compiler-manifest", project.CompilerManifestPath,
+            "--cache-directory", relativeCache,
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
     [Test]
     public async Task WorkerRuntimeAssetAliasIsRejectedBeforeInvalidationDeletesIt()
     {

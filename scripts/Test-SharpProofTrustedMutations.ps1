@@ -816,6 +816,14 @@ $mutations = @(
         Mutated = '                InvalidDataException or JsonException or'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~MainFailsClosedWhenWorkerDependencyManifestIsMalformed'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-rejects-cache-inside-worker-tree'
+        File = 'SharpProof.Worker.Launcher\Program.cs'
+        Original = '            cacheDirectory != null &&'
+        Mutated = '            false &&'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~DirectLauncherRejectsCacheInsideWorkerRuntimeDirectory'
     }
 )
 

@@ -16,9 +16,7 @@ public sealed class NullnessDomain : ClosedAbstractDomain<NullnessValue>
 
     public override bool LessThanOrEqual(NullnessValue left, NullnessValue right)
     {
-        Validate(left);
-        Validate(right);
-        return left == right || left == NullnessValue.Bottom || right == NullnessValue.MaybeNull;
+        return Join(left, right) == right;
     }
 
     public override NullnessValue Join(NullnessValue left, NullnessValue right)
