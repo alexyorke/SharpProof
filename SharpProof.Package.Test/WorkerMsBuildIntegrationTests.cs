@@ -922,6 +922,16 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task LauncherProtocolAssetIsPublishedByTargets()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var build = await project.BuildAsync(verify: false);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        Assert.That(File.Exists(LauncherProtocolOutputPath()), Is.True);
+    }
+
+    [Test]
     public async Task LauncherProtocolAssetAliasIsRejectedBeforeInvalidationDeletesIt()
     {
         RequireWindowsWorker();

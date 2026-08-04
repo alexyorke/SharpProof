@@ -895,7 +895,7 @@ $mutations = @(
         Original = '                    "SharpProof.Worker.Protocol.dll")'
         Mutated = '                    "SharpProof.Worker.Missing.dll")'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
-        Filter = 'FullyQualifiedName~LauncherProtocolAssetAliasIsRejectedBeforeInvalidationDeletesIt'
+        Filter = 'FullyQualifiedName~LauncherProtocolAssetIsPublishedByTargets'
     },
     [pscustomobject]@{
         Name = 'launcher-normalizes-malformed-worker-deps'
