@@ -892,8 +892,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'closure-staging-length-consistency'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
-        Original = '        if (stagedLength != sourceLength ||`n            currentSourceLength != sourceLength)'
-        Mutated = '        if (stagedLength != sourceLength &&`n            currentSourceLength != sourceLength)'
+        Original = '        if (stagedLength != sourceLength ||'
+        Mutated = '        if (stagedLength != sourceLength &&'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~StagedComponentLengthValidationIsFailClosed'
     }
