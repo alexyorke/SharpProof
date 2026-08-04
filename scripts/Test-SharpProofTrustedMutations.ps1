@@ -645,7 +645,7 @@ $mutations = @(
         Name = 'cache-write-size-admission'
         File = 'SharpProof.Worker\VerificationCache.cs'
         Original = "            if (Encoding.UTF8.GetByteCount(json) >`n                Math.Min(_maximumBytes, WorkerProtocolJson.MaximumJsonBytes))"
-        Mutated = '            if (false)'
+        Mutated = '            if (Encoding.UTF8.GetByteCount(json) > _maximumBytes)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~CacheWriteLimitsAreRejectedBeforePublication'
     },
