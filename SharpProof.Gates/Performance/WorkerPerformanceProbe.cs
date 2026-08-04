@@ -530,8 +530,12 @@ internal static class WorkerPerformanceProbe
         {
             get;
         }
+        private string WorkerDirectoryPath =>
+            Path.Combine(DirectoryPath, "worker");
+        private string IoDirectoryPath =>
+            Path.Combine(DirectoryPath, "io");
         internal string LauncherManifestPath =>
-            Path.Combine(DirectoryPath, "launcher.compiler-manifest.json");
+            Path.Combine(IoDirectoryPath, "launcher.compiler-manifest.json");
 
         internal static WorkerProbeWorkspace Create()
         {
@@ -540,11 +544,15 @@ internal static class WorkerPerformanceProbe
                 "SharpProof.Gates.Performance",
                 Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(directory);
+            var workerDirectory = Path.Combine(directory, "worker");
+            var ioDirectory = Path.Combine(directory, "io");
+            Directory.CreateDirectory(workerDirectory);
+            Directory.CreateDirectory(ioDirectory);
             var cancellationSource = Path.Combine(
-                directory,
+                ioDirectory,
                 "CancellationSubject.cs");
             var launcherSource = Path.Combine(
-                directory,
+                ioDirectory,
                 "LauncherSubject.cs");
             File.WriteAllText(
                 cancellationSource,
@@ -655,18 +663,18 @@ internal static class WorkerPerformanceProbe
 
         internal string RequestPath(string runName)
         {
-            return Path.Combine(DirectoryPath, runName + ".request.json");
+            return Path.Combine(IoDirectoryPath, runName + ".request.json");
         }
 
         internal string ResultPath(string runName)
         {
-            return Path.Combine(DirectoryPath, runName + ".result.json");
+            return Path.Combine(IoDirectoryPath, runName + ".result.json");
         }
 
         internal string CreateUncooperativeWorker(string launcherPath)
         {
             var path = Path.Combine(
-                DirectoryPath,
+                WorkerDirectoryPath,
                 "UncooperativeWorker.dll");
             var syntaxTree = CSharpSyntaxTree.ParseText(
                 """
