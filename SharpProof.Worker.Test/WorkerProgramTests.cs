@@ -30,6 +30,40 @@ public sealed class WorkerProgramTests
     }
 
     [Test]
+    public async Task DirectInvocationRejectsRequestResultAliasBeforeStartBarrier()
+    {
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Worker.Test",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var requestAndResultPath = Path.Combine(directory, "request.json");
+        const string sentinel = "request-sentinel";
+        await File.WriteAllTextAsync(requestAndResultPath, sentinel);
+        try
+        {
+            var exitCode = await Program.Main([
+                "verify",
+                "--request",
+                requestAndResultPath,
+                "--result",
+                requestAndResultPath,
+                "--start-event",
+                "missing-start-event"
+            ]);
+
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(
+                await File.ReadAllTextAsync(requestAndResultPath),
+                Is.EqualTo(sentinel));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
     [NonParallelizable]
     public async Task InvalidProjectedRequestDisposesRuntimeSnapshotBeforeReturning()
     {

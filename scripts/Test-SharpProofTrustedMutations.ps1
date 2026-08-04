@@ -778,6 +778,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~WorkerClosureRetainsStagedComponentsUntilSnapshotDisposal'
     },
     [pscustomobject]@{
+        Name = 'worker-rejects-request-result-alias'
+        File = 'SharpProof.Worker\Program.cs'
+        Original = '        return !string.Equals(request, result, StringComparison.OrdinalIgnoreCase);'
+        Mutated = '        return true;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~DirectInvocationRejectsRequestResultAliasBeforeStartBarrier'
+    },
+    [pscustomobject]@{
         Name = 'closure-retains-each-component-path-once'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
         Original = '                components.Values.ToArray(),'

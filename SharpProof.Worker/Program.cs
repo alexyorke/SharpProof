@@ -95,7 +95,7 @@ internal static class Program
         request = Path.GetFullPath(requestValue);
         result = Path.GetFullPath(resultValue);
         startEvent = eventValue;
-        return true;
+        return !string.Equals(request, result, StringComparison.OrdinalIgnoreCase);
     }
     private static bool WaitForStart(string eventName)
     {
