@@ -17,6 +17,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         var path = GetPath(inputHash);
         try
         {
+            using var cacheLock = AcquireLock(_directory);
             var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)
                 .ConfigureAwait(false);
             var envelope = JsonSerializer.Deserialize<CacheEnvelope>(json, WorkerProtocolJson.Options);
@@ -34,10 +35,15 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             }
             cancellationToken.ThrowIfCancellationRequested();
             var payload = JsonSerializer.Deserialize<CachePayload>(envelope.Payload, WorkerProtocolJson.Options);
-            if (payload == null ||
-                !string.Equals(payload.ManifestHash, manifest.Hash, StringComparison.Ordinal) ||
-                payload.CallableResults is not { } callables || callables.Any(static result => result == null) ||
-                payload.ClaimResults is not { } claims || claims.Any(static result => result == null))
+            if (payload is not
+                {
+                    ManifestHash: var payloadManifestHash,
+                    CallableResults: { } callables,
+                    ClaimResults: { } claims
+                } ||
+                !string.Equals(payloadManifestHash, manifest.Hash, StringComparison.Ordinal) ||
+                callables.Any(static result => result == null) ||
+                claims.Any(static result => result == null))
             {
                 return null;
             }
@@ -73,7 +79,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         ArgumentNullException.ThrowIfNull(response);
         try
         {
-            Directory.CreateDirectory(_directory);
+            using var cacheLock = AcquireLock(_directory);
             var payload = JsonSerializer.Serialize(new CachePayload(
                 manifest.Hash, response.CallableResults, response.ClaimResults), WorkerProtocolJson.Options);
             var envelope = new CacheEnvelope(WorkerCacheVersions.Current,
@@ -95,6 +101,16 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             // Cache failures never change semantic verifier outcomes.
             return false;
         }
+    }
+
+    private static FileStream AcquireLock(string directory)
+    {
+        Directory.CreateDirectory(directory);
+        return new FileStream(
+            Path.Combine(directory, ".sharp-proof-cache.lock"),
+            FileMode.OpenOrCreate,
+            FileAccess.ReadWrite,
+            FileShare.None);
     }
 
     private void Evict(CancellationToken cancellationToken)
@@ -149,12 +165,12 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         ImmutableArray<CompilerCallablePreparation> targets,
         CancellationToken cancellationToken = default)
     {
-        return expectedManifest != null && WorkerProtocolJson.IsSha256(expectedInputHash) && response is
+        return WorkerProtocolJson.IsSha256(expectedInputHash) && response is
         {
             RunStatus: WorkerRunStatus.Complete,
             Errors.Length: 0,
             CallableResults: { } callables,
-            ClaimResults: { } claims
+            ClaimResults: { Length: > 0 } claims
         } &&
         callables.All(static result =>
             result is
@@ -162,10 +178,10 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 Coverage: WorkerCallableCoverage.Complete,
                 Reason: WorkerCallableCoverageReason.None
             }) &&
-        claims.Length != 0 &&
         claims.All(static result =>
             result is { Outcome: WorkerClaimOutcome.Refuted }) &&
-        expectedManifest.Claims.Length == claims.Length &&
+        expectedManifest is { Claims: { Length: var claimCount } } &&
+        claimCount == claims.Length &&
         expectedManifest.Claims.All(static claim =>
             claim.Kind == WorkerClaimKind.Postcondition) &&
         WorkerProtocolJson.Validate(response, expectedInputHash, expectedManifest).IsValid &&
@@ -272,15 +288,14 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
     {
         var type = factory.GetVariableInfo(variable.Variable).Type;
         if (type == factory.BooleanType &&
-            row.Kind == nameof(IrValueKind.Boolean) &&
-            row.Value is "true" or "false")
+            row is { Kind: nameof(IrValueKind.Boolean), Value: "true" or "false" })
         {
             value = factory.CreateBooleanValue(row.Value == "true");
             return true;
         }
 
         if (type == factory.IntegerType &&
-            row.Kind == nameof(IrValueKind.Integer) &&
+            row is { Kind: nameof(IrValueKind.Integer) } &&
             long.TryParse(
                 row.Value,
                 NumberStyles.AllowLeadingSign,

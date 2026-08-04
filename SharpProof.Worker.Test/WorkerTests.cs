@@ -3487,6 +3487,30 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task CacheDirectoryLockMakesReadMissAndWriteUnavailable()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        var backend = new SpuriousModelBackend();
+        using var worker = new SharpProofWorker(backend);
+        var first = await worker.VerifyAsync(request);
+        Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+
+        using var heldLock = new FileStream(
+            Path.Combine(project.CacheDirectory, ".sharp-proof-cache.lock"),
+            FileMode.OpenOrCreate,
+            FileAccess.ReadWrite,
+            FileShare.None);
+        var second = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
+        }
+    }
+
+    [Test]
     public async Task CacheEvictionLeavesLegacyJsonFilesUntouched()
     {
         using var project = TestProject.Create(RefutationSource);

@@ -650,6 +650,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~CacheWriteLimitsAreRejectedBeforePublication'
     },
     [pscustomobject]@{
+        Name = 'cache-read-lock-coordination'
+        File = 'SharpProof.Worker\VerificationCache.cs'
+        Original = "            using var cacheLock = AcquireLock(_directory);`n            var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)"
+        Mutated = '            var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~CacheDirectoryLockMakesReadMissAndWriteUnavailable'
+    },
+    [pscustomobject]@{
+        Name = 'cache-write-lock-coordination'
+        File = 'SharpProof.Worker\VerificationCache.cs'
+        Original = "            using var cacheLock = AcquireLock(_directory);`n            var payload = JsonSerializer.Serialize(new CachePayload("
+        Mutated = '            var payload = JsonSerializer.Serialize(new CachePayload('
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~CacheDirectoryLockMakesReadMissAndWriteUnavailable'
+    },
+    [pscustomobject]@{
         Name = 'protocol-manifest-result-equality'
         File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
         Original = "actual.OrderBy(static value => value, StringComparer.Ordinal)`n            .SequenceEqual(expected.OrderBy(static value => value, StringComparer.Ordinal),`n                StringComparer.Ordinal)"
