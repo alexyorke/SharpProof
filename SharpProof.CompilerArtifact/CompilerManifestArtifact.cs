@@ -64,17 +64,34 @@ internal static class WorkerBinaryIdentity
             long totalBytes = 0;
             foreach (var component in components)
             {
-                using var stream = OpenRead(component.Value);
-                ValidateComponentLength(
-                    component.Key,
-                    stream.Length,
-                    ref totalBytes);
-                stream.Position = 0;
-                hash.Add(component.Key).Add(stream);
-                stagedHandles[stagedCount++] = OpenRead(StageComponent(
-                    stagingDirectory,
-                    path,
-                    component.Value));
+                using (var stream = OpenRead(component.Value))
+                {
+                    var sourceTotalBytes = totalBytes;
+                    ValidateComponentLength(
+                        component.Key,
+                        stream.Length,
+                        ref sourceTotalBytes);
+                    var stagedPath = Combine(
+                        stagingDirectory,
+                        component.Key.Replace('/', DirectorySeparatorChar));
+                    Directory.CreateDirectory(GetDirectoryName(stagedPath)!);
+                    stream.Position = 0;
+                    using (var destination = new FileStream(
+                               stagedPath,
+                               FileMode.CreateNew,
+                               FileAccess.Write,
+                               FileShare.Read))
+                    {
+                        stream.CopyTo(destination);
+                    }
+                    using var staged = OpenRead(stagedPath);
+                    ValidateComponentLength(
+                        component.Key,
+                        staged.Length,
+                        ref totalBytes);
+                    hash.Add(component.Key).Add(staged);
+                    stagedHandles[stagedCount++] = OpenRead(stagedPath);
+                }
             }
             return new WorkerRuntimeClosureSnapshot(
                 path,
@@ -210,19 +227,6 @@ internal static class WorkerBinaryIdentity
             FileMode.Open,
             FileAccess.Read,
             FileShare.Read);
-    }
-
-    private static string StageComponent(
-        string stagingDirectory,
-        string workerPath,
-        string componentPath)
-    {
-        var stagedPath = componentPath.Replace(
-            GetDirectoryName(workerPath)!,
-            stagingDirectory);
-        Directory.CreateDirectory(GetDirectoryName(stagedPath)!);
-        File.Copy(componentPath, stagedPath);
-        return stagedPath;
     }
 
     private static string CreateStagingDirectory()
