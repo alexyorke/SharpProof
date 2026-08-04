@@ -18,6 +18,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         try
         {
             using var cacheLock = AcquireLock(_directory);
+            ValidatePath(path);
             var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)
                 .ConfigureAwait(false);
             var envelope = JsonSerializer.Deserialize<CacheEnvelope>(json, WorkerProtocolJson.Options);
@@ -62,6 +63,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             }
 
             cancellationToken.ThrowIfCancellationRequested();
+            ValidatePath(path);
             File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
             return response;
         }
@@ -92,11 +94,13 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             }
 
             var path = GetPath(inputHash);
+            ValidatePath(path);
             await AtomicFile.WriteUtf8Async(path, json, cancellationToken).ConfigureAwait(false);
-            Evict(cancellationToken);
-            return true;
+            ValidatePath(path);
+            return Evict(cancellationToken);
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is
+            ArgumentException or IOException or UnauthorizedAccessException)
         {
             // Cache failures never change semantic verifier outcomes.
             return false;
@@ -105,15 +109,28 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
 
     private static FileStream AcquireLock(string directory)
     {
+        var lockPath = Path.Combine(directory, ".sharp-proof-cache.lock");
+        ValidatePath(directory, lockPath);
         Directory.CreateDirectory(directory);
-        return new FileStream(
-            Path.Combine(directory, ".sharp-proof-cache.lock"),
+        ValidatePath(directory, lockPath);
+        var cacheLock = new FileStream(
+            lockPath,
             FileMode.OpenOrCreate,
             FileAccess.ReadWrite,
             FileShare.None);
+        try
+        {
+            ValidatePath(directory, lockPath);
+            return cacheLock;
+        }
+        catch
+        {
+            cacheLock.Dispose();
+            throw;
+        }
     }
 
-    private void Evict(CancellationToken cancellationToken)
+    private bool Evict(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var files = new DirectoryInfo(_directory)
@@ -121,7 +138,12 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             .OrderBy(static file => file.LastWriteTimeUtc)
             .ThenBy(static file => file.Name, StringComparer.Ordinal)
             .ToArray();
-        var total = files.Sum(static file => file.Length);
+        long total = 0;
+        foreach (var file in files)
+        {
+            ValidatePath(file.FullName);
+            total += file.Length;
+        }
         foreach (var file in files)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -130,17 +152,31 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 break;
             }
 
-            var length = file.Length;
             try
             {
+                ValidatePath(file.FullName);
+                var length = file.Length;
                 file.Delete();
                 total -= length;
             }
             catch (Exception exception) when (exception is
-                IOException or UnauthorizedAccessException)
+                ArgumentException or IOException or UnauthorizedAccessException)
             {
+                return false;
             }
         }
+
+        return true;
+    }
+
+    private void ValidatePath(string path)
+    {
+        ValidatePath(_directory, path);
+    }
+
+    private static void ValidatePath(string directory, string path)
+    {
+        WorkerCachePath.ValidateNoReparsePoints([directory, path]);
     }
 
     private string GetPath(string inputHash)

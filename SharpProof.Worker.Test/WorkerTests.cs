@@ -39,6 +39,36 @@ public sealed class WorkerTests
         "managed-array-allocation"
     ];
 
+    private static bool TryCreateFileSymbolicLink(string link, string target)
+    {
+        try
+        {
+            File.CreateSymbolicLink(link, target);
+            return true;
+        }
+        catch (Exception exception) when (exception is
+            IOException or UnauthorizedAccessException or
+            PlatformNotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryCreateDirectorySymbolicLink(string link, string target)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(link, target);
+            return true;
+        }
+        catch (Exception exception) when (exception is
+            IOException or UnauthorizedAccessException or
+            PlatformNotSupportedException)
+        {
+            return false;
+        }
+    }
+
     [Test]
     public void ProtocolValidationClosesVersionAndBudgetBounds()
     {
@@ -3508,6 +3538,120 @@ public sealed class WorkerTests
             Assert.That(backend.CallCount, Is.EqualTo(2));
             Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
         }
+    }
+
+    [Test]
+    public async Task ReparsePointCacheEntryFailsClosedWithoutTouchingTarget()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        var backend = new SpuriousModelBackend();
+        using var worker = new SharpProofWorker(backend);
+        var first = await worker.VerifyAsync(request);
+        Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+
+        var cacheFile = Directory.GetFiles(
+            project.CacheDirectory,
+            "*.sharp-proof-cache.json").Single();
+        var external = Path.Combine(project.DirectoryPath, "external-cache.json");
+        const string externalContents = "external cache target";
+        await File.WriteAllTextAsync(external, externalContents);
+        File.Delete(cacheFile);
+        if (!TryCreateFileSymbolicLink(cacheFile, external))
+        {
+            Assert.Ignore("The host does not permit symbolic-link creation.");
+        }
+
+        var second = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
+            Assert.That(await File.ReadAllTextAsync(external), Is.EqualTo(externalContents));
+        }
+    }
+
+    [Test]
+    public async Task ReparsePointCacheLockFailsClosedWithoutTouchingTarget()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        var backend = new SpuriousModelBackend();
+        using var worker = new SharpProofWorker(backend);
+        var first = await worker.VerifyAsync(request);
+        Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+
+        var lockPath = Path.Combine(
+            project.CacheDirectory,
+            ".sharp-proof-cache.lock");
+        var external = Path.Combine(project.DirectoryPath, "external-lock");
+        const string externalContents = "external lock target";
+        await File.WriteAllTextAsync(external, externalContents);
+        File.Delete(lockPath);
+        if (!TryCreateFileSymbolicLink(lockPath, external))
+        {
+            Assert.Ignore("The host does not permit symbolic-link creation.");
+        }
+
+        var second = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
+            Assert.That(await File.ReadAllTextAsync(external), Is.EqualTo(externalContents));
+        }
+    }
+
+    [Test]
+    public async Task ReparsePointEvictionEntryFailsClosedWithoutDeletion()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        request.Cache.MaximumBytes = 1;
+        var external = Path.Combine(project.DirectoryPath, "external-eviction.json");
+        const string externalContents = "external eviction target";
+        await File.WriteAllTextAsync(external, externalContents);
+        Directory.CreateDirectory(project.CacheDirectory);
+        var cacheFile = Path.Combine(
+            project.CacheDirectory,
+            new string('b', 64) + ".sharp-proof-cache.json");
+        if (!TryCreateFileSymbolicLink(cacheFile, external))
+        {
+            Assert.Ignore("The host does not permit symbolic-link creation.");
+        }
+
+        using var worker = new SharpProofWorker(new SpuriousModelBackend());
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
+            Assert.That(File.Exists(cacheFile), Is.True);
+            Assert.That(await File.ReadAllTextAsync(external), Is.EqualTo(externalContents));
+        }
+    }
+
+    [Test]
+    public async Task ReparsePointCacheDirectoryFailsClosedBeforeChildAccess()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var realDirectory = Path.Combine(project.DirectoryPath, "real-cache");
+        var aliasDirectory = Path.Combine(project.DirectoryPath, "cache-alias");
+        Directory.CreateDirectory(realDirectory);
+        if (!TryCreateDirectorySymbolicLink(aliasDirectory, realDirectory))
+        {
+            Assert.Ignore("The host does not permit symbolic-link creation.");
+        }
+
+        var request = project.CreateRequest(cacheEnabled: true);
+        request.Cache.Directory = aliasDirectory;
+        using var worker = new SharpProofWorker(new SpuriousModelBackend());
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
+        Assert.That(Directory.GetFiles(realDirectory), Is.Empty);
     }
 
     [Test]
