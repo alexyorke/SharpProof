@@ -181,13 +181,15 @@ internal static class WorkerBinaryIdentity
                 "runtimes/",
                 StringComparison.OrdinalIgnoreCase) ? name : GetFileName(name));
         }
-        names.Add("System.Collections.Immutable.dll");
         var result = new SortedDictionary<string, string>(StringComparer.Ordinal);
         foreach (var path in Directory.GetFiles(directory, "*", SearchOption.AllDirectories))
         {
             var relativePath = path.Substring(directory.Length + 1)
                 .Replace(DirectorySeparatorChar, '/');
-            if (names.Contains(relativePath))
+            if (names.Contains(relativePath) ||
+                relativePath.EndsWith(
+                    "System.Collections.Immutable.dll",
+                    StringComparison.OrdinalIgnoreCase))
             {
                 result.Add(relativePath, path);
             }
