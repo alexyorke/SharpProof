@@ -786,7 +786,8 @@ public sealed class ArchitectureTests
                 "SharpProof.PortableAnalyzer/SharpProof.PortableAnalyzer.csproj",
                 "SharpProof.Package/SharpProof.nuspec",
                 "SharpProof.Package/buildTransitive/SharpProof.props",
-                "SharpProof.Package/buildTransitive/SharpProof.targets"
+                "SharpProof.Package/buildTransitive/SharpProof.targets",
+                "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.targets"
             ]
         };
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(

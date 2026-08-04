@@ -106,6 +106,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~DecoderRejectsUnknownWireEnumCodes'
     },
     [pscustomobject]@{
+        Name = 'portable-schema-slot-role-fails-closed'
+        File = 'SharpProof.CompilerArtifact\CompilerArtifactModel.schema.json'
+        Original = '{ "kind": "Boolean", "slots": ["booleanValue",'
+        Mutated = '{ "kind": "Boolean", "slots": ["unsupported",'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~SchemaPinsEnvelopeWireCatalogsAndEffectEvidenceDomain'
+    },
+    [pscustomobject]@{
         Name = 'portable-codec-havoc-order-fails-closed'
         File = 'SharpProof.CompilerArtifact\PortableIrGraphCodec.cs'
         Original = '                    index > previous,'
@@ -808,6 +816,22 @@ $mutations = @(
         Mutated = '            ..LauncherArguments.LauncherRuntimePaths[1..],'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~RequestProjectionRejectsLauncherRuntimeCollisionBeforeManifestRead'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-checks-protocol-companion-path'
+        File = 'SharpProof.Worker.Launcher\LauncherArguments.generated.cs'
+        Original = 'System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Worker.Protocol.dll")'
+        Mutated = 'System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Worker.dll")'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~RequestProjectionRejectsLauncherProtocolRuntimeCollisionBeforeManifestRead'
+    },
+    [pscustomobject]@{
+        Name = 'targets-protect-protocol-companion-path'
+        File = 'SharpProof.Verifier.Win-x64\buildTransitive\SharpProof.Verifier.Win-x64.targets'
+        Original = '                    "SharpProof.Worker.Protocol.dll")'
+        Mutated = '                    "SharpProof.Worker.Missing.dll")'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~LauncherProtocolAssetAliasIsRejectedBeforeInvalidationDeletesIt'
     },
     [pscustomobject]@{
         Name = 'launcher-normalizes-malformed-worker-deps'

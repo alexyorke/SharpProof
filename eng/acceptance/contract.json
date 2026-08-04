@@ -22,8 +22,8 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 96,
-    "expectedCatalogSha256": "33007603af657ea94bf1dc284e21ab4d27b80a82db19a77623eed7d74ca04f39"
+    "expectedCatalogCount": 99,
+    "expectedCatalogSha256": "b868d58afbf050cec15d577c1e636fc59ea083e9c4d59839d3c7669a9b75513b"
   },
   "worker": {
     "protocolVersion": 9,
@@ -418,7 +418,8 @@
           "SharpProof.PortableAnalyzer/SharpProof.PortableAnalyzer.csproj",
           "SharpProof.Package/SharpProof.nuspec",
           "SharpProof.Package/buildTransitive/SharpProof.props",
-          "SharpProof.Package/buildTransitive/SharpProof.targets"
+          "SharpProof.Package/buildTransitive/SharpProof.targets",
+          "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.targets"
         ]
       }
     ]

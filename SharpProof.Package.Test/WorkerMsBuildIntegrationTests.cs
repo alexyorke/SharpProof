@@ -904,6 +904,32 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task LauncherProtocolAssetAliasIsRejectedBeforeInvalidationDeletesIt()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var protocolPath = LauncherProtocolOutputPath();
+        Assert.That(File.Exists(protocolPath), Is.True, protocolPath);
+        var failed = await project.RunVerificationTargetAsync(
+            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+            ("SharpProofVerifyResultFile", protocolPath));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(failed.ExitCode, Is.Not.Zero);
+            Assert.That(
+                failed.Output.Contains(
+                    "SharpProof launcher input is invalid: ArgumentException",
+                    StringComparison.Ordinal),
+                Is.True);
+            Assert.That(File.Exists(protocolPath), Is.True);
+        }
+    }
+
+    [Test]
     public async Task WorkerCacheDirectoryAliasIsRejectedBeforeInvalidationDeletesIt()
     {
         RequireWindowsWorker();
@@ -1776,6 +1802,17 @@ public sealed class WorkerMsBuildIntegrationTests
                 "The test build configuration was not found.");
         return Path.Combine(ConsumerProject.FindRepositoryRoot(), "SharpProof.Worker",
             "bin", configuration, "net9.0", "SharpProof.Worker.dll");
+    }
+
+    private static string LauncherProtocolOutputPath()
+    {
+        var configuration = new DirectoryInfo(Path.GetDirectoryName(
+            typeof(WorkerMsBuildIntegrationTests).Assembly.Location)!)
+            .Parent?.Name ?? throw new InvalidOperationException(
+                "The test build configuration was not found.");
+        return Path.Combine(ConsumerProject.FindRepositoryRoot(),
+            "SharpProof.Worker.Launcher", "bin", configuration, "net9.0",
+            "SharpProof.Worker.Protocol.dll");
     }
 
     private static void RequireWindowsWorker()
