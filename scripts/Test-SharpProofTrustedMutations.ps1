@@ -754,12 +754,12 @@ $mutations = @(
         Filter = 'FullyQualifiedName~WorkerProcessCreationDisablesHandleInheritance'
     },
     [pscustomobject]@{
-        Name = 'closure-hashes-parsed-dependency-stream'
+        Name = 'closure-retains-staged-component-handles'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
-        Original = "                var isDependency = component.Value ==`n                    Path.ChangeExtension(path, `".deps.json`");`n                var stream = isDependency`n                    ? dependency`n                    : OpenRead(component.Value);"
-        Mutated = '                var stream = OpenRead(component.Value);'
+        Original = "                stagedHandles[stagedCount++] = OpenRead(StageComponent(`n                    stagingDirectory,`n                    path,`n                    component.Value));"
+        Mutated = "                StageComponent(`n                    stagingDirectory,`n                    path,`n                    component.Value);"
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
-        Filter = 'FullyQualifiedName~WorkerClosureHashesTheParsedDependencyStream'
+        Filter = 'FullyQualifiedName~WorkerClosureRetainsStagedComponentsUntilSnapshotDisposal'
     },
     [pscustomobject]@{
         Name = 'closure-retains-each-component-path-once'

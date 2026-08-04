@@ -955,7 +955,7 @@ public sealed class ArchitectureTests
     }
 
     [Test]
-    public void WorkerClosureHashesTheParsedDependencyStream()
+    public void WorkerClosureRetainsStagedComponentsUntilSnapshotDisposal()
     {
         var source = File.ReadAllText(Path.Combine(
             RepositoryRoot(),
@@ -965,9 +965,12 @@ public sealed class ArchitectureTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(source, Does.Contain(
-                "Path.ChangeExtension(path, \".deps.json\")"));
-            Assert.That(source, Does.Contain("var stream = isDependency"));
-            Assert.That(source, Does.Contain("? dependency"));
+                "FileStream[] stagedHandles = [];"));
+            Assert.That(source, Does.Contain(
+                "stagedHandles[stagedCount++] = OpenRead(StageComponent("));
+            Assert.That(source, Does.Contain(
+                "foreach (var handle in StagedHandles)"));
+            Assert.That(source, Does.Contain("handle.Dispose();"));
         }
     }
 
