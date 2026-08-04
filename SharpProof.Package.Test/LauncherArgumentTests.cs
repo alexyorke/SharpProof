@@ -583,7 +583,11 @@ public sealed class LauncherArgumentTests
         var directory = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
             Guid.NewGuid().ToString("N"));
+        var ioDirectory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
+        Directory.CreateDirectory(ioDirectory);
         var worker = Path.Combine(directory, "worker.dll");
         try
         {
@@ -601,9 +605,9 @@ public sealed class LauncherArgumentTests
                 exitCode = await Program.Main([
                     "verify",
                     "--worker", worker,
-                    "--request", Path.Combine(directory, "request.json"),
-                    "--result", Path.Combine(directory, "result.json"),
-                    "--compiler-manifest", Path.Combine(directory, "missing.json"),
+                    "--request", Path.Combine(ioDirectory, "request.json"),
+                    "--result", Path.Combine(ioDirectory, "result.json"),
+                    "--compiler-manifest", Path.Combine(ioDirectory, "missing.json"),
                     "--verify-policy", "advisory",
                     "--assumption-policy", "allow"
                 ]);
@@ -625,6 +629,10 @@ public sealed class LauncherArgumentTests
             if (Directory.Exists(directory))
             {
                 Directory.Delete(directory, recursive: true);
+            }
+            if (Directory.Exists(ioDirectory))
+            {
+                Directory.Delete(ioDirectory, recursive: true);
             }
         }
     }
