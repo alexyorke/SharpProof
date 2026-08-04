@@ -964,13 +964,25 @@ public sealed class ArchitectureTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(source, Does.Contain(
-                "FileStream[] stagedHandles = [];"));
-            Assert.That(source, Does.Contain(
-                "stagedHandles[stagedCount++] = OpenRead(StageComponent("));
-            Assert.That(source, Does.Contain(
-                "foreach (var handle in StagedHandles)"));
-            Assert.That(source, Does.Contain("handle.Dispose();"));
+            Assert.That(
+                source.Contains(
+                    "FileStream[] stagedHandles = [];",
+                    StringComparison.Ordinal),
+                Is.True);
+            Assert.That(
+                source.Contains(
+                    "stagedHandles[stagedCount++] = " +
+                    "OpenRead(StageComponent(",
+                    StringComparison.Ordinal),
+                Is.True);
+            Assert.That(
+                source.Contains(
+                    "foreach (var handle in StagedHandles)",
+                    StringComparison.Ordinal),
+                Is.True);
+            Assert.That(
+                source.Contains("handle.Dispose();", StringComparison.Ordinal),
+                Is.True);
         }
     }
 
