@@ -412,7 +412,7 @@ public sealed class LauncherArgumentTests
     public void RequestProjectionRejectsLauncherRuntimeCollisionBeforeManifestRead(
         string extension)
     {
-        var launcher = typeof(Program).Assembly.Location;
+        var launcher = LauncherArguments.LauncherRuntimePaths[0];
         var resultPath = extension == "launcher"
             ? launcher
             : Path.ChangeExtension(launcher, extension);
