@@ -219,7 +219,9 @@
         "name": "generatedOutputPolicy",
         "paths": [
           "eng/generated/approved-outputs.v1.json",
-          "scripts/Test-ProductionCSharpComplexity.ps1"
+          "scripts/Test-ProductionCSharpComplexity.ps1",
+          "scripts/GeneratedFileHelpers.ps1",
+          "scripts/CSharpSourceMetrics.ps1"
         ]
       },
       {
@@ -363,7 +365,10 @@
         "SharpProof.Frontend/OperationSubsetClassifier.cs",
         "SharpProof.Worker.Launcher/Program.cs",
         "SharpProof.Worker/CallableVerificationPolicy.cs",
-        "scripts/Get-SharpProofTcbPaths.ps1"
+        "scripts/Get-SharpProofTcbPaths.ps1",
+        "scripts/Get-SharpProofReleaseDigests.ps1",
+        "scripts/Test-SharpProofCoverage.ps1",
+        "eng/acceptance/Verify.ps1"
         ]
       },
       {
