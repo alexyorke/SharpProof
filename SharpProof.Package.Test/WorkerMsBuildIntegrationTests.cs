@@ -748,6 +748,150 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task LauncherRepairsMalformedWorkerResultInProcess()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+        var requestPath = project.VerifyOutputPath(
+            "net8.0", "in-process-malformed-request.json");
+        var resultPath = project.VerifyOutputPath(
+            "net8.0", "in-process-malformed-result.json");
+
+        var exitCode = await Program.RunMain(
+            [
+                "verify",
+                "--worker", WorkerOutputPath(),
+                "--request", requestPath,
+                "--result", resultPath,
+                "--compiler-manifest", project.CompilerManifestPath,
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow"
+            ],
+            static path => WorkerBinaryIdentity.ComputeSha256(path),
+            static (arguments, _, _, _) =>
+            {
+                File.WriteAllText(arguments.ResultPath, "not-json");
+                return 0;
+            });
+
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(resultPath))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exitCode, Is.Not.Zero);
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.MalformedResult));
+            Assert.That(
+                response.Errors.Select(static error => error.Code),
+                Does.Contain("worker.malformed_result"));
+        }
+    }
+
+    [Test]
+    public async Task LauncherReportsStagedWorkerClosureHashMismatchInProcess()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+        var requestPath = project.VerifyOutputPath(
+            "net8.0", "in-process-hash-mismatch-request.json");
+        var resultPath = project.VerifyOutputPath(
+            "net8.0", "in-process-hash-mismatch-result.json");
+
+        var exitCode = await Program.RunMain(
+            [
+                "verify",
+                "--worker", WorkerOutputPath(),
+                "--request", requestPath,
+                "--result", resultPath,
+                "--compiler-manifest", project.CompilerManifestPath,
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow"
+            ],
+            static _ => new string('0', WorkerProtocolVersions.EmptySha256.Length));
+
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(resultPath))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exitCode, Is.Not.Zero);
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.ContainmentFailure));
+            Assert.That(
+                response.Errors.Select(static error => error.Code),
+                Does.Contain("containment.unavailable"));
+        }
+    }
+
+    [Test]
+    public async Task LauncherReportsInProcessPublicationFailure()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+        var stableRequest = await File.ReadAllTextAsync(project.RequestPath);
+        var requestPath = project.VerifyOutputPath(
+            "net8.0", "in-process-publication-request.json");
+        var resultPath = project.VerifyOutputPath(
+            "net8.0", "in-process-publication-result.json");
+        var publishedManifest = project.VerifyOutputPath(
+            "net8.0", "in-process-published-manifest.json");
+
+        using (File.Open(
+                   project.RequestPath,
+                   FileMode.Open,
+                   FileAccess.Read,
+                   FileShare.Read))
+        {
+            var exitCode = await Program.RunMain(
+                [
+                    "verify",
+                    "--worker", WorkerOutputPath(),
+                    "--request", requestPath,
+                    "--result", resultPath,
+                    "--compiler-manifest", project.CompilerManifestPath,
+                    "--verify-policy", "advisory",
+                    "--assumption-policy", "allow",
+                    "--publish-request", project.RequestPath,
+                    "--publish-result", project.ResultPath,
+                    "--publish-compiler-manifest", publishedManifest
+                ],
+                static path => WorkerBinaryIdentity.ComputeSha256(path),
+                (arguments, _, _, _) =>
+                {
+                    var request = WorkerProtocolJson.DeserializeRequest(
+                        File.ReadAllText(arguments.RequestPath))!;
+                    var response = WorkerProtocolJson.DeserializeResponse(
+                        File.ReadAllText(project.ResultPath))!;
+                    response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+                    response.InputHash = Program.ComputeExpectedInputHash(
+                        arguments.WorkerPath,
+                        request,
+                        File.ReadAllBytes(arguments.CompilerManifestPath));
+                    File.WriteAllText(
+                        arguments.ResultPath,
+                        WorkerProtocolJson.SerializeResponse(response));
+                    return 0;
+                });
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exitCode, Is.EqualTo(3));
+                Assert.That(
+                    await File.ReadAllTextAsync(project.RequestPath),
+                    Is.EqualTo(stableRequest));
+                Assert.That(File.Exists(project.ResultPath), Is.False);
+            }
+        }
+    }
+
+    [Test]
     public async Task HardTimeoutReplacesWorkerOwnedMalformedOutput()
     {
         RequireWindowsWorker();

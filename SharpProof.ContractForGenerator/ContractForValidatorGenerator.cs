@@ -54,7 +54,8 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator
                 context.CancellationToken.ThrowIfCancellationRequested();
                 context.ReportDiagnostic(At(
                     GeneratedDiagnosticDescriptors.InvalidTarget,
-                    GetSourceLocation(candidate, Location.None),
+                    ContractForCompanionValidator.GetSourceLocation(
+                        candidate, Location.None),
                     candidate.Name));
             }
             return;
@@ -108,7 +109,8 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator
         {
             cancellationToken.ThrowIfCancellationRequested();
             var attributes = ContractForSymbolMatcher.GetAttributes(companion, contractFor);
-            var fallback = GetSourceLocation(companion, Location.None);
+            var fallback = ContractForCompanionValidator.GetSourceLocation(
+                companion, Location.None);
             if (attributes.Length != 1)
             {
                 var location = attributes.FirstOrDefault() is { } first
@@ -146,16 +148,6 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator
         CancellationToken cancellationToken)
     {
         return attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation() ?? fallback;
-    }
-
-    private static Location GetSourceLocation(ISymbol symbol, Location fallback)
-    {
-        return symbol.Locations.Where(static location => location.IsInSource)
-            .OrderBy(
-                static location => location.SourceTree?.FilePath,
-                StringComparer.Ordinal)
-            .ThenBy(static location => location.SourceSpan.Start)
-            .FirstOrDefault() ?? fallback;
     }
 
 }

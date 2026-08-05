@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.InteropServices;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
@@ -60,6 +61,59 @@ public sealed class WorkerProgramTests
         finally
         {
             Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task DirectInvocationWritesFailureForMalformedRequest()
+    {
+        if (!OperatingSystem.IsWindows() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64 ||
+            RuntimeInformation.OSArchitecture != Architecture.X64)
+        {
+            Assert.Ignore("The direct worker is supported only on Windows x64.");
+        }
+
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SharpProof-worker-malformed-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var requestPath = Path.Combine(directory, "request.json");
+        var resultPath = Path.Combine(directory, "result.json");
+        var eventName = "Local\\SharpProof.Worker.Test." +
+            Guid.NewGuid().ToString("N");
+        try
+        {
+            await File.WriteAllTextAsync(requestPath, "{");
+            using var startEvent = new EventWaitHandle(
+                true, EventResetMode.ManualReset, eventName);
+
+            var exitCode = await Program.Main([
+                "verify",
+                "--request", requestPath,
+                "--result", resultPath,
+                "--start-event", eventName
+            ]);
+
+            var response = WorkerProtocolJson.DeserializeResponse(
+                await File.ReadAllTextAsync(resultPath))!;
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exitCode, Is.Zero);
+                Assert.That(
+                    response.FailureReason,
+                    Is.EqualTo(WorkerRunFailureReason.InvalidRequest));
+                Assert.That(
+                    response.Errors.Select(static error => error.Code),
+                    Does.Contain("request.malformed"));
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
         }
     }
 

@@ -668,6 +668,96 @@ public sealed class ManagedAbstractFlowTests
     }
 
     [Test]
+    public void ContractRequiresRefinesConditionalAndFacts()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                private static void Sink(int value) {
+                }
+
+                public static void Calls(int left, int right) {
+                    if (left > 0 && right > 0) {
+                        Sink(left);
+                        Sink(right);
+                    }
+                }
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Calls");
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var sinks = root.Descendants().OfType<IInvocationOperation>()
+            .Where(static invocation => invocation.TargetMethod.Name == "Sink")
+            .ToArray();
+
+        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
+            .Analyze(method, ControlFlowGraph.Create(root), null, default);
+
+        Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
+        Assert.That(sinks, Has.Length.EqualTo(2));
+        foreach (var sink in sinks)
+        {
+            Assert.That(
+                analysis.Result!.TryEvaluate(
+                    sink, sink.Arguments[0].Value, out var value),
+                Is.True);
+            Assert.That(value.TryGetInteger(out var interval), Is.True);
+            Assert.That(
+                interval,
+                Is.EqualTo(IntervalValue.Range(1, int.MaxValue)));
+        }
+    }
+
+    [Test]
+    public void ContractRequiresRefinesNegatedConditionalOrFacts()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                private static void Sink(int value) {
+                }
+
+                public static void Calls(int left, int right) {
+                    if (!(left > 0 || right > 0)) {
+                        Sink(left);
+                        Sink(right);
+                    }
+                }
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Calls");
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var sinks = root.Descendants().OfType<IInvocationOperation>()
+            .Where(static invocation => invocation.TargetMethod.Name == "Sink")
+            .ToArray();
+
+        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
+            .Analyze(method, ControlFlowGraph.Create(root), null, default);
+
+        Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
+        Assert.That(sinks, Has.Length.EqualTo(2));
+        foreach (var sink in sinks)
+        {
+            Assert.That(
+                analysis.Result!.TryEvaluate(
+                    sink, sink.Arguments[0].Value, out var value),
+                Is.True);
+            Assert.That(value.TryGetInteger(out var interval), Is.True);
+            Assert.That(
+                interval,
+                Is.EqualTo(IntervalValue.Range(int.MinValue, 0)));
+        }
+    }
+
+    [Test]
     public void SourceShadowedContractClauseDoesNotRefineScalarFacts()
     {
         var compilation = EffectTestHost.CreateCompilation(

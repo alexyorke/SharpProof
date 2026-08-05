@@ -270,10 +270,8 @@ internal static class WorkerBinaryIdentity
         {
             Directory.Delete(path, recursive: true);
         }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException)
         {
         }
     }
