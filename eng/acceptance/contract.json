@@ -22,8 +22,8 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 110,
-    "expectedCatalogSha256": "35728b1a083682e792ca2d1c0d61b8fb4ad1dd354b244479389225840c2b80de"
+    "expectedCatalogCount": 111,
+    "expectedCatalogSha256": "06a6d40cccfd568fb8e9797edae10949b5ae79f7ea6205e00ec2ac649169e586"
   },
   "worker": {
     "protocolVersion": 9,

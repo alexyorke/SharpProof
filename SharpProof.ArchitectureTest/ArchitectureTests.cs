@@ -1024,7 +1024,7 @@ public sealed class ArchitectureTests
                 Is.True);
             Assert.That(
                 source.Contains(
-                    "hash.Add(component.Key).Add(stagedRead);",
+                    "hash.Add(component.Key.ToUpperInvariant()).Add(stagedRead);",
                     StringComparison.Ordinal),
                 Is.True);
             Assert.That(

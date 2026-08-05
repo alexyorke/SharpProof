@@ -826,6 +826,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~WorkerClosureRetainsStagedComponentsUntilSnapshotDisposal'
     },
     [pscustomobject]@{
+        Name = 'closure-canonicalizes-component-key'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '                    hash.Add(component.Key.ToUpperInvariant()).Add(stagedRead);'
+        Mutated = '                    hash.Add(component.Key).Add(stagedRead);'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~IdentityIgnoresWindowsPathSpelling'
+    },
+    [pscustomobject]@{
         Name = 'worker-rejects-request-result-alias'
         File = 'SharpProof.Worker\Program.cs'
         Original = '        return !string.Equals(request, result, StringComparison.OrdinalIgnoreCase);'
