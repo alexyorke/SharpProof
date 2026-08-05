@@ -668,6 +668,72 @@ public sealed class ManagedAbstractFlowTests
     }
 
     [Test]
+    public void AssumeRefinesCompoundAndFacts()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static void Calls(int left, int right) {
+                    SharpProof.Attributes.Contract.Requires(
+                        left > 0 && right > 0);
+                }
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Calls");
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var requires = root.Descendants().OfType<IInvocationOperation>()
+            .Single(static invocation => invocation.TargetMethod.Name == "Requires");
+        var state = ManagedAbstractFlow.ForCompilation(compilation)
+            .Assume(ManagedFlowState.Empty, requires.Arguments[0].Value, true);
+
+        Assert.That(
+            state.Get(method.Parameters[0]).TryGetInteger(out var left),
+            Is.True);
+        Assert.That(left, Is.EqualTo(IntervalValue.Range(1, int.MaxValue)));
+        Assert.That(
+            state.Get(method.Parameters[1]).TryGetInteger(out var right),
+            Is.True);
+        Assert.That(right, Is.EqualTo(IntervalValue.Range(1, int.MaxValue)));
+    }
+
+    [Test]
+    public void AssumeRefinesNegatedCompoundOrFacts()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static void Calls(int left, int right) {
+                    SharpProof.Attributes.Contract.Requires(
+                        !(left > 0 || right > 0));
+                }
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Calls");
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var requires = root.Descendants().OfType<IInvocationOperation>()
+            .Single(static invocation => invocation.TargetMethod.Name == "Requires");
+        var state = ManagedAbstractFlow.ForCompilation(compilation)
+            .Assume(ManagedFlowState.Empty, requires.Arguments[0].Value, true);
+
+        Assert.That(
+            state.Get(method.Parameters[0]).TryGetInteger(out var left),
+            Is.True);
+        Assert.That(left, Is.EqualTo(IntervalValue.Range(int.MinValue, 0)));
+        Assert.That(
+            state.Get(method.Parameters[1]).TryGetInteger(out var right),
+            Is.True);
+        Assert.That(right, Is.EqualTo(IntervalValue.Range(int.MinValue, 0)));
+    }
+
+    [Test]
     public void ContractRequiresRefinesConditionalAndFacts()
     {
         var compilation = EffectTestHost.CreateCompilation(

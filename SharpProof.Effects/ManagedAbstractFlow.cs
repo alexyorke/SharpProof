@@ -245,7 +245,7 @@ internal sealed class ManagedAbstractFlow
                 out interval);
     }
 
-    private ManagedFlowState Assume(ManagedFlowState state, IOperation condition, bool expected)
+    internal ManagedFlowState Assume(ManagedFlowState state, IOperation condition, bool expected)
     {
         condition = Unwrap(condition);
         if (EvaluateCore(condition, state).TryGetBoolean(out var constant))
@@ -688,7 +688,7 @@ internal sealed class ManagedAbstractFlow
         method.Parameters[0].Type.SpecialType == SpecialType.System_Boolean &&
         invocation.Arguments.Length == 1 &&
         _contractApi != null &&
-        SymbolEqualityComparer.Default.Equals(method.ContainingType.OriginalDefinition, _contractApi.OriginalDefinition);
+            SymbolEqualityComparer.Default.Equals(method.ContainingType.OriginalDefinition, _contractApi.OriginalDefinition);
     }
 
     private static ManagedFlowState HavocCall(
