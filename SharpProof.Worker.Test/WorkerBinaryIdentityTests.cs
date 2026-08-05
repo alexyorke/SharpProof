@@ -434,6 +434,22 @@ public sealed class WorkerBinaryIdentityTests
         }
     }
 
+    [Test]
+    public void IdentityIgnoresWindowsPathSpelling()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("Windows path spelling is case-insensitive.");
+        }
+
+        var worker = typeof(SharpProofWorker).Assembly.Location;
+        var differentlyCased = worker.ToUpperInvariant();
+
+        Assert.That(
+            WorkerBinaryIdentity.ComputeSha256(differentlyCased),
+            Is.EqualTo(WorkerBinaryIdentity.ComputeSha256(worker)));
+    }
+
     private static void ValidateLength(string key, long length)
     {
         long total = 0;

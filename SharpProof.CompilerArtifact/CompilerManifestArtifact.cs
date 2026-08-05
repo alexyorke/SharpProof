@@ -94,7 +94,7 @@ internal static class WorkerBinaryIdentity
                     EnsureStagedComponentConsistency(
                         component.Value,
                         stagedPath);
-                    hash.Add(component.Key).Add(stagedRead);
+                    hash.Add(component.Key.ToUpperInvariant()).Add(stagedRead);
                 }
                 stagedHandles[stagedCount++] = OpenRead(stagedPath);
             }
@@ -205,7 +205,7 @@ internal static class WorkerBinaryIdentity
             dependencyStream,
             new JsonDocumentOptions { MaxDepth = 32 });
         var root = document.RootElement;
-        var names = new HashSet<string>
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             GetFileName(workerPath),
             GetFileName(ChangeExtension(workerPath, ".deps.json")),
