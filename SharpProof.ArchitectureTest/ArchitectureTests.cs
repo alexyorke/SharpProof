@@ -754,7 +754,8 @@ public sealed class ArchitectureTests
                 "SharpProof.Worker/CallableVerificationPolicy.cs",
                 "scripts/Get-SharpProofTcbPaths.ps1",
                 "scripts/Get-SharpProofReleaseDigests.ps1",
-                "scripts/Test-SharpProofCoverage.ps1"
+                "scripts/Test-SharpProofCoverage.ps1",
+                "eng/acceptance/Verify.ps1"
             ],
             ["resultAssembly"] = [
                 "SharpProof.Worker/CallableClaimResultAssembler.cs",
