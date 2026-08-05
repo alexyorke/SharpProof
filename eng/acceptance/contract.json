@@ -20,6 +20,11 @@
   "automation": {
     "solutionBuildWallSeconds": 600
   },
+  "mutationEvidence": {
+    "schemaVersion": 1,
+    "expectedCatalogCount": 111,
+    "expectedCatalogSha256": "06a6d40cccfd568fb8e9797edae10949b5ae79f7ea6205e00ec2ac649169e586"
+  },
   "worker": {
     "protocolVersion": 9,
     "manifestSchemaVersion": 4,
@@ -63,6 +68,7 @@
           "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
           "SharpProof.Contracts/ContractClauseInventory.cs",
           "SharpProof.Contracts/ContractForSymbolMatcher.cs",
+          "SharpProof.Frontend/ReferencedTypeSymbols.cs",
           "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
           "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
           "SharpProof.Frontend/CompilationModelProvider.cs",
@@ -151,7 +157,17 @@
           "SharpProof.Frontend/ContractApi.catalog.json",
           "scripts/Generate-ContractApiCatalog.ps1",
           "SharpProof.Frontend/ContractApiMetadata.generated.cs",
+          "SharpProof.Attributes/Contract.cs",
+          "SharpProof.Attributes/ContractForAttribute.cs",
+          "SharpProof.Attributes/ClosedContractAttributes.cs",
+          "SharpProof.Attributes/AllowedCapabilitiesAttribute.cs",
+          "SharpProof.Attributes/AllowedExceptionsAttribute.cs",
+          "SharpProof.Attributes/DoesNotThrowAttribute.cs",
+          "SharpProof.Attributes/EnforcePureAttribute.cs",
           "SharpProof.Attributes/EffectContractAttribute.cs",
+          "SharpProof.Attributes/SharpProofSuppressAttribute.cs",
+          "SharpProof.Attributes/SharpProofTrustedAttribute.cs",
+          "SharpProof.Attributes/ZeroAllocationsAttribute.cs",
           "SharpProof.Attributes/SharpProofEffect.cs",
           "SharpProof.Attributes/SharpProofCapability.cs"
         ]
@@ -162,6 +178,16 @@
           "SharpProof.Analyzer/AnalyzerDiagnostic.catalog.json",
           "scripts/Generate-AnalyzerDiagnosticCatalog.ps1",
           "SharpProof.Analyzer/AnalyzerDiagnosticCatalog.generated.cs"
+        ]
+      },
+      {
+        "name": "diagnosticDescriptorCatalog",
+        "paths": [
+          "eng/diagnostics/diagnostic-descriptors.v1.json",
+          "scripts/Generate-DiagnosticDescriptors.ps1",
+          "SharpProof.Analyzer/GeneratedDiagnosticDescriptors.generated.cs",
+          "SharpProof.ContractForGenerator/GeneratedDiagnosticDescriptors.generated.cs",
+          "SharpProof.Meta.Analyzers/MetaDiagnosticDescriptors.generated.cs"
         ]
       },
       {
@@ -201,7 +227,8 @@
         "paths": [
           "scripts/SharpProof.MutationEvidence.psm1",
           "scripts/Test-SharpProofMutationEvidence.ps1",
-          "scripts/Test-SharpProofTrustedMutations.ps1"
+          "scripts/Test-SharpProofTrustedMutations.ps1",
+          "scripts/Test-SharpProofMutationCatalog.ps1"
         ]
       },
       {
@@ -335,7 +362,8 @@
         "SharpProof.Frontend/FrontendSubset.cs",
         "SharpProof.Frontend/OperationSubsetClassifier.cs",
         "SharpProof.Worker.Launcher/Program.cs",
-          "SharpProof.Worker/CallableVerificationPolicy.cs"
+        "SharpProof.Worker/CallableVerificationPolicy.cs",
+        "scripts/Get-SharpProofTcbPaths.ps1"
         ]
       },
       {
@@ -365,19 +393,23 @@
       {
         "name": "protocolValidation",
         "paths": [
+          "SharpProof.Worker/Program.cs",
+          "SharpProof.Worker.Protocol/ProtocolModel.schema.json",
+          "scripts/Generate-ProtocolModel.ps1",
           "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
           "SharpProof.Worker.Protocol/ProtocolManifest.cs",
           "SharpProof.Worker.Protocol/ProtocolManifestPayload.cs",
           "SharpProof.Worker.Protocol/ProtocolJson.cs",
           "SharpProof.Worker.Protocol/ProtocolJsonSupport.cs"
         ],
-        "rationale": "The checked-in generated model and runtime validator are the reviewed, coverlet-visible runtime protocol boundary; CI separately verifies the schema projection is current."
+        "rationale": "The protocol schema and generator define the declarative security vocabulary; the checked-in generated model and runtime validator are the reviewed, coverlet-visible runtime boundary, and CI verifies the projection is current."
       },
       {
         "name": "cacheValidation",
         "paths": [
           "SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs",
           "SharpProof.CompilerArtifact/CompilerManifestArtifact.cs",
+          "SharpProof.Worker.Protocol/WorkerCachePath.cs",
           "SharpProof.Worker/WorkerInputSnapshot.cs",
           "SharpProof.Worker/VerificationCache.cs"
         ]
@@ -388,7 +420,16 @@
           "SharpProof.PortableAnalyzer/SharpProof.PortableAnalyzer.csproj",
           "SharpProof.Package/SharpProof.nuspec",
           "SharpProof.Package/buildTransitive/SharpProof.props",
-          "SharpProof.Package/buildTransitive/SharpProof.targets"
+          "SharpProof.Package/buildTransitive/SharpProof.targets",
+          "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.targets"
+        ]
+      },
+      {
+        "name": "releaseContainment",
+        "paths": [
+          "scripts/Invoke-SharpProofDotnet.ps1",
+          "scripts/JobObjectHelpers.ps1",
+          "scripts/Test-SharpProofPackageConsumers.ps1"
         ]
       }
     ]

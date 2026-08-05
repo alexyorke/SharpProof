@@ -265,12 +265,9 @@ public sealed class SharpProofWorker : IDisposable
         try
         {
             status = WorkerCacheStatus.Miss;
-            projectDirectory = Path.GetFullPath(projectDirectory);
-            var directory = string.IsNullOrWhiteSpace(request.Cache.Directory)
-                ? Path.Combine(projectDirectory, "obj", "SharpProof", "cache")
-                : Path.IsPathFullyQualified(request.Cache.Directory)
-                    ? request.Cache.Directory
-                    : Path.GetFullPath(request.Cache.Directory, projectDirectory);
+            var directory = WorkerCachePath.Resolve(
+                request.Cache.Directory,
+                projectDirectory);
             return new VerificationCache(directory, request.Cache.MaximumBytes);
         }
         catch (Exception exception) when (exception is ArgumentException or NotSupportedException)

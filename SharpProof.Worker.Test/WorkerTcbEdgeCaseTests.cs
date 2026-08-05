@@ -17,6 +17,20 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class WorkerTcbEdgeCaseTests
 {
+    [Test]
+    public void KnownWindowsReparsePointIsRejectedBeforeTraversal()
+    {
+        if (!OperatingSystem.IsWindows() ||
+            !Directory.Exists(@"C:\Users\All Users"))
+        {
+            Assert.Ignore("The qualification host has no stable system junction.");
+        }
+
+        Action validate = () => WorkerCachePath.ValidateNoReparsePoints([
+            Path.Combine(@"C:\Users\All Users", "SharpProof", "cache")]);
+        Assert.Throws<ArgumentException>(validate);
+    }
+
     [TestCase(
         BackendFailureReason.Timeout,
         WorkerClaimReason.MethodTimeout)]
@@ -798,6 +812,134 @@ public sealed class WorkerTcbEdgeCaseTests
         }
     }
 
+    [Test]
+    public async Task CacheRejectsOversizedJsonBeforeDeserialization()
+    {
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "worker-cache-size-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var inputHash = new string('d', 64);
+            var path = Path.Combine(
+                directory,
+                inputHash + ".sharp-proof-cache.json");
+            await File.WriteAllBytesAsync(
+                path, new byte[WorkerProtocolJson.MaximumJsonBytes + 1]);
+            var cache = new VerificationCache(
+                directory, WorkerProtocolJson.MaximumJsonBytes * 2L);
+            var manifest = new WorkerClaimManifest();
+            WorkerProtocolJson.SealManifest(manifest);
+
+            var response = await cache.TryReadAsync(
+                inputHash,
+                manifest,
+                [],
+                new WorkerBudgets(),
+                CancellationToken.None);
+
+            Assert.That(response, Is.Null);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task CacheWriteLimitsAreRejectedBeforePublication()
+    {
+        var inputHash = new string('e', 64);
+        var manifest = new WorkerClaimManifest();
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = new WorkerVerifyResponse
+        {
+            ClaimResults = [new WorkerClaimResult
+            {
+                ProofCore = [new string('x', WorkerProtocolJson.MaximumJsonBytes)]
+            }]
+        };
+        foreach (var maximumBytes in new[]
+        {
+            1L,
+            (long)WorkerProtocolJson.MaximumJsonBytes * 2
+        })
+        {
+            var directory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "worker-cache-write-size-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var cache = new VerificationCache(directory, maximumBytes);
+                Assert.That(
+                    await cache.TryWriteAsync(
+                        response,
+                        inputHash,
+                        manifest,
+                        CancellationToken.None),
+                    Is.False,
+                    maximumBytes.ToString(CultureInfo.InvariantCulture));
+                Assert.That(
+                    Directory.GetFiles(directory, "*.sharp-proof-cache.json"),
+                    Is.Empty,
+                    maximumBytes.ToString(CultureInfo.InvariantCulture));
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Test]
+    public void CacheLockDisposesHandleWhenPostOpenValidationFails()
+    {
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "worker-cache-lock-validation-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var calls = 0;
+            Action<string, string> validatePath = (_, _) =>
+            {
+                calls++;
+                if (calls == 3)
+                {
+                    throw new ArgumentException("synthetic validation failure");
+                }
+            };
+
+            VerificationCache.PathValidationOverride = validatePath;
+            var acquireLock = typeof(VerificationCache)
+                .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
+                .Single(method => method.Name == "AcquireLock" &&
+                    method.GetParameters().Length == 1);
+            Action failValidation = () => acquireLock.Invoke(
+                null,
+                [directory]);
+            var invocation = Assert.Throws<TargetInvocationException>(
+                failValidation);
+            Assert.That(
+                invocation!.InnerException,
+                Is.TypeOf<ArgumentException>());
+
+            using var reopened = new FileStream(
+                Path.Combine(directory, ".sharp-proof-cache.lock"),
+                FileMode.OpenOrCreate,
+                FileAccess.ReadWrite,
+                FileShare.None);
+            Assert.That(calls, Is.EqualTo(3));
+        }
+        finally
+        {
+            VerificationCache.PathValidationOverride = null;
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static Task WriteCacheEnvelopeAsync(
         string directory,
         string inputHash,
@@ -828,7 +970,9 @@ public sealed class WorkerTcbEdgeCaseTests
             },
             WorkerProtocolJson.Options);
         return File.WriteAllTextAsync(
-            Path.Combine(directory, inputHash + ".json"),
+            Path.Combine(
+                directory,
+                inputHash + ".sharp-proof-cache.json"),
             envelope);
     }
 

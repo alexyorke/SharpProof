@@ -15,6 +15,7 @@ $acceptanceRoot = $PSScriptRoot
 $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
+. (Join-Path $repositoryRoot 'scripts\Get-SharpProofTcbPaths.ps1')
 . (Join-Path $repositoryRoot 'scripts\CSharpSourceMetrics.ps1')
     & (Join-Path $repositoryRoot 'scripts\Generate-DiagnosticDescriptors.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-CSharpScalarSemantics.ps1') -Verify
@@ -229,6 +230,11 @@ Assert-Equal $contract.analyzer.diagnosticsEnabledByDefault $true 'analyzer.diag
 Assert-Equal $contract.analyzer.unsupportedUnannotatedCallableBehavior 'silent' 'analyzer.unsupportedUnannotatedCallableBehavior'
 Assert-Equal $contract.analyzer.unsupportedSelectedCallableDiagnostic 'SP0047' 'analyzer.unsupportedSelectedCallableDiagnostic'
 Assert-Equal $contract.automation.solutionBuildWallSeconds 600 'automation.solutionBuildWallSeconds'
+Assert-Equal $contract.mutationEvidence.schemaVersion 1 'mutationEvidence.schemaVersion'
+Assert-Equal $contract.mutationEvidence.expectedCatalogCount 111 'mutationEvidence.expectedCatalogCount'
+if ([string]$contract.mutationEvidence.expectedCatalogSha256 -notmatch '^[0-9a-f]{64}$') {
+    throw 'mutationEvidence.expectedCatalogSha256 must be a lowercase SHA-256 digest.'
+}
 Assert-Equal `
     (Get-MsBuildDefault $portableTargets 'SharpProofProfile' 'portable package') `
     $contract.analyzer.defaultProfile `
@@ -371,6 +377,7 @@ try {
         'scalarSemanticsCatalog',
         'contractApiCatalog',
         'analyzerDiagnosticCatalog',
+        'diagnosticDescriptorCatalog',
         'projectionCatalog',
         'launcherArgumentCatalog',
         'generatedOutputPolicy',
@@ -390,7 +397,8 @@ try {
         'canonicalIdentityEncoding',
         'protocolValidation',
         'cacheValidation',
-        'portableShippingBoundary'
+        'portableShippingBoundary',
+        'releaseContainment'
     )
     $tcbComponents = @($contract.trustedComputingBase.components)
     $actualTcbComponents = @(
@@ -404,26 +412,16 @@ try {
         throw "Trusted-computing-base components must be exactly: " +
             ($requiredTcbComponents -join ', ') + "."
     }
-    $allTcbPaths = [Collections.Generic.HashSet[string]]::new(
-        [StringComparer]::Ordinal)
-    foreach ($path in $kernelPaths) {
-        if (-not $allTcbPaths.Add([string]$path)) {
-            throw "Trusted-computing-base path is declared more than once: $path"
-        }
-    }
+    $canonicalTcbPaths = @(Get-SharpProofTcbPaths -Contract $contract)
     foreach ($component in $tcbComponents) {
         $name = [string]$component.name
         $paths = @($component.paths)
         Assert-RepositoryPaths `
             -Paths $paths `
             -Scope "trusted-computing-base component '$name'"
-        foreach ($path in $paths) {
-            if (-not $allTcbPaths.Add([string]$path)) {
-                throw "Trusted-computing-base path belongs to multiple components: $path"
-            }
-        }
         Write-Host "Trusted-computing-base $name paths: $($paths.Count)"
     }
+    Write-Host "Trusted-computing-base union paths: $($canonicalTcbPaths.Count)"
 
     $coordinatorComplexity = $contract.productionCoordinatorComplexity
     $layers = @($coordinatorComplexity.layers)

@@ -90,7 +90,9 @@ internal sealed class AnalyzerSession
                 new AnalyzerEffectCallPreconditionPolicy(
                     _contractBinder.Value,
                     _contractClauses.Value,
-                    _callPreconditions.Value)),
+                    new ConservativeEffectCallPreconditionPolicy(
+                        compilation,
+                        includeSourceCompanions: false))),
             LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
@@ -130,23 +132,24 @@ internal sealed class AnalyzerSession
         IMethodSymbol method)
     {
         method = EffectAnalysisSession.NormalizeMethod(method);
-        if (_callPreconditions.Value.HasPotentialPreconditions(
-                method))
+        if (_callPreconditions.Value.HasPotentialPreconditions(method) ||
+            ResolveEffectContract(method) is
+            { Kind: > EffectContractResolutionKind.Missing and < EffectContractResolutionKind.Valid })
         {
             return true;
         }
 
-        if ((method.IsStatic ||
-             method.MethodKind == MethodKind.Constructor) &&
-            method.ContainingType.StaticConstructors.Length != 0)
+        if (method is
+        { ContainingType: { StaticConstructors.Length: > 0 } } and
+            ({ IsStatic: true } or { MethodKind: MethodKind.Constructor }))
         {
             return true;
         }
 
         var binding = BindRequires(method);
         return !binding.IsSuccess ||
-            binding.Contracts == null ||
-            binding.Contracts.Clauses.Any(static clause =>
+            binding.Contracts is not { } contracts ||
+            contracts.Clauses.Any(static clause =>
                 clause.Kind == BoundContractKind.Requires);
     }
 

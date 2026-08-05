@@ -29,9 +29,12 @@ internal static class Program
         WorkerVerifyRequest? request;
         try
         {
-            request = WorkerProtocolJson.DeserializeRequest(await File.ReadAllTextAsync(requestPath).ConfigureAwait(false));
+            request = WorkerProtocolJson.DeserializeRequest(
+                await WorkerProtocolJson.ReadUtf8FileAsync(requestPath).ConfigureAwait(false));
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        catch (Exception exception) when (exception is
+            ArgumentException or IOException or InvalidDataException or
+                UnauthorizedAccessException or JsonException)
         {
             return await Respond(Failure(WorkerRunFailureReason.InvalidRequest,
                 [new WorkerProtocolError {
@@ -92,7 +95,7 @@ internal static class Program
         request = Path.GetFullPath(requestValue);
         result = Path.GetFullPath(resultValue);
         startEvent = eventValue;
-        return true;
+        return !string.Equals(request, result, StringComparison.OrdinalIgnoreCase);
     }
     private static bool WaitForStart(string eventName)
     {

@@ -27,6 +27,7 @@ public static class WorkerManifestVersions
 public static class WorkerLauncherDefaults
 {
     public const int TerminationGraceMilliseconds = 1000;
+    public const int MaximumTerminationGraceMilliseconds = 300000;
 }
 
 public sealed class WorkerVerifyRequest
@@ -78,6 +79,7 @@ public sealed class WorkerBudgets
     public const int DefaultProjectWallTimeMilliseconds = 300000;
     public const int DefaultMaximumExpressionDepth = 64;
     public const long DefaultProcessMemoryLimitBytes = 2147483648L;
+    public const long MaximumProcessMemoryLimitBytes = 17179869184L;
     public uint QueryRlimit { get; set; } = DefaultQueryRlimit;
     public uint MethodRlimit { get; set; } = DefaultMethodRlimit;
     public int MethodWallTimeMilliseconds { get; set; } = DefaultMethodWallTimeMilliseconds;
@@ -639,7 +641,7 @@ internal static class WorkerProtocolMetadata
         new("project_wall", static value => value.ProjectWallTimeMilliseconds > 0),
         new("parallelism", static value => value.MaxParallelism is >= 1 and <= WorkerBudgets.MaximumParallelism),
         new("expression_depth", static value => value.MaximumExpressionDepth is >= 1 and <= 256),
-        new("process_memory", static value => value.ProcessMemoryLimitBytes > 0),
+        new("process_memory", static value => value.ProcessMemoryLimitBytes is >= 1 and <= WorkerBudgets.MaximumProcessMemoryLimitBytes),
         new("worker_processes", static value => value.MaxWorkerProcesses is >= 1 and <= WorkerBudgets.MaximumParallelism),
         new("wall_order", static value => value.MethodWallTimeMilliseconds <= value.ProjectWallTimeMilliseconds),
     ];

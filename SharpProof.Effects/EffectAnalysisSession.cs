@@ -79,7 +79,11 @@ public sealed class EffectAnalysisSession
         var normalized = NormalizeMethod(method);
         if (!IsSourceMethod(normalized))
         {
-            return new EffectMethodResult(normalized, _external.Resolve(normalized));
+            return new EffectMethodResult(
+                normalized,
+                EffectSummaryOperations.Join(
+                    _external.Resolve(normalized),
+                    ResolveEntryPreconditions(normalized)));
         }
 
         EnsureAnalyzed([normalized], cancellationToken);

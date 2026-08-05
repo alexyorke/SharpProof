@@ -1980,7 +1980,8 @@ public sealed partial class HumanReleaseGateScriptTests
                   {
                     "name": "fixture",
                     "paths": [
-                      "SharpProof.Worker/ProductMarker.cs"
+                      "SharpProof.Worker/ProductMarker.cs",
+                      "scripts/Get-SharpProofTcbPaths.ps1"
                     ]
                   }
                 ]
@@ -2126,6 +2127,19 @@ public sealed partial class HumanReleaseGateScriptTests
                 await File.WriteAllTextAsync(
                     acceptanceTarget,
                     FixtureAcceptance);
+                var tcbHelperTarget = Path.Combine(
+                    repository,
+                    "scripts",
+                    "Get-SharpProofTcbPaths.ps1");
+                Directory.CreateDirectory(
+                    Path.GetDirectoryName(tcbHelperTarget)!);
+                File.Copy(
+                    Path.Combine(
+                        FindRepositoryRoot(),
+                        "scripts",
+                        "Get-SharpProofTcbPaths.ps1"),
+                    tcbHelperTarget,
+                    overwrite: true);
                 var productDirectory = Path.Combine(
                     repository,
                     "SharpProof.Worker");

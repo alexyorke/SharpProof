@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Xml.Linq;
 using NUnit.Framework;
+using SharpProof.CompilerArtifact;
 using SharpProof.Worker;
 using SharpProof.Worker.Launcher;
 using SharpProof.Worker.Protocol;
@@ -357,6 +358,24 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(manifest, Does.Contain("\"targetFramework\":\"net8.0\""));
             Assert.That(manifest, Does.Not.Contain('\r'));
         }
+    }
+
+    [Test]
+    public async Task WhitespaceCacheDirectoryUsesFrameworkScopedDefault()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var build = await project.BuildAsync(
+            verify: true,
+            ("SharpProofVerifyCacheDirectory", " "));
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+
+        var request = WorkerProtocolJson.DeserializeRequest(
+            await File.ReadAllTextAsync(project.RequestPath))!;
+        Assert.That(
+            request.Cache.Directory,
+            Is.EqualTo(Path.Combine(
+                Path.GetDirectoryName(project.RequestPath)!, "cache")));
     }
 
     [Test]
@@ -729,6 +748,150 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task LauncherRepairsMalformedWorkerResultInProcess()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+        var requestPath = project.VerifyOutputPath(
+            "net8.0", "in-process-malformed-request.json");
+        var resultPath = project.VerifyOutputPath(
+            "net8.0", "in-process-malformed-result.json");
+
+        var exitCode = await Program.RunMain(
+            [
+                "verify",
+                "--worker", WorkerOutputPath(),
+                "--request", requestPath,
+                "--result", resultPath,
+                "--compiler-manifest", project.CompilerManifestPath,
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow"
+            ],
+            static path => WorkerBinaryIdentity.ComputeSha256(path),
+            static (arguments, _, _, _) =>
+            {
+                File.WriteAllText(arguments.ResultPath, "not-json");
+                return 0;
+            });
+
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(resultPath))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exitCode, Is.Not.Zero);
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.MalformedResult));
+            Assert.That(
+                response.Errors.Select(static error => error.Code),
+                Does.Contain("worker.malformed_result"));
+        }
+    }
+
+    [Test]
+    public async Task LauncherReportsStagedWorkerClosureHashMismatchInProcess()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+        var requestPath = project.VerifyOutputPath(
+            "net8.0", "in-process-hash-mismatch-request.json");
+        var resultPath = project.VerifyOutputPath(
+            "net8.0", "in-process-hash-mismatch-result.json");
+
+        var exitCode = await Program.RunMain(
+            [
+                "verify",
+                "--worker", WorkerOutputPath(),
+                "--request", requestPath,
+                "--result", resultPath,
+                "--compiler-manifest", project.CompilerManifestPath,
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow"
+            ],
+            static _ => new string('0', WorkerProtocolVersions.EmptySha256.Length));
+
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(resultPath))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exitCode, Is.Not.Zero);
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.ContainmentFailure));
+            Assert.That(
+                response.Errors.Select(static error => error.Code),
+                Does.Contain("containment.unavailable"));
+        }
+    }
+
+    [Test]
+    public async Task LauncherReportsInProcessPublicationFailure()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+        var stableRequest = await File.ReadAllTextAsync(project.RequestPath);
+        var requestPath = project.VerifyOutputPath(
+            "net8.0", "in-process-publication-request.json");
+        var resultPath = project.VerifyOutputPath(
+            "net8.0", "in-process-publication-result.json");
+        var publishedManifest = project.VerifyOutputPath(
+            "net8.0", "in-process-published-manifest.json");
+
+        using (File.Open(
+                   project.RequestPath,
+                   FileMode.Open,
+                   FileAccess.Read,
+                   FileShare.Read))
+        {
+            var exitCode = await Program.RunMain(
+                [
+                    "verify",
+                    "--worker", WorkerOutputPath(),
+                    "--request", requestPath,
+                    "--result", resultPath,
+                    "--compiler-manifest", project.CompilerManifestPath,
+                    "--verify-policy", "advisory",
+                    "--assumption-policy", "allow",
+                    "--publish-request", project.RequestPath,
+                    "--publish-result", project.ResultPath,
+                    "--publish-compiler-manifest", publishedManifest
+                ],
+                static path => WorkerBinaryIdentity.ComputeSha256(path),
+                (arguments, _, _, _) =>
+                {
+                    var request = WorkerProtocolJson.DeserializeRequest(
+                        File.ReadAllText(arguments.RequestPath))!;
+                    var response = WorkerProtocolJson.DeserializeResponse(
+                        File.ReadAllText(project.ResultPath))!;
+                    response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+                    response.InputHash = Program.ComputeExpectedInputHash(
+                        arguments.WorkerPath,
+                        request,
+                        File.ReadAllBytes(arguments.CompilerManifestPath));
+                    File.WriteAllText(
+                        arguments.ResultPath,
+                        WorkerProtocolJson.SerializeResponse(response));
+                    return 0;
+                });
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exitCode, Is.EqualTo(3));
+                Assert.That(
+                    await File.ReadAllTextAsync(project.RequestPath),
+                    Is.EqualTo(stableRequest));
+                Assert.That(File.Exists(project.ResultPath), Is.False);
+            }
+        }
+    }
+
+    [Test]
     public async Task HardTimeoutReplacesWorkerOwnedMalformedOutput()
     {
         RequireWindowsWorker();
@@ -859,6 +1022,320 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(
                 await File.ReadAllTextAsync(project.ResultPath),
                 Is.EqualTo(result));
+        }
+    }
+
+    [Test]
+    public async Task WorkerRuntimeCompanionAliasIsRejectedBeforeInvalidationDeletesIt()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var sourceWorker = WorkerOutputPath();
+        var collisionWorker = project.CollisionWorkerPath;
+        Directory.CreateDirectory(Path.GetDirectoryName(collisionWorker)!);
+        File.Copy(sourceWorker, collisionWorker, overwrite: true);
+        foreach (var extension in new[] { ".deps.json", ".runtimeconfig.json" })
+        {
+            File.Copy(
+                Path.ChangeExtension(sourceWorker, extension),
+                Path.ChangeExtension(collisionWorker, extension),
+                overwrite: true);
+        }
+
+        var collisionCompanion = Path.ChangeExtension(
+            collisionWorker, ".deps.json");
+        var failed = await project.RunVerificationTargetAsync(
+            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+            ("SharpProofWorkerPath", collisionWorker),
+            ("SharpProofVerifyResultFile", collisionCompanion));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(failed.ExitCode, Is.Not.Zero);
+            Assert.That(
+                failed.Output.Contains(
+                    "SharpProof launcher input is invalid: ArgumentException",
+                    StringComparison.Ordinal),
+                Is.True);
+            Assert.That(File.Exists(collisionWorker), Is.True);
+            Assert.That(File.Exists(collisionCompanion), Is.True);
+        }
+    }
+
+    [Test]
+    public async Task LauncherProtocolAssetRemainsProtectedByTargets()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var build = await project.BuildAsync(verify: true);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        _ = await project.RunVerificationTargetAsync(
+            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+            ("SharpProofVerifyResultFile", LauncherProtocolOutputPath()));
+        Assert.That(File.Exists(LauncherProtocolOutputPath()), Is.True);
+    }
+
+    [Test]
+    public async Task LauncherProtocolAssetAliasIsRejectedBeforeInvalidationDeletesIt()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var launcherDirectory = Path.GetDirectoryName(
+            LauncherProtocolOutputPath())!;
+        foreach (var fileName in new[] {
+                     "SharpProof.CompilerArtifact.dll",
+                     "SharpProof.Ir.dll",
+                     "SharpProof.Specs.dll",
+                     "SharpProof.Worker.Protocol.dll",
+                     "SharpProof.Worker.Launcher.exe",
+                     "System.IO.Pipelines.dll",
+                     "System.Text.Encodings.Web.dll",
+                     "System.Text.Json.dll"
+                 })
+        {
+            var collisionPath = Path.Combine(launcherDirectory, fileName);
+            Assert.That(File.Exists(collisionPath), Is.True, collisionPath);
+            var failed = await project.RunVerificationTargetAsync(
+                ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+                ("SharpProofVerifyResultFile", collisionPath));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(failed.ExitCode, Is.Not.Zero, collisionPath);
+                Assert.That(
+                    failed.Output.Contains(
+                        "SharpProof launcher input is invalid: ArgumentException",
+                        StringComparison.Ordinal),
+                    Is.True,
+                    collisionPath);
+                Assert.That(File.Exists(collisionPath), Is.True, collisionPath);
+            }
+        }
+    }
+
+    [Test]
+    public async Task WorkerCacheDirectoryAliasIsRejectedBeforeInvalidationDeletesIt()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var stableRequest = await File.ReadAllBytesAsync(project.RequestPath);
+        var stableResult = await File.ReadAllBytesAsync(project.ResultPath);
+        var stableManifest = await File.ReadAllBytesAsync(
+            project.CompilerManifestPath);
+        foreach (var cachePath in new[] {
+            project.ResultPath,
+            project.RequestPath,
+            project.CompilerManifestPath,
+            WorkerOutputPath()
+        })
+        {
+            var failed = await project.RunVerificationTargetAsync(
+                ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+                ("SharpProofVerifyCacheDirectory", cachePath));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(failed.ExitCode, Is.Not.Zero, cachePath);
+                Assert.That(
+                    failed.Output,
+                    Does.Contain(
+                        "SharpProof launcher input is invalid: ArgumentException"),
+                    cachePath);
+                Assert.That(
+                    failed.Output,
+                    Does.Contain("SharpProof I/O paths must be distinct."),
+                    cachePath);
+                Assert.That(File.Exists(project.RequestPath), Is.True, cachePath);
+                Assert.That(File.Exists(project.ResultPath), Is.True, cachePath);
+                Assert.That(
+                    File.Exists(project.CompilerManifestPath),
+                    Is.True,
+                    cachePath);
+                Assert.That(
+                    await File.ReadAllBytesAsync(project.RequestPath),
+                    Is.EqualTo(stableRequest),
+                    cachePath);
+                Assert.That(
+                    await File.ReadAllBytesAsync(project.ResultPath),
+                    Is.EqualTo(stableResult),
+                    cachePath);
+                Assert.That(
+                    await File.ReadAllBytesAsync(project.CompilerManifestPath),
+                    Is.EqualTo(stableManifest),
+                    cachePath);
+            }
+        }
+    }
+
+    [Test]
+    public async Task DirectLauncherRejectsRelativeCacheAliasAfterManifestResolution()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var projectDirectory = Path.GetDirectoryName(project.ProjectPath)!;
+        var relativeManifest = Path.GetRelativePath(
+            projectDirectory,
+            project.CompilerManifestPath);
+        string[] arguments = [
+            "verify",
+            "--worker", WorkerOutputPath(),
+            "--request", project.RequestPath,
+            "--result", project.ResultPath,
+            "--compiler-manifest", project.CompilerManifestPath,
+            "--cache-directory", relativeManifest,
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [TestCase("")]
+    [TestCase("cache")]
+    public async Task DirectLauncherRejectsCacheInsideWorkerRuntimeDirectory(
+        string relativeCacheSuffix)
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var workerDirectory = Path.GetDirectoryName(WorkerOutputPath())!;
+        var cachePath = Path.Combine(workerDirectory, relativeCacheSuffix);
+        var projectDirectory = Path.GetDirectoryName(project.ProjectPath)!;
+        var relativeCache = Path.GetRelativePath(projectDirectory, cachePath);
+        string[] arguments = [
+            "verify",
+            "--worker", WorkerOutputPath(),
+            "--request", project.RequestPath,
+            "--result", project.ResultPath,
+            "--compiler-manifest", project.CompilerManifestPath,
+            "--cache-directory", relativeCache,
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
+    public async Task WorkerRuntimeAssetAliasIsRejectedBeforeInvalidationDeletesIt()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var sourceWorker = WorkerOutputPath();
+        var sourceDirectory = Path.GetDirectoryName(sourceWorker)!;
+        var collisionWorker = project.CollisionWorkerPath;
+        var collisionDirectory = Path.GetDirectoryName(collisionWorker)!;
+        string collisionAsset;
+        using (var sourceSnapshot = WorkerBinaryIdentity.CreateSnapshot(
+                   sourceWorker))
+        {
+            foreach (var component in sourceSnapshot.ComponentPaths)
+            {
+                var relative = Path.GetRelativePath(sourceDirectory, component);
+                var destination = Path.Combine(collisionDirectory, relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                File.Copy(component, destination, overwrite: true);
+            }
+        }
+
+        using (var collisionSnapshot = WorkerBinaryIdentity.CreateSnapshot(
+                   collisionWorker))
+        {
+            var workerCompanions = new[] {
+                collisionWorker,
+                Path.ChangeExtension(collisionWorker, ".deps.json"),
+                Path.ChangeExtension(collisionWorker, ".runtimeconfig.json")
+            };
+            collisionAsset = collisionSnapshot.ComponentPaths.First(
+                path => !workerCompanions.Contains(
+                    path, StringComparer.OrdinalIgnoreCase));
+        }
+
+        var failed = await project.RunVerificationTargetAsync(
+            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+            ("SharpProofWorkerPath", collisionWorker),
+            ("SharpProofVerifyResultFile", collisionAsset));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(failed.ExitCode, Is.Not.Zero);
+            Assert.That(
+                failed.Output.Contains(
+                    "SharpProof launcher input is invalid: ArgumentException",
+                    StringComparison.Ordinal),
+                Is.True);
+            Assert.That(File.Exists(collisionAsset), Is.True);
+        }
+    }
+
+    [Test]
+    public async Task MissingWorkerDoesNotAllowInvalidationToDeleteWorkerTreeOutput()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var directory = Path.Combine(
+            Path.GetDirectoryName(project.ProjectPath)!,
+            "missing-worker-output");
+        Directory.CreateDirectory(directory);
+        var worker = Path.Combine(directory, "worker.dll");
+        var result = Path.Combine(directory, "result.json");
+        const string sentinel = "worker-tree-result-sentinel";
+        File.Copy(
+            Path.ChangeExtension(WorkerOutputPath(), ".deps.json"),
+            Path.ChangeExtension(worker, ".deps.json"));
+        await File.WriteAllTextAsync(result, sentinel);
+        try
+        {
+            var failed = await project.RunVerificationTargetAsync(
+                ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+                ("SharpProofWorkerPath", worker),
+                ("SharpProofVerifyResultFile", result));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(failed.ExitCode, Is.Not.Zero, failed.Output);
+                Assert.That(File.Exists(result), Is.True, failed.Output);
+                Assert.That(
+                    await File.ReadAllTextAsync(result),
+                    Is.EqualTo(sentinel));
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
         }
     }
 
@@ -1309,12 +1786,14 @@ public sealed class WorkerMsBuildIntegrationTests
                 new WorkerVerifyRequest(),
                 null,
                 null,
-                out var validResponse);
+                out var validResponse,
+                out var validatedResponse);
 
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(exitCode, Is.EqualTo(3));
                 Assert.That(validResponse, Is.True);
+                Assert.That(validatedResponse, Is.Not.Null);
                 Assert.That(
                     error.ToString(),
                     Does.Contain("infrastructure.test"));
@@ -1330,11 +1809,13 @@ public sealed class WorkerMsBuildIntegrationTests
                 new WorkerVerifyRequest(),
                 null,
                 null,
-                out validResponse);
+                out validResponse,
+                out validatedResponse);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(exitCode, Is.EqualTo(3));
                 Assert.That(validResponse, Is.False);
+                Assert.That(validatedResponse, Is.Null);
                 Assert.That(
                     error.ToString(),
                     Does.Contain("unavailable or malformed"));
@@ -1478,6 +1959,7 @@ public sealed class WorkerMsBuildIntegrationTests
             static value => value.ToString(
                 "x2", CultureInfo.InvariantCulture)));
         workerPath ??= WorkerOutputPath();
+        var workerBinarySha256 = WorkerBinaryIdentity.ComputeSha256(workerPath);
         var expectedInputHash = Program.ComputeExpectedInputHash(
             workerPath, request, artifact.Bytes);
         using (Assert.EnterMultipleScope())
@@ -1486,6 +1968,11 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(response.RequestHash,
                 Is.EqualTo(WorkerProtocolJson.ComputeRequestHash(request)));
             Assert.That(response.InputHash, Is.EqualTo(expectedInputHash));
+            Assert.That(
+                response.Summary.Versions.WorkerBinarySha256,
+                Is.EqualTo(response.RunStatus == WorkerRunStatus.Complete
+                    ? workerBinarySha256
+                    : WorkerProtocolVersions.EmptySha256));
             Assert.That(
                 artifact.ManifestHash,
                 Is.EqualTo(response.Manifest.Hash));
@@ -1505,6 +1992,17 @@ public sealed class WorkerMsBuildIntegrationTests
                 "The test build configuration was not found.");
         return Path.Combine(ConsumerProject.FindRepositoryRoot(), "SharpProof.Worker",
             "bin", configuration, "net9.0", "SharpProof.Worker.dll");
+    }
+
+    private static string LauncherProtocolOutputPath()
+    {
+        var configuration = new DirectoryInfo(Path.GetDirectoryName(
+            typeof(WorkerMsBuildIntegrationTests).Assembly.Location)!)
+            .Parent?.Name ?? throw new InvalidOperationException(
+                "The test build configuration was not found.");
+        return Path.Combine(ConsumerProject.FindRepositoryRoot(),
+            "SharpProof.Worker.Launcher", "bin", configuration, "net9.0",
+            "SharpProof.Worker.Protocol.dll");
     }
 
     private static void RequireWindowsWorker()
@@ -1662,6 +2160,11 @@ public sealed class WorkerMsBuildIntegrationTests
                 "net8.0",
                 "SharpProof",
                 "compiler-manifest.json");
+            CollisionWorkerPath = Path.Combine(
+                root,
+                "obj",
+                "collision-worker",
+                "SharpProof.Worker.dll");
         }
 
         internal string ProjectPath
@@ -1677,6 +2180,10 @@ public sealed class WorkerMsBuildIntegrationTests
             get;
         }
         internal string CompilerManifestPath
+        {
+            get;
+        }
+        internal string CollisionWorkerPath
         {
             get;
         }

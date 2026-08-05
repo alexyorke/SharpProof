@@ -19,6 +19,17 @@ internal static class Program
 
     internal static async Task<int> Main(string[] args)
     {
+        return await RunMain(
+            args,
+            static path => WorkerBinaryIdentity.ComputeSha256(path))
+            .ConfigureAwait(false);
+    }
+
+    internal static async Task<int> RunMain(
+        string[] args,
+        Func<string, string> computeWorkerSha256,
+        Func<LauncherArguments, WorkerVerifyRequest, string, string, int>? runWorker = null)
+    {
         if (!LauncherArguments.TryParse(args, out var arguments))
         {
             Console.Error.WriteLine(
@@ -33,13 +44,24 @@ internal static class Program
         CompilerManifestArtifact artifact;
         byte[] artifactBytes;
         string expectedInputHash;
+        WorkerRuntimeClosureSnapshot? runtimeSnapshot = null;
         try
         {
-            request = arguments.CreateRequest(out artifact, out artifactBytes);
-            expectedInputHash = ComputeExpectedInputHash(arguments.WorkerPath, request, artifactBytes);
+            arguments.ValidatePreflight();
+            arguments.ValidateDistinctPaths(runtimeSnapshot);
+            runtimeSnapshot = WorkerBinaryIdentity.CreateSnapshot(
+                arguments.WorkerPath);
+            request = arguments.CreateRequest(
+                runtimeSnapshot, out artifact, out artifactBytes);
+            expectedInputHash = ComputeExpectedInputHash(
+                request,
+                artifactBytes,
+                runtimeSnapshot);
             var validation = WorkerProtocolJson.Validate(request);
             if (!validation.IsValid)
             {
+                runtimeSnapshot.Dispose();
+                runtimeSnapshot = null;
                 WriteErrors(validation.Errors, string.Empty);
                 return 2;
             }
@@ -50,8 +72,11 @@ internal static class Program
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or
                 ArgumentException or FormatException or OverflowException or
-                JsonException)
+                InvalidDataException or JsonException or KeyNotFoundException or
+                InvalidOperationException)
         {
+            runtimeSnapshot?.Dispose();
+            runtimeSnapshot = null;
             Console.Error.WriteLine(
                 "SharpProof launcher input is invalid: " +
                 exception.GetType().Name + ": " + exception.Message);
@@ -61,7 +86,22 @@ internal static class Program
         int exitCode;
         try
         {
-            exitCode = RunWorker(arguments, request, artifact.Compilation.ProjectDirectory);
+            using (runtimeSnapshot)
+            {
+                if (computeWorkerSha256(
+                        runtimeSnapshot.ExecutionWorkerPath) !=
+                    runtimeSnapshot.Sha256)
+                {
+                    throw new InvalidOperationException(
+                        "The staged worker runtime closure changed before launch.");
+                }
+
+                exitCode = (runWorker ?? RunWorker)(
+                    arguments,
+                    request,
+                    artifact.Compilation.ProjectDirectory,
+                    runtimeSnapshot.ExecutionWorkerPath);
+            }
         }
         catch (Exception exception) when (ClassifyLauncherFailure(exception) is { } failure)
         {
@@ -82,23 +122,25 @@ internal static class Program
                 launcherFailure.Status, launcherFailure.Reason, launcherFailure.Code, launcherFailure.Message).ConfigureAwait(false);
         }
         var resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
-            artifact.Manifest, out var validResponse);
+            artifact.Manifest, out var validResponse, out var validatedResponse);
         if (!validResponse)
         {
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
                 WorkerRunStatus.Failed, WorkerRunFailureReason.MalformedResult, "worker.malformed_result",
                 "The worker result was unavailable or malformed.").ConfigureAwait(false);
             resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
-                artifact.Manifest, out validResponse);
+                artifact.Manifest, out validResponse, out validatedResponse);
         }
         if (validResponse)
         {
             try
             {
-                PublishOutputs(arguments, request, artifact, artifactBytes, expectedInputHash);
+                PublishOutputs(arguments, request, artifact, artifactBytes, expectedInputHash,
+                    validatedResponse!);
             }
             catch (Exception exception) when (
-                exception is IOException or UnauthorizedAccessException or ArgumentException)
+                exception is IOException or InvalidDataException or
+                    UnauthorizedAccessException or ArgumentException)
             {
                 Console.Error.WriteLine(
                     "SharpProof worker result could not be published.");
@@ -143,7 +185,7 @@ internal static class Program
 
     private static int RunWorker(
         LauncherArguments arguments, WorkerVerifyRequest request,
-        string projectDirectory)
+        string projectDirectory, string workerPath)
     {
         var hardLimit = ComputeHardLimit(
             request.Budgets.ProjectWallTimeMilliseconds, arguments.TerminationGraceMilliseconds);
@@ -154,7 +196,7 @@ internal static class Program
             startEventName);
         using var process = job.StartSuspended(
             ResolveDotNetHostPath(projectDirectory),
-            [arguments.WorkerPath, "verify", "--request", arguments.RequestPath,
+            [workerPath, "verify", "--request", arguments.RequestPath,
                 "--result", arguments.ResultPath, "--start-event", startEventName],
             projectDirectory);
         process.Resume();
@@ -214,11 +256,24 @@ internal static class Program
     internal static string ComputeExpectedInputHash(
         string workerPath, WorkerVerifyRequest request, byte[] artifactBytes)
     {
-        var version = FileVersionInfo.GetVersionInfo(Path.GetFullPath(workerPath));
+        using var snapshot = WorkerBinaryIdentity.CreateSnapshot(workerPath);
+        return ComputeExpectedInputHash(
+            request,
+            artifactBytes,
+            snapshot);
+    }
+
+    internal static string ComputeExpectedInputHash(
+        WorkerVerifyRequest request,
+        byte[] artifactBytes,
+        WorkerRuntimeClosureSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        var version = FileVersionInfo.GetVersionInfo(snapshot.ExecutionWorkerPath);
         return CompilerArtifactInputHash.Compute(
             request, artifactBytes, RequiredVersion(version.ProductName, "product name"),
             RequiredVersion(version.ProductVersion, "product version"),
-            WorkerBinaryIdentity.ComputeSha256(workerPath),
+            snapshot.Sha256,
             ApiSpecTable.DefaultTableIdentity, ApiSpecTable.DefaultTableVersion,
             ApiSpecTable.Default.ContentSha256);
     }
@@ -230,17 +285,20 @@ internal static class Program
 
     internal static int ValidateAndReport(
         string resultPath, WorkerVerifyRequest request,
-        string? expectedInputHash, WorkerClaimManifest? expectedManifest, out bool validResponse)
+        string? expectedInputHash, WorkerClaimManifest? expectedManifest,
+        out bool validResponse, out WorkerVerifyResponse? validatedResponse)
     {
         validResponse = false;
+        validatedResponse = null;
         WorkerVerifyResponse? response;
         try
         {
             response = WorkerProtocolJson.DeserializeResponse(
-                File.ReadAllText(resultPath));
+                WorkerProtocolJson.ReadUtf8File(resultPath));
         }
         catch (Exception exception) when (
-            exception is IOException or UnauthorizedAccessException or JsonException)
+            exception is ArgumentException or IOException or InvalidDataException or
+                UnauthorizedAccessException or JsonException)
         {
             Console.Error.WriteLine(
                 "SharpProof worker result is unavailable or malformed.");
@@ -260,6 +318,7 @@ internal static class Program
         validResponse = true;
         ArgumentNullException.ThrowIfNull(response);
         WorkerProtocolJson.Canonicalize(response);
+        validatedResponse = response;
         WriteErrors(response.Errors, "SharpProof ");
 
         var manifestClaims = response.Manifest.Claims.ToDictionary(static claim => claim.ClaimId, StringComparer.Ordinal);
@@ -337,7 +396,8 @@ internal static class Program
 
     private static void PublishOutputs(
         LauncherArguments arguments, WorkerVerifyRequest request,
-        CompilerManifestArtifact artifact, byte[] artifactBytes, string expectedInputHash)
+        CompilerManifestArtifact artifact, byte[] artifactBytes, string expectedInputHash,
+        WorkerVerifyResponse response)
     {
         if (arguments.PublishRequestPath == null)
         {
@@ -369,9 +429,6 @@ internal static class Program
             request.CompilerManifest.Path = arguments.PublishCompilerManifestPath!;
             AtomicFile.WriteUtf8(
                 arguments.PublishRequestPath, WorkerProtocolJson.SerializeRequest(request));
-            var response = WorkerProtocolJson.DeserializeResponse(
-                File.ReadAllText(arguments.ResultPath)) ??
-                throw new IOException("The worker response is missing.");
             response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
             if (!WorkerProtocolJson.ValidateForRequest(
                     response, response.RequestHash, expectedInputHash,
@@ -510,23 +567,71 @@ internal sealed partial class LauncherArguments
     internal WorkerVerifyRequest CreateRequest(
         out CompilerManifestArtifact artifact, out byte[] artifactBytes)
     {
-        ValidateDistinctPaths();
+        return CreateRequest(null, out artifact, out artifactBytes);
+    }
+
+    internal WorkerVerifyRequest CreateRequest(
+        WorkerRuntimeClosureSnapshot? runtimeSnapshot,
+        out CompilerManifestArtifact artifact, out byte[] artifactBytes)
+    {
+        ValidateDistinctPaths(runtimeSnapshot, Optional("cache-directory"));
         var compilerManifest = CreateCompilerManifestReference(
             out artifact,
             out artifactBytes);
-        return ProjectRequest(compilerManifest);
+        var request = ProjectRequest(compilerManifest);
+        ValidateDistinctPaths(
+            runtimeSnapshot,
+            WorkerCachePath.Resolve(
+                Optional("cache-directory"),
+                artifact.Compilation.ProjectDirectory));
+        return request;
     }
 
-    private void ValidateDistinctPaths()
+    internal void ValidateDistinctPaths(
+        WorkerRuntimeClosureSnapshot? runtimeSnapshot,
+        string? cacheDirectory = null)
     {
-        string?[] candidates = [RequestPath, ResultPath, CompilerManifestPath,
+        var workerPath = WorkerPath;
+        var runtimeRoots = new[] {
+            workerPath,
+            Path.ChangeExtension(workerPath, ".deps.json"),
+            Path.ChangeExtension(workerPath, ".runtimeconfig.json")
+        };
+        string?[] candidates = [..runtimeRoots,
+            ..LauncherArguments.LauncherRuntimePaths,
+            cacheDirectory, RequestPath, ResultPath, CompilerManifestPath,
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath];
-        var paths = candidates.OfType<string>().ToArray();
-        if (paths.Distinct(StringComparer.OrdinalIgnoreCase).Count() != paths.Length)
+        WorkerCachePath.ValidateNoReparsePoints(
+            candidates.OfType<string>());
+        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (candidates.OfType<string>().Any(path => !paths.Add(path)) ||
+            runtimeSnapshot?.ComponentPaths.Any(path =>
+                !runtimeRoots.Contains(path, StringComparer.OrdinalIgnoreCase) &&
+                !LauncherArguments.LauncherRuntimePaths.Contains(
+                    path, StringComparer.OrdinalIgnoreCase) &&
+                !paths.Add(path)) is true ||
+            candidates
+                .Skip(runtimeRoots.Length +
+                    LauncherArguments.LauncherRuntimePaths.Length)
+                .OfType<string>()
+                .Any(path => WorkerCachePath.IsSameOrDescendant(
+                    Path.GetFullPath(path),
+                    Path.GetDirectoryName(workerPath)!)))
         {
             throw new ArgumentException("SharpProof I/O paths must be distinct.");
         }
+    }
+
+    internal void ValidatePreflight()
+    {
+        var graceMilliseconds = TerminationGraceMilliseconds;
+        ArgumentOutOfRangeException.ThrowIfLessThan(
+            graceMilliseconds, 1, "termination-grace-ms");
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(
+            graceMilliseconds,
+            WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds,
+            "termination-grace-ms");
     }
 
     private WorkerFileReference CreateCompilerManifestReference(
@@ -638,7 +743,7 @@ internal sealed partial class WindowsJob : IDisposable
         {
             if (!NativeMethods.CreateProcess(
                     applicationPath, commandLinePointer, IntPtr.Zero, IntPtr.Zero,
-                    inheritHandles: true,
+                    inheritHandles: false,
                     NativeMethods.CreateSuspended | NativeMethods.CreateNoWindow,
                     IntPtr.Zero, workingDirectory,
                     &startupInfo, &processInformation))

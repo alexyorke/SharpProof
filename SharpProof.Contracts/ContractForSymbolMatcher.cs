@@ -94,7 +94,9 @@ internal static class ContractForSymbolMatcher
         }
 
         var result = ImmutableArray.CreateBuilder<CompanionDescriptor>();
-        foreach (var type in GetAllTypes(compilation.Assembly.GlobalNamespace, cancellationToken))
+        foreach (var type in ReferencedTypeSymbols.GetAll(
+                     compilation,
+                     cancellationToken))
         {
             var attributes = GetAttributes(type, contractFor);
             if (attributes.Length == 1 && TryGetTarget(attributes[0], out var target))
@@ -225,33 +227,6 @@ internal static class ContractForSymbolMatcher
     {
         return GetOrdinaryMethods(target.ContainingType)
             .Count(candidate => MemberSignaturesMatch(candidate, companion)) == 1;
-    }
-
-    private static IEnumerable<INamedTypeSymbol> GetAllTypes(
-        INamespaceOrTypeSymbol container,
-        CancellationToken cancellationToken)
-    {
-        foreach (var type in container.GetTypeMembers())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            yield return type;
-            foreach (var nested in GetAllTypes(type, cancellationToken))
-            {
-                yield return nested;
-            }
-        }
-        if (container is not INamespaceSymbol @namespace)
-        {
-            yield break;
-        }
-
-        foreach (var child in @namespace.GetNamespaceMembers())
-        {
-            foreach (var type in GetAllTypes(child, cancellationToken))
-            {
-                yield return type;
-            }
-        }
     }
 
     private static bool IsReceiver(IMethodSymbol target, IParameterSymbol receiver)

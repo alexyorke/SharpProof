@@ -1,6 +1,58 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Test-NUnitMultipleAssertionLines {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Lines
+    )
+
+    if ($Lines.Count -lt 3 -or
+        $Lines[0] -ne 'Multiple failures or warnings in test:') {
+        return $false
+    }
+
+    $failureIndexes = @(
+        for ($index = 1; $index -lt $Lines.Count; $index++) {
+            if ($Lines[$index] -match '^\d+\)\s+') {
+                $index
+            }
+        })
+    if ($failureIndexes.Count -eq 0 -or $failureIndexes[0] -ne 1) {
+        return $false
+    }
+
+    for ($failure = 0; $failure -lt $failureIndexes.Count; $failure++) {
+        $start = $failureIndexes[$failure]
+        $end = if ($failure + 1 -lt $failureIndexes.Count) {
+            $failureIndexes[$failure + 1]
+        }
+        else {
+            $Lines.Count
+        }
+        $block = @($Lines[$start..($end - 1)])
+        $hasExpected = @($block | Where-Object {
+                $_ -match '^Expected(:| is\b| and actual are both\b)'
+            }).Count -ne 0
+        $hasActual = @($block | Where-Object {
+                $_ -match '^Expected is\b.*\bactual is\b'
+            }).Count -eq 1
+        $hasButWas = @($block | Where-Object {
+                $_ -match '^But was:'
+            }).Count -eq 1
+        if ($block[0] -notmatch '^\d+\)\s+Assert\.That\(' -or
+            @($block | Where-Object {
+                $_ -match '(?i)\bSystem\.[A-Za-z]+Exception\b'
+            }).Count -ne 0 -or
+            -not $hasExpected -or
+            (-not $hasActual -and -not $hasButWas)) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
 function Get-RequiredIntegerAttribute {
     param(
         [Parameter(Mandatory = $true)]
@@ -37,20 +89,54 @@ function Test-NUnitAssertionMessage {
     $lines = @($Message.Replace("`r`n", "`n").Split("`n") |
         ForEach-Object { $_.Trim() } |
         Where-Object { $_.Length -ne 0 })
-    $assertionIndex = if ($lines.Count -gt 0 -and
-        $lines[0] -match '^Assert\.That\(.*\)$') { 0 } else { 1 }
-    if ($assertionIndex -eq 1 -and
-        ($lines.Count -lt 2 -or
-         $lines[0] -match '(?i)\b(exception|error|warning)\b' -or
-         $lines[1] -notmatch '^Assert\.That\(.*\)$')) {
+    if (Test-NUnitMultipleAssertionLines -Lines $lines) {
+        return $true
+    }
+    $assertionIndex = -1
+    for ($index = 0; $index -lt $lines.Count; $index++) {
+        if ($lines[$index] -match '^Assert\.That\(') {
+            $assertionIndex = $index
+            break
+        }
+    }
+    if ($assertionIndex -lt 0) {
+        return $false
+    }
+    if ($assertionIndex -gt 0 -and
+        @($lines[0..($assertionIndex - 1)] | Where-Object {
+            $_ -match '(?i)^\s*(?:[A-Za-z0-9_.]*Exception\b|(?:error|warning|stack trace)\s*:|(?:fatal|unhandled)\s+exception\b)'
+        }).Count -ne 0) {
         return $false
     }
     if ($lines.Count -le $assertionIndex + 1) {
         return $false
     }
 
-    $details = @($lines[($assertionIndex + 1)..($lines.Count - 1)])
-    $allowedDetail = '^(Expected:|But was:|Expected is\b|Values differ at index\b|Missing:)'
+    $expectedIndex = -1
+    for ($index = $assertionIndex + 1; $index -lt $lines.Count; $index++) {
+        if ($lines[$index] -match '^Expected(:| is\b| and actual are both\b)') {
+            $expectedIndex = $index
+            break
+        }
+    }
+    if ($expectedIndex -lt 0) {
+        return $false
+    }
+
+    $assertionContinuation = if ($expectedIndex -gt $assertionIndex + 1) {
+        @($lines[($assertionIndex + 1)..($expectedIndex - 1)])
+    }
+    else {
+        @()
+    }
+    if (@($assertionContinuation | Where-Object {
+            $_ -match '(?i)^\s*(?:[A-Za-z0-9_.]*Exception\b|(?:error|warning|stack trace)\s*:|(?:fatal|unhandled)\s+exception\b)'
+        }).Count -ne 0) {
+        return $false
+    }
+
+    $details = @($lines[$expectedIndex..($lines.Count - 1)])
+    $allowedDetail = '^(Expected:|But was:|Expected is\b|Expected and actual are both\b|Values differ at index\b|Expected string length\b|String lengths are both\b|Missing:|Extra:|First non-matching item at index\b|-+\^$)'
     if (@($details | Where-Object { $_ -notmatch $allowedDetail }).Count -ne 0) {
         return $false
     }

@@ -199,6 +199,81 @@ try {
         throw 'Assertion kill was not recognized.'
     }
 
+    $multilineAssertion = New-TestParts `
+        -Outcome Failed `
+        -Message ("reverse LessThan`n" +
+            "Assert.That(reverse, Is.EqualTo(`n" +
+            "    reversed.TryGetValue(kind, out var expectedReverse)`n" +
+            "        ? expectedReverse`n" +
+            "        : kind)`n" +
+            " Expected: GreaterThan`n" +
+            " But was: GreaterThanOrEqual")
+    $multilinePath = Write-Fixture `
+        -Name multiline-assertion `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $multilineAssertion.Definition `
+        -Entries $multilineAssertion.Entry `
+        -Results $multilineAssertion.Result
+    $multilineMutation = Read-SharpProofMutationTestEvidence `
+        -TrxPath $multilinePath `
+        -EvidenceName multiline-assertion `
+        -Mode Mutation `
+        -ProcessExitCode 1 `
+        -ExpectedMethodName ExpectedTest `
+        -ExpectedLedger $baseline.testLedger
+    if ($multilineMutation.assertionFailureCount -ne 1) {
+        throw 'Multiline assertion kill was not recognized.'
+    }
+
+    $identifierContinuation = New-TestParts `
+        -Outcome Failed `
+        -Message ("Assert.That(WorkerProtocolJson.Validate(response).Errors`n" +
+            "                .Select(static error => error.Code), Does.Contain(""response.claim_set""))`n" +
+            " Expected: some item equal to ""response.claim_set""`n" +
+            " But was:  < ""summary.totals"" >")
+    $identifierContinuationPath = Write-Fixture `
+        -Name identifier-continuation `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $identifierContinuation.Definition `
+        -Entries $identifierContinuation.Entry `
+        -Results $identifierContinuation.Result
+    $identifierContinuationMutation = Read-SharpProofMutationTestEvidence `
+        -TrxPath $identifierContinuationPath `
+        -EvidenceName identifier-continuation `
+        -Mode Mutation `
+        -ProcessExitCode 1 `
+        -ExpectedMethodName ExpectedTest `
+        -ExpectedLedger $baseline.testLedger
+    if ($identifierContinuationMutation.assertionFailureCount -ne 1) {
+        throw 'Assertion code identifier continuation was not recognized.'
+    }
+
+    $prefixedAssertion = New-TestParts `
+        -Outcome Failed `
+        -Message "Incomplete-reason flags 4 changed projection precedence.`n Assert.That(actual, Is.EqualTo(expected))`n Expected: 1`n But was: 2"
+    $prefixedPath = Write-Fixture `
+        -Name prefixed-assertion `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $prefixedAssertion.Definition `
+        -Entries $prefixedAssertion.Entry `
+        -Results $prefixedAssertion.Result
+    $prefixedMutation = Read-SharpProofMutationTestEvidence `
+        -TrxPath $prefixedPath `
+        -EvidenceName prefixed-assertion `
+        -Mode Mutation `
+        -ProcessExitCode 1 `
+        -ExpectedMethodName ExpectedTest `
+        -ExpectedLedger $baseline.testLedger
+    if ($prefixedMutation.assertionFailureCount -ne 1) {
+        throw 'Prefixed assertion kill was not recognized.'
+    }
+
     $collectionAssertion = New-TestParts `
         -Outcome Failed `
         -Message "Assert.That(actual, Is.EqualTo(expected))`n Expected is <System.Int32[1]>, actual is <System.Int32[0]>`n Values differ at index [0]"
@@ -219,6 +294,122 @@ try {
         -ExpectedLedger $baseline.testLedger
     if ($collectionMutation.assertionFailureCount -ne 1) {
         throw 'Collection assertion kill was not recognized.'
+    }
+
+    $nunitCollectionAssertion = New-TestParts `
+        -Outcome Failed `
+        -Message ("Assert.That(actual, Is.EqualTo(expected))`n" +
+            " Expected and actual are both <System.Linq.Enumerable+SelectArrayIterator>`n" +
+            " Values differ at index [0]`n" +
+            " Expected string length 24 but was 20. Strings differ at index 0.`n" +
+            " Expected: ConsoleApplication`n" +
+            " But was: WindowsApplication`n" +
+            " First non-matching item at index [0]: item`n" +
+            " Extra: item`n" +
+            " -----------^")
+    $nunitCollectionPath = Write-Fixture `
+        -Name nunit-collection-assertion `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $nunitCollectionAssertion.Definition `
+        -Entries $nunitCollectionAssertion.Entry `
+        -Results $nunitCollectionAssertion.Result
+    $nunitCollectionMutation = Read-SharpProofMutationTestEvidence `
+        -TrxPath $nunitCollectionPath `
+        -EvidenceName nunit-collection `
+        -Mode Mutation `
+        -ProcessExitCode 1 `
+        -ExpectedMethodName ExpectedTest `
+        -ExpectedLedger $baseline.testLedger
+    if ($nunitCollectionMutation.assertionFailureCount -ne 1) {
+        throw 'NUnit collection assertion kill was not recognized.'
+    }
+
+    $multipleAssertion = New-TestParts `
+        -Outcome Failed `
+        -Message ("Multiple failures or warnings in test:`n" +
+            " 1) Assert.That(first, Is.EqualTo(expected))`n" +
+            " Expected: 1`n" +
+            " But was: 2`n" +
+            " at test.cs:10`n" +
+            " 2) Assert.That(second, Is.True)`n" +
+            " Expected: True`n" +
+            " But was: False`n" +
+            " at test.cs:11")
+    $multiplePath = Write-Fixture `
+        -Name multiple-assertion `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $multipleAssertion.Definition `
+        -Entries $multipleAssertion.Entry `
+        -Results $multipleAssertion.Result
+    $multipleMutation = Read-SharpProofMutationTestEvidence `
+        -TrxPath $multiplePath `
+        -EvidenceName multiple-assertion `
+        -Mode Mutation `
+        -ProcessExitCode 1 `
+        -ExpectedMethodName ExpectedTest `
+        -ExpectedLedger $baseline.testLedger
+    if ($multipleMutation.assertionFailureCount -ne 1) {
+        throw 'Multiple assertion kill was not recognized.'
+    }
+
+    $multipleCollectionAssertion = New-TestParts `
+        -Outcome Failed `
+        -Message ("Multiple failures or warnings in test:`n" +
+            " 1) Assert.That(first, Is.EqualTo(expected))`n" +
+            " Expected is <System.String[1]>, actual is <System.Linq.EmptyPartition`1[System.String]>`n" +
+            " Values differ at index [0]`n" +
+            " 2) Assert.That(second, Is.EqualTo(expected))`n" +
+            " Expected: 1`n" +
+            " But was: 2")
+    $multipleCollectionPath = Write-Fixture `
+        -Name multiple-collection-assertion `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $multipleCollectionAssertion.Definition `
+        -Entries $multipleCollectionAssertion.Entry `
+        -Results $multipleCollectionAssertion.Result
+    $multipleCollectionMutation = Read-SharpProofMutationTestEvidence `
+        -TrxPath $multipleCollectionPath `
+        -EvidenceName multiple-collection-assertion `
+        -Mode Mutation `
+        -ProcessExitCode 1 `
+        -ExpectedMethodName ExpectedTest `
+        -ExpectedLedger $baseline.testLedger
+    if ($multipleCollectionMutation.assertionFailureCount -ne 1) {
+        throw 'Multiple collection assertion kill was not recognized.'
+    }
+
+    $multipleMixed = New-TestParts `
+        -Outcome Failed `
+        -Message ("Multiple failures or warnings in test:`n" +
+            " 1) Assert.That(first, Is.EqualTo(expected))`n" +
+            " Expected: 1`n" +
+            " But was: 2`n" +
+            " 2) System.InvalidOperationException : crash")
+    $multipleMixedPath = Write-Fixture `
+        -Name multiple-mixed `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $multipleMixed.Definition `
+        -Entries $multipleMixed.Entry `
+        -Results $multipleMixed.Result
+    Assert-Throws `
+        -Because 'a mixed Assert.Multiple failure and exception' `
+        -ExpectedMessage 'not killed solely by assertions' `
+        -Action {
+        Read-SharpProofMutationTestEvidence `
+            -TrxPath $multipleMixedPath `
+            -EvidenceName multiple-mixed `
+            -Mode Mutation `
+            -ProcessExitCode 1 `
+            -ExpectedMethodName ExpectedTest `
+            -ExpectedLedger $baseline.testLedger
     }
 
     $crash = New-TestParts `

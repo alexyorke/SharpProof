@@ -23,6 +23,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Get-SharpProofTcbPaths.ps1')
 $resolvedCoverageRoot = (Resolve-Path `
     -LiteralPath $CoverageRoot `
     -ErrorAction Stop).Path
@@ -68,6 +69,9 @@ $reports = @(
 )
 if ($reports.Count -eq 0) {
     throw "No Cobertura XML reports were found under $resolvedCoverageRoot."
+}
+if ([string]::IsNullOrWhiteSpace($ComparisonRef) -and -not $ReportOnly) {
+    throw 'ComparisonRef is required for changed-TCB coverage enforcement.'
 }
 
 $lineHits = [Collections.Generic.Dictionary[string,
@@ -224,7 +228,11 @@ $aggregatePassed =
 
 $changedTcb = [pscustomobject][ordered]@{
     comparisonRef = $ComparisonRef
+    canonicalFiles = 0
     changedFiles = 0
+    coverageFiles = 0
+    metadataFiles = 0
+    changedMetadataFiles = @()
     coveredLines = 0
     coverableLines = 0
     linePercent = 100.0
@@ -237,16 +245,19 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
     $contractPath = Join-Path $repositoryRoot 'eng\acceptance\contract.json'
     $contract = Get-Content -LiteralPath $contractPath -Raw |
         ConvertFrom-Json
-    $tcbPaths = @(
-        @($contract.trustedKernel.paths)
-        $contract.trustedComputingBase.components |
-            ForEach-Object { @($_.paths) } |
-            ForEach-Object { ([string]$_).Replace('\', '/') } |
+    $canonicalTcbPaths = @(Get-SharpProofTcbPaths `
+        -Contract $contract `
+        -IncludeAcceptanceContract)
+    $coverageTcbPaths = @(
+        $canonicalTcbPaths |
             Where-Object {
                 $_.EndsWith('.cs', [StringComparison]::OrdinalIgnoreCase)
-            } |
-            Sort-Object -Unique
-    )
+            })
+    $coverageTcbFiles = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::OrdinalIgnoreCase)
+    foreach ($coveragePath in $coverageTcbPaths) {
+        [void]$coverageTcbFiles.Add($coveragePath)
+    }
     $diffTarget = if ($IncludeWorkingTree) {
         $ComparisonRef
     }
@@ -258,9 +269,26 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
         --no-renames `
         $diffTarget `
         -- `
-        @tcbPaths
+        @canonicalTcbPaths
     if ($LASTEXITCODE -ne 0) {
         throw "git diff failed for comparison ref '$ComparisonRef'."
+    }
+    $changedTcbFiles = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::OrdinalIgnoreCase)
+    $changedFileNames = & git -C $repositoryRoot diff `
+        --name-only `
+        --no-renames `
+        $diffTarget `
+        -- `
+        @canonicalTcbPaths
+    if ($LASTEXITCODE -ne 0) {
+        throw "git changed-file enumeration failed for comparison ref '$ComparisonRef'."
+    }
+    foreach ($changedFileName in $changedFileNames) {
+        $normalized = ([string]$changedFileName).Replace('\', '/')
+        if (-not [string]::IsNullOrWhiteSpace($normalized)) {
+            [void]$changedTcbFiles.Add($normalized)
+        }
     }
     $changedLines = [Collections.Generic.Dictionary[string,
         Collections.Generic.HashSet[int]]]::new(
@@ -269,10 +297,6 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
     foreach ($line in $diff) {
         if ($line.StartsWith('+++ b/', [StringComparison]::Ordinal)) {
             $currentPath = $line.Substring(6).Replace('\', '/')
-            if (-not $changedLines.ContainsKey($currentPath)) {
-                $changedLines[$currentPath] =
-                    [Collections.Generic.HashSet[int]]::new()
-            }
             continue
         }
         if ($null -eq $currentPath) {
@@ -292,29 +316,64 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
             1
         }
         for ($number = $start; $number -lt $start + $count; $number++) {
+            if (-not $changedLines.ContainsKey($currentPath)) {
+                $changedLines[$currentPath] =
+                    [Collections.Generic.HashSet[int]]::new()
+            }
             [void]$changedLines[$currentPath].Add($number)
         }
     }
     $changedCovered = 0
     $changedCoverable = 0
+    $changedMetadataFiles = @(
+        $changedTcbFiles |
+            Where-Object { -not $coverageTcbFiles.Contains($_) } |
+            Sort-Object)
     $nonCoverableChangedFiles =
         [Collections.Generic.List[string]]::new()
     $uncoveredChangedLines = [Collections.Generic.List[string]]::new()
-    foreach ($entry in $changedLines.GetEnumerator()) {
-        if ($entry.Value.Count -eq 0) {
+    foreach ($changedPath in $changedTcbFiles) {
+        if (-not $coverageTcbFiles.Contains($changedPath)) {
+            # The canonical union also contains metadata, such as the
+            # acceptance contract. Metadata changes participate in the
+            # changed-TCB selection and release digest, but have no C# line
+            # sequence points. Record them explicitly instead of treating
+            # them as missing coverage or silently dropping them.
             continue
         }
-        if (-not $lineHits.ContainsKey($entry.Key)) {
+        if (-not $changedLines.ContainsKey($changedPath) -or
+            $changedLines[$changedPath].Count -eq 0 -or
+            -not $lineHits.ContainsKey($changedPath)) {
             # Coverlet emits zero-hit sequence points for executable code.
-            # A changed file that is absent while its project is present in
-            # the report therefore contains no instrumentable lines, such as
-            # an interface made entirely of abstract declarations.
-            $nonCoverableChangedFiles.Add($entry.Key)
+            # A changed file that has no corresponding report entry is not
+            # trusted as covered. This also fails closed for non-C# TCB files,
+            # deleted files, and binary changes until explicit evidence is
+            # supplied by a separate gate.
+            $nonCoverableChangedFiles.Add($changedPath)
             continue
         }
-        $fileHits = $lineHits[$entry.Key]
-        foreach ($number in $entry.Value) {
+        $fileHits = $lineHits[$changedPath]
+        $sourcePath = Join-Path $repositoryRoot ($changedPath.Replace('/', '\'))
+        $sourceLines = if (Test-Path -LiteralPath $sourcePath -PathType Leaf) {
+            @(Get-Content -LiteralPath $sourcePath)
+        }
+        else {
+            @()
+        }
+        foreach ($number in $changedLines[$changedPath]) {
+            if ($number -gt 0 -and
+                $number -le $sourceLines.Count -and
+                $sourceLines[$number - 1].Trim() -in @('{', '}')) {
+                # Coverlet may attach a sequence point to a brace-only line
+                # for generated cleanup code. Braces are not executable
+                # source and do not participate in the changed-TCB ratchet.
+                continue
+            }
             if (-not $fileHits.ContainsKey($number)) {
+                # A changed source line without a sequence point is
+                # non-executable syntax such as a declaration or brace.
+                # Coverlet emits sequence points for executable lines; only
+                # those lines participate in the changed-TCB ratchet.
                 continue
             }
             $changedCoverable++
@@ -322,7 +381,7 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
                 $changedCovered++
             }
             else {
-                $uncoveredChangedLines.Add("$($entry.Key):$number")
+                $uncoveredChangedLines.Add("${changedPath}:$number")
             }
         }
     }
@@ -335,18 +394,21 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
     $changedPercent = [Math]::Round($changedPercent, 2)
     $changedTcb = [pscustomobject][ordered]@{
         comparisonRef = $ComparisonRef
-        changedFiles = @(
-            $changedLines.GetEnumerator() |
-                Where-Object { $_.Value.Count -gt 0 }
-        ).Count
+        canonicalFiles = $canonicalTcbPaths.Count
+        changedFiles = $changedTcbFiles.Count
+        coverageFiles = $coverageTcbPaths.Count
+        metadataFiles = $canonicalTcbPaths.Count - $coverageTcbPaths.Count
+        changedMetadataFiles = $changedMetadataFiles
         coveredLines = $changedCovered
         coverableLines = $changedCoverable
         linePercent = $changedPercent
         minimumLinePercent = [double]$baseline.minimumChangedTcbLinePercent
         nonCoverableFiles = @($nonCoverableChangedFiles | Sort-Object)
         uncoveredLines = @($uncoveredChangedLines | Sort-Object)
-        passed = $changedPercent + 0.005 -ge
-            [double]$baseline.minimumChangedTcbLinePercent
+        passed = $nonCoverableChangedFiles.Count -eq 0 -and
+            $uncoveredChangedLines.Count -eq 0 -and
+            $changedPercent + 0.005 -ge
+                [double]$baseline.minimumChangedTcbLinePercent
     }
 }
 

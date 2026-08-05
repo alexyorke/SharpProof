@@ -8,10 +8,30 @@ namespace SharpProof.Worker.Protocol;
 
 public static partial class WorkerProtocolJson
 {
+    internal const int MaximumJsonBytes = 16 * 1024 * 1024;
     internal const int MaximumJsonDepth = 32;
+    private static readonly UTF8Encoding s_strictUtf8 = new(false, true);
+    private static readonly StringComparer s_ordinal = StringComparer.Ordinal;
     private static readonly JsonSerializerOptions s_options = CreateOptions();
 
     public static JsonSerializerOptions Options => new(s_options);
+
+    internal static string ReadUtf8File(string path)
+    {
+        using var reader = OpenJsonReader(path);
+        return reader.ReadToEnd().TrimStart('\uFEFF');
+    }
+
+    internal static async Task<string> ReadUtf8FileAsync(
+        string path, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using var reader = OpenJsonReader(path);
+        var text = await reader.ReadToEndAsync().ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return text.TrimStart('\uFEFF');
+    }
+
     public static WorkerVerifyRequest? DeserializeRequest(string json)
     {
         return Deserialize<WorkerVerifyRequest>(json, WorkerProtocolMetadata.WorkerVerifyRequestJsonProperties);
@@ -30,6 +50,25 @@ public static partial class WorkerProtocolJson
     public static string ComputeRequestHash(WorkerVerifyRequest request)
     {
         return ComputeSha256(Encoding.UTF8.GetBytes(SerializeRequest(request)));
+    }
+
+    private static StreamReader OpenJsonReader(string path)
+    {
+        var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 81920,
+            options: FileOptions.SequentialScan);
+        if (stream.Length > MaximumJsonBytes)
+        {
+            stream.Dispose();
+            throw new InvalidDataException(
+                $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
+        }
+
+        return new StreamReader(stream, s_strictUtf8, detectEncodingFromByteOrderMarks: false);
     }
 
     public static string SerializeResponse(WorkerVerifyResponse response)
@@ -81,16 +120,16 @@ public static partial class WorkerProtocolJson
         }
 
         response.CallableResults = SortOrdinal(response.CallableResults, static value => value?.CallableId);
-        foreach (var result in response.CallableResults.Where(static value => value != null))
+        foreach (var result in response.CallableResults.OfType<WorkerCallableResult>())
         {
             result.Assumptions = CanonicalizeAssumptions(result.Assumptions);
         }
 
         response.ClaimResults = [.. (response.ClaimResults ?? [])
-            .OrderBy(value => FindClaimCallableId(response.Manifest, value?.ClaimId), StringComparer.Ordinal)
+            .OrderBy(value => FindClaimCallableId(response.Manifest, value?.ClaimId), s_ordinal)
             .ThenBy(value => FindClaimOrdinal(response.Manifest, value?.ClaimId))
-            .ThenBy(static value => value?.ClaimId, StringComparer.Ordinal)];
-        foreach (var result in response.ClaimResults.Where(static value => value != null))
+            .ThenBy(static value => value?.ClaimId, s_ordinal)];
+        foreach (var result in response.ClaimResults.OfType<WorkerClaimResult>())
         {
             Canonicalize(result);
         }
@@ -103,16 +142,16 @@ public static partial class WorkerProtocolJson
                 static value => value?.Reason.ToString());
         }
         response.Errors = [.. (response.Errors ?? [])
-            .OrderBy(static value => value?.Code, StringComparer.Ordinal)
-            .ThenBy(static value => value?.Message, StringComparer.Ordinal)];
+            .OrderBy(static value => value?.Code, s_ordinal)
+            .ThenBy(static value => value?.Message, s_ordinal)];
     }
     private static void Canonicalize(WorkerClaimResult result)
     {
         result.ProofCore = SortOrdinal(result.ProofCore, static value => value);
         result.Model = [.. (result.Model ?? [])
-            .OrderBy(static value => value?.Variable, StringComparer.Ordinal)
-            .ThenBy(static value => value?.Kind, StringComparer.Ordinal)
-            .ThenBy(static value => value?.Value, StringComparer.Ordinal)];
+            .OrderBy(static value => value?.Variable, s_ordinal)
+            .ThenBy(static value => value?.Kind, s_ordinal)
+            .ThenBy(static value => value?.Value, s_ordinal)];
         result.Assumptions = CanonicalizeAssumptions(result.Assumptions);
         if (result.EffectWitness != null)
         {
@@ -197,7 +236,7 @@ public static partial class WorkerProtocolJson
         var callableIds = new HashSet<string>(
             callables.Where(static value => !string.IsNullOrWhiteSpace(value.CallableId))
                 .Select(static value => value.CallableId),
-            StringComparer.Ordinal);
+            s_ordinal);
         foreach (var callable in callables)
         {
             errors.Check(HasValidLocation(callable.Location), prefix + ".callable_location")
@@ -220,18 +259,18 @@ public static partial class WorkerProtocolJson
     {
         var expected = claims.Where(value => value.CallableId == callable.CallableId)
             .OrderBy(static value => value.Ordinal)
-            .ThenBy(static value => value.ClaimId, StringComparer.Ordinal).ToArray();
+            .ThenBy(static value => value.ClaimId, s_ordinal).ToArray();
         errors.Check(expected.Select(static value => value.Ordinal)
                 .SequenceEqual(Enumerable.Range(0, expected.Length)), prefix + ".dense_ordinals")
             .Check(callable.ClaimIds != null && callable.ClaimIds.SequenceEqual(
-                expected.Select(static value => value.ClaimId), StringComparer.Ordinal),
+                expected.Select(static value => value.ClaimId), s_ordinal),
                 prefix + ".claim_membership");
     }
     private static WorkerCallableResult[] ValidateCallableResults(WorkerCallableResult[]? values,
         WorkerClaimManifest? manifest, Validator errors)
     {
         var valid = ValidateResultSet(values,
-            manifest?.Callables?.Where(static value => value != null)
+            manifest?.Callables?.OfType<WorkerCallableManifestEntry>()
                 .Select(static value => value.CallableId) ?? [],
             static value => value.CallableId, "response.callable_results",
             "response.callable_id", "response.callable_set", errors);
@@ -249,7 +288,7 @@ public static partial class WorkerProtocolJson
     private static WorkerClaimResult[] ValidateClaimResults(WorkerClaimResult[]? values, WorkerClaimManifest? manifest, Validator errors)
     {
         var valid = ValidateResultSet(values,
-            manifest?.Claims?.Where(static value => value != null)
+            manifest?.Claims?.OfType<WorkerClaimManifestEntry>()
                 .Select(static value => value.ClaimId) ?? [],
             static value => value.ClaimId, "response.claim_results",
             "response.result_claim_id", "response.claim_set", errors);
@@ -307,13 +346,13 @@ public static partial class WorkerProtocolJson
 
         var owners = manifest.Claims.Where(static value =>
                 value != null && !string.IsNullOrWhiteSpace(value.ClaimId))
-            .GroupBy(static value => value.ClaimId, StringComparer.Ordinal)
+            .GroupBy(static value => value.ClaimId, s_ordinal)
             .ToDictionary(static group => group.Key, static group => group.First().CallableId,
-                StringComparer.Ordinal);
+                s_ordinal);
         var incomplete = new HashSet<string>(
             callables.Where(static value => value.Coverage == WorkerCallableCoverage.Incomplete)
                 .Select(static value => value.CallableId),
-            StringComparer.Ordinal);
+            s_ordinal);
         errors.Check(!claims.Any(value => value.Outcome == WorkerClaimOutcome.Unknown &&
             owners.TryGetValue(value.ClaimId, out var owner) && !incomplete.Contains(owner)),
             "response.unknown_coverage");
@@ -378,10 +417,10 @@ public static partial class WorkerProtocolJson
         var expected = values.GroupBy(static value => value)
             .ToDictionary(static group => group.Key, static group => group.Count());
         return actual != null &&
-            actual.All(value => value != null && count(value) > 0 &&
-                IsDefined(kind(value), unspecified)) &&
             actual.Length == expected.Count &&
-            actual.All(value => expected.TryGetValue(kind(value), out var expectedCount) &&
+            actual.All(value => value != null && count(value) > 0 &&
+                IsDefined(kind(value), unspecified) &&
+                expected.TryGetValue(kind(value), out var expectedCount) &&
                 count(value) == expectedCount);
     }
     private static WorkerProtocolError[] ValidateProtocolErrors(WorkerProtocolError[]? values, Validator errors)
@@ -455,19 +494,19 @@ public static partial class WorkerProtocolJson
     {
         var items = values.ToArray();
         errors.Check(items.All(static value => !string.IsNullOrWhiteSpace(value)) &&
-            items.Distinct(StringComparer.Ordinal).Count() == items.Length, code);
+            items.Distinct(s_ordinal).Count() == items.Length, code);
     }
     private static void ValidateExactIds(IEnumerable<string?> actual, IEnumerable<string?> expected, string code, Validator errors)
     {
-        errors.Check(actual.OrderBy(static value => value, StringComparer.Ordinal)
-            .SequenceEqual(expected.OrderBy(static value => value, StringComparer.Ordinal),
-                StringComparer.Ordinal), code);
+        errors.Check(actual.OrderBy(static value => value, s_ordinal)
+            .SequenceEqual(expected.OrderBy(static value => value, s_ordinal),
+                s_ordinal), code);
     }
 
     private static bool CompleteUnique<T>(T[]? values, Func<T, bool> complete, Func<T, string?> key) where T : class
     {
         return values != null && values.All(value => value != null && complete(value)) &&
-            values.Select(key).Distinct(StringComparer.Ordinal).Count() == values.Length;
+            values.Select(key).Distinct(s_ordinal).Count() == values.Length;
     }
 
     private static T[] Present<T>(T[]? values, string code, Validator errors) where T : class
@@ -486,28 +525,31 @@ public static partial class WorkerProtocolJson
         return [.. (values ?? [])
             .OrderBy(static value => WorkerProtocolMetadata.GetAssumptionOrder(
                 value?.Kind ?? WorkerAssumptionKind.Unspecified))
-            .ThenBy(static value => value?.Id, StringComparer.Ordinal)];
+            .ThenBy(static value => value?.Id, s_ordinal)];
     }
 
     private static T[] SortManifestEnums<T>(T[]? values) where T : struct, Enum
     {
-        return [.. (values ?? []).OrderBy(ManifestName, StringComparer.Ordinal)];
+        return [.. (values ?? []).OrderBy(ManifestName, s_ordinal)];
     }
 
     private static T[] SortOrdinal<T>(T[]? values, Func<T, string?> identity)
     {
-        return [.. (values ?? []).OrderBy(identity, StringComparer.Ordinal)];
+        return [.. (values ?? []).OrderBy(identity, s_ordinal)];
     }
 
     private static bool SameAssumptionDeclarations(
             WorkerAssumptionEvidence[]? actual, WorkerAssumptionEvidence[]? expected)
     {
-        return (actual ?? []).Where(static value => value != null)
-                .OrderBy(static value => value.Id, StringComparer.Ordinal)
-                .Select(static value => (value.Id, value.Kind))
-                .SequenceEqual((expected ?? []).Where(static value => value != null)
-                    .OrderBy(static value => value.Id, StringComparer.Ordinal)
-                    .Select(static value => (value.Id, value.Kind)));
+        static IEnumerable<(string Id, WorkerAssumptionKind Kind)> Normalize(
+            WorkerAssumptionEvidence[]? values)
+        {
+            return (values ?? []).Where(static value => value != null)
+                .OrderBy(static value => value.Id, s_ordinal)
+                .Select(static value => (value.Id, value.Kind));
+        }
+
+        return Normalize(actual).SequenceEqual(Normalize(expected));
     }
 
     private static string ManifestName<T>(T value) where T : struct, Enum

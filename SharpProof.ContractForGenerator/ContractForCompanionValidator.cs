@@ -183,7 +183,7 @@ internal static class ContractForCompanionValidator
         return Diagnostic.Create(descriptor, location, arguments);
     }
 
-    private static Location GetSourceLocation(ISymbol symbol, Location fallback)
+    internal static Location GetSourceLocation(ISymbol symbol, Location fallback)
     {
         return symbol.Locations.Where(static location => location.IsInSource)
             .OrderBy(

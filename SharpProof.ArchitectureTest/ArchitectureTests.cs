@@ -60,7 +60,7 @@ public sealed class ArchitectureTests
         {
             Assert.That(
                 sdk.GetProperty("version").GetString(),
-                Is.EqualTo("9.0.315"));
+                Is.EqualTo("9.0.316"));
             Assert.That(
                 sdk.GetProperty("rollForward").GetString(),
                 Is.EqualTo("disable"));
@@ -530,6 +530,7 @@ public sealed class ArchitectureTests
                 "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
                 "SharpProof.Contracts/ContractClauseInventory.cs",
                 "SharpProof.Contracts/ContractForSymbolMatcher.cs",
+                "SharpProof.Frontend/ReferencedTypeSymbols.cs",
                 "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
                 "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
                 "SharpProof.Frontend/CompilationModelProvider.cs",
@@ -591,7 +592,17 @@ public sealed class ArchitectureTests
                 "SharpProof.Frontend/ContractApi.catalog.json",
                 "scripts/Generate-ContractApiCatalog.ps1",
                 "SharpProof.Frontend/ContractApiMetadata.generated.cs",
+                "SharpProof.Attributes/Contract.cs",
+                "SharpProof.Attributes/ContractForAttribute.cs",
+                "SharpProof.Attributes/ClosedContractAttributes.cs",
+                "SharpProof.Attributes/AllowedCapabilitiesAttribute.cs",
+                "SharpProof.Attributes/AllowedExceptionsAttribute.cs",
+                "SharpProof.Attributes/DoesNotThrowAttribute.cs",
+                "SharpProof.Attributes/EnforcePureAttribute.cs",
                 "SharpProof.Attributes/EffectContractAttribute.cs",
+                "SharpProof.Attributes/SharpProofSuppressAttribute.cs",
+                "SharpProof.Attributes/SharpProofTrustedAttribute.cs",
+                "SharpProof.Attributes/ZeroAllocationsAttribute.cs",
                 "SharpProof.Attributes/SharpProofEffect.cs",
                 "SharpProof.Attributes/SharpProofCapability.cs"
             ],
@@ -599,6 +610,13 @@ public sealed class ArchitectureTests
                 "SharpProof.Analyzer/AnalyzerDiagnostic.catalog.json",
                 "scripts/Generate-AnalyzerDiagnosticCatalog.ps1",
                 "SharpProof.Analyzer/AnalyzerDiagnosticCatalog.generated.cs"
+            ],
+            ["diagnosticDescriptorCatalog"] = [
+                "eng/diagnostics/diagnostic-descriptors.v1.json",
+                "scripts/Generate-DiagnosticDescriptors.ps1",
+                "SharpProof.Analyzer/GeneratedDiagnosticDescriptors.generated.cs",
+                "SharpProof.ContractForGenerator/GeneratedDiagnosticDescriptors.generated.cs",
+                "SharpProof.Meta.Analyzers/MetaDiagnosticDescriptors.generated.cs"
             ],
             ["projectionCatalog"] = [
                 "SharpProof.Projection.catalog.json",
@@ -626,7 +644,8 @@ public sealed class ArchitectureTests
             ["mutationEvidencePolicy"] = [
                 "scripts/SharpProof.MutationEvidence.psm1",
                 "scripts/Test-SharpProofMutationEvidence.ps1",
-                "scripts/Test-SharpProofTrustedMutations.ps1"
+                "scripts/Test-SharpProofTrustedMutations.ps1",
+                "scripts/Test-SharpProofMutationCatalog.ps1"
             ],
             ["declarativeModelsCatalog"] = [
                 "SharpProof.DeclarativeModels.catalog.json",
@@ -730,7 +749,8 @@ public sealed class ArchitectureTests
                 "SharpProof.Frontend/FrontendSubset.cs",
                 "SharpProof.Frontend/OperationSubsetClassifier.cs",
                 "SharpProof.Worker.Launcher/Program.cs",
-                "SharpProof.Worker/CallableVerificationPolicy.cs"
+                "SharpProof.Worker/CallableVerificationPolicy.cs",
+                "scripts/Get-SharpProofTcbPaths.ps1"
             ],
             ["resultAssembly"] = [
                 "SharpProof.Worker/CallableClaimResultAssembler.cs",
@@ -748,6 +768,9 @@ public sealed class ArchitectureTests
                 "SharpProof.Ir/CanonicalHashWriter.cs"
             ],
             ["protocolValidation"] = [
+                "SharpProof.Worker/Program.cs",
+                "SharpProof.Worker.Protocol/ProtocolModel.schema.json",
+                "scripts/Generate-ProtocolModel.ps1",
                 "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
                 "SharpProof.Worker.Protocol/ProtocolManifest.cs",
                 "SharpProof.Worker.Protocol/ProtocolManifestPayload.cs",
@@ -757,6 +780,7 @@ public sealed class ArchitectureTests
             ["cacheValidation"] = [
                 "SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs",
                 "SharpProof.CompilerArtifact/CompilerManifestArtifact.cs",
+                "SharpProof.Worker.Protocol/WorkerCachePath.cs",
                 "SharpProof.Worker/WorkerInputSnapshot.cs",
                 "SharpProof.Worker/VerificationCache.cs"
             ],
@@ -764,7 +788,13 @@ public sealed class ArchitectureTests
                 "SharpProof.PortableAnalyzer/SharpProof.PortableAnalyzer.csproj",
                 "SharpProof.Package/SharpProof.nuspec",
                 "SharpProof.Package/buildTransitive/SharpProof.props",
-                "SharpProof.Package/buildTransitive/SharpProof.targets"
+                "SharpProof.Package/buildTransitive/SharpProof.targets",
+                "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.targets"
+            ],
+            ["releaseContainment"] = [
+                "scripts/Invoke-SharpProofDotnet.ps1",
+                "scripts/JobObjectHelpers.ps1",
+                "scripts/Test-SharpProofPackageConsumers.ps1"
             ]
         };
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(
@@ -839,19 +869,29 @@ public sealed class ArchitectureTests
                 .And.Contain("SharpProof.Contracts/ContractForSymbolMatcher.cs")
                 .And.Contain("SharpProof.Contracts/ContractClauseInventory.cs")
                 .And.Contain("SharpProof.Attributes/SharpProofEffect.cs")
-                .And.Contain("SharpProof.Attributes/SharpProofCapability.cs"));
+                .And.Contain("SharpProof.Attributes/SharpProofCapability.cs")
+                .And.Contain("SharpProof.Worker/Program.cs"));
         Assert.That(
             File.ReadAllText(Path.Combine(
                 RepositoryRoot(),
                 "scripts",
                 "Get-SharpProofReleaseDigests.ps1")),
-            Does.Contain("$acceptanceJson.trustedKernel.paths"));
+            Does.Contain("Get-SharpProofTcbPaths"));
         Assert.That(
             File.ReadAllText(Path.Combine(
                 RepositoryRoot(),
                 "scripts",
                 "Test-SharpProofCoverage.ps1")),
-            Does.Contain("$contract.trustedKernel.paths"));
+            Does.Contain("Get-SharpProofTcbPaths")
+                .And.Contain("$canonicalTcbPaths")
+                .And.Contain("$coverageTcbPaths")
+                .And.Contain("$changedTcbFiles")
+                .And.Contain("ComparisonRef is required")
+                .And.Contain("contract.json")
+                .And.Contain("-Contract $contract")
+                .And.Contain("-IncludeAcceptanceContract")
+                .And.Contain("EndsWith('.cs'")
+                .And.Contain("changedMetadataFiles"));
     }
 
     [Test]
@@ -887,7 +927,125 @@ public sealed class ArchitectureTests
             "Use /p: and /m: in workflow PowerShell commands so script " +
             "parameter binding cannot consume MSBuild switches." +
             Environment.NewLine +
-            string.Join(Environment.NewLine, violations));
+                string.Join(Environment.NewLine, violations));
+    }
+
+    [Test]
+    public void ReleasePackageWorkflowBindsTheExactRepositoryCommit()
+    {
+        var workflow = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            ".github",
+            "workflows",
+            "package-consumers.yml"));
+        var bindings = Regex.Matches(
+                workflow,
+                @"/p:RepositoryCommit=\$env:GITHUB_SHA",
+                RegexOptions.CultureInvariant)
+            .Count;
+
+        Assert.That(bindings, Is.EqualTo(3));
+    }
+
+    [Test]
+    public void CrossPlatformPackageCachePrimingUsesTheNativeDotnetPath()
+    {
+        var workflow = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            ".github",
+            "workflows",
+            "package-consumers.yml"));
+        var primeStart = workflow.IndexOf(
+            "      - name: Prime the framework-only package cache",
+            StringComparison.Ordinal);
+        var primeEnd = workflow.IndexOf(
+            "      - name: Download exact NuGet artifacts",
+            primeStart,
+            StringComparison.Ordinal);
+
+        Assert.That(primeStart, Is.GreaterThanOrEqualTo(0));
+        Assert.That(primeEnd, Is.GreaterThan(primeStart));
+        var primeStep = workflow[primeStart..primeEnd];
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(primeStep, Does.Contain("if ($IsWindows)"));
+            Assert.That(
+                primeStep,
+                Does.Contain(
+                    "Invoke-SharpProofDotnet.ps1\" @restoreArguments"));
+            Assert.That(primeStep, Does.Contain("& dotnet @restoreArguments"));
+            Assert.That(
+                primeStep,
+                Does.Contain(
+                    "Framework-only package cache restore failed"));
+        }
+    }
+
+    [Test]
+    public void WorkerProcessCreationDisablesHandleInheritance()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "SharpProof.Worker.Launcher",
+            "Program.cs"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(source, Does.Contain("inheritHandles: false"));
+            Assert.That(source, Does.Not.Contain("inheritHandles: true"));
+        }
+    }
+
+    [Test]
+    public void WorkerClosureRetainsStagedComponentsUntilSnapshotDisposal()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "SharpProof.CompilerArtifact",
+            "CompilerManifestArtifact.cs"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                source.Contains(
+                    "FileStream[] stagedHandles = [];",
+                    StringComparison.Ordinal),
+                Is.True);
+            Assert.That(
+                source.Contains(
+                    "FileMode.CreateNew))",
+                    StringComparison.Ordinal),
+                Is.True);
+            Assert.That(
+                source.Contains(
+                    "staged.Write(sourceBytes, 0, sourceBytes.Length);",
+                    StringComparison.Ordinal),
+                Is.True);
+            Assert.That(
+                source.Contains(
+                    "hash.Add(component.Key.ToUpperInvariant()).Add(stagedRead);",
+                    StringComparison.Ordinal),
+                Is.True);
+            Assert.That(
+                source.Contains(
+                    "stagedHandles[stagedCount++] = OpenRead(stagedPath);",
+                    StringComparison.Ordinal),
+                Is.True);
+            Assert.That(
+                source.Contains(
+                    "File.Copy(component.Value, stagedPath);",
+                    StringComparison.Ordinal),
+                Is.False);
+            Assert.That(
+                source.Contains(
+                    "foreach (var handle in StagedHandles)",
+                    StringComparison.Ordinal),
+                Is.True);
+            Assert.That(
+                source.Contains("handle.Dispose();", StringComparison.Ordinal),
+                Is.True);
+        }
     }
 
     [Test]

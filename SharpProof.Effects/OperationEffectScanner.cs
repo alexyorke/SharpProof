@@ -133,26 +133,22 @@ internal sealed class OperationEffectScanner
                 Scan(increment.Target, EffectAccess.Read),
                 ScanWriteTarget(increment.Target, increment.Target, valueIsStoredDirectly: false),
                 CheckedOverflow(increment.IsChecked, increment),
-                _callResolver.ResolveOperator(increment.OperatorMethod, EffectRegionSet.Empty,
-                    [ClassifyRegion(increment.Target)],
-                    [increment.Target],
-                    increment)),
+                ResolveOperatorEffects(increment.OperatorMethod, [increment.Target], increment)),
             IInvocationOperation invocation => ScanInvocation(invocation),
             IObjectCreationOperation creation => ScanObjectCreation(creation),
             IArrayCreationOperation array => EffectSummaryOperations.Join(ScanChildren(array),
                 EffectSummaryOperations.Allocate(EffectAllocationKind.Managed), ArrayCreationExceptions(array)),
-            IDelegateCreationOperation delegateCreation => EffectSummaryOperations.Join(
-                ScanChildren(delegateCreation),
-                EffectSummaryOperations.Allocate(EffectAllocationKind.Managed)),
-            IInterpolatedStringOperation { ConstantValue.HasValue: true } => EffectSummary.Empty,
-            IAnonymousObjectCreationOperation anonymousObject => EffectSummaryOperations.Join(
-                ScanChildren(anonymousObject),
-                EffectSummaryOperations.Allocate(EffectAllocationKind.Managed)),
+            IOperation allocation when allocation is
+                IDelegateCreationOperation or IAnonymousObjectCreationOperation =>
+                EffectSummaryOperations.Join(
+                    ScanChildren(allocation),
+                    EffectSummaryOperations.Allocate(EffectAllocationKind.Managed)),
             IThrowOperation thrown when IsSourceThrow(thrown) => EffectSummaryOperations.Join(
                 ScanChildren(thrown),
                 EffectSummaryOperations.Throw(
                     ResolveThrownException(thrown))),
-            IThrowOperation => EffectSummary.Empty,
+            IInterpolatedStringOperation { ConstantValue.HasValue: true } or IThrowOperation =>
+                EffectSummary.Empty,
             IBinaryOperation binary => ScanBinary(binary),
             IUnaryOperation unary => ScanUnary(unary),
             IConversionOperation conversion => ScanConversion(conversion),
@@ -185,7 +181,7 @@ internal sealed class OperationEffectScanner
         var accessSummary = access == EffectAccess.Write
             ? EffectSummaryOperations.Write(region) : EffectSummaryOperations.Read(region);
         return EffectSummaryOperations.Join(
-            field.Instance == null ? EffectSummary.Empty : Scan(field.Instance),
+            ScanInstance(field.Instance),
             PotentialNullReceiver(field.Instance, field),
             accessSummary,
             field.Field.IsVolatile
@@ -203,8 +199,7 @@ internal sealed class OperationEffectScanner
             IsIntrinsicArrayCardinalityProperty(property))
         {
             return EffectSummaryOperations.Join(
-                property.Instance == null
-                    ? EffectSummary.Empty : Scan(property.Instance),
+                ScanInstance(property.Instance),
                 PotentialNullReceiver(property.Instance, property),
                 EffectSummaryOperations.Read(
                     ClassifyRegion(property.Instance, aliasSource: true)));
@@ -253,8 +248,7 @@ internal sealed class OperationEffectScanner
         var accessSummary = access == EffectAccess.Write
             ? EffectSummaryOperations.Write(region) : EffectSummaryOperations.Read(region);
         var exceptions = EffectSummary.Empty;
-        if (!DefiniteOperationFacts.IsDefinitelyNonNull(element.ArrayReference) &&
-            _abstractFlow?.ProvesNonNull(element, element.ArrayReference) != true)
+        if (!IsProvenNonNull(element.ArrayReference, element))
         {
             exceptions = EffectSummaryOperations.Join(exceptions, Throw(FrameworkTypeMetadataNames.NullReferenceException));
         }
@@ -309,10 +303,8 @@ internal sealed class OperationEffectScanner
 
     private EffectSummary ScanCompoundAssignment(ICompoundAssignmentOperation assignment)
     {
-        var operatorCall = _callResolver.ResolveOperator(
+        var operatorCall = ResolveOperatorEffects(
             assignment.OperatorMethod,
-            EffectRegionSet.Empty,
-            [ClassifyRegion(assignment.Target), ClassifyRegion(assignment.Value)],
             [assignment.Target, assignment.Value],
             assignment);
         var exceptions = IntegralDivisionExceptions(assignment.OperatorKind, assignment.Type,
@@ -346,7 +338,8 @@ internal sealed class OperationEffectScanner
         BinaryOperatorKind operatorKind, ITypeSymbol? type, IOperation left, IOperation right, IOperation origin)
     {
         if (operatorKind is not (BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder) ||
-            !IsIntegral(type))
+            !TryGetIntegralDivisionSemantics(
+                type, out var isSigned, out var hasMinimum, out var minimum))
         {
             return EffectSummary.Empty;
         }
@@ -354,9 +347,9 @@ internal sealed class OperationEffectScanner
         var result = _abstractFlow?.ProvesNonZero(origin, right) == true
             ? EffectSummary.Empty
             : Throw(FrameworkTypeMetadataNames.DivideByZeroException);
-        if (IsSignedIntegral(type))
+        if (isSigned)
         {
-            var overflowProvenAbsent = TryGetIntegerMinimum(type, out var minimum) &&
+            var overflowProvenAbsent = hasMinimum &&
                 _abstractFlow?.ProvesNoSignedDivisionOverflow(origin, left, right, minimum) == true;
             if (!overflowProvenAbsent)
             {
@@ -371,7 +364,7 @@ internal sealed class OperationEffectScanner
         if (invocation.IsImplicit &&
             invocation.Syntax.AncestorsAndSelf().Any(static syntax => syntax is LockStatementSyntax))
         {
-            return ScanMany(invocation.Arguments.Select(static argument => argument.Value));
+            return ScanArgumentValues(invocation.Arguments);
         }
 
         if (_session.IsConditionallyElided(invocation))
@@ -418,16 +411,27 @@ internal sealed class OperationEffectScanner
         IOperation? instance, IEnumerable<IArgumentOperation> arguments, IOperation origin)
     {
         return EffectSummaryOperations.Join(
-            instance == null ? EffectSummary.Empty : Scan(instance),
-            ScanMany(arguments.Select(static argument => argument.Value)),
+            ScanInstance(instance),
+            ScanArgumentValues(arguments),
             PotentialNullReceiver(instance, origin));
+    }
+
+    private EffectSummary ScanInstance(IOperation? instance)
+    {
+        return instance == null ? EffectSummary.Empty : Scan(instance);
+    }
+
+    private EffectSummary ScanArgumentValues(
+        IEnumerable<IArgumentOperation> arguments)
+    {
+        return ScanMany(arguments.Select(static argument => argument.Value));
     }
 
     private EffectSummary ScanObjectCreation(IObjectCreationOperation creation)
     {
         var receiver = EffectRegionSet.Create(EffectRegionId.Fresh(creation.Syntax.SpanStart));
         return EffectSummaryOperations.Join(
-            ScanMany(creation.Arguments.Select(static argument => argument.Value)),
+            ScanArgumentValues(creation.Arguments),
             creation.Initializer == null
                 ? EffectSummary.Empty
                 : ScanChildren(creation.Initializer),
@@ -454,8 +458,8 @@ internal sealed class OperationEffectScanner
             IntegralDivisionExceptions(binary.OperatorKind, binary.Type,
                 binary.LeftOperand, binary.RightOperand, binary),
             CheckedOverflow(binary.IsChecked, binary),
-            _callResolver.ResolveOperator(binary.OperatorMethod, EffectRegionSet.Empty,
-                [ClassifyRegion(binary.LeftOperand), ClassifyRegion(binary.RightOperand)],
+            ResolveOperatorEffects(
+                binary.OperatorMethod,
                 [binary.LeftOperand, binary.RightOperand],
                 binary));
     }
@@ -465,10 +469,7 @@ internal sealed class OperationEffectScanner
         return EffectSummaryOperations.Join(
             Scan(unary.Operand),
             CheckedOverflow(unary.IsChecked, unary),
-            _callResolver.ResolveOperator(unary.OperatorMethod, EffectRegionSet.Empty,
-                [ClassifyRegion(unary.Operand)],
-                [unary.Operand],
-                unary));
+            ResolveOperatorEffects(unary.OperatorMethod, [unary.Operand], unary));
     }
 
     private EffectSummary ScanConversion(IConversionOperation operation)
@@ -484,10 +485,20 @@ internal sealed class OperationEffectScanner
         return EffectSummaryOperations.Join(
             Scan(operation.Operand),
             ClassifyConversion(operation, conversion),
-            _callResolver.ResolveOperator(operation.OperatorMethod, EffectRegionSet.Empty,
-                [ClassifyRegion(operation.Operand)],
-                [operation.Operand],
-                operation));
+            ResolveOperatorEffects(operation.OperatorMethod, [operation.Operand], operation));
+    }
+
+    private EffectSummary ResolveOperatorEffects(
+        IMethodSymbol? method,
+        ImmutableArray<IOperation?> operands,
+        IOperation origin)
+    {
+        return _callResolver.ResolveOperator(
+            method,
+            EffectRegionSet.Empty,
+            [.. operands.Select(operand => ClassifyRegion(operand))],
+            operands,
+            origin);
     }
 
     private EffectSummary ClassifyConversion(
@@ -536,7 +547,7 @@ internal sealed class OperationEffectScanner
             return ClassifyNullableAndCheckedConversion(operation);
         }
 
-        if (conversion.IsNumeric || conversion.IsEnumeration)
+        if (conversion is { IsNumeric: true } or { IsEnumeration: true })
         {
             return CheckedOverflow(operation.IsChecked, operation);
         }
@@ -546,19 +557,22 @@ internal sealed class OperationEffectScanner
             return EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
         }
 
-        if (conversion.IsAnonymousFunction || conversion.IsMethodGroup)
+        if (conversion is
+        { IsAnonymousFunction: true } or
+        { IsMethodGroup: true })
         {
             return EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
         }
 
-        if (conversion.IsIdentity ||
-            conversion.IsNullLiteral ||
-            conversion.IsDefaultLiteral ||
-            conversion.IsConstantExpression ||
-            conversion.IsThrow ||
-            conversion.IsObjectCreation ||
-            conversion.IsSwitchExpression ||
-            conversion.IsConditionalExpression)
+        if (conversion is
+        { IsIdentity: true } or
+        { IsNullLiteral: true } or
+        { IsDefaultLiteral: true } or
+        { IsConstantExpression: true } or
+        { IsThrow: true } or
+        { IsObjectCreation: true } or
+        { IsSwitchExpression: true } or
+        { IsConditionalExpression: true })
         {
             return EffectSummary.Empty;
         }
@@ -619,11 +633,7 @@ internal sealed class OperationEffectScanner
 
     private EffectSummary PotentialNullReceiver(IOperation? instance, IOperation access)
     {
-        if (instance == null ||
-            instance is IInstanceReferenceOperation ||
-            instance.Type is { IsValueType: true } ||
-            DefiniteOperationFacts.IsDefinitelyNonNull(instance) ||
-            _abstractFlow?.ProvesNonNull(access, instance) == true)
+        if (IsProvenNonNull(instance, access))
         {
             return EffectSummary.Empty;
         }
@@ -633,10 +643,18 @@ internal sealed class OperationEffectScanner
 
     private EffectSummary PotentialNullLock(IOperation value, IOperation origin)
     {
-        return DefiniteOperationFacts.IsDefinitelyNonNull(value) ||
-        _abstractFlow?.ProvesNonNull(origin, value) == true
+        return IsProvenNonNull(value, origin)
             ? EffectSummary.Empty
             : Throw(FrameworkTypeMetadataNames.ArgumentNullException);
+    }
+
+    private bool IsProvenNonNull(IOperation? value, IOperation access)
+    {
+        return value == null ||
+            value is IInstanceReferenceOperation ||
+            value.Type is { IsValueType: true } ||
+            DefiniteOperationFacts.IsDefinitelyNonNull(value) ||
+            _abstractFlow?.ProvesNonNull(access, value) == true;
     }
 
     private EffectSummary ArrayCreationExceptions(
@@ -657,8 +675,7 @@ internal sealed class OperationEffectScanner
         }
 
         var exceptions = _session.ResolveThrownException(thrown.Exception);
-        if (DefiniteOperationFacts.IsDefinitelyNonNull(thrown.Exception) ||
-            _abstractFlow?.ProvesNonNull(thrown, thrown.Exception) == true)
+        if (IsProvenNonNull(thrown.Exception, thrown))
         {
             return exceptions;
         }
@@ -920,10 +937,11 @@ internal sealed class OperationEffectScanner
             IParameterReferenceOperation parameter => ClassifyParameter(parameter.Parameter),
             ILocalReferenceOperation local => ClassifyLocal(local.Local),
             IFieldReferenceOperation { Field.IsStatic: true } => EffectRegionSet.Create(EffectRegionId.Static()),
-            IFieldReferenceOperation => EffectRegionSet.Unknown,
-            IArrayElementReferenceOperation => EffectRegionSet.Unknown,
-            IObjectCreationOperation creation => EffectRegionSet.Create(EffectRegionId.Fresh(creation.Syntax.SpanStart)),
-            IArrayCreationOperation creation => EffectRegionSet.Create(EffectRegionId.Fresh(creation.Syntax.SpanStart)),
+            IFieldReferenceOperation or IArrayElementReferenceOperation =>
+                EffectRegionSet.Unknown,
+            IOperation creation when creation is
+                IObjectCreationOperation or IArrayCreationOperation =>
+                EffectRegionSet.Create(EffectRegionId.Fresh(creation.Syntax.SpanStart)),
             IConditionalOperation conditional when aliasSource =>
                 ClassifyRegion(conditional.WhenTrue, true).Union(
                     ClassifyRegion(conditional.WhenFalse, true)),
@@ -985,9 +1003,7 @@ internal sealed class OperationEffectScanner
                 {
                     IVariableDeclaratorOperation declarator =>
                         (declarator.Symbol, declarator.Initializer?.Value),
-                    ISimpleAssignmentOperation { Target: ILocalReferenceOperation local } assignment =>
-                        (local.Local, assignment.Value),
-                    ICoalesceAssignmentOperation { Target: ILocalReferenceOperation local } assignment =>
+                    IAssignmentOperation { Target: ILocalReferenceOperation local } assignment =>
                         (local.Local, assignment.Value),
                     _ => default
                 };
@@ -1095,47 +1111,29 @@ internal sealed class OperationEffectScanner
         CompilerIdentityBridge.IsIntrinsicSequenceLength(property);
     }
 
-    private static bool IsIntegral(ITypeSymbol? type)
+    private static bool TryGetIntegralDivisionSemantics(
+        ITypeSymbol? type, out bool isSigned, out bool hasMinimum, out long minimum)
     {
-        return TryGetIntegerSemantics(type, out _) ||
-        UnwrapNullable(type)?.SpecialType is
-            SpecialType.System_UInt64 or SpecialType.System_IntPtr or SpecialType.System_UIntPtr;
-    }
-
-    private static bool IsSignedIntegral(ITypeSymbol? type)
-    {
-        return TryGetIntegerSemantics(type, out var semantics)
-            ? semantics.IsSigned
-            : UnwrapNullable(type)?.SpecialType == SpecialType.System_IntPtr;
-    }
-
-    private static bool TryGetIntegerMinimum(ITypeSymbol? type, out long minimum)
-    {
-        if (TryGetIntegerSemantics(type, out var semantics) && semantics.IsSigned)
-        {
-            minimum = semantics.Minimum;
-            return true;
-        }
-        minimum = 0;
-        return false;
-    }
-
-    private static ITypeSymbol? UnwrapNullable(ITypeSymbol? type)
-    {
-        return type is INamedTypeSymbol
+        var specialType = type is INamedTypeSymbol
         {
             OriginalDefinition.SpecialType: SpecialType.System_Nullable_T,
             TypeArguments.Length: 1
         } nullable
-            ? nullable.TypeArguments[0]
-            : type;
-    }
+            ? nullable.TypeArguments[0].SpecialType
+            : type?.SpecialType ?? SpecialType.None;
+        if (CSharpScalarSemantics.TryGetInteger(specialType, out var semantics))
+        {
+            isSigned = semantics.IsSigned;
+            hasMinimum = isSigned;
+            minimum = semantics.Minimum;
+            return true;
+        }
 
-    private static bool TryGetIntegerSemantics(
-        ITypeSymbol? type, out CSharpIntegerSemantics semantics)
-    {
-        return CSharpScalarSemantics.TryGetInteger(
-            UnwrapNullable(type)?.SpecialType ?? SpecialType.None, out semantics);
+        isSigned = specialType == SpecialType.System_IntPtr;
+        hasMinimum = false;
+        minimum = 0;
+        return specialType is
+            SpecialType.System_UInt64 or SpecialType.System_IntPtr or SpecialType.System_UIntPtr;
     }
 
     private enum EffectAccess

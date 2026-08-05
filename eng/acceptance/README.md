@@ -101,6 +101,9 @@ ratchets. Expression nodes, decision points, and declarations are release
 gates; physical and nonblank lines are informational only. It then builds the
 repository under the bounded Job Object wrapper and runs
 every current architecture, semantic, corpus, fuzz, worker, package,
+and coverage gate. Changed-TCB coverage selects the same canonical union used
+by release digests; C# paths are checked with sequence-point evidence, while
+changed declarative metadata is reported explicitly in the coverage summary.
 cancellation, and performance gate. Unannotated advisory performance compares
 paired, order-interleaved compiler-only and SharpProof-imported MSBuild
 rebuilds of contract-free code with ordinary source and BCL calls under the

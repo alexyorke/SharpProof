@@ -224,18 +224,36 @@ function Invoke-ConsumerDotNet {
     )
 
     Push-Location $WorkingDirectory
+    $capturePath = $null
     try {
         $captureOutput = $Arguments[0] -eq '--version' -or
             $Arguments[0] -eq 'msbuild'
-        if ($WindowsHost -and -not $captureOutput) {
-            & (Join-Path `
-                $RepositoryRoot `
-                'scripts\Invoke-SharpProofDotnet.ps1') `
+        if ($WindowsHost) {
+            $wrapper = Join-Path $RepositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
+            if ($captureOutput) {
+                $capturePath = Join-Path $WorkingDirectory (
+                    '.sharp-proof-dotnet-' +
+                    [Guid]::NewGuid().ToString('N') + '.log')
+                & $wrapper `
+                    -MemoryLimitMb 4096 `
+                    -TimeoutSeconds 300 `
+                    -OutputPath $capturePath `
+                    @Arguments
+                $output = if ([IO.File]::Exists($capturePath)) {
+                    [IO.File]::ReadAllText($capturePath)
+                }
+                else {
+                    ''
+                }
+            }
+            else {
+                & $wrapper `
                     -MemoryLimitMb 4096 `
                     -TimeoutSeconds 300 `
                     @Arguments
+                $output = ''
+            }
             $exitCode = $LASTEXITCODE
-            $output = ''
         }
         else {
             $output = & dotnet @Arguments 2>&1 | Out-String
@@ -252,6 +270,9 @@ function Invoke-ConsumerDotNet {
         return $output.Trim()
     }
     finally {
+        if ($null -ne $capturePath -and [IO.File]::Exists($capturePath)) {
+            Remove-Item -LiteralPath $capturePath -Force
+        }
         Pop-Location
     }
 }

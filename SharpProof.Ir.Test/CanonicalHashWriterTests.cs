@@ -83,6 +83,28 @@ public sealed class CanonicalHashWriterTests
     }
 
     [Test]
+    public void StreamGrowthBeyondTheDeclaredLengthFailsClosed()
+    {
+        using var writer = new CanonicalHashWriter();
+        using var stream = new GrowingStream([0, 1, 2, 3]);
+
+        Assert.That(
+            (Action)(() => writer.Add(stream)),
+            Throws.TypeOf<InvalidDataException>());
+    }
+
+    [Test]
+    public void ZeroLengthStreamGrowthFailsClosed()
+    {
+        using var writer = new CanonicalHashWriter();
+        using var stream = new GrowingStream([]);
+
+        Assert.That(
+            (Action)(() => writer.Add(stream)),
+            Throws.TypeOf<InvalidDataException>());
+    }
+
+    [Test]
     public void FinishedWriterRejectsFurtherUse()
     {
         using var writer = new CanonicalHashWriter();
@@ -101,5 +123,30 @@ public sealed class CanonicalHashWriterTests
     private enum TestEnum
     {
         One = 1
+    }
+
+    private sealed class GrowingStream : MemoryStream
+    {
+        private bool _grown;
+
+        internal GrowingStream(byte[] initial)
+        {
+            Write(initial);
+            Position = 0;
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (!_grown)
+            {
+                _grown = true;
+                SetLength(Length + 1);
+                Position = Length - 1;
+                WriteByte(4);
+                Position = 0;
+            }
+
+            return base.Read(buffer, offset, count);
+        }
     }
 }

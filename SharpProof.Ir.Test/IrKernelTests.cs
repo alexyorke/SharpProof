@@ -777,6 +777,46 @@ public sealed class IrKernelTests
             Is.EqualTo(IrUnsupportedReason.InvalidVariableValue));
     }
 
+    [TestCase(IrBinaryOperator.Add, "Integer arithmetic requires integer values.")]
+    [TestCase(IrBinaryOperator.LessThan, "Integer comparison requires integer values.")]
+    [TestCase(IrBinaryOperator.LessThanOrEqual, "Integer comparison requires integer values.")]
+    [TestCase(IrBinaryOperator.GreaterThan, "Integer comparison requires integer values.")]
+    [TestCase(IrBinaryOperator.GreaterThanOrEqual, "Integer comparison requires integer values.")]
+    public void InterpreterRejectsNonIntegerRuntimeKindsForIntegerBinaryOperators(
+        IrBinaryOperator @operator, string expectedDetail)
+    {
+        var factory = new IrFactory();
+        var left = factory.CreateVariable("left", factory.IntegerType);
+        var right = factory.CreateVariable("right", factory.IntegerType);
+        var term = factory.Binary(
+            @operator,
+            factory.Variable(left),
+            factory.Variable(right));
+        var wrongKind = new IrValue(
+            factory.IntegerType,
+            IrValueKind.Boolean,
+            true);
+
+        var result = new IrInterpreter(factory).Evaluate(
+            term,
+            new Dictionary<IrVarId, IrValue>
+            {
+                [left] = wrongKind,
+                [right] = factory.CreateIntegerValue(1)
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Status,
+                Is.EqualTo(IrEvaluationStatus.Unsupported));
+            Assert.That(
+                result.Unsupported!.Reason,
+                Is.EqualTo(IrUnsupportedReason.InvalidVariableValue));
+            Assert.That(result.Unsupported.Detail, Is.EqualTo(expectedDetail));
+        }
+    }
+
     [Test]
     public void InterpreterEvaluatesSequenceLengthAndAccessFailures()
     {

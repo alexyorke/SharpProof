@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Runtime.InteropServices;
 using NUnit.Framework;
+using SharpProof.CompilerArtifact;
+using SharpProof.Worker;
 using SharpProof.Worker.Launcher;
 using SharpProof.Worker.Protocol;
 
@@ -233,6 +235,97 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void CachePathResolutionUsesTheManifestProjectDirectory()
+    {
+        var projectDirectory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "cache-project");
+        var defaultPath = Path.Combine(
+            projectDirectory,
+            "obj",
+            "SharpProof",
+            "cache");
+        var relativePath = Path.Combine("nested", "cache");
+        var absolutePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "absolute-cache");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                WorkerCachePath.Resolve(null, projectDirectory),
+                Is.EqualTo(Path.GetFullPath(defaultPath)));
+            Assert.That(
+                WorkerCachePath.Resolve(" ", projectDirectory),
+                Is.EqualTo(Path.GetFullPath(defaultPath)));
+            Assert.That(
+                WorkerCachePath.Resolve(relativePath, projectDirectory),
+                Is.EqualTo(Path.GetFullPath(
+                    Path.Combine(projectDirectory, relativePath))));
+            Assert.That(
+                WorkerCachePath.Resolve(absolutePath, projectDirectory),
+                Is.EqualTo(Path.GetFullPath(absolutePath)));
+        }
+    }
+
+    [Test]
+    public void RequestProjectionRejectsReparsePointPathBeforeManifestRead()
+    {
+        var root = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "reparse-path-" + Guid.NewGuid().ToString("N"));
+        var target = Path.Combine(root, "target");
+        var alias = Path.Combine(root, "alias");
+        Directory.CreateDirectory(target);
+        try
+        {
+            try
+            {
+                Directory.CreateSymbolicLink(alias, target);
+            }
+            catch (IOException exception)
+            {
+                Assert.Ignore("The test host cannot create directory links: " + exception.Message);
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                Assert.Ignore("The test host cannot create directory links: " + exception.Message);
+            }
+            catch (PlatformNotSupportedException exception)
+            {
+                Assert.Ignore("The test host does not support directory links: " + exception.Message);
+            }
+
+            string[] arguments = [
+                "verify",
+                "--worker", Path.Combine(root, "worker.dll"),
+                "--request", Path.Combine(root, "request.json"),
+                "--result", Path.Combine(alias, "result.json"),
+                "--compiler-manifest", Path.Combine(root, "missing.json"),
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow"
+            ];
+            Assert.That(
+                LauncherArguments.TryParse(arguments, out var parsed),
+                Is.True);
+            Assert.That(
+                (Action)(() => parsed.ValidateDistinctPaths(null)),
+                Throws.TypeOf<ArgumentException>());
+        }
+        finally
+        {
+            if (Directory.Exists(alias))
+            {
+                Directory.Delete(alias);
+            }
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Test]
     public void RequestProjectionRejectsCollidingIoPathsBeforeManifestRead()
     {
         string[] arguments = [
@@ -251,6 +344,401 @@ public sealed class LauncherArgumentTests
         Assert.That(
             (Action)(() => parsed.CreateRequest(out _, out _)),
             Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
+    public void RequestProjectionRejectsCachePathCollisionBeforeManifestRead()
+    {
+        var requestPath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "request.json");
+        string[] arguments = [
+            "verify",
+            "--worker", "worker.dll",
+            "--request", requestPath,
+            "--result", Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "result.json"),
+            "--compiler-manifest", "missing-compiler-manifest.json",
+            "--cache-directory", requestPath,
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
+    public void RequestProjectionRejectsWorkerTreeOutputBeforeManifestRead()
+    {
+        var worker = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "worker-tree-worker.dll");
+        string[] arguments = [
+            "verify",
+            "--worker", worker,
+            "--request", Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "worker-tree-request.json"),
+            "--result", Path.Combine(
+                Path.GetDirectoryName(worker)!,
+                "worker-tree-output.json"),
+            "--compiler-manifest", "missing-compiler-manifest.json",
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
+    public void RequestProjectionRejectsWorkerPathCollisionBeforeManifestRead()
+    {
+        string[] arguments = [
+            "verify",
+            "--worker", "request.json",
+            "--request", "request.json",
+            "--result", "result.json",
+            "--compiler-manifest", "missing-compiler-manifest.json",
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
+    public void MissingWorkerWithoutDllSuffixIsRejectedBeforeHashing()
+    {
+        var worker = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "missing-worker-" + Guid.NewGuid().ToString("N"));
+
+        var exception = Assert.Throws<FileNotFoundException>((Action)(() =>
+            Program.ComputeExpectedInputHash(
+                worker,
+                new WorkerVerifyRequest(),
+                [])));
+        Assert.That(exception!.Message, Does.Contain("must be a .dll"));
+    }
+
+    [TestCase("worker.deps.json")]
+    [TestCase("worker.runtimeconfig.json")]
+    public void RequestProjectionRejectsWorkerRuntimeCompanionCollisionBeforeManifestRead(
+        string resultPath)
+    {
+        string[] arguments = [
+            "verify",
+            "--worker", "worker.dll",
+            "--request", "request.json",
+            "--result", resultPath,
+            "--compiler-manifest", "missing-compiler-manifest.json",
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [TestCase("launcher")]
+    [TestCase(".deps.json")]
+    [TestCase(".runtimeconfig.json")]
+    [TestCase("SharpProof.CompilerArtifact.dll")]
+    [TestCase("SharpProof.Ir.dll")]
+    [TestCase("SharpProof.Specs.dll")]
+    [TestCase("SharpProof.Worker.Protocol.dll")]
+    [TestCase("SharpProof.Worker.Launcher.exe")]
+    [TestCase("System.IO.Pipelines.dll")]
+    [TestCase("System.Text.Encodings.Web.dll")]
+    [TestCase("System.Text.Json.dll")]
+    public void RequestProjectionRejectsLauncherRuntimeCollisionBeforeManifestRead(
+        string extension)
+    {
+        var launcher = LauncherArguments.LauncherRuntimePaths[0];
+        var resultPath = extension switch
+        {
+            "launcher" => launcher,
+            _ when extension.Length > 0 && extension[0] == '.' =>
+                Path.ChangeExtension(launcher, extension),
+            _ => Path.Combine(Path.GetDirectoryName(launcher)!, extension)
+        };
+        string[] arguments = [
+            "verify",
+            "--worker", Path.Combine(
+                Path.GetTempPath(),
+                "SharpProof-isolated-worker-" + Guid.NewGuid().ToString("N"),
+                "worker.dll"),
+            "--request", "request.json",
+            "--result", resultPath,
+            "--compiler-manifest", "missing-compiler-manifest.json",
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+        Assert.That(
+            (Action)(() => parsed.ValidateDistinctPaths(null)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
+    public void RequestProjectionRejectsLauncherProtocolRuntimeCollisionBeforeManifestRead()
+    {
+        var launcher = LauncherArguments.LauncherRuntimePaths[0];
+        var protocol = Path.Combine(
+            Path.GetDirectoryName(launcher)!,
+            "SharpProof.Worker.Protocol.dll");
+        string[] arguments = [
+            "verify",
+            "--worker", Path.Combine(
+                Path.GetTempPath(),
+                "SharpProof-isolated-worker-" + Guid.NewGuid().ToString("N"),
+                "worker.dll"),
+            "--request", "request.json",
+            "--result", protocol,
+            "--compiler-manifest", "missing-compiler-manifest.json",
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+        Assert.That(
+            (Action)(() => parsed.ValidateDistinctPaths(null)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
+    public void RequestProjectionRejectsDiscoveredRuntimeAssetCollisionBeforeManifestRead()
+    {
+        var worker = typeof(SharpProofWorker).Assembly.Location;
+        var testRoot = Path.GetDirectoryName(Path.GetDirectoryName(worker)!)!;
+        var testId = Guid.NewGuid().ToString("N");
+        var runtimeAsset = Path.Combine(
+            testRoot,
+            "SharpProof-discovered-runtime-asset-" + testId + ".bin");
+        using var snapshot = new WorkerRuntimeClosureSnapshot(
+            worker,
+            Path.Combine(
+                testRoot,
+                "SharpProof-snapshot-" + Guid.NewGuid().ToString("N"),
+                Path.GetFileName(worker)),
+            [runtimeAsset],
+            "snapshot",
+            Array.Empty<FileStream>());
+        string[] arguments = [
+            "verify",
+            "--worker", worker,
+            "--request", Path.Combine(testRoot, "SharpProof-safe-request-" + testId + ".json"),
+            "--result", runtimeAsset,
+            "--compiler-manifest", Path.Combine(
+                testRoot, "SharpProof-safe-missing-manifest-" + testId + ".json"),
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        var nonCollidingArguments = arguments.ToArray();
+        nonCollidingArguments[6] = Path.Combine(
+            testRoot, "SharpProof-safe-result-" + testId + ".json");
+        Assert.That(
+            LauncherArguments.TryParse(nonCollidingArguments, out var nonColliding),
+            Is.True);
+        Assert.That(
+            (Action)(() => nonColliding.CreateRequest(snapshot, out _, out _)),
+            Throws.TypeOf<FileNotFoundException>());
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Exception? collision = null;
+        try
+        {
+            parsed.CreateRequest(snapshot, out _, out _);
+        }
+        catch (ArgumentException exception)
+        {
+            collision = exception;
+        }
+        catch (FileNotFoundException exception)
+        {
+            collision = exception;
+        }
+        Assert.That(collision?.GetType(), Is.EqualTo(typeof(ArgumentException)));
+    }
+
+    [TestCase(0)]
+    [TestCase(300_001)]
+    public void TerminationGraceIsBoundedBeforeWorkerStarts(int graceMilliseconds)
+    {
+        string[] arguments = [
+            .. ValidArguments(),
+            "--termination-grace-ms",
+            graceMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Assert.That(
+            (Action)parsed.ValidatePreflight,
+            Throws.TypeOf<ArgumentOutOfRangeException>());
+    }
+
+    [Test]
+    public void ProcessMemoryLimitHasFiniteProtocolBound()
+    {
+        var request = new WorkerVerifyRequest
+        {
+            CompilerManifest = new WorkerFileReference
+            {
+                Path = "compiler-manifest.json",
+                Sha256 = new('a', 64)
+            },
+            Budgets = new WorkerBudgets
+            {
+                ProcessMemoryLimitBytes = WorkerBudgets.MaximumProcessMemoryLimitBytes + 1
+            }
+        };
+
+        var validation = WorkerProtocolJson.Validate(request);
+
+        Assert.That(validation.IsValid, Is.False);
+        Assert.That(
+            validation.Errors.Select(static error => error.Code),
+            Does.Contain("budgets.process_memory"));
+    }
+
+    [Test]
+    [NonParallelizable]
+    public async Task MainLeavesRequestAndResultSentinelsWhenManifestIsMalformed()
+    {
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var worker = Path.Combine(directory, "worker.dll");
+        var request = Path.Combine(directory, "request.json");
+        var result = Path.Combine(directory, "result.json");
+        var manifest = Path.Combine(directory, "compiler-manifest.json");
+        const string requestSentinel = "request sentinel";
+        const string resultSentinel = "result sentinel";
+        try
+        {
+            await File.WriteAllTextAsync(request, requestSentinel);
+            await File.WriteAllTextAsync(result, resultSentinel);
+            await File.WriteAllTextAsync(manifest, "{ malformed manifest");
+
+            var exitCode = await Program.Main([
+                "verify",
+                "--worker", worker,
+                "--request", request,
+                "--result", result,
+                "--compiler-manifest", manifest,
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow"
+            ]);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exitCode, Is.EqualTo(2));
+                Assert.That(await File.ReadAllTextAsync(request), Is.EqualTo(requestSentinel));
+                Assert.That(await File.ReadAllTextAsync(result), Is.EqualTo(resultSentinel));
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Test]
+    [NonParallelizable]
+    public async Task MainFailsClosedWhenWorkerDependencyManifestIsMalformed()
+    {
+        var sourceWorker = typeof(SharpProofWorker).Assembly.Location;
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N"));
+        var ioDirectory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        Directory.CreateDirectory(ioDirectory);
+        var worker = Path.Combine(directory, "worker.dll");
+        try
+        {
+            File.Copy(sourceWorker, worker);
+            File.Copy(
+                Path.ChangeExtension(sourceWorker, ".runtimeconfig.json"),
+                Path.ChangeExtension(worker, ".runtimeconfig.json"));
+            await File.WriteAllTextAsync(
+                Path.ChangeExtension(worker, ".deps.json"),
+                "{ malformed dependency manifest");
+
+            var escaped = false;
+            var exitCode = 0;
+            try
+            {
+                exitCode = await Program.Main([
+                    "verify",
+                    "--worker", worker,
+                    "--request", Path.Combine(ioDirectory, "request.json"),
+                    "--result", Path.Combine(ioDirectory, "result.json"),
+                    "--compiler-manifest", Path.Combine(ioDirectory, "missing.json"),
+                    "--verify-policy", "advisory",
+                    "--assumption-policy", "allow"
+                ]);
+            }
+            catch (JsonException)
+            {
+                escaped = true;
+            }
+            catch (KeyNotFoundException)
+            {
+                escaped = true;
+            }
+            catch (InvalidOperationException)
+            {
+                escaped = true;
+            }
+
+            Assert.That(escaped, Is.False);
+            Assert.That(exitCode, Is.EqualTo(2));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+            if (Directory.Exists(ioDirectory))
+            {
+                Directory.Delete(ioDirectory, recursive: true);
+            }
+        }
     }
 
     [Test]
@@ -287,6 +775,48 @@ public sealed class LauncherArgumentTests
         finally
         {
             File.Delete(path);
+        }
+    }
+
+    [Test]
+    public void WorkerResultByteLimitIsEnforcedBeforeDeserialization()
+    {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N") + ".json");
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        try
+        {
+            using (var stream = File.Create(path))
+            {
+                stream.SetLength(WorkerProtocolJson.MaximumJsonBytes + 1L);
+            }
+
+            Console.SetError(error);
+            var exitCode = Program.ValidateAndReport(
+                path,
+                new WorkerVerifyRequest(),
+                null,
+                null,
+                out var validResponse,
+                out var validatedResponse);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exitCode, Is.EqualTo(3));
+                Assert.That(validResponse, Is.False);
+                Assert.That(validatedResponse, Is.Null);
+                Assert.That(error.ToString(), Does.Contain("unavailable or malformed"));
+            }
+        }
+        finally
+        {
+            Console.SetError(originalError);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
         }
     }
 
@@ -382,7 +912,7 @@ public sealed class LauncherArgumentTests
                 path, WorkerProtocolJson.SerializeResponse(response));
             Assert.That(
                 Program.ValidateAndReport(
-                    path, request, inputHash, manifest, out var valid),
+                    path, request, inputHash, manifest, out var valid, out _),
                 Is.EqualTo(3));
             Assert.That(valid, Is.False);
             Assert.That(capture.ToString(), Does.Contain(expectedError));
@@ -488,7 +1018,8 @@ public sealed class LauncherArgumentTests
                 request,
                 inputHash,
                 manifest,
-                out var valid);
+                out var valid,
+                out _);
 
             using (Assert.EnterMultipleScope())
             {

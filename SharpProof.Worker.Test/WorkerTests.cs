@@ -39,6 +39,36 @@ public sealed class WorkerTests
         "managed-array-allocation"
     ];
 
+    private static bool TryCreateFileSymbolicLink(string link, string target)
+    {
+        try
+        {
+            File.CreateSymbolicLink(link, target);
+            return true;
+        }
+        catch (Exception exception) when (exception is
+            IOException or UnauthorizedAccessException or
+            PlatformNotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryCreateDirectorySymbolicLink(string link, string target)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(link, target);
+            return true;
+        }
+        catch (Exception exception) when (exception is
+            IOException or UnauthorizedAccessException or
+            PlatformNotSupportedException)
+        {
+            return false;
+        }
+    }
+
     [Test]
     public void ProtocolValidationClosesVersionAndBudgetBounds()
     {
@@ -1515,7 +1545,7 @@ public sealed class WorkerTests
 
         Assert.That(backend.CallCount, Is.EqualTo(requests.Count));
         Assert.That(
-            Directory.GetFiles(project.CacheDirectory, "*.json"),
+            Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
             Has.Length.EqualTo(requests.Count));
 
         void Add(
@@ -3125,7 +3155,7 @@ public sealed class WorkerTests
         AssertSemanticallyEquivalent(first, second);
         Assert.That(
             Directory.Exists(project.CacheDirectory)
-                ? Directory.GetFiles(project.CacheDirectory, "*.json")
+                ? Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json")
                 : [],
             Is.Empty);
     }
@@ -3411,7 +3441,7 @@ public sealed class WorkerTests
         var first = await worker.VerifyAsync(request);
         var cacheFile = Directory.GetFiles(
             project.CacheDirectory,
-            "*.json").Single();
+            "*.sharp-proof-cache.json").Single();
         await File.WriteAllTextAsync(cacheFile, "{corrupt");
         var second = await worker.VerifyAsync(request);
 
@@ -3429,7 +3459,7 @@ public sealed class WorkerTests
         var first = await worker.VerifyAsync(request);
         var cacheFile = Directory.GetFiles(
             project.CacheDirectory,
-            "*.json").Single();
+            "*.sharp-proof-cache.json").Single();
         var current = "\"schemaVersion\":" +
             WorkerCacheVersions.Current.ToString(
                 System.Globalization.CultureInfo.InvariantCulture);
@@ -3456,13 +3486,242 @@ public sealed class WorkerTests
         request.Cache.MaximumBytes = 1;
         var backend = new SpuriousModelBackend();
         using var worker = new SharpProofWorker(backend);
-        await worker.VerifyAsync(request);
+        var first = await worker.VerifyAsync(request);
+        var second = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
+            Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
+            Assert.That(
+                Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
+                Is.Empty);
+        }
+    }
+
+    [Test]
+    public async Task CacheEvictionPreservesUnrelatedJsonFiles()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        Directory.CreateDirectory(project.CacheDirectory);
+        var unrelatedPath = Path.Combine(project.CacheDirectory, "unrelated.json");
+        await File.WriteAllTextAsync(unrelatedPath, "not a cache entry");
+
+        var request = project.CreateRequest(cacheEnabled: true);
+        request.Cache.MaximumBytes = 1;
+        using var worker = new SharpProofWorker(new SpuriousModelBackend());
         await worker.VerifyAsync(request);
 
-        Assert.That(backend.CallCount, Is.EqualTo(2));
-        Assert.That(
-            Directory.GetFiles(project.CacheDirectory, "*.json"),
-            Is.Empty);
+        Assert.That(File.Exists(unrelatedPath), Is.True);
+    }
+
+    [Test]
+    public async Task CacheEvictionFailurePreservesHeldCacheEntry()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("Cache sharing violations are Windows-specific.");
+        }
+
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        request.Cache.MaximumBytes = 1024 * 1024;
+        var backend = new SpuriousModelBackend();
+        using var worker = new SharpProofWorker(backend);
+        var first = await worker.VerifyAsync(request);
+        Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+
+        var firstCacheFile = Directory.GetFiles(
+            project.CacheDirectory,
+            "*.sharp-proof-cache.json").Single();
+        var maximumBytes = new FileInfo(firstCacheFile).Length + 1;
+        using var held = new FileStream(
+            firstCacheFile,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read);
+
+        var secondRequest = project.CreateRequest(
+            cacheEnabled: true,
+            targetFramework: "net8.0-windows");
+        secondRequest.Cache.MaximumBytes = maximumBytes;
+        var second = await worker.VerifyAsync(secondRequest);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(second.Errors, Is.Empty);
+            Assert.That(File.Exists(firstCacheFile), Is.True);
+        }
+    }
+
+    [Test]
+    public async Task CacheDirectoryLockMakesReadMissAndWriteUnavailable()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        var backend = new SpuriousModelBackend();
+        using var worker = new SharpProofWorker(backend);
+        var first = await worker.VerifyAsync(request);
+        Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+
+        using var heldLock = new FileStream(
+            Path.Combine(project.CacheDirectory, ".sharp-proof-cache.lock"),
+            FileMode.OpenOrCreate,
+            FileAccess.ReadWrite,
+            FileShare.None);
+        var second = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
+        }
+    }
+
+    [Test]
+    public async Task ReparsePointCacheEntryFailsClosedWithoutTouchingTarget()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        var backend = new SpuriousModelBackend();
+        using var worker = new SharpProofWorker(backend);
+        var first = await worker.VerifyAsync(request);
+        Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+
+        var cacheFile = Directory.GetFiles(
+            project.CacheDirectory,
+            "*.sharp-proof-cache.json").Single();
+        var external = Path.Combine(project.DirectoryPath, "external-cache.json");
+        const string externalContents = "external cache target";
+        await File.WriteAllTextAsync(external, externalContents);
+        File.Delete(cacheFile);
+        if (!TryCreateFileSymbolicLink(cacheFile, external))
+        {
+            Assert.Ignore("The host does not permit symbolic-link creation.");
+        }
+
+        var second = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
+            Assert.That(await File.ReadAllTextAsync(external), Is.EqualTo(externalContents));
+        }
+    }
+
+    [Test]
+    public async Task ReparsePointCacheLockFailsClosedWithoutTouchingTarget()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        var backend = new SpuriousModelBackend();
+        using var worker = new SharpProofWorker(backend);
+        var first = await worker.VerifyAsync(request);
+        Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+
+        var lockPath = Path.Combine(
+            project.CacheDirectory,
+            ".sharp-proof-cache.lock");
+        var external = Path.Combine(project.DirectoryPath, "external-lock");
+        const string externalContents = "external lock target";
+        await File.WriteAllTextAsync(external, externalContents);
+        File.Delete(lockPath);
+        if (!TryCreateFileSymbolicLink(lockPath, external))
+        {
+            Assert.Ignore("The host does not permit symbolic-link creation.");
+        }
+
+        var second = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
+            Assert.That(await File.ReadAllTextAsync(external), Is.EqualTo(externalContents));
+        }
+    }
+
+    [Test]
+    public async Task ReparsePointEvictionEntryFailsClosedWithoutDeletion()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        request.Cache.MaximumBytes = 1;
+        var external = Path.Combine(project.DirectoryPath, "external-eviction.json");
+        const string externalContents = "external eviction target";
+        await File.WriteAllTextAsync(external, externalContents);
+        Directory.CreateDirectory(project.CacheDirectory);
+        var cacheFile = Path.Combine(
+            project.CacheDirectory,
+            new string('b', 64) + ".sharp-proof-cache.json");
+        if (!TryCreateFileSymbolicLink(cacheFile, external))
+        {
+            Assert.Ignore("The host does not permit symbolic-link creation.");
+        }
+
+        using var worker = new SharpProofWorker(new SpuriousModelBackend());
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
+            Assert.That(File.Exists(cacheFile), Is.True);
+            Assert.That(await File.ReadAllTextAsync(external), Is.EqualTo(externalContents));
+        }
+    }
+
+    [Test]
+    public async Task ReparsePointCacheDirectoryFailsClosedBeforeChildAccess()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var realDirectory = Path.Combine(project.DirectoryPath, "real-cache");
+        var aliasDirectory = Path.Combine(project.DirectoryPath, "cache-alias");
+        Directory.CreateDirectory(realDirectory);
+        if (!TryCreateDirectorySymbolicLink(aliasDirectory, realDirectory))
+        {
+            Assert.Ignore("The host does not permit symbolic-link creation.");
+        }
+
+        var request = project.CreateRequest(cacheEnabled: true);
+        request.Cache.Directory = aliasDirectory;
+        using var worker = new SharpProofWorker(new SpuriousModelBackend());
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
+        Assert.That(Directory.GetFiles(realDirectory), Is.Empty);
+    }
+
+    [Test]
+    public async Task CacheEvictionLeavesLegacyJsonFilesUntouched()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        Directory.CreateDirectory(project.CacheDirectory);
+        var legacyPath = Path.Combine(
+            project.CacheDirectory,
+            new string('a', 64) + ".json");
+        const string legacyContents = "legacy cache entry";
+        await File.WriteAllTextAsync(legacyPath, legacyContents);
+
+        var request = project.CreateRequest(cacheEnabled: true);
+        request.Cache.MaximumBytes = 1;
+        using var worker = new SharpProofWorker(new SpuriousModelBackend());
+        await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(legacyPath), Is.True);
+            Assert.That(
+                await File.ReadAllTextAsync(legacyPath),
+                Is.EqualTo(legacyContents));
+            Assert.That(
+                Directory.GetFiles(
+                    project.CacheDirectory,
+                    "*.sharp-proof-cache.json"),
+                Is.Empty);
+        }
     }
 
     [Test]
@@ -3495,7 +3754,7 @@ public sealed class WorkerTests
                 cached.Summary.CacheStatus,
                 Is.EqualTo(WorkerCacheStatus.Hit));
             Assert.That(
-                Directory.GetFiles(project.CacheDirectory, "*.json"),
+                Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
                 Has.Length.EqualTo(1));
         }
     }
@@ -3942,7 +4201,7 @@ public sealed class WorkerTests
         Assert.That(backend.CallCount, Is.EqualTo(2));
         Assert.That(second.InputHash, Is.Not.EqualTo(first.InputHash));
         Assert.That(
-            Directory.GetFiles(project.CacheDirectory, "*.json"),
+            Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
             Has.Length.EqualTo(2));
     }
 
@@ -3974,7 +4233,7 @@ public sealed class WorkerTests
         }
         Assert.That(
             Directory.Exists(project.CacheDirectory)
-                ? Directory.GetFiles(project.CacheDirectory, "*.json")
+                ? Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json")
                 : [],
             Is.Empty);
     }
@@ -4170,7 +4429,7 @@ public sealed class WorkerTests
     private static string[] CacheFiles(TestProject project)
     {
         return Directory.Exists(project.CacheDirectory)
-            ? Directory.GetFiles(project.CacheDirectory, "*.json")
+            ? Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json")
             : [];
     }
 

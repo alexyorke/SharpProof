@@ -177,7 +177,7 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary>
                AllocationLessThanOrEqual(left.Allocation, right.Allocation) &&
                left.Capabilities.IsSubsetOf(right.Capabilities) &&
                left.Throws.IsSubsetOf(right.Throws) &&
-               TerminationLessThanOrEqual(left.Termination, right.Termination) &&
+               left.Termination <= right.Termination &&
                left.Completeness <= right.Completeness &&
                (left.Uncertainty & ~right.Uncertainty) == 0;
     }
@@ -207,7 +207,9 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary>
             left.Reads.Union(right.Reads), left.Writes.Union(right.Writes),
             left.Allocation | right.Allocation, left.Capabilities.Union(right.Capabilities),
             left.Throws.Union(right.Throws),
-            JoinTermination(left.Termination, right.Termination),
+            left.Termination > right.Termination
+                ? left.Termination
+                : right.Termination,
             left.Completeness > right.Completeness
                 ? left.Completeness
                 : right.Completeness,
@@ -233,15 +235,4 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary>
         return (left & ~right) == 0;
     }
 
-    private static bool TerminationLessThanOrEqual(
-        EffectTermination left, EffectTermination right)
-    {
-        return left <= right;
-    }
-
-    private static EffectTermination JoinTermination(
-        EffectTermination left, EffectTermination right)
-    {
-        return left > right ? left : right;
-    }
 }

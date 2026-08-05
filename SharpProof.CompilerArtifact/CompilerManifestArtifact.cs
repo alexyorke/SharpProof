@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using static System.IO.Path;
 
 namespace SharpProof.CompilerArtifact;
 
@@ -39,49 +41,101 @@ internal static class WorkerBinaryIdentity
 {
     internal const int MaximumComponentKeyCharacters = 256;
     internal const int MaximumRuntimeComponents = 64;
-    internal const long MaximumComponentBytes = 32L * 1024 * 1024;
+    internal const int MaximumComponentBytes = 32 * 1024 * 1024;
     internal const long MaximumClosureBytes = 64L * 1024 * 1024;
     internal const long MaximumDependenciesBytes = 1024L * 1024;
     internal const long MaximumRuntimeConfigBytes = 64L * 1024;
-    private static readonly Dictionary<string, long>
-        s_componentLimitReductions = new Dictionary<string, long>(
-            StringComparer.Ordinal)
+
+    internal static WorkerRuntimeClosureSnapshot CreateSnapshot(
+        string workerPath)
+    {
+        var path = NormalizeWorkerPath(workerPath);
+        var stagingDirectory = CreateStagingDirectory();
+        FileStream[] stagedHandles = [];
+        var stagedCount = 0;
+        try
         {
-            ["dependencies"] =
-                MaximumComponentBytes - MaximumDependenciesBytes,
-            ["runtimeConfig"] =
-                MaximumComponentBytes - MaximumRuntimeConfigBytes
-        };
+            Directory.CreateDirectory(stagingDirectory);
+            WorkerCachePath.ValidateNoReparsePoints([
+                stagingDirectory,
+                path,
+                ChangeExtension(path, ".deps.json")]);
+            using var dependency = OpenRead(ChangeExtension(path, ".deps.json"));
+            var components = RuntimeComponents(path, dependency);
+            stagedHandles = new FileStream[components.Count];
+            using var hash = new CanonicalHashWriter();
+            hash.Add("SharpProof.WorkerBinarySet", 1);
+            long totalBytes = 0;
+#pragma warning disable CA2000 // Stream ownership transfers to the retained snapshot list.
+            foreach (var component in components)
+            {
+                var sourceBytes = CompilerManifestArtifactFile.ReadAllBytes(
+                    component.Value,
+                    MaximumComponentBytes);
+                var sourceLength = sourceBytes.LongLength;
+                ValidateComponentLength(component.Key, sourceLength, ref totalBytes);
+                var stagedPath = Combine(
+                    stagingDirectory,
+                    component.Key.Replace('/', DirectorySeparatorChar));
+                Directory.CreateDirectory(GetDirectoryName(stagedPath)!);
+                using (var staged = new FileStream(
+                           stagedPath,
+                           FileMode.CreateNew))
+                {
+                    staged.Write(sourceBytes, 0, sourceBytes.Length);
+                }
+                using (var stagedRead = OpenRead(stagedPath))
+                {
+                    var stagedTotalBytes = totalBytes - sourceLength;
+                    ValidateComponentLength(
+                        component.Key,
+                        stagedRead.Length,
+                        ref stagedTotalBytes);
+                    EnsureStagedComponentConsistency(
+                        component.Value,
+                        stagedPath);
+                    hash.Add(component.Key.ToUpperInvariant()).Add(stagedRead);
+                }
+                stagedHandles[stagedCount++] = OpenRead(stagedPath);
+            }
+#pragma warning restore CA2000
+            return new WorkerRuntimeClosureSnapshot(
+                path,
+                Combine(stagingDirectory, GetFileName(path)),
+                components.Values.ToArray(),
+                hash.Finish(),
+                stagedHandles);
+        }
+        catch
+        {
+            for (var index = 0; index < stagedCount; index++)
+            {
+                stagedHandles[index].Dispose();
+            }
+            DeleteStagingDirectory(stagingDirectory);
+
+            throw;
+        }
+    }
 
     internal static string ComputeSha256(string workerPath)
     {
-        var path = Path.GetFullPath(workerPath);
-        if (!path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
-        {
-            path = Path.ChangeExtension(path, ".dll");
-            if (!File.Exists(path))
-            {
-                throw new FileNotFoundException("The managed worker binary is unavailable.", path);
-            }
-        }
-
-        using var hash = new CanonicalHashWriter();
-        hash.Add("SharpProof.WorkerBinarySet", 1);
-        var components = RuntimeComponents(path);
-        ValidateComponentCount(components.Count);
-
-        long totalBytes = 0;
-        foreach (var component in components)
-        {
-            using var stream = OpenRead(component.Value);
-            var length = stream.Length;
-            ValidateComponentLength(component.Key, length, ref totalBytes);
-            hash.Add(component.Key).Add(stream);
-        }
-
-        return hash.Finish();
+        using var snapshot = CreateSnapshot(workerPath);
+        return snapshot.Sha256;
     }
 
+    private static string NormalizeWorkerPath(string workerPath)
+    {
+        var path = GetFullPath(workerPath);
+        if (!path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new FileNotFoundException(
+                "The managed worker binary must be a .dll.",
+                path);
+        }
+
+        return path;
+    }
     internal static void ValidateComponentCount(int count)
     {
         if (count > MaximumRuntimeComponents)
@@ -102,11 +156,17 @@ internal static class WorkerBinaryIdentity
                 "A worker runtime component identity is too long.");
         }
 
-        s_componentLimitReductions.TryGetValue(key, out var reduction);
-        var excess = Math.Max(
-            length - (MaximumComponentBytes - reduction),
-            totalBytes - (MaximumClosureBytes - length));
-        if (excess > 0)
+        var maximum = key switch
+        {
+            "dependencies" => MaximumDependenciesBytes,
+            "runtimeConfig" => MaximumRuntimeConfigBytes,
+            _ when key.EndsWith(".deps.json", StringComparison.OrdinalIgnoreCase) =>
+                MaximumDependenciesBytes,
+            _ when key.EndsWith(".runtimeconfig.json", StringComparison.OrdinalIgnoreCase) =>
+                MaximumRuntimeConfigBytes,
+            _ => MaximumComponentBytes
+        };
+        if (length > maximum || totalBytes > MaximumClosureBytes - length)
         {
             throw new InvalidDataException(
                 "The worker runtime closure exceeds its byte limits.");
@@ -115,18 +175,27 @@ internal static class WorkerBinaryIdentity
         totalBytes += length;
     }
 
-    private static SortedDictionary<string, string> RuntimeComponents(string workerPath)
+    internal static void EnsureStagedComponentConsistency(
+        string sourcePath,
+        string stagedPath)
     {
-        var directory = Path.GetDirectoryName(workerPath) ??
-            throw new InvalidDataException("The managed worker directory is unavailable.");
-        var dependencies = Path.ChangeExtension(workerPath, ".deps.json");
-        var result = new SortedDictionary<string, string>(StringComparer.Ordinal)
+        if (!CompilerManifestArtifactFile.ReadAllBytes(
+                    sourcePath,
+                    MaximumComponentBytes).SequenceEqual(
+                CompilerManifestArtifactFile.ReadAllBytes(
+                    stagedPath,
+                    MaximumComponentBytes)))
         {
-            ["worker"] = workerPath,
-            ["dependencies"] = dependencies,
-            ["runtimeConfig"] = Path.ChangeExtension(workerPath, ".runtimeconfig.json")
-        };
-        using var dependencyStream = OpenRead(dependencies);
+            throw new InvalidDataException(
+                "A worker runtime component changed during staging.");
+        }
+    }
+
+    private static SortedDictionary<string, string> RuntimeComponents(
+        string workerPath,
+        FileStream dependencyStream)
+    {
+        var directory = GetDirectoryName(workerPath)!;
         long dependencyBytes = 0;
         ValidateComponentLength(
             "dependencies",
@@ -136,14 +205,46 @@ internal static class WorkerBinaryIdentity
             dependencyStream,
             new JsonDocumentOptions { MaxDepth = 32 });
         var root = document.RootElement;
-        var targetName = root.GetProperty("runtimeTarget").GetProperty("name").GetString() ??
-            throw new InvalidDataException("The worker runtime target is unavailable.");
-        var target = root.GetProperty("targets").GetProperty(targetName);
-        foreach (var library in target.EnumerateObject())
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            AddLibraryAssets(result, directory, library.Value);
+            GetFileName(workerPath),
+            GetFileName(ChangeExtension(workerPath, ".deps.json")),
+            GetFileName(ChangeExtension(workerPath, ".runtimeconfig.json"))
+        };
+        foreach (Match match in Regex.Matches(
+                     root.GetRawText(),
+                     @"(?:runtimes/(?:win-x64|win)/[^""\r\n]+\.dll|(?<![A-Za-z0-9_./-])(?!runtimes/)(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.dll)"))
+        {
+            var name = match.Value;
+            names.Add(name.StartsWith(
+                "runtimes/",
+                StringComparison.OrdinalIgnoreCase) ? name : GetFileName(name));
+        }
+        var optionalFrameworkAssembly = GetFileName(
+            typeof(ImmutableArray<>).Assembly.Location);
+        if (File.Exists(Combine(directory, optionalFrameworkAssembly)))
+        {
+            names.Add(optionalFrameworkAssembly);
         }
 
+        ValidateComponentCount(names.Count);
+        var result = new SortedDictionary<string, string>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var name in names)
+        {
+            if (name.IndexOf('\\') >= 0 ||
+                name.IndexOf("..", StringComparison.Ordinal) >= 0)
+            {
+                throw new InvalidDataException(
+                    "A worker runtime component identity is invalid.");
+            }
+
+            result.Add(
+                name,
+                Combine(directory, name.Replace('/', DirectorySeparatorChar)));
+        }
+
+        WorkerCachePath.ValidateNoReparsePoints(result.Values);
         return result;
     }
 
@@ -156,48 +257,49 @@ internal static class WorkerBinaryIdentity
             FileShare.Read);
     }
 
-    private static void AddLibraryAssets(
-        SortedDictionary<string, string> result, string directory, JsonElement library)
+    private static string CreateStagingDirectory()
     {
-        foreach (var group in new[] { "runtime", "native", "runtimeTargets" })
+        return Combine(
+            GetTempPath(),
+            "SharpProof.Worker.Runtime." + GetRandomFileName());
+    }
+
+    internal static void DeleteStagingDirectory(string path)
+    {
+        try
         {
-            if (!library.TryGetProperty(group, out var assets))
-            {
-                continue;
-            }
-
-            foreach (var asset in assets.EnumerateObject())
-            {
-                if (group == "runtimeTargets" &&
-                    asset.Value.GetProperty("rid").GetString() is not ("win" or "win-x64"))
-                {
-                    continue;
-                }
-
-                result.Add(group + "/" + asset.Name, ResolveAsset(directory, asset.Name));
-            }
+            Directory.Delete(path, recursive: true);
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException)
+        {
         }
     }
 
-    private static string ResolveAsset(string directory, string relativePath)
+}
+
+internal sealed class WorkerRuntimeClosureSnapshot(
+    string workerPath,
+    string executionWorkerPath,
+    IReadOnlyList<string> componentPaths,
+    string sha256,
+    IReadOnlyList<FileStream> stagedHandles) : IDisposable
+{
+    internal string WorkerPath { get; } = workerPath;
+    internal string ExecutionWorkerPath { get; } = executionWorkerPath;
+    internal IReadOnlyList<string> ComponentPaths { get; } =
+        ImmutableArray.CreateRange(componentPaths);
+    internal string Sha256 { get; } = sha256;
+    private IReadOnlyList<FileStream> StagedHandles { get; } = stagedHandles;
+
+    public void Dispose()
     {
-        var nested = Path.GetFullPath(Path.Combine(
-            directory, relativePath.Replace('/', Path.DirectorySeparatorChar)));
-        var root = Path.GetFullPath(directory) + Path.DirectorySeparatorChar;
-        if (!nested.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        foreach (var handle in StagedHandles)
         {
-            throw new InvalidDataException("A worker runtime asset escapes its package.");
+            handle.Dispose();
         }
-
-        if (File.Exists(nested))
-        {
-            return nested;
-        }
-
-        var flattened = Path.Combine(directory, Path.GetFileName(relativePath));
-        return File.Exists(flattened)
-            ? flattened
-            : throw new FileNotFoundException("A trusted worker runtime component is unavailable.", nested);
+        WorkerBinaryIdentity.DeleteStagingDirectory(
+            GetDirectoryName(ExecutionWorkerPath)!);
     }
 }
 
@@ -278,20 +380,18 @@ internal static class CompilerManifestArtifactJson
 
     private static bool HasValidDiagnostics(CompilerDiagnosticArtifact[]? diagnostics)
     {
-        return diagnostics != null &&
-        diagnostics.All(static item =>
+        return diagnostics?.All(static item =>
             item != null &&
             !string.IsNullOrWhiteSpace(item.Code) &&
             !string.IsNullOrWhiteSpace(item.Message) &&
-            item.Location is { Start: >= 0, Length: >= 0, Line: >= 0, Column: >= 0 });
+            item.Location is { Start: >= 0, Length: >= 0, Line: >= 0, Column: >= 0 }) == true;
     }
 
     private static bool HasMatchingCallables(
         CompilerCallableArtifact[]? callables,
         WorkerClaimManifest manifest)
     {
-        return callables != null &&
-        callables.Length == manifest.Callables.Length &&
+        return callables?.Length == manifest.Callables.Length &&
         callables.Select(static item => item?.CallableId).SequenceEqual(
             manifest.Callables.Select(static item => item.CallableId),
             StringComparer.Ordinal);
@@ -301,15 +401,15 @@ internal static class CompilerManifestArtifactJson
         CompilerCallableArtifact[]? callables,
         CompilerCompilationSnapshot? compilation)
     {
-        if (callables == null || compilation?.SyntaxTrees == null)
+        if (callables is null || compilation is not { SyntaxTrees: not null })
         {
             return false;
         }
 
         foreach (var effectEvent in callables
-                     .Where(static callable => callable != null)
+                     .OfType<CompilerCallableArtifact>()
                      .SelectMany(static callable => callable.EffectClaims ?? [])
-                     .Where(static claim => claim != null)
+                     .OfType<CompilerEffectClaimArtifact>()
                      .SelectMany(static claim => claim.Replay?.Events ?? []))
         {
             if (effectEvent == null ||
@@ -337,11 +437,13 @@ internal static class CompilerManifestArtifactJson
 
 internal static class CompilerManifestArtifactFile
 {
-    internal const int MaximumBytes = 16 * 1024 * 1024;
+    internal const int MaximumBytes = WorkerProtocolJson.MaximumJsonBytes;
 
-    internal static byte[] ReadAllBytes(string path)
+    internal static byte[] ReadAllBytes(
+        string path,
+        int maximumBytes = MaximumBytes)
     {
-        using var stream = Open(path, out var length);
+        using var stream = Open(path, out var length, maximumBytes);
         var bytes = new byte[length];
         var offset = 0;
         while (offset < bytes.Length)
@@ -359,14 +461,17 @@ internal static class CompilerManifestArtifactFile
         return bytes;
     }
 
-    private static FileStream Open(string path, out int length)
+    private static FileStream Open(
+        string path,
+        out int length,
+        int maximumBytes)
     {
         var stream = new FileStream(
             path,
             FileMode.Open,
             FileAccess.Read,
             FileShare.Read);
-        if (stream.Length > MaximumBytes)
+        if (stream.Length > maximumBytes)
         {
             stream.Dispose();
             throw new InvalidDataException(

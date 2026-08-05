@@ -581,6 +581,15 @@ $commits = @(
 if ($commits.Count -ne 1) {
     throw "NuGet artifact repository commits must match; found '$($commits -join ', ')'."
 }
+$checkoutCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $checkoutCommit -notmatch '^[0-9a-f]{40}$') {
+    throw 'Could not resolve the release checkout commit.'
+}
+if ($commits[0] -ne $checkoutCommit) {
+    throw (
+        "NuGet artifact repository commit '$($commits[0])' does not match " +
+        "checkout '$checkoutCommit'.")
+}
 
 $thirdPartyPackages = @(
     $thirdPartyManifest.packages.PSObject.Properties |

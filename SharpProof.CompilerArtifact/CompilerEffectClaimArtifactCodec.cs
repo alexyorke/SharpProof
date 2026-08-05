@@ -133,11 +133,7 @@ internal static class CompilerEffectClaimArtifactCodec
         using var hash = new CanonicalHashWriter();
         hash.Add(CompilerEffectEvidenceCatalog.ConstraintDomain, CompilerEffectEvidenceCatalog.ConstraintVersion, kind,
             constraint.AllowedEffects, constraint.AllowedCapabilities);
-        foreach (var type in (constraint.AllowedExceptionTypes ?? [])
-                     .OrderBy(static item => item, StringComparer.Ordinal))
-        {
-            hash.Add(type);
-        }
+        AddSortedStrings(hash, constraint.AllowedExceptionTypes ?? []);
 
         return hash.Finish();
     }
@@ -162,19 +158,11 @@ internal static class CompilerEffectClaimArtifactCodec
         hash.Add(CompilerEffectEvidenceCatalog.EvidenceDomain, CompilerEffectEvidenceCatalog.EvidenceVersion, value.ClaimId,
             value.ContractKind, value.Outcome, value.Reason, value.Certainty,
             constraint.AllowedEffects, constraint.AllowedCapabilities);
-        foreach (var type in constraint.AllowedExceptionTypes
-                     .OrderBy(static item => item, StringComparer.Ordinal))
-        {
-            hash.Add(type);
-        }
+        AddSortedStrings(hash, constraint.AllowedExceptionTypes);
 
         hash.Add(witness?.Kind, witness?.Detail, witness?.Effects ?? WorkerEffectSet.None,
             witness?.Capabilities ?? WorkerEffectCapabilitySet.None);
-        foreach (var type in (witness?.ExactExceptionTypeHierarchy ?? [])
-                     .OrderBy(static item => item, StringComparer.Ordinal))
-        {
-            hash.Add(type);
-        }
+        AddSortedStrings(hash, witness?.ExactExceptionTypeHierarchy ?? []);
 
         var replay = value.Replay;
         hash.Add(replay != null,
@@ -187,6 +175,16 @@ internal static class CompilerEffectClaimArtifactCodec
         return hash.Add(witness?.Location.Path, witness?.Location.Start ?? -1,
             witness?.Location.Length ?? -1, witness?.Location.Line ?? -1,
             witness?.Location.Column ?? -1, value.Evidence).Finish();
+    }
+
+    private static void AddSortedStrings(
+        CanonicalHashWriter hash,
+        string[] values)
+    {
+        foreach (var value in values.OrderBy(static item => item, StringComparer.Ordinal))
+        {
+            hash.Add(value);
+        }
     }
 
     private static void AddReplayEvent(

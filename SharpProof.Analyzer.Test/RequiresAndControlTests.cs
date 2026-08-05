@@ -69,6 +69,181 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task ExternalMetadataPreconditionEnvelopeCannotBeAssumed()
+    {
+        var external = AnalyzerTestHost.EmitReference(
+            """
+            using SharpProof.Attributes;
+
+            public static class ExternalFixture {
+                [SharpProofTrusted("reviewed external implementation")]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    Complete = true)]
+                public static void Restricted(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                [SharpProofTrusted("reviewed precondition-free implementation")]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    Complete = true,
+                    PreconditionFree = true)]
+                public static void Certified(int value) {
+                }
+
+                public sealed class Service {
+                    [SharpProofTrusted("reviewed external implementation")]
+                    [EffectContract(
+                        SharpProofEffect.None,
+                        Complete = true,
+                        PreconditionFree = true)]
+                    public void Restricted(int value) {
+                    }
+                }
+            }
+
+            [ContractFor(typeof(ExternalFixture.Service))]
+            public static class ServiceContracts {
+                public static void Restricted(
+                    ExternalFixture.Service receiver,
+                    int value) {
+                    Contract.Requires(value > 0);
+                }
+            }
+            """,
+            "ExternalMetadataPreconditionEnvelope");
+        var consumerSource = """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static void Direct(
+                    [Positive] int marker,
+                    int value) {
+                    ExternalFixture.Restricted(value);
+                }
+
+                public static void Companion(
+                    [Positive] int marker,
+                    ExternalFixture.Service service,
+                    int value) {
+                    service.Restricted(value);
+                }
+
+                public static void Certified() {
+                    ExternalFixture.Certified(1);
+                }
+            }
+            """;
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            consumerSource,
+            ["SP0027", "SP0047"],
+            [external]);
+        var session = new AnalyzerSession(
+            compilation,
+            SharpProof.Analyzer.Configuration
+                .AnalyzerConfiguration.AdvisoryAll,
+            CancellationToken.None);
+        var externalType = compilation.GetTypeByMetadataName(
+            "ExternalFixture")!;
+        var restricted = externalType.GetMembers("Restricted")
+            .OfType<IMethodSymbol>()
+            .Single();
+        var certified = externalType.GetMembers("Certified")
+            .OfType<IMethodSymbol>()
+            .Single();
+        Assert.That(
+            session.HasPotentialCallPreconditions(restricted),
+            Is.True);
+        Assert.That(
+            session.HasPotentialCallPreconditions(certified),
+            Is.False);
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            "contracts");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0047", "SP0047"]));
+            Assert.That(
+                diagnostics.Select(diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+                Has.All.Contain("RequiresCallSiteAnalysisUnknown"));
+            Assert.That(
+                diagnostics.Select(diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+                Has.None.Contain("'Certified'"));
+        }
+    }
+
+    [Test]
+    public async Task ExternalMetadataCompanionPresenceCannotBeAssumedAbsent()
+    {
+        var external = AnalyzerTestHost.EmitReference(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Service {
+                public void Restricted(int value) {
+                }
+            }
+
+            [ContractFor(typeof(Service))]
+            public static class ServiceContracts {
+                public static void Restricted(
+                    Service receiver,
+                    int value) {
+                    Contract.Requires(value > 0);
+                }
+            }
+            """,
+            "ExternalMetadataOnlyContractFor");
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static void Call(
+                    [Positive] int marker,
+                    Service service,
+                    int value) {
+                    service.Restricted(value);
+                }
+            }
+            """,
+            ["SP0047"],
+            [external]);
+        var session = new AnalyzerSession(
+            compilation,
+            SharpProof.Analyzer.Configuration
+                .AnalyzerConfiguration.AdvisoryAll,
+            CancellationToken.None);
+        var service = compilation.GetTypeByMetadataName("Service")!;
+        var restricted = service.GetMembers("Restricted")
+            .OfType<IMethodSymbol>()
+            .Single();
+
+        Assert.That(
+            session.HasPotentialCallPreconditions(restricted),
+            Is.True);
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            "contracts");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0047"]));
+            Assert.That(
+                diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("RequiresCallSiteAnalysisUnknown"));
+        }
+    }
+
+    [Test]
     public async Task UnsupportedEffectsSyntaxDoesNotHideConcretePreconditionViolation()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

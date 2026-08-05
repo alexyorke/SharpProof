@@ -205,6 +205,126 @@ public sealed class DependencyAutomationTests
         }
     }
 
+    [Test]
+    public void RepositorySecurityPinsExternalWorkflowActionsToImmutableShas()
+    {
+        var workflowDirectory = Path.Combine(
+            RepositoryRoot(),
+            ".github",
+            "workflows");
+        var references = Directory.EnumerateFiles(workflowDirectory)
+            .Where(static path =>
+                string.Equals(
+                    Path.GetExtension(path),
+                    ".yml",
+                    StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(
+                    Path.GetExtension(path),
+                    ".yaml",
+                    StringComparison.OrdinalIgnoreCase))
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .SelectMany(path => File.ReadLines(path)
+                .Select((line, index) => new
+                {
+                    Path = path,
+                    Line = line,
+                    Number = index + 1
+                }))
+            .Where(static entry => entry.Line.TrimStart().StartsWith(
+                "uses:",
+                StringComparison.Ordinal))
+            .ToArray();
+
+        Assert.That(references, Is.Not.Empty);
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var reference in references)
+            {
+                var value = reference.Line.TrimStart()["uses:".Length..]
+                    .Trim();
+                if (value.StartsWith("./", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var at = value.LastIndexOf('@');
+                Assert.That(
+                    at,
+                    Is.GreaterThan(0),
+                    $"{reference.Path}:{reference.Number}");
+                if (at <= 0)
+                {
+                    continue;
+                }
+
+                var revision = value[(at + 1)..].Split('#')[0].Trim();
+                Assert.That(
+                    revision,
+                    Does.Match("^[0-9a-fA-F]{40}$"),
+                    $"{reference.Path}:{reference.Number}");
+            }
+        }
+    }
+
+    [Test]
+    public void RepositoryWorkflowsUseThePinnedRepositorySdk()
+    {
+        var workflowDirectory = Path.Combine(
+            RepositoryRoot(),
+            ".github",
+            "workflows");
+        var versions = Directory.EnumerateFiles(workflowDirectory)
+            .Where(static path =>
+                string.Equals(
+                    Path.GetExtension(path),
+                    ".yml",
+                    StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(
+                    Path.GetExtension(path),
+                    ".yaml",
+                    StringComparison.OrdinalIgnoreCase))
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .SelectMany(path => File.ReadLines(path)
+                .Select((line, index) => new
+                {
+                    Path = path,
+                    Value = line,
+                    Number = index + 1
+                }))
+            .Where(static entry => entry.Value.TrimStart().StartsWith(
+                "dotnet-version:",
+                StringComparison.Ordinal))
+            .Select(static entry => new
+            {
+                entry.Path,
+                entry.Number,
+                Value = entry.Value.TrimStart()["dotnet-version:".Length..]
+                    .Split('#')[0]
+                    .Trim()
+                    .Trim('"', '\'')
+            })
+            .ToArray();
+
+        Assert.That(versions, Is.Not.Empty);
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var version in versions)
+            {
+                Assert.That(
+                    version.Value,
+                    Is.AnyOf("9.0.316", "9.0.300"),
+                    $"{version.Path}:{version.Number}");
+            }
+
+            Assert.That(
+                versions.Count(static version => version.Value == "9.0.316"),
+                Is.GreaterThan(0));
+            Assert.That(
+                versions.Count(static version => version.Value == "9.0.300"),
+                Is.EqualTo(1));
+        }
+    }
+
     private static void AssertCompilerCeiling(string block)
     {
         using (Assert.EnterMultipleScope())

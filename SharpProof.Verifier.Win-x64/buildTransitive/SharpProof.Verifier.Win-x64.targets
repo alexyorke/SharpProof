@@ -13,6 +13,9 @@
       <InvocationRequestPath ParameterType="System.String" />
       <InvocationResultPath ParameterType="System.String" />
       <InvocationManifestPath ParameterType="System.String" />
+      <WorkerPath ParameterType="System.String" />
+      <LauncherPath ParameterType="System.String" />
+      <CachePath ParameterType="System.String" />
     </ParameterGroup>
     <Task>
       <Using Namespace="System.Linq" />
@@ -30,16 +33,115 @@
         var aliasesOutput = outputPaths
             .Distinct(System.StringComparer.OrdinalIgnoreCase)
             .Count() != outputPaths.Length;
+        var toolPaths = new[] { WorkerPath, LauncherPath }
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .SelectMany(path => new[] {
+                path,
+                System.IO.Path.ChangeExtension(path, ".deps.json"),
+                System.IO.Path.ChangeExtension(path, ".runtimeconfig.json")
+            })
+            .Concat(new[] {
+                System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(resolvePath(LauncherPath)),
+                    "SharpProof.CompilerArtifact.dll"),
+                System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(resolvePath(LauncherPath)),
+                    "SharpProof.Ir.dll"),
+                System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(resolvePath(LauncherPath)),
+                    "SharpProof.Specs.dll"),
+                System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(resolvePath(LauncherPath)),
+                    "SharpProof.Worker.Protocol.dll"),
+                System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(resolvePath(LauncherPath)),
+                    "SharpProof.Worker.Launcher.exe"),
+                System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(resolvePath(LauncherPath)),
+                    "System.IO.Pipelines.dll"),
+                System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(resolvePath(LauncherPath)),
+                    "System.Text.Encodings.Web.dll"),
+                System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(resolvePath(LauncherPath)),
+                    "System.Text.Json.dll")
+            });
+        var resolvedWorkerPath = resolvePath(WorkerPath);
+        var workerDirectory = System.IO.Path.GetDirectoryName(
+            resolvedWorkerPath);
+        var workerTreeExists = System.IO.File.Exists(resolvedWorkerPath) ||
+            System.IO.File.Exists(System.IO.Path.ChangeExtension(
+                resolvedWorkerPath, ".deps.json")) ||
+            System.IO.File.Exists(System.IO.Path.ChangeExtension(
+                resolvedWorkerPath, ".runtimeconfig.json"));
         var protectedPaths = new[] {
             RequestPath, ManifestPath, InvocationRequestPath,
             InvocationResultPath, InvocationManifestPath
         }.Where(path => !string.IsNullOrWhiteSpace(path))
             .Select(resolvePath)
+            .Concat(toolPaths.Select(resolvePath))
             .ToArray();
+        var resolvedCachePath = string.IsNullOrWhiteSpace(CachePath)
+            ? null
+            : resolvePath(CachePath);
+        System.Func<string, bool> traversesReparsePoint = path => {
+            try {
+                var current = resolvePath(path);
+                while (!string.IsNullOrWhiteSpace(current)) {
+                    try {
+                        if ((System.IO.File.GetAttributes(current) &
+                             System.IO.FileAttributes.ReparsePoint) != 0)
+                            return true;
+                    }
+                    catch (System.IO.FileNotFoundException) { }
+                    catch (System.IO.DirectoryNotFoundException) { }
+                    var parent = System.IO.Path.GetDirectoryName(current);
+                    if (string.IsNullOrWhiteSpace(parent) ||
+                        System.String.Equals(parent, current,
+                            System.StringComparison.OrdinalIgnoreCase))
+                        break;
+                    current = parent;
+                }
+                return false;
+            }
+            catch {
+                return true;
+            }
+        };
+        var aliasesReparse = outputPaths.Concat(protectedPaths)
+            .Concat(resolvedCachePath != null
+                ? new[] { resolvedCachePath }
+                : System.Array.Empty<string>())
+            .Any(traversesReparsePoint);
+        if (aliasesReparse)
+            Log.LogError(
+                "SharpProof output paths must not traverse reparse points.");
         var aliasesInput = outputPaths
             .Any(output => protectedPaths.Any(input => string.Equals(
                 output, input, System.StringComparison.OrdinalIgnoreCase)));
-        if (!aliasesInput && !aliasesOutput) {
+        var aliasesWorkerTree = workerTreeExists &&
+            !string.IsNullOrWhiteSpace(workerDirectory) &&
+            outputPaths.Any(output => output.StartsWith(
+                workerDirectory + System.IO.Path.DirectorySeparatorChar,
+                System.StringComparison.OrdinalIgnoreCase));
+        var aliasesCache = resolvedCachePath != null &&
+            (outputPaths.Any(output => string.Equals(
+                output, resolvedCachePath,
+                System.StringComparison.OrdinalIgnoreCase)) ||
+             protectedPaths.Any(input => string.Equals(
+                input, resolvedCachePath,
+                System.StringComparison.OrdinalIgnoreCase)) ||
+             workerTreeExists &&
+             !string.IsNullOrWhiteSpace(workerDirectory) &&
+             (string.Equals(
+                  resolvedCachePath,
+                  workerDirectory,
+                  System.StringComparison.OrdinalIgnoreCase) ||
+              resolvedCachePath.StartsWith(
+                  workerDirectory + System.IO.Path.DirectorySeparatorChar,
+                  System.StringComparison.OrdinalIgnoreCase)));
+        if (!aliasesReparse && !aliasesInput && !aliasesOutput &&
+            !aliasesWorkerTree && !aliasesCache) {
             using (var publication =
                 new System.Threading.Mutex(false, @"Local\SharpProof.Publish")) {
                 var ownsPublication = false;
@@ -84,7 +186,9 @@
       <SharpProofVerifyRequestFile Condition="'$(SharpProofVerifyRequestFile)' == ''">$(_SharpProofVerifyDirectory)\request.json</SharpProofVerifyRequestFile>
       <SharpProofVerifyResultFile Condition="'$(SharpProofVerifyResultFile)' == ''">$(_SharpProofVerifyDirectory)\result.json</SharpProofVerifyResultFile>
       <SharpProofCompilerManifestFile Condition="'$(SharpProofCompilerManifestFile)' == ''">$(_SharpProofVerifyDirectory)\compiler-manifest.json</SharpProofCompilerManifestFile>
-      <SharpProofVerifyCacheDirectory Condition="'$(SharpProofVerifyCacheDirectory)' == ''">$(_SharpProofVerifyDirectory)\cache</SharpProofVerifyCacheDirectory>
+      <_SharpProofVerifyCacheDirectoryNormalized>$([System.String]::Copy('$(SharpProofVerifyCacheDirectory)').Trim())</_SharpProofVerifyCacheDirectoryNormalized>
+      <_SharpProofEffectiveCacheDirectory Condition="'$(_SharpProofVerifyCacheDirectoryNormalized)' == ''">$(_SharpProofVerifyDirectory)\cache</_SharpProofEffectiveCacheDirectory>
+      <_SharpProofEffectiveCacheDirectory Condition="'$(_SharpProofVerifyCacheDirectoryNormalized)' != ''">$(SharpProofVerifyCacheDirectory)</_SharpProofEffectiveCacheDirectory>
       <_SharpProofInvocationId Condition="'$(_SharpProofInvocationId)' == ''">$([System.Guid]::NewGuid().ToString('N'))</_SharpProofInvocationId>
       <_SharpProofInvocationDirectory>$(_SharpProofVerifyDirectory)\runs\$(_SharpProofInvocationId)</_SharpProofInvocationDirectory>
       <_SharpProofInvocationRequestFile>$(_SharpProofInvocationDirectory)\request.json</_SharpProofInvocationRequestFile>
@@ -104,7 +208,10 @@
         SarifPath="$(SharpProofVerifySarifFile)"
         InvocationRequestPath="$(_SharpProofInvocationRequestFile)"
         InvocationResultPath="$(_SharpProofInvocationResultFile)"
-        InvocationManifestPath="$(_SharpProofCompilerManifestPath)" />
+        InvocationManifestPath="$(_SharpProofCompilerManifestPath)"
+        WorkerPath="$(_SharpProofWorkerPath)"
+        LauncherPath="$(_SharpProofLauncherPath)"
+        CachePath="$(_SharpProofEffectiveCacheDirectory)" />
   </Target>
 
   <Target Name="_SharpProofVerifyCore"
@@ -126,7 +233,7 @@
     <Error Condition="!Exists('$(_SharpProofWorkerPath)')"
            Text="SharpProof verifier worker was not found at '$(_SharpProofWorkerPath)'." />
     <MakeDir Directories="$(_SharpProofInvocationDirectory)" />
-    <Exec Command="&quot;$(SharpProofDotNetHost)&quot; &quot;$(_SharpProofLauncherPath)&quot; verify --worker &quot;$(_SharpProofWorkerPath)&quot; --request &quot;$(_SharpProofInvocationRequestFile)&quot; --result &quot;$(_SharpProofInvocationResultFile)&quot; --publish-request &quot;$(SharpProofVerifyRequestFile)&quot; --publish-result &quot;$(SharpProofVerifyResultFile)&quot; --compiler-manifest &quot;$(_SharpProofCompilerManifestPath)&quot; --publish-compiler-manifest &quot;$(SharpProofCompilerManifestFile)&quot; --verify-policy &quot;$(_SharpProofVerifyPolicyNormalized)&quot; --assumption-policy &quot;$(_SharpProofAssumptionPolicyNormalized)&quot; --query-rlimit &quot;$(SharpProofVerifyQueryRlimit)&quot; --method-rlimit &quot;$(SharpProofVerifyMethodRlimit)&quot; --method-wall-ms &quot;$(SharpProofVerifyMethodWallTimeMilliseconds)&quot; --project-wall-ms &quot;$(SharpProofVerifyProjectWallTimeMilliseconds)&quot; --max-parallelism &quot;$(SharpProofVerifyMaxParallelism)&quot; --max-expression-depth &quot;$(SharpProofVerifyMaximumExpressionDepth)&quot; --process-memory-bytes &quot;$(SharpProofVerifyProcessMemoryLimitBytes)&quot; --max-worker-processes &quot;$(SharpProofVerifyMaxWorkerProcesses)&quot; --termination-grace-ms &quot;$(SharpProofVerifyTerminationGraceMilliseconds)&quot; --cache-enabled &quot;$(SharpProofVerifyCacheEnabled)&quot; --cache-directory &quot;$(SharpProofVerifyCacheDirectory)&quot; --cache-maximum-bytes &quot;$(SharpProofVerifyCacheMaximumBytes)&quot;$(_SharpProofVerifySarifArgument)"
+    <Exec Command="&quot;$(SharpProofDotNetHost)&quot; &quot;$(_SharpProofLauncherPath)&quot; verify --worker &quot;$(_SharpProofWorkerPath)&quot; --request &quot;$(_SharpProofInvocationRequestFile)&quot; --result &quot;$(_SharpProofInvocationResultFile)&quot; --publish-request &quot;$(SharpProofVerifyRequestFile)&quot; --publish-result &quot;$(SharpProofVerifyResultFile)&quot; --compiler-manifest &quot;$(_SharpProofCompilerManifestPath)&quot; --publish-compiler-manifest &quot;$(SharpProofCompilerManifestFile)&quot; --verify-policy &quot;$(_SharpProofVerifyPolicyNormalized)&quot; --assumption-policy &quot;$(_SharpProofAssumptionPolicyNormalized)&quot; --query-rlimit &quot;$(SharpProofVerifyQueryRlimit)&quot; --method-rlimit &quot;$(SharpProofVerifyMethodRlimit)&quot; --method-wall-ms &quot;$(SharpProofVerifyMethodWallTimeMilliseconds)&quot; --project-wall-ms &quot;$(SharpProofVerifyProjectWallTimeMilliseconds)&quot; --max-parallelism &quot;$(SharpProofVerifyMaxParallelism)&quot; --max-expression-depth &quot;$(SharpProofVerifyMaximumExpressionDepth)&quot; --process-memory-bytes &quot;$(SharpProofVerifyProcessMemoryLimitBytes)&quot; --max-worker-processes &quot;$(SharpProofVerifyMaxWorkerProcesses)&quot; --termination-grace-ms &quot;$(SharpProofVerifyTerminationGraceMilliseconds)&quot; --cache-enabled &quot;$(SharpProofVerifyCacheEnabled)&quot; --cache-directory &quot;$(_SharpProofEffectiveCacheDirectory)&quot; --cache-maximum-bytes &quot;$(SharpProofVerifyCacheMaximumBytes)&quot;$(_SharpProofVerifySarifArgument)"
           WorkingDirectory="$(MSBuildProjectDirectory)"
           StandardOutputImportance="High"
           StandardErrorImportance="High"

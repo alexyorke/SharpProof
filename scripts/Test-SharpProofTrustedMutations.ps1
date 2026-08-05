@@ -7,7 +7,8 @@ param(
 
     [string[]]$MutationName = @(),
 
-    [string]$ExpectedCommit = '',
+    [Parameter(Mandatory = $true)]
+    [string]$ExpectedCommit,
 
     [switch]$KeepWorkspace
 )
@@ -29,8 +30,10 @@ $sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($sourceCommit)) {
     throw 'Unable to resolve the mutation source commit.'
 }
-if (-not [string]::IsNullOrWhiteSpace($ExpectedCommit) -and
-    $sourceCommit -ne $ExpectedCommit) {
+if ($ExpectedCommit -notmatch '^[0-9a-f]{40}$') {
+    throw "ExpectedCommit must be a 40-character commit SHA: '$ExpectedCommit'."
+}
+if ($sourceCommit -ne $ExpectedCommit) {
     throw "Mutation source commit '$sourceCommit' does not match '$ExpectedCommit'."
 }
 
@@ -87,10 +90,28 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'portable-codec-unknown-wire-fails-closed'
         File = 'SharpProof.CompilerArtifact\PortableIrGraphCodec.cs'
-        Original = '        return value >= 0 && value < values.Length'
-        Mutated = '        return value >= 0'
+        Original = (@'
+        return value >= 0 && value < values.Length
+            ? values[value]
+            : throw Bad("Portable IR contains an unknown enum value.");
+'@).Trim()
+        Mutated = (@'
+        return value >= 0 && value < values.Length
+            ? values[value]
+            : value == 999
+                ? values[0]
+                : throw Bad("Portable IR contains an unknown enum value.");
+'@).Trim()
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~DecoderRejectsUnknownWireEnumCodes'
+    },
+    [pscustomobject]@{
+        Name = 'portable-schema-slot-role-fails-closed'
+        File = 'SharpProof.CompilerArtifact\CompilerArtifactModel.schema.json'
+        Original = '{ "kind": "Boolean", "slots": ["booleanValue",'
+        Mutated = '{ "kind": "Boolean", "slots": ["unsupported",'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~SchemaPinsEnvelopeWireCatalogsAndEffectEvidenceDomain'
     },
     [pscustomobject]@{
         Name = 'portable-codec-havoc-order-fails-closed'
@@ -175,8 +196,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'lowering-unchecked-arithmetic'
         File = 'SharpProof.Frontend\RoslynOperationLowerer.cs'
-        Original = "CSharpScalarSemantics.RequiresCheckedArithmetic(operation.OperatorKind) &&`n                !operation.IsChecked)"
-        Mutated = "CSharpScalarSemantics.RequiresCheckedArithmetic(operation.OperatorKind) &&`n                operation.IsChecked)"
+        Original = "CSharpScalarSemantics.RequiresCheckedArithmetic(`n                        operation.OperatorKind) && !operation.IsChecked)"
+        Mutated = "CSharpScalarSemantics.RequiresCheckedArithmetic(`n                        operation.OperatorKind) && operation.IsChecked)"
         Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
         Filter = 'FullyQualifiedName~OverflowAndConversionShapesAreExactOnlyWhenRepresentable'
     },
@@ -231,8 +252,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'effect-fresh-array-content-provenance'
         File = 'SharpProof.Effects\OperationEffectScanner.cs'
-        Original = '            IArrayElementReferenceOperation => EffectRegionSet.Unknown,'
-        Mutated = '            IArrayElementReferenceOperation element => ClassifyRegion(element.ArrayReference, aliasSource),'
+        Original = "            IFieldReferenceOperation or IArrayElementReferenceOperation =>`n                EffectRegionSet.Unknown,"
+        Mutated = "            IFieldReferenceOperation => EffectRegionSet.Unknown,`n            IArrayElementReferenceOperation element => ClassifyRegion(element.ArrayReference, aliasSource),"
         Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
         Filter = 'FullyQualifiedName~FreshArrayContentsDoNotBecomeFreshOwnedAliases'
     },
@@ -245,6 +266,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~SourceOnlyMetadataPreconditionsCannotDisappearIntoTrustedSummaries'
     },
     [pscustomobject]@{
+        Name = 'external-contract-closed-precondition-boundary'
+        File = 'SharpProof.Effects\EffectAnalysisSession.cs'
+        Original = "                EffectSummaryOperations.Join(`n                    _external.Resolve(normalized),`n                    ResolveEntryPreconditions(normalized)));"
+        Mutated = '                _external.Resolve(normalized));'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~DirectExternalAnalysisAppliesClosedEntryPreconditions'
+    },
+    [pscustomobject]@{
         Name = 'frontend-default-subset-decision'
         File = 'SharpProof.Frontend\FrontendSubset.cs'
         Original = '    public bool IsExact => Decision == FrontendSubsetDecision.Exact;'
@@ -255,8 +284,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'frontend-delegate-reference-equality'
         File = 'SharpProof.Frontend\CSharpScalarSemantics.generated.cs'
-        Original = '        type.IsReferenceType && type.TypeKind != TypeKind.Delegate ||'
-        Mutated = '        type.IsReferenceType ||'
+        Original = '        type is null or ({ IsReferenceType: true, TypeKind: not TypeKind.Delegate } and not INamedTypeSymbol { IsAbstract: true }) ||'
+        Mutated = '        type is null or { IsReferenceType: true } ||'
         Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
         Filter = 'FullyQualifiedName~UnsupportedValueDomainsCannotMasqueradeAsReferenceEquality'
     },
@@ -267,6 +296,14 @@ $mutations = @(
         Mutated = '                []);'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~ConfigurationProviderFailureReportsAndSuppressesAnalysis'
+    },
+    [pscustomobject]@{
+        Name = 'compiler-collector-configuration-gate'
+        File = 'SharpProof.CompilerCollector\FinalCompilationCollector.cs'
+        Original = '            if (!SharpProofAnalyzer.GetConfigurationDiagnostics('
+        Mutated = '            if (SharpProofAnalyzer.GetConfigurationDiagnostics('
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~TreeLocalConfigurationGateDoesNotEmitAnArtifact'
     },
     [pscustomobject]@{
         Name = 'effect-region-contract-catalog'
@@ -461,6 +498,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~UnannotatedCallerStillChecksExternalClosedPreconditions'
     },
     [pscustomobject]@{
+        Name = 'effect-metadata-callsite-certificate'
+        File = 'SharpProof.Analyzer\AnalyzerSession.cs'
+        Original = "            ResolveEffectContract(method) is`n            { Kind: > EffectContractResolutionKind.Missing and < EffectContractResolutionKind.Valid })"
+        Mutated = "            ResolveEffectContract(method) is`n            { Kind: > EffectContractResolutionKind.Missing and <= EffectContractResolutionKind.Valid })"
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ExternalMetadataPreconditionEnvelopeCannotBeAssumed'
+    },
+    [pscustomobject]@{
+        Name = 'analyzer-bodyless-entry-precondition'
+        File = 'SharpProof.Analyzer\EffectCallPreconditionPolicy.cs'
+        Original = "        if (method is`n            {`n                IsAbstract: false,`n                IsExtern: false,`n                DeclaringSyntaxReferences: { IsEmpty: false }`n            } &&`n            binding.Contracts.Clauses.Any(`n                static clause =>`n                    clause.Kind ==`n                    BoundContractKind.Requires))"
+        Mutated = "        if (method.IsAbstract || method.IsExtern)"
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~BodylessContractWithClosedPreconditionRemainsUnknown'
+    },
+    [pscustomobject]@{
         Name = 'compilation-reference-model-owner'
         File = 'SharpProof.Frontend\CompilationModelProvider.cs'
         Original = '        return owner.GetSemanticModel(tree, ignoreAccessibility: false);'
@@ -599,15 +652,39 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'cache-manifest-binding'
         File = 'SharpProof.Worker\VerificationCache.cs'
-        Original = '!string.Equals(payload.ManifestHash, manifest.Hash, StringComparison.Ordinal) ||'
+        Original = '                !string.Equals(payloadManifestHash, manifest.Hash, StringComparison.Ordinal) ||'
         Mutated = 'false ||'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~RehashedCacheSealedForDifferentManifestMissesAndRecomputes'
     },
     [pscustomobject]@{
+        Name = 'cache-write-size-admission'
+        File = 'SharpProof.Worker\VerificationCache.cs'
+        Original = "            if (Encoding.UTF8.GetByteCount(json) >`n                Math.Min(_maximumBytes, WorkerProtocolJson.MaximumJsonBytes))"
+        Mutated = '            if (Encoding.UTF8.GetByteCount(json) > _maximumBytes)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~CacheWriteLimitsAreRejectedBeforePublication'
+    },
+    [pscustomobject]@{
+        Name = 'cache-read-lock-coordination'
+        File = 'SharpProof.Worker\VerificationCache.cs'
+        Original = "            using var cacheLock = AcquireLock(_directory);`n            ValidatePath(path);`n            var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)"
+        Mutated = '            var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~CacheDirectoryLockMakesReadMissAndWriteUnavailable'
+    },
+    [pscustomobject]@{
+        Name = 'cache-write-lock-coordination'
+        File = 'SharpProof.Worker\VerificationCache.cs'
+        Original = "            using var cacheLock = AcquireLock(_directory);`n            var payload = JsonSerializer.Serialize(new CachePayload("
+        Mutated = '            var payload = JsonSerializer.Serialize(new CachePayload('
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~CacheDirectoryLockMakesReadMissAndWriteUnavailable'
+    },
+    [pscustomobject]@{
         Name = 'protocol-manifest-result-equality'
         File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
-        Original = "actual.OrderBy(static value => value, StringComparer.Ordinal)`n            .SequenceEqual(expected.OrderBy(static value => value, StringComparer.Ordinal),`n                StringComparer.Ordinal)"
+        Original = "actual.OrderBy(static value => value, s_ordinal)`n            .SequenceEqual(expected.OrderBy(static value => value, s_ordinal),`n                s_ordinal)"
         Mutated = 'actual.Concat(expected).All(static _ => true)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~StrictResponseValidationRequiresExactManifestAndResultSets'
@@ -615,10 +692,26 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'worker-runtime-component-byte-limit'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
-        Original = 'internal const long MaximumComponentBytes = 32L * 1024 * 1024;'
-        Mutated = 'internal const long MaximumComponentBytes = 64L * 1024 * 1024;'
+        Original = 'internal const int MaximumComponentBytes = 32 * 1024 * 1024;'
+        Mutated = 'internal const int MaximumComponentBytes = 64 * 1024 * 1024;'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~RuntimeClosureLimitsFailClosedAtEveryBoundary'
+    },
+    [pscustomobject]@{
+        Name = 'worker-rejects-unsupported-runtime-rid-leaf'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '(?!runtimes/)'
+        Mutated = '(?=runtimes/)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~IdentityCoversTheCompleteTrustedRuntimeClosure'
+    },
+    [pscustomobject]@{
+        Name = 'worker-runtime-target-selection'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '        foreach (var name in names)'
+        Mutated = '        foreach (var name in Array.Empty<string>())'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~IdentityCoversTheCompleteTrustedRuntimeClosure'
     },
     [pscustomobject]@{
         Name = 'launcher-argument-query-budget-projection'
@@ -655,7 +748,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'launcher-manifest-byte-limit'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
-        Original = 'MaximumBytes = 16 * 1024 * 1024;'
+        Original = 'MaximumBytes = WorkerProtocolJson.MaximumJsonBytes;'
         Mutated = 'MaximumBytes = 32 * 1024 * 1024;'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~CompilerManifestByteLimitIsEnforcedBeforeAllocation'
@@ -667,10 +760,223 @@ $mutations = @(
         Mutated = 'MaximumJsonDepth = 64;'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~DeserializationRejectsDocumentsBeyondTheDeclaredDepth'
+    },
+    [pscustomobject]@{
+        Name = 'contract-api-consumer-requires-identity'
+        File = 'SharpProof.Effects\ManagedAbstractFlow.cs'
+        Original = '            Name: ContractApiCatalog.RequiresMethodName,'
+        Mutated = '            Name: ContractApiCatalog.EnsuresMethodName,'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~ContractRequiresRefinesSubsequentFacts'
+    },
+    [pscustomobject]@{
+        Name = 'effect-managed-flow-binary-refinement-guard'
+        File = 'SharpProof.Effects\ManagedAbstractFlow.cs'
+        Original = "            IBinaryOperation { OperatorMethod: null, IsLifted: false } binary =>`n                AssumeComparison(state, binary.LeftOperand, binary.RightOperand,"
+        Mutated = "            IBinaryOperation binary =>`n                AssumeComparison(state, binary.LeftOperand, binary.RightOperand,"
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~UserDefinedEqualityDoesNotRefineNullness'
+    },
+    [pscustomobject]@{
+        Name = 'effect-managed-flow-binary-evaluation-guard'
+        File = 'SharpProof.Effects\ManagedAbstractFlow.cs'
+        Original = "            IBinaryOperation { OperatorMethod: null, IsLifted: false } binary =>`n                Binary(binary.OperatorKind,"
+        Mutated = "            IBinaryOperation binary =>`n                Binary(binary.OperatorKind,"
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~UserDefinedEqualityEvaluatesAsUnknown'
+    },
+    [pscustomobject]@{
+        Name = 'contract-api-closed-category-parity'
+        File = 'SharpProof.Frontend\ContractApiMetadata.generated.cs'
+        Original = "                NotNull,`n                `"NotNullAttribute`",`n                ContractApiAttributeCategory.Closed,"
+        Mutated = "                NotNull,`n                `"NotNullAttribute`",`n                ContractApiAttributeCategory.Effect,"
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~CatalogAttributeMetadataMatchesDeclarations'
+    },
+    [pscustomobject]@{
+        Name = 'contract-api-closed-selection-parity'
+        File = 'SharpProof.Frontend\ContractApiMetadata.generated.cs'
+        Original = "                NotNull,`n                `"NotNullAttribute`",`n                ContractApiAttributeCategory.Closed,`n                ContractApiSelectionFeature.Contracts),"
+        Mutated = "                NotNull,`n                `"NotNullAttribute`",`n                ContractApiAttributeCategory.Closed,`n                ContractApiSelectionFeature.Effects),"
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~CatalogAttributeMetadataMatchesDeclarations'
+    },
+    [pscustomobject]@{
+        Name = 'worker-rejects-implicit-worker-path'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '        if (!path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))'
+        Mutated = '        if (path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~MissingWorkerWithoutDllSuffixIsRejectedBeforeHashing'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-disables-inherited-handles'
+        File = 'SharpProof.Worker.Launcher\Program.cs'
+        Original = '                    inheritHandles: false,'
+        Mutated = '                    inheritHandles: true,'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~WorkerProcessCreationDisablesHandleInheritance'
+    },
+    [pscustomobject]@{
+        Name = 'closure-retains-staged-component-handles'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '                stagedHandles[stagedCount++] = OpenRead(stagedPath);'
+        Mutated = '                stagedHandles[stagedCount++] = OpenRead(component.Value);'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~WorkerClosureRetainsStagedComponentsUntilSnapshotDisposal'
+    },
+    [pscustomobject]@{
+        Name = 'closure-canonicalizes-component-key'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '                    hash.Add(component.Key.ToUpperInvariant()).Add(stagedRead);'
+        Mutated = '                    hash.Add(component.Key).Add(stagedRead);'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~IdentityIgnoresWindowsPathSpelling'
+    },
+    [pscustomobject]@{
+        Name = 'worker-rejects-request-result-alias'
+        File = 'SharpProof.Worker\Program.cs'
+        Original = '        return !string.Equals(request, result, StringComparison.OrdinalIgnoreCase);'
+        Mutated = '        return true;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~DirectInvocationRejectsRequestResultAliasBeforeStartBarrier'
+    },
+    [pscustomobject]@{
+        Name = 'closure-retains-each-component-path-once'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '                components.Values.ToArray(),'
+        Mutated = '                components.Values.Take(1).ToArray(),'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~IdentityCoversTheCompleteTrustedRuntimeClosure'
+    },
+    [pscustomobject]@{
+        Name = 'closure-component-paths-immutable'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '        ImmutableArray.CreateRange(componentPaths);'
+        Mutated = '        componentPaths;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~RuntimeClosureComponentPathsAreImmutable'
+    },
+    [pscustomobject]@{
+        Name = 'closure-executes-staged-worker'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '    internal string ExecutionWorkerPath { get; } = executionWorkerPath;'
+        Mutated = '    internal string ExecutionWorkerPath { get; } = string.IsNullOrEmpty(executionWorkerPath) ? workerPath : workerPath;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~RuntimeClosureComponentPathsAreImmutable'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-checks-discovered-runtime-paths'
+        File = 'SharpProof.Worker.Launcher\Program.cs'
+        Original = "            runtimeSnapshot?.ComponentPaths.Any(path =>`n                !runtimeRoots.Contains(path, StringComparer.OrdinalIgnoreCase) &&`n                !LauncherArguments.LauncherRuntimePaths.Contains(`n                    path, StringComparer.OrdinalIgnoreCase) &&`n                !paths.Add(path)) is true"
+        Mutated = '            runtimeSnapshot?.ComponentPaths.Any(path => path.Length == 0) == true'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~RequestProjectionRejectsDiscoveredRuntimeAssetCollisionBeforeManifestRead'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-validates-static-alias-before-snapshot'
+        File = 'SharpProof.Worker.Launcher\Program.cs'
+        Original = '            arguments.ValidateDistinctPaths(runtimeSnapshot);'
+        Mutated = '            arguments.ValidatePreflight();'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~WorkerRuntimeCompanionAliasIsRejectedBeforeInvalidationDeletesIt'
+    }
+    [pscustomobject]@{
+        Name = 'launcher-checks-launcher-runtime-paths'
+        File = 'SharpProof.Worker.Launcher\Program.cs'
+        Original = '            ..LauncherArguments.LauncherRuntimePaths,'
+        Mutated = '            ..LauncherArguments.LauncherRuntimePaths[1..],'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~RequestProjectionRejectsLauncherRuntimeCollisionBeforeManifestRead'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-checks-protocol-companion-path'
+        File = 'SharpProof.Worker.Launcher\LauncherArguments.generated.cs'
+        Original = 'System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Worker.Protocol.dll")'
+        Mutated = 'System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Worker.dll")'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~RequestProjectionRejectsLauncherProtocolRuntimeCollisionBeforeManifestRead'
+    },
+    [pscustomobject]@{
+        Name = 'targets-protect-protocol-companion-path'
+        File = 'SharpProof.Verifier.Win-x64\buildTransitive\SharpProof.Verifier.Win-x64.targets'
+        Original = '                    "SharpProof.Worker.Protocol.dll")'
+        Mutated = '                    "SharpProof.Worker.Missing.dll")'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~LauncherProtocolAssetRemainsProtectedByTargets'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-normalizes-malformed-worker-deps'
+        File = 'SharpProof.Worker.Launcher\Program.cs'
+        Original = "                InvalidDataException or JsonException or KeyNotFoundException or`n                InvalidOperationException)"
+        Mutated = "                InvalidDataException or KeyNotFoundException or`n                InvalidOperationException)"
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~MainFailsClosedWhenWorkerDependencyManifestIsMalformed'
+    },
+    [pscustomobject]@{
+        Name = 'launcher-rejects-cache-inside-worker-tree'
+        File = 'SharpProof.Worker.Launcher\Program.cs'
+        Original = "            candidates`n                .Skip(runtimeRoots.Length +`n                    LauncherArguments.LauncherRuntimePaths.Length)`n                .OfType<string>()`n                .Any(path => WorkerCachePath.IsSameOrDescendant(`n                    Path.GetFullPath(path),`n                    Path.GetDirectoryName(workerPath)!))"
+        Mutated = '            false'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~DirectLauncherRejectsCacheInsideWorkerRuntimeDirectory'
+    },
+    [pscustomobject]@{
+        Name = 'analyzer-source-companion-fallback'
+        File = 'SharpProof.Analyzer\AnalyzerSession.cs'
+        Original = '                        includeSourceCompanions: false'
+        Mutated = '                        includeSourceCompanions: true'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~CompanionPreconditionDoesNotContaminateOtherMember'
+    },
+    [pscustomobject]@{
+        Name = 'closure-staging-content-consistency'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = "        if (!CompilerManifestArtifactFile.ReadAllBytes(`n                    sourcePath,`n                    MaximumComponentBytes).SequenceEqual("
+        Mutated = "        if (CompilerManifestArtifactFile.ReadAllBytes(`n                    sourcePath,`n                    MaximumComponentBytes).SequenceEqual("
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~StagedComponentConsistencyIsFailClosed'
+    },
+    [pscustomobject]@{
+        Name = 'closure-staging-length-consistency'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '        if (length > maximum || totalBytes > MaximumClosureBytes - length)'
+        Mutated = '        if (length > maximum && totalBytes > MaximumClosureBytes - length)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~RuntimeClosureLimitsFailClosedAtEveryBoundary'
     }
 )
 
+$acceptanceContract = Get-Content -LiteralPath (
+    Join-Path $repositoryRoot 'eng\acceptance\contract.json') -Raw |
+    ConvertFrom-Json
+$mutationPolicy = $acceptanceContract.mutationEvidence
+$catalogCount = @($mutations).Count
+$catalogLines = @(
+    $mutations |
+        ForEach-Object {
+            $file = $_.File.Replace('\', '/')
+            "$($_.Name)`t$file`t$($_.Filter)"
+        })
+$catalogText = [string]::Join("`n", $catalogLines) + "`n"
+$catalogHasher = [Security.Cryptography.SHA256]::Create()
+try {
+    $catalogBytes = [Text.UTF8Encoding]::new($false).GetBytes($catalogText)
+    $catalogSha256 = [Convert]::ToHexString(
+        $catalogHasher.ComputeHash($catalogBytes)).ToLowerInvariant()
+}
+finally {
+    $catalogHasher.Dispose()
+}
+if ($catalogCount -ne [int]$mutationPolicy.expectedCatalogCount -or
+    $catalogSha256 -ne [string]$mutationPolicy.expectedCatalogSha256) {
+    throw (
+        'Trusted mutation registrations do not match the acceptance ' +
+        'catalog policy.')
+}
+
 if ($MutationName.Count -gt 0) {
+    $selection = 'selected'
     $knownNames = @($mutations.Name)
     $requestedNames = @($MutationName | Select-Object -Unique)
     $unknownNames = @($requestedNames | Where-Object { $_ -notin $knownNames })
@@ -678,6 +984,9 @@ if ($MutationName.Count -gt 0) {
         throw "Unknown mutation name(s): $($unknownNames -join ', ')."
     }
     $mutations = @($mutations | Where-Object { $_.Name -in $requestedNames })
+}
+else {
+    $selection = 'full'
 }
 
 $mutationRoot = Join-Path ([IO.Path]::GetTempPath()) 'SharpProof-mutation'
@@ -900,6 +1209,9 @@ try {
         schemaVersion = 2
         commit = $sourceCommit
         configuration = $Configuration
+        selection = $selection
+        catalogCount = $catalogCount
+        catalogSha256 = $catalogSha256
         mutationCount = $results.Count
         killedCount = @($results | Where-Object killed).Count
         mutations = $results

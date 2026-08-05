@@ -6,6 +6,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         ArgumentNullGuard.NotNull(directory, nameof(directory)));
     private readonly long _maximumBytes = ArgumentNullGuard.RequirePositive(
         maximumBytes, nameof(maximumBytes));
+    internal static Action<string, string>? PathValidationOverride;
 
     internal async Task<WorkerVerifyResponse?> TryReadAsync(
         string inputHash,
@@ -15,28 +16,36 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         CancellationToken cancellationToken)
     {
         var path = GetPath(inputHash);
-        if (!File.Exists(path))
-        {
-            return null;
-        }
-
         try
         {
-            var json = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
+            using var cacheLock = AcquireLock(_directory);
+            ValidatePath(path);
+            var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)
+                .ConfigureAwait(false);
             var envelope = JsonSerializer.Deserialize<CacheEnvelope>(json, WorkerProtocolJson.Options);
-            if (envelope == null || envelope.SchemaVersion != WorkerCacheVersions.Current ||
-                !string.Equals(envelope.InputHash, inputHash, StringComparison.Ordinal) ||
-                string.IsNullOrEmpty(envelope.Payload) ||
-                !string.Equals(envelope.PayloadHash, HashText(envelope.Payload), StringComparison.Ordinal))
+            if (envelope is not
+                {
+                    SchemaVersion: WorkerCacheVersions.Current,
+                    InputHash: var envelopeInputHash,
+                    Payload: { Length: > 0 } envelopePayload,
+                    PayloadHash: var payloadHash
+                } ||
+                !string.Equals(envelopeInputHash, inputHash, StringComparison.Ordinal) ||
+                !string.Equals(payloadHash, HashText(envelopePayload), StringComparison.Ordinal))
             {
                 return null;
             }
             cancellationToken.ThrowIfCancellationRequested();
             var payload = JsonSerializer.Deserialize<CachePayload>(envelope.Payload, WorkerProtocolJson.Options);
-            if (payload == null ||
-                !string.Equals(payload.ManifestHash, manifest.Hash, StringComparison.Ordinal) ||
-                payload.CallableResults is not { } callables || callables.Any(static result => result == null) ||
-                payload.ClaimResults is not { } claims || claims.Any(static result => result == null))
+            if (payload is not
+                {
+                    ManifestHash: var payloadManifestHash,
+                    CallableResults: { } callables,
+                    ClaimResults: { } claims
+                } ||
+                !string.Equals(payloadManifestHash, manifest.Hash, StringComparison.Ordinal) ||
+                callables.Any(static result => result == null) ||
+                claims.Any(static result => result == null))
             {
                 return null;
             }
@@ -55,11 +64,13 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             }
 
             cancellationToken.ThrowIfCancellationRequested();
+            ValidatePath(path);
             File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
             return response;
         }
         catch (Exception exception) when (exception is
-            JsonException or IOException or UnauthorizedAccessException)
+            ArgumentException or JsonException or IOException or InvalidDataException or
+                UnauthorizedAccessException)
         {
             return null;
         }
@@ -71,33 +82,73 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         ArgumentNullException.ThrowIfNull(response);
         try
         {
-            Directory.CreateDirectory(_directory);
+            using var cacheLock = AcquireLock(_directory);
             var payload = JsonSerializer.Serialize(new CachePayload(
                 manifest.Hash, response.CallableResults, response.ClaimResults), WorkerProtocolJson.Options);
             var envelope = new CacheEnvelope(WorkerCacheVersions.Current,
                 inputHash, HashText(payload), payload);
             var json = JsonSerializer.Serialize(envelope, WorkerProtocolJson.Options);
+            if (Encoding.UTF8.GetByteCount(json) >
+                Math.Min(_maximumBytes, WorkerProtocolJson.MaximumJsonBytes))
+            {
+                return false;
+            }
+
             var path = GetPath(inputHash);
+            ValidatePath(path);
             await AtomicFile.WriteUtf8Async(path, json, cancellationToken).ConfigureAwait(false);
-            Evict(cancellationToken);
-            return true;
+            ValidatePath(path);
+            return Evict(cancellationToken);
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is
+            ArgumentException or IOException or UnauthorizedAccessException or
+            OverflowException)
         {
             // Cache failures never change semantic verifier outcomes.
             return false;
         }
     }
 
-    private void Evict(CancellationToken cancellationToken)
+    private static FileStream AcquireLock(string directory)
+    {
+        var lockPath = Path.Combine(directory, ".sharp-proof-cache.lock");
+        ValidatePath(directory, lockPath);
+        Directory.CreateDirectory(directory);
+        ValidatePath(directory, lockPath);
+        var cacheLock = new FileStream(
+            lockPath,
+            FileMode.OpenOrCreate,
+            FileAccess.ReadWrite,
+            FileShare.None);
+        try
+        {
+            ValidatePath(directory, lockPath);
+            return cacheLock;
+        }
+        catch
+        {
+            cacheLock.Dispose();
+            throw;
+        }
+    }
+
+    private bool Evict(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var files = new DirectoryInfo(_directory)
-            .EnumerateFiles("*.json", SearchOption.TopDirectoryOnly)
+            .EnumerateFiles("*.sharp-proof-cache.json", SearchOption.TopDirectoryOnly)
             .OrderBy(static file => file.LastWriteTimeUtc)
             .ThenBy(static file => file.Name, StringComparer.Ordinal)
             .ToArray();
-        var total = files.Sum(static file => file.Length);
+        long total = 0;
+        foreach (var file in files)
+        {
+            ValidatePath(file.FullName);
+            checked
+            {
+                total += file.Length;
+            }
+        }
         foreach (var file in files)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -106,17 +157,37 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 break;
             }
 
-            var length = file.Length;
             try
             {
+                ValidatePath(file.FullName);
+                var length = file.Length;
                 file.Delete();
                 total -= length;
             }
             catch (Exception exception) when (exception is
-                IOException or UnauthorizedAccessException)
+                ArgumentException or IOException or UnauthorizedAccessException)
             {
+                return false;
             }
         }
+
+        return true;
+    }
+
+    private void ValidatePath(string path)
+    {
+        ValidatePath(_directory, path);
+    }
+
+    private static void ValidatePath(string directory, string path)
+    {
+        if (PathValidationOverride is { } validator)
+        {
+            validator(directory, path);
+            return;
+        }
+
+        WorkerCachePath.ValidateNoReparsePoints([directory, path]);
     }
 
     private string GetPath(string inputHash)
@@ -126,7 +197,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             throw new ArgumentException("A SHA-256 input hash is required.", nameof(inputHash));
         }
 
-        return Path.Combine(_directory, inputHash + ".json");
+        return Path.Combine(_directory, inputHash + ".sharp-proof-cache.json");
     }
 
     private static string HashText(string value)
@@ -141,20 +212,23 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         ImmutableArray<CompilerCallablePreparation> targets,
         CancellationToken cancellationToken = default)
     {
-        return expectedManifest != null && WorkerProtocolJson.IsSha256(expectedInputHash) && response is
+        return WorkerProtocolJson.IsSha256(expectedInputHash) && response is
         {
             RunStatus: WorkerRunStatus.Complete,
             Errors.Length: 0,
             CallableResults: { } callables,
-            ClaimResults: { } claims
+            ClaimResults: { Length: > 0 } claims
         } &&
         callables.All(static result =>
-            result != null && result.Coverage == WorkerCallableCoverage.Complete &&
-            result.Reason == WorkerCallableCoverageReason.None) &&
-        claims.Length != 0 &&
+            result is
+            {
+                Coverage: WorkerCallableCoverage.Complete,
+                Reason: WorkerCallableCoverageReason.None
+            }) &&
         claims.All(static result =>
-            result != null && result.Outcome == WorkerClaimOutcome.Refuted) &&
-        expectedManifest.Claims.Length == claims.Length &&
+            result is { Outcome: WorkerClaimOutcome.Refuted }) &&
+        expectedManifest is { Claims: { Length: var claimCount } } &&
+        claimCount == claims.Length &&
         expectedManifest.Claims.All(static claim =>
             claim.Kind == WorkerClaimKind.Postcondition) &&
         WorkerProtocolJson.Validate(response, expectedInputHash, expectedManifest).IsValid &&
@@ -261,15 +335,14 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
     {
         var type = factory.GetVariableInfo(variable.Variable).Type;
         if (type == factory.BooleanType &&
-            row.Kind == nameof(IrValueKind.Boolean) &&
-            row.Value is "true" or "false")
+            row is { Kind: nameof(IrValueKind.Boolean), Value: "true" or "false" })
         {
             value = factory.CreateBooleanValue(row.Value == "true");
             return true;
         }
 
         if (type == factory.IntegerType &&
-            row.Kind == nameof(IrValueKind.Integer) &&
+            row is { Kind: nameof(IrValueKind.Integer) } &&
             long.TryParse(
                 row.Value,
                 NumberStyles.AllowLeadingSign,

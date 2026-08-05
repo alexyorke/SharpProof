@@ -675,6 +675,7 @@ Assert-Properties `
     -Allowed @(
         'allowReferenceTypes',
         'excludedReferenceTypeKinds',
+        'excludeAbstractReferenceTypes',
         'specialTypes') `
     -Context 'builtInEquality'
 $allowReferenceEquality = Assert-Boolean `
@@ -692,6 +693,9 @@ if (@($excludedReferenceTypeKinds | Select-Object -Unique).Count -ne
     $excludedReferenceTypeKinds.Count) {
     throw 'builtInEquality.excludedReferenceTypeKinds contains duplicates.'
 }
+$excludeAbstractReferenceTypes = Assert-Boolean `
+    -Value $catalog.builtInEquality.excludeAbstractReferenceTypes `
+    -Context 'builtInEquality.excludeAbstractReferenceTypes'
 $equalityTypes = @(
     $catalog.builtInEquality.specialTypes |
         ForEach-Object {
@@ -978,13 +982,24 @@ Add-Lines -Lines $lines -Values @(
     '    }',
     '',
     '    private static bool SupportsBuiltInEquality(ITypeSymbol? type) =>',
-    '        type == null ||')
+    '')
 if ($allowReferenceEquality) {
-    $referenceCondition = 'type.IsReferenceType'
-    foreach ($typeKind in $excludedReferenceTypeKinds) {
-        $referenceCondition += " && type.TypeKind != TypeKind.$typeKind"
+    $excludedKinds = @(
+        $excludedReferenceTypeKinds |
+            ForEach-Object { "TypeKind.$_" })
+    $excludedKindPattern = if ($excludedKinds.Count -eq 1) {
+        $excludedKinds[0]
+    } else {
+        "($($excludedKinds -join ' or '))"
     }
-    $lines.Add("        $referenceCondition ||")
+    $referencePattern =
+        "{ IsReferenceType: true, TypeKind: not $excludedKindPattern }"
+    if ($excludeAbstractReferenceTypes) {
+        $referencePattern = "($referencePattern and not INamedTypeSymbol { IsAbstract: true })"
+    }
+    $lines.Add("        type is null or $referencePattern ||")
+} else {
+    $lines.Add('        type is null ||')
 }
 foreach ($type in $equalityTypes) {
     $lines.Add("        type.SpecialType == SpecialType.$type ||")

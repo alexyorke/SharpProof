@@ -22,5 +22,6 @@
     <InternalsVisibleTo Include="SharpProof.Worker" />
     <InternalsVisibleTo Include="SharpProof.Worker.Launcher" />
     <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+    <InternalsVisibleTo Include="SharpProof.Package.Test" />
   </ItemGroup>
 </Project>

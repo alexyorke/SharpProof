@@ -33,7 +33,7 @@ jobs:
       - name: Setup required .NET SDKs
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "9.0.316"
           global-json-file: global.json
 
       - name: Select the artifact version
@@ -75,6 +75,7 @@ jobs:
           restore SharpProof.sln
           --locked-mode
           /p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION
+          /p:RepositoryCommit=$env:GITHUB_SHA
 
       - name: Build package payloads
         shell: pwsh
@@ -84,6 +85,7 @@ jobs:
           --configuration Release
           --no-restore
           /p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION
+          /p:RepositoryCommit=$env:GITHUB_SHA
 
       - name: Pack and validate the three-package graph
         shell: pwsh
@@ -106,7 +108,8 @@ jobs:
               --configuration Release `
               --no-build `
               --output nupkgs `
-              /p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION
+              /p:SharpProofPackageVersion=$env:SHARPPROOF_RELEASE_VERSION `
+              /p:RepositoryCommit=$env:GITHUB_SHA
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
@@ -193,21 +196,35 @@ jobs:
             expected_smt: Graceful
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Setup required .NET SDKs
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "9.0.316"
           global-json-file: global.json
 
       - name: Prime the framework-only package cache
         shell: pwsh
         working-directory: ${{ runner.temp }}
-        run: >-
-          dotnet restore
-          "$env:GITHUB_WORKSPACE/SharpProof.Attributes/SharpProof.Attributes.csproj"
-          --source https://api.nuget.org/v3/index.json
-          --nologo
+        run: |
+          $restoreProject = "$env:GITHUB_WORKSPACE/SharpProof.Attributes/SharpProof.Attributes.csproj"
+          $restoreArguments = @(
+            'restore',
+            $restoreProject,
+            '--source',
+            'https://api.nuget.org/v3/index.json',
+            '--nologo')
+          if ($IsWindows) {
+            & "$env:GITHUB_WORKSPACE/scripts/Invoke-SharpProofDotnet.ps1" @restoreArguments
+          }
+          else {
+            & dotnet @restoreArguments
+          }
+          if ($LASTEXITCODE -ne 0) {
+            throw "Framework-only package cache restore failed with exit code $LASTEXITCODE."
+          }
 
       - name: Download exact NuGet artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -249,7 +266,7 @@ jobs:
         shell: pwsh
         working-directory: ${{ runner.temp }}
         run: >-
-          dotnet restore
+          & "$env:GITHUB_WORKSPACE/scripts/Invoke-SharpProofDotnet.ps1" restore
           "$env:GITHUB_WORKSPACE/SharpProof.Attributes/SharpProof.Attributes.csproj"
           --source https://api.nuget.org/v3/index.json
           --nologo
@@ -408,7 +425,7 @@ jobs:
       - name: Setup required .NET SDKs
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "9.0.316"
           global-json-file: global.json
 
       - name: Resolve the immutable release coverage baseline
@@ -625,6 +642,9 @@ jobs:
           if (-not $?) {
             throw 'Trusted-boundary mutation testing failed.'
           }
+          .\scripts\Test-SharpProofMutationCatalog.ps1 `
+            -EvidencePath artifacts/release-qualification/mutations.json `
+            -ExpectedCommit $env:SHARPPROOF_RELEASE_COMMIT
           .\scripts\Write-SharpProofReleaseQualification.ps1 `
             -Status running `
             -Tag $env:GITHUB_REF_NAME `
@@ -999,7 +1019,7 @@ jobs:
       - name: Setup required .NET SDKs
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "9.0.316"
           global-json-file: global.json
 
       - name: Download the tested private-preview bytes
@@ -1059,7 +1079,7 @@ jobs:
       - name: Setup required .NET SDKs
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "9.0.316"
           global-json-file: global.json
 
       - name: Download the tested release bytes

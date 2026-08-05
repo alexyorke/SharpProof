@@ -84,10 +84,42 @@ finally {
     $document.Dispose()
 }
 $catalog = $catalogJson | ConvertFrom-Json
-Assert-Properties $catalog @('schemaVersion', 'options', 'budgets', 'cache') `
+Assert-Properties $catalog @(
+    'schemaVersion', 'runtimeCompanionExtensions', 'runtimeCompanionFiles',
+    'runtimeCompanionAssemblyTypes', 'options', 'budgets', 'cache') `
     'launcher argument catalog'
 if ($catalog.schemaVersion -ne 1) {
     throw 'Launcher argument catalog schemaVersion must be 1.'
+}
+$runtimeCompanionExtensions = @($catalog.runtimeCompanionExtensions)
+$expectedRuntimeCompanionExtensions = @(
+    '.deps.json', '.runtimeconfig.json')
+if (($runtimeCompanionExtensions -join '|') -ne
+    ($expectedRuntimeCompanionExtensions -join '|')) {
+    throw 'Launcher runtime companion extensions are invalid.'
+}
+$runtimeCompanionFiles = @($catalog.runtimeCompanionFiles)
+$runtimeCompanionFileNames = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::OrdinalIgnoreCase)
+foreach ($file in $runtimeCompanionFiles) {
+    if ($file -isnot [string] -or
+        [string]::IsNullOrWhiteSpace($file) -or
+        [IO.Path]::GetFileName([string]$file) -cne [string]$file -or
+        -not $runtimeCompanionFileNames.Add([string]$file)) {
+        throw "Launcher runtime companion file is invalid or duplicated: '$file'."
+    }
+}
+if ($runtimeCompanionFiles.Count -eq 0) {
+    throw 'Launcher runtime companion files are incomplete.'
+}
+$runtimeCompanionAssemblyTypes = $catalog.runtimeCompanionAssemblyTypes
+foreach ($property in $runtimeCompanionAssemblyTypes.PSObject.Properties) {
+    if ($property.Name -notin $runtimeCompanionFiles -or
+        $property.Value -isnot [string] -or
+        [string]$property.Value -cnotmatch
+            '\A[A-Za-z_][A-Za-z0-9_.]*\z') {
+        throw "Launcher runtime companion assembly type is invalid: '$($property.Name)'."
+    }
 }
 
 $optionKeys = [Collections.Generic.HashSet[string]]::new(
@@ -240,6 +272,42 @@ foreach ($entry in @($catalog.options)) {
     $lines.Add("        $(Quote-CSharpString $entry.key),")
 }
 $lines.Add('    ];')
+$lines.Add('')
+$lines.Add('    internal static string[] LauncherRuntimePaths')
+$lines.Add('    {')
+$lines.Add('        get')
+$lines.Add('        {')
+$lines.Add('            var path = typeof(LauncherArguments).Assembly.Location;')
+$lines.Add('            return [')
+$lines.Add('                path,')
+foreach ($extension in $runtimeCompanionExtensions) {
+    $lines.Add(
+        "                System.IO.Path.ChangeExtension(path, " +
+        "$(Quote-CSharpString $extension)),")
+}
+foreach ($file in $runtimeCompanionFiles) {
+    $assemblyProperty = $runtimeCompanionAssemblyTypes.PSObject.Properties[
+        $file]
+    $assemblyType = if ($null -ne $assemblyProperty) {
+        $assemblyProperty.Value
+    }
+    else {
+        $null
+    }
+    $fileExpression = if ($null -ne $assemblyType) {
+        "System.IO.Path.GetFileName(typeof($assemblyType).Assembly.Location)"
+    }
+    else {
+        Quote-CSharpString $file
+    }
+    $lines.Add(
+        "                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, " +
+        "$fileExpression),")
+}
+$lines[$lines.Count - 1] = $lines[$lines.Count - 1].TrimEnd(',')
+$lines.Add('            ];')
+$lines.Add('        }')
+$lines.Add('    }')
 $lines.Add('')
 foreach ($entry in @($catalog.options | Where-Object accessor -ne 'none')) {
     $key = Quote-CSharpString $entry.key

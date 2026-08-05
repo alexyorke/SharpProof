@@ -127,7 +127,8 @@ policy-aware SARIF 2.1.0 projection of validated responses.
 
 ## Trusted-boundary mutation evidence
 
-`scripts/Test-SharpProofTrustedMutations.ps1` requires a clean tracked tree,
+`scripts/Test-SharpProofTrustedMutations.ps1` requires a clean tracked tree and
+the explicit `-ExpectedCommit` SHA for the checkout,
 archives the exact `HEAD` into an isolated workspace, proves each focused
 baseline test passes, then applies one deterministic mutation at a time. Each
 mutation must still compile and must be killed by its designated assertion; a

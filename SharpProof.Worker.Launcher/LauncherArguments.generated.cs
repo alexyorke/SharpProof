@@ -51,6 +51,27 @@ internal sealed partial class LauncherArguments
         "cache-maximum-bytes",
     ];
 
+    internal static string[] LauncherRuntimePaths
+    {
+        get
+        {
+            var path = typeof(LauncherArguments).Assembly.Location;
+            return [
+                path,
+                System.IO.Path.ChangeExtension(path, ".deps.json"),
+                System.IO.Path.ChangeExtension(path, ".runtimeconfig.json"),
+                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.CompilerArtifact.dll"),
+                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Ir.dll"),
+                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Specs.dll"),
+                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Worker.Protocol.dll"),
+                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Worker.Launcher.exe"),
+                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, System.IO.Path.GetFileName(typeof(System.IO.Pipelines.Pipe).Assembly.Location)),
+                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, System.IO.Path.GetFileName(typeof(System.Text.Encodings.Web.HtmlEncoder).Assembly.Location)),
+                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, System.IO.Path.GetFileName(typeof(System.Text.Json.JsonSerializer).Assembly.Location))
+            ];
+        }
+    }
+
     internal string WorkerPath => FullPath("worker");
     internal string RequestPath => FullPath("request");
     internal string ResultPath => FullPath("result");

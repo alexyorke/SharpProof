@@ -38,9 +38,9 @@ both generated C# projections before building.
 | `SharpProofVerifyProjectWallTimeMilliseconds` | `300000` | Outer project wall boundary | verifier props and `WorkerBudgets`; mirrored as 300 seconds by `contract.json` |
 | `SharpProofVerifyMaxParallelism` | `4` | Maximum concurrent worker method verification | verifier props and `WorkerBudgets`; mirrored by `contract.json` |
 | `SharpProofVerifyMaximumExpressionDepth` | `64` | Compiler-visible proof-obligation term depth sealed into the artifact; worker request must match | verifier props, `FinalCompilationCollector`, and `WorkerBudgets`; not present in `contract.json` |
-| `SharpProofVerifyProcessMemoryLimitBytes` | `2147483648` | Windows Job Object memory limit | verifier props and `WorkerBudgets`; mirrored as 2048 MiB by `contract.json` |
+| `SharpProofVerifyProcessMemoryLimitBytes` | `2147483648` | Windows Job Object memory limit; accepted range is 1 byte through 16 GiB | verifier props and `WorkerBudgets`; mirrored as 2048 MiB by `contract.json` |
 | `SharpProofVerifyMaxWorkerProcesses` | `4` | Windows Job Object active-process limit | verifier props and `WorkerBudgets`; not present in `contract.json` |
-| `SharpProofVerifyTerminationGraceMilliseconds` | `1000` | Grace added to the project boundary before forced termination | verifier props and `WorkerLauncherDefaults`; mirrored by `contract.json` |
+| `SharpProofVerifyTerminationGraceMilliseconds` | `1000` | Grace added to the project boundary before forced termination; accepted range is 1 through 300000 milliseconds | verifier props and `WorkerLauncherDefaults`; mirrored by `contract.json` |
 | `SharpProofVerifyCacheEnabled` | `true` | Enables the content-addressed disk cache | verifier props and `WorkerCacheOptions`; not present in `contract.json` |
 | `SharpProofVerifyCacheMaximumBytes` | `536870912` | Maximum cache size, 512 MiB | verifier props and `WorkerCacheOptions`; mirrored by `contract.json` |
 | `SharpProofVerifySarifFile` | unset | Opt-in deterministic SARIF 2.1.0 output path | verifier targets |
@@ -49,6 +49,10 @@ both generated C# projections before building.
 `SharpProofVerifyCacheDirectory` is initialized by the verifier targets beneath
 the project's intermediate output, normally
 `obj/<Configuration>/<TargetFramework>/SharpProof/cache`.
+Configured cache directories should be dedicated to SharpProof. Active entries
+use the `*.sharp-proof-cache.json` filename namespace; older `<hash>.json`
+files and other JSON files are intentionally ignored and are not removed by
+cache eviction. Historical files require user-managed cleanup.
 `SharpProofVerifyRequestFile` and `SharpProofVerifyResultFile` are initialized
 beside it. Concurrent builds use isolated invocation paths beneath
 `SharpProof/runs`. Validated writers are serialized by a cross-process mutex.
@@ -90,9 +94,18 @@ The worker rejects malformed budgets before analysis:
   project time;
 - parallelism and the Job Object process limit must each be from 1 through 4;
 - expression depth must be from 1 through 256;
-- process memory must be positive;
-- cache size must be from 1 byte through 512 MiB.
+- process memory must be from 1 byte through 16 GiB;
+- cache size must be from 1 byte through 512 MiB for active
+  `*.sharp-proof-cache.json` entries.
 
+Worker request, result, and cache envelope JSON files are capped at 16 MiB
+before UTF-8 decoding and JSON deserialization. Oversized, invalid-UTF-8, or
+malformed files fail closed as invalid input, malformed output, or a cache
+miss; the cache's 512 MiB limit remains the aggregate eviction limit for
+active `*.sharp-proof-cache.json` entries, not every file in the configured
+directory.
+
+The configured termination grace must be from 1 through 300000 milliseconds.
 The configured method and project wall values are fail-closed outer boundaries,
 not proof facts. Z3 queries use deterministic resource limits. The launcher
 uses the project wall limit plus the termination grace to enforce a final
@@ -122,9 +135,12 @@ Before launch, runtime-closure identity is also bounded and streamed. The
 closure permits at most 64 logical components and 64 MiB in total. A component
 identity is limited to 256 characters; an ordinary component is limited to
 32 MiB, the worker dependency manifest to 1 MiB, and the runtime configuration
-to 64 KiB. Dependency JSON depth is limited to 32. The launcher opens each
-component read-only without write sharing while hashing it, and any missing,
-oversized, escaping, or malformed closure fails before worker execution.
+to 64 KiB. Dependency JSON depth is limited to 32. The launcher hashes each
+selected component while it is opened read-only, materializes the exact
+hashed closure in a private temporary tree, and launches the worker from that
+tree. The source files are therefore not re-resolved after hashing; the
+temporary tree is removed after the worker exits. Any missing, oversized, or
+malformed closure fails before worker execution.
 
 `SharpProofFeatures` is a semantic compiler-artifact input. `contracts` excludes
 effect-only annotations from the manifest; `effects` excludes postcondition

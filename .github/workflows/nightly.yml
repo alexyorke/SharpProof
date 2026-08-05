@@ -19,7 +19,7 @@ jobs:
       - name: Setup required .NET SDKs
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "9.0.316"
           global-json-file: global.json
 
       - name: Restore and build
@@ -48,11 +48,14 @@ jobs:
 
       - name: Kill trusted-boundary mutations
         shell: pwsh
-        run: >-
-          .\scripts\Test-SharpProofTrustedMutations.ps1
-          -Configuration Release
-          -OutputPath artifacts/nightly/mutations.json
-          -ExpectedCommit $env:GITHUB_SHA
+        run: |
+          .\scripts\Test-SharpProofTrustedMutations.ps1 `
+            -Configuration Release `
+            -OutputPath artifacts/nightly/mutations.json `
+            -ExpectedCommit $env:GITHUB_SHA
+          .\scripts\Test-SharpProofMutationCatalog.ps1 `
+            -EvidencePath artifacts/nightly/mutations.json `
+            -ExpectedCommit $env:GITHUB_SHA
 
       - name: Retain performance outcome
         shell: pwsh

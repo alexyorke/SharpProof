@@ -304,13 +304,13 @@ public sealed class RoslynOperationLowerer
 
         return operation switch
         {
-            ILiteralOperation => true,
-            ILocalReferenceOperation => true,
-            IParameterReferenceOperation => true,
-            IInstanceReferenceOperation => true,
-            IDefaultValueOperation => true,
-            ITypeOfOperation => true,
-            ISizeOfOperation => true,
+            ILiteralOperation or
+                ILocalReferenceOperation or
+                IParameterReferenceOperation or
+                IInstanceReferenceOperation or
+                IDefaultValueOperation or
+                ITypeOfOperation or
+                ISizeOfOperation => true,
             IConversionOperation conversion =>
                 conversion.OperatorMethod == null &&
                 IsDemonstrablyPure(conversion.Operand),
@@ -647,19 +647,25 @@ public sealed class RoslynOperationLowerer
                 return OpaqueBinary(operation, FrontendAbstention.UnsupportedOperationKind);
             }
 
-            if (mapped.Value != IrBinaryOperator.StringConcat &&
-                CSharpScalarSemantics.IsIntegerArithmetic(operation.OperatorKind) &&
-                !CSharpScalarSemantics.SupportsExactIntegerIrArithmetic(
-                    operation.Type?.SpecialType ?? SpecialType.None))
+            if (mapped.Value != IrBinaryOperator.StringConcat)
             {
-                return OpaqueBinary(operation, FrontendAbstention.UnsupportedType);
-            }
+                if (CSharpScalarSemantics.IsIntegerArithmetic(
+                        operation.OperatorKind) &&
+                    !CSharpScalarSemantics.SupportsExactIntegerIrArithmetic(
+                        operation.Type?.SpecialType ?? SpecialType.None))
+                {
+                    return OpaqueBinary(
+                        operation,
+                        FrontendAbstention.UnsupportedType);
+                }
 
-            if (mapped.Value != IrBinaryOperator.StringConcat &&
-                CSharpScalarSemantics.RequiresCheckedArithmetic(operation.OperatorKind) &&
-                !operation.IsChecked)
-            {
-                return OpaqueBinary(operation, FrontendAbstention.UncheckedOverflowSemantics);
+                if (CSharpScalarSemantics.RequiresCheckedArithmetic(
+                        operation.OperatorKind) && !operation.IsChecked)
+                {
+                    return OpaqueBinary(
+                        operation,
+                        FrontendAbstention.UncheckedOverflowSemantics);
+                }
             }
 
             try
@@ -837,8 +843,9 @@ public sealed class RoslynOperationLowerer
             params LoweredExpression[] expressions)
         {
             return expressions
-                .Select(static expression => expression.Classification.Abstention)
-                .First(static abstention => abstention != FrontendAbstention.None);
+                .First(static expression =>
+                    expression.Classification.Abstention != FrontendAbstention.None)
+                .Classification.Abstention;
         }
 
         private LoweredExpression OpaqueOperand(

@@ -97,6 +97,15 @@ try {
         -ShouldPass $false `
         -ExpectedMessage "Unsupported metadata-row projection role 'unsupported'"
 
+    $unknownSlotRole = $canonical.Replace(
+        '{ "kind": "Boolean", "slots": ["booleanValue",',
+        '{ "kind": "Boolean", "slots": ["unsupported",')
+    Invoke-GeneratorCase `
+        -Name 'unknown-slot-role' `
+        -Schema $unknownSlotRole `
+        -ShouldPass $false `
+        -ExpectedMessage "has unsupported role 'unsupported'"
+
     $duplicateMethod = $canonical.Replace(
         '      "method": "VariableRow",',
         '      "method": "TypeRow",')
@@ -113,7 +122,7 @@ try {
         -Name 'missing-argument' `
         -Schema $missingArgument `
         -ShouldPass $false `
-        -ExpectedMessage "must define 1 arguments"
+        -ExpectedMessage 'at least one argument'
 
     Write-Host 'Compiler-artifact metadata-row generator validation passed.'
 }

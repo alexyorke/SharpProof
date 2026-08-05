@@ -97,9 +97,9 @@ internal static class WorkerResultAssembler
         bool FatalCallable, bool FatalClaim, bool TimedOut, bool Canceled) Classify(
         IEnumerable<WorkerCallableResult>? callables, IEnumerable<WorkerClaimResult>? claims)
     {
-        var callableReasons = callables?.Where(static result => result != null)
+        var callableReasons = callables?.OfType<WorkerCallableResult>()
             .Select(static result => result.Reason).ToArray() ?? [];
-        var claimReasons = claims?.Where(static result => result != null)
+        var claimReasons = claims?.OfType<WorkerClaimResult>()
             .Select(static result => result.Reason).ToArray() ?? [];
         var callableFailure = callableReasons.Contains(WorkerCallableCoverageReason.InfrastructureFailure)
             ? WorkerRunFailureReason.InfrastructureFailure
