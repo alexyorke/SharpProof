@@ -639,7 +639,9 @@ public sealed class ArchitectureTests
             ],
             ["generatedOutputPolicy"] = [
                 "eng/generated/approved-outputs.v1.json",
-                "scripts/Test-ProductionCSharpComplexity.ps1"
+                "scripts/Test-ProductionCSharpComplexity.ps1",
+                "scripts/GeneratedFileHelpers.ps1",
+                "scripts/CSharpSourceMetrics.ps1"
             ],
             ["mutationEvidencePolicy"] = [
                 "scripts/SharpProof.MutationEvidence.psm1",
@@ -750,7 +752,9 @@ public sealed class ArchitectureTests
                 "SharpProof.Frontend/OperationSubsetClassifier.cs",
                 "SharpProof.Worker.Launcher/Program.cs",
                 "SharpProof.Worker/CallableVerificationPolicy.cs",
-                "scripts/Get-SharpProofTcbPaths.ps1"
+                "scripts/Get-SharpProofTcbPaths.ps1",
+                "scripts/Get-SharpProofReleaseDigests.ps1",
+                "scripts/Test-SharpProofCoverage.ps1"
             ],
             ["resultAssembly"] = [
                 "SharpProof.Worker/CallableClaimResultAssembler.cs",
