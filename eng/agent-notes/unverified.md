@@ -5,8 +5,24 @@
 The line is `Evaluate(binary.Left, values)` inside the
 `IrBinaryTerm { Right: IrVariableTerm }` arm of `Assume`.
 
-**Status: could not write a test that depends on it.** Two attempts, both
-passed for the wrong reason.
+**Status: reachable — do NOT delete. Still not covered by a test that depends
+on it.** Two test attempts, both passed for the wrong reason.
+
+### Deletion is ruled out (checked 2026-08-06)
+
+The earlier note speculated the arm might be unreachable because operands could
+be normalised upstream into `value == 3`. **They are not.** `IrFactory.Binary`
+(`IrFactory.cs:400-422`) interns on `children: [left.Id.Value, right.Id.Value]`
+— positional — and `IrTermServices.FoldBinary` only folds constant operands, it
+never swaps them. So `3 == value` keeps `Left = IrIntegerTerm(3)`,
+`Right = IrVariableTerm(value)`, the `Left: IrVariableTerm` arm cannot match,
+and the `Right:` arm is the only one that can. The code is live.
+
+That makes the open question narrower and more interesting: attempt 2's SP0027
+survived deleting the arm, so **that diagnostic was not caused by the
+refinement at all**. Find out what actually produced it before writing a third
+test — print `diagnostic.Location` and the message, and check whether it is
+reported against `Narrow(value)` or against the caller's own clause.
 
 ### What was tried
 
