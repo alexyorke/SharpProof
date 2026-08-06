@@ -2590,8 +2590,12 @@ public sealed class AnalyzerModeAndEffectTests
     public void AdvisoryDescriptorsUseProductionDefaults()
     {
         var descriptors = new SharpProofAnalyzer().SupportedDiagnostics;
+        // SP0050 joins SP0049 as an infrastructure error: both report that
+        // SharpProof could not do its job, which is not an advisory finding
+        // about the user's code.
         var informational = descriptors.Where(static descriptor =>
-            descriptor.Id is not ("SP0024" or "SP0025" or "SP0027" or "SP0049"));
+            descriptor.Id is not
+                ("SP0024" or "SP0025" or "SP0027" or "SP0049" or "SP0050"));
 
         Assert.That(
             informational.Select(static descriptor => descriptor.DefaultSeverity),

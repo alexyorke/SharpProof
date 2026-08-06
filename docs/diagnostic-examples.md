@@ -55,6 +55,7 @@ compiler-collection infrastructure error during Windows verification.
 | `SP0046` | `effects` | Info, on | Yes |
 | `SP0047` | Explicitly selected unsupported method | Info, on | Yes |
 | `SP0049` | Windows verification compiler manifest | Error, on | On artifact failure |
+| `SP0050` | Referenced contract API assembly | Error, on | On unreadable payload |
 
 `SharpProofFeatures=all` enables both feature pipelines. `SharpProofMode` and
 `all-experimental` are deprecated preview compatibility inputs.
@@ -244,6 +245,25 @@ portable whole-body lowered CFG/IR. It contains no source text. The worker
 hydrates this artifact without constructing a Roslyn compilation or rereading
 references. Exact manifest/lowered-callable equality and the expression-depth
 match are required before cache lookup or backend creation.
+
+<a id="sp0050"></a>
+## SP0050 - contract API could not be verified
+
+SharpProof pins the exact payload of the `SharpProof.Attributes` assembly it
+was built against. SP0050 is emitted when that assembly is referenced and
+located but cannot be read to check the pin -- a sharing violation, an
+antivirus scanner, a permission failure, or an unreadable network share.
+
+The diagnostic exists because the failure is otherwise invisible. An
+unverifiable contract API leaves every `Contract.Requires`, `Contract.Ensures`,
+and closed contract attribute unresolvable, so the whole contract surface
+silently disappears and the analyzer reports nothing at all -- which is
+indistinguishable from code that has no contracts. It is an infrastructure
+failure, never a contract or proof outcome.
+
+A payload that reads successfully but does not match the pin is not SP0050.
+That is a genuine identity mismatch rather than an environment fault, and it
+continues to disable contract analysis without a diagnostic.
 
 <a id="contractfor-generator-diagnostics"></a>
 ## ContractFor generator diagnostics

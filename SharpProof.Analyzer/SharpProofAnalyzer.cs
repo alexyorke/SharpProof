@@ -52,6 +52,21 @@ public sealed partial class SharpProofAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        // A contract API that is referenced but unreadable disables every
+        // contract silently, which is indistinguishable from "nothing to
+        // report". Surface it instead.
+        if (SharpProof.Frontend.ContractApiIdentityResolver
+                .ForCompilation(context.Compilation)
+                .UnreadableContractApiReason is { } unreadableContractApi)
+        {
+            context.RegisterCompilationEndAction(
+                compilationContext => compilationContext.ReportDiagnostic(
+                    Diagnostic.Create(
+                        GeneratedDiagnosticDescriptors.ContractApiUnverifiableRule,
+                        Location.None,
+                        unreadableContractApi)));
+        }
+
         if (ContractRuntimePolicy.IsRuntimeEvaluationEnabled(
                 context.Compilation,
                 context.CancellationToken))
