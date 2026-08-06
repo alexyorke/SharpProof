@@ -135,3 +135,48 @@ Re-collect coverage from a clean build at the current HEAD and take that list as
 authoritative before queuing any further line. Also worth reporting upstream:
 the gate should either recollect or refuse to run against artifacts whose commit
 does not match HEAD.
+
+## RESOLVED diagnosis: why `ManagedContractFacts.cs:158` resists mutation testing
+
+Probed 2026-08-06 by printing the diagnostic from the attempt-2 fixture. It is
+real and correctly targeted:
+
+```
+SP0027@line10: Call to 'Narrow' violates precondition '(v5 > 5)'
+```
+
+So the refinement genuinely happens — `value` is pinned to `[3,3]` and `3 > 5`
+is false. The reason it survived deleting the arm is that **two independent
+mechanisms apply the same clause**:
+
+1. `ManagedContractFacts.ApplyRequires` seeds the caller's *entry state* from its
+   bound clauses, working on **IR terms** (`RequiresCallSiteDiscovery.cs:79`).
+   This is the path containing line 158.
+2. `ManagedAbstractFlow.Transfer` case `IInvocationOperation`
+   (`ManagedAbstractFlow.cs:254`) calls its own operation-level `Assume` when it
+   transfers the `Contract.Requires(...)` invocation **in the body**.
+
+For an explicit `Contract.Requires` the body transfer re-derives the same fact,
+so removing path 1 changes nothing observable. Line 158 is *executed* but its
+effect is masked.
+
+### Consequences
+
+- The line is **coverable** — any test whose caller has a reversed-operand
+  clause (`3 == value`) will execute it. It is currently uncovered only because
+  no existing test has one.
+- It is **not mutation-discriminating through the analyzer**, by construction.
+  Do not keep trying; a black-box test can cover it but can never fail without
+  it.
+- The discriminating test would have to drive `ManagedContractFacts` directly at
+  unit level. `ApplyRequires` is `internal` and `SharpProof.Analyzer.Test` has
+  access, but it takes a `BoundMethodContracts`, so the fixture needs a bound
+  contract built from a real compilation rather than hand-constructed IR.
+
+### Recommendation
+
+Either add the covering test with an explicit comment that it cannot
+discriminate and explain why, or build the direct unit fixture. Do not delete
+the arm — it is live (see the operand-order note above), and path 1 is what
+seeds entry state before the body is walked, which matters for callers whose
+clauses come from closed-contract attributes rather than explicit invocations.
