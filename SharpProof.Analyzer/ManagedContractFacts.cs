@@ -73,7 +73,7 @@ internal static class ManagedContractFacts
             IrUnaryTerm { Operator: IrUnaryOperator.Not } unary =>
                 ManagedAbstractValue.NegateBoolean(
                     Evaluate(unary.Operand, variables, definitelyStrings)),
-            IrBinaryTerm binary => ManagedAbstractValue.Binary(
+            IrBinaryTerm binary => ManagedAbstractValue.BinaryOverIrScalars(
                 CSharpScalarSemantics.MapBinaryToRoslyn(binary.Operator),
                 Evaluate(binary.Left, variables, definitelyStrings),
                 Evaluate(binary.Right, variables, definitelyStrings)),
@@ -139,27 +139,24 @@ internal static class ManagedContractFacts
                 Assume(Assume(state, binary.Left, false, variables), binary.Right, false, variables),
             IrVariableTerm variable when variables.TryGetValue(variable.Variable, out var symbol) =>
                 state.Set(symbol, ManagedAbstractValue.Boolean(expected)),
+            // The opposite operand is evaluated against the live state, not an
+            // empty one, so a clause such as Requires(a < b) refines against
+            // what is already known about b rather than only against literals.
             IrBinaryTerm { Left: IrVariableTerm left } binary
                 when variables.TryGetValue(left.Variable, out var leftSymbol) =>
                 ManagedAbstractFlow.Refine(
                     state,
                     leftSymbol,
                     CSharpScalarSemantics.MapBinaryToRoslyn(binary.Operator),
-                    Evaluate(binary.Right, EmptyValues), expected),
+                    Evaluate(binary.Right, values), expected),
             IrBinaryTerm { Right: IrVariableTerm right } binary
                 when variables.TryGetValue(right.Variable, out var rightSymbol) =>
                 ManagedAbstractFlow.Refine(state, rightSymbol,
                     CSharpScalarSemantics.ReverseBinary(
                         CSharpScalarSemantics.MapBinaryToRoslyn(
                             binary.Operator)),
-                    Evaluate(binary.Left, EmptyValues), expected),
+                    Evaluate(binary.Left, values), expected),
             _ => state
         };
     }
-
-    private static IReadOnlyDictionary<IrVarId, ManagedAbstractValue> EmptyValues
-    {
-        get;
-    } =
-        new Dictionary<IrVarId, ManagedAbstractValue>();
 }

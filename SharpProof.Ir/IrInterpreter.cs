@@ -93,6 +93,12 @@ public sealed partial class IrEvaluationResult
 
 public sealed class IrInterpreter(IrFactory factory)
 {
+    /// <summary>
+    /// Ceiling on term nesting evaluated recursively, matching the verifier's
+    /// hard expression-depth cap.
+    /// </summary>
+    private const int MaximumEvaluationDepth = 256;
+
     private static readonly IReadOnlyDictionary<IrVarId, IrValue> EmptyEnvironment =
         ImmutableDictionary<IrVarId, IrValue>.Empty;
     private readonly IrFactory _factory =
@@ -117,6 +123,33 @@ public sealed class IrInterpreter(IrFactory factory)
         }
 
         state.CancellationToken.ThrowIfCancellationRequested();
+
+        // Evaluation is deliberately lazy — conditionals and AndAlso/OrElse
+        // evaluate only the taken side, which is what makes definedness work —
+        // so this cannot be flattened into an explicit stack. Bound the depth
+        // instead: StackOverflowException is uncatchable and would kill the
+        // worker with no result file.
+        if (state.Depth >= MaximumEvaluationDepth)
+        {
+            return Unsupported(IrUnsupportedReason.UnsupportedOperation,
+                "The term nests deeper than " +
+                MaximumEvaluationDepth.ToString(CultureInfo.InvariantCulture) +
+                " levels.");
+        }
+
+        state.Depth++;
+        try
+        {
+            return EvaluateBounded(term, state);
+        }
+        finally
+        {
+            state.Depth--;
+        }
+    }
+
+    private IrEvaluationResult EvaluateBounded(IrTerm term, EvaluationState state)
+    {
         var result = term switch
         {
             IrBooleanTerm value => Boolean(value.Value),
@@ -501,5 +534,6 @@ public sealed class IrInterpreter(IrFactory factory)
         internal IReadOnlyDictionary<IrVarId, IrValue> Variables { get; } = variables;
         internal CancellationToken CancellationToken { get; } = cancellationToken;
         internal Dictionary<IrId, IrEvaluationResult> Results { get; } = [];
+        internal int Depth { get; set; }
     }
 }

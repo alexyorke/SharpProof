@@ -75,8 +75,12 @@ internal static class CallableClaimResultAssembler
     internal static ImmutableArray<WorkerClaimResult> PostconditionUnknowns(
         CompilerCallablePreparation target, WorkerClaimReason reason)
     {
-        return [.. Enumerable.Range(0, target.Clauses.Count(static clause =>
-                clause.Kind == CompilerContractKind.Ensures))
+        // One caller reaches here precisely because the Ensures clauses outnumber
+        // the declared claim ids, so the clause count cannot be used to index
+        // ClaimIds without clamping.
+        var ensures = target.Clauses.Count(static clause =>
+            clause.Kind == CompilerContractKind.Ensures);
+        return [.. Enumerable.Range(0, Math.Min(ensures, target.Entry.ClaimIds.Length))
             .Select(index => Unknown(target, index, reason))];
     }
 

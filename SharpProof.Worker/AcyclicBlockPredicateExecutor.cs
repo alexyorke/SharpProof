@@ -610,22 +610,50 @@ internal static class SymbolicTermOperations
         }
     }
 
+    /// <summary>
+    /// Measures term depth with an explicit stack. This is the function that
+    /// enforces the expression-depth budget, so it must not itself recurse to
+    /// the full depth of the term it is about to reject.
+    /// </summary>
     internal static int GetDepth(IrTerm root)
     {
         var memo = new Dictionary<IrId, int>();
-        return Visit(root);
-
-        int Visit(IrTerm term)
+        var pending = new Stack<(IrTerm Term, bool ChildrenReady)>();
+        pending.Push((root, false));
+        while (pending.Count != 0)
         {
-            if (memo.TryGetValue(term.Id, out var existing))
+            var (term, childrenReady) = pending.Pop();
+            if (memo.ContainsKey(term.Id))
             {
-                return existing;
+                continue;
             }
 
             var children = IrTraversal.GetChildren(term);
-            var depth = children.Length == 0 ? 1 : 1 + children.Max(Visit);
+            if (!childrenReady && children.Length != 0)
+            {
+                // Re-queue below the children so every child is memoised by the
+                // time this term is popped again.
+                pending.Push((term, true));
+                foreach (var child in children)
+                {
+                    if (!memo.ContainsKey(child.Id))
+                    {
+                        pending.Push((child, false));
+                    }
+                }
+
+                continue;
+            }
+
+            var depth = 1;
+            foreach (var child in children)
+            {
+                depth = Math.Max(depth, 1 + memo[child.Id]);
+            }
+
             memo.Add(term.Id, depth);
-            return depth;
         }
+
+        return memo[root.Id];
     }
 }

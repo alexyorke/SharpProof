@@ -306,6 +306,8 @@ public sealed class EffectAnalysisSession
                     EffectUncertainty.DirectCall | EffectUncertainty.Recursion));
         }
 
+        var computeDepth = 0;
+
         EffectSummary Compute(IMethodSymbol method)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -314,11 +316,16 @@ public sealed class EffectAnalysisSession
                 return cached;
             }
 
-            if (!nodes.TryGetValue(method, out var node))
+            // A depth cut-off is a fact about this chain, not about the method,
+            // so it is deliberately not cached: another path may still reach the
+            // method shallowly enough to summarize it.
+            if (!nodes.TryGetValue(method, out var node) ||
+                computeDepth >= EffectCallGraph.MaximumCallGraphDepth)
             {
                 return EffectSummaryOperations.UnknownBoundary(EffectUncertainty.UnmodeledCall);
             }
 
+            computeDepth++;
             var summary = node.LocalSummary;
             foreach (var call in node.Calls
                          .OrderBy(static call => call.Target, EffectSymbolComparer<IMethodSymbol>.Instance)
@@ -330,6 +337,7 @@ public sealed class EffectAnalysisSession
                         call.Origin, _compilation));
             }
 
+            computeDepth--;
             summaries[method] = summary;
             return summary;
         }

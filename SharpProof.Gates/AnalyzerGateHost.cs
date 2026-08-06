@@ -24,19 +24,16 @@ internal static class AnalyzerGateHost
 {
     internal static readonly CSharpParseOptions ParseOptions =
         new(LanguageVersion.Preview);
-    internal static readonly ImmutableArray<string> DiagnosticIds = [
-        "SP0002",
-        "SP0013",
-        "SP0015",
-        "SP0016",
-        "SP0024",
-        "SP0025",
-        "SP0027",
-        "SP0030",
-        "SP0045",
-        "SP0046",
-        "SP0047"
-    ];
+    /// <summary>
+    /// Every diagnostic the corpus gate normalizes to a warning before
+    /// snapshotting. Derived from the analyzer's own supported set so a new
+    /// descriptor cannot be silently omitted from the gate.
+    /// </summary>
+    internal static readonly ImmutableArray<string> DiagnosticIds =
+        [.. GeneratedDiagnosticDescriptors.SupportedDiagnostics
+            .Select(static descriptor => descriptor.Id)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static id => id, StringComparer.Ordinal)];
 
     private static readonly Lazy<ImmutableArray<MetadataReference>> References =
         new(CreateReferences);

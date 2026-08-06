@@ -18,6 +18,14 @@ internal sealed class OperationEffectScanner
     private readonly EffectAnalysisSession _session;
     private IOperation? _directOperation;
     private int _scanDepth;
+    private int _nestingDepth;
+
+    /// <summary>
+    /// Matches the expression-depth ceiling the verifier enforces
+    /// (<c>WorkerBudgets.MaximumExpressionDepth</c>) and the base-type walk in
+    /// <see cref="EffectMethodNodeBuilder"/>.
+    /// </summary>
+    private const int MaximumOperationNestingDepth = 256;
 
     internal OperationEffectScanner(
         EffectAnalysisSession session, IMethodSymbol method, List<EffectCallSite> calls,
@@ -108,6 +116,28 @@ internal sealed class OperationEffectScanner
     }
 
     private EffectSummary Scan(IOperation operation, EffectAccess access)
+    {
+        // Every recursive path through the scanner funnels here, so this is the
+        // one place that has to keep deeply nested expressions from exhausting
+        // the stack. StackOverflowException is uncatchable and would take the
+        // compiler host down instead of producing an abstention.
+        if (_nestingDepth >= MaximumOperationNestingDepth)
+        {
+            return EffectSummaryOperations.Unsupported();
+        }
+
+        _nestingDepth++;
+        try
+        {
+            return ScanCore(operation, access);
+        }
+        finally
+        {
+            _nestingDepth--;
+        }
+    }
+
+    private EffectSummary ScanCore(IOperation operation, EffectAccess access)
     {
         if (ManagedFlowResult.HasSameIdentity(operation, _directOperation))
         {

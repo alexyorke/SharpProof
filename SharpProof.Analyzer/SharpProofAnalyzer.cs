@@ -462,6 +462,10 @@ public sealed partial class SharpProofAnalyzer : DiagnosticAnalyzer
                 name.Identifier.ValueText);
     }
 
+    // Decomposed deliberately: ToDisplayString and other string-based symbol
+    // identity are banned in this layer (RS0030 / SPMETA001), so the namespace
+    // is matched structurally rather than compared against
+    // ContractApiMetadata.AttributesNamespace as a string.
     private static bool IsSharpProofAttributesNamespace(
         INamespaceSymbol? @namespace)
     {

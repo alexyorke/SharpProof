@@ -2,6 +2,14 @@ namespace SharpProof.Effects;
 
 internal static class EffectCallGraph
 {
+    /// <summary>
+    /// Ceiling on call-chain nesting walked recursively. Depth is bounded by the
+    /// number of distinct methods, so only a pathologically long chain reaches
+    /// this — but StackOverflowException is uncatchable, so the walk stops and
+    /// over-approximates rather than risking it.
+    /// </summary>
+    internal const int MaximumCallGraphDepth = 512;
+
     internal static HashSet<IMethodSymbol> FindRecursiveMethods(
         IReadOnlyDictionary<IMethodSymbol, EffectMethodNode> nodes,
         CancellationToken cancellationToken)
@@ -15,6 +23,16 @@ internal static class EffectCallGraph
         void Visit(IMethodSymbol method)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (stack.Count >= MaximumCallGraphDepth)
+            {
+                // Stopping the descent hides any cycle below this point, so the
+                // method is reported as recursive: callers then carry the
+                // Recursion uncertainty instead of a summary we did not verify.
+                states[method] = 2;
+                recursive.Add(method);
+                return;
+            }
+
             states.Add(method, 1);
             stack.Add(method);
             foreach (var target in nodes[method].Calls

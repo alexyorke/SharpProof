@@ -14,6 +14,20 @@ internal sealed class ManagedAbstractFlow
 {
     internal const int MaxAnalyzedBlocks = 256;
     internal const int MaxAnalyzedOperations = 4096;
+
+    /// <summary>
+    /// Ceiling on expression/statement nesting walked recursively, matching the
+    /// verifier's expression-depth budget. Deeply nested trees abstain instead
+    /// of exhausting the stack, because StackOverflowException is uncatchable
+    /// and would take the compiler host down with it.
+    /// </summary>
+    private const int MaximumWalkDepth = 256;
+
+    // Instances are shared per compilation across Roslyn's concurrent analysis
+    // threads, so the recursion guard cannot live in an instance field.
+    [ThreadStatic]
+    private static int _walkDepth;
+
     private static readonly ConditionalWeakTable<Compilation, ManagedAbstractFlow> Sessions = new();
     private readonly ResolvedApiSpecTable _apiSpecs;
     private readonly INamedTypeSymbol? _contractApi;
@@ -91,9 +105,26 @@ internal sealed class ManagedAbstractFlow
         }
 
         var result = new ManagedFlowResult(this);
-        _ = ForwardDataflowAnalysis.Analyze(CreateDataflowGraph(graph, result, cancellationToken),
-            FlowDomain.Instance, entryState ?? CreateEntryState(method),
-            new ForwardDataflowAnalysisOptions(maxIterations: MaxAnalyzedBlocks * 4));
+
+        // CheckBudget bounds the source CFG, but CreateDataflowGraph adds a
+        // synthetic block per edge, so the iteration limit has to be taken from
+        // the expanded graph rather than from MaxAnalyzedBlocks.
+        var dataflowGraph = CreateDataflowGraph(graph, result, cancellationToken);
+        try
+        {
+            _ = ForwardDataflowAnalysis.Analyze(dataflowGraph,
+                FlowDomain.Instance, entryState ?? CreateEntryState(method),
+                new ForwardDataflowAnalysisOptions(
+                    maxIterations: dataflowGraph.Blocks.Length * 4));
+        }
+        catch (DataflowConvergenceException)
+        {
+            // Every other resource limit here degrades to an incomplete summary.
+            // Reaching the iteration bound must not escape as AD0001.
+            return ManagedFlowAnalysis.BudgetExceeded(
+                EffectAnalysisIncompleteReason.BlockBudgetExceeded);
+        }
+
         return ManagedFlowAnalysis.Complete(result);
     }
 
@@ -147,6 +178,27 @@ internal sealed class ManagedAbstractFlow
             return state;
         }
 
+        if (_walkDepth >= MaximumWalkDepth)
+        {
+            // Abandoning the sub-tree means we no longer know what it wrote, so
+            // every fact has to be dropped rather than carried forward stale.
+            return state.Forget();
+        }
+
+        _walkDepth++;
+        try
+        {
+            return TransferCore(state, operation, result, cancellationToken);
+        }
+        finally
+        {
+            _walkDepth--;
+        }
+    }
+
+    private ManagedFlowState TransferCore(
+        ManagedFlowState state, IOperation operation, ManagedFlowResult result, CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
         switch (operation)
         {
@@ -420,6 +472,24 @@ internal sealed class ManagedAbstractFlow
     }
 
     private ManagedAbstractValue EvaluateCore(IOperation operation, ManagedFlowState state)
+    {
+        if (_walkDepth >= MaximumWalkDepth)
+        {
+            return ManagedAbstractValue.Unknown;
+        }
+
+        _walkDepth++;
+        try
+        {
+            return EvaluateBounded(operation, state);
+        }
+        finally
+        {
+            _walkDepth--;
+        }
+    }
+
+    private ManagedAbstractValue EvaluateBounded(IOperation operation, ManagedFlowState state)
     {
         operation = Unwrap(operation);
         if (operation.ConstantValue.HasValue)
@@ -1435,6 +1505,30 @@ internal readonly record struct ManagedAbstractValue(
         return true;
     }
 
+    /// <summary>
+    /// Binary evaluation over IR scalars, where no Roslyn type symbol is
+    /// available to bound the result. The IR integer domain is exactly Int64 —
+    /// the frontend admits exact arithmetic only for <c>long</c>, see
+    /// <c>CSharpScalarSemantics.SupportsExactIrArithmetic</c> — and
+    /// <see cref="TryArithmetic"/> already refuses any interval that leaves that
+    /// range, so a computed interval is kept rather than discarded for want of a
+    /// type to check it against.
+    /// </summary>
+    internal static ManagedAbstractValue BinaryOverIrScalars(
+        BinaryOperatorKind @operator, ManagedAbstractValue left, ManagedAbstractValue right)
+    {
+        if (@operator is BinaryOperatorKind.Add or BinaryOperatorKind.Subtract or
+                BinaryOperatorKind.Multiply &&
+            left.TryGetInteger(out var leftInteger) &&
+            right.TryGetInteger(out var rightInteger) &&
+            TryArithmetic(@operator, leftInteger, rightInteger, out var result))
+        {
+            return Integer(result);
+        }
+
+        return Binary(@operator, left, right);
+    }
+
     internal static ManagedAbstractValue KeepWithinType(IntervalValue value, ITypeSymbol? type)
     {
         return FitsType(value, type) ? Integer(value) : TopForType(type);
@@ -1696,6 +1790,22 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             IParenthesizedOperation parenthesized => UnwrapHarmlessValue(parenthesized.Operand),
             _ => operation
         };
+    }
+
+    /// <summary>
+    /// Reports whether the value is certainly a string, including a string that
+    /// has been converted to a wider reference type. Callers use this to decide
+    /// that a cast back to <c>string</c> cannot fail, so both call-site and
+    /// effect-precondition analysis must agree on it.
+    /// </summary>
+    internal static bool IsDefinitelyString(IOperation operation)
+    {
+        operation = UnwrapHarmlessValue(operation);
+        return operation.Type?.SpecialType == SpecialType.System_String ||
+            operation is IConversionOperation
+            {
+                Operand.Type.SpecialType: SpecialType.System_String
+            };
     }
 
     internal static bool IsDefinitelyNonNull(IOperation operation)
