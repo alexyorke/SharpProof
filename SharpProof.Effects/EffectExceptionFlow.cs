@@ -45,7 +45,17 @@ internal static class EffectExceptionFlow
         var includesUnknown = thrown.IncludesUnknown;
         var model = SharpProof.Frontend.Host.CompilationModelProvider
             .GetSemanticModel(compilation, origin.SyntaxTree);
-        foreach (var @try in origin.Ancestors().OfType<TryStatementSyntax>())
+        // Stop at a lambda or local-function boundary, as ContainsRethrow does.
+        // A throw inside a nested callable does not unwind into a try that
+        // lexically encloses the callable -- it unwinds wherever the callable is
+        // invoked -- so those try statements must not be treated as catching it.
+        // Currently a no-op because nested-callable bodies are never scanned;
+        // this keeps it sound if that changes.
+        foreach (var @try in origin.Ancestors()
+                     .TakeWhile(static ancestor =>
+                         ancestor is not AnonymousFunctionExpressionSyntax and
+                         not LocalFunctionStatementSyntax)
+                     .OfType<TryStatementSyntax>())
         {
             if (@try.Catches.Any(@catch => @catch.Filter?.Span.Contains(origin.Span) == true))
             {
