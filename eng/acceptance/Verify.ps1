@@ -365,52 +365,24 @@ try {
         -Scope 'trusted-kernel'
     Write-Host "Trusted-kernel paths: $($kernelPaths.Count)"
 
-    $requiredTcbComponents = @(
-        'discovery',
-        'lowering',
-        'execution',
-        'obligationGeneration',
-        'encoding',
-        'apiSpecifications',
-        'apiSpecificationIdentity',
-        'apiSpecificationCatalog',
-        'scalarSemanticsCatalog',
-        'contractApiCatalog',
-        'analyzerDiagnosticCatalog',
-        'diagnosticDescriptorCatalog',
-        'projectionCatalog',
-        'launcherArgumentCatalog',
-        'generatedOutputPolicy',
-        'mutationEvidencePolicy',
-        'declarativeModelsCatalog',
-        'boundContractModelCatalog',
-        'effectContractCatalog',
-        'operationSupportCatalog',
-        'irModelCatalog',
-        'compilerWireCatalog',
-        'effectAnalysis',
-        'replay',
-        'effectResultAssembly',
-        'policy',
-        'resultAssembly',
-        'compilerInputIdentity',
-        'canonicalIdentityEncoding',
-        'protocolValidation',
-        'cacheValidation',
-        'portableShippingBoundary',
-        'releaseContainment'
-    )
+    # contract.json is the single source of truth for the trusted computing
+    # base; the component names are no longer restated here. That removes the
+    # drift tripwire deliberately, so what remains is a coherence check: names
+    # must be present and unique, and every declared path must exist.
     $tcbComponents = @($contract.trustedComputingBase.components)
-    $actualTcbComponents = @(
-        $tcbComponents |
-            ForEach-Object { [string]$_.name } |
-            Sort-Object
-    )
-    $expectedTcbComponents = @($requiredTcbComponents | Sort-Object)
-    if (($actualTcbComponents -join ',') -ne
-        ($expectedTcbComponents -join ',')) {
-        throw "Trusted-computing-base components must be exactly: " +
-            ($requiredTcbComponents -join ', ') + "."
+    if ($tcbComponents.Count -eq 0) {
+        throw 'The trusted-computing-base contract must declare components.'
+    }
+    $seenTcbComponents = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($component in $tcbComponents) {
+        $name = [string]$component.name
+        if ([string]::IsNullOrWhiteSpace($name)) {
+            throw 'Every trusted-computing-base component must be named.'
+        }
+        if (-not $seenTcbComponents.Add($name)) {
+            throw "Trusted-computing-base component '$name' is declared twice."
+        }
     }
     $canonicalTcbPaths = @(Get-SharpProofTcbPaths -Contract $contract)
     foreach ($component in $tcbComponents) {

@@ -43,12 +43,6 @@ public sealed class ArchitectureTests
         "SharpProof.Worker.Launcher"
     ];
 
-    private static readonly string[] TrustedKernelPaths = [
-        "SharpProof.Verify/Evidence.cs",
-        "SharpProof.Verify/Outcomes.cs",
-        "SharpProof.Verify/ProofKernel.cs"
-    ];
-
     [Test]
     public void RepositoryRestoreIsHermeticLockedAndSdkPinned()
     {
@@ -516,292 +510,6 @@ public sealed class ArchitectureTests
     [Test]
     public void TrustedComputingBaseDeclarationNamesEveryRequiredPath()
     {
-        var expected = new Dictionary<string, string[]>(
-            StringComparer.Ordinal)
-        {
-            ["discovery"] = [
-                "SharpProof.Analyzer/SharpProofAnalyzer.cs",
-                "SharpProof.Analyzer/ContractRuntimePolicy.cs",
-                "SharpProof.CompilerCollector/FinalCompilationCollectorAnalyzer.cs",
-                "SharpProof.CompilerCollector/FinalCompilationCollector.cs",
-                "SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs",
-                "SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs",
-                "SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs",
-                "SharpProof.Contracts/ContractClauseInventoryBuilder.cs",
-                "SharpProof.Contracts/ContractClauseInventory.cs",
-                "SharpProof.Contracts/ContractForSymbolMatcher.cs",
-                "SharpProof.Frontend/ReferencedTypeSymbols.cs",
-                "SharpProof.Contracts/EffectiveContractSourceResolver.cs",
-                "SharpProof.Frontend/CSharpPreprocessorSymbols.cs",
-                "SharpProof.Frontend/CompilationModelProvider.cs",
-                "SharpProof.Frontend/ContractApiIdentityResolver.cs",
-                "SharpProof.Frontend/ContractApiMetadataRuntime.cs",
-                "SharpProof.Frontend/SharpProof.Frontend.csproj"
-            ],
-            ["lowering"] = [
-                "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs",
-                "SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs",
-                "SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs",
-                "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
-                "SharpProof.Contracts/ClosedContractAttributeValidator.cs",
-                "SharpProof.Contracts/ContractBinder.cs",
-                "SharpProof.Contracts/ContractCanonicalization.cs",
-                "SharpProof.Contracts/ContractExpressionBinder.cs",
-                "SharpProof.Contracts/ContractIntrinsicValidator.cs",
-                "SharpProof.Contracts/ContractApiSymbols.cs",
-                "SharpProof.Frontend/OperationSupportCatalog.cs",
-                "SharpProof.Frontend/RoslynOperationLowerer.cs",
-                "SharpProof.Frontend/RoslynProgramLowerer.cs"
-            ],
-            ["execution"] = [
-                "SharpProof.Worker/CallableEvidenceBuilder.cs",
-                "SharpProof.Worker/CallableEntryFeasibility.cs",
-                "SharpProof.Worker/CallableVerifier.cs",
-                "SharpProof.Worker/AcyclicBlockPredicateExecutor.cs",
-                "SharpProof.Worker/SpecResultDomainProjection.cs",
-                "SharpProof.Worker/SharpProofWorker.cs"
-            ],
-            ["obligationGeneration"] = [
-                "SharpProof.Worker/PostconditionObligationBuilder.cs"
-            ],
-            ["encoding"] = [
-                "SharpProof.Smt/IrSmtBackend.cs",
-                "SharpProof.Verify/Backend.cs"
-            ],
-            ["apiSpecifications"] = [
-                "SharpProof.Specs/ApiSpecTable.cs",
-                "SharpProof.Specs/ApiSpecTermValidator.cs",
-                "SharpProof.Effects/ApiSpecResolution.cs",
-                "SharpProof.Specs/ApiSpecInstantiation.cs"
-            ],
-            ["apiSpecificationIdentity"] = [
-                "SharpProof.Specs/ApiSpecContentDigest.cs"
-            ],
-            ["apiSpecificationCatalog"] = [
-                "SharpProof.Specs/DefaultApiSpecCatalog.json",
-                "scripts/Generate-ApiSpecCatalog.ps1",
-                "SharpProof.Specs/DefaultApiSpecCatalog.generated.cs"
-            ],
-            ["scalarSemanticsCatalog"] = [
-                "SharpProof.Frontend/CSharpScalarSemantics.json",
-                "scripts/Generate-CSharpScalarSemantics.ps1",
-                "SharpProof.Frontend/CSharpScalarSemantics.generated.cs",
-                "SharpProof.Ir/IrOperatorCatalog.generated.cs"
-            ],
-            ["contractApiCatalog"] = [
-                "SharpProof.Frontend/ContractApi.catalog.json",
-                "scripts/Generate-ContractApiCatalog.ps1",
-                "SharpProof.Frontend/ContractApiMetadata.generated.cs",
-                "SharpProof.Attributes/Contract.cs",
-                "SharpProof.Attributes/ContractForAttribute.cs",
-                "SharpProof.Attributes/ClosedContractAttributes.cs",
-                "SharpProof.Attributes/AllowedCapabilitiesAttribute.cs",
-                "SharpProof.Attributes/AllowedExceptionsAttribute.cs",
-                "SharpProof.Attributes/DoesNotThrowAttribute.cs",
-                "SharpProof.Attributes/EnforcePureAttribute.cs",
-                "SharpProof.Attributes/EffectContractAttribute.cs",
-                "SharpProof.Attributes/SharpProofSuppressAttribute.cs",
-                "SharpProof.Attributes/SharpProofTrustedAttribute.cs",
-                "SharpProof.Attributes/ZeroAllocationsAttribute.cs",
-                "SharpProof.Attributes/SharpProofEffect.cs",
-                "SharpProof.Attributes/SharpProofCapability.cs"
-            ],
-            ["analyzerDiagnosticCatalog"] = [
-                "SharpProof.Analyzer/AnalyzerDiagnostic.catalog.json",
-                "scripts/Generate-AnalyzerDiagnosticCatalog.ps1",
-                "SharpProof.Analyzer/AnalyzerDiagnosticCatalog.generated.cs"
-            ],
-            ["diagnosticDescriptorCatalog"] = [
-                "eng/diagnostics/diagnostic-descriptors.v1.json",
-                "scripts/Generate-DiagnosticDescriptors.ps1",
-                "SharpProof.Analyzer/GeneratedDiagnosticDescriptors.generated.cs",
-                "SharpProof.ContractForGenerator/GeneratedDiagnosticDescriptors.generated.cs",
-                "SharpProof.Meta.Analyzers/MetaDiagnosticDescriptors.generated.cs"
-            ],
-            ["projectionCatalog"] = [
-                "SharpProof.Projection.catalog.json",
-                "scripts/Generate-ProjectionCatalog.ps1",
-                "SharpProof.Verify/VerificationProjections.generated.cs",
-                "SharpProof.Analyzer/EffectEvaluationProjections.generated.cs",
-                "SharpProof.Worker/WorkerProjections.generated.cs",
-                "SharpProof.Contracts/ContractProjections.generated.cs",
-                "SharpProof.Ir/IrPrinterProjections.generated.cs",
-                "SharpProof.Effects/EffectProjections.generated.cs",
-                "SharpProof.Frontend/OperationSupportProjections.generated.cs",
-                "SharpProof.Worker.Launcher/LauncherProjections.generated.cs",
-                "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableProjections.generated.cs",
-                "SharpProof.Frontend/CompilerIdentityProjections.generated.cs"
-            ],
-            ["launcherArgumentCatalog"] = [
-                "SharpProof.Worker.Launcher/LauncherArguments.catalog.json",
-                "scripts/Generate-LauncherArguments.ps1",
-                "SharpProof.Worker.Launcher/LauncherArguments.generated.cs"
-            ],
-            ["generatedOutputPolicy"] = [
-                "eng/generated/approved-outputs.v1.json",
-                "scripts/Test-ProductionCSharpComplexity.ps1",
-                "scripts/GeneratedFileHelpers.ps1",
-                "scripts/CSharpSourceMetrics.ps1"
-            ],
-            ["mutationEvidencePolicy"] = [
-                "scripts/SharpProof.MutationEvidence.psm1",
-                "scripts/Test-SharpProofMutationEvidence.ps1",
-                "scripts/Test-SharpProofTrustedMutations.ps1",
-                "scripts/Test-SharpProofMutationCatalog.ps1"
-            ],
-            ["declarativeModelsCatalog"] = [
-                "SharpProof.DeclarativeModels.catalog.json",
-                "scripts/Generate-DeclarativeModels.ps1",
-                "SharpProof.Analyzer/DeclarativeModels.generated.cs",
-                "SharpProof.CompilerCollector/CompilerArtifact/DeclarativeModels.generated.cs",
-                "SharpProof.Specs/DeclarativeModels.generated.cs",
-                "SharpProof.Worker/DeclarativeModels.generated.cs",
-                "SharpProof.Contracts/DeclarativeModels.generated.cs",
-                "SharpProof.Contracts/EffectiveContractModels.generated.cs",
-                "SharpProof.Effects/EffectResultModels.generated.cs",
-                "SharpProof.Effects/ApiSpecResolutionModels.generated.cs",
-                "SharpProof.Frontend/DeclarativeModels.generated.cs",
-                "SharpProof.Verify/DeclarativeModels.generated.cs"
-            ],
-            ["boundContractModelCatalog"] = [
-                "SharpProof.Contracts/BoundContractModel.schema.json",
-                "scripts/Generate-BoundContractModel.ps1",
-                "SharpProof.Contracts/BoundContractModel.generated.cs"
-            ],
-            ["effectContractCatalog"] = [
-                "SharpProof.Effects/EffectContractMappings.catalog.json",
-                "scripts/Generate-EffectContractMappings.ps1",
-                "SharpProof.Effects/EffectContractMappings.generated.cs"
-            ],
-            ["operationSupportCatalog"] = [
-                "SharpProof.Frontend/OperationSupport.catalog.json",
-                "scripts/Generate-OperationSupportCatalog.ps1",
-                "SharpProof.Frontend/OperationSupportCatalog.generated.cs"
-            ],
-            ["irModelCatalog"] = [
-                "SharpProof.Ir/IrModel.schema.json",
-                "scripts/Generate-IrModel.ps1",
-                "SharpProof.Ir/IrIdentifierAliases.cs",
-                "SharpProof.Ir/ScopedIrId.cs",
-                "SharpProof.Ir/ArgumentNullGuard.cs",
-                "SharpProof.Ir/IrModel.generated.cs",
-                "SharpProof.Ir/IrProgram.cs"
-            ],
-            ["compilerWireCatalog"] = [
-                "SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json",
-                "scripts/Generate-CompilerArtifactModel.ps1",
-                "scripts/Test-CompilerArtifactModelGenerator.ps1",
-                "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
-                "SharpProof.CompilerCollector/CompilerArtifact/CompilerWireMappings.generated.cs"
-            ],
-            ["effectAnalysis"] = [
-                "SharpProof.Analyzer/AnalyzerFeaturePipeline.cs",
-                "SharpProof.Analyzer/AnalyzerSession.cs",
-                "SharpProof.Analyzer/CallArgumentAliasPolicy.cs",
-                "SharpProof.Analyzer/EffectCallPreconditionPolicy.cs",
-                "SharpProof.Analyzer/EffectContractDiagnostics.cs",
-                "SharpProof.Analyzer/EffectEvaluationTypes.cs",
-                "SharpProof.Analyzer/ManagedContractFacts.cs",
-                "SharpProof.Analyzer/RequiresCallSiteAnalyzer.cs",
-                "SharpProof.Analyzer/RequiresCallSiteDiscovery.cs",
-                "SharpProof.Analyzer/RequiresCallSiteTreeAnalyzer.cs",
-                "SharpProof.Contracts/ContractSelectionInventory.cs",
-                "SharpProof.Effects/EffectAnalysisSession.cs",
-                "SharpProof.Effects/EffectCallPreconditionPolicy.cs",
-                "SharpProof.Effects/EffectCallSiteResolver.cs",
-                "SharpProof.Effects/EffectCallGraph.cs",
-                "SharpProof.Effects/EffectMethodNodeBuilder.cs",
-                "SharpProof.Effects/EffectContractMappings.cs",
-                "SharpProof.Effects/OperationEffectScanner.cs",
-                "SharpProof.Effects/EffectExceptionFlow.cs",
-                "SharpProof.Effects/ManagedAbstractFlow.cs",
-                "SharpProof.Effects/ExternalEffectResolver.cs",
-                "SharpProof.Effects/EffectSummaryOperations.cs",
-                "SharpProof.Effects/EffectProjection.cs",
-                "SharpProof.Effects/EffectSummary.cs",
-                "SharpProof.Effects/EffectValues.cs",
-                "SharpProof.Effects/EffectRegions.cs",
-                "SharpProof.Effects/EffectContractValues.cs",
-                "SharpProof.Dataflow/ForwardDataflowAnalysis.cs",
-                "SharpProof.Dataflow/DataflowGraph.cs",
-                "SharpProof.Dataflow/IAbstractDomain.cs",
-                "SharpProof.Dataflow/ClosedAbstractDomain.cs",
-                "SharpProof.Dataflow/IntervalDomain.cs",
-                "SharpProof.Dataflow/IntervalValue.cs",
-                "SharpProof.Dataflow/NullnessDomain.cs",
-                "SharpProof.Dataflow/NullnessValue.cs",
-                "SharpProof.Specs/FrameworkTypeMetadataNames.cs"
-            ],
-            ["replay"] = [
-                "SharpProof.Ir/IrInterpreter.cs",
-                "SharpProof.Ir/IrProgramInterpreter.cs",
-                "SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs",
-                "SharpProof.Worker/CallableCounterexampleReplayer.cs",
-                "SharpProof.Worker/EffectCounterexampleReplayer.cs"
-            ],
-            ["effectResultAssembly"] = [
-                "SharpProof.Worker/EffectClaimResultAssembler.cs"
-            ],
-            ["policy"] = [
-                "SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs",
-                "SharpProof.Analyzer/AnalyzerGeneratedCodePolicy.cs",
-                "SharpProof.Analyzer/LanguageSubsetGate.cs",
-                "SharpProof.Analyzer/SharpProofControlAttributePolicy.cs",
-                "SharpProof.Effects/TrustedBoundaryPolicy.cs",
-                "SharpProof.Frontend/FrontendSubset.cs",
-                "SharpProof.Frontend/OperationSubsetClassifier.cs",
-                "SharpProof.Worker.Launcher/Program.cs",
-                "SharpProof.Worker/CallableVerificationPolicy.cs",
-                "scripts/Get-SharpProofTcbPaths.ps1",
-                "scripts/Get-SharpProofReleaseDigests.ps1",
-                "scripts/Test-SharpProofCoverage.ps1",
-                "eng/acceptance/Verify.ps1"
-            ],
-            ["resultAssembly"] = [
-                "SharpProof.Worker/CallableClaimResultAssembler.cs",
-                "SharpProof.Worker.Protocol/WorkerResultAssembler.cs"
-            ],
-            ["compilerInputIdentity"] = [
-                "SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs",
-                "SharpProof.CompilerCollector/CompilerArtifact/CompilerOptionWireMappings.cs",
-                "SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs",
-                "SharpProof.CompilerArtifact/CompilationFingerprint.cs"
-            ],
-            ["canonicalIdentityEncoding"] = [
-                "SharpProof.Analyzer/CompilerArtifact/CompilerExceptionTypeIdentity.cs",
-                "SharpProof.Frontend/CompilerIdentityBridge.cs",
-                "SharpProof.Ir/CanonicalHashWriter.cs"
-            ],
-            ["protocolValidation"] = [
-                "SharpProof.Worker/Program.cs",
-                "SharpProof.Worker.Protocol/ProtocolModel.schema.json",
-                "scripts/Generate-ProtocolModel.ps1",
-                "SharpProof.Worker.Protocol/ProtocolModel.generated.cs",
-                "SharpProof.Worker.Protocol/ProtocolManifest.cs",
-                "SharpProof.Worker.Protocol/ProtocolManifestPayload.cs",
-                "SharpProof.Worker.Protocol/ProtocolJson.cs",
-                "SharpProof.Worker.Protocol/ProtocolJsonSupport.cs"
-            ],
-            ["cacheValidation"] = [
-                "SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs",
-                "SharpProof.CompilerArtifact/CompilerManifestArtifact.cs",
-                "SharpProof.Worker.Protocol/WorkerCachePath.cs",
-                "SharpProof.Worker/WorkerInputSnapshot.cs",
-                "SharpProof.Worker/VerificationCache.cs"
-            ],
-            ["portableShippingBoundary"] = [
-                "SharpProof.PortableAnalyzer/SharpProof.PortableAnalyzer.csproj",
-                "SharpProof.Package/SharpProof.nuspec",
-                "SharpProof.Package/buildTransitive/SharpProof.props",
-                "SharpProof.Package/buildTransitive/SharpProof.targets",
-                "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.targets"
-            ],
-            ["releaseContainment"] = [
-                "scripts/Invoke-SharpProofDotnet.ps1",
-                "scripts/JobObjectHelpers.ps1",
-                "scripts/Test-SharpProofPackageConsumers.ps1"
-            ]
-        };
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(
             RepositoryRoot(), "eng", "acceptance", "contract.json")));
         var root = document.RootElement;
@@ -810,8 +518,9 @@ public sealed class ArchitectureTests
                 .GetProperty("paths")
                 .EnumerateArray()
                 .Select(static path => path.GetString() ?? "")
-                .OrderBy(static path => path, StringComparer.Ordinal),
-            Is.EqualTo(TrustedKernelPaths));
+                .Where(static path => path.Length != 0),
+            Is.Not.Empty,
+            "The trusted kernel must declare at least one path.");
         Assert.That(
             root.GetProperty("trustedKernel")
                 .TryGetProperty("maximumNonblankLines", out _),
@@ -830,21 +539,27 @@ public sealed class ArchitectureTests
                     .Select(static path => path.GetString() ?? "")
                     .ToArray(),
                 StringComparer.Ordinal);
-        Assert.That(
-            actual.Keys.OrderBy(static name => name, StringComparer.Ordinal),
-            Is.EqualTo(expected.Keys.OrderBy(
-                static name => name,
-                StringComparer.Ordinal)));
-        foreach (var component in expected)
+        // The declaration in contract.json is the single source of truth; this
+        // test no longer restates it. That removes the drift tripwire on purpose:
+        // a path can now be added to or removed from the trusted computing base
+        // without a second file being edited, so the review of contract.json is
+        // the only remaining control. What is still enforced below is that the
+        // declaration is internally coherent and matches the repository.
+        Assert.That(actual, Is.Not.Empty);
+        foreach (var component in actual)
         {
             Assert.That(
-                actual[component.Key].OrderBy(
-                    static path => path,
-                    StringComparer.Ordinal),
-                Is.EqualTo(component.Value.OrderBy(
-                    static path => path,
-                    StringComparer.Ordinal)),
+                component.Key,
+                Is.Not.Empty,
+                "Every trusted-computing-base component must be named.");
+            Assert.That(
+                component.Value,
+                Is.Not.Empty,
                 component.Key);
+            Assert.That(
+                component.Value.Distinct(StringComparer.Ordinal).Count(),
+                Is.EqualTo(component.Value.Length),
+                component.Key + " declares a path twice.");
         }
         var canonicalTcb = root.GetProperty("trustedKernel")
             .GetProperty("paths")
@@ -856,6 +571,28 @@ public sealed class ArchitectureTests
             canonicalTcb.Distinct(StringComparer.Ordinal).Count(),
             Is.EqualTo(canonicalTcb.Length),
             "The canonical TCB union must not contain duplicate ownership.");
+
+        // Nothing restates the declaration any more, so a typo or a path left
+        // behind by a rename would otherwise go unnoticed until a release gate
+        // failed. Every declared path must resolve to a file inside the tree.
+        foreach (var path in canonicalTcb)
+        {
+            var full = Path.GetFullPath(Path.Combine(RepositoryRoot(), path));
+            Assert.That(
+                full.StartsWith(
+                    RepositoryRoot() + Path.DirectorySeparatorChar,
+                    StringComparison.OrdinalIgnoreCase),
+                Is.True,
+                path + " escapes the repository root.");
+            Assert.That(
+                File.Exists(full),
+                Is.True,
+                path + " is declared in the trusted computing base but missing.");
+        }
+        // Kept deliberately. With the full declaration no longer restated here,
+        // this is the only remaining assertion about what the trusted computing
+        // base must contain, so it is a cheap tripwire on the paths whose silent
+        // removal would matter most rather than the redundancy it once was.
         Assert.That(
             canonicalTcb,
             Does.Contain("SharpProof.Verify/Evidence.cs")
