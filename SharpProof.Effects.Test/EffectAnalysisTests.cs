@@ -3834,4 +3834,47 @@ public sealed class EffectAnalysisTests
         result.Method.MetadataName + "/" +
         result.Method.Parameters.Length;
     }
+
+    [Test]
+    public void DeeplyNestedExpressionsAbstainInsteadOfExhaustingTheStack()
+    {
+        var chain = string.Join(" + ", Enumerable.Repeat("value", 400));
+        var compilation = EffectTestHost.CreateCompilation(
+            $$"""
+            public static class Sample {
+                public static long Deep(long value) => {{chain}};
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        // The scanner and the abstract flow both walk this tree recursively.
+        // Past their depth budget they must abstain, because
+        // StackOverflowException is uncatchable and would kill the compiler.
+        var result = session.Analyze(Method(compilation, "Deep"));
+
+        Assert.That(result.Projection.IsComplete, Is.False);
+    }
+
+    [Test]
+    public void DeepCallChainsAbstainInsteadOfExhaustingTheStack()
+    {
+        var methods = string.Join(
+            Environment.NewLine,
+            Enumerable.Range(0, 600).Select(static index =>
+                $"    public static long Step{index}(long value) => " +
+                (index == 599
+                    ? "value;"
+                    : $"Step{index + 1}(value);")));
+        var compilation = EffectTestHost.CreateCompilation(
+            $$"""
+            public static class Sample {
+            {{methods}}
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        var result = session.Analyze(Method(compilation, "Step0"));
+
+        Assert.That(result.Projection.IsComplete, Is.False);
+    }
 }

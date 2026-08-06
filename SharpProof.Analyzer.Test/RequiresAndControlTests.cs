@@ -1634,4 +1634,31 @@ public sealed class RequiresAndControlTests
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EquivalentTo(["SP0002", "SP0024", "SP0024"]));
     }
+
+    [Test]
+    public async Task ReversedPreconditionsRefineAgainstCallSiteFacts()
+    {
+        // The variable-on-the-right branch used to evaluate the other operand
+        // against an empty environment rather than the live one.
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static void Reversed(long value) {
+                    Contract.Requires(0 < value);
+                }
+
+                public static void Call() {
+                    Reversed(-1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
 }

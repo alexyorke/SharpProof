@@ -791,6 +791,52 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task LauncherFailsClosedOnAnUnclassifiedException()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+        var requestPath = project.VerifyOutputPath(
+            "net8.0", "in-process-unclassified-request.json");
+        var resultPath = project.VerifyOutputPath(
+            "net8.0", "in-process-unclassified-result.json");
+
+        // An IOException is not one of the four types the launcher classifies.
+        // It used to escape Main, so the process died leaving no result file at
+        // all rather than a fail-closed response.
+        var exitCode = await Program.RunMain(
+            [
+                "verify",
+                "--worker", WorkerOutputPath(),
+                "--request", requestPath,
+                "--result", resultPath,
+                "--compiler-manifest", project.CompilerManifestPath,
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow"
+            ],
+            static path => WorkerBinaryIdentity.ComputeSha256(path),
+            static (_, _, _, _) => throw new IOException("device not ready"));
+
+        Assert.That(File.Exists(resultPath), Is.True);
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(resultPath))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exitCode, Is.Not.Zero);
+            Assert.That(
+                response.RunStatus,
+                Is.EqualTo(WorkerRunStatus.Failed));
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.InfrastructureFailure));
+            Assert.That(
+                response.Errors.Select(static error => error.Code),
+                Does.Contain("launcher.infrastructure"));
+        }
+    }
+
+    [Test]
     public async Task LauncherReportsStagedWorkerClosureHashMismatchInProcess()
     {
         RequireWindowsWorker();

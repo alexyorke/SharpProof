@@ -2011,6 +2011,34 @@ public sealed class ClaimManifestBuilderTests
         """;
     }
 
+    [Test]
+    public void DeeplyNestedPredicatesStillProduceAClaimIdentity()
+    {
+        // The claim fingerprint walks the operation tree recursively. Beyond its
+        // depth budget it truncates rather than recursing, because
+        // StackOverflowException is uncatchable and would take the compiler down.
+        // Truncation is safe: identity also carries a duplicate rank, so claims
+        // that fingerprint alike still receive distinct ids.
+        var predicate = string.Join(" + ", Enumerable.Repeat("value", 400));
+        var source = $$"""
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                public static long Deep(long value) {
+                    Contract.Ensures({{predicate}} >= 0);
+                    return value;
+                }
+            }
+            """;
+
+        var result = Build(("Subject.cs", source));
+
+        var claims = result.Manifest.Claims.Where(static claim =>
+            claim.Kind == WorkerClaimKind.Postcondition).ToArray();
+        Assert.That(claims, Has.Length.EqualTo(1));
+        Assert.That(claims[0].ClaimId, Is.Not.Empty);
+    }
+
     private static ClaimManifestBuildResult Build(
         params (string FileName, string Source)[] sources)
     {

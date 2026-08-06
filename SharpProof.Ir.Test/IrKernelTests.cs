@@ -1045,4 +1045,61 @@ public sealed class IrKernelTests
                 factory.Variable(text)),
             factory.String("fallback"));
     }
+
+    [Test]
+    public void DeeplyNestedTermsAbstainInsteadOfExhaustingTheStack()
+    {
+        var factory = new IrFactory();
+        var value = factory.CreateVariable("value", factory.IntegerType);
+
+        // A variable operand keeps the factory from constant-folding the chain
+        // away, so the term really is 512 levels deep.
+        var term = (IrTerm)factory.Variable(value);
+        for (var index = 0; index < 512; index++)
+        {
+            term = factory.Binary(
+                IrBinaryOperator.Add,
+                term,
+                factory.Variable(value));
+        }
+
+        var environment = new Dictionary<IrVarId, IrValue>
+        {
+            [value] = factory.CreateIntegerValue(1)
+        };
+        var result = new IrInterpreter(factory).Evaluate(term, environment);
+
+        // StackOverflowException is uncatchable, so the interpreter has to
+        // refuse the term rather than try to evaluate it.
+        Assert.That(
+            result.Status,
+            Is.EqualTo(IrEvaluationStatus.Unsupported));
+        Assert.That(
+            result.Unsupported!.Reason,
+            Is.EqualTo(IrUnsupportedReason.UnsupportedOperation));
+    }
+
+    [Test]
+    public void TermsWithinTheDepthBudgetStillEvaluate()
+    {
+        var factory = new IrFactory();
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        var term = (IrTerm)factory.Variable(value);
+        for (var index = 0; index < 32; index++)
+        {
+            term = factory.Binary(
+                IrBinaryOperator.Add,
+                term,
+                factory.Variable(value));
+        }
+
+        var environment = new Dictionary<IrVarId, IrValue>
+        {
+            [value] = factory.CreateIntegerValue(1)
+        };
+        var result = new IrInterpreter(factory).Evaluate(term, environment);
+
+        Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(result.Value!.Integer, Is.EqualTo(33L));
+    }
 }

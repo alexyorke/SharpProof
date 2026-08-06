@@ -87,8 +87,24 @@ internal sealed class ManagedAbstractFlow
         return state;
     }
 
+    /// <summary>
+    /// Overrides the solver's iteration bound so the non-convergence path can be
+    /// exercised. Mirrors
+    /// <c>ForwardDataflowAnalysis.AnalyzeWithWorklistOrderForTesting</c>.
+    /// </summary>
+    internal ManagedFlowAnalysis AnalyzeWithIterationLimitForTesting(
+        IMethodSymbol method,
+        ControlFlowGraph graph,
+        ManagedFlowState? entryState,
+        int maxIterations,
+        CancellationToken cancellationToken)
+    {
+        return Analyze(method, graph, entryState, cancellationToken, maxIterations);
+    }
+
     internal ManagedFlowAnalysis Analyze(
-        IMethodSymbol method, ControlFlowGraph graph, ManagedFlowState? entryState, CancellationToken cancellationToken)
+        IMethodSymbol method, ControlFlowGraph graph, ManagedFlowState? entryState, CancellationToken cancellationToken,
+        int? maxIterationsOverride = null)
     {
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         graph = ArgumentNullGuard.NotNull(graph, nameof(graph));
@@ -115,7 +131,8 @@ internal sealed class ManagedAbstractFlow
             _ = ForwardDataflowAnalysis.Analyze(dataflowGraph,
                 FlowDomain.Instance, entryState ?? CreateEntryState(method),
                 new ForwardDataflowAnalysisOptions(
-                    maxIterations: dataflowGraph.Blocks.Length * 4));
+                    maxIterations: maxIterationsOverride
+                        ?? dataflowGraph.Blocks.Length * 4));
         }
         catch (DataflowConvergenceException)
         {

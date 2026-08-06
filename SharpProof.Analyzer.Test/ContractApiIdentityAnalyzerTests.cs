@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 
 namespace SharpProof.Analyzer.Test;
@@ -204,5 +205,67 @@ public sealed class ContractApiIdentityAnalyzerTests
             message,
             Does.Contain(method)
                 .And.Contain("ContractApiIdentityRejected"));
+    }
+
+    [Test]
+    public async Task UnreadableContractApiIsReportedInsteadOfSilentlyDisablingAnalysis()
+    {
+        const string source = """
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                public static long Identity(long value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """;
+        var attributesPath =
+            typeof(SharpProof.Attributes.Contract).Assembly.Location;
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProofUnreadable-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var copied = Path.Combine(directory, "SharpProof.Attributes.dll");
+        File.Copy(attributesPath, copied);
+
+        // Reference the copy, then delete it. Roslyn has already read the image,
+        // so the compilation is intact, but the payload pin can no longer read
+        // the path -- the same shape as an antivirus scanner or a dropped share.
+        var reference = MetadataReference.CreateFromFile(copied);
+        File.Delete(copied);
+        Directory.Delete(directory);
+
+        var trustedPlatformAssemblies =
+            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
+            throw new InvalidOperationException(
+                "Trusted platform assemblies are unavailable.");
+        var references = trustedPlatformAssemblies
+            .Split(Path.PathSeparator)
+            .Where(static path => !string.Equals(
+                Path.GetFileName(path),
+                "SharpProof.Attributes.dll",
+                StringComparison.OrdinalIgnoreCase))
+            .Select(static path => MetadataReference.CreateFromFile(path))
+            .Cast<MetadataReference>()
+            .Append(reference);
+        var compilation = CSharpCompilation.Create(
+            "UnreadableContractApiFixture",
+            [CSharpSyntaxTree.ParseText(source)],
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+                .WithSpecificDiagnosticOptions(
+                    new SharpProofAnalyzer().SupportedDiagnostics.ToImmutableDictionary(
+                        static descriptor => descriptor.Id,
+                        static descriptor => descriptor.Id == "SP0050"
+                            ? ReportDiagnostic.Warn
+                            : ReportDiagnostic.Suppress,
+                        StringComparer.Ordinal)));
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, mode: null);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SP0050"));
     }
 }

@@ -199,14 +199,10 @@ internal sealed class ContractApiIdentityResolver
                         reference)))
             .ToImmutableArray();
         if (matches.Length != 1 ||
-            matches[0] is not
-                PortableExecutableReference matched ||
-            string.IsNullOrEmpty(matched.FilePath))
-        {
-            return false;
-        }
-
-        if (matched.FilePath is not { } path)
+            matches[0] is not PortableExecutableReference
+            {
+                FilePath: { Length: > 0 } path
+            })
         {
             return false;
         }
