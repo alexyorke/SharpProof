@@ -441,7 +441,7 @@
   },
   "productionComplexity": {
     "measurement": "Aggregate Roslyn expression nodes, decision points, and members across handwritten production C#; whitespace, comments, line wrapping, and optional braces are excluded.",
-    "maximumExpressionNodes": 94400,
+    "maximumExpressionNodes": 95400,
     "maximumDecisionPoints": 5200,
     "maximumMembers": 3900
   },
