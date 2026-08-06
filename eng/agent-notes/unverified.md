@@ -93,3 +93,45 @@ options are:
 
 Investigate `ManagedFlowState`'s operations on the bottom instance before doing
 either. Do not add a test that asserts something true either way.
+
+## The changed-TCB line numbers are not stable across gate invocations
+
+**Do not chase individual line numbers without a matched, fresh coverage
+collection.** This invalidates part of the queue as written.
+
+Observed 2026-08-06. Two runs of
+`Test-SharpProofCoverage.ps1 -CoverageRoot artifacts/coverage -ComparisonRef master`
+against the **same** coverage artifacts and **identical production code**
+reported different uncovered sets:
+
+| Run | Uncovered changed-TCB lines |
+|---|---|
+| At `a842a27d0` | `ManagedContractFacts.cs:158`, `ManagedAbstractFlow.cs:195`, `ManagedAbstractFlow.cs:1811` |
+| At `59e7be1d2` | `ManagedContractFacts.cs:158`, `ManagedAbstractFlow.cs:137`, `:141`, `:142` |
+
+The only change between them was two documentation-only commits that do not
+touch `ManagedAbstractFlow.cs`. Lines 137/141/142 are the
+`catch (DataflowConvergenceException)` block, which **is** covered by the
+committed test `NonConvergentAnalysisDegradesToAnIncompleteSummary`.
+
+Likely cause: the gate compares line numbers recorded in the Cobertura data,
+produced by whatever build was instrumented, against line numbers computed from
+a `git diff <ref>...HEAD` of the current tree. When HEAD moves, the diff side
+shifts but the coverage side does not, so the two are matched against a stale
+mapping. `git diff master...HEAD -- SharpProof.Effects/ManagedAbstractFlow.cs`
+has no hunk anywhere near line 1811, which is consistent with that line having
+been a mis-attribution rather than a real gap.
+
+### Consequence
+
+`ManagedAbstractFlow.cs:195` and `:1811` may never have been genuine gaps. The
+mutation result for `:195` — the test passing with the `IsBottom` guard deleted
+— is still a real observation and worth resolving, but it is no longer evidence
+of a coverage problem.
+
+### Next step
+
+Re-collect coverage from a clean build at the current HEAD and take that list as
+authoritative before queuing any further line. Also worth reporting upstream:
+the gate should either recollect or refuse to run against artifacts whose commit
+does not match HEAD.

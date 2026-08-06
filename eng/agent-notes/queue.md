@@ -28,24 +28,24 @@ invert the code under test, re-run, restore, confirm `git diff` is clean.
 
 ## Ready
 
-- [ ] **`ManagedContractFacts.cs:158`** — reversed-refinement arm. Two tests
-  passed for the wrong reason; the second passed with the arm deleted. Next step
-  is *not* a third test: determine whether the operands of `3 == value` are
-  normalised upstream into `value == 3`, which would make the
-  `Right: IrVariableTerm` arm unreachable for comparisons and therefore
-  deletable. See `unverified.md`.
+- [ ] **`ManagedContractFacts.cs:158`** — the one remaining genuine gap. The
+  reversed-refinement arm is confirmed reachable (see `unverified.md`: the IR
+  factory preserves operand order, so `3 == value` keeps the literal on the
+  left and only the `Right:` arm can match). Two tests passed for the wrong
+  reason. Next step is *not* a third test: print `diagnostic.Location` and the
+  message from the attempt-2 fixture to find out what actually produces its
+  SP0027, since that diagnostic survived deleting the arm.
 
-- [ ] **`ManagedAbstractFlow.cs:195`** — `IsBottom` early return in `Transfer`.
-  Diagnosis confirmed (`TransferMany` calls `Transfer` before checking
-  `IsBottom`, and `ApplyRequires` can return `Bottom`), but the test passed with
-  the guard deleted, so it is probably a short-circuit optimisation. Determine
-  whether any `ManagedFlowState` operation fails to preserve bottom. If none
-  does, delete the guard. See `unverified.md`.
+## Resolved as not-a-gap
 
-- [ ] **`ManagedAbstractFlow.cs:1811`** — `IParenthesizedOperation` arm of
-  `UnwrapHarmlessValue`. Establish first *why* the coverage gate considers this
-  line changed at all; it may be diff drift from insertions above it rather than
-  a real gap. Do not write a test before answering that.
+- [x] **`ManagedAbstractFlow.cs:195` and `:1811`** — artifacts of stale coverage
+  data, not real gaps. A fresh matched collection at HEAD does not report them.
+  See the line-number instability note in `unverified.md`.
+- [x] **`ManagedAbstractFlow.cs:137/141/142`** — the convergence catch. Genuinely
+  uncovered, but because the committed test used a cyclic (`while`) fixture that
+  `IsAcyclic` rejects before the solver runs, and asserted `not Complete` which
+  `Cyclic` satisfies. Fixed with an acyclic fixture and an exact
+  `BudgetExceeded` assertion; mutation-confirmed.
 
 ## Backlog — refill from here when Ready empties
 

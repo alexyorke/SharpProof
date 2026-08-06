@@ -1109,10 +1109,8 @@ public sealed class ManagedAbstractFlowTests
             public static class Sample {
                 public static long Calls(long value) {
                     var total = 0L;
-                    while (value > 0) {
-                        total += value;
-                        value--;
-                    }
+                    if (value > 0) { total = value; } else { total = -value; }
+                    if (value > 10) { total += 1; } else { total += 2; }
                     return total;
                 }
             }
@@ -1123,9 +1121,10 @@ public sealed class ManagedAbstractFlowTests
         var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
 
-        // Reaching the iteration bound is a resource limit, not a defect. It has
-        // to surface as an incomplete summary rather than escaping the analyzer
-        // as AD0001.
+        // The body must be ACYCLIC: a loop is rejected by the IsAcyclic gate
+        // before the solver ever runs, so a cyclic fixture would report Cyclic
+        // and never exercise the convergence catch at all. Branching gives a
+        // multi-block graph that cannot settle within one worklist round.
         var analysis = ManagedAbstractFlow.ForCompilation(compilation)
             .AnalyzeWithIterationLimitForTesting(
                 method,
@@ -1134,9 +1133,12 @@ public sealed class ManagedAbstractFlowTests
                 maxIterations: 1,
                 default);
 
+        // Assert the specific status. "not Complete" would also be satisfied by
+        // Cyclic, which is how the previous version of this test passed without
+        // reaching the catch.
         Assert.That(
             analysis.Status,
-            Is.Not.EqualTo(ManagedFlowStatus.Complete));
+            Is.EqualTo(ManagedFlowStatus.BudgetExceeded));
     }
 
     [Test]
