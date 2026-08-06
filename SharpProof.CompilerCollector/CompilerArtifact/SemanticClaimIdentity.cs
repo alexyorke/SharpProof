@@ -156,9 +156,33 @@ internal static partial class SemanticClaimIdentity
         return writer.Finish();
     }
 
+    /// <summary>
+    /// Ceiling on operation nesting walked recursively. Nothing this deep can be
+    /// verified anyway -- the verifier's hard expression-depth cap is the same
+    /// 256 -- so truncating costs no reachable precision, and it keeps a
+    /// generated expression from taking the compiler down with an uncatchable
+    /// StackOverflowException.
+    /// </summary>
+    private const int MaximumFingerprintDepth = 256;
+
     private static void WriteOperation(
         CanonicalHashWriter writer, IOperation operation, ClaimIdentityContext context)
     {
+        WriteOperation(writer, operation, context, 0);
+    }
+
+    private static void WriteOperation(
+        CanonicalHashWriter writer, IOperation operation, ClaimIdentityContext context, int depth)
+    {
+        if (depth >= MaximumFingerprintDepth)
+        {
+            // Truncation is deterministic, and claim identity also carries a
+            // duplicate rank (ClaimManifestBuilder.NextRank), so two claims whose
+            // fingerprints truncate to the same value still receive distinct ids.
+            writer.Add("depth-limit");
+            return;
+        }
+
         writer.Add(operation.Kind.ToString()).Add(operation.IsImplicit);
         WriteType(writer, operation.Type, context);
         WriteOptionalConstant(writer, operation.ConstantValue, context);
@@ -222,7 +246,7 @@ internal static partial class SemanticClaimIdentity
         writer.Add(children.Count);
         foreach (var child in children)
         {
-            WriteOperation(writer, child, context);
+            WriteOperation(writer, child, context, depth + 1);
         }
     }
     private static void WriteLocalRole(CanonicalHashWriter writer, ILocalSymbol local)
