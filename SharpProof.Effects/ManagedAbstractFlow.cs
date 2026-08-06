@@ -1662,7 +1662,11 @@ internal readonly record struct ManagedAbstractValue(
 /// <summary>Fail-closed execution facts shared by analyzer and effect witnesses.</summary>
 internal sealed class DefiniteOperationFacts(Compilation compilation, CancellationToken cancellationToken)
 {
-    private readonly HashSet<IMethodSymbol> _activeMethods = [];
+    // Explicit comparer: this set is the cycle guard for CompletesNormally, so
+    // if it ever degraded to reference equality the failure mode would be
+    // unbounded recursion rather than a wrong answer.
+    private readonly HashSet<IMethodSymbol> _activeMethods =
+        new(SymbolEqualityComparer.Default);
     private readonly INamedTypeSymbol? _contractApi =
         ContractApiIdentityResolver.ForCompilation(compilation).Contract;
 

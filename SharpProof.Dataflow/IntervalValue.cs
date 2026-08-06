@@ -135,13 +135,17 @@ public readonly struct IntervalValue : IEquatable<IntervalValue>
             return "bottom";
         }
 
-        var lower = LowerBound?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "-inf";
-        var upper = UpperBound?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "+inf";
+        // Invariant throughout: under sv-SE or fi-FI the negative sign becomes
+        // U+2212, so a current-culture rendering would vary by machine. The
+        // interpolated Modulus and Remainder need the same treatment as the
+        // bounds, not just the bounds themselves.
+        var lower = LowerBound?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-inf";
+        var upper = UpperBound?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "+inf";
         return Modulus switch
         {
-            var value when value.IsZero => $"[{lower}, {upper}]",
-            var value when value.IsOne => $"[{lower}, {upper}]",
-            _ => $"[{lower}, {upper}] mod {Modulus} = {Remainder}"
+            var value when value.IsZero => FormattableString.Invariant($"[{lower}, {upper}]"),
+            var value when value.IsOne => FormattableString.Invariant($"[{lower}, {upper}]"),
+            _ => FormattableString.Invariant($"[{lower}, {upper}] mod {Modulus} = {Remainder}")
         };
     }
 

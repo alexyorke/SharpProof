@@ -155,7 +155,11 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
 
     private void AccountResources(Solver solver)
     {
-        foreach (var entry in solver.Statistics.Entries)
+        // Statistics is a caller-owned Z3 object holding a native reference, the
+        // same as Model in CreateSatisfiable. This backend outlives hundreds of
+        // queries per lane, so leaving it to the finalizer accumulates.
+        using var statistics = solver.Statistics;
+        foreach (var entry in statistics.Entries)
         {
             if (!string.Equals(
                     entry.Key,

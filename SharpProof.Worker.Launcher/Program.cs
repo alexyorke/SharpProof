@@ -103,8 +103,13 @@ internal static class Program
                     runtimeSnapshot.ExecutionWorkerPath);
             }
         }
-        catch (Exception exception) when (ClassifyLauncherFailure(exception) is { } failure)
+        // Matches the worker's own discipline (Worker/Program.cs): everything
+        // except OOM and StackOverflow is caught, so the launcher always leaves
+        // a fail-closed result file instead of crashing with none.
+        catch (Exception exception) when (
+            exception is not OutOfMemoryException and not StackOverflowException)
         {
+            var failure = ClassifyLauncherFailure(exception);
             exitCode = failure.ExitCode;
             Console.Error.WriteLine(failure.ConsoleMessage);
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
@@ -162,7 +167,7 @@ internal static class Program
         return exitCode;
     }
 
-    private static LauncherFailure? ClassifyLauncherFailure(Exception exception)
+    private static LauncherFailure ClassifyLauncherFailure(Exception exception)
     {
         return exception switch
         {
@@ -175,7 +180,12 @@ internal static class Program
                 125, WorkerRunStatus.Failed, WorkerRunFailureReason.ContainmentFailure,
                 "containment.unavailable", "Required worker containment could not be established.",
                 "SharpProof worker containment could not be established."),
-            _ => null
+            // Anything unclassified (an IOException out of RunWorker, say) still
+            // has to produce a result file rather than escape Main.
+            _ => new(3, WorkerRunStatus.Failed, WorkerRunFailureReason.InfrastructureFailure,
+                "launcher.infrastructure",
+                "The SharpProof launcher failed before the worker produced a result.",
+                "SharpProof launcher failed before the worker produced a result.")
         };
     }
 

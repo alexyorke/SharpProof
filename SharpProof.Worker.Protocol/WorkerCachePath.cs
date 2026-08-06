@@ -15,9 +15,23 @@ internal static class WorkerCachePath
 
     internal static bool IsSameOrDescendant(string path, string directory)
     {
-        return (path + Path.DirectorySeparatorChar).StartsWith(
-            directory + Path.DirectorySeparatorChar,
+        // Both sides are separator-terminated so that "C:\toolsX" is not treated
+        // as living under "C:\tools". A drive root already ends in a separator,
+        // and unconditionally appending one there built the prefix "C:\\", which
+        // no path could ever start with -- silently disabling containment checks
+        // for a worker deployed at the root of a drive.
+        return Terminate(path).StartsWith(
+            Terminate(directory),
             StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string Terminate(string value)
+    {
+        return value.Length != 0 &&
+            (value[value.Length - 1] == Path.DirectorySeparatorChar ||
+             value[value.Length - 1] == Path.AltDirectorySeparatorChar)
+            ? value
+            : value + Path.DirectorySeparatorChar;
     }
 
     internal static void ValidateNoReparsePoints(IEnumerable<string> paths)
