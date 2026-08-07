@@ -28,24 +28,22 @@ invert the code under test, re-run, restore, confirm `git diff` is clean.
 
 ## Ready
 
-- [ ] **`ManagedContractFacts.cs:158`** — the one remaining genuine gap. The
-  reversed-refinement arm is confirmed reachable (see `unverified.md`: the IR
-  factory preserves operand order, so `3 == value` keeps the literal on the
-  left and only the `Right:` arm can match). Two tests passed for the wrong
-  reason. Next step is *not* a third test: print `diagnostic.Location` and the
-  message from the attempt-2 fixture to find out what actually produces its
-  SP0027, since that diagnostic survived deleting the arm.
+_Empty. The coverage gate passes with zero uncovered changed-TCB lines._
 
-## Resolved as not-a-gap
+## Resolved
 
+- [x] **`ManagedContractFacts.cs:158`** — closed by a unit-level fixture that
+  drives `ApplyRequires` directly. End to end this line is unreachable to a
+  discriminating test, because `ManagedAbstractFlow.Transfer` re-derives the
+  same fact when it walks the `Contract.Requires` invocation in the body and
+  masks it. At unit level nothing walks a body, so the refinement can only come
+  from the arm under test. Mutation-confirmed: removing the
+  `Right: IrVariableTerm` arm fails the test.
 - [x] **`ManagedAbstractFlow.cs:195` and `:1811`** — artifacts of stale coverage
-  data, not real gaps. A fresh matched collection at HEAD does not report them.
-  See the line-number instability note in `unverified.md`.
-- [x] **`ManagedAbstractFlow.cs:137/141/142`** — the convergence catch. Genuinely
-  uncovered, but because the committed test used a cyclic (`while`) fixture that
-  `IsAcyclic` rejects before the solver runs, and asserted `not Complete` which
-  `Cyclic` satisfies. Fixed with an acyclic fixture and an exact
-  `BudgetExceeded` assertion; mutation-confirmed.
+  data, not real gaps.
+- [x] **`ManagedAbstractFlow.cs:137/141/142`** — the convergence catch. Real, and
+  uncovered because the committed test used a cyclic fixture rejected by
+  `IsAcyclic` before the solver ran. Fixed and mutation-confirmed.
 
 ## Backlog — refill from here when Ready empties
 
