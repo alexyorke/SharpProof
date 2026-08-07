@@ -24,6 +24,16 @@ internal sealed class CompilerCompilationSnapshot
     public CompilerAdditionalFileSnapshot[] AdditionalFiles { get; set; } = [];
 }
 
+internal enum CompilerReportDiagnostic
+{
+    Default = 0,
+    Error = 1,
+    Warn = 2,
+    Info = 3,
+    Hidden = 4,
+    Suppress = 5
+}
+
 internal sealed class CompilerCompilationOptionsSnapshot
 {
     public CompilerOutputKind OutputKind { get; set; }
@@ -31,6 +41,9 @@ internal sealed class CompilerCompilationOptionsSnapshot
     public CompilerPlatform Platform { get; set; }
     public CompilerNullableContext NullableContext { get; set; }
     public CompilerMetadataImportOptions MetadataImportOptions { get; set; }
+    public int WarningLevel { get; set; }
+    public CompilerReportDiagnostic GeneralDiagnosticOption { get; set; }
+    public CompilerDiagnosticOptionSnapshot[] SpecificDiagnosticOptions { get; set; } = [];
     public bool CheckOverflow { get; set; }
     public bool AllowUnsafe { get; set; }
     public bool Deterministic { get; set; }
@@ -38,6 +51,12 @@ internal sealed class CompilerCompilationOptionsSnapshot
     public CompilerAssemblyIdentityComparer AssemblyIdentityComparer { get; set; }
     public string[] Usings { get; set; } = [];
     public CompilerResolverPolicy ResolverPolicy { get; set; }
+}
+
+internal sealed class CompilerDiagnosticOptionSnapshot
+{
+    public string Id { get; set; } = string.Empty;
+    public CompilerReportDiagnostic ReportDiagnostic { get; set; }
 }
 
 internal sealed class CompilerSyntaxTreeSnapshot
@@ -55,11 +74,18 @@ internal sealed class CompilerSyntaxTreeSnapshot
 
 internal sealed class CompilerReferenceSnapshot
 {
-    public string Path { get; set; } = string.Empty;
     public string Kind { get; set; } = string.Empty;
     public bool EmbedInteropTypes { get; set; }
     public string[] Aliases { get; set; } = [];
     public string Identity { get; set; } = string.Empty;
+    public CompilerReferenceModuleSnapshot[] Modules { get; set; } = [];
+}
+
+internal sealed class CompilerReferenceModuleSnapshot
+{
+    public string Name { get; set; } = string.Empty;
+    public string Mvid { get; set; } = string.Empty;
+    public string Path { get; set; } = string.Empty;
     public string Sha256 { get; set; } = string.Empty;
 }
 

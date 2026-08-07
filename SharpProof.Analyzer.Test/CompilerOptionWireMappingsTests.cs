@@ -42,6 +42,12 @@ public sealed class CompilerOptionWireMappingsTests
             Is.EqualTo(Enum.GetValues<MetadataImportOptions>()
                 .Select(static value => value.ToString())));
         Assert.That(
+            Enum.GetValues<ReportDiagnostic>()
+                .Select(value =>
+                    CompilerOptionWireMappings.Map(value).ToString()),
+            Is.EqualTo(Enum.GetValues<ReportDiagnostic>()
+                .Select(static value => value.ToString())));
+        Assert.That(
             CompilerOptionWireMappings.Map(AssemblyIdentityComparer.Default),
             Is.EqualTo(CompilerAssemblyIdentityComparer.Default));
         Assert.That(
@@ -64,6 +70,9 @@ public sealed class CompilerOptionWireMappingsTests
         Assert.Throws<InvalidOperationException>(
             (Action)(() => CompilerOptionWireMappings.Map(
                 unchecked((MetadataImportOptions)byte.MaxValue))));
+        Assert.Throws<InvalidOperationException>(
+            (Action)(() => CompilerOptionWireMappings.Map(
+                (ReportDiagnostic)int.MaxValue)));
         Assert.Throws<InvalidOperationException>(
             (Action)(() => CompilerOptionWireMappings.Map(null!)));
     }

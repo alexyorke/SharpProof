@@ -1466,7 +1466,7 @@ public sealed partial class HumanReleaseGateScriptTests
                 workerVersion = QualifiedRcVersion,
                 protocolVersion = "9",
                 manifestSchemaVersion = 4,
-                compilerArtifactSchemaVersion = 9,
+                compilerArtifactSchemaVersion = 10,
                 workerAssemblySha256 = Digest,
                 runtimeClosureSha256 = Digest,
                 specificationCatalogSha256 = Digest

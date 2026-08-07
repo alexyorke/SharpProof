@@ -243,6 +243,118 @@ public sealed class ContractForValidatorGeneratorTests
     }
 
     [Test]
+    public void OpenAndClosedGenericCompanionsAreReportedAsOverlapping()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget<T> {
+                void Invoke(T value);
+            }
+
+            [ContractFor(typeof(ITarget<>))]
+            public static class OpenContracts<T> {
+                public static void Invoke(ITarget<T> receiver, T value) { }
+            }
+
+            [ContractFor(typeof(ITarget<int>))]
+            public static class ClosedContracts {
+                public static void Invoke(ITarget<int> receiver, int value) { }
+            }
+            """);
+
+        Assert.That(
+            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SPCF0002", "SPCF0002"]));
+    }
+
+    [Test]
+    public void DistinctClosedGenericCompanionsDoNotOverlap()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget<T> {
+                void Invoke(T value);
+            }
+
+            [ContractFor(typeof(ITarget<int>))]
+            public static class IntContracts {
+                public static void Invoke(ITarget<int> receiver, int value) { }
+            }
+
+            [ContractFor(typeof(ITarget<string>))]
+            public static class StringContracts {
+                public static void Invoke(ITarget<string> receiver, string value) { }
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [TestCase(
+        "typeof(ITarget<>)",
+        "public static class ReferencedContracts<T> { public static void Invoke(ITarget<T> receiver, T value) { } }",
+        "typeof(ITarget<int>)",
+        "public static class SourceContracts { public static void Invoke(ITarget<int> receiver, int value) { } }")]
+    [TestCase(
+        "typeof(ITarget<int>)",
+        "public static class ReferencedContracts { public static void Invoke(ITarget<int> receiver, int value) { } }",
+        "typeof(ITarget<>)",
+        "public static class SourceContracts<T> { public static void Invoke(ITarget<T> receiver, T value) { } }")]
+    public void ReferencedAndSourceGenericCompanionsReportSourceOverlap(
+        string referencedTarget,
+        string referencedCompanion,
+        string sourceTarget,
+        string sourceCompanion)
+    {
+        var compilation = GeneratorTestHost.CreateCompilationWithReference(
+            $$"""
+            using SharpProof.Attributes;
+            public interface ITarget<T> { void Invoke(T value); }
+            [ContractFor({{referencedTarget}})]
+            {{referencedCompanion}}
+            """,
+            ("Subject.cs",
+            $$"""
+            using SharpProof.Attributes;
+            [ContractFor({{sourceTarget}})]
+            {{sourceCompanion}}
+            """));
+
+        var diagnostic = AssertSingle(
+            GeneratorTestHost.Run(compilation),
+            "SPCF0002");
+        Assert.That(GetLocatedText(diagnostic), Does.Contain("ContractFor"));
+    }
+
+    [Test]
+    public void ReferencedAndSourceDistinctClosedCompanionsDoNotOverlap()
+    {
+        var compilation = GeneratorTestHost.CreateCompilationWithReference(
+            """
+            using SharpProof.Attributes;
+            public interface ITarget<T> { void Invoke(T value); }
+            [ContractFor(typeof(ITarget<int>))]
+            public static class ReferencedContracts {
+                public static void Invoke(ITarget<int> receiver, int value) { }
+            }
+            """,
+            ("Subject.cs",
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(ITarget<string>))]
+            public static class SourceContracts {
+                public static void Invoke(ITarget<string> receiver, string value) { }
+            }
+            """));
+
+        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+    }
+
+    [Test]
     public void RepeatedContractForAttributesOnOneCompanionFailClosed()
     {
         var compilation =
@@ -537,8 +649,8 @@ public sealed class ContractForValidatorGeneratorTests
             }
             """);
 
-        var diagnostic = AssertSingle(run, "SPCF0005");
-        Assert.That(GetLocatedText(diagnostic), Is.EqualTo("Read"));
+        var diagnostic = AssertSingle(run, "SPCF0003");
+        Assert.That(GetLocatedText(diagnostic), Does.Contain("ContractFor"));
     }
 
     [Test]

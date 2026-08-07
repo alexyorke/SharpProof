@@ -7,15 +7,21 @@ internal static class CompilationFingerprint
     private const string RuntimeContractEvaluationSymbol =
         "SHARPPROOF_CONTRACTS";
 
-    internal static string ComputeSha256(CompilerCompilationSnapshot snapshot)
+    internal static string ComputeSha256(
+        CompilerCompilationSnapshot snapshot,
+        CompilerDiagnosticArtifact[] diagnostics)
     {
         snapshot = ArgumentNullGuard.NotNull(snapshot, nameof(snapshot));
 
         using var hash = new CanonicalHashWriter();
         hash.Add(
             "SharpProof.CompilerCompilationSnapshot",
-            6,
-            JsonSerializer.Serialize(snapshot, WorkerProtocolJson.Options));
+            7,
+            JsonSerializer.Serialize(snapshot, WorkerProtocolJson.Options),
+            JsonSerializer.Serialize(
+                CompilerDiagnosticArtifactOrdering.Canonicalize(
+                    ArgumentNullGuard.NotNull(diagnostics, nameof(diagnostics))),
+                WorkerProtocolJson.Options));
         return hash.Finish();
     }
 
@@ -52,10 +58,26 @@ internal static class CompilationFingerprint
         Enum.IsDefined(typeof(CompilerPlatform), value.Platform) &&
         Enum.IsDefined(typeof(CompilerNullableContext), value.NullableContext) &&
         Enum.IsDefined(typeof(CompilerMetadataImportOptions), value.MetadataImportOptions) &&
+        value.WarningLevel >= 0 &&
+        Enum.IsDefined(
+            typeof(CompilerReportDiagnostic), value.GeneralDiagnosticOption) &&
+        ValidDiagnosticOptions(value.SpecificDiagnosticOptions) &&
         !value.ReferencesSupersedeLowerVersions &&
         Enum.IsDefined(typeof(CompilerAssemblyIdentityComparer), value.AssemblyIdentityComparer) &&
         All(value.Usings, HasText) &&
         value.ResolverPolicy == CompilerResolverPolicy.EvidenceOnly;
+    }
+
+    private static bool ValidDiagnosticOptions(
+        CompilerDiagnosticOptionSnapshot[]? values)
+    {
+        return values != null &&
+            values.All(static value => value != null &&
+                HasText(value.Id) && Enum.IsDefined(
+                    typeof(CompilerReportDiagnostic), value.ReportDiagnostic)) &&
+            values.Zip(values.Skip(1), static (left, right) =>
+                StringComparer.Ordinal.Compare(left.Id, right.Id) < 0)
+                .All(static ordered => ordered);
     }
 
     private static bool ValidTree(CompilerSyntaxTreeSnapshot? value)
@@ -82,11 +104,33 @@ internal static class CompilationFingerprint
     private static bool ValidReference(CompilerReferenceSnapshot? value)
     {
         return value != null &&
-        Path.IsPathRooted(value.Path) &&
         value.Kind is "Assembly" or "Module" &&
         All(value.Aliases, HasText) &&
         HasText(value.Identity) &&
-        WorkerProtocolJson.IsSha256(value.Sha256);
+        value.Modules is { Length: > 0 } &&
+        (value.Kind == "Assembly" || value.Modules.Length == 1 &&
+            string.Equals(value.Identity, value.Modules[0].Name,
+                StringComparison.Ordinal)) &&
+        All(value.Modules, ValidReferenceModule) &&
+        value.Modules.Select(static module => module.Name)
+            .Distinct(StringComparer.Ordinal).Count() == value.Modules.Length &&
+        value.Modules.Skip(1).Zip(value.Modules.Skip(2),
+                static (left, right) => StringComparer.Ordinal.Compare(
+                    left.Name, right.Name) < 0)
+            .All(static ordered => ordered) &&
+        value.Modules.Select(static module => module.Path)
+            .Distinct(StringComparer.OrdinalIgnoreCase).Count() ==
+        value.Modules.Length;
+    }
+
+    private static bool ValidReferenceModule(
+        CompilerReferenceModuleSnapshot? value)
+    {
+        return value != null &&
+            HasText(value.Name) &&
+            Guid.TryParseExact(value.Mvid, "D", out _) &&
+            IsCanonicalPath(value.Path) &&
+            WorkerProtocolJson.IsSha256(value.Sha256);
     }
 
     private static bool ValidAdditionalFiles(CompilerAdditionalFileSnapshot[]? values)
@@ -99,16 +143,17 @@ internal static class CompilationFingerprint
 
     private static bool ValidAdditionalFile(CompilerAdditionalFileSnapshot? value)
     {
-        if (value == null ||
-            !Path.IsPathRooted(value.Path) ||
-            !WorkerProtocolJson.IsSha256(value.Sha256))
-        {
-            return false;
-        }
+        return value != null &&
+            IsCanonicalPath(value.Path) &&
+            WorkerProtocolJson.IsSha256(value.Sha256);
+    }
 
+    private static bool IsCanonicalPath(string path)
+    {
         try
         {
-            return Path.GetFullPath(value.Path).Replace('\\', '/') == value.Path;
+            return Path.IsPathRooted(path) &&
+                Path.GetFullPath(path).Replace('\\', '/') == path;
         }
         catch (Exception exception) when (
             exception is ArgumentException or IOException or NotSupportedException)
@@ -133,5 +178,70 @@ internal static class CompilationFingerprint
     private static bool HasText(string value)
     {
         return !string.IsNullOrWhiteSpace(value);
+    }
+}
+
+internal static class CompilerDiagnosticArtifactOrdering
+{
+    internal static CompilerDiagnosticArtifact[] Canonicalize(
+        IEnumerable<CompilerDiagnosticArtifact> diagnostics)
+    {
+        return [.. diagnostics
+            .OrderBy(static item => item.Location.Path, StringComparer.Ordinal)
+            .ThenBy(static item => item.Location.Start)
+            .ThenBy(static item => item.Location.Length)
+            .ThenBy(static item => item.Code, StringComparer.Ordinal)
+            .ThenBy(static item => item.Message, StringComparer.Ordinal)
+            .ThenBy(static item => item.Location.Line)
+            .ThenBy(static item => item.Location.Column)];
+    }
+
+    internal static bool IsCanonical(CompilerDiagnosticArtifact[] diagnostics)
+    {
+        return diagnostics.Zip(
+                diagnostics.Skip(1),
+                static (left, right) => Compare(left, right) <= 0)
+            .All(static ordered => ordered);
+    }
+
+    private static int Compare(
+        CompilerDiagnosticArtifact left,
+        CompilerDiagnosticArtifact right)
+    {
+        var result = StringComparer.Ordinal.Compare(
+            left.Location.Path, right.Location.Path);
+        if (result != 0)
+        {
+            return result;
+        }
+
+        result = left.Location.Start.CompareTo(right.Location.Start);
+        if (result != 0)
+        {
+            return result;
+        }
+
+        result = left.Location.Length.CompareTo(right.Location.Length);
+        if (result != 0)
+        {
+            return result;
+        }
+
+        result = StringComparer.Ordinal.Compare(left.Code, right.Code);
+        if (result != 0)
+        {
+            return result;
+        }
+
+        result = StringComparer.Ordinal.Compare(left.Message, right.Message);
+        if (result != 0)
+        {
+            return result;
+        }
+
+        result = left.Location.Line.CompareTo(right.Location.Line);
+        return result != 0
+            ? result
+            : left.Location.Column.CompareTo(right.Location.Column);
     }
 }

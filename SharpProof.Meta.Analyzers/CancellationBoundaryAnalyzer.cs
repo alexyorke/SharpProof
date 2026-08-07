@@ -134,7 +134,8 @@ internal static class CancellationBoundaryAnalyzer
         switch (pattern)
         {
             case ITypePatternOperation typePattern:
-                return !IsOrDerivesFrom(
+                return typePattern.MatchedType.TypeKind == TypeKind.Class &&
+                       !IsOrDerivesFrom(
                            cancellationType, typePattern.MatchedType) &&
                        !IsOrDerivesFrom(
                            typePattern.MatchedType, cancellationType);
@@ -144,7 +145,7 @@ internal static class CancellationBoundaryAnalyzer
             }:
                 return IsOrDerivesFrom(
                            cancellationType, excludedPattern.MatchedType) ||
-                       IsOrDerivesFrom(
+                       IsAssignableTo(
                            caughtType, excludedPattern.MatchedType);
             case IBinaryPatternOperation binary
                 when binary.OperatorKind == BinaryOperatorKind.Or:
@@ -187,30 +188,30 @@ internal static class CancellationBoundaryAnalyzer
         return false;
     }
 
-    private static bool RethrowsCancellationImmediately(CatchClauseSyntax clause)
+    private static bool IsAssignableTo(
+        ITypeSymbol? type,
+        ITypeSymbol? possibleBase)
     {
-        if (clause.Block.Statements.FirstOrDefault() is
-            ThrowStatementSyntax { Expression: null })
+        if (IsOrDerivesFrom(type, possibleBase))
         {
             return true;
         }
-
-        if (clause.Block.Statements.LastOrDefault() is not
-            ThrowStatementSyntax { Expression: null })
+        if (type is not INamedTypeSymbol namedType ||
+            possibleBase?.TypeKind != TypeKind.Interface)
         {
             return false;
         }
 
-        return !clause.Block.Statements
-            .Take(clause.Block.Statements.Count - 1)
-            .SelectMany(static statement => statement.DescendantNodesAndSelf())
-            .Any(static syntax => syntax is
-                ReturnStatementSyntax or
-                GotoStatementSyntax or
-                YieldStatementSyntax or
-                BreakStatementSyntax or
-                ContinueStatementSyntax or
-                ThrowStatementSyntax);
+        return namedType.AllInterfaces.Any(implemented =>
+            SymbolEqualityComparer.Default.Equals(
+                implemented.OriginalDefinition,
+                possibleBase.OriginalDefinition));
+    }
+
+    private static bool RethrowsCancellationImmediately(CatchClauseSyntax clause)
+    {
+        return clause.Block.Statements.FirstOrDefault() is
+            ThrowStatementSyntax { Expression: null };
     }
 
     private static bool IsAuditedCancellationBoundary(

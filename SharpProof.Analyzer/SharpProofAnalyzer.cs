@@ -111,6 +111,21 @@ public sealed partial class SharpProofAnalyzer : DiagnosticAnalyzer
                     symbolContext,
                     session),
                 SymbolKind.Method);
+            context.RegisterSymbolAction(
+                symbolContext =>
+                    SharpProofControlAttributePolicy.ValidateDeclaredScope(
+                        symbolContext.Symbol,
+                        session,
+                        symbolContext.ReportDiagnostic,
+                        symbolContext.CancellationToken),
+                SymbolKind.NamedType);
+            context.RegisterCompilationEndAction(
+                compilationContext =>
+                    SharpProofControlAttributePolicy.ValidateDeclaredScope(
+                        compilationContext.Compilation.Assembly,
+                        session,
+                        compilationContext.ReportDiagnostic,
+                        compilationContext.CancellationToken));
         }
         if (activation.RequiresOperationAnalysis)
         {

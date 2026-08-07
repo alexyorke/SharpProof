@@ -1309,6 +1309,36 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task NullCompilerDiagnosticsAreTypedAsManifestInvalid()
+    {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        var json = await File.ReadAllTextAsync(request.CompilerManifest.Path);
+        json = json.Replace(
+            "\"compilerDiagnostics\":[]",
+            "\"compilerDiagnostics\":null",
+            StringComparison.Ordinal);
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
+        request.CompilerManifest.Sha256 = WorkerProtocolJson.ComputeSha256(bytes);
+        using var worker = new SharpProofWorker(
+            () => throw new AssertionException(
+                "An invalid manifest must fail before backend creation."));
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.CompilerManifestMismatch));
+            Assert.That(
+                response.Errors.Single().Code,
+                Is.EqualTo("compiler_manifest.invalid"));
+        }
+    }
+
+    [Test]
     public async Task OversizedCompilerManifestIsTypedAndStopsBeforeWork()
     {
         using var project = TestProject.Create(TautologySource);
@@ -1345,7 +1375,7 @@ public sealed class WorkerTests
             await File.ReadAllTextAsync(request.CompilerManifest.Path));
         artifact.Compilation.CompilerVersion = "0.0.0.0";
         artifact.CompilationSha256 =
-            CompilationFingerprint.ComputeSha256(artifact.Compilation);
+            CompilationFingerprint.ComputeSha256(artifact.Compilation, []);
         var bytes = System.Text.Encoding.UTF8.GetBytes(
             CompilerManifestArtifactJson.Serialize(artifact));
         await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);

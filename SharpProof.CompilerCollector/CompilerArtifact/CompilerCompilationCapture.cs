@@ -1,5 +1,7 @@
 using System.Text;
 using Microsoft.CodeAnalysis.Text;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
 // This capture runs only in the build-time compiler collector.
 namespace SharpProof.CompilerArtifact;
 #pragma warning disable RS1035 // Build-only compiler evidence must hash final reference images.
@@ -51,6 +53,16 @@ internal static class CompilerCompilationCapture
                 Platform = CompilerOptionWireMappings.Map(options.Platform),
                 NullableContext = CompilerOptionWireMappings.Map(options.NullableContextOptions),
                 MetadataImportOptions = CompilerOptionWireMappings.Map(options.MetadataImportOptions),
+                WarningLevel = options.WarningLevel,
+                GeneralDiagnosticOption = CompilerOptionWireMappings.Map(
+                    options.GeneralDiagnosticOption),
+                SpecificDiagnosticOptions = [.. options.SpecificDiagnosticOptions
+                    .OrderBy(static option => option.Key, StringComparer.Ordinal)
+                    .Select(static option => new CompilerDiagnosticOptionSnapshot
+                    {
+                        Id = option.Key,
+                        ReportDiagnostic = CompilerOptionWireMappings.Map(option.Value)
+                    })],
                 CheckOverflow = options.CheckOverflow,
                 AllowUnsafe = options.AllowUnsafe,
                 Deterministic = options.Deterministic,
@@ -60,7 +72,7 @@ internal static class CompilerCompilationCapture
                 ResolverPolicy = CompilerResolverPolicy.EvidenceOnly
             },
             SyntaxTrees = [.. compilation.SyntaxTrees.Select(tree => CaptureTree(tree, cancellationToken))],
-            References = [.. compilation.References.Select(reference => CaptureReference(compilation, reference, cancellationToken))],
+            References = [.. compilation.References.Select(reference => CaptureReference(reference, cancellationToken))],
             AdditionalFiles = [.. additionalFiles.Select(file => CaptureAdditionalFile(
                 file, normalizedProject, cancellationToken)).OrderBy(static file => file.Path, StringComparer.Ordinal)
                 .ThenBy(static file => file.Sha256, StringComparer.Ordinal)]
@@ -88,22 +100,98 @@ internal static class CompilerCompilationCapture
                 .Select(static value => new CompilerFeatureSnapshot { Key = value.Key, Value = value.Value })]
         };
     }
-    private static CompilerReferenceSnapshot CaptureReference(CSharpCompilation compilation, MetadataReference reference,
+    private static CompilerReferenceSnapshot CaptureReference(MetadataReference reference,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var portable = reference as PortableExecutableReference ??
             throw new InvalidOperationException("The final compilation contains a non-file reference.");
-        var path = portable.FilePath ?? portable.Display ??
-            throw new InvalidOperationException("The final compilation contains an unnamed reference.");
+        var path = portable.FilePath ?? throw new InvalidOperationException(
+            "The final compilation contains a non-file reference.");
+        var backingMetadata = portable.GetMetadata();
+        if (reference.Properties.Kind == MetadataImageKind.Assembly &&
+                backingMetadata is not AssemblyMetadata ||
+            reference.Properties.Kind == MetadataImageKind.Module &&
+                backingMetadata is not ModuleMetadata)
+        {
+            throw new InvalidDataException(
+                "A compiler reference kind does not match its metadata.");
+        }
+        var backingModules = backingMetadata switch
+        {
+            AssemblyMetadata assembly => assembly.GetModules(),
+            ModuleMetadata module => ImmutableArray.Create(module),
+            _ => throw new InvalidDataException(
+                "A compiler reference identity is unavailable.")
+        };
+        if (backingModules.Length > 1)
+        {
+            backingModules = [
+                backingModules[0],
+                .. backingModules.Skip(1).OrderBy(
+                    static module => ReadModuleName(module.GetMetadataReader()),
+                    StringComparer.Ordinal)
+            ];
+        }
+        var modules = ImmutableArray.CreateBuilder<CompilerReferenceModuleSnapshot>(
+            backingModules.Length);
+        string? identity = null;
+        for (var index = 0; index < backingModules.Length; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var backingReader = backingModules[index].GetMetadataReader();
+            var backingName = ReadModuleName(backingReader);
+            var modulePath = index == 0
+                ? Path.GetFullPath(path)
+                : ResolveSiblingModule(path, backingName);
+            using var stream = new FileStream(
+                modulePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read);
+            using var image = new PEReader(stream, PEStreamOptions.LeaveOpen);
+            if (!image.HasMetadata)
+            {
+                throw new InvalidDataException(
+                    "A compiler reference does not contain metadata.");
+            }
+            var fileReader = image.GetMetadataReader();
+            if (index == 0 && fileReader.IsAssembly !=
+                    (reference.Properties.Kind == MetadataImageKind.Assembly) ||
+                index != 0 && fileReader.IsAssembly)
+            {
+                throw new InvalidDataException(
+                    "A compiler reference kind does not match its file metadata.");
+            }
+            var fileName = ReadModuleName(fileReader);
+            var fileMvid = ReadMvid(fileReader);
+            if (!string.Equals(backingName, fileName, StringComparison.Ordinal) ||
+                ReadMvid(backingReader) != fileMvid ||
+                !MetadataEquals(backingReader, fileReader))
+            {
+                throw new InvalidDataException(
+                    "A compiler reference path does not match its loaded metadata.");
+            }
+            if (index == 0)
+            {
+                identity = Identity(fileReader);
+            }
+            modules.Add(new CompilerReferenceModuleSnapshot
+            {
+                Name = fileName,
+                Mvid = fileMvid.ToString("D"),
+                Path = NormalizePath(modulePath),
+                Sha256 = Hash(stream, cancellationToken)
+            });
+        }
         return new CompilerReferenceSnapshot
         {
-            Path = NormalizePath(path),
             Kind = reference.Properties.Kind.ToString(),
             EmbedInteropTypes = reference.Properties.EmbedInteropTypes,
             Aliases = [.. reference.Properties.Aliases.OrderBy(static value => value, StringComparer.Ordinal)],
-            Identity = Identity(compilation, reference),
-            Sha256 = Hash(ReadImage(path, cancellationToken))
+            Identity = identity ?? throw new InvalidDataException(
+                "A compiler reference contains no modules."),
+            Modules = modules.ToArray()
         };
     }
     private static CompilerAdditionalFileSnapshot CaptureAdditionalFile(AdditionalText file, string projectDirectory,
@@ -127,23 +215,59 @@ internal static class CompilerCompilationCapture
         return Hash(Encoding.UTF8.GetBytes(text.ToString()));
     }
 
-    private static string Identity(CSharpCompilation compilation, MetadataReference reference)
+    private static string Identity(MetadataReader reader)
     {
-        return compilation.GetAssemblyOrModuleSymbol(reference) switch
+        return reader.IsAssembly
+            ? reader.GetAssemblyDefinition().GetAssemblyName().FullName
+            : reader.GetString(reader.GetModuleDefinition().Name);
+    }
+
+    private static string ResolveSiblingModule(string manifestPath, string name)
+    {
+        if (!string.Equals(Path.GetFileName(name), name, StringComparison.Ordinal))
         {
-            IAssemblySymbol assembly => assembly.Identity.ToString(),
-            IModuleSymbol module => module.Name,
-            _ => ((PortableExecutableReference)reference).GetMetadata() switch
-            {
-                AssemblyMetadata assembly => assembly.GetModules()[0]
-                    .GetMetadataReader()
-                    .GetAssemblyDefinition()
-                    .GetAssemblyName()
-                    .FullName,
-                ModuleMetadata module => module.Name,
-                _ => throw new InvalidDataException("A compiler reference identity is unavailable.")
-            }
-        };
+            throw new InvalidDataException(
+                "A linked compiler module must be a safe sibling.");
+        }
+        var directory = Path.GetDirectoryName(Path.GetFullPath(manifestPath)) ??
+            throw new InvalidDataException(
+                "A compiler reference directory is unavailable.");
+        var path = Path.GetFullPath(Path.Combine(directory, name));
+        if (!string.Equals(
+                Path.GetDirectoryName(path),
+                directory,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                "A linked compiler module must be a safe sibling.");
+        }
+        return path;
+    }
+
+    private static string ReadModuleName(MetadataReader reader)
+    {
+        return reader.GetString(reader.GetModuleDefinition().Name);
+    }
+
+    private static unsafe bool MetadataEquals(
+        MetadataReader left,
+        MetadataReader right)
+    {
+        return left.MetadataLength == right.MetadataLength &&
+            new ReadOnlySpan<byte>(left.MetadataPointer, left.MetadataLength)
+                .SequenceEqual(new ReadOnlySpan<byte>(
+                    right.MetadataPointer, right.MetadataLength));
+    }
+
+    private static Guid ReadMvid(MetadataReader reader)
+    {
+        var handle = reader.GetModuleDefinition().Mvid;
+        if (handle.IsNil)
+        {
+            throw new InvalidDataException(
+                "A compiler reference module has no MVID.");
+        }
+        return reader.GetGuid(handle);
     }
 
     private static bool HasResolverDirective(SyntaxTree tree, CancellationToken cancellationToken)
@@ -168,18 +292,20 @@ internal static class CompilerCompilationCapture
         return Path.GetFullPath(path).Replace('\\', '/');
     }
 
-    private static byte[] ReadImage(string path, CancellationToken cancellationToken)
+    private static string Hash(Stream stream, CancellationToken cancellationToken)
     {
-        using var input = File.OpenRead(path);
-        using var output = new MemoryStream(input.Length <= int.MaxValue ? (int)input.Length : 0);
+        stream.Position = 0;
+        using var hash = System.Security.Cryptography.SHA256.Create();
         var buffer = new byte[81920];
         int count;
-        while ((count = input.Read(buffer, 0, buffer.Length)) != 0)
+        while ((count = stream.Read(buffer, 0, buffer.Length)) != 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            output.Write(buffer, 0, count);
+            hash.TransformBlock(buffer, 0, count, buffer, 0);
         }
-        return output.ToArray();
+        hash.TransformFinalBlock([], 0, 0);
+        return string.Concat(hash.Hash!.Select(static value =>
+            value.ToString("x2", CultureInfo.InvariantCulture)));
     }
     private static string Hash(byte[] bytes)
     {

@@ -44,7 +44,7 @@ both generated C# projections before building.
 | `SharpProofVerifyCacheEnabled` | `true` | Enables the content-addressed disk cache | verifier props and `WorkerCacheOptions`; not present in `contract.json` |
 | `SharpProofVerifyCacheMaximumBytes` | `536870912` | Maximum cache size, 512 MiB | verifier props and `WorkerCacheOptions`; mirrored by `contract.json` |
 | `SharpProofVerifySarifFile` | unset | Opt-in deterministic SARIF 2.1.0 output path | verifier targets |
-| `SharpProofDotNetHost` | `dotnet` | Host used to start the launcher | verifier props |
+| `SharpProofDotNetHost` | `dotnet` | Direct `dotnet.exe` muxer used to start the launcher; wrappers and scripts are rejected so cancellation terminates the launcher boundary | verifier props |
 
 `SharpProofVerifyCacheDirectory` is initialized by the verifier targets beneath
 the project's intermediate output, normally
@@ -113,7 +113,7 @@ process boundary.
 
 `SharpProofVerifyMaximumExpressionDepth` is also a compiler-visible property.
 The collector parses it, enforces the 1-through-256 range, and seals it into the
-schema-9 compiler artifact. The launcher supplies the same property as the
+schema-10 compiler artifact. The launcher supplies the same property as the
 worker request budget. A mismatch is `CompilerManifestMismatch` and stops
 before cache lookup or backend creation; neither side may silently use a
 different depth.
@@ -218,7 +218,7 @@ is the observed runner total rather than the requested budget.
 | IDE edit maximum | At most 250 ms |
 
 The active contract also fixes protocol version 9, cache schema version 11,
-claim-manifest schema version 4, and compiler artifact schema version 9, along
+claim-manifest schema version 4, and compiler artifact schema version 10, along
 with exact proof-kernel and component TCB path inventories, formatting-neutral
 Roslyn complexity ratchets, and the reference surfaces `netstandard2.0`,
 `net8.0`, and `net472`.

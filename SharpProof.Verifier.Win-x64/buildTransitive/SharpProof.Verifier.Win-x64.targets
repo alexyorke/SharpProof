@@ -15,24 +15,37 @@
       <InvocationManifestPath ParameterType="System.String" />
       <WorkerPath ParameterType="System.String" />
       <LauncherPath ParameterType="System.String" />
+      <WorkerProtocolPath ParameterType="System.String" />
       <CachePath ParameterType="System.String" />
     </ParameterGroup>
     <Task>
+      <Reference Include="$(_SharpProofWorkerProtocolPath)" />
       <Using Namespace="System.Linq" />
+      <Using Namespace="SharpProof.Worker.Protocol" />
       <Code Type="Fragment"
             Language="cs"><![CDATA[
-        var projectDirectory = System.IO.Path.GetFullPath(ProjectDirectory);
-        System.Func<string, string> resolvePath = path =>
+        System.Func<string, string> normalizePath =
+            WindowsPathIdentity.Canonicalize;
+        var lexicalProjectDirectory = System.IO.Path.GetFullPath(
+            ProjectDirectory);
+        System.Func<string, string> resolveLexicalPath = path =>
             System.IO.Path.GetFullPath(System.IO.Path.IsPathRooted(path)
                 ? path
-                : System.IO.Path.Combine(projectDirectory, path));
+                : System.IO.Path.Combine(lexicalProjectDirectory, path));
+        System.Func<string, string> resolvePath = path =>
+            normalizePath(resolveLexicalPath(path));
         var outputPaths = new[] { ResultPath, SarifPath }
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .Select(resolvePath)
             .ToArray();
         var aliasesOutput = outputPaths
             .Distinct(System.StringComparer.OrdinalIgnoreCase)
-            .Count() != outputPaths.Length;
+            .Count() != outputPaths.Length ||
+            outputPaths.SelectMany((path, index) =>
+                    outputPaths.Skip(index + 1)
+                        .Select(other => new[] { path, other }))
+                .Any(pair => WindowsPathIdentity.AreSameExistingFile(
+                    pair[0], pair[1]));
         var toolPaths = new[] { WorkerPath, LauncherPath }
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .SelectMany(path => new[] {
@@ -76,7 +89,8 @@
                 resolvedWorkerPath, ".runtimeconfig.json"));
         var protectedPaths = new[] {
             RequestPath, ManifestPath, InvocationRequestPath,
-            InvocationResultPath, InvocationManifestPath
+            InvocationResultPath, InvocationManifestPath,
+            WorkerProtocolPath
         }.Where(path => !string.IsNullOrWhiteSpace(path))
             .Select(resolvePath)
             .Concat(toolPaths.Select(resolvePath))
@@ -86,7 +100,7 @@
             : resolvePath(CachePath);
         System.Func<string, bool> traversesReparsePoint = path => {
             try {
-                var current = resolvePath(path);
+                var current = resolveLexicalPath(path);
                 while (!string.IsNullOrWhiteSpace(current)) {
                     try {
                         if ((System.IO.File.GetAttributes(current) &
@@ -116,30 +130,30 @@
         if (aliasesReparse)
             Log.LogError(
                 "SharpProof output paths must not traverse reparse points.");
-        var aliasesInput = outputPaths
+        var aliasesFileIdentity = outputPaths
+            .Any(output => protectedPaths.Any(input =>
+                !string.Equals(
+                    output, input, System.StringComparison.OrdinalIgnoreCase) &&
+                WindowsPathIdentity.AreSameExistingFile(output, input)));
+        var aliasesInput = aliasesFileIdentity || outputPaths
             .Any(output => protectedPaths.Any(input => string.Equals(
                 output, input, System.StringComparison.OrdinalIgnoreCase)));
+        if (aliasesFileIdentity)
+            Log.LogError(
+                "SharpProof output aliases a protected file identity.");
         var aliasesWorkerTree = workerTreeExists &&
             !string.IsNullOrWhiteSpace(workerDirectory) &&
-            outputPaths.Any(output => output.StartsWith(
-                workerDirectory + System.IO.Path.DirectorySeparatorChar,
-                System.StringComparison.OrdinalIgnoreCase));
+            outputPaths.Any(output => WindowsPathIdentity.IsSameOrDescendant(
+                output, workerDirectory));
         var aliasesCache = resolvedCachePath != null &&
-            (outputPaths.Any(output => string.Equals(
-                output, resolvedCachePath,
-                System.StringComparison.OrdinalIgnoreCase)) ||
-             protectedPaths.Any(input => string.Equals(
-                input, resolvedCachePath,
-                System.StringComparison.OrdinalIgnoreCase)) ||
+            (outputPaths.Any(output => WindowsPathIdentity.IsSameOrDescendant(
+                output, resolvedCachePath)) ||
+             protectedPaths.Any(input => WindowsPathIdentity.IsSameOrDescendant(
+                input, resolvedCachePath)) ||
              workerTreeExists &&
              !string.IsNullOrWhiteSpace(workerDirectory) &&
-             (string.Equals(
-                  resolvedCachePath,
-                  workerDirectory,
-                  System.StringComparison.OrdinalIgnoreCase) ||
-              resolvedCachePath.StartsWith(
-                  workerDirectory + System.IO.Path.DirectorySeparatorChar,
-                  System.StringComparison.OrdinalIgnoreCase)));
+             WindowsPathIdentity.IsSameOrDescendant(
+                 resolvedCachePath, workerDirectory));
         if (!aliasesReparse && !aliasesInput && !aliasesOutput &&
             !aliasesWorkerTree && !aliasesCache) {
             using (var publication =
@@ -158,14 +172,227 @@
                             "Timed out waiting to invalidate prior SharpProof outputs.");
                     else
                         foreach (var path in outputPaths)
-                            if (System.IO.File.Exists(path))
-                                System.IO.File.Delete(path);
+                            WindowsPathIdentity.DeleteIfUnprotected(
+                                path, protectedPaths);
                 }
                 finally {
                     if (ownsPublication) publication.ReleaseMutex();
                 }
             }
         }
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <UsingTask TaskName="_SharpProofRunVerifier"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Executable ParameterType="System.String"
+                  Required="true" />
+      <Arguments ParameterType="Microsoft.Build.Framework.ITaskItem[]"
+                 Required="true" />
+      <WorkingDirectory ParameterType="System.String"
+                        Required="true" />
+      <ExitCode ParameterType="System.Int32"
+                Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Reference Include="$(_SharpProofWorkerProtocolPath)" />
+      <Code Type="Class"
+            Language="cs"><![CDATA[
+using System;
+using System.Diagnostics;
+using System.Text;
+using Microsoft.Build.Framework;
+using Microsoft.Build.Utilities;
+using SharpProof.Worker.Protocol;
+
+public sealed class _SharpProofRunVerifier : Task, ICancelableTask
+{
+    private readonly object _synchronization = new object();
+    private Process _process;
+    private bool _canceled;
+
+    [Required]
+    public string Executable { get; set; }
+
+    [Required]
+    public ITaskItem[] Arguments { get; set; }
+
+    [Required]
+    public string WorkingDirectory { get; set; }
+
+    [Output]
+    public int ExitCode { get; set; }
+
+    public override bool Execute()
+    {
+        Process process = null;
+        try
+        {
+            var resolvedExecutable = ResolveDotNetHost(Executable);
+            var commandLine = new StringBuilder();
+            foreach (var argument in Arguments)
+            {
+                if (commandLine.Length != 0)
+                    commandLine.Append(' ');
+                commandLine.Append(QuoteArgument(argument.ItemSpec));
+            }
+            process = new Process {
+                StartInfo = new ProcessStartInfo {
+                    FileName = resolvedExecutable,
+                    Arguments = commandLine.ToString(),
+                    WorkingDirectory = WorkingDirectory,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                }
+            };
+            lock (_synchronization)
+            {
+                if (_canceled)
+                {
+                    ExitCode = -1;
+                    return true;
+                }
+                if (!process.Start())
+                    throw new InvalidOperationException(
+                        "The SharpProof verifier process could not be started.");
+                _process = process;
+            }
+            var standardOutput = process.StandardOutput.ReadToEndAsync();
+            var standardError = process.StandardError.ReadToEndAsync();
+            process.WaitForExit();
+            var output = standardOutput.GetAwaiter().GetResult();
+            var error = standardError.GetAwaiter().GetResult();
+            if (!string.IsNullOrWhiteSpace(output))
+                Log.LogMessage(MessageImportance.High, "{0}", output);
+            if (!string.IsNullOrWhiteSpace(error))
+                Log.LogMessage(MessageImportance.High, "{0}", error);
+            ExitCode = process.ExitCode;
+        }
+        catch (Exception exception)
+        {
+            ExitCode = -1;
+            Log.LogMessage(
+                MessageImportance.High,
+                "SharpProof verifier launch failed: {0}",
+                exception.Message);
+        }
+        finally
+        {
+            lock (_synchronization)
+            {
+                if (ReferenceEquals(_process, process))
+                    _process = null;
+            }
+            if (process != null)
+                process.Dispose();
+        }
+        return true;
+    }
+
+    private static string ResolveDotNetHost(string executable)
+    {
+        if (string.IsNullOrWhiteSpace(executable))
+            throw new InvalidOperationException(
+                "SharpProofDotNetHost must name the direct dotnet.exe muxer.");
+
+        string candidate;
+        if (string.Equals(executable, "dotnet", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(executable, "dotnet.exe", StringComparison.OrdinalIgnoreCase))
+        {
+            candidate = null;
+            foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ??
+                         string.Empty).Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var path = System.IO.Path.Combine(
+                    directory.Trim().Trim('"'), "dotnet.exe");
+                if (System.IO.File.Exists(path))
+                {
+                    candidate = path;
+                    break;
+                }
+            }
+            if (candidate == null)
+                throw new InvalidOperationException(
+                    "SharpProofDotNetHost could not resolve dotnet.exe from PATH.");
+        }
+        else
+        {
+            if (!System.IO.Path.IsPathRooted(executable) ||
+                !string.Equals(
+                    System.IO.Path.GetFileName(executable),
+                    "dotnet.exe",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "SharpProofDotNetHost must name the direct dotnet.exe muxer.");
+            }
+            candidate = executable;
+        }
+
+        var resolved = WindowsPathIdentity.Canonicalize(candidate);
+        var directoryPath = System.IO.Path.GetDirectoryName(resolved);
+        if (!System.IO.File.Exists(resolved) ||
+            string.IsNullOrEmpty(directoryPath) ||
+            !System.IO.Directory.Exists(System.IO.Path.Combine(
+                directoryPath, "host", "fxr")))
+        {
+            throw new InvalidOperationException(
+                "SharpProofDotNetHost must be a complete dotnet.exe installation.");
+        }
+        WindowsPathIdentity.Canonicalize(
+            System.IO.Path.Combine(directoryPath, "host", "fxr"));
+        return resolved;
+    }
+
+    public void Cancel()
+    {
+        Process process;
+        lock (_synchronization)
+        {
+            _canceled = true;
+            process = _process;
+        }
+        if (process == null)
+            return;
+        try
+        {
+            if (!process.HasExited)
+                process.Kill();
+        }
+        catch (InvalidOperationException) { }
+        catch (System.ComponentModel.Win32Exception) { }
+    }
+
+    private static string QuoteArgument(string argument)
+    {
+                var quoted = new StringBuilder(argument.Length + 2);
+                quoted.Append('"');
+                var backslashes = 0;
+                foreach (var character in argument) {
+                    if (character == '\\') {
+                        backslashes++;
+                        continue;
+                    }
+                    if (character == '"') {
+                        quoted.Append('\\', (backslashes * 2) + 1);
+                        quoted.Append(character);
+                        backslashes = 0;
+                        continue;
+                    }
+                    quoted.Append('\\', backslashes);
+                    quoted.Append(character);
+                    backslashes = 0;
+                }
+                quoted.Append('\\', backslashes * 2);
+                quoted.Append('"');
+                return quoted.ToString();
+    }
+}
       ]]></Code>
     </Task>
   </UsingTask>
@@ -200,7 +427,7 @@
       <_SharpProofProjectDirectory>$(MSBuildProjectDirectory)</_SharpProofProjectDirectory>
     </PropertyGroup>
     <_SharpProofInvalidatePublishedResult
-        Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND ('$(BuildingProject)' != 'false' OR '$(_SharpProofForceInvalidatePublishedResult)' == 'true')"
+        Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'"
         ResultPath="$(SharpProofVerifyResultFile)"
         ProjectDirectory="$(MSBuildProjectDirectory)"
         RequestPath="$(SharpProofVerifyRequestFile)"
@@ -211,14 +438,12 @@
         InvocationManifestPath="$(_SharpProofCompilerManifestPath)"
         WorkerPath="$(_SharpProofWorkerPath)"
         LauncherPath="$(_SharpProofLauncherPath)"
+        WorkerProtocolPath="$(_SharpProofWorkerProtocolPath)"
         CachePath="$(_SharpProofEffectiveCacheDirectory)" />
   </Target>
 
   <Target Name="_SharpProofVerifyCore"
           DependsOnTargets="_SharpProofInitializeVerify;ResolveReferences">
-    <PropertyGroup>
-      <_SharpProofVerifySarifArgument Condition="'$(SharpProofVerifySarifFile)' != ''"> --publish-sarif &quot;$(SharpProofVerifySarifFile)&quot;</_SharpProofVerifySarifArgument>
-    </PropertyGroup>
     <Error Condition="'$(_SharpProofVerifierHostSupported)' != 'true'"
            Text="SharpProof out-of-process verification is supported only on Windows x64. Portable analyzer profiles remain available on this host." />
     <Error Condition="'$(_SharpProofVerifyPolicyNormalized)' != 'advisory' AND '$(_SharpProofVerifyPolicyNormalized)' != 'warn-on-unknown' AND '$(_SharpProofVerifyPolicyNormalized)' != 'require-proven'"
@@ -233,14 +458,64 @@
     <Error Condition="!Exists('$(_SharpProofWorkerPath)')"
            Text="SharpProof verifier worker was not found at '$(_SharpProofWorkerPath)'." />
     <MakeDir Directories="$(_SharpProofInvocationDirectory)" />
-    <Exec Command="&quot;$(SharpProofDotNetHost)&quot; &quot;$(_SharpProofLauncherPath)&quot; verify --worker &quot;$(_SharpProofWorkerPath)&quot; --request &quot;$(_SharpProofInvocationRequestFile)&quot; --result &quot;$(_SharpProofInvocationResultFile)&quot; --publish-request &quot;$(SharpProofVerifyRequestFile)&quot; --publish-result &quot;$(SharpProofVerifyResultFile)&quot; --compiler-manifest &quot;$(_SharpProofCompilerManifestPath)&quot; --publish-compiler-manifest &quot;$(SharpProofCompilerManifestFile)&quot; --verify-policy &quot;$(_SharpProofVerifyPolicyNormalized)&quot; --assumption-policy &quot;$(_SharpProofAssumptionPolicyNormalized)&quot; --query-rlimit &quot;$(SharpProofVerifyQueryRlimit)&quot; --method-rlimit &quot;$(SharpProofVerifyMethodRlimit)&quot; --method-wall-ms &quot;$(SharpProofVerifyMethodWallTimeMilliseconds)&quot; --project-wall-ms &quot;$(SharpProofVerifyProjectWallTimeMilliseconds)&quot; --max-parallelism &quot;$(SharpProofVerifyMaxParallelism)&quot; --max-expression-depth &quot;$(SharpProofVerifyMaximumExpressionDepth)&quot; --process-memory-bytes &quot;$(SharpProofVerifyProcessMemoryLimitBytes)&quot; --max-worker-processes &quot;$(SharpProofVerifyMaxWorkerProcesses)&quot; --termination-grace-ms &quot;$(SharpProofVerifyTerminationGraceMilliseconds)&quot; --cache-enabled &quot;$(SharpProofVerifyCacheEnabled)&quot; --cache-directory &quot;$(_SharpProofEffectiveCacheDirectory)&quot; --cache-maximum-bytes &quot;$(SharpProofVerifyCacheMaximumBytes)&quot;$(_SharpProofVerifySarifArgument)"
-          WorkingDirectory="$(MSBuildProjectDirectory)"
-          StandardOutputImportance="High"
-          StandardErrorImportance="High"
-          IgnoreExitCode="true">
+    <ItemGroup>
+      <_SharpProofVerifierArgument Remove="@(_SharpProofVerifierArgument)" />
+      <_SharpProofVerifierArgument Include="$([MSBuild]::Escape('$(_SharpProofLauncherPath)'))" />
+      <_SharpProofVerifierArgument Include="verify" />
+      <_SharpProofVerifierArgument Include="--worker" />
+      <_SharpProofVerifierArgument Include="$([MSBuild]::Escape('$(_SharpProofWorkerPath)'))" />
+      <_SharpProofVerifierArgument Include="--request" />
+      <_SharpProofVerifierArgument Include="$([MSBuild]::Escape('$(_SharpProofInvocationRequestFile)'))" />
+      <_SharpProofVerifierArgument Include="--result" />
+      <_SharpProofVerifierArgument Include="$([MSBuild]::Escape('$(_SharpProofInvocationResultFile)'))" />
+      <_SharpProofVerifierArgument Include="--publish-request" />
+      <_SharpProofVerifierArgument Include="$([MSBuild]::Escape('$(SharpProofVerifyRequestFile)'))" />
+      <_SharpProofVerifierArgument Include="--publish-result" />
+      <_SharpProofVerifierArgument Include="$([MSBuild]::Escape('$(SharpProofVerifyResultFile)'))" />
+      <_SharpProofVerifierArgument Include="--compiler-manifest" />
+      <_SharpProofVerifierArgument Include="$([MSBuild]::Escape('$(_SharpProofCompilerManifestPath)'))" />
+      <_SharpProofVerifierArgument Include="--publish-compiler-manifest" />
+      <_SharpProofVerifierArgument Include="$([MSBuild]::Escape('$(SharpProofCompilerManifestFile)'))" />
+      <_SharpProofVerifierArgument Include="--verify-policy" />
+      <_SharpProofVerifierArgument Include="$(_SharpProofVerifyPolicyNormalized)" />
+      <_SharpProofVerifierArgument Include="--assumption-policy" />
+      <_SharpProofVerifierArgument Include="$(_SharpProofAssumptionPolicyNormalized)" />
+      <_SharpProofVerifierArgument Include="--query-rlimit" />
+      <_SharpProofVerifierArgument Include="$(SharpProofVerifyQueryRlimit)" />
+      <_SharpProofVerifierArgument Include="--method-rlimit" />
+      <_SharpProofVerifierArgument Include="$(SharpProofVerifyMethodRlimit)" />
+      <_SharpProofVerifierArgument Include="--method-wall-ms" />
+      <_SharpProofVerifierArgument Include="$(SharpProofVerifyMethodWallTimeMilliseconds)" />
+      <_SharpProofVerifierArgument Include="--project-wall-ms" />
+      <_SharpProofVerifierArgument Include="$(SharpProofVerifyProjectWallTimeMilliseconds)" />
+      <_SharpProofVerifierArgument Include="--max-parallelism" />
+      <_SharpProofVerifierArgument Include="$(SharpProofVerifyMaxParallelism)" />
+      <_SharpProofVerifierArgument Include="--max-expression-depth" />
+      <_SharpProofVerifierArgument Include="$(SharpProofVerifyMaximumExpressionDepth)" />
+      <_SharpProofVerifierArgument Include="--process-memory-bytes" />
+      <_SharpProofVerifierArgument Include="$(SharpProofVerifyProcessMemoryLimitBytes)" />
+      <_SharpProofVerifierArgument Include="--max-worker-processes" />
+      <_SharpProofVerifierArgument Include="$(SharpProofVerifyMaxWorkerProcesses)" />
+      <_SharpProofVerifierArgument Include="--termination-grace-ms" />
+      <_SharpProofVerifierArgument Include="$(SharpProofVerifyTerminationGraceMilliseconds)" />
+      <_SharpProofVerifierArgument Include="--cache-enabled" />
+      <_SharpProofVerifierArgument Include="$(SharpProofVerifyCacheEnabled)" />
+      <_SharpProofVerifierArgument Include="--cache-directory" />
+      <_SharpProofVerifierArgument Include="$([MSBuild]::Escape('$(_SharpProofEffectiveCacheDirectory)'))" />
+      <_SharpProofVerifierArgument Include="--cache-maximum-bytes" />
+      <_SharpProofVerifierArgument Include="$(SharpProofVerifyCacheMaximumBytes)" />
+      <_SharpProofVerifierArgument Include="--publish-sarif"
+                                   Condition="'$(SharpProofVerifySarifFile)' != ''" />
+      <_SharpProofVerifierArgument Include="$([MSBuild]::Escape('$(SharpProofVerifySarifFile)'))"
+                                   Condition="'$(SharpProofVerifySarifFile)' != ''" />
+    </ItemGroup>
+    <_SharpProofRunVerifier
+        Executable="$(SharpProofDotNetHost)"
+        Arguments="@(_SharpProofVerifierArgument)"
+        WorkingDirectory="$(MSBuildProjectDirectory)">
       <Output TaskParameter="ExitCode"
               PropertyName="_SharpProofVerifierExitCode" />
-    </Exec>
+    </_SharpProofRunVerifier>
     <RemoveDir Directories="$(_SharpProofInvocationDirectory)" />
     <Error Condition="'$(_SharpProofVerifierExitCode)' != '0'"
            Text="SharpProof verifier failed with exit code $(_SharpProofVerifierExitCode)." />

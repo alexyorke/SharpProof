@@ -10,6 +10,7 @@
     <SharpProofLauncherPath Condition="'$(SharpProofLauncherPath)' == ''">$(_SharpProofToolsDirectory)/SharpProof.Worker.Launcher.dll</SharpProofLauncherPath>
     <_SharpProofWorkerPath>$([System.IO.Path]::GetFullPath('$(SharpProofWorkerPath)'))</_SharpProofWorkerPath>
     <_SharpProofLauncherPath>$([System.IO.Path]::GetFullPath('$(SharpProofLauncherPath)'))</_SharpProofLauncherPath>
+    <_SharpProofWorkerProtocolPath>$([System.IO.Path]::Combine('$(_SharpProofToolsDirectory)', 'SharpProof.Worker.Protocol.dll'))</_SharpProofWorkerProtocolPath>
     <SharpProofVerifyQueryRlimit Condition="'$(SharpProofVerifyQueryRlimit)' == ''">3000000</SharpProofVerifyQueryRlimit>
     <SharpProofVerifyMethodRlimit Condition="'$(SharpProofVerifyMethodRlimit)' == ''">20000000</SharpProofVerifyMethodRlimit>
     <SharpProofVerifyMethodWallTimeMilliseconds Condition="'$(SharpProofVerifyMethodWallTimeMilliseconds)' == ''">10000</SharpProofVerifyMethodWallTimeMilliseconds>

@@ -87,7 +87,7 @@ public sealed class CompilerManifestArtifactTests
             Guid.NewGuid().ToString("D");
         artifact.CompilationSha256 =
             CompilationFingerprint.ComputeSha256(
-                artifact.Compilation);
+                artifact.Compilation, []);
 
         var roundTrip = CompilerManifestArtifactJson.Deserialize(
             CompilerManifestArtifactJson.Serialize(artifact));
@@ -107,7 +107,29 @@ public sealed class CompilerManifestArtifactTests
             snapshot => snapshot.SyntaxTrees[0].Sha256 = "invalid",
             snapshot => snapshot.SyntaxTrees[0].TextLength = -1,
             snapshot => snapshot.References[0].Aliases = null!,
-            snapshot => snapshot.References[0].Kind = "invalid"
+            snapshot => snapshot.References[0].Kind = "invalid",
+            snapshot => snapshot.References[0].Kind = "Module",
+            snapshot => snapshot.References[0].Modules[0].Mvid = "invalid",
+            snapshot => snapshot.Options.WarningLevel = -1,
+            snapshot => snapshot.Options.SpecificDiagnosticOptions = null!,
+            snapshot => snapshot.Options.SpecificDiagnosticOptions = [null!],
+            snapshot => snapshot.Options.SpecificDiagnosticOptions = [
+                new() { Id = " ", ReportDiagnostic = CompilerReportDiagnostic.Error }
+            ],
+            snapshot => snapshot.Options.SpecificDiagnosticOptions = [
+                new() { Id = "CS0002", ReportDiagnostic = CompilerReportDiagnostic.Error },
+                new() { Id = "CS0001", ReportDiagnostic = CompilerReportDiagnostic.Error }
+            ],
+            snapshot => snapshot.Options.SpecificDiagnosticOptions = [
+                new() { Id = "CS0001", ReportDiagnostic = CompilerReportDiagnostic.Error },
+                new() { Id = "CS0001", ReportDiagnostic = CompilerReportDiagnostic.Warn }
+            ],
+            snapshot => snapshot.References[0].Modules = [null!],
+            snapshot => snapshot.References[0].Modules[0].Name = " ",
+            snapshot => snapshot.References[0].Modules = [
+                snapshot.References[0].Modules[0],
+                snapshot.References[0].Modules[0]
+            ]
         ];
 
         foreach (var corrupt in corruptions)
@@ -116,7 +138,7 @@ public sealed class CompilerManifestArtifactTests
             corrupt(artifact.Compilation);
             artifact.CompilationSha256 =
                 CompilationFingerprint.ComputeSha256(
-                    artifact.Compilation);
+                    artifact.Compilation, []);
             var json = JsonSerializer.Serialize(
                     artifact,
                     WorkerProtocolJson.Options) +
@@ -125,6 +147,97 @@ public sealed class CompilerManifestArtifactTests
             Assert.Throws<JsonException>(
                 (Action)(() =>
                     CompilerManifestArtifactJson.Deserialize(json)));
+        }
+    }
+
+    [Test]
+    public void NullableSchemaShapesFailWithJsonException()
+    {
+        var previousSchema = CreateArtifact();
+        previousSchema.SchemaVersion = 9;
+        var modules = CreateArtifact();
+        modules.Compilation.References[0].Modules = null!;
+        modules.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            modules.Compilation, []);
+
+        CompilerManifestArtifact[] malformedDiagnostics = [
+            CreateArtifact(),
+            CreateArtifact(),
+            CreateArtifact(),
+            CreateArtifact(),
+            CreateArtifact()
+        ];
+        malformedDiagnostics[0].CompilerDiagnostics = null!;
+        malformedDiagnostics[1].CompilerDiagnostics = [null!];
+        malformedDiagnostics[2].CompilerDiagnostics = [Diagnostic(
+            "a", length: 1, line: 1, column: 1)];
+        malformedDiagnostics[2].CompilerDiagnostics[0].Location = null!;
+        malformedDiagnostics[3].Compilation.Options.GeneralDiagnosticOption =
+            (CompilerReportDiagnostic)int.MaxValue;
+        malformedDiagnostics[4].Compilation.Options.SpecificDiagnosticOptions = [
+            new()
+            {
+                Id = "CS0001",
+                ReportDiagnostic = (CompilerReportDiagnostic)int.MaxValue
+            }
+        ];
+
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(
+                JsonSerializer.Serialize(
+                    previousSchema, WorkerProtocolJson.Options) + "\n")));
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(
+                JsonSerializer.Serialize(modules, WorkerProtocolJson.Options) + "\n")));
+        foreach (var artifact in malformedDiagnostics)
+        {
+            Assert.Throws<JsonException>((Action)(() =>
+                CompilerManifestArtifactJson.Serialize(artifact)));
+            Assert.Throws<JsonException>((Action)(() =>
+                CompilerManifestArtifactJson.Deserialize(
+                    JsonSerializer.Serialize(artifact, WorkerProtocolJson.Options) + "\n")));
+        }
+    }
+
+    [Test]
+    public void CompilerDiagnosticsHaveTotalCanonicalOrderingAndFingerprint()
+    {
+        var diagnostics = new[]
+        {
+            Diagnostic("b", length: 1, line: 1, column: 1),
+            Diagnostic("a", length: 2, line: 1, column: 1),
+            Diagnostic("a", length: 1, line: 2, column: 1),
+            Diagnostic("a", length: 1, line: 1, column: 2),
+            Diagnostic("a", length: 1, line: 1, column: 1)
+        };
+        var artifact = CreateArtifact();
+        artifact.CompilerDiagnostics = [.. diagnostics.Reverse()];
+        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation, artifact.CompilerDiagnostics);
+        var reversedHash = artifact.CompilationSha256;
+
+        var roundTrip = CompilerManifestArtifactJson.Deserialize(
+            CompilerManifestArtifactJson.Serialize(artifact));
+        var canonicalHash = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation, diagnostics);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(reversedHash, Is.EqualTo(canonicalHash));
+            Assert.That(
+                roundTrip.CompilerDiagnostics.Select(static diagnostic => (
+                    diagnostic.Location.Length,
+                    diagnostic.Message,
+                    diagnostic.Location.Line,
+                    diagnostic.Location.Column)),
+                Is.EqualTo(new[]
+                {
+                    (1, "a", 1, 1),
+                    (1, "a", 1, 2),
+                    (1, "a", 2, 1),
+                    (1, "b", 1, 1),
+                    (2, "a", 1, 1)
+                }));
         }
     }
 
@@ -184,7 +297,7 @@ public sealed class CompilerManifestArtifactTests
         artifact.Callables[0].Clauses[0].Root = int.MaxValue;
         artifact.CompilationSha256 =
             CompilationFingerprint.ComputeSha256(
-                artifact.Compilation);
+                artifact.Compilation, []);
         var roundTrip = CompilerManifestArtifactJson.Deserialize(
             CompilerManifestArtifactJson.Serialize(artifact));
 
@@ -862,13 +975,34 @@ public sealed class CompilerManifestArtifactTests
         };
     }
 
+    private static CompilerDiagnosticArtifact Diagnostic(
+        string message,
+        int length,
+        int line,
+        int column)
+    {
+        return new()
+        {
+            Code = "compiler.TEST",
+            Message = message,
+            Location = new WorkerSourceLocation
+            {
+                Path = "same.cs",
+                Start = 1,
+                Length = length,
+                Line = line,
+                Column = column
+            }
+        };
+    }
+
     private static void AssertMalformedAdditionalFiles(
         params CompilerAdditionalFileSnapshot[] files)
     {
         var artifact = CreateArtifact();
         artifact.Compilation.AdditionalFiles = files;
         artifact.CompilationSha256 =
-            CompilationFingerprint.ComputeSha256(artifact.Compilation);
+            CompilationFingerprint.ComputeSha256(artifact.Compilation, []);
         var json = JsonSerializer.Serialize(
                 artifact,
                 WorkerProtocolJson.Options) +

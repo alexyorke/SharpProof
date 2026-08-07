@@ -17,6 +17,14 @@ namespace SharpProof.Package.Test;
 [NonParallelizable]
 public sealed class WorkerMsBuildIntegrationTests
 {
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CreateHardLinkW(
+        string fileName,
+        string existingFileName,
+        IntPtr securityAttributes);
+
     private static readonly string[] s_publicPolicyProperties = [
         "SharpProofProfile",
         "SharpProofFeatures",
@@ -48,6 +56,7 @@ public sealed class WorkerMsBuildIntegrationTests
         "ItemGroup",
         "Import",
         "Import",
+        "Target",
         "Target"
     ];
     private static readonly string[] s_manualConsumerImportOrder = [
@@ -360,6 +369,50 @@ public sealed class WorkerMsBuildIntegrationTests
                 request.CompilerManifest.Path,
                 Is.EqualTo(Path.GetFullPath(project.CompilerManifestPath)));
         }
+    }
+
+    [Test]
+    public async Task VerifierLaunchPreservesPercentCharactersInPaths()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.CreateWithPercentPath(IdentitySource);
+
+        var build = await project.BuildAsync(verify: true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(build.ExitCode, Is.Zero, build.Output);
+            Assert.That(File.Exists(project.RequestPath), Is.True, build.Output);
+            Assert.That(File.Exists(project.ResultPath), Is.True, build.Output);
+            Assert.That(File.Exists(project.CompilerManifestPath), Is.True, build.Output);
+        }
+    }
+
+    [Test]
+    public async Task VerifierHostMustBeTheDirectDotNetMuxer()
+    {
+        RequireWindowsWorker();
+        var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ??
+            throw new InvalidOperationException(
+                "The test host did not disclose its dotnet host path.");
+        using (var direct = ConsumerProject.Create(IdentitySource))
+        {
+            var build = await direct.BuildAsync(
+                verify: true,
+                ("SharpProofDotNetHost", host));
+            Assert.That(build.ExitCode, Is.Zero, build.Output);
+        }
+
+        using var wrapper = ConsumerProject.Create(IdentitySource);
+        var rejected = await wrapper.BuildAsync(
+            verify: true,
+            ("SharpProofDotNetHost", typeof(Program).Assembly.Location));
+
+        Assert.That(rejected.ExitCode, Is.Not.Zero, rejected.Output);
+        Assert.That(
+            rejected.Output,
+            Does.Contain(
+                "SharpProofDotNetHost must name the direct dotnet.exe muxer."));
     }
 
     [Test]
@@ -1140,6 +1193,95 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task ExtendedWorkerCompanionAliasIsRejectedBeforeInvalidationDeletesIt()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var sourceWorker = WorkerOutputPath();
+        var collisionWorker = project.CollisionWorkerPath;
+        Directory.CreateDirectory(Path.GetDirectoryName(collisionWorker)!);
+        File.Copy(sourceWorker, collisionWorker, overwrite: true);
+        foreach (var extension in new[] { ".deps.json", ".runtimeconfig.json" })
+        {
+            File.Copy(
+                Path.ChangeExtension(sourceWorker, extension),
+                Path.ChangeExtension(collisionWorker, extension),
+                overwrite: true);
+        }
+
+        var collisionCompanion = Path.ChangeExtension(
+            collisionWorker, ".deps.json");
+        var expectedBytes = await File.ReadAllBytesAsync(collisionCompanion);
+        var extendedAlias = @"\\?\" + Path.GetFullPath(collisionCompanion);
+        var failed = await project.RunVerificationTargetAsync(
+            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+            ("SharpProofWorkerPath", collisionWorker),
+            ("SharpProofVerifyResultFile", extendedAlias));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(failed.ExitCode, Is.Not.Zero);
+            Assert.That(File.Exists(collisionCompanion), Is.True);
+            Assert.That(
+                await File.ReadAllBytesAsync(collisionCompanion),
+                Is.EqualTo(expectedBytes));
+        }
+    }
+
+    [Test]
+    public async Task HardLinkedWorkerCompanionIsRejectedBeforeInvalidationDeletesIt()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var sourceWorker = WorkerOutputPath();
+        var collisionWorker = project.CollisionWorkerPath;
+        Directory.CreateDirectory(Path.GetDirectoryName(collisionWorker)!);
+        File.Copy(sourceWorker, collisionWorker, overwrite: true);
+        foreach (var extension in new[] { ".deps.json", ".runtimeconfig.json" })
+        {
+            File.Copy(
+                Path.ChangeExtension(sourceWorker, extension),
+                Path.ChangeExtension(collisionWorker, extension),
+                overwrite: true);
+        }
+
+        var collisionCompanion = Path.ChangeExtension(
+            collisionWorker, ".deps.json");
+        var expectedBytes = await File.ReadAllBytesAsync(collisionCompanion);
+        var hardLink = Path.Combine(
+            Path.GetDirectoryName(project.ResultPath)!,
+            "hard-linked-result.json");
+        if (!CreateHardLinkW(hardLink, collisionCompanion, IntPtr.Zero))
+        {
+            throw new System.ComponentModel.Win32Exception(
+                Marshal.GetLastWin32Error());
+        }
+
+        var failed = await project.RunVerificationTargetAsync(
+            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+            ("SharpProofWorkerPath", collisionWorker),
+            ("SharpProofVerifyResultFile", hardLink));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(failed.ExitCode, Is.Not.Zero);
+            Assert.That(
+                failed.Output,
+                Does.Contain("aliases a protected file identity"));
+            Assert.That(File.Exists(collisionCompanion), Is.True);
+            Assert.That(
+                await File.ReadAllBytesAsync(collisionCompanion),
+                Is.EqualTo(expectedBytes));
+        }
+    }
+
+    [Test]
     public async Task LauncherProtocolAssetRemainsProtectedByTargets()
     {
         RequireWindowsWorker();
@@ -1748,9 +1890,17 @@ public sealed class WorkerMsBuildIntegrationTests
             .Single(static target =>
                 target.Attribute("Name")?.Value ==
                 "_SharpProofVerifyCore");
-        var invocation = verifyCore.Descendants("Exec").Single();
-        var command = invocation.Attribute("Command")?.Value ??
-            string.Empty;
+        var invocation = verifyCore.Descendants("_SharpProofRunVerifier").Single();
+        var runnerCode = targets.Descendants("UsingTask")
+            .Single(static task =>
+                task.Attribute("TaskName")?.Value == "_SharpProofRunVerifier")
+            .Descendants("Code")
+            .Single()
+            .Value;
+        var arguments = string.Join(
+            " ",
+            verifyCore.Descendants("_SharpProofVerifierArgument")
+                .Select(static argument => argument.Attribute("Include")?.Value));
         var targetXml = targets.ToString(SaveOptions.DisableFormatting);
 
         using (Assert.EnterMultipleScope())
@@ -1788,14 +1938,23 @@ public sealed class WorkerMsBuildIntegrationTests
                     "SharpProofCompilerManifestFile"),
                 Is.Not.Empty);
             Assert.That(
-                command,
+                arguments,
                 Does.Contain("--compiler-manifest")
                     .And.Contain("$(_SharpProofCompilerManifestPath)")
                     .And.Contain("--publish-compiler-manifest")
                     .And.Contain("$(SharpProofCompilerManifestFile)"));
             Assert.That(
-                s_reconstructionArguments.Where(command.Contains),
+                s_reconstructionArguments.Where(arguments.Contains),
                 Is.Empty);
+            Assert.That(
+                invocation.Attribute("Executable")?.Value,
+                Is.EqualTo("$(SharpProofDotNetHost)"));
+            Assert.That(verifyCore.Descendants("Exec"), Is.Empty);
+            Assert.That(
+                runnerCode,
+                Does.Contain("ICancelableTask")
+                    .And.Contain("public void Cancel()")
+                    .And.Contain("process.Kill()"));
             Assert.That(
                 s_reconstructionListArtifacts.Where(targetXml.Contains),
                 Is.Empty);
@@ -2161,8 +2320,10 @@ public sealed class WorkerMsBuildIntegrationTests
                             .Select(static symbol => symbol.GetString() ??
                                 string.Empty)]))],
                 [.. compilation.GetProperty("references").EnumerateArray()
-                    .Select(static reference => new CompilerReference(
-                        reference.GetProperty("path").GetString() ??
+                    .SelectMany(static reference =>
+                        reference.GetProperty("modules").EnumerateArray())
+                    .Select(static module => new CompilerReference(
+                        module.GetProperty("path").GetString() ??
                             string.Empty))]);
             using (Assert.EnterMultipleScope())
             {
@@ -2171,7 +2332,7 @@ public sealed class WorkerMsBuildIntegrationTests
                     Is.EqualTo("SharpProof.CompilerManifest"));
                 Assert.That(
                     root.GetProperty("schemaVersion").GetInt32(),
-                    Is.EqualTo(9));
+                    Is.EqualTo(10));
                 Assert.That(
                     root.GetProperty("protocolVersion").GetString(),
                     Is.EqualTo(WorkerProtocolVersions.Current));
@@ -2442,14 +2603,25 @@ public sealed class WorkerMsBuildIntegrationTests
             return CreateCore(source, useSpaces: false, properties);
         }
 
+        internal static ConsumerProject CreateWithPercentPath(
+            string source)
+        {
+            return CreateCore(
+                source,
+                useSpaces: false,
+                [],
+                "consumer-%TEMP%-" + Guid.NewGuid().ToString("N"));
+        }
+
         private static ConsumerProject CreateCore(
             string source,
             bool useSpaces,
-            (string Name, string Value)[] properties)
+            (string Name, string Value)[] properties,
+            string? explicitName = null)
         {
-            var name = useSpaces
+            var name = explicitName ?? (useSpaces
                 ? "consumer project " + Guid.NewGuid().ToString("N")
-                : Guid.NewGuid().ToString("N");
+                : Guid.NewGuid().ToString("N"));
             var root = Path.Combine(
                 Path.GetTempPath(),
                 "SharpProof.Package.Test",
@@ -2528,7 +2700,6 @@ public sealed class WorkerMsBuildIntegrationTests
                 "/nodeReuse:false",
                 "-p:Configuration=Release",
                 "-p:SharpProofVerify=true",
-                "-p:_SharpProofForceInvalidatePublishedResult=true",
                 "-p:SharpProofVerifyRequestFile=" + RequestPath,
                 "-p:SharpProofVerifyResultFile=" + ResultPath,
                 "-p:SharpProofVerifyCacheDirectory=" +
@@ -2674,6 +2845,10 @@ public sealed class WorkerMsBuildIntegrationTests
                 Path.Combine(repository, "SharpProof.Worker.Launcher", "bin",
                     testConfiguration, "net9.0",
                     "SharpProof.Worker.Launcher.dll"));
+            var protocol = SecurityElement.Escape(
+                Path.Combine(repository, "SharpProof.Worker.Protocol", "bin",
+                    testConfiguration, "netstandard2.0",
+                    "SharpProof.Worker.Protocol.dll"));
             var configuredProperties = string.Join(
                 Environment.NewLine,
                 properties.Select(static property =>
@@ -2700,6 +2875,7 @@ public sealed class WorkerMsBuildIntegrationTests
                     <_SharpProofWorkerPath>$([System.IO.Path]::GetFullPath('$(SharpProofWorkerPath)'))</_SharpProofWorkerPath>
                     <SharpProofLauncherPath>{launcher}</SharpProofLauncherPath>
                     <_SharpProofLauncherPath>$([System.IO.Path]::GetFullPath('$(SharpProofLauncherPath)'))</_SharpProofLauncherPath>
+                    <_SharpProofWorkerProtocolPath>{protocol}</_SharpProofWorkerProtocolPath>
                   </PropertyGroup>
                   <ItemGroup>
                     <Reference Include="SharpProof.Attributes">
@@ -2709,6 +2885,23 @@ public sealed class WorkerMsBuildIntegrationTests
                   </ItemGroup>
                   <Import Project="{targets}" />
                   <Import Project="{verifierTargets}" />
+                  <Target Name="_SharpProofTestInvalidatePublishedResult"
+                          BeforeTargets="_SharpProofVerifyCore"
+                          Condition="'$(BuildingProject)' == 'false'">
+                    <_SharpProofInvalidatePublishedResult
+                        ResultPath="$(SharpProofVerifyResultFile)"
+                        ProjectDirectory="$(MSBuildProjectDirectory)"
+                        RequestPath="$(SharpProofVerifyRequestFile)"
+                        ManifestPath="$(SharpProofCompilerManifestFile)"
+                        SarifPath="$(SharpProofVerifySarifFile)"
+                        InvocationRequestPath="$(_SharpProofInvocationRequestFile)"
+                        InvocationResultPath="$(_SharpProofInvocationResultFile)"
+                        InvocationManifestPath="$(_SharpProofCompilerManifestPath)"
+                        WorkerPath="$(_SharpProofWorkerPath)"
+                        LauncherPath="$(_SharpProofLauncherPath)"
+                        WorkerProtocolPath="$(_SharpProofWorkerProtocolPath)"
+                        CachePath="$(_SharpProofEffectiveCacheDirectory)" />
+                  </Target>
                   <Target Name="_RemoveSharpProofAnalyzersForWorkerTargetTest"
                           BeforeTargets="CoreCompile">
                     <ItemGroup>

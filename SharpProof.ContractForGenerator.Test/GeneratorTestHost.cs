@@ -21,6 +21,18 @@ internal static class GeneratorTestHost
         return CreateCompilation(CreateReferences(includeAttributes: false), sources);
     }
 
+    internal static CSharpCompilation CreateCompilationWithReference(
+        string referenceSource,
+        params (string Path, string Source)[] sources)
+    {
+        var reference = CreateCompilation(
+            References,
+            ("ReferencedContracts.cs", referenceSource));
+        return CreateCompilation(
+            References.Add(reference.ToMetadataReference()),
+            sources);
+    }
+
     private static CSharpCompilation CreateCompilation(
         ImmutableArray<MetadataReference> references,
         params (string Path, string Source)[] sources)

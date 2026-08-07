@@ -65,6 +65,19 @@ public sealed class WorkerProgramTests
     }
 
     [Test]
+    public async Task DirectInvocationRejectsMalformedPathsWithoutThrowing()
+    {
+        var exitCode = await Program.Main([
+            "verify",
+            "--request", "request\0.json",
+            "--result", "result.json",
+            "--start-event", "missing-start-event"
+        ]);
+
+        Assert.That(exitCode, Is.EqualTo(2));
+    }
+
+    [Test]
     public async Task DirectInvocationWritesFailureForMalformedRequest()
     {
         if (!OperatingSystem.IsWindows() ||
@@ -152,7 +165,7 @@ public sealed class WorkerProgramTests
             {
                 Features = WorkerFeatureSet.All,
                 Compilation = compilation,
-                CompilationSha256 = CompilationFingerprint.ComputeSha256(compilation),
+                CompilationSha256 = CompilationFingerprint.ComputeSha256(compilation, []),
                 Manifest = manifest
             };
             await File.WriteAllTextAsync(

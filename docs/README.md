@@ -102,7 +102,7 @@ the current coverage inventory or normative semantics.
 ## Known production gaps
 
 During Windows verification, the production analyzer emits a deterministic
-schema-9 compiler artifact from the final post-generator Roslyn
+schema-10 compiler artifact from the final post-generator Roslyn
 `Compilation`. It contains the selected-claim manifest and portable lowered
 whole-body CFG/IR for supported selected callables, plus bound contract/spec
 metadata, compiler diagnostics, generated-tree hashes, bounded options, mapped

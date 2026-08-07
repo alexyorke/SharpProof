@@ -237,9 +237,9 @@ internal static class Program
     internal static string ValidateDotNetHostPath(
         string candidate, string projectDirectory)
     {
-        var hostPath = Path.GetFullPath(candidate);
+        var hostPath = NormalizeAbsolutePath(candidate);
         var hostRoot = Path.GetDirectoryName(hostPath) ?? string.Empty;
-        var projectRoot = Path.GetFullPath(projectDirectory);
+        var projectRoot = NormalizeAbsolutePath(projectDirectory);
         if (!Path.EndsInDirectorySeparator(projectRoot))
         {
             projectRoot += Path.DirectorySeparatorChar;
@@ -257,6 +257,11 @@ internal static class Program
         }
 
         return hostPath;
+    }
+
+    internal static string NormalizeAbsolutePath(string path)
+    {
+        return WindowsPathIdentity.Canonicalize(path);
     }
 
     internal static int ComputeHardLimit(
@@ -663,12 +668,14 @@ internal sealed partial class LauncherArguments
 
     private string FullPath(string key)
     {
-        return Path.GetFullPath(Required(key));
+        return Program.NormalizeAbsolutePath(Required(key));
     }
 
     private string? OptionalFullPath(string key)
     {
-        return Optional(key) is { } value ? Path.GetFullPath(value) : null;
+        return Optional(key) is { } value
+            ? Program.NormalizeAbsolutePath(value)
+            : null;
     }
 
     private string Required(string key)

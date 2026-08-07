@@ -92,8 +92,17 @@ internal static class Program
             request = result = startEvent = string.Empty;
             return false;
         }
-        request = Path.GetFullPath(requestValue);
-        result = Path.GetFullPath(resultValue);
+        try
+        {
+            request = Path.GetFullPath(requestValue);
+            result = Path.GetFullPath(resultValue);
+        }
+        catch (Exception exception) when (exception is
+            ArgumentException or IOException or NotSupportedException)
+        {
+            request = result = startEvent = string.Empty;
+            return false;
+        }
         startEvent = eventValue;
         return !string.Equals(request, result, StringComparison.OrdinalIgnoreCase);
     }
@@ -109,7 +118,12 @@ internal static class Program
             using var startEvent = EventWaitHandle.OpenExisting(eventName);
             return startEvent.WaitOne(TimeSpan.FromSeconds(30));
         }
-        catch (WaitHandleCannotBeOpenedException) { return false; }
+        catch (Exception exception) when (exception is
+            ArgumentException or IOException or UnauthorizedAccessException or
+                WaitHandleCannotBeOpenedException)
+        {
+            return false;
+        }
     }
     internal static bool IsBackendUnavailable(Exception exception)
     {

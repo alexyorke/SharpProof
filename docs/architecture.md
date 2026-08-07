@@ -209,7 +209,7 @@ models are not cacheable.
 
 During Windows verification, the build-only compiler collector observes the
 final post-generator Roslyn `Compilation` and atomically emits compiler
-artifact schema version 9. The compiler owns selection, contract/spec binding,
+artifact schema version 10. The compiler owns selection, contract/spec binding,
 effect evaluation, and body lowering. Every selected callable has either a
 typed failure record or a portable graph containing its bound clauses,
 canonical variables, whole-body CFG/IR, body start, initial environment,

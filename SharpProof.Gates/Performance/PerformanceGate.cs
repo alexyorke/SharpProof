@@ -1184,8 +1184,20 @@ internal static class PerformanceGate
                     "_SharpProofVerifyCore",
                     StringComparer.Ordinal));
         var verifierExec = verifierTargets.Descendants("Exec").ToArray();
+        var verifierRun = verifierTargets
+            .Descendants("_SharpProofRunVerifier")
+            .ToArray();
+        var verifierRunnerCode = verifierTargets.Descendants("UsingTask")
+            .SingleOrDefault(static task => string.Equals(
+                (string?)task.Attribute("TaskName"),
+                "_SharpProofRunVerifier",
+                StringComparison.Ordinal))
+            ?.Descendants("Code")
+            .SingleOrDefault()
+            ?.Value;
         var portableContainsVerifierWork =
             portableTargets.Descendants("Exec").Any() ||
+            portableTargets.Descendants("_SharpProofRunVerifier").Any() ||
             portableTargets.Descendants("Target").Any(static target =>
                 (string?)target.Attribute("Name") is
                     "SharpProofVerify" or "_SharpProofVerifyCore");
@@ -1234,9 +1246,17 @@ internal static class PerformanceGate
             verifierCore.Attribute("AfterTargets") != null ||
             unexpectedCoreDependency ||
             callTargetInvokesCore ||
-            verifierExec.Length != 1 ||
+            verifierExec.Length != 0 ||
+            verifierRun.Length != 1 ||
+            verifierRunnerCode == null ||
+            !verifierRunnerCode.Contains(
+                "ICancelableTask", StringComparison.Ordinal) ||
+            !verifierRunnerCode.Contains(
+                "public void Cancel()", StringComparison.Ordinal) ||
+            !verifierRunnerCode.Contains(
+                "process.Kill()", StringComparison.Ordinal) ||
             !ReferenceEquals(
-                verifierExec[0].Ancestors("Target").SingleOrDefault(),
+                verifierRun[0].Ancestors("Target").SingleOrDefault(),
                 verifierCore))
         {
             throw new InvalidDataException(

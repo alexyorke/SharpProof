@@ -60,7 +60,7 @@ manifest claims while sharing the effective combined constraint and evidence.
 Each effect claim is `Proven` only when a complete compiler-produced effect
 summary establishes its contract. The compiler can record a structured
 `DefiniteViolation` candidate for a simple unconditional direct operation.
-Compiler artifact schema 9 carries an independently replayable event only for
+Compiler artifact schema 10 carries an independently replayable event only for
 a definite managed object or array allocation whose operands are already
 known to complete and whose allocation is not static-initialization-sensitive.
 The worker derives `Allocates` from that event rather than trusting the
@@ -334,7 +334,7 @@ its outcome is not combined with the containing callable. Unavailable captured
 facts remain unknown. An expression-tree lambda is quoted code and is not
 treated as an executing call site.
 
-The packaged verifier consumes compiler artifact schema version 9 produced
+The packaged verifier consumes compiler artifact schema version 10 produced
 from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed
 lowering failure or portable whole-body CFG/IR with bound clauses, canonical

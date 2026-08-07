@@ -189,7 +189,7 @@ ghost specification evidence.
   state is a fatal `CounterexampleReplayFailed`; one on an unselected path
   does not block the refutation. Result models expose only canonical user
   variables.
-  For an effect candidate, compiler artifact schema 9 currently admits one
+  For an effect candidate, compiler artifact schema 10 currently admits one
   unconditional definite managed object/array allocation event. The worker
   recomputes its constraint and operation identities, checks its source-tree
   identity/span and sealed witness, and independently derives `Allocates`.
@@ -241,7 +241,7 @@ ghost specification evidence.
 ## Closed compiler artifact and remaining limits
 
 During Windows verification, the production analyzer captures compiler
-artifact schema version 9 from the post-generator compilation. The artifact
+artifact schema version 10 from the post-generator compilation. The artifact
 contains:
 
 - the feature-selected, sealed claim manifest;
@@ -257,15 +257,16 @@ contains:
   mode, source kind, preprocessor symbols, and parse features;
 - a bounded proof-relevant compilation-option set, assembly and target
   identity, and compiler identity/MVID provenance; and
-- reference provenance: path, image hash, symbol identity, image kind,
-  embed-interop flag, and aliases.
+- reference provenance: manifest and linked-module paths, image hashes, names,
+  MVIDs, symbol identity, image kind, embed-interop flag, and aliases.
 
 The bounded compilation-option record covers output kind, optimization,
 platform, nullable context, metadata import, checked overflow, unsafe mode,
-determinism, global usings, reference-supersession state, the supported
-Default/Desktop assembly-identity comparer profile, and the fixed
-evidence-only resolver policy. General and warning diagnostic options are
-not serialized directly; their observable compiler error diagnostics are.
+determinism, global usings, warning level, general and per-diagnostic reporting
+options, reference-supersession state, the supported Default/Desktop
+assembly-identity comparer profile, and the fixed evidence-only resolver
+policy. Realized compiler error diagnostics are sealed alongside those
+options so opaque syntax-tree diagnostic providers also affect the fingerprint.
 
 Source text and reference image bytes are not embedded. The compiler must be
 able to read each file-backed `PortableExecutableReference` to record its

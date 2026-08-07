@@ -72,6 +72,20 @@ internal static partial class CompilerOptionWireMappings
         };
     }
 
+    internal static CompilerReportDiagnostic Map(ReportDiagnostic value)
+    {
+        return value switch
+        {
+            ReportDiagnostic.Default => CompilerReportDiagnostic.Default,
+            ReportDiagnostic.Error => CompilerReportDiagnostic.Error,
+            ReportDiagnostic.Warn => CompilerReportDiagnostic.Warn,
+            ReportDiagnostic.Info => CompilerReportDiagnostic.Info,
+            ReportDiagnostic.Hidden => CompilerReportDiagnostic.Hidden,
+            ReportDiagnostic.Suppress => CompilerReportDiagnostic.Suppress,
+            _ => throw Unsupported(nameof(ReportDiagnostic), value)
+        };
+    }
+
     internal static CompilerAssemblyIdentityComparer Map(AssemblyIdentityComparer value)
     {
         if (ReferenceEquals(value, AssemblyIdentityComparer.Default))

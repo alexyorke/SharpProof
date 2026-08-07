@@ -4,7 +4,7 @@
   "jsonNamingPolicy": "camelCase",
   "artifactEnvelope": {
     "schema": "SharpProof.CompilerManifest",
-    "version": 9
+    "version": 10
   },
   "declarations": [
     {
@@ -21,7 +21,7 @@
           "accessibility": "internal",
           "name": "Current",
           "type": "int",
-          "value": 9
+          "value": 10
         }
       ]
     },
@@ -2086,6 +2086,18 @@
     },
     {
       "kind": "enum",
+      "name": "CompilerReportDiagnostic",
+      "members": [
+        { "name": "Default", "value": 0 },
+        { "name": "Error", "value": 1 },
+        { "name": "Warn", "value": 2 },
+        { "name": "Info", "value": 3 },
+        { "name": "Hidden", "value": 4 },
+        { "name": "Suppress", "value": 5 }
+      ]
+    },
+    {
+      "kind": "enum",
       "name": "CompilerAssemblyIdentityComparer",
       "members": [
         { "name": "Default", "value": 0 },
@@ -2154,6 +2166,36 @@
           }
         },
         {
+          "name": "WarningLevel",
+          "jsonName": "warningLevel",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "GeneralDiagnosticOption",
+          "jsonName": "generalDiagnosticOption",
+          "type": "CompilerReportDiagnostic",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "SpecificDiagnosticOptions",
+          "jsonName": "specificDiagnosticOptions",
+          "type": "CompilerDiagnosticOptionSnapshot[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
           "name": "CheckOverflow",
           "jsonName": "checkOverflow",
           "type": "bool",
@@ -2217,6 +2259,32 @@
           "name": "ResolverPolicy",
           "jsonName": "resolverPolicy",
           "type": "CompilerResolverPolicy",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerDiagnosticOptionSnapshot",
+      "properties": [
+        {
+          "name": "Id",
+          "jsonName": "id",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "ReportDiagnostic",
+          "jsonName": "reportDiagnostic",
+          "type": "CompilerReportDiagnostic",
           "accessibility": "public",
           "set": "set",
           "default": {
@@ -2326,16 +2394,6 @@
       "name": "CompilerReferenceSnapshot",
       "properties": [
         {
-          "name": "Path",
-          "jsonName": "path",
-          "type": "string",
-          "accessibility": "public",
-          "set": "set",
-          "default": {
-            "kind": "stringEmpty"
-          }
-        },
-        {
           "name": "Kind",
           "jsonName": "kind",
           "type": "string",
@@ -2368,6 +2426,52 @@
         {
           "name": "Identity",
           "jsonName": "identity",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Modules",
+          "jsonName": "modules",
+          "type": "CompilerReferenceModuleSnapshot[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerReferenceModuleSnapshot",
+      "properties": [
+        {
+          "name": "Name",
+          "jsonName": "name",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Mvid",
+          "jsonName": "mvid",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Path",
+          "jsonName": "path",
           "type": "string",
           "accessibility": "public",
           "set": "set",
@@ -2855,6 +2959,23 @@
         { "source": "Public", "target": "Public" },
         { "source": "Internal", "target": "Internal" },
         { "source": "All", "target": "All" }
+      ]
+    },
+    {
+      "name": "ReportDiagnostic",
+      "owner": "CompilerOptionWireMappings",
+      "method": "Map",
+      "kind": "enum",
+      "sourceType": "ReportDiagnostic",
+      "targetType": "CompilerReportDiagnostic",
+      "unknownException": "InvalidOperationException",
+      "rows": [
+        { "source": "Default", "target": "Default" },
+        { "source": "Error", "target": "Error" },
+        { "source": "Warn", "target": "Warn" },
+        { "source": "Info", "target": "Info" },
+        { "source": "Hidden", "target": "Hidden" },
+        { "source": "Suppress", "target": "Suppress" }
       ]
     },
     {

@@ -1636,6 +1636,46 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task EmptyTypesReportMalformedControlReasonsWithoutMethods()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            [SharpProofSuppress("")]
+            public sealed class Empty { }
+
+            public sealed class Outer {
+                [SharpProofTrusted(" ")]
+                public sealed class Nested { }
+            }
+            """,
+            "all-experimental",
+            ["SP0024"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0024", "SP0024"]));
+    }
+
+    [Test]
+    public async Task MethodlessAssemblyReportsMalformedControlReason()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            [assembly: SharpProofTrusted("")]
+            """,
+            "all-experimental",
+            ["SP0024"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0024"]));
+    }
+
+    [Test]
     public async Task ReversedPreconditionsRefineAgainstCallSiteFacts()
     {
         // The variable-on-the-right branch used to evaluate the other operand

@@ -273,13 +273,6 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     try { }
                     catch (OperationCanceledException) { throw; }
                 }
-                static void CleanupThenRethrow(IDisposable cleanup) {
-                    try { }
-                    catch {
-                        cleanup.Dispose();
-                        throw;
-                    }
-                }
                 static void BroadCatchAfterCancellationRethrow() {
                     try { }
                     catch (OperationCanceledException) { throw; }
@@ -300,7 +293,8 @@ public sealed class SharpProofSoundnessAnalyzerTests
             using System;
             using System.Threading.Tasks;
             namespace SharpProof.Verify;
-            sealed class CustomCancellationException : OperationCanceledException { }
+            interface IMarker { }
+            sealed class CustomCancellationException : OperationCanceledException, IMarker { }
             static class C {
                 static void TaskCanceled() {
                     try { } catch (TaskCanceledException) { }
@@ -317,13 +311,48 @@ public sealed class SharpProofSoundnessAnalyzerTests
                 static void Bare() {
                     try { } catch { }
                 }
+                static void InterfaceFilter() {
+                    try { }
+                    catch (Exception exception) when (exception is IMarker) { }
+                }
             }
             """;
 
         var diagnostics = await Analyze(source);
         Assert.That(
             diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA003"),
-            Is.EqualTo(5));
+            Is.EqualTo(6));
+    }
+
+    [Test]
+    public async Task RejectsRethrowDeferredUntilAfterCleanupOrDivergence()
+    {
+        const string source =
+            """
+            using System;
+            namespace SharpProof.Verify;
+            static class C {
+                static void Cleanup(IDisposable cleanup) {
+                    try { }
+                    catch {
+                        cleanup.Dispose();
+                        throw;
+                    }
+                }
+                static void Diverge() {
+                    try { }
+                    catch {
+                        while (true) { }
+                        throw;
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(2));
     }
 
     [Test]
@@ -333,6 +362,8 @@ public sealed class SharpProofSoundnessAnalyzerTests
             """
             using System;
             namespace SharpProof.Verify;
+            interface IMarker { }
+            sealed class CustomCancellationException : OperationCanceledException, IMarker { }
             static class C {
                 static void ExcludedType() {
                     try { }
@@ -347,6 +378,11 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     try { }
                     catch (Exception exception)
                         when (exception is ArgumentException or InvalidOperationException) { }
+                }
+                static void ExcludedImplementedInterface() {
+                    try { }
+                    catch (CustomCancellationException exception)
+                        when (exception is not IMarker) { }
                 }
             }
             """;

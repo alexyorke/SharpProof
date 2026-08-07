@@ -28,7 +28,7 @@
   "worker": {
     "protocolVersion": 9,
     "manifestSchemaVersion": 4,
-    "compilerArtifactSchemaVersion": 9,
+    "compilerArtifactSchemaVersion": 10,
     "maximumParallelism": 4,
     "maximumMemoryMiB": 2048,
     "queryRlimit": 3000000,
@@ -441,7 +441,7 @@
   },
   "productionComplexity": {
     "measurement": "Aggregate Roslyn expression nodes, decision points, and members across handwritten production C#; whitespace, comments, line wrapping, and optional braces are excluded.",
-    "maximumExpressionNodes": 95400,
+    "maximumExpressionNodes": 97700,
     "maximumDecisionPoints": 5200,
     "maximumMembers": 3900
   },

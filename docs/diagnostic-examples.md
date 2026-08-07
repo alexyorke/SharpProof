@@ -75,7 +75,7 @@ This is a not-proven diagnostic. It does not claim a replayed impure trace.
 Reserved as a live-analyzer diagnostic. The current path-insensitive
 may-effect analyzer never emits SP0013. Separately, the opt-in Windows worker
 can publish a typed effect `Refuted` result after independently replaying the
-schema-9 event for an unconditional definite managed object/array allocation.
+schema-10 event for an unconditional definite managed object/array allocation.
 
 A possible allocation is reported as SP0045 instead.
 
@@ -238,7 +238,7 @@ artifact lowering, serialization, or write failure. The diagnostic is an error
 because the required closed compiler evidence is missing. It is an
 infrastructure failure, never a contract or proof outcome.
 
-Compiler artifact schema version 9 includes the sealed selected-claim manifest,
+Compiler artifact schema version 10 includes the sealed selected-claim manifest,
 compiler diagnostics, source/generated-tree hashes and parse evidence, and,
 for each supported selected callable, bound contract/spec metadata plus
 portable whole-body lowered CFG/IR. It contains no source text. The worker

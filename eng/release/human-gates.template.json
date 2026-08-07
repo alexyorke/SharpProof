@@ -88,7 +88,7 @@
         "workerVersion": "1.0.0-rc.1",
         "protocolVersion": "9",
         "manifestSchemaVersion": 4,
-        "compilerArtifactSchemaVersion": 9,
+        "compilerArtifactSchemaVersion": 10,
         "workerAssemblySha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "runtimeClosureSha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "specificationCatalogSha256": "0000000000000000000000000000000000000000000000000000000000000000"
@@ -307,7 +307,7 @@
         "workerVersion": "1.0.0-rc.1",
         "protocolVersion": "9",
         "manifestSchemaVersion": 4,
-        "compilerArtifactSchemaVersion": 9,
+        "compilerArtifactSchemaVersion": 10,
         "workerAssemblySha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "runtimeClosureSha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "specificationCatalogSha256": "0000000000000000000000000000000000000000000000000000000000000000"

@@ -81,7 +81,7 @@ both implemented feature groups:
   verification.
 
 `SharpProofFeatures` values are `effects`, `contracts`, and `all` (the
-default). The effective selection is sealed into the schema-9 compiler
+default). The effective selection is sealed into the schema-10 compiler
 artifact and filters its manifest: `contracts` excludes effect-only
 annotations, `effects` excludes postcondition claims and contract assumptions,
 and `all` selects both surfaces. Every effective effect contract has one typed
@@ -606,7 +606,7 @@ host shadowing and arbitrary relative overrides are rejected before any push.
 
 ## Closed compiler artifact and remaining release gaps
 
-The build-only collector now emits compiler artifact schema version 9 from the
+The build-only collector now emits compiler artifact schema version 10 from the
 final post-generator Roslyn `Compilation`. It seals the feature-selected claim
 manifest and, for each selected callable, either a typed lowering failure or
 portable whole-body CFG/IR with bound contract clauses, canonical variables,
