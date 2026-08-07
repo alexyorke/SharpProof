@@ -2147,6 +2147,30 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void AnalyzeAllIncludesTheSameDirectWitnessesAsAnalyze()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static object Allocate() => new object();
+            }
+            """);
+        var method = Method(compilation, "Allocate");
+        var session = new EffectAnalysisSession(compilation);
+
+        var direct = session.Analyze(method).DirectWitnesses;
+        var all = session.AnalyzeAll().Single(
+            result => SymbolEqualityComparer.Default.Equals(result.Method, method));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(direct.Length, Is.EqualTo(1));
+            Assert.That(direct[0].Kind, Is.EqualTo("managed-allocation"));
+            Assert.That(all.DirectWitnesses, Is.EqualTo(direct));
+        }
+    }
+
+    [Test]
     public void ColdConcurrentAnalysisPublishesOneDeterministicCache()
     {
         var compilation = EffectTestHost.CreateCompilation(

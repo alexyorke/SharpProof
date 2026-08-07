@@ -50,10 +50,11 @@ public sealed class IrProgramInterpreter(IrFactory factory)
             foreach (var instruction in block.Instructions)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (++steps > maximumSteps)
+                if (steps == maximumSteps)
                 {
-                    return Result(IrProgramExecutionStatus.StepLimit, instruction, values, steps);
+                    return Result(IrProgramExecutionStatus.StepLimit, null, values, steps);
                 }
+                steps++;
 
                 switch (instruction)
                 {

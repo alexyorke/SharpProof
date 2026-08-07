@@ -745,8 +745,54 @@ public sealed class ProtocolJsonTests
         Assert.That(
             WorkerProtocolJson.Validate(response).Errors
                 .Select(static error => error.Code),
-            Does.Contain("summary.totals")
+                Does.Contain("summary.totals")
                 .And.Contain("response.claim_payload"));
+    }
+
+    [Test]
+    public void SummaryCountBucketsMustHaveUniqueKinds()
+    {
+        var manifest = CreateManifest();
+        var first = manifest.Claims[0];
+        manifest.Callables[0].ClaimIds = [.. manifest.Callables[0].ClaimIds, "claim.identity.1"];
+        manifest.Claims = [.. manifest.Claims, new WorkerClaimManifestEntry {
+            ClaimId = "claim.identity.1",
+            CallableId = first.CallableId,
+            Ordinal = 1,
+            Kind = first.Kind,
+            Evidence = first.Evidence,
+            Location = new WorkerSourceLocation {
+                Path = first.Location.Path,
+                Start = first.Location.Start,
+                Length = first.Location.Length,
+                Line = first.Location.Line,
+                Column = first.Location.Column
+            }
+        }];
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = CreateResponse(manifest);
+        SetUnknown(response, WorkerClaimReason.UnsupportedBody, index: 1);
+        response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
+        response.CallableResults[0].Reason = WorkerCallableCoverageReason.SemanticUnknown;
+        response.Summary = CreateSummary(response);
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+
+        response.Summary.OutcomeCounts = [
+            new WorkerClaimOutcomeCount { Outcome = WorkerClaimOutcome.Proven, Count = 1 },
+            new WorkerClaimOutcomeCount { Outcome = WorkerClaimOutcome.Proven, Count = 1 }
+        ];
+        Assert.That(
+            WorkerProtocolJson.Validate(response).Errors.Select(static error => error.Code),
+            Does.Contain("summary.outcomes"));
+
+        response.Summary = CreateSummary(response);
+        response.Summary.ReasonCounts = [
+            new WorkerClaimReasonCount { Reason = WorkerClaimReason.None, Count = 1 },
+            new WorkerClaimReasonCount { Reason = WorkerClaimReason.None, Count = 1 }
+        ];
+        Assert.That(
+            WorkerProtocolJson.Validate(response).Errors.Select(static error => error.Code),
+            Does.Contain("summary.reasons"));
     }
 
     [Test]
@@ -1058,10 +1104,11 @@ public sealed class ProtocolJsonTests
 
     private static void SetUnknown(
         WorkerVerifyResponse response,
-        WorkerClaimReason reason)
+        WorkerClaimReason reason,
+        int index = 0)
     {
-        response.ClaimResults[0].Outcome = WorkerClaimOutcome.Unknown;
-        response.ClaimResults[0].Reason = reason;
+        response.ClaimResults[index].Outcome = WorkerClaimOutcome.Unknown;
+        response.ClaimResults[index].Reason = reason;
     }
 
     private static WorkerEffectViolationWitness CreateEffectWitness(

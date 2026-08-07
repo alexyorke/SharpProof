@@ -16,17 +16,17 @@ internal static class CancellationBoundaryAnalyzer
         SharpProofSoundnessAnalyzer.KnownSymbols symbols)
     {
         var clause = (CatchClauseSyntax)context.Node;
-        if (clause.Declaration?.Type == null)
-        {
-            return;
-        }
-
-        var caughtType = context.SemanticModel
-            .GetTypeInfo(clause.Declaration.Type, context.CancellationToken)
-            .Type;
-        if (!IsSameType(
-                caughtType,
-                symbols[SharpProofSoundnessAnalyzer.KnownType.OperationCanceledException]) ||
+        var cancellationType =
+            symbols[SharpProofSoundnessAnalyzer.KnownType.OperationCanceledException];
+        var caughtType = clause.Declaration?.Type == null
+            ? null
+            : context.SemanticModel
+                .GetTypeInfo(clause.Declaration.Type, context.CancellationToken)
+                .Type;
+        if (!CatchesCancellation(clause, caughtType, cancellationType) ||
+            CancellationHandledEarlier(clause, cancellationType, context) ||
+            FilterExcludesCancellation(
+                clause, caughtType, cancellationType, context) ||
             RethrowsCancellationImmediately(clause) ||
             IsAuditedCancellationBoundary(
                 clause,
@@ -42,10 +42,175 @@ internal static class CancellationBoundaryAnalyzer
             clause.CatchKeyword.GetLocation()));
     }
 
+    private static bool CancellationHandledEarlier(
+        CatchClauseSyntax clause,
+        INamedTypeSymbol? cancellationType,
+        SyntaxNodeAnalysisContext context)
+    {
+        if (cancellationType == null || clause.Parent is not TryStatementSyntax statement)
+        {
+            return false;
+        }
+
+        foreach (var previous in statement.Catches)
+        {
+            if (ReferenceEquals(previous, clause))
+            {
+                return false;
+            }
+
+            if (previous.Filter != null)
+            {
+                continue;
+            }
+
+            if (previous.Declaration?.Type == null)
+            {
+                return true;
+            }
+
+            var previousType = context.SemanticModel.GetTypeInfo(
+                previous.Declaration.Type, context.CancellationToken).Type;
+            if (IsOrDerivesFrom(cancellationType, previousType))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool CatchesCancellation(
+        CatchClauseSyntax clause,
+        ITypeSymbol? caughtType,
+        INamedTypeSymbol? cancellationType)
+    {
+        return cancellationType != null &&
+            (clause.Declaration == null ||
+             IsOrDerivesFrom(caughtType, cancellationType) ||
+             IsOrDerivesFrom(cancellationType, caughtType));
+    }
+
+    private static bool FilterExcludesCancellation(
+        CatchClauseSyntax clause,
+        ITypeSymbol? caughtType,
+        INamedTypeSymbol? cancellationType,
+        SyntaxNodeAnalysisContext context)
+    {
+        if (clause.Filter?.FilterExpression is not { } filter)
+        {
+            return false;
+        }
+
+        var constant = context.SemanticModel.GetConstantValue(
+            filter, context.CancellationToken);
+        if (constant is { HasValue: true, Value: false })
+        {
+            return true;
+        }
+
+        if (clause.Declaration?.Identifier.ValueText is not { Length: > 0 } identifier ||
+            filter is not IsPatternExpressionSyntax
+            {
+                Expression: IdentifierNameSyntax tested
+            } ||
+            tested.Identifier.ValueText != identifier ||
+            context.SemanticModel.GetOperation(
+                filter, context.CancellationToken) is not IIsPatternOperation
+                patternTest)
+        {
+            return false;
+        }
+
+        return PatternExcludesCancellation(
+            patternTest.Pattern, caughtType, cancellationType);
+    }
+
+    private static bool PatternExcludesCancellation(
+        IPatternOperation pattern,
+        ITypeSymbol? caughtType,
+        INamedTypeSymbol? cancellationType)
+    {
+        switch (pattern)
+        {
+            case ITypePatternOperation typePattern:
+                return !IsOrDerivesFrom(
+                           cancellationType, typePattern.MatchedType) &&
+                       !IsOrDerivesFrom(
+                           typePattern.MatchedType, cancellationType);
+            case INegatedPatternOperation
+            {
+                Pattern: ITypePatternOperation excludedPattern
+            }:
+                return IsOrDerivesFrom(
+                           cancellationType, excludedPattern.MatchedType) ||
+                       IsOrDerivesFrom(
+                           caughtType, excludedPattern.MatchedType);
+            case IBinaryPatternOperation binary
+                when binary.OperatorKind == BinaryOperatorKind.Or:
+                return PatternExcludesCancellation(
+                           binary.LeftPattern, caughtType, cancellationType) &&
+                       PatternExcludesCancellation(
+                           binary.RightPattern, caughtType, cancellationType);
+            case IBinaryPatternOperation binary
+                when binary.OperatorKind == BinaryOperatorKind.And:
+                return PatternExcludesCancellation(
+                           binary.LeftPattern, caughtType, cancellationType) ||
+                       PatternExcludesCancellation(
+                           binary.RightPattern, caughtType, cancellationType);
+            default:
+                return false;
+        }
+    }
+
+    private static bool IsOrDerivesFrom(
+        ITypeSymbol? type,
+        ITypeSymbol? possibleBase)
+    {
+        if (possibleBase == null)
+        {
+            return false;
+        }
+
+        for (var current = type as INamedTypeSymbol;
+             current != null;
+             current = current.BaseType)
+        {
+            if (SymbolEqualityComparer.Default.Equals(
+                    current.OriginalDefinition,
+                    possibleBase.OriginalDefinition))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static bool RethrowsCancellationImmediately(CatchClauseSyntax clause)
     {
-        return clause.Block.Statements.FirstOrDefault() is
-            ThrowStatementSyntax { Expression: null };
+        if (clause.Block.Statements.FirstOrDefault() is
+            ThrowStatementSyntax { Expression: null })
+        {
+            return true;
+        }
+
+        if (clause.Block.Statements.LastOrDefault() is not
+            ThrowStatementSyntax { Expression: null })
+        {
+            return false;
+        }
+
+        return !clause.Block.Statements
+            .Take(clause.Block.Statements.Count - 1)
+            .SelectMany(static statement => statement.DescendantNodesAndSelf())
+            .Any(static syntax => syntax is
+                ReturnStatementSyntax or
+                GotoStatementSyntax or
+                YieldStatementSyntax or
+                BreakStatementSyntax or
+                ContinueStatementSyntax or
+                ThrowStatementSyntax);
     }
 
     private static bool IsAuditedCancellationBoundary(

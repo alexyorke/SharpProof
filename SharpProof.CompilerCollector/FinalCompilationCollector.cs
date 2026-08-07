@@ -32,6 +32,10 @@ internal static class FinalCompilationCollector
             }
             AtomicFile.WriteUtf8(path, Create(context, options, configuration));
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
 #pragma warning disable CA1031
         catch (Exception exception)
             when (!context.CancellationToken.IsCancellationRequested)

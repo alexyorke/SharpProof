@@ -236,6 +236,19 @@ public sealed class IrProgramTests
     }
 
     [Test]
+    public void BuilderRejectsInvalidInstructionsAfterBuildAsConsumed()
+    {
+        var factory = new IrFactory();
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        builder.Return(entry, factory.CreateOperation("return"));
+        builder.Build();
+
+        Assert.Throws<InvalidOperationException>(
+            (Action)(() => builder.Return(entry, default)));
+    }
+
+    [Test]
     public void BuilderEnforcesHavocKindVariableConsistency()
     {
         var factory = new IrFactory();
@@ -326,6 +339,38 @@ public sealed class IrProgramTests
             result.Status,
             Is.EqualTo(IrProgramExecutionStatus.StepLimit));
         Assert.That(result.Steps, Is.EqualTo(3));
+    }
+
+    [Test]
+    public void InterpreterStopsWithinABlockAtTheExactStepBudget()
+    {
+        var factory = new IrFactory();
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        builder.Assign(
+            entry,
+            factory.CreateOperation("first"),
+            value,
+            factory.Integer(1));
+        builder.Assign(
+            entry,
+            factory.CreateOperation("second"),
+            value,
+            factory.Integer(2));
+        builder.Return(entry, factory.CreateOperation("return"));
+
+        var result = new IrProgramInterpreter(factory).Execute(
+            builder.Build(),
+            maximumSteps: 1);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.StepLimit));
+            Assert.That(result.Steps, Is.EqualTo(1));
+            Assert.That(result.Instruction, Is.Null);
+            Assert.That(result.GetCurrentValue(value)?.Integer, Is.EqualTo(1));
+        }
     }
 
     [TestCase(IrHavocKind.Variables)]

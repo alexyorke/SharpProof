@@ -259,6 +259,35 @@ public sealed class NestedRequiresCallSiteTests
         Assert.That(diagnostics, Is.Empty);
     }
 
+    [Test]
+    public async Task LambdasInUnreachableBlocksAreNotAnalyzed()
+    {
+        var diagnostics = await Analyze(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    if (false) {
+                        Func<int> unreachable =
+                            () => Positive(-1);
+                        return unreachable();
+                    }
+
+                    return 0;
+                }
+            }
+            """);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
     private static Task<ImmutableArray<Diagnostic>> Analyze(
         string source,
         IAnalyzerSessionFactory? sessionFactory = null)

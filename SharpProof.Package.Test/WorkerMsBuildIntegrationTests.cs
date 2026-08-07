@@ -172,6 +172,33 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task NonBuildingEvaluationPreservesPublishedVerificationFiles()
+    {
+        using var project = ConsumerProject.Create(IdentitySource);
+        var sarifPath = project.VerifyOutputPath("net8.0", "result.sarif");
+        Directory.CreateDirectory(Path.GetDirectoryName(project.ResultPath)!);
+        var request = new byte[] { 1, 2, 3 };
+        var result = new byte[] { 4, 5, 6 };
+        var manifest = new byte[] { 7, 8, 9 };
+        var sarif = new byte[] { 10, 11, 12 };
+        await File.WriteAllBytesAsync(project.RequestPath, request);
+        await File.WriteAllBytesAsync(project.ResultPath, result);
+        await File.WriteAllBytesAsync(project.CompilerManifestPath, manifest);
+        await File.WriteAllBytesAsync(sarifPath, sarif);
+
+        var evaluation = await project.RunNonBuildingInitializationAsync(sarifPath);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(evaluation.ExitCode, Is.Zero, evaluation.Output);
+            Assert.That(await File.ReadAllBytesAsync(project.RequestPath), Is.EqualTo(request));
+            Assert.That(await File.ReadAllBytesAsync(project.ResultPath), Is.EqualTo(result));
+            Assert.That(await File.ReadAllBytesAsync(project.CompilerManifestPath), Is.EqualTo(manifest));
+            Assert.That(await File.ReadAllBytesAsync(sarifPath), Is.EqualTo(sarif));
+        }
+    }
+
+    [Test]
     public async Task OptInBuildUsesFinalCompilerArtifact()
     {
         RequireWindowsWorker();
@@ -1105,7 +1132,8 @@ public sealed class WorkerMsBuildIntegrationTests
                 failed.Output.Contains(
                     "SharpProof launcher input is invalid: ArgumentException",
                     StringComparison.Ordinal),
-                Is.True);
+                Is.True,
+                failed.Output);
             Assert.That(File.Exists(collisionWorker), Is.True);
             Assert.That(File.Exists(collisionCompanion), Is.True);
         }
@@ -2500,6 +2528,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 "/nodeReuse:false",
                 "-p:Configuration=Release",
                 "-p:SharpProofVerify=true",
+                "-p:_SharpProofForceInvalidatePublishedResult=true",
                 "-p:SharpProofVerifyRequestFile=" + RequestPath,
                 "-p:SharpProofVerifyResultFile=" + ResultPath,
                 "-p:SharpProofVerifyCacheDirectory=" +
@@ -2520,6 +2549,26 @@ public sealed class WorkerMsBuildIntegrationTests
             arguments.AddRange(properties.Select(static property =>
                 "-p:" + property.Name + "=" + property.Value));
             return RunDotNetAsync(arguments);
+        }
+
+        internal Task<BuildResult> RunNonBuildingInitializationAsync(
+            string sarifPath)
+        {
+            return RunDotNetAsync([
+                "msbuild",
+                ProjectPath,
+                "/t:GenerateMSBuildEditorConfigFile",
+                "/nologo",
+                "/nodeReuse:false",
+                "-p:Configuration=Release",
+                "-p:TargetFramework=net8.0",
+                "-p:SharpProofVerify=true",
+                "-p:BuildingProject=false",
+                "-p:SharpProofVerifyRequestFile=" + RequestPath,
+                "-p:SharpProofVerifyResultFile=" + ResultPath,
+                "-p:SharpProofCompilerManifestFile=" + CompilerManifestPath,
+                "-p:SharpProofVerifySarifFile=" + sarifPath
+            ]);
         }
 
         private async Task<BuildResult> RunDotNetAsync(

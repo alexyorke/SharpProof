@@ -273,11 +273,88 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     try { }
                     catch (OperationCanceledException) { throw; }
                 }
+                static void CleanupThenRethrow(IDisposable cleanup) {
+                    try { }
+                    catch {
+                        cleanup.Dispose();
+                        throw;
+                    }
+                }
+                static void BroadCatchAfterCancellationRethrow() {
+                    try { }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception) { }
+                }
             }
             """;
 
         var diagnostics = await Analyze(source);
         Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task RejectsDerivedBroadAndBareCancellationCatches()
+    {
+        const string source =
+            """
+            using System;
+            using System.Threading.Tasks;
+            namespace SharpProof.Verify;
+            sealed class CustomCancellationException : OperationCanceledException { }
+            static class C {
+                static void TaskCanceled() {
+                    try { } catch (TaskCanceledException) { }
+                }
+                static void Custom() {
+                    try { } catch (CustomCancellationException) { }
+                }
+                static void SystemBase() {
+                    try { } catch (SystemException) { }
+                }
+                static void ExceptionBase() {
+                    try { } catch (Exception) { }
+                }
+                static void Bare() {
+                    try { } catch { }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(5));
+    }
+
+    [Test]
+    public async Task AllowsCatchFiltersThatExcludeCancellation()
+    {
+        const string source =
+            """
+            using System;
+            namespace SharpProof.Verify;
+            static class C {
+                static void ExcludedType() {
+                    try { }
+                    catch (Exception exception)
+                        when (exception is not OperationCanceledException) { }
+                }
+                static void Never() {
+                    try { }
+                    catch (Exception) when (false) { }
+                }
+                static void UnrelatedTypes() {
+                    try { }
+                    catch (Exception exception)
+                        when (exception is ArgumentException or InvalidOperationException) { }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SPMETA003"));
     }
 
     [TestCase(

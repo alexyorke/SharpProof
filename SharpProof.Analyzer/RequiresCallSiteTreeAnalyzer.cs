@@ -340,6 +340,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 ControlFlowGraph graph)
         {
             return graph.Blocks
+                .Where(static block => block.IsReachable)
                 .SelectMany(static block =>
                     block.Operations.Concat(
                         block.BranchValue == null

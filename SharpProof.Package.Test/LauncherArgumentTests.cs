@@ -840,6 +840,11 @@ public sealed class LauncherArgumentTests
                 Is.EqualTo(Path.GetFullPath(actualHost)));
             Assert.That(
                 (Action)(() => _ = Program.ValidateDotNetHostPath(
+                    actualHost,
+                    Path.GetPathRoot(actualHost)!)),
+                Throws.TypeOf<InvalidOperationException>());
+            Assert.That(
+                (Action)(() => _ = Program.ValidateDotNetHostPath(
                     "dotnet.exe", project)),
                 Throws.TypeOf<InvalidOperationException>());
             Assert.That(

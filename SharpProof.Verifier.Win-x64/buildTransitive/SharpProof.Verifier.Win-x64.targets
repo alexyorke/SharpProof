@@ -200,7 +200,7 @@
       <_SharpProofProjectDirectory>$(MSBuildProjectDirectory)</_SharpProofProjectDirectory>
     </PropertyGroup>
     <_SharpProofInvalidatePublishedResult
-        Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true'"
+        Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND ('$(BuildingProject)' != 'false' OR '$(_SharpProofForceInvalidatePublishedResult)' == 'true')"
         ResultPath="$(SharpProofVerifyResultFile)"
         ProjectDirectory="$(MSBuildProjectDirectory)"
         RequestPath="$(SharpProofVerifyRequestFile)"

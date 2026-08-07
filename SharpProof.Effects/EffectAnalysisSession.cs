@@ -106,7 +106,13 @@ public sealed class EffectAnalysisSession
     {
         var methods = CollectSourceMethods(cancellationToken);
         EnsureAnalyzed(methods, cancellationToken);
-        return [.. methods.Select(method => new EffectMethodResult(method, _summaries[method]))];
+        lock (_gate)
+        {
+            return [.. methods.Select(method => new EffectMethodResult(
+                method,
+                _summaries[method],
+                _nodes[method].DirectWitnesses))];
+        }
     }
 
     internal int AnalyzedSourceMethodCount => _summaries.Count;
