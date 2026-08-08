@@ -12,19 +12,15 @@ release blocker.
 
 ## Active item
 
-`PREVIEW-015` is the only locally active item. The bounded relational-callee
-feature was added after the previous preview candidate was qualified, so its
-trusted-boundary mutations and exact-commit package/pilot evidence must be
-regenerated before the register can return to locally complete. `PREVIEW-011`
-remains blocked only on owner-managed release values and authorization for
-external publication. No further semantic expansion is in scope.
+There are no locally controlled active items. `PREVIEW-011` remains blocked
+only on owner-managed release values and authorization for external
+publication. No further semantic expansion is in scope before the preview.
 
-Every `Closed` row shares this final repository evidence: Debug solution tests
-passed at commit `2c04e1dbf` (Package 238/2 platform skips, Worker 384/6,
-Gates 25/25), and full Release acceptance passed (zero build warnings/errors,
-Package 238/2, Worker 384/6, Gates 22/22, fuzz 1000/1000, corpus 480 cases,
-performance and packaging green). Candidate-specific mutation, pilot, and
-release-artifact evidence is generated again after this register update.
+Every `Closed` row is qualified by evidence generated from one clean,
+immutable candidate commit. The release manifest, mutation summary, pilot
+report, and offline publication plan record that full commit and their own
+SHA-256 digests. Changing the candidate requires regenerating all four files,
+the Debug solution result, and the full Release acceptance result.
 
 ## Debt register
 
@@ -44,7 +40,7 @@ release-artifact evidence is generated again after this register update.
 | PREVIEW-012 | Closed | No five-library pilot report exists. | Qualify two effect-heavy libraries, two contract-heavy libraries, and one mixed strict-mode library; record diagnostics, Unknown reasons, latency, memory, false positives, and setup friction. | Five pinned public-package pilots pass from candidate NuGet packages: Serilog 4.4.0 and Polly 8.7.0 (effects), Ardalis.GuardClauses 5.0.0 and FluentValidation 12.1.1 (contracts), and OneOf 3.0.271 (mixed strict). The strict pilot proves 4/4 claims. Effect pilots report typed expected abstentions (`EffectSummaryIncomplete`, `UnsupportedCallable`); contract pilots include assertion-backed SP0027 negative probes. The report records wall time, observed process-tree peak working set, diagnostics, zero reported false positives, SARIF, and setup friction. |
 | PREVIEW-013 | Closed | The documented two-human TCB review rule is not enforceable for the current solo workflow. | Replace it with the approved solo evidence gate: executable regression, mutation evidence, soundness note where semantics change, exact-commit artifacts, and green acceptance. | `preview-evidence.v1.json` is acceptance-owned and pins zero required human approvals plus the six required evidence classes. Structural acceptance validates the exact contract. Current preview documentation no longer describes reviewer count or elapsed time as a blocker; stable 1.0 governance is explicitly separate. |
 | PREVIEW-014 | Closed | The trusted-host boundary was spread across several documents and could be mistaken for hostile-filesystem or cross-host publication support. | State one normative boundary: local trusted Windows build host; reject UNC publication; Rider, Windows ARM64, hostile local mutation, and shared-network publication are unsupported for this preview. | `docs/preview-support.md` is the normative boundary; README and the documentation map link it. Shared identity validation rejects UNC and mapped-remote publication paths. |
-| PREVIEW-015 | Active | Bounded relational source, implementation-IL, and audited specification-pack summaries were added after the last exact preview qualification. Their proof assumptions, provenance closure, opt-in boundary, fresh instantiation, and counterexample classification are supported behavior but are not represented in the trusted mutation catalog or current candidate evidence. | Eight mutation-discriminating probes covering source admission, implementation-IL admission, reference-assembly rejection, specification-pack opt-in, transitive provenance, fresh instantiation, worker assumption binding, and counterexample classification. Then regenerate exact-commit Debug, acceptance, five-pilot, package, and release dry-run evidence. | Pending. |
+| PREVIEW-015 | Closed | Bounded relational source, implementation-IL, and audited specification-pack summaries were added after the previous preview qualification. Their proof assumptions, provenance closure, opt-in boundary, fresh instantiation, and counterexample classification required exact-candidate evidence. | Eight mutation-discriminating probes covering source admission, implementation-IL admission, reference-assembly rejection, specification-pack opt-in, transitive provenance, fresh instantiation, worker assumption binding, and counterexample classification. Then regenerate exact-commit Debug, acceptance, five-pilot, package, and release dry-run evidence. | The trusted catalog contains 127 mutations with catalog SHA-256 `ddd6fd5b22975bf794eb84ad9b02d2c5b5c003ab648b31eacbdce2b5c8b32c3b`; all eight relational probes are killed. The immutable-candidate procedure requires green Debug and Release acceptance, the exact dependency-ordered three-package graph, package-backed consumers, five complete pilots, and a schema-1 offline publication plan before this candidate may be promoted. Each generated evidence file binds itself to the candidate commit and is independently hash-validated. |
 
 ## Completion rule
 
