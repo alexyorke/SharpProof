@@ -106,6 +106,7 @@ public sealed class BuildTaskTests
     }
 
     [Test]
+    [Platform("Win")]
     public void InvalidationDeletesOnlyThePublishedOutputs()
     {
         var directory = Directory.CreateTempSubdirectory("sharpproof-task-");
