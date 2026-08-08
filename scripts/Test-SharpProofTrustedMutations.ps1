@@ -964,8 +964,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'compiler-reference-raw-metadata-binding'
         File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerCompilationCapture.cs'
-        Original = '                !MetadataEquals(backingReader, fileReader))'
-        Mutated = '                false)'
+        Original = '        return left.MetadataLength == right.MetadataLength &&'
+        Mutated = '        return left.MetadataLength == right.MetadataLength ||'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~ReferencePathMustMatchRawMetadataWhenMvidIsUnchanged'
     },
