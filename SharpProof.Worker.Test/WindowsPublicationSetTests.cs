@@ -11,9 +11,24 @@ public sealed class WindowsPublicationSetTests
     [Platform("Win")]
     public void RemotePublicationPathIsRejected()
     {
-        Assert.Throws<ArgumentException>((Action)(() =>
+        string? exceptionType = null;
+        try
+        {
             WindowsPathIdentity.RequireLocalPath(
-                @"\\server\share\SharpProof\result.json")));
+                @"\\server\share\SharpProof\result.json");
+        }
+        catch (ArgumentException exception)
+        {
+            exceptionType = exception.GetType().FullName;
+        }
+        catch (IOException exception)
+        {
+            exceptionType = exception.GetType().FullName;
+        }
+
+        Assert.That(
+            exceptionType,
+            Is.EqualTo(typeof(ArgumentException).FullName));
     }
 
     [Test]
