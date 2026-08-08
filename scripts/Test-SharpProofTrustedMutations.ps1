@@ -1008,6 +1008,110 @@ $mutations = @(
         Mutated = '    <Error Condition="''false'' == ''true''"'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~ProjectBodyConfigurationRejectsRetiredMode'
+    },
+    [pscustomobject]@{
+        Name = 'relational-source-call-admission'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerRelationalSummaryProvider.cs'
+        Original = (@'
+        return _apiSpecs.IsSideEffectFree(method) ||
+            _specificationPacks.CanResolve(method) ||
+            IsSourceCandidate(method) ||
+            CompilerImplementationIlSummaryLowerer.IsCandidate(
+                _compilation,
+                method);
+'@).Trim()
+        Mutated = (@'
+        return _apiSpecs.IsSideEffectFree(method) ||
+            _specificationPacks.CanResolve(method) ||
+            CompilerImplementationIlSummaryLowerer.IsCandidate(
+                _compilation,
+                method);
+'@).Trim()
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~DirectAcyclicSourceCallCarriesAReusableRelationalSummary'
+    },
+    [pscustomobject]@{
+        Name = 'relational-implementation-il-admission'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerRelationalSummaryProvider.cs'
+        Original = (@'
+        return _apiSpecs.IsSideEffectFree(method) ||
+            _specificationPacks.CanResolve(method) ||
+            IsSourceCandidate(method) ||
+            CompilerImplementationIlSummaryLowerer.IsCandidate(
+                _compilation,
+                method);
+'@).Trim()
+        Mutated = (@'
+        return _apiSpecs.IsSideEffectFree(method) ||
+            _specificationPacks.CanResolve(method) ||
+            IsSourceCandidate(method);
+'@).Trim()
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~ExactImplementationIlSummaryProvesAnExternalCallChain'
+    },
+    [pscustomobject]@{
+        Name = 'relational-reference-assembly-rejection'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerImplementationIlSummaryLowerer.cs'
+        Original = '        if (IsReferenceAssembly(method.ContainingAssembly))'
+        Mutated = '        if (false && IsReferenceAssembly(method.ContainingAssembly))'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~ReferenceAssemblyIsNotImplementationProofAuthority'
+    },
+    [pscustomobject]@{
+        Name = 'relational-spec-pack-explicit-opt-in'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerSpecificationPackProvider.cs'
+        Original = '        var selected = (enabledPacks ?? [])'
+        Mutated = '        var selected = (enabledPacks ?? catalog.Packs.Keys)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~AuditedSpecificationPackRequiresExplicitOptIn'
+    },
+    [pscustomobject]@{
+        Name = 'relational-transitive-provenance'
+        File = 'SharpProof.Summaries\IrRelationalSummaryBuilder.cs'
+        Original = '            foreach (var provenance in dependency.DependencyProvenance)'
+        Mutated = '            foreach (var provenance in Array.Empty<IrSummaryProvenance>())'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~MixedSourceAndImplementationSummariesSealDependencyEvidence'
+    },
+    [pscustomobject]@{
+        Name = 'relational-instantiation-freshness'
+        File = 'SharpProof.Summaries\IrRelationalSummaryInstantiator.cs'
+        Original = '            instanceOrdinal.ToString(System.Globalization.CultureInfo.InvariantCulture) +'
+        Mutated = '            "0" +'
+        Project = 'SharpProof.Summaries.Test\SharpProof.Summaries.Test.csproj'
+        Filter = 'FullyQualifiedName~CallCompositionUsesAReusableRelationAndFreshVariables'
+    },
+    [pscustomobject]@{
+        Name = 'relational-worker-assumption-binding'
+        File = 'SharpProof.Worker\AcyclicBlockPredicateExecutor.cs'
+        Original = (@'
+            _summaryAssumptions.Add(new GuardedBodySummaryAssumption(
+                prepared.CallIdentity,
+                prepared.Origin,
+                prepared.EvidenceSha256,
+                prepared.EvidenceIdentity,
+                guard,
+                relation));
+'@).Trim()
+        Mutated = (@'
+            _summaryAssumptions.Add(new GuardedBodySummaryAssumption(
+                prepared.CallIdentity,
+                prepared.Origin,
+                prepared.EvidenceSha256,
+                prepared.EvidenceIdentity,
+                guard,
+                factory.Boolean(true)));
+'@).Trim()
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~SourceCallContributesItsGuardedRelationalAssumption'
+    },
+    [pscustomobject]@{
+        Name = 'relational-counterexample-classification'
+        File = 'SharpProof.Worker\CallableCounterexampleReplayer.cs'
+        Original = '                            body.SummaryCalls.ContainsKey(call.Id))'
+        Mutated = '                            false)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~ExecutedRelationalSummaryCallIsNotAReplayableCounterexample'
     }
 )
 
