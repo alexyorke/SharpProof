@@ -1559,7 +1559,7 @@ public sealed class WorkerMsBuildIntegrationTests
         Directory.CreateDirectory(isolatedLauncherDirectory);
         _ = await project.RunVerificationTargetAsync(
             ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
-            ("SharpProofLauncherPath", Path.Combine(
+            ("_SharpProofLauncherPath", Path.Combine(
                 isolatedLauncherDirectory,
                 "isolated-launcher.dll")),
             ("SharpProofVerifyResultFile", protocolPath));
