@@ -972,8 +972,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'publication-locks-every-member'
         File = 'SharpProof.Worker.Protocol\WindowsPathIdentity.cs'
-        Original = '            while (acquired != mutexes.Length)'
-        Mutated = '            while (acquired < 1)'
+        Original = '            .OrderBy(static name => name, StringComparer.Ordinal)'
+        Mutated = '            .OrderBy(static name => name, StringComparer.Ordinal).Take(1)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~OverlapOnAnyPublicationMemberBlocks'
     },
