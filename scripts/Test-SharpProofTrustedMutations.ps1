@@ -944,6 +944,62 @@ $mutations = @(
         Mutated = '        if (length > maximum && totalBytes > MaximumClosureBytes - length)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~RuntimeClosureLimitsFailClosedAtEveryBoundary'
+    },
+    [pscustomobject]@{
+        Name = 'build-task-cancel-before-launch'
+        File = 'SharpProof.BuildTasks\RunVerifier.cs'
+        Original = '                if (_canceled)'
+        Mutated = '                if (false)'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~CanceledVerifierTaskDoesNotLaunchAProcess'
+    },
+    [pscustomobject]@{
+        Name = 'compiler-linked-module-closure'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerCompilationCapture.cs'
+        Original = "            backingModules = [`n                backingModules[0],`n                .. backingModules.Skip(1).OrderBy(`n                    static module => ReadModuleName(module.GetMetadataReader()),`n                    StringComparer.Ordinal)`n            ];"
+        Mutated = '            backingModules = [backingModules[0]];'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~LinkedNetmoduleProvenanceCapturesCompleteClosure'
+    },
+    [pscustomobject]@{
+        Name = 'compiler-reference-raw-metadata-binding'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerCompilationCapture.cs'
+        Original = '                !MetadataEquals(backingReader, fileReader))'
+        Mutated = '                false)'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ReferencePathMustMatchRawMetadataWhenMvidIsUnchanged'
+    },
+    [pscustomobject]@{
+        Name = 'publication-locks-every-member'
+        File = 'SharpProof.Worker.Protocol\WindowsPathIdentity.cs'
+        Original = '            while (acquired != mutexes.Length)'
+        Mutated = '            while (acquired < 1)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~OverlapOnAnyPublicationMemberBlocks'
+    },
+    [pscustomobject]@{
+        Name = 'publication-rejects-unc'
+        File = 'SharpProof.Worker.Protocol\WindowsPathIdentity.cs'
+        Original = '        if (fullPath.StartsWith(@"\\\\", StringComparison.Ordinal))'
+        Mutated = '        if (false)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~RemotePublicationPathIsRejected'
+    },
+    [pscustomobject]@{
+        Name = 'analyzer-rejects-retired-mode'
+        File = 'SharpProof.Analyzer\Configuration\AnalyzerConfiguration.cs'
+        Original = '        return (options.TryGetValue("sharpproof_mode", out value!) ||'
+        Mutated = '        return (options.TryGetValue("sharpproof_removed", out value!) ||'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~RetiredModeOptionFailsClosed'
+    },
+    [pscustomobject]@{
+        Name = 'package-rejects-retired-mode'
+        File = 'SharpProof.Package\buildTransitive\SharpProof.targets'
+        Original = '    <Error Condition="''$(SharpProofMode)'' != ''''"'
+        Mutated = '    <Error Condition="''false'' == ''true''"'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~ProjectBodyConfigurationRejectsRetiredMode'
     }
 )
 
