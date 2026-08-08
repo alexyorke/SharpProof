@@ -68,7 +68,7 @@ internal static class CompilerCompilationCapture
                 Deterministic = options.Deterministic,
                 ReferencesSupersedeLowerVersions = supersedes,
                 AssemblyIdentityComparer = CompilerOptionWireMappings.Map(options.AssemblyIdentityComparer),
-                Usings = [.. options.Usings],
+                Usings = options.Usings.ToArray(),
                 ResolverPolicy = CompilerResolverPolicy.EvidenceOnly
             },
             SyntaxTrees = [.. compilation.SyntaxTrees.Select(tree => CaptureTree(tree, cancellationToken))],

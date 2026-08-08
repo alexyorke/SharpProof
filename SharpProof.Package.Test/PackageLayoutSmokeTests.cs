@@ -84,6 +84,7 @@ public sealed class PackageLayoutSmokeTests
 
     private static readonly string[] ExpectedToolEntries = [
         "tools/net9/Microsoft.Z3.dll",
+        "tools/net9/SharpProof.BuildTasks.dll",
         "tools/net9/SharpProof.CompilerArtifact.dll",
         "tools/net9/SharpProof.Dataflow.dll",
         "tools/net9/SharpProof.Ir.dll",

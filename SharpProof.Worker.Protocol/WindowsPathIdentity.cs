@@ -16,6 +16,7 @@ public static class WindowsPathIdentity
     private const uint DeleteAccess = 0x00010000;
     private const uint OpenExisting = 3;
     private const uint FileFlagBackupSemantics = 0x02000000;
+    private const uint DriveRemote = 4;
     private const int ErrorFileNotFound = 2;
     private const int ErrorPathNotFound = 3;
     private const string PublicationMarkerSuffix =
@@ -94,6 +95,31 @@ public static class WindowsPathIdentity
     {
         var canonical = Canonicalize(publicationPath);
         return PublicationMutexNameForCanonicalPath(canonical);
+    }
+
+    public static string RequireLocalPath(string path)
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            throw new PlatformNotSupportedException(
+                "Windows path identity requires Windows.");
+        }
+        var fullPath = NormalizeNamespace(Path.GetFullPath(path));
+        if (fullPath.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "SharpProof preview publication requires a local Windows path.",
+                nameof(path));
+        }
+        var canonical = Canonicalize(path);
+        var root = Path.GetPathRoot(canonical) ?? string.Empty;
+        if (GetDriveTypeW(root) == DriveRemote)
+        {
+            throw new ArgumentException(
+                "SharpProof preview publication requires a local Windows path.",
+                nameof(path));
+        }
+        return canonical;
     }
 
     public static string PublicationMarkerPath(string publicationPath)
@@ -566,6 +592,10 @@ public static class WindowsPathIdentity
             capacity = checked((int)length + 1);
         }
     }
+
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    private static extern uint GetDriveTypeW(string rootPathName);
 
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]

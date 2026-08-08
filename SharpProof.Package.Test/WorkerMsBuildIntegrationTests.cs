@@ -409,6 +409,91 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task LongLocalPublicationPathsWorkInDotNetAndVisualStudioMsBuild()
+    {
+        RequireWindowsWorker();
+        var visualStudioMsBuild = ConsumerProject.FindVisualStudioMsBuild();
+        if (visualStudioMsBuild == null)
+        {
+            Assert.Ignore("Visual Studio MSBuild is not installed.");
+            return;
+        }
+        using var project = ConsumerProject.CreateConfigured(
+            IdentitySource,
+            ("TargetFrameworks", "netstandard2.0"));
+        var segment = new string('l', 48);
+        var publicationDirectory = Path.Combine(
+            project.Root,
+            segment + "1",
+            segment + "2",
+            segment + "3",
+            segment + "4",
+            segment + "5");
+        Directory.CreateDirectory(publicationDirectory);
+        var requestPath = Path.Combine(publicationDirectory, "request.json");
+        var resultPath = Path.Combine(publicationDirectory, "result.json");
+        var manifestPath = Path.Combine(publicationDirectory, "manifest.json");
+        var sarifPath = Path.Combine(publicationDirectory, "result.sarif");
+        var cachePath = Path.Combine(publicationDirectory, "cache");
+        Assert.That(resultPath.Length, Is.GreaterThan(260));
+
+        var dotnet = await project.BuildAsync(
+            verify: true,
+            ("SharpProofVerifyRequestFile", requestPath),
+            ("SharpProofVerifyResultFile", resultPath),
+            ("SharpProofCompilerManifestFile", manifestPath),
+            ("SharpProofVerifyCacheDirectory", cachePath),
+            ("SharpProofVerifySarifFile", sarifPath));
+        var visualStudio = await project.BuildWithVisualStudioMsBuildAsync(
+            visualStudioMsBuild,
+            ("SharpProofVerifyRequestFile", requestPath),
+            ("SharpProofVerifyResultFile", resultPath),
+            ("SharpProofCompilerManifestFile", manifestPath),
+            ("SharpProofVerifyCacheDirectory", cachePath),
+            ("SharpProofVerifySarifFile", sarifPath));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(dotnet.ExitCode, Is.Zero, dotnet.Output);
+            Assert.That(visualStudio.ExitCode, Is.Zero, visualStudio.Output);
+            Assert.That(File.Exists(requestPath), Is.True);
+            Assert.That(File.Exists(resultPath), Is.True);
+            Assert.That(File.Exists(manifestPath), Is.True);
+            Assert.That(File.Exists(sarifPath), Is.True);
+        }
+    }
+
+    [Test]
+    public async Task OverlongProjectDirectoryFailsBeforeCompilerLaunch()
+    {
+        RequireWindowsWorker();
+        var visualStudioMsBuild = ConsumerProject.FindVisualStudioMsBuild();
+        if (visualStudioMsBuild == null)
+        {
+            Assert.Ignore("Visual Studio MSBuild is not installed.");
+            return;
+        }
+        using var project = ConsumerProject.CreateWithLongPath(IdentitySource);
+        Assert.That(project.Root.Length, Is.GreaterThan(239));
+
+        var restore = await project.RestoreAsync();
+        var dotnet = await project.BuildAsync(verify: true);
+        var visualStudio = await project.BuildWithVisualStudioMsBuildAsync(
+            visualStudioMsBuild);
+        const string expected =
+            "SharpProof verification requires MSBuildProjectDirectory to be at most 239 characters";
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(restore.ExitCode, Is.Zero, restore.Output);
+            Assert.That(dotnet.ExitCode, Is.Not.Zero, dotnet.Output);
+            Assert.That(dotnet.Output, Does.Contain(expected));
+            Assert.That(visualStudio.ExitCode, Is.Not.Zero, visualStudio.Output);
+            Assert.That(visualStudio.Output, Does.Contain(expected));
+        }
+    }
+
+    [Test]
     public async Task VerifierHostMustBeTheDirectDotNetMuxer()
     {
         RequireWindowsWorker();
@@ -1989,13 +2074,12 @@ public sealed class WorkerMsBuildIntegrationTests
             .Single(static target =>
                 target.Attribute("Name")?.Value ==
                 "_SharpProofVerifyCore");
-        var invocation = verifyCore.Descendants("_SharpProofRunVerifier").Single();
-        var runnerCode = targets.Descendants("UsingTask")
-            .Single(static task =>
-                task.Attribute("TaskName")?.Value == "_SharpProofRunVerifier")
-            .Descendants("Code")
-            .Single()
-            .Value;
+        var invocation = verifyCore
+            .Descendants("SharpProof.BuildTasks.RunVerifier")
+            .Single();
+        var runnerTask = targets.Descendants("UsingTask")
+            .Single(static task => task.Attribute("TaskName")?.Value ==
+                "SharpProof.BuildTasks.RunVerifier");
         var arguments = string.Join(
             " ",
             verifyCore.Descendants("_SharpProofVerifierArgument")
@@ -2050,10 +2134,8 @@ public sealed class WorkerMsBuildIntegrationTests
                 Is.EqualTo("$(SharpProofDotNetHost)"));
             Assert.That(verifyCore.Descendants("Exec"), Is.Empty);
             Assert.That(
-                runnerCode,
-                Does.Contain("ICancelableTask")
-                    .And.Contain("public void Cancel()")
-                    .And.Contain("process.Kill()"));
+                runnerTask.Attribute("AssemblyFile")?.Value,
+                Is.EqualTo("$(_SharpProofBuildTasksPath)"));
             Assert.That(
                 s_reconstructionListArtifacts.Where(targetXml.Contains),
                 Is.Empty);
@@ -2545,6 +2627,8 @@ public sealed class WorkerMsBuildIntegrationTests
         {
             get;
         }
+        internal string Root => _root;
+
         internal string RequestPath
         {
             get;
@@ -2752,6 +2836,74 @@ public sealed class WorkerMsBuildIntegrationTests
                 "consumer-%TEMP%-" + Guid.NewGuid().ToString("N"));
         }
 
+        internal static ConsumerProject CreateWithLongPath(string source)
+        {
+            var segment = new string('l', 48);
+            return CreateCore(
+                source,
+                useSpaces: false,
+                [("TargetFrameworks", "netstandard2.0")],
+                Path.Combine(
+                    "consumer-long-" + Guid.NewGuid().ToString("N"),
+                    segment + "1",
+                    segment + "2",
+                    segment + "3",
+                    segment + "4",
+                    segment + "5"));
+        }
+
+        internal static string? FindVisualStudioMsBuild()
+        {
+            var programFiles = Environment.GetFolderPath(
+                Environment.SpecialFolder.ProgramFilesX86);
+            var vswhere = Path.Combine(
+                programFiles,
+                "Microsoft Visual Studio",
+                "Installer",
+                "vswhere.exe");
+            if (!File.Exists(vswhere))
+            {
+                return null;
+            }
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = vswhere,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            foreach (var argument in new[]
+            {
+                "-latest", "-products", "*",
+                "-requires", "Microsoft.Component.MSBuild",
+                "-find", @"MSBuild\**\Bin\MSBuild.exe"
+            })
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+            using var process = Process.Start(startInfo)!;
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+            if (process.ExitCode != 0)
+            {
+                return null;
+            }
+            var defaultPath = output.Split(
+                    ['\r', '\n'],
+                    StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault(File.Exists);
+            if (defaultPath == null)
+            {
+                return null;
+            }
+            var amd64Path = Path.Combine(
+                Path.GetDirectoryName(defaultPath)!,
+                "amd64",
+                "MSBuild.exe");
+            return File.Exists(amd64Path) ? amd64Path : defaultPath;
+        }
+
         private static ConsumerProject CreateCore(
             string source,
             bool useSpaces,
@@ -2804,6 +2956,38 @@ public sealed class WorkerMsBuildIntegrationTests
             arguments.AddRange(properties.Select(static property =>
                 "-p:" + property.Name + "=" + property.Value));
             return await RunDotNetAsync(arguments);
+        }
+
+        internal Task<BuildResult> RestoreAsync()
+        {
+            return RunDotNetAsync([
+                "restore",
+                ProjectPath,
+                "--nologo",
+                "/nodeReuse:false",
+                "-p:SharpProofVerify=false"
+            ]);
+        }
+
+        internal Task<BuildResult> BuildWithVisualStudioMsBuildAsync(
+            string msBuildPath,
+            params (string Name, string Value)[] properties)
+        {
+            var arguments = new List<string>
+            {
+                ProjectPath,
+                "/t:Build",
+                "/p:Configuration=Release",
+                "/p:SharpProofVerify=true",
+                "/p:MSBuildEnableWorkloadResolver=false",
+                "/p:UseSharedCompilation=false",
+                "/p:GeneratePackageOnBuild=false",
+                "/nologo",
+                "/nodeReuse:false"
+            };
+            arguments.AddRange(properties.Select(static property =>
+                "/p:" + property.Name + "=" + property.Value));
+            return RunProcessAsync(msBuildPath, arguments);
         }
 
         internal Task<BuildResult> BuildIsolatedAsync(
@@ -2884,10 +3068,19 @@ public sealed class WorkerMsBuildIntegrationTests
         private async Task<BuildResult> RunDotNetAsync(
             IEnumerable<string> arguments)
         {
+            return await RunProcessAsync("dotnet", arguments);
+        }
+
+        private async Task<BuildResult> RunProcessAsync(
+            string executable,
+            IEnumerable<string> arguments)
+        {
             var startInfo = new ProcessStartInfo
             {
-                FileName = "dotnet",
-                WorkingDirectory = _root,
+                FileName = executable,
+                WorkingDirectory = _root.Length < 240
+                    ? _root
+                    : Path.GetTempPath(),
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -2897,7 +3090,44 @@ public sealed class WorkerMsBuildIntegrationTests
             {
                 startInfo.ArgumentList.Add(argument);
             }
-
+            if (string.Equals(
+                    Path.GetFileName(executable),
+                    "MSBuild.exe",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var key in startInfo.Environment.Keys
+                             .Where(static key =>
+                                 key.StartsWith(
+                                     "DOTNET_",
+                                     StringComparison.OrdinalIgnoreCase) ||
+                                 key.StartsWith(
+                                     "MSBUILD",
+                                     StringComparison.OrdinalIgnoreCase))
+                             .ToArray())
+                {
+                    startInfo.Environment.Remove(key);
+                }
+                var dotnetHost = Environment.GetEnvironmentVariable(
+                    "DOTNET_HOST_PATH") ??
+                    throw new InvalidOperationException(
+                        "The test host did not disclose the dotnet host path.");
+                using var globalJson = JsonDocument.Parse(
+                    await File.ReadAllTextAsync(Path.Combine(
+                        FindRepositoryRoot(),
+                        "global.json")));
+                var sdkVersion = globalJson.RootElement
+                    .GetProperty("sdk")
+                    .GetProperty("version")
+                    .GetString() ?? throw new InvalidDataException(
+                        "global.json does not declare an SDK version.");
+                startInfo.Environment["MSBuildSDKsPath"] = Path.Combine(
+                    Path.GetDirectoryName(dotnetHost) ??
+                        throw new InvalidOperationException(
+                            "The dotnet host path has no directory."),
+                    "sdk",
+                    sdkVersion,
+                    "Sdks");
+            }
             using var process = Process.Start(startInfo)!;
             var standardOutput = process.StandardOutput.ReadToEndAsync();
             var standardError = process.StandardError.ReadToEndAsync();
@@ -2988,6 +3218,10 @@ public sealed class WorkerMsBuildIntegrationTests
                 Path.Combine(repository, "SharpProof.Worker.Protocol", "bin",
                     testConfiguration, "netstandard2.0",
                     "SharpProof.Worker.Protocol.dll"));
+            var buildTasks = SecurityElement.Escape(
+                Path.Combine(repository, "SharpProof.BuildTasks", "bin",
+                    testConfiguration, "netstandard2.0",
+                    "SharpProof.BuildTasks.dll"));
             var configuredProperties = string.Join(
                 Environment.NewLine,
                 properties.Select(static property =>
@@ -3015,6 +3249,7 @@ public sealed class WorkerMsBuildIntegrationTests
                     <SharpProofLauncherPath>{launcher}</SharpProofLauncherPath>
                     <_SharpProofLauncherPath>$([System.IO.Path]::GetFullPath('$(SharpProofLauncherPath)'))</_SharpProofLauncherPath>
                     <_SharpProofWorkerProtocolPath>{protocol}</_SharpProofWorkerProtocolPath>
+                    <_SharpProofBuildTasksPath>{buildTasks}</_SharpProofBuildTasksPath>
                   </PropertyGroup>
                   <ItemGroup>
                     <Reference Include="SharpProof.Attributes">
@@ -3027,7 +3262,7 @@ public sealed class WorkerMsBuildIntegrationTests
                   <Target Name="_SharpProofTestInvalidatePublishedResult"
                           BeforeTargets="_SharpProofVerifyCore"
                           Condition="'$(BuildingProject)' == 'false'">
-                    <_SharpProofInvalidatePublishedResult
+                    <SharpProof.BuildTasks.InvalidatePublishedResult
                         ResultPath="$(SharpProofVerifyResultFile)"
                         ProjectDirectory="$(MSBuildProjectDirectory)"
                         RequestPath="$(SharpProofVerifyRequestFile)"

@@ -236,7 +236,7 @@ internal static class ContractForSymbolMatcher
 
             if (method.Arity != 0)
             {
-                method = method.Construct([.. target.TypeArguments]);
+                method = method.Construct(target.TypeArguments.ToArray());
             }
 
             return (!RequiresConstructedSignatureCheck(target) ||
@@ -281,9 +281,8 @@ internal static class ContractForSymbolMatcher
                       "The nested companion type could not be specialized.");
             constructed = definition.Arity == 0
                 ? definition
-                : definition.Construct([
-                    .. targetLayers[targetIndex++].TypeArguments
-                ]);
+                : definition.Construct(
+                    targetLayers[targetIndex++].TypeArguments.ToArray());
         }
 
         return constructed ?? throw new ArgumentException(

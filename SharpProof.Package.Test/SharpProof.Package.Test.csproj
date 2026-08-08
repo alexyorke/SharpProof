@@ -6,11 +6,16 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Build.Framework"
+                      PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core"
+                      PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="NUnit" />
     <PackageReference Include="NUnit3TestAdapter" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\SharpProof.BuildTasks\SharpProof.BuildTasks.csproj" />
     <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj"
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />

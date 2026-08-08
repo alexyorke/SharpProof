@@ -25,6 +25,7 @@ public sealed class ArchitectureTests
     private static readonly string[] ProductionProjects = [
         "SharpProof.Analyzer",
         "SharpProof.Attributes",
+        "SharpProof.BuildTasks",
         "SharpProof.Ir",
         "SharpProof.Meta.Analyzers",
         "SharpProof.PortableAnalyzer",
@@ -140,6 +141,7 @@ public sealed class ArchitectureTests
                 "SharpProof.Specs"
             ],
             ["SharpProof.Attributes"] = [],
+            ["SharpProof.BuildTasks"] = ["SharpProof.Worker.Protocol"],
             ["SharpProof.Ir"] = [],
             ["SharpProof.Meta.Analyzers"] = [],
             ["SharpProof.PortableAnalyzer"] = ["SharpProof.Attributes"],

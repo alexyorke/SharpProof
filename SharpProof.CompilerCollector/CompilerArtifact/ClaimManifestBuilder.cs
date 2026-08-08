@@ -130,7 +130,7 @@ internal sealed partial class ClaimManifestBuilder(
                 : postconditions.FirstOrDefault()?.Entry.Location ?? new WorkerSourceLocation(),
             ClaimIds = [.. postconditions.Select(static claim => claim.Entry.ClaimId),
                 .. effects.Select(static claim => claim.Entry.ClaimId)],
-            Assumptions = [.. assumptions]
+            Assumptions = assumptions.ToArray()
         };
         return new ManifestCallableTarget(target, seed.Declaration, seed.Model,
             entry, postconditions, effects, supported);

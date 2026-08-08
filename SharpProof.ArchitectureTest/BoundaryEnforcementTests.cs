@@ -11,6 +11,7 @@ public sealed class BoundaryEnforcementTests
     private static readonly string[] BannedApiProjects = [
         "SharpProof.Analyzer",
         "SharpProof.Attributes",
+        "SharpProof.BuildTasks",
         "SharpProof.CompilerArtifact",
         "SharpProof.CompilerCollector",
         "SharpProof.ContractForGenerator",
@@ -410,6 +411,7 @@ public sealed class BoundaryEnforcementTests
             @"SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj",
             @"SharpProof.Attributes.Test\SharpProof.Attributes.Test.csproj",
             @"SharpProof.Attributes\SharpProof.Attributes.csproj",
+            @"SharpProof.BuildTasks\SharpProof.BuildTasks.csproj",
             @"SharpProof.CompilerProbe.TestAsset\SharpProof.CompilerProbe.TestAsset.csproj",
             @"SharpProof.CompilerArtifact\SharpProof.CompilerArtifact.csproj",
             @"SharpProof.CompilerCollector\SharpProof.CompilerCollector.csproj",

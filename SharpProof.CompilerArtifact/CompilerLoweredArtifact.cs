@@ -35,7 +35,7 @@ internal static class CompilerLoweredArtifact
             CallableId = preparation.Entry.CallableId,
             FailureReason = WorkerClaimReason.None,
             Graph = encoded.Graph,
-            EffectClaims = [.. preparation.EffectClaims],
+            EffectClaims = preparation.EffectClaims.ToArray(),
             Clauses = [.. preparation.Clauses.Select((clause, index) =>
                 new CompilerClauseArtifact {
                     Kind = clause.Kind, Evidence = clause.Evidence, Root = index,

@@ -40,6 +40,8 @@
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Verify.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.Protocol.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.Protocol.pdb" target="tools\net9" />
+    <file src="..\SharpProof.BuildTasks\bin\$configuration$\netstandard2.0\SharpProof.BuildTasks.dll" target="tools\net9" />
+    <file src="..\SharpProof.BuildTasks\bin\$configuration$\netstandard2.0\SharpProof.BuildTasks.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.deps.json" target="tools\net9" />

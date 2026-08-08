@@ -128,9 +128,9 @@ public sealed class EffectAnalysisSession
     {
         if (target.ReducedFrom != null)
         {
-            actualArguments = [instance, .. actualArguments];
+            actualArguments = actualArguments.Insert(0, instance);
             instance = null;
-            arguments = [receiver, .. arguments];
+            arguments = arguments.Insert(0, receiver);
             receiver = EffectRegionSet.Empty;
         }
         var normalized = NormalizeMethod(target);

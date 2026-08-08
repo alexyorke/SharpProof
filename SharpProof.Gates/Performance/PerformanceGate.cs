@@ -1185,19 +1185,19 @@ internal static class PerformanceGate
                     StringComparer.Ordinal));
         var verifierExec = verifierTargets.Descendants("Exec").ToArray();
         var verifierRun = verifierTargets
-            .Descendants("_SharpProofRunVerifier")
+            .Descendants("SharpProof.BuildTasks.RunVerifier")
             .ToArray();
-        var verifierRunnerCode = verifierTargets.Descendants("UsingTask")
+        var verifierRunnerTask = verifierTargets.Descendants("UsingTask")
             .SingleOrDefault(static task => string.Equals(
                 (string?)task.Attribute("TaskName"),
-                "_SharpProofRunVerifier",
-                StringComparison.Ordinal))
-            ?.Descendants("Code")
-            .SingleOrDefault()
-            ?.Value;
+                "SharpProof.BuildTasks.RunVerifier",
+                StringComparison.Ordinal));
+        var inlineTaskFactories = verifierTargets.Descendants("UsingTask")
+            .Where(static task => task.Attribute("TaskFactory") != null)
+            .ToArray();
         var portableContainsVerifierWork =
             portableTargets.Descendants("Exec").Any() ||
-            portableTargets.Descendants("_SharpProofRunVerifier").Any() ||
+            portableTargets.Descendants("SharpProof.BuildTasks.RunVerifier").Any() ||
             portableTargets.Descendants("Target").Any(static target =>
                 (string?)target.Attribute("Name") is
                     "SharpProofVerify" or "_SharpProofVerifyCore");
@@ -1248,13 +1248,12 @@ internal static class PerformanceGate
             callTargetInvokesCore ||
             verifierExec.Length != 0 ||
             verifierRun.Length != 1 ||
-            verifierRunnerCode == null ||
-            !verifierRunnerCode.Contains(
-                "ICancelableTask", StringComparison.Ordinal) ||
-            !verifierRunnerCode.Contains(
-                "public void Cancel()", StringComparison.Ordinal) ||
-            !verifierRunnerCode.Contains(
-                "process.Kill()", StringComparison.Ordinal) ||
+            inlineTaskFactories.Length != 0 ||
+            verifierRunnerTask == null ||
+            !string.Equals(
+                (string?)verifierRunnerTask.Attribute("AssemblyFile"),
+                "$(_SharpProofBuildTasksPath)",
+                StringComparison.Ordinal) ||
             !ReferenceEquals(
                 verifierRun[0].Ancestors("Target").SingleOrDefault(),
                 verifierCore))

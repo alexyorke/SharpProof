@@ -6,9 +6,9 @@ internal static class IrTraversal
         return term switch
         {
             IrOpaqueTerm opaque =>
-                [.. opaque.Receiver == null
+                opaque.Receiver == null
                     ? opaque.Arguments
-                    : opaque.Arguments.Insert(0, opaque.Receiver)],
+                    : opaque.Arguments.Insert(0, opaque.Receiver),
             IrUnaryTerm unary => [unary.Operand],
             IrBinaryTerm binary => [binary.Left, binary.Right],
             IrConditionalTerm conditional =>

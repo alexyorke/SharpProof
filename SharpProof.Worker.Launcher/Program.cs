@@ -606,6 +606,10 @@ internal sealed partial class LauncherArguments
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath
         }.OfType<string>().ToArray();
+        foreach (var publicationPath in publicationPaths)
+        {
+            WindowsPathIdentity.RequireLocalPath(publicationPath);
+        }
         string?[] candidates = [..runtimeRoots,
             ..LauncherArguments.LauncherRuntimePaths,
             cacheDirectory, RequestPath, ResultPath, CompilerManifestPath,

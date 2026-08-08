@@ -420,6 +420,16 @@
         ]
       },
       {
+        "name": "publicationContainment",
+        "paths": [
+          "SharpProof.BuildTasks/SharpProof.BuildTasks.csproj",
+          "SharpProof.BuildTasks/InvalidatePublishedResult.cs",
+          "SharpProof.BuildTasks/RunVerifier.cs",
+          "SharpProof.Worker.Protocol/WindowsPathIdentity.cs"
+        ],
+        "rationale": "The compiled MSBuild tasks and shared native Windows path identity helper own verifier launch cancellation, publication locking, invalidation, and filesystem alias rejection."
+      },
+      {
         "name": "portableShippingBoundary",
         "paths": [
           "SharpProof.PortableAnalyzer/SharpProof.PortableAnalyzer.csproj",

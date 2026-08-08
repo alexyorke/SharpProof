@@ -191,11 +191,15 @@ artifacts exclude effect annotations and effect-only artifacts exclude
 postcondition claims. On the supported Windows x64 worker host, the
 launcher creates a startup barrier, assigns the worker to a Job Object with
 process and memory limits, and only then releases verification work. Concurrent
-builds use isolated artifact/request/result paths. After validating a response,
-a cross-process mutex serializes publication. The stable result is deleted
-first, the manifest and request are atomically replaced, and the result is
-written last as the commit marker. A failed publication therefore cannot leave
-a stale successful result associated with a partly updated evidence set. The
+builds use isolated artifact/request/result paths. A packaged netstandard2.0
+MSBuild task assembly owns host resolution, cancellation, path validation, and
+pre-verification invalidation for both command-line and Visual Studio MSBuild.
+After validating a response, ordered cross-process locks cover the canonical
+request, result, manifest, and optional SARIF publication set. Partial overlap
+with another declared set is rejected. The stable result is deleted first, the
+manifest and request are atomically replaced, and the result is written last as
+the commit marker. A failed publication therefore cannot leave a stale
+successful result associated with a partly updated evidence set. The
 content-addressed cache includes semantic, protocol, tool, compilation,
 reference, option, target-framework, canonical packaged worker runtime-closure,
 and spec-content identity.

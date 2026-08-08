@@ -37,8 +37,10 @@ disabled). The package-consumer compatibility lane separately validates the
 `netstandard2.0` contract API with its minimum SDK, currently 9.0.300. The
 `SharpProof.Attributes` contract API alone remains a `netstandard2.0` library,
 and `SharpProofProfile=off` omits analyzer/generator loading on an older host.
-Visual Studio and Rider qualification with Roslyn 4.14 or newer remains a
-release gate.
+The preview verifier is qualified for Windows x64 command-line MSBuild and
+Visual Studio 2022 Build Tools 17.14 x64 MSBuild. Rider and Windows ARM64 are
+not supported for this preview. The exact host and filesystem boundary is
+listed in [Preview support boundary](docs/preview-support.md).
 
 The coordinates below are the intended preview packages, but no SharpProof
 package has been promoted to the public NuGet feed yet. Until the first
@@ -321,11 +323,13 @@ dotnet build /p:SharpProofVerify=true
 `SharpProofVerify` remains optional in `advisory`; the `strict` profile
 requires it. It runs after compilation, outside design-time builds. Each
 invocation uses isolated compiler-artifact, request, and result paths. After
-protocol validation, a cross-process mutex serializes publication. The stable
-result is removed first; the manifest and request are atomically replaced, and
-the validated result is written last as the commit marker. An interrupted
-publication therefore leaves no successful result that can be mistaken for a
-current manifest/request/result set. The default result is published under:
+protocol validation, one ordered cross-process lock set covers the request,
+result, manifest, and optional SARIF paths. Partially overlapping publication
+configurations are rejected. The stable result is removed first; the manifest
+and request are atomically replaced, and the validated result is written last
+as the commit marker. An interrupted publication therefore leaves no
+successful result that can be mistaken for a current manifest/request/result
+set. The default result is published under:
 
 ```text
 obj/<Configuration>/<TargetFramework>/SharpProof/result.json
@@ -553,8 +557,13 @@ The full acceptance workflow runs on `windows-latest`. A separate
 package-consumer workflow restores the exact same three-package artifact graph
 and exercises portable analyzer consumers on Windows x64, Linux x64, macOS x64,
 and macOS ARM64. Only Windows x64 executes the packaged worker; every other
-matrix host asserts the explicit unsupported-host rejection. Real Visual
-Studio, Rider, and Windows ARM64 validation remain outstanding release gates.
+matrix host asserts the explicit unsupported-host rejection. Windows x64
+command-line and Visual Studio 2022 Build Tools 17.14 x64 MSBuild are
+qualified, including percent-containing paths and local publication paths
+beyond 260 characters. Project directories longer than 239 characters fail
+before compiler launch with a classified build error. Rider, Windows ARM64,
+UNC/shared-network publication, and hostile concurrent filesystem mutation are
+outside this preview's supported boundary.
 
 Every package build runs SDK package validation and emits a matching `.snupkg`
 with portable PDBs. Package tests require the main packages to remain PDB-free,

@@ -8,6 +8,15 @@ namespace SharpProof.Worker.Test;
 public sealed class WindowsPublicationSetTests
 {
     [Test]
+    [Platform("Win")]
+    public void RemotePublicationPathIsRejected()
+    {
+        Assert.Throws<ArgumentException>((Action)(() =>
+            WindowsPathIdentity.RequireLocalPath(
+                @"\\server\share\SharpProof\result.json")));
+    }
+
+    [Test]
     public void SameSetInDifferentOrdersSerializesWithoutDeadlock()
     {
         using var directory = TemporaryDirectory.Create();

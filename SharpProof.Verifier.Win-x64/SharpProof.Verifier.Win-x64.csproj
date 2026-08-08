@@ -33,6 +33,11 @@
                       SkipGetTargetFrameworkProperties="true"
                       PrivateAssets="all"
                       TreatAsPackageReference="false" />
+    <ProjectReference Include="..\SharpProof.BuildTasks\SharpProof.BuildTasks.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      PrivateAssets="all"
+                      TreatAsPackageReference="false" />
   </ItemGroup>
   <Target Name="_SharpProofPrepareNuspecProperties"
           BeforeTargets="GenerateNuspec">
