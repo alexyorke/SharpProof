@@ -2665,8 +2665,8 @@ public sealed class WorkerTests
                 summary.DependencyEvidence.Select(static item => item.Origin),
                 Does.Contain(CompilerSummaryOrigin.ImplementationIl));
             Assert.That(
-                implementationEvidence?.EvidenceSha256,
-                Has.Length.EqualTo(64));
+                implementationEvidence?.EvidenceSha256.Length ?? 0,
+                Is.EqualTo(64));
             Assert.That(
                 result.ProofCore.Any(static item => item.StartsWith(
                     "source-summary:",
