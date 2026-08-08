@@ -31,6 +31,7 @@ public sealed class AnalyzerArchitectureTests
         "SharpProof.Frontend",
         "SharpProof.Ir",
         "SharpProof.Specs",
+        "SharpProof.Summaries",
         "SharpProof.Worker.Protocol"
     ];
 

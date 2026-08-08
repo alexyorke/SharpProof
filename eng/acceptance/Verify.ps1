@@ -266,9 +266,11 @@ Assert-Equal `
     $contract.analyzer.defaultAssumptionPolicy `
     'SharpProofAssumptionPolicy'
 Assert-Equal ($contract.supportedTargetFrameworks -join ',') 'netstandard2.0,net8.0,net472' 'supportedTargetFrameworks'
-Assert-Equal $contract.worker.protocolVersion 9 'worker.protocolVersion'
+Assert-Equal $contract.worker.protocolVersion 10 'worker.protocolVersion'
 Assert-Equal $contract.worker.manifestSchemaVersion 4 'worker.manifestSchemaVersion'
-Assert-Equal $contract.worker.compilerArtifactSchemaVersion 10 'worker.compilerArtifactSchemaVersion'
+Assert-Equal $contract.worker.compilerArtifactSchemaVersion 11 'worker.compilerArtifactSchemaVersion'
+Assert-Equal $contract.worker.relationalSummarySchemaVersion 1 'worker.relationalSummarySchemaVersion'
+Assert-Equal $contract.worker.specificationPackSchemaVersion 1 'worker.specificationPackSchemaVersion'
 Assert-Equal $contract.worker.maximumParallelism 4 'worker.maximumParallelism'
 Assert-Equal $contract.worker.maximumWorkerProcesses 4 'worker.maximumWorkerProcesses'
 Assert-Equal $contract.worker.maximumExpressionDepth 64 'worker.maximumExpressionDepth'
@@ -279,7 +281,7 @@ Assert-Equal $contract.worker.maximumMethodWallSeconds 10 'worker.maximumMethodW
 Assert-Equal $contract.worker.maximumProjectWallSeconds 300 'worker.maximumProjectWallSeconds'
 Assert-Equal $contract.worker.forcedTerminationMilliseconds 1000 'worker.forcedTerminationMilliseconds'
 Assert-Equal $contract.worker.maximumProjectDirectoryCharacters 239 'worker.maximumProjectDirectoryCharacters'
-Assert-Equal $contract.cache.schemaVersion 11 'cache.schemaVersion'
+Assert-Equal $contract.cache.schemaVersion 12 'cache.schemaVersion'
 Assert-Equal $contract.cache.enabledByDefault $true 'cache.enabledByDefault'
 Assert-Equal $contract.cache.maximumMiB 512 'cache.maximumMiB'
 Assert-Equal ($contract.cache.cacheableOutcomes -join ',') 'Refuted' 'cache.cacheableOutcomes'
@@ -507,6 +509,7 @@ try {
         'SharpProof.Package.Test\SharpProof.Package.Test.csproj',
         'SharpProof.Smt.Test\SharpProof.Smt.Test.csproj',
         'SharpProof.Specs.Test\SharpProof.Specs.Test.csproj',
+        'SharpProof.Summaries.Test\SharpProof.Summaries.Test.csproj',
         'SharpProof.Testing.Test\SharpProof.Testing.Test.csproj',
         'SharpProof.Gates.Test\SharpProof.Gates.Test.csproj',
         'SharpProof.Fuzz.Test\SharpProof.Fuzz.Test.csproj',

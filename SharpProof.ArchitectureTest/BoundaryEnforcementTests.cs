@@ -24,6 +24,7 @@ public sealed class BoundaryEnforcementTests
         "SharpProof.PortableAnalyzer",
         "SharpProof.Smt",
         "SharpProof.Specs",
+        "SharpProof.Summaries",
         "SharpProof.Verify",
         "SharpProof.Worker",
         "SharpProof.Worker.Launcher",
@@ -43,6 +44,7 @@ public sealed class BoundaryEnforcementTests
         "SharpProof.PortableAnalyzer",
         "SharpProof.Smt",
         "SharpProof.Specs",
+        "SharpProof.Summaries",
         "SharpProof.Verify",
         "SharpProof.Worker"
     ];
@@ -437,6 +439,8 @@ public sealed class BoundaryEnforcementTests
             @"SharpProof.Smt\SharpProof.Smt.csproj",
             @"SharpProof.Specs.Test\SharpProof.Specs.Test.csproj",
             @"SharpProof.Specs\SharpProof.Specs.csproj",
+            @"SharpProof.Summaries.Test\SharpProof.Summaries.Test.csproj",
+            @"SharpProof.Summaries\SharpProof.Summaries.csproj",
             @"SharpProof.Testing.Test\SharpProof.Testing.Test.csproj",
             @"SharpProof.Testing\SharpProof.Testing.csproj",
             @"SharpProof.Verifier.Win-x64\SharpProof.Verifier.Win-x64.csproj",

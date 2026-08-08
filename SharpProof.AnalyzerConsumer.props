@@ -3,6 +3,7 @@
   <PropertyGroup>
     <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
     <SharpProofFeatures Condition="'$(SharpProofFeatures)' == ''">all</SharpProofFeatures>
+    <SharpProofSpecificationPacks Condition="'$(SharpProofSpecificationPacks)' == ''"></SharpProofSpecificationPacks>
     <_SharpProofProfileNormalized>$([System.String]::Copy('$(SharpProofProfile)').ToLowerInvariant())</_SharpProofProfileNormalized>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">true</SharpProofVerify>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == ''">false</SharpProofVerify>
@@ -13,6 +14,7 @@
     <CompilerVisibleProperty Include="SharpProofFeatures" />
     <CompilerVisibleProperty Include="SharpProofVerifyPolicy" />
     <CompilerVisibleProperty Include="SharpProofAssumptionPolicy" />
+    <CompilerVisibleProperty Include="SharpProofSpecificationPacks" />
     <CompilerVisibleProperty Include="_SharpProofCompilerManifestPath" />
     <CompilerVisibleProperty Include="_SharpProofCompilationTargetFramework" />
     <CompilerVisibleProperty Include="_SharpProofProjectDirectory" />
@@ -42,6 +44,7 @@
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\SharpProof.Frontend.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\SharpProof.Ir.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\SharpProof.Specs.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\SharpProof.Summaries.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\SharpProof.Worker.Protocol.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\System.IO.Pipelines.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\System.Text.Encodings.Web.dll" />

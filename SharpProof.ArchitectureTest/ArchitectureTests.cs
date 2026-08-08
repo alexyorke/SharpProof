@@ -42,6 +42,7 @@ public sealed class ArchitectureTests
         "SharpProof.Effects",
         "SharpProof.Verify",
         "SharpProof.Smt",
+        "SharpProof.Summaries",
         "SharpProof.Worker.Protocol",
         "SharpProof.Worker",
         "SharpProof.Worker.Launcher"
@@ -160,6 +161,7 @@ public sealed class ArchitectureTests
                 "SharpProof.Frontend",
                 "SharpProof.Ir",
                 "SharpProof.Specs",
+                "SharpProof.Summaries",
                 "SharpProof.Worker.Protocol"
             ],
             ["SharpProof.ContractForGenerator"] = ["SharpProof.Contracts"],
@@ -180,6 +182,7 @@ public sealed class ArchitectureTests
             ],
             ["SharpProof.Verify"] = ["SharpProof.Ir", "SharpProof.Specs"],
             ["SharpProof.Smt"] = ["SharpProof.Ir", "SharpProof.Verify"],
+            ["SharpProof.Summaries"] = ["SharpProof.Ir"],
             ["SharpProof.Worker.Protocol"] = [],
             ["SharpProof.Worker"] = [
                 "SharpProof.CompilerArtifact",
@@ -330,6 +333,7 @@ public sealed class ArchitectureTests
             "SharpProof.Frontend",
             "SharpProof.Ir",
             "SharpProof.Smt",
+            "SharpProof.Summaries",
             "SharpProof.Verify",
             "SharpProof.Worker",
             "SharpProof.Worker.Protocol",

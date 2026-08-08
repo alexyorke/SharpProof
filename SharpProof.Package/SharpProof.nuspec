@@ -53,6 +53,9 @@
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Ir.pdb" target="tools\collector" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Specs.dll" target="tools\collector" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Specs.pdb" target="tools\collector" />
+    <file src="..\SharpProof.Specs\RelationalSpecPackCatalog.json" target="tools\collector" />
+    <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Summaries.dll" target="tools\collector" />
+    <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Summaries.pdb" target="tools\collector" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Worker.Protocol.dll" target="tools\collector" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Worker.Protocol.pdb" target="tools\collector" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\Microsoft.Bcl.AsyncInterfaces.dll" target="tools\collector" />

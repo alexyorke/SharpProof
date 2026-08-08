@@ -28,6 +28,7 @@ both generated C# projections before building.
 |---|---:|---|---|
 | `SharpProofProfile` | `advisory` | Analyzer/build posture: `advisory`, `strict`, or `off` | `SharpProof.targets`; mirrored by `contract.json` |
 | `SharpProofFeatures` | `all` | Analyzer and worker-manifest features: `effects`, `contracts`, or `all` | `SharpProof.targets`; mirrored by `contract.json` |
+| `SharpProofSpecificationPacks` | unset | Semicolon-delimited IDs of embedded audited relational packs to enable; unknown or blank IDs fail closed | `RelationalSpecPackCatalog.json`, compiler collector, and preview-interface catalog |
 | `SharpProofVerifyPolicy` | `advisory`; strict defaults to `require-proven` | Incomplete selected-analysis policy: `advisory`, `warn-on-unknown`, or `require-proven` | verifier targets; mirrored by `contract.json` |
 | `SharpProofAssumptionPolicy` | `allow`; strict defaults to `error` | User/trusted evidence policy: `allow`, `warn`, or `error` | verifier targets; mirrored by `contract.json` |
 | `SharpProofVerify` | `false`; strict requires `true` | Optional advisory worker execution; mandatory in strict | `SharpProof.targets` |
@@ -111,7 +112,7 @@ process boundary.
 
 `SharpProofVerifyMaximumExpressionDepth` is also a compiler-visible property.
 The collector parses it, enforces the 1-through-256 range, and seals it into the
-schema-10 compiler artifact. The launcher supplies the same property as the
+schema-11 compiler artifact. The launcher supplies the same property as the
 worker request budget. A mismatch is `CompilerManifestMismatch` and stops
 before cache lookup or backend creation; neither side may silently use a
 different depth.
@@ -215,8 +216,9 @@ is the observed runner total rather than the requested budget.
 | IDE edit p95 | At most 100 ms |
 | IDE edit maximum | At most 250 ms |
 
-The active contract also fixes protocol version 9, cache schema version 11,
-claim-manifest schema version 4, and compiler artifact schema version 10, along
+The active contract also fixes protocol version 10, cache schema version 12,
+claim-manifest schema version 4, compiler artifact schema version 11,
+relational-summary schema version 1, and specification-pack schema version 1, along
 with exact proof-kernel and component TCB path inventories, formatting-neutral
 Roslyn complexity ratchets, and the reference surfaces `netstandard2.0`,
 `net8.0`, and `net472`.

@@ -29,7 +29,8 @@ public sealed class WorkerMsBuildIntegrationTests
         "SharpProofProfile",
         "SharpProofFeatures",
         "SharpProofVerifyPolicy",
-        "SharpProofAssumptionPolicy"
+        "SharpProofAssumptionPolicy",
+        "SharpProofSpecificationPacks"
     ];
     private static readonly string[] s_compilerManifestProperties = [
         "_SharpProofCompilerManifestPath",
@@ -387,6 +388,56 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(
                 request.CompilerManifest.Path,
                 Is.EqualTo(Path.GetFullPath(project.CompilerManifestPath)));
+        }
+    }
+
+    [Test]
+    public async Task RelationalSpecificationPackIsExplicitAndPackaged()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Maximum(int left, int right) {
+                    Contract.Ensures(
+                        Contract.Result<int>() ==
+                        (left >= right ? left : right));
+                    return Math.Max(left, right);
+                }
+            }
+            """);
+
+        var disabledBuild = await project.BuildAsync(verify: true);
+        Assert.That(disabledBuild.ExitCode, Is.Zero, disabledBuild.Output);
+        var disabled = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(project.ResultPath))!;
+
+        var enabledBuild = await project.BuildAsync(
+            verify: true,
+            ("SharpProofSpecificationPacks", "dotnet.scalar"));
+        Assert.That(enabledBuild.ExitCode, Is.Zero, enabledBuild.Output);
+        var enabled = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(project.ResultPath))!;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                disabled.ClaimResults.Single().Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                disabled.ClaimResults.Single().Reason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(
+                enabled.ClaimResults.Single().Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                enabled.ClaimResults.Single().ProofCore.Any(
+                    static item => item.StartsWith(
+                        "spec-pack:dotnet.scalar@1:",
+                        StringComparison.Ordinal)),
+                Is.True);
         }
     }
 
@@ -2669,7 +2720,7 @@ public sealed class WorkerMsBuildIntegrationTests
                     Is.EqualTo("SharpProof.CompilerManifest"));
                 Assert.That(
                     root.GetProperty("schemaVersion").GetInt32(),
-                    Is.EqualTo(10));
+                    Is.EqualTo(11));
                 Assert.That(
                     root.GetProperty("protocolVersion").GetString(),
                     Is.EqualTo(WorkerProtocolVersions.Current));

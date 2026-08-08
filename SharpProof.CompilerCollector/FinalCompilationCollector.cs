@@ -7,6 +7,8 @@ internal static class FinalCompilationCollector
     private const string OutputOption = "build_property._SharpProofCompilerManifestPath",
         TargetFrameworkOption = "build_property._SharpProofCompilationTargetFramework",
         ProjectDirectoryOption = "build_property._SharpProofProjectDirectory",
+        SpecificationPacksOption =
+            "build_property.SharpProofSpecificationPacks",
         MaximumExpressionDepthOption =
             "build_property.SharpProofVerifyMaximumExpressionDepth";
     internal static void Collect(CompilationAnalysisContext context, AnalyzerConfiguration configuration)
@@ -76,9 +78,35 @@ internal static class FinalCompilationCollector
         var artifact = CompilerManifestArtifactProducer.Create(
             compilation, Get(options, ProjectDirectoryOption),
             targetFramework, features, discovery, maximumExpressionDepth,
-            context.CancellationToken, context.Options.AdditionalFiles);
+            context.CancellationToken,
+            context.Options.AdditionalFiles,
+            ParseSpecificationPacks(Get(options, SpecificationPacksOption)));
         return CompilerManifestArtifactJson.Serialize(artifact);
     }
+
+    private static ImmutableArray<string> ParseSpecificationPacks(
+        string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return [];
+        }
+
+        var packs = value.Split([';'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(static pack => pack.Trim())
+            .Where(static pack => pack.Length != 0)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static pack => pack, StringComparer.Ordinal)
+            .ToImmutableArray();
+        if (packs.IsEmpty)
+        {
+            throw new InvalidOperationException(
+                "SharpProofSpecificationPacks must contain a pack identifier.");
+        }
+
+        return packs;
+    }
+
     private static string Get(AnalyzerConfigOptions options, string key)
     {
         return options.TryGetValue(key, out var value) ? value : string.Empty;

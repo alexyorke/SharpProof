@@ -375,6 +375,10 @@ internal static class CompilerManifestArtifactJson
             Schema: CompilerManifestArtifactVersions.Schema,
             SchemaVersion: CompilerManifestArtifactVersions.Current,
             ProtocolVersion: WorkerProtocolVersions.Current,
+            RelationalSummarySchemaVersion:
+                CompilerRelationalSummaryVersions.Current,
+            SpecificationPackSchemaVersion:
+                CompilerSpecificationPackVersions.Current,
             Compilation: not null,
             MaximumExpressionDepth: >= 1 and <= 256
         } &&

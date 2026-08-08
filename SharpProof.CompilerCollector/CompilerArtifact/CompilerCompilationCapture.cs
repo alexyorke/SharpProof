@@ -222,7 +222,7 @@ internal static class CompilerCompilationCapture
             : reader.GetString(reader.GetModuleDefinition().Name);
     }
 
-    private static string ResolveSiblingModule(string manifestPath, string name)
+    internal static string ResolveSiblingModule(string manifestPath, string name)
     {
         if (!string.Equals(Path.GetFileName(name), name, StringComparison.Ordinal))
         {
@@ -244,12 +244,12 @@ internal static class CompilerCompilationCapture
         return path;
     }
 
-    private static string ReadModuleName(MetadataReader reader)
+    internal static string ReadModuleName(MetadataReader reader)
     {
         return reader.GetString(reader.GetModuleDefinition().Name);
     }
 
-    private static unsafe bool MetadataEquals(
+    internal static unsafe bool MetadataEquals(
         MetadataReader left,
         MetadataReader right)
     {
@@ -296,7 +296,7 @@ internal static class CompilerCompilationCapture
             : fullPath;
     }
 
-    private static string Hash(Stream stream, CancellationToken cancellationToken)
+    internal static string Hash(Stream stream, CancellationToken cancellationToken)
     {
         stream.Position = 0;
         using var hash = System.Security.Cryptography.SHA256.Create();

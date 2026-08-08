@@ -11,6 +11,7 @@
     "SharpProofLauncherPath",
     "SharpProofPortableAnalyzerPath",
     "SharpProofProfile",
+    "SharpProofSpecificationPacks",
     "SharpProofToolsDirectory",
     "SharpProofVerify",
     "SharpProofVerifyCacheDirectory",
@@ -35,9 +36,11 @@
     "SharpProofMode"
   ],
   "versions": {
-    "workerProtocol": 9,
+    "workerProtocol": 10,
     "workerManifest": 4,
-    "compilerArtifact": 10,
-    "workerCache": 11
+    "compilerArtifact": 11,
+    "relationalSummary": 1,
+    "specificationPack": 1,
+    "workerCache": 12
   }
 }

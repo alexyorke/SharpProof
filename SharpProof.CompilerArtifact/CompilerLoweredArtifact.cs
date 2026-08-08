@@ -23,12 +23,24 @@ internal static class CompilerLoweredArtifact
         }
 
         var body = preparation.Body;
-        var roots = preparation.Clauses.Select(static clause => clause.Condition).ToArray();
+        var orderedSummaryCalls = body?.SummaryCalls.Values
+            .OrderBy(static item => item.Instruction.Value)
+            .ToArray() ?? [];
+        var roots = preparation.Clauses
+            .Select(static clause => clause.Condition)
+            .Concat(orderedSummaryCalls.Select(
+                static call => call.NormalRelation))
+            .ToArray();
         var variables = preparation.Variables
             .SelectMany(static variable => variable.CurrentStateVariable.HasValue
                 ? new[] { variable.Variable, variable.CurrentStateVariable.Value }
                 : [variable.Variable])
-            .Concat(body?.ParameterBindings.SelectMany(static item => new[] { item.Key, item.Value }) ?? []).Distinct().ToArray();
+            .Concat(body?.ParameterBindings.SelectMany(
+                static item => new[] { item.Key, item.Value }) ?? [])
+            .Concat(orderedSummaryCalls.SelectMany(static call =>
+                call.ExistentialVariables.Insert(0, call.Result)))
+            .Distinct()
+            .ToArray();
         var encoded = PortableIrGraphCodec.Encode(preparation.Factory, body?.Program, roots, variables);
         var artifact = new CompilerCallableArtifact
         {
@@ -72,7 +84,16 @@ internal static class CompilerLoweredArtifact
                 Target = encoded.VariableIndices[item.Value]
             })];
         var instructions = encoded.Graph.Blocks.SelectMany(static block => block.Instructions).ToArray();
-        foreach (var call in body.SpecCalls.Values)
+        var allCalls = body.SpecCalls.Values
+            .Select(static call => (
+                call.Instruction,
+                call.CallIdentity))
+            .Concat(body.SummaryCalls.Values.Select(static call => (
+                call.Instruction,
+                call.CallIdentity)))
+            .OrderBy(static call => call.Instruction.Value)
+            .ToArray();
+        foreach (var call in allCalls)
         {
             var instruction = instructions[encoded.InstructionIndices[call.Instruction]];
             var member = encoded.Graph.Members[instruction.B];
@@ -83,7 +104,7 @@ internal static class CompilerLoweredArtifact
 
             member.DocumentationCommentId = call.CallIdentity;
         }
-        artifact.Body.Calls = [.. body.SpecCalls.Values.OrderBy(static item => item.Instruction.Value)
+        artifact.Body.Calls = [.. allCalls
             .Select(item => new CompilerCallIdentityArtifact {
                 Instruction = encoded.InstructionIndices[item.Instruction], Identity = item.CallIdentity
             })];
@@ -91,6 +112,25 @@ internal static class CompilerLoweredArtifact
             .Select(item => new CompilerSpecCallArtifact {
                 Instruction = encoded.InstructionIndices[item.Instruction], WitnessIdentifier = item.WitnessIdentifier,
                 ConsumesMemoryHavoc = item.ConsumesMemoryHavoc
+            })];
+        artifact.Body.SummaryCalls = [.. orderedSummaryCalls.Select((item, index) =>
+            new CompilerSummaryCallArtifact {
+                Instruction = encoded.InstructionIndices[item.Instruction],
+                Identity = item.CallIdentity,
+                Origin = item.Origin,
+                Result = encoded.VariableIndices[item.Result],
+                ExistentialVariables = [.. item.ExistentialVariables.Select(
+                    variable => encoded.VariableIndices[variable])],
+                NormalRelationRoot = preparation.Clauses.Length + index,
+                EvidenceSha256 = item.EvidenceSha256,
+                EvidenceIdentity = item.EvidenceIdentity,
+                DependencyEvidence = [.. item.DependencyEvidence.Select(
+                    static evidence => new CompilerSummaryEvidenceArtifact
+                    {
+                        Origin = evidence.Origin,
+                        EvidenceSha256 = evidence.EvidenceSha256,
+                        EvidenceIdentity = evidence.EvidenceIdentity
+                    })]
             })];
         return artifact;
     }
@@ -168,9 +208,11 @@ internal static class CompilerLoweredArtifact
         }
 
         var decoded = PortableIrGraphCodec.Decode(artifact.Graph);
-        if (decoded.Roots.Count != artifact.Clauses.Length)
+        var summaryRootCount = artifact.Body?.SummaryCalls?.Length ?? 0;
+        if (decoded.Roots.Count != artifact.Clauses.Length + summaryRootCount)
         {
-            throw new InvalidDataException("A lowered callable contains non-clause roots.");
+            throw new InvalidDataException(
+                "A lowered callable contains an invalid root closure.");
         }
 
         IrTerm Root(int index)
@@ -245,7 +287,13 @@ internal static class CompilerLoweredArtifact
             return new CompilerCanonicalVariable(row.Role, row.Ordinal, variable, current, interval, row.ModelLabel);
         }).ToImmutableArray();
         ValidateVariables(decoded.Factory, variables);
-        var body = DecodeBody(artifact.Body, artifact.Graph, decoded, variables);
+        var body = DecodeBody(
+            artifact.Body,
+            artifact.Graph,
+            decoded,
+            variables,
+            artifact.Clauses.Length,
+            compilation);
         return new CompilerCallablePreparation(
             decoded.Factory, entry, clauses, variables, WorkerClaimReason.None, body)
         {
@@ -344,7 +392,9 @@ internal static class CompilerLoweredArtifact
         CompilerBodyArtifact? row,
         PortableIrGraph portable,
         DecodedPortableIrGraph graph,
-        ImmutableArray<CompilerCanonicalVariable> variables)
+        ImmutableArray<CompilerCanonicalVariable> variables,
+        int clauseRootCount,
+        CompilerCompilationSnapshot compilation)
     {
         if (row == null)
         {
@@ -355,7 +405,8 @@ internal static class CompilerLoweredArtifact
 
             return null;
         }
-        if (row.ParameterBindings == null || row.Calls == null || row.SpecCalls == null)
+        if (row.ParameterBindings == null || row.Calls == null ||
+            row.SpecCalls == null || row.SummaryCalls == null)
         {
             throw new InvalidDataException("A lowered body is incomplete.");
         }
@@ -363,7 +414,8 @@ internal static class CompilerLoweredArtifact
         if (row.Kind == CompilerPreparedBodyKind.Trivial)
         {
             if (graph.Program != null || row.ParameterBindings.Length != 0 ||
-                row.Calls.Length != 0 || row.SpecCalls.Length != 0)
+                row.Calls.Length != 0 || row.SpecCalls.Length != 0 ||
+                row.SummaryCalls.Length != 0)
             {
                 throw new InvalidDataException("A trivial lowered body is invalid.");
             }
@@ -403,33 +455,217 @@ internal static class CompilerLoweredArtifact
             bindings.Add(source, target);
         }
         var specs = ImmutableDictionary.CreateBuilder<IrInstructionId, CompilerPreparedSpecCall>();
+        var summaries = ImmutableDictionary.CreateBuilder<IrInstructionId, CompilerPreparedSummaryCall>();
         var calls = graph.Instructions.OfType<IrCallInstruction>().ToArray();
         var portableCalls = portable.Blocks.SelectMany(static block => block.Instructions).Where(
             static instruction => instruction.Kind == IrInstructionKind.Call).ToArray();
-        if (row.Calls.Length != calls.Length || row.SpecCalls.Length != calls.Length)
+        if (row.Calls.Length != calls.Length ||
+            row.SpecCalls.Length + row.SummaryCalls.Length != calls.Length)
         {
-            throw new InvalidDataException("Lowered spec calls do not equal program calls.");
+            throw new InvalidDataException(
+                "Lowered call evidence does not equal program calls.");
         }
 
+        var identities = new Dictionary<IrInstructionId, string>();
         for (var index = 0; index < row.Calls.Length; index++)
         {
             var identity = row.Calls[index] ??
                 throw new InvalidDataException("A lowered call identity is invalid.");
-            var spec = row.SpecCalls[index] ??
-                throw new InvalidDataException("A lowered spec-call descriptor is invalid.");
             var call = calls[index];
             if (At(graph.Instructions, identity.Instruction, "instruction").Id != call.Id ||
-                At(graph.Instructions, spec.Instruction, "instruction").Id != call.Id ||
-                string.IsNullOrWhiteSpace(identity.Identity) || string.IsNullOrWhiteSpace(spec.WitnessIdentifier) ||
+                string.IsNullOrWhiteSpace(identity.Identity) ||
                 At(portable.Members, portableCalls[index].B, "member").DocumentationCommentId != identity.Identity)
             {
                 throw new InvalidDataException("A lowered call descriptor is invalid.");
             }
 
-            specs.Add(call.Id, new CompilerPreparedSpecCall(
-                call.Id, identity.Identity, spec.WitnessIdentifier, spec.ConsumesMemoryHavoc));
+            identities.Add(call.Id, identity.Identity);
         }
-        return CompilerPreparedBody.ProgramBody(graph.Program, bindings.ToImmutable(), specs.ToImmutable());
+
+        foreach (var spec in row.SpecCalls)
+        {
+            if (spec == null)
+            {
+                throw new InvalidDataException(
+                    "A lowered spec-call descriptor is invalid.");
+            }
+
+            var instruction = At(
+                graph.Instructions,
+                spec.Instruction,
+                "instruction");
+            if (instruction is not IrCallInstruction call ||
+                !identities.TryGetValue(call.Id, out var identity) ||
+                string.IsNullOrWhiteSpace(spec.WitnessIdentifier) ||
+                specs.ContainsKey(call.Id))
+            {
+                throw new InvalidDataException(
+                    "A lowered spec-call descriptor is invalid.");
+            }
+
+            specs.Add(call.Id, new CompilerPreparedSpecCall(
+                call.Id,
+                identity,
+                spec.WitnessIdentifier,
+                spec.ConsumesMemoryHavoc));
+        }
+
+        for (var index = 0; index < row.SummaryCalls.Length; index++)
+        {
+            var summary = row.SummaryCalls[index] ??
+                throw new InvalidDataException(
+                    "A lowered summary-call descriptor is invalid.");
+            var instruction = At(
+                graph.Instructions,
+                summary.Instruction,
+                "instruction");
+            if (instruction is not IrCallInstruction call ||
+                !identities.TryGetValue(call.Id, out var identity) ||
+                summary.Identity != identity ||
+                !ValidSummaryEvidence(
+                    summary.Origin,
+                    summary.EvidenceSha256,
+                    summary.EvidenceIdentity,
+                    compilation) ||
+                !ValidDependencyEvidence(
+                    summary.DependencyEvidence,
+                    compilation) ||
+                summary.NormalRelationRoot != clauseRootCount + index ||
+                !WorkerProtocolJson.IsSha256(summary.EvidenceSha256) ||
+                summary.ExistentialVariables == null ||
+                specs.ContainsKey(call.Id) ||
+                summaries.ContainsKey(call.Id))
+            {
+                throw new InvalidDataException(
+                    "A lowered summary-call descriptor is invalid.");
+            }
+
+            var result = At(
+                graph.Variables,
+                summary.Result,
+                "variable");
+            var existentials = summary.ExistentialVariables
+                .Select(index => At(
+                    graph.Variables,
+                    index,
+                    "variable"))
+                .ToImmutableArray();
+            var relation = At(
+                graph.Roots,
+                summary.NormalRelationRoot,
+                "root");
+            var free = existentials.Insert(0, result);
+            if (!call.Target.HasValue ||
+                graph.Factory.GetVariableInfo(call.Target.Value).Type !=
+                graph.Factory.GetVariableInfo(result).Type ||
+                free.Distinct().Count() != free.Length ||
+                relation.Type != graph.Factory.BooleanType)
+            {
+                throw new InvalidDataException(
+                    "A lowered source-call relation is invalid.");
+            }
+
+            summaries.Add(call.Id, new CompilerPreparedSummaryCall(
+                call.Id,
+                identity,
+                summary.Origin,
+                result,
+                existentials,
+                relation,
+                summary.EvidenceSha256,
+                summary.EvidenceIdentity,
+                [.. summary.DependencyEvidence.Select(static evidence =>
+                    new CompilerPreparedSummaryEvidence(
+                        evidence.Origin,
+                        evidence.EvidenceSha256,
+                        evidence.EvidenceIdentity))]));
+        }
+
+        if (specs.Count + summaries.Count != calls.Length)
+        {
+            throw new InvalidDataException(
+                "Lowered call evidence is incomplete.");
+        }
+
+        return CompilerPreparedBody.ProgramBody(
+            graph.Program,
+            bindings.ToImmutable(),
+            specs.ToImmutable(),
+            summaries.ToImmutable());
+    }
+
+    private static bool ValidSummaryEvidenceIdentity(
+        CompilerSummaryOrigin origin,
+        string? identity)
+    {
+        if (identity == null)
+        {
+            return false;
+        }
+
+        if (origin != CompilerSummaryOrigin.SpecificationPack)
+        {
+            return identity.Length == 0;
+        }
+
+        return identity.Length is > 0 and <= 128 &&
+            identity.Contains('@') &&
+            identity.All(static character =>
+                character is >= 'a' and <= 'z' or
+                >= '0' and <= '9' or '.' or '-' or '@');
+    }
+
+    private static bool ValidSummaryEvidence(
+        CompilerSummaryOrigin origin,
+        string? sha256,
+        string? identity,
+        CompilerCompilationSnapshot compilation)
+    {
+        return Enum.IsDefined(typeof(CompilerSummaryOrigin), origin) &&
+            WorkerProtocolJson.IsSha256(sha256) &&
+            ValidSummaryEvidenceIdentity(origin, identity) &&
+            (origin != CompilerSummaryOrigin.ImplementationIl ||
+                (compilation.References ?? []).SelectMany(
+                        static reference => reference?.Modules ?? [])
+                    .Any(module => module != null &&
+                        module.Sha256 == sha256));
+    }
+
+    private static bool ValidDependencyEvidence(
+        CompilerSummaryEvidenceArtifact[]? evidence,
+        CompilerCompilationSnapshot compilation)
+    {
+        if (evidence == null)
+        {
+            return false;
+        }
+
+        string? previous = null;
+        foreach (var item in evidence)
+        {
+            if (item == null ||
+                !ValidSummaryEvidence(
+                    item.Origin,
+                    item.EvidenceSha256,
+                    item.EvidenceIdentity,
+                    compilation))
+            {
+                return false;
+            }
+
+            var key = ((int)item.Origin).ToString(
+                    CultureInfo.InvariantCulture) + "|" +
+                item.EvidenceIdentity + "|" + item.EvidenceSha256;
+            if (previous != null &&
+                StringComparer.Ordinal.Compare(previous, key) >= 0)
+            {
+                return false;
+            }
+
+            previous = key;
+        }
+
+        return true;
     }
     private static WorkerClaimEvidence ManifestEvidence(CompilerContractEvidence value)
     {

@@ -125,7 +125,7 @@ before assembling a `Refuted` record.
 
 ## Worker verification records
 
-Protocol version 9 binds compiler-manifest evidence and separates run state,
+Protocol version 10 binds compiler-manifest evidence and separates run state,
 callable coverage, and claim outcome.
 Every enum reserves `Unspecified` as its zero value; a valid request or response
 must use a permitted nonzero value where the field is required.
@@ -229,7 +229,7 @@ Effect claim records have an additional closed certainty field:
 A may-effect summary is suitable for proving the absence of a disallowed
 effect, but the presence of a may-effect is not itself a concrete trace.
 Consequently a complete summary that does not establish the contract remains
-`Unknown(EffectContractNotEstablished)`. Compiler artifact schema 10 can seal
+`Unknown(EffectContractNotEstablished)`. Compiler artifact schema 11 can seal
 one unconditional definite managed object/array allocation event for
 independent worker replay. The worker validates its order, source-tree
 identity/span, selected-constraint and semantic-operation hashes, and sealed
@@ -335,7 +335,7 @@ Unknown outcomes, protocol errors, cancellation, timeout, malformed results,
 backend failures, and failed replay are never semantic cache entries. Only a
 `Complete`, exact-manifest, postcondition-only response with complete callable
 coverage and all claims replay-validated `Refuted` is cacheable. Cache schema
-version 11 revalidates every read against the complete current manifest,
+version 12 revalidates every read against the complete current manifest,
 reconstructs supported scalar models, checks entry assumptions and source
 ranges, and repeats whole-body replay. Proven claims, effect claims, and
 unsupported models are not written or reused. `require-proven` runs bypass

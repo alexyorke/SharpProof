@@ -1,4 +1,4 @@
-using static SharpProof.Worker.SymbolicTermOperations;
+using static SharpProof.Ir.IrSemanticTerms;
 
 namespace SharpProof.Worker;
 

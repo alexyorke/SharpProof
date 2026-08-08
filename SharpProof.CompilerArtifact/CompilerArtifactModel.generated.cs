@@ -11,7 +11,17 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 10;
+    internal const int Current = 11;
+}
+
+internal static class CompilerRelationalSummaryVersions
+{
+    internal const int Current = 1;
+}
+
+internal static class CompilerSpecificationPackVersions
+{
+    internal const int Current = 1;
 }
 
 internal enum CompilerContractKind
@@ -40,6 +50,13 @@ internal enum CompilerPreparedBodyKind
 {
     Trivial = 0,
     Program = 1
+}
+
+internal enum CompilerSummaryOrigin
+{
+    Source = 0,
+    ImplementationIl = 1,
+    SpecificationPack = 2
 }
 
 internal sealed record CompilerCallablePreparation(
@@ -82,7 +99,8 @@ internal sealed record CompilerPreparedBody(
     CompilerPreparedBodyKind Kind,
     IrProgram? Program,
     ImmutableDictionary<IrVarId, IrVarId> ParameterBindings,
-    ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> SpecCalls
+    ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> SpecCalls,
+    ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall> SummaryCalls
 )
 {
     internal const int MaximumInstructions = 4096;
@@ -92,17 +110,20 @@ internal sealed record CompilerPreparedBody(
             CompilerPreparedBodyKind.Trivial,
             null,
             ImmutableDictionary<IrVarId, IrVarId>.Empty,
-            ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty);
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty);
 
     internal static CompilerPreparedBody ProgramBody(
         IrProgram program,
         ImmutableDictionary<IrVarId, IrVarId> parameterBindings,
-        ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> specCalls) =>
+        ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> specCalls,
+        ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall> summaryCalls) =>
         new(
             CompilerPreparedBodyKind.Program,
             program ?? throw new ArgumentNullException(nameof(program)),
             parameterBindings,
-            specCalls);
+            specCalls,
+            summaryCalls);
 }
 
 internal sealed record CompilerPreparedSpecCall(
@@ -110,6 +131,24 @@ internal sealed record CompilerPreparedSpecCall(
     string CallIdentity,
     string WitnessIdentifier,
     bool ConsumesMemoryHavoc
+);
+
+internal sealed record CompilerPreparedSummaryEvidence(
+    CompilerSummaryOrigin Origin,
+    string EvidenceSha256,
+    string EvidenceIdentity
+);
+
+internal sealed record CompilerPreparedSummaryCall(
+    IrInstructionId Instruction,
+    string CallIdentity,
+    CompilerSummaryOrigin Origin,
+    IrVarId Result,
+    ImmutableArray<IrVarId> ExistentialVariables,
+    IrTerm NormalRelation,
+    string EvidenceSha256,
+    string EvidenceIdentity,
+    ImmutableArray<CompilerPreparedSummaryEvidence> DependencyEvidence
 );
 
 internal sealed class CompilerCallableArtifact
@@ -215,6 +254,7 @@ internal sealed class CompilerBodyArtifact
     public CompilerVariableMappingArtifact[] ParameterBindings { get; set; } = [];
     public CompilerCallIdentityArtifact[] Calls { get; set; } = [];
     public CompilerSpecCallArtifact[] SpecCalls { get; set; } = [];
+    public CompilerSummaryCallArtifact[] SummaryCalls { get; set; } = [];
 }
 
 internal sealed class CompilerVariableMappingArtifact
@@ -234,6 +274,26 @@ internal sealed class CompilerSpecCallArtifact
     public int Instruction { get; set; } = -1;
     public string WitnessIdentifier { get; set; } = string.Empty;
     public bool ConsumesMemoryHavoc { get; set; }
+}
+
+internal sealed class CompilerSummaryEvidenceArtifact
+{
+    public CompilerSummaryOrigin Origin { get; set; }
+    public string EvidenceSha256 { get; set; } = string.Empty;
+    public string EvidenceIdentity { get; set; } = string.Empty;
+}
+
+internal sealed class CompilerSummaryCallArtifact
+{
+    public int Instruction { get; set; } = -1;
+    public string Identity { get; set; } = string.Empty;
+    public CompilerSummaryOrigin Origin { get; set; }
+    public int Result { get; set; } = -1;
+    public int[] ExistentialVariables { get; set; } = [];
+    public int NormalRelationRoot { get; set; } = -1;
+    public string EvidenceSha256 { get; set; } = string.Empty;
+    public string EvidenceIdentity { get; set; } = string.Empty;
+    public CompilerSummaryEvidenceArtifact[] DependencyEvidence { get; set; } = [];
 }
 
 internal enum CompilerOutputKind
@@ -301,6 +361,8 @@ internal sealed class CompilerManifestArtifact
     public string Schema { get; set; } = CompilerManifestArtifactVersions.Schema;
     public int SchemaVersion { get; set; } = CompilerManifestArtifactVersions.Current;
     public string ProtocolVersion { get; set; } = WorkerProtocolVersions.Current;
+    public int RelationalSummarySchemaVersion { get; set; } = CompilerRelationalSummaryVersions.Current;
+    public int SpecificationPackSchemaVersion { get; set; } = CompilerSpecificationPackVersions.Current;
     public WorkerFeatureSet Features { get; set; }
     public string CompilationSha256 { get; set; } = string.Empty;
     public CompilerCompilationSnapshot Compilation { get; set; } = new();

@@ -127,6 +127,48 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
+    public void DirectAcyclicSourceCallCarriesAReusableRelationalSummary()
+    {
+        var preparation = Prepare(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                private static bool Read(bool value) => value;
+
+                internal static bool Verify(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() == value);
+                    return Read(value);
+                }
+            }
+            """,
+            "Verify");
+
+        Assert.That(
+            preparation.IsSuccess,
+            Is.True,
+            preparation.FailureReason.ToString());
+        var body = preparation.Body!;
+        var descriptor = body.SummaryCalls.Values.Single();
+        var call = body.Program!.Blocks
+            .SelectMany(static block => block.Instructions)
+            .OfType<IrCallInstruction>()
+            .Single(instruction => instruction.Id == descriptor.Instruction);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(body.SpecCalls, Is.Empty);
+            Assert.That(
+                descriptor.Origin,
+                Is.EqualTo(CompilerSummaryOrigin.Source));
+            Assert.That(descriptor.CallIdentity, Does.Contain(".Read("));
+            Assert.That(descriptor.EvidenceSha256, Has.Length.EqualTo(64));
+            Assert.That(descriptor.EvidenceIdentity, Is.Empty);
+            Assert.That(descriptor.NormalRelation.Type, Is.EqualTo(preparation.Factory.BooleanType));
+            Assert.That(call.Id, Is.EqualTo(descriptor.Instruction));
+        }
+    }
+
+    [Test]
     public void ConstructorAndRefBodyAreTypedUnsupported()
     {
         var constructor = Prepare(
@@ -244,7 +286,8 @@ public sealed class CompilerCallableLowererTests
                     {{body}}
                 }
 
-                private static int UnsupportedCall(int value) => value;
+                private static int UnsupportedCall(int value) =>
+                    UnsupportedCall(value);
             }
             """,
             "Verify");

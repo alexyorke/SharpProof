@@ -92,6 +92,41 @@ public sealed class CallableCounterexampleReplayerTests
     }
 
     [Test]
+    public void ExecutedRelationalSummaryCallIsNotAReplayableCounterexample()
+    {
+        var fixture = CreateObstacle(ReplayObstacle.Call);
+        var body = fixture.Target.Body!;
+        var call = body.Program!.Blocks
+            .SelectMany(static block => block.Instructions)
+            .OfType<IrCallInstruction>()
+            .Single();
+        var prepared = new CompilerPreparedSummaryCall(
+            call.Id,
+            "M:Subject.Opaque(System.Int64)",
+            CompilerSummaryOrigin.Source,
+            call.Target!.Value,
+            [],
+            fixture.Target.Factory.Boolean(true),
+            new string('a', 64),
+            string.Empty,
+            []);
+        var target = fixture.Target with
+        {
+            Body = body with
+            {
+                SummaryCalls = body.SummaryCalls.Add(call.Id, prepared)
+            }
+        };
+
+        Assert.That(
+            CallableCounterexampleReplayer.Replay(
+                target,
+                0,
+                fixture.Model),
+            Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
+    }
+
+    [Test]
     public void ReplayRejectsAProgramAboveTheCompilerInstructionBound()
     {
         var fixture = Create(static (factory, _, _, _) => factory.Boolean(false),
@@ -176,7 +211,10 @@ public sealed class CallableCounterexampleReplayerTests
                 ImmutableDictionary<IrVarId, IrVarId>.Empty,
                 ImmutableDictionary<
                     IrInstructionId,
-                    CompilerPreparedSpecCall>.Empty));
+                    CompilerPreparedSpecCall>.Empty,
+                ImmutableDictionary<
+                    IrInstructionId,
+                    CompilerPreparedSummaryCall>.Empty));
 
         Assert.That(
             CallableCounterexampleReplayer.Replay(
@@ -295,7 +333,8 @@ public sealed class CallableCounterexampleReplayerTests
             WorkerClaimReason.None,
             CompilerPreparedBody.ProgramBody(program(factory, source),
                 ImmutableDictionary<IrVarId, IrVarId>.Empty.Add(source, current),
-                ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty));
+                ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+                ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty));
         return new ReplayFixture(target,
             ImmutableDictionary<IrVarId, IrValue>.Empty.Add(
                 current, factory.CreateIntegerValue(5)));

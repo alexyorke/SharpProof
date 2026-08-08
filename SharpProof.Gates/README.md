@@ -117,10 +117,11 @@ measures cancel-to-exit latency, while a real launcher process test measures
 the forced-termination deadline independently. The unannotated advisory and
 IDE analyzer performance paths reference neither SMT nor Z3.
 
-Worker/package tests also exercise protocol version 9 manifest equality,
+Worker/package tests also exercise protocol version 10 manifest equality,
 stable claim IDs, policy-controlled SP0047/SP0048 output, cache validation
 against the current manifest, fatal run handling, and compiler artifact schema
-version 10, including generated contracts, portable whole-body CFG/IR,
+version 11, including generated contracts, portable whole-body CFG/IR,
+schema-1 relational source/implementation-IL/audited-pack summaries,
 compiler diagnostics, exact lowered-callable hydration, and independent
 whole-body counterexample replay. Package tests also cover deterministic,
 policy-aware SARIF 2.1.0 projection of validated responses.

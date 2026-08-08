@@ -23,7 +23,7 @@ depends on a modeled call which the independent interpreter cannot execute is
 also `Unknown`; it is never reported as a refutation. Backend unavailability,
 infrastructure failure, malformed backend output, containment failure, and a
 failed replay of an otherwise replayable counterexample make protocol version
-9 mark the whole run `Failed`; these conditions are fatal under every build
+10 mark the whole run `Failed`; these conditions are fatal under every build
 policy. Unsupported unannotated analyzer callables remain silent. Explicitly
 selected unsupported callables produce SP0047.
 
@@ -40,7 +40,7 @@ exhaustion, and all `Unknown` outcomes are not reusable proof-cache entries.
 
 ## Accountable selection and worker runs
 
-Worker protocol version 9 separates `WorkerRunStatus` from
+Worker protocol version 10 separates `WorkerRunStatus` from
 `WorkerClaimOutcome`. The compiler-symbol-based manifest is sealed before
 verification. It contains every selected callable, every discovered
 postcondition, and every selected effect-attribute occurrence with a stable
@@ -60,7 +60,7 @@ manifest claims while sharing the effective combined constraint and evidence.
 Each effect claim is `Proven` only when a complete compiler-produced effect
 summary establishes its contract. The compiler can record a structured
 `DefiniteViolation` candidate for a simple unconditional direct operation.
-Compiler artifact schema 10 carries an independently replayable event only for
+Compiler artifact schema 11 carries an independently replayable event only for
 a definite managed object or array allocation whose operands are already
 known to complete and whose allocation is not static-initialization-sensitive.
 The worker derives `Allocates` from that event rather than trusting the
@@ -172,6 +172,48 @@ contributes no assumption, postcondition, effect, suppression, trust fact, or
 compiler-bound ghost specification.
 
 Callee postconditions may be assumed only after verification or explicit trust.
+
+## Relational callee summaries
+
+Worker postcondition verification may compose a direct callee only when the
+build-time collector constructs a complete quantifier-free relation in the
+shared typed IR. The relation describes normal completion and the result in
+terms of receiver-free scalar input variables. It is an ordinary solver
+formula, not a trusted `Proven` result. The caller remains `Proven` only when
+Z3 establishes the composed obligation and the proof core passes the normal
+hygiene checks.
+
+The current source-summary boundary is one exact current-compilation
+declaration for a static, non-generic method with Boolean or supported-integer
+parameters and result. Its selected CFG must be acyclic and every reachable
+instruction and direct dependency must lower exactly. Recursive dependency
+components, virtual or instance dispatch, references, heap operations,
+unsupported arithmetic, and summary budget failures abstain.
+
+An implementation-IL summary is admissible only for an external method with
+the same static scalar shape and an exact file-backed implementation PE. The
+collector requires raw metadata equality with the metadata Roslyn compiled
+against, rejects reference assemblies and facades as body authority, and
+decodes only a bounded scalar opcode set. A missing body, changed image,
+unsupported opcode, cross-module target, loop, recursion, unresolved call, or
+resource limit abstains. This facility is not a general IL interpreter and is
+not used for metadata effect inference.
+
+An audited specification-pack summary is admissible only when its pack ID was
+explicitly selected by `SharpProofSpecificationPacks`. Packs are embedded,
+strictly schema-validated data with exact method signature, assembly-name, and
+public-key-token constraints. Arbitrary consumer files are not pack authority.
+The current pack schema is 1; `dotnet.scalar@1` contains the audited
+`System.Math.Max(int, int)` relation. An absent, unknown, malformed, or
+identity-mismatched pack never contributes a fact.
+
+Every summary call seals its origin, SHA-256 evidence, pack identity when
+applicable, and the canonical transitive provenance of every composed
+dependency. Compiler artifact schema 11, relational-summary schema version 1,
+and specification-pack schema version 1 validate that closure before backend
+creation.
+Unsupported or incomplete calls remain `Unknown`; neither a convenient method
+name nor a reference-assembly body can become an assumption.
 
 ## Effects
 
@@ -334,15 +376,19 @@ its outcome is not combined with the containing callable. Unavailable captured
 facts remain unknown. An expression-tree lambda is quoted code and is not
 treated as an executing call site.
 
-The packaged verifier consumes compiler artifact schema version 10 produced
+The packaged verifier consumes compiler artifact schema version 11 produced
 from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed
 lowering failure or portable whole-body CFG/IR with bound clauses, canonical
 variables, body-entry state, parameter mappings, and bound API-spec witness
-metadata. It also carries the admitted unconditional managed-allocation replay
+metadata. It also carries canonical relational-summary calls and their complete
+source, implementation-IL, or audited-pack dependency provenance, plus the
+admitted unconditional managed-allocation replay
 events, their selected-constraint and semantic-operation hashes, and their
-source-tree identities and spans. Worker protocol version 9 and semantic cache
-schema version 11 are unchanged. The artifact further carries compiler error
+source-tree identities and spans. Worker protocol version 10 and semantic cache
+schema version 12 carry the current wire break. Relational-summary schema
+version 1 and specification-pack schema version 1 govern the new evidence. The
+artifact further carries compiler error
 diagnostics and mapped locations, handwritten and generated tree hashes, raw
 and effective per-tree preprocessor symbols, and parse evidence, plus a bounded
 proof-relevant compilation-option set, assembly and target identity, and
@@ -373,8 +419,8 @@ admitted program subset, counterexample replay is independent of symbolic
 execution: the worker executes the compiler-produced whole-body IR with a
 separate interpreter and evaluates the original postcondition over the
 reconstructed state. Differential compiled-C# execution remains a test
-facility and is not run during user builds. A SAT result that depends on a
-spec-modeled call result which the replay interpreter cannot execute becomes
+facility and is not run during user builds. A SAT result that depends on an
+API-spec or relational-summary call result which the replay interpreter cannot execute becomes
 `Unknown` with `CounterexampleNotReplayable`, never `Refuted`. A replay
 discrepancy for an otherwise executable counterexample remains the fatal
 `CounterexampleReplayFailed` run failure. Optional SARIF 2.1.0 is a

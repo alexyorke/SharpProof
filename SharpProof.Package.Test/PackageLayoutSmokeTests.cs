@@ -50,6 +50,7 @@ public sealed class PackageLayoutSmokeTests
         "SharpProof.Frontend.dll",
         "SharpProof.Ir.dll",
         "SharpProof.Specs.dll",
+        "SharpProof.Summaries.dll",
         "SharpProof.Worker.Protocol.dll",
         "System.IO.Pipelines.dll",
         "System.Text.Encodings.Web.dll",
@@ -76,6 +77,8 @@ public sealed class PackageLayoutSmokeTests
         "tools/collector/SharpProof.Frontend.dll",
         "tools/collector/SharpProof.Ir.dll",
         "tools/collector/SharpProof.Specs.dll",
+        "tools/collector/SharpProof.Summaries.dll",
+        "tools/collector/RelationalSpecPackCatalog.json",
         "tools/collector/SharpProof.Worker.Protocol.dll",
         "tools/collector/System.IO.Pipelines.dll",
         "tools/collector/System.Text.Encodings.Web.dll",
@@ -745,7 +748,7 @@ public sealed class PackageLayoutSmokeTests
                 manifest.RootElement
                     .GetProperty("schemaVersion")
                     .GetInt32(),
-                Is.EqualTo(10));
+                Is.EqualTo(11));
             var effectClaims = manifest.RootElement
                 .GetProperty("callables")
                 .EnumerateArray()

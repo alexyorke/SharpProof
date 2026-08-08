@@ -28,6 +28,7 @@
     <ProjectReference Include="..\SharpProof.Frontend\SharpProof.Frontend.csproj" />
     <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
     <ProjectReference Include="..\SharpProof.Specs\SharpProof.Specs.csproj" />
+    <ProjectReference Include="..\SharpProof.Summaries\SharpProof.Summaries.csproj" />
     <ProjectReference Include="..\SharpProof.Worker.Protocol\SharpProof.Worker.Protocol.csproj" />
     <ProjectReference
       Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj"

@@ -28,6 +28,7 @@
         $(_SharpProofCollectorDirectory)/SharpProof.Frontend.dll;
         $(_SharpProofCollectorDirectory)/SharpProof.Ir.dll;
         $(_SharpProofCollectorDirectory)/SharpProof.Specs.dll;
+        $(_SharpProofCollectorDirectory)/SharpProof.Summaries.dll;
         $(_SharpProofCollectorDirectory)/SharpProof.Worker.Protocol.dll;
         $(_SharpProofCollectorDirectory)/System.IO.Pipelines.dll;
         $(_SharpProofCollectorDirectory)/System.Text.Encodings.Web.dll;

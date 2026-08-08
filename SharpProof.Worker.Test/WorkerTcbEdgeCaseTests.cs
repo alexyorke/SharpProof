@@ -386,7 +386,10 @@ public sealed class WorkerTcbEdgeCaseTests
                 ImmutableDictionary<IrVarId, IrVarId>.Empty,
                 ImmutableDictionary<
                     IrInstructionId,
-                    CompilerPreparedSpecCall>.Empty));
+                    CompilerPreparedSpecCall>.Empty,
+                ImmutableDictionary<
+                    IrInstructionId,
+                    CompilerPreparedSummaryCall>.Empty));
 
         var result = await VerifyWithSmtAsync(target);
 
@@ -1133,7 +1136,10 @@ public sealed class WorkerTcbEdgeCaseTests
                 ImmutableDictionary<IrVarId, IrVarId>.Empty,
                 ImmutableDictionary<
                     IrInstructionId,
-                    CompilerPreparedSpecCall>.Empty));
+                    CompilerPreparedSpecCall>.Empty,
+                ImmutableDictionary<
+                    IrInstructionId,
+                    CompilerPreparedSummaryCall>.Empty));
     }
 
     private static CompilerCallablePreparation CreateDivisionTarget(
@@ -1187,7 +1193,10 @@ public sealed class WorkerTcbEdgeCaseTests
                     parameter),
                 ImmutableDictionary<
                     IrInstructionId,
-                    CompilerPreparedSpecCall>.Empty));
+                    CompilerPreparedSpecCall>.Empty,
+                ImmutableDictionary<
+                    IrInstructionId,
+                    CompilerPreparedSummaryCall>.Empty));
     }
 
     private static CompilerCallablePreparation CreateTarget(

@@ -226,7 +226,7 @@ public sealed class CompilerManifestArtifactTests
     public void NullableSchemaShapesFailWithJsonException()
     {
         var previousSchema = CreateArtifact();
-        previousSchema.SchemaVersion = 9;
+        previousSchema.SchemaVersion = 10;
         var modules = CreateArtifact();
         modules.Compilation.References[0].Modules = null!;
         modules.CompilationSha256 = CompilationFingerprint.ComputeSha256(
@@ -268,6 +268,29 @@ public sealed class CompilerManifestArtifactTests
             Assert.Throws<JsonException>((Action)(() =>
                 CompilerManifestArtifactJson.Deserialize(
                     JsonSerializer.Serialize(artifact, WorkerProtocolJson.Options) + "\n")));
+        }
+    }
+
+    [Test]
+    public void RelationalEvidenceSchemaVersionsAreExactPins()
+    {
+        Action<CompilerManifestArtifact>[] corruptions =
+        [
+            artifact => artifact.RelationalSummarySchemaVersion = 0,
+            artifact => artifact.RelationalSummarySchemaVersion =
+                CompilerRelationalSummaryVersions.Current + 1,
+            artifact => artifact.SpecificationPackSchemaVersion = 0,
+            artifact => artifact.SpecificationPackSchemaVersion =
+                CompilerSpecificationPackVersions.Current + 1
+        ];
+
+        foreach (var corrupt in corruptions)
+        {
+            var artifact = CreateArtifact();
+            corrupt(artifact);
+
+            Assert.Throws<JsonException>((Action)(() =>
+                CompilerManifestArtifactJson.Serialize(artifact)));
         }
     }
 

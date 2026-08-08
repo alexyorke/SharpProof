@@ -26,9 +26,11 @@
     "expectedCatalogSha256": "fabd65c5bb1a13acde7cb6cf9f92ef104846f2765a6e171adf9fee75af15f83a"
   },
   "worker": {
-    "protocolVersion": 9,
+    "protocolVersion": 10,
     "manifestSchemaVersion": 4,
-    "compilerArtifactSchemaVersion": 10,
+    "compilerArtifactSchemaVersion": 11,
+    "relationalSummarySchemaVersion": 1,
+    "specificationPackSchemaVersion": 1,
     "maximumParallelism": 4,
     "maximumWorkerProcesses": 4,
     "maximumExpressionDepth": 64,
@@ -42,7 +44,7 @@
     "maximumProjectDirectoryCharacters": 239
   },
   "cache": {
-    "schemaVersion": 11,
+    "schemaVersion": 12,
     "enabledByDefault": true,
     "maximumMiB": 512,
     "cacheableOutcomes": [
@@ -458,9 +460,9 @@
   },
   "productionComplexity": {
     "measurement": "Aggregate Roslyn expression nodes, decision points, and members across handwritten production C#; whitespace, comments, line wrapping, and optional braces are excluded.",
-    "ceilingRationale": "2026-08-07: extracting the cancellable verifier runner and invalidator from unmeasured inline MSBuild XML into the directly testable SharpProof.BuildTasks assembly moved that trusted-boundary logic under the production C# ratchet. The old inline implementation was removed.",
-    "maximumExpressionNodes": 100800,
-    "maximumDecisionPoints": 5230,
+    "ceilingRationale": "2026-08-07: extracting the cancellable verifier runner and invalidator from unmeasured inline MSBuild XML into the directly testable SharpProof.BuildTasks assembly moved that trusted-boundary logic under the production C# ratchet. 2026-08-08: bounded relational interprocedural verification added one reusable typed-IR summary engine, an isolated exact implementation-PE decoder, and a strict data-driven specification-pack parser; source, IL, and audited packs now share one Z3 composition path instead of growing method-specific verifier branches. Dead dependency-graph scaffolding was removed, production roots are derived from Directory.Build.props, and each new semantic layer has its own narrow ratchet below.",
+    "maximumExpressionNodes": 111400,
+    "maximumDecisionPoints": 5950,
     "maximumMembers": 3900
   },
   "productionCoordinatorComplexity": {
@@ -519,6 +521,30 @@
         "path": "SharpProof.Worker.Protocol/ProtocolJson.cs",
         "maximumExpressionNodes": 3450,
         "maximumDecisionPoints": 135
+      },
+      {
+        "name": "relational-summary-builder",
+        "path": "SharpProof.Summaries/IrRelationalSummaryBuilder.cs",
+        "maximumExpressionNodes": 1950,
+        "maximumDecisionPoints": 120
+      },
+      {
+        "name": "relational-summary-provider",
+        "path": "SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs",
+        "maximumExpressionNodes": 800,
+        "maximumDecisionPoints": 50
+      },
+      {
+        "name": "implementation-il-summary-lowerer",
+        "path": "SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs",
+        "maximumExpressionNodes": 4150,
+        "maximumDecisionPoints": 340
+      },
+      {
+        "name": "specification-pack-provider",
+        "path": "SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs",
+        "maximumExpressionNodes": 2000,
+        "maximumDecisionPoints": 125
       }
     ]
   },

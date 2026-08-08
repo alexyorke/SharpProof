@@ -7,9 +7,11 @@
     <SharpProofCollectorDirectory Condition="'$(SharpProofCollectorDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/collector'))</SharpProofCollectorDirectory>
     <_SharpProofCollectorDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofCollectorDirectory)'))</_SharpProofCollectorDirectory>
     <SharpProofCompilerCollectorPath Condition="'$(SharpProofCompilerCollectorPath)' == ''">$(_SharpProofCollectorDirectory)/SharpProof.CompilerCollector.dll</SharpProofCompilerCollectorPath>
+    <SharpProofSpecificationPacks Condition="'$(SharpProofSpecificationPacks)' == ''"></SharpProofSpecificationPacks>
   </PropertyGroup>
   <ItemGroup>
     <CompilerVisibleProperty Include="SharpProofProfile" />
     <CompilerVisibleProperty Include="SharpProofFeatures" />
+    <CompilerVisibleProperty Include="SharpProofSpecificationPacks" />
   </ItemGroup>
 </Project>

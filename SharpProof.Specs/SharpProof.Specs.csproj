@@ -10,4 +10,8 @@
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="RelationalSpecPackCatalog.json"
+                      LogicalName="SharpProof.Specs.RelationalSpecPackCatalog.json" />
+  </ItemGroup>
 </Project>

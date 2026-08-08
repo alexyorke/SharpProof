@@ -21,12 +21,13 @@ internal sealed partial class AcyclicBlockPredicateExecutor
         ImmutableArray<CompilerCanonicalVariable> variables,
         IrFactory factory, IrProgram program,
         ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> specCalls,
+        ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall> summaryCalls,
         ImmutableDictionary<IrVarId, IrTerm> initialEnvironment,
         ImmutableDictionary<IrVarId, IrVarId> parameterBindings)
     {
         ArgumentNullException.ThrowIfNull(factory);
         ArgumentNullException.ThrowIfNull(program);
-        return new Run(variables, factory, program, specCalls, initialEnvironment,
+        return new Run(variables, factory, program, specCalls, summaryCalls, initialEnvironment,
             parameterBindings, _maximumExpressionDepth, _maximumSymbolicOperations).Execute();
     }
 
@@ -34,6 +35,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
         ImmutableArray<CompilerCanonicalVariable> variables,
         IrFactory factory, IrProgram program,
         ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> specCalls,
+        ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall> summaryCalls,
         ImmutableDictionary<IrVarId, IrTerm> initialEnvironment,
         ImmutableDictionary<IrVarId, IrVarId> parameterBindings,
         int maximumExpressionDepth, int remainingOperations)
@@ -44,6 +46,8 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             ImmutableDictionary.CreateBuilder<IrVarId, SpecResultProjection>();
         private readonly ImmutableArray<GuardedBodySpecAssumption>.Builder _assumptions =
             ImmutableArray.CreateBuilder<GuardedBodySpecAssumption>();
+        private readonly ImmutableArray<GuardedBodySummaryAssumption>.Builder _summaryAssumptions =
+            ImmutableArray.CreateBuilder<GuardedBodySummaryAssumption>();
         private WorkerClaimReason _reason = WorkerClaimReason.None;
 
         internal SymbolicBodyExecution Execute()
@@ -73,7 +77,8 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             }
             return _returns.Count == 0 ? SymbolicBodyExecution.Failed(WorkerClaimReason.UnsupportedBody) :
                 new SymbolicBodyExecution(WorkerClaimReason.None, _returns.ToImmutable(),
-                    _projections.ToImmutable(), _assumptions.ToImmutable());
+                    _projections.ToImmutable(), _assumptions.ToImmutable(),
+                    _summaryAssumptions.ToImmutable());
         }
 
         private bool ExecuteBlock(IrBasicBlock block, FlowState state)
@@ -125,16 +130,38 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                         environment = environment.SetItem(assign.Target, assigned);
                         break;
                     case IrCallInstruction call:
-                        if (!specCalls.TryGetValue(call.Id, out var prepared) ||
-                            ApplySpec(call, prepared, environment, predicate) is not { } application)
+                        SpecApplication? application = null;
+                        if (specCalls.TryGetValue(call.Id, out var preparedSpec))
+                        {
+                            application = ApplySpec(
+                                call,
+                                preparedSpec,
+                                environment,
+                                predicate);
+                        }
+                        else if (summaryCalls.TryGetValue(
+                                     call.Id,
+                                     out var preparedSummary))
+                        {
+                            application = ApplySummary(
+                                call,
+                                preparedSummary,
+                                environment,
+                                predicate);
+                        }
+
+                        if (application == null)
                         {
                             return false;
                         }
 
                         environment = environment.SetItem(
-                            call.Target!.Value, application.Result);
-                        predicate = application.Predicate;
-                        expectedMemoryHavoc = application.ConsumesMemoryHavoc ? call.Operation : null;
+                            call.Target!.Value,
+                            application.Value.Result);
+                        predicate = application.Value.Predicate;
+                        expectedMemoryHavoc = application.Value.ConsumesMemoryHavoc
+                            ? call.Operation
+                            : null;
                         break;
                     case IrBranchInstruction branch:
                         return index == block.Instructions.Length - 1 &&
@@ -171,7 +198,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
 
         private IrTerm? ConstrainNormalExecution(IrTerm predicate, IrTerm evaluated)
         {
-            if (!SymbolicTermOperations.RequiresDefinednessWitness(evaluated))
+            if (!IrSemanticTerms.RequiresDefinednessWitness(evaluated))
             {
                 return predicate;
             }
@@ -181,7 +208,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 return null;
             }
 
-            var constrained = SymbolicTermOperations.ConstrainSuccessfulEvaluation(
+            var constrained = IrSemanticTerms.ConstrainSuccessfulEvaluation(
                 factory,
                 predicate,
                 evaluated);
@@ -242,7 +269,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 return null;
             }
 
-            var predicate = SymbolicTermOperations.Disjoin(
+            var predicate = IrSemanticTerms.Disjoin(
                 factory, values.Select(static value => value.Predicate).ToArray());
             if (!Supported(predicate))
             {
@@ -377,6 +404,79 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             return new SpecApplication(result, guard, prepared.ConsumesMemoryHavoc);
         }
 
+        private SpecApplication? ApplySummary(
+            IrCallInstruction call,
+            CompilerPreparedSummaryCall prepared,
+            IReadOnlyDictionary<IrVarId, IrTerm> environment,
+            IrTerm guard)
+        {
+            if (!call.Target.HasValue ||
+                prepared.Instruction != call.Id ||
+                !Enum.IsDefined(prepared.Origin) ||
+                factory.GetVariableInfo(call.Target.Value).Type !=
+                factory.GetVariableInfo(prepared.Result).Type ||
+                !WorkerProtocolJson.IsSha256(prepared.EvidenceSha256))
+            {
+                return null;
+            }
+
+            if (call.Receiver != null)
+            {
+                var receiver = Substitute(call.Receiver, environment);
+                if (receiver == null ||
+                    ConstrainNormalExecution(
+                        guard,
+                        receiver) is not { } receiverGuard)
+                {
+                    return null;
+                }
+
+                guard = receiverGuard;
+            }
+
+            foreach (var argumentTerm in call.Arguments)
+            {
+                var argument = Substitute(argumentTerm, environment);
+                if (argument == null ||
+                    ConstrainNormalExecution(
+                        guard,
+                        argument) is not { } argumentGuard)
+                {
+                    return null;
+                }
+
+                guard = argumentGuard;
+            }
+
+            var freeVariables = new HashSet<IrVarId>(
+                prepared.ExistentialVariables)
+            {
+                prepared.Result
+            };
+            if (freeVariables.Count !=
+                    prepared.ExistentialVariables.Length + 1 ||
+                Substitute(
+                    prepared.NormalRelation,
+                    environment,
+                    freeVariables) is not { } relation ||
+                relation.Type != factory.BooleanType)
+            {
+                return null;
+            }
+
+            _summaryAssumptions.Add(new GuardedBodySummaryAssumption(
+                prepared.CallIdentity,
+                prepared.Origin,
+                prepared.EvidenceSha256,
+                prepared.EvidenceIdentity,
+                guard,
+                relation));
+            return new SpecApplication(
+                factory.Variable(prepared.Result),
+                guard,
+                ConsumesMemoryHavoc: false);
+        }
+
         private ImmutableDictionary<IrVarId, IrTerm>? CreateCurrentStates(
             ImmutableDictionary<IrVarId, IrTerm> environment)
         {
@@ -488,9 +588,12 @@ internal sealed partial class AcyclicBlockPredicateExecutor
 
         private IrTerm? Substitute(
             IrTerm term,
-            IReadOnlyDictionary<IrVarId, IrTerm> environment)
+            IReadOnlyDictionary<IrVarId, IrTerm> environment,
+            HashSet<IrVarId>? freeVariables = null)
         {
-            if (!IrTraversal.CollectVariables(term).All(environment.ContainsKey))
+            if (!IrTraversal.CollectVariables(term).All(variable =>
+                    environment.ContainsKey(variable) ||
+                    freeVariables?.Contains(variable) == true))
             {
                 return null;
             }
@@ -505,7 +608,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
 
         private bool Supported(IrTerm term)
         {
-            return SymbolicTermOperations.GetDepth(term) <= maximumExpressionDepth;
+            return IrTermAnalysis.GetDepth(term) <= maximumExpressionDepth;
         }
 
         private bool Spend(int amount = 1)
@@ -533,127 +636,11 @@ internal sealed partial record SymbolicBodyExecution
     internal bool IsSuccess => Reason == WorkerClaimReason.None;
     internal static SymbolicBodyExecution Failed(WorkerClaimReason reason)
     {
-        return new(reason, [], ImmutableDictionary<IrVarId, SpecResultProjection>.Empty, []);
-    }
-}
-
-internal static class SymbolicTermOperations
-{
-    internal static bool RequiresDefinednessWitness(IrTerm? term)
-    {
-        return term is not (
-            null or
-            IrBooleanTerm or
-            IrIntegerTerm or
-            IrStringTerm or
-            IrNullTerm or
-            IrVariableTerm);
-    }
-
-    internal static IrTerm ConstrainSuccessfulEvaluation(
-        IrFactory factory,
-        IrTerm predicate,
-        IrTerm? evaluated)
-    {
-        if (!RequiresDefinednessWitness(evaluated))
-        {
-            return predicate;
-        }
-
-        var successfulEvaluation = factory.Binary(
-            IrBinaryOperator.Equal,
-            evaluated!,
-            evaluated!);
-        return factory.Binary(
-            IrBinaryOperator.AndAlso,
-            predicate,
-            successfulEvaluation);
-    }
-
-    internal static IrTerm Guard(IrFactory factory, IrTerm condition, IrTerm consequence)
-    {
-        return factory.Binary(IrBinaryOperator.OrElse,
-            factory.Unary(IrUnaryOperator.Not, condition), consequence);
-    }
-
-    internal static IrTerm Conjoin(IrFactory factory, IReadOnlyList<IrTerm> terms)
-    {
-        return Combine(factory, terms, IrBinaryOperator.AndAlso, identity: true);
-    }
-
-    internal static IrTerm Disjoin(IrFactory factory, IReadOnlyList<IrTerm> terms)
-    {
-        return Combine(factory, terms, IrBinaryOperator.OrElse, identity: false);
-    }
-
-    private static IrTerm Combine(
-        IrFactory factory, IReadOnlyList<IrTerm> terms,
-        IrBinaryOperator @operator, bool identity)
-    {
-        if (terms.Count == 0)
-        {
-            return factory.Boolean(identity);
-        }
-
-        return Visit(0, terms.Count);
-
-        IrTerm Visit(int start, int count)
-        {
-            if (count == 1)
-            {
-                return terms[start];
-            }
-
-            var leftCount = count / 2;
-            return factory.Binary(@operator, Visit(start, leftCount),
-                Visit(start + leftCount, count - leftCount));
-        }
-    }
-
-    /// <summary>
-    /// Measures term depth with an explicit stack. This is the function that
-    /// enforces the expression-depth budget, so it must not itself recurse to
-    /// the full depth of the term it is about to reject.
-    /// </summary>
-    internal static int GetDepth(IrTerm root)
-    {
-        var memo = new Dictionary<IrId, int>();
-        var pending = new Stack<(IrTerm Term, bool ChildrenReady)>();
-        pending.Push((root, false));
-        while (pending.Count != 0)
-        {
-            var (term, childrenReady) = pending.Pop();
-            if (memo.ContainsKey(term.Id))
-            {
-                continue;
-            }
-
-            var children = IrTraversal.GetChildren(term);
-            if (!childrenReady && children.Length != 0)
-            {
-                // Re-queue below the children so every child is memoised by the
-                // time this term is popped again.
-                pending.Push((term, true));
-                foreach (var child in children)
-                {
-                    if (!memo.ContainsKey(child.Id))
-                    {
-                        pending.Push((child, false));
-                    }
-                }
-
-                continue;
-            }
-
-            var depth = 1;
-            foreach (var child in children)
-            {
-                depth = Math.Max(depth, 1 + memo[child.Id]);
-            }
-
-            memo.Add(term.Id, depth);
-        }
-
-        return memo[root.Id];
+        return new(
+            reason,
+            [],
+            ImmutableDictionary<IrVarId, SpecResultProjection>.Empty,
+            [],
+            []);
     }
 }

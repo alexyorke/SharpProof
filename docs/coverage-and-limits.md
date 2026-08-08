@@ -16,9 +16,10 @@ unsupported expressions, approximate facts, and exhausted budgets remain
 | Effect contracts | Analyzer with `SharpProofFeatures=effects` or `all`; independent replay in the opt-in Windows x64 worker | Runs a bounded acyclic scalar CFG pass, then computes conservative may summaries for reads, writes, allocation, capabilities, exceptions, termination, and completeness; checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, `[AllowedExceptions]`, and `[EffectContract]`; emits one accountable worker claim per selected attribute; independently replays unconditional definite managed object/array allocation events | Impossible refined branches are excluded. A loop disables scalar refinement but the conservative all-block scan can still prove effect absence. Replayed allocation can refute `ZeroAllocations` or an `EffectContract` that excludes `Allocates`; observable purity permits fresh allocation. Other definite candidates become `CounterexampleNotReplayable`; possible effects, exhausted budgets, and unresolved boundaries remain typed `Unknown` |
 | Call-site preconditions | Analyzer with `SharpProofFeatures=contracts` or `all` | Binds source `Contract.Requires` clauses and closed parameter attributes with compiler symbols for ordinary calls and object creation; follows executable local-function, lambda, and anonymous-method child CFGs exactly once; combines exact IR replay with compilation-scoped Boolean, nullness, interval, cardinality, explicitly trusted return-annotation, approved API-spec result, and effect facts at definite call sites | Unknown or captured values, possible throws, cycles, quoted expression-tree lambdas, and exhausted analysis budgets do not become violations or proofs; unsupported explicitly selected methods report SP0047 |
 | Postconditions | Optional Windows x64 worker with `SharpProofFeatures=contracts` or `all`; strict enables the worker by default | Manifests `Contract.Ensures` and return attributes, including directly owned local-function, lambda, anonymous-method, and top-level claims, then proves admitted bounded obligations over normal-return paths with Boolean logic, bounded integer comparisons, checked `long` arithmetic, and replay-gated counterexamples | The additional callable forms are currently visible as `UnsupportedCallable`; `effects` excludes postcondition claims; this is bounded `Ensures` verification, not arbitrary deep, recursive, looping, heap, or sequence verification |
+| Relational callees | Build-time compiler collector plus the Windows x64 worker | Infers quantifier-free relations for direct acyclic static scalar source methods and exact implementation IL, or imports an explicitly enabled schema-1 audited pack; composes every relation into the caller's Z3 obligation with a sealed transitive evidence closure | Boolean/supported-integer inputs and results only; no virtual/instance dispatch, generics, `ref`, heap, loops, recursion, reference-assembly body authority, or arbitrary pack files; unsupported cases remain `Unknown` |
 | Worker body execution | Compiler collector plus opt-in Windows x64 worker | The compiler emits portable whole-body CFG/IR; the worker executes its bounded acyclic subset with locals, reassignment, branches, multiple returns, entry-state `Old`, supported expressions, and eligible resolved API specs | Loops, stateful instructions outside the narrow admitted model, unresolved calls, unsupported mutation, and exceeded bounds abstain |
 | `ContractFor` validation | Incremental generator loaded with any non-`off` profile | Validates companion type and member identity, including receiver, overload, generic constraints, ref/scoped kinds, nullability, defaults, and return shape | It validates and binds existing source; it emits no generated source and does not make an unsupported contract provable |
-| External calls | Analyzer, compiler collector, and worker | Analyzer/compiler stages resolve exact original symbols against `ApiSpecTable`; the artifact binds an admitted lowered call to its exact witness identifier, which the worker revalidates against the matching spec table | The worker does not turn arbitrary trusted metadata contracts into proof facts; missing, ambiguous, untrusted, incomplete, or target-framework-inapplicable models fail closed |
+| External calls | Analyzer, compiler collector, and worker | Analyzer/compiler stages resolve exact original symbols against `ApiSpecTable`; bounded postcondition calls can instead use exact implementation-IL relations or explicitly selected audited relational packs; the artifact binds each admitted call to canonical evidence that the worker revalidates | The worker does not turn arbitrary trusted metadata contracts, reference assemblies, or consumer-supplied pack files into proof facts; missing, ambiguous, untrusted, incomplete, or target-framework-inapplicable models fail closed |
 | SMT | Worker only | Encodes the admitted Boolean and bounded-integer obligations; creates `Proven` only after unsat-core hygiene and `Refuted` only after executable replay | No Z3 or verifier payload is loaded into the IDE analyzer |
 
 Effect exception contracts cover modeled synchronous managed exception flows.
@@ -34,7 +35,8 @@ Not active as 1.0 preview product features:
 - metadata IL effect inference;
 - standalone runtime-hazard queries;
 - nullable-contract diagnostics;
-- general source-callee assume/guarantee verification;
+- general, recursive, virtual, or heap-aware source-callee verification beyond
+  the direct acyclic scalar relational-summary boundary;
 - a mutable heap or general points-to model;
 - arbitrary loops, recursion, reference equality, sequence elements, or broad
   SMT theories.
@@ -184,12 +186,12 @@ ghost specification evidence.
   Contract-only ordinary `void` methods replay as exact zero-step programs.
   Constructor postconditions are `UnsupportedBody` until base-constructor and
   field-initializer semantics are lowered.
-  An executed spec-modeled call becomes `Unknown` with
+  An executed API-spec or relational-summary call becomes `Unknown` with
   `CounterexampleNotReplayable`. Any other unsupported or inconsistent replay
   state is a fatal `CounterexampleReplayFailed`; one on an unselected path
   does not block the refutation. Result models expose only canonical user
   variables.
-  For an effect candidate, compiler artifact schema 10 currently admits one
+  For an effect candidate, compiler artifact schema 11 currently admits one
   unconditional definite managed object/array allocation event. The worker
   recomputes its constraint and operation identities, checks its source-tree
   identity/span and sealed witness, and independently derives `Allocates`.
@@ -199,7 +201,7 @@ ghost specification evidence.
 - `Unknown` covers unsupported, unresolved, approximate, method-time-limited,
   or resource-exhausted claim analysis. Unsupported unannotated analyzer
   callables are silent; unsupported selected callables produce SP0047.
-- Protocol version 9 binds a compiler-manifest artifact and separately records
+- Protocol version 10 binds a compiler-manifest artifact and separately records
   run status, callable coverage, and one
   outcome for each stable manifest claim ID. Exact manifest/result equality is
   mandatory.
@@ -228,7 +230,7 @@ ghost specification evidence.
 - Caller cancellation is run status `Canceled`, project timeout is
   `TimedOut`, and infrastructure/protocol/backend/replay failure is `Failed`.
   None is a successful claim outcome.
-- Cache schema version 11 stores only complete, postcondition-only, all-refuted
+- Cache schema version 12 stores only complete, postcondition-only, all-refuted
   payloads. Cache reads are checked against the entire current manifest, then
   every supported scalar model is reconstructed and whole-body replayed.
   Proven claims, effect claims, unsupported models, `Unknown`, cancellation,
@@ -241,7 +243,7 @@ ghost specification evidence.
 ## Closed compiler artifact and remaining limits
 
 During Windows verification, the production analyzer captures compiler
-artifact schema version 10 from the post-generator compilation. The artifact
+artifact schema version 11 from the post-generator compilation. The artifact
 contains:
 
 - the feature-selected, sealed claim manifest;
@@ -249,6 +251,10 @@ contains:
   or portable whole-body CFG/IR with bound contract clauses, canonical
   variables, body-entry state, parameter mappings, and exact API-spec witness
   metadata;
+- canonical source, exact implementation-IL, and explicitly enabled audited
+  specification-pack summary calls, including complete transitive evidence
+  closure under relational-summary schema version 1 and specification-pack
+  schema version 1;
 - compiler-neutral ordered replay evidence for the admitted unconditional
   managed object/array allocation, including the selected-constraint and
   semantic-operation hashes plus source-tree identity and span;

@@ -6,7 +6,8 @@ internal static class CompilerManifestArtifactProducer
     internal static CompilerManifestArtifact Create(CSharpCompilation compilation, string projectDirectory,
         string targetFramework, WorkerFeatureSet features, ClaimManifestBuildResult discovery,
         int maximumExpressionDepth, CancellationToken cancellationToken,
-        ImmutableArray<AdditionalText> additionalFiles = default)
+        ImmutableArray<AdditionalText> additionalFiles = default,
+        ImmutableArray<string> specificationPacks = default)
     {
         var snapshot = CompilerCompilationCapture.Capture(
             compilation, projectDirectory, targetFramework, additionalFiles, cancellationToken);
@@ -26,7 +27,10 @@ internal static class CompilerManifestArtifactProducer
         }
         else
         {
-            var lowerer = new CompilerCallableLowerer(compilation, new IrFactory());
+            var lowerer = new CompilerCallableLowerer(
+                compilation,
+                new IrFactory(),
+                specificationPacks.IsDefault ? [] : specificationPacks);
             callables = [.. targets.Select(item => {
                 var artifact = CompilerLoweredArtifact.Encode(
                     lowerer.Prepare(item, cancellationToken));

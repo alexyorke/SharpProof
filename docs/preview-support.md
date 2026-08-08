@@ -40,8 +40,9 @@ authenticity claim.
 - UNC, mapped-network, or cross-host publication.
 - Hostile concurrent local filesystem mutation.
 - Arbitrary `SharpProofDotNetHost` wrappers.
-- Loops in worker verification, mutable-heap reasoning, and general
-  source-callee assume/guarantee verification.
+- Loops or recursion in worker verification, mutable-heap reasoning, virtual
+  dispatch, and general source-callee verification beyond the direct acyclic
+  scalar relational-summary boundary.
 
 These are roadmap items, not ambiguous supported-surface defects. Portable
 analyzer use on the separately tested consumer matrix remains distinct from

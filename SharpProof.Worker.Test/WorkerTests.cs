@@ -2493,13 +2493,14 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task LoopsAndUnspecifiedCallsAbstainSafely()
+    public async Task LoopsAbstainWhileDirectAcyclicSourceCallsAreProven()
     {
         using var project = TestProject.Create(
             """
             using SharpProof.Attributes;
             public static class Subject {
                 private static bool Read(bool value) => value;
+                private static bool ReadAgain(bool value) => Read(value);
 
                 public static bool Loop(bool value) {
                     Contract.Ensures(
@@ -2513,7 +2514,7 @@ public sealed class WorkerTests
                 public static bool Call(bool value) {
                     Contract.Ensures(
                         Contract.Result<bool>() == value);
-                    return Read(value);
+                    return ReadAgain(value);
                 }
             }
             """);
@@ -2524,12 +2525,407 @@ public sealed class WorkerTests
 
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
+        var loop = response.ClaimResults.Single(record =>
+            GetCallableId(response, record).Contains(
+                ".Loop(",
+                StringComparison.Ordinal));
+        var call = response.ClaimResults.Single(record =>
+            GetCallableId(response, record).Contains(
+                ".Call(",
+                StringComparison.Ordinal));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(loop.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                loop.Reason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(call.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(call.Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                call.ProofCore.Any(static item => item.StartsWith(
+                    "source-summary:",
+                    StringComparison.Ordinal)),
+                Is.True);
+        }
+    }
+
+    [Test]
+    public async Task ExactImplementationIlSummaryProvesAnExternalCallChain()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static bool Call(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() == value);
+                    return ExternalImplementation.ReadAgain(value);
+                }
+            }
+            """);
+        project.AddImplementationReference(
+            """
+            public static class ExternalImplementation {
+                private static bool Read(bool value) => value;
+                public static bool ReadAgain(bool value) => Read(value);
+            }
+            """);
+        var compilation = project.CreateCompilation();
+        var external = compilation.GetTypeByMetadataName(
+                "ExternalImplementation")!
+            .GetMembers("ReadAgain")
+            .OfType<IMethodSymbol>()
+            .Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                CompilerImplementationIlSummaryLowerer.IsCandidate(
+                    compilation,
+                    external),
+                Is.True);
+            Assert.That(
+                external.MetadataToken & unchecked((int)0xff000000),
+                Is.EqualTo(0x06000000));
+        }
+        var discovery = new ClaimManifestBuilder(compilation).Build();
+        var target = discovery.Targets.Values.Single(candidate =>
+            candidate.Method.MetadataName == "Call");
+        var lowerer = new CompilerCallableLowerer(
+            compilation,
+            new IrFactory());
+        var preparation = lowerer.Prepare(target);
         Assert.That(
-            response.ClaimResults.Select(static record => record.Outcome),
-            Is.All.EqualTo(WorkerClaimOutcome.Unknown));
+            preparation.IsSuccess,
+            Is.True,
+            lowerer.LastImplementationIlAbstention.ToString());
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        var result = response.ClaimResults.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                result.ProofCore.Any(static item => item.StartsWith(
+                    "il-summary:",
+                    StringComparison.Ordinal)),
+                Is.True);
+        }
+    }
+
+    [Test]
+    public async Task MixedSourceAndImplementationSummariesSealDependencyEvidence()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                private static bool Local(bool value) =>
+                    ExternalMixed.Read(value);
+
+                public static bool Call(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() == value);
+                    return Local(value);
+                }
+            }
+            """);
+        project.AddImplementationReference(
+            """
+            public static class ExternalMixed {
+                public static bool Read(bool value) => value;
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            await File.ReadAllTextAsync(request.CompilerManifest.Path));
+        var summary = artifact.Callables.Single()
+            .Body!.SummaryCalls.Single();
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        var result = response.ClaimResults.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(summary.Origin, Is.EqualTo(CompilerSummaryOrigin.Source));
+            Assert.That(
+                summary.DependencyEvidence.Select(static item => item.Origin),
+                Does.Contain(CompilerSummaryOrigin.ImplementationIl));
+            Assert.That(
+                summary.DependencyEvidence.Single(item =>
+                        item.Origin == CompilerSummaryOrigin.ImplementationIl)
+                    .EvidenceSha256,
+                Has.Length.EqualTo(64));
+            Assert.That(
+                result.ProofCore.Any(static item => item.StartsWith(
+                    "source-summary:",
+                    StringComparison.Ordinal)),
+                Is.True);
+        }
+
+        summary.DependencyEvidence.Single(item =>
+                item.Origin == CompilerSummaryOrigin.ImplementationIl)
+            .EvidenceSha256 = new string('b', 64);
         Assert.That(
-            response.ClaimResults.Select(static record => record.Reason),
-            Is.All.EqualTo(WorkerClaimReason.UnsupportedBody));
+            (Action)(() => CompilerManifestArtifactJson.DecodeCallables(
+                artifact)),
+            Throws.TypeOf<InvalidDataException>());
+    }
+
+    [Test]
+    public async Task ImplementationIlBranchesAndInt32WrappingRemainExact()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Select(
+                    bool chooseLeft,
+                    int left,
+                    int right) {
+                    Contract.Ensures(
+                        Contract.Result<int>() ==
+                        (chooseLeft ? left : right));
+                    return ExternalScalar.Select(
+                        chooseLeft,
+                        left,
+                        right);
+                }
+
+                public static int Increment(int value) {
+                    Contract.Ensures(
+                        value != int.MaxValue ||
+                        Contract.Result<int>() == int.MinValue);
+                    return ExternalScalar.Increment(value);
+                }
+            }
+            """);
+        project.AddImplementationReference(
+            """
+            public static class ExternalScalar {
+                public static int Select(
+                    bool chooseLeft,
+                    int left,
+                    int right) => chooseLeft ? left : right;
+
+                public static int Increment(int value) =>
+                    unchecked(value + 1);
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                response.ClaimResults.Select(static result => result.Outcome),
+                Is.All.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                response.ClaimResults.Select(static result => result.Reason),
+                Is.All.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                response.ClaimResults,
+                Has.All.Matches<WorkerClaimResult>(result =>
+                    result.ProofCore.Any(static item => item.StartsWith(
+                        "il-summary:",
+                        StringComparison.Ordinal))));
+        }
+    }
+
+    [Test]
+    public async Task CyclicImplementationIlAbstainsWithoutTrustingTheBody()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static bool Loop(bool value) {
+                    Contract.Ensures(Contract.Result<bool>() == value);
+                    return ExternalCycles.Loop(value);
+                }
+
+                public static bool Recurse(bool value) {
+                    Contract.Ensures(Contract.Result<bool>() == value);
+                    return ExternalCycles.Recurse(value);
+                }
+            }
+            """);
+        project.AddImplementationReference(
+            """
+            public static class ExternalCycles {
+                public static bool Loop(bool value) {
+                    while (value) { }
+                    return value;
+                }
+
+                public static bool Recurse(bool value) =>
+                    value || Recurse(value);
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                response.ClaimResults.Select(static result => result.Outcome),
+                Is.All.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                response.ClaimResults.Select(static result => result.Reason),
+                Is.All.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(
+                response.ClaimResults.SelectMany(
+                    static result => result.ProofCore),
+                Is.Empty);
+        }
+    }
+
+    [Test]
+    public async Task ReferenceAssemblyIsNotImplementationProofAuthority()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static bool Call(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() == value);
+                    return ReferenceOnly.Read(value);
+                }
+            }
+            """);
+        project.AddImplementationReference(
+            """
+            using System.Runtime.CompilerServices;
+            [assembly: ReferenceAssembly]
+            public static class ReferenceOnly {
+                public static bool Read(bool value) => value;
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        var result = response.ClaimResults.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                result.Reason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(result.ProofCore, Is.Empty);
+        }
+    }
+
+    [Test]
+    public async Task AuditedSpecificationPackRequiresExplicitOptIn()
+    {
+        using var project = TestProject.Create(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Maximum(int left, int right) {
+                    Contract.Ensures(
+                        Contract.Result<int>() ==
+                        (left >= right ? left : right));
+                    return Math.Max(left, right);
+                }
+            }
+            """);
+        project.UseNetCoreReferencePack();
+        var withoutRequest = project.CreateRequest(cacheEnabled: false);
+        using var withoutPackWorker = SharpProofWorker.Create(
+            withoutRequest.Budgets);
+        var withoutPack = await withoutPackWorker.VerifyAsync(
+            withoutRequest);
+
+        var withRequest = project.CreateRequest(
+            cacheEnabled: false,
+            specificationPacks: ["dotnet.scalar"]);
+        var withArtifact = CompilerManifestArtifactJson.Deserialize(
+            await File.ReadAllTextAsync(withRequest.CompilerManifest.Path));
+        var summaryArtifact = withArtifact.Callables.Single()
+            .Body!.SummaryCalls.Single();
+        using var withPackWorker = SharpProofWorker.Create(
+            withRequest.Budgets);
+        var withPack = await withPackWorker.VerifyAsync(
+            withRequest);
+
+        Assert.That(withoutPack.Errors, Is.Empty);
+        Assert.That(withPack.Errors, Is.Empty);
+        var disabled = withoutPack.ClaimResults.Single();
+        var enabled = withPack.ClaimResults.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                disabled.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                disabled.Reason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(enabled.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(enabled.Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                enabled.ProofCore.Any(static item => item.StartsWith(
+                    "spec-pack:dotnet.scalar@1:",
+                    StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                summaryArtifact.Origin,
+                Is.EqualTo(CompilerSummaryOrigin.SpecificationPack));
+            Assert.That(
+                summaryArtifact.EvidenceIdentity,
+                Is.EqualTo("dotnet.scalar@1"));
+            Assert.That(
+                summaryArtifact.EvidenceSha256,
+                Has.Length.EqualTo(64));
+        }
+
+        summaryArtifact.EvidenceIdentity = string.Empty;
+        Assert.That(
+            (Action)(() => CompilerManifestArtifactJson.DecodeCallables(
+                withArtifact)),
+            Throws.TypeOf<InvalidDataException>());
+    }
+
+    [Test]
+    public void UnknownSpecificationPackFailsClosed()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static bool Identity(bool value) {
+                    Contract.Ensures(Contract.Result<bool>() == value);
+                    return value;
+                }
+            }
+            """);
+
+        Assert.That(
+            (Action)(() => project.CreateRequest(
+                    cacheEnabled: false,
+                    specificationPacks: ["missing-pack"])),
+            Throws.InvalidOperationException.With.Message.Contains(
+                "Unknown SharpProof specification pack"));
     }
 
     [Test]
@@ -2578,6 +2974,49 @@ public sealed class WorkerTests
                     Contract.Ensures(
                         Contract.Result<int>() >= value);
                     return Math.Abs(value);
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.Errors, Is.Empty);
+        var record = response.ClaimResults.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                response.RunStatus,
+                Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.None));
+            Assert.That(
+                record.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                record.Reason,
+                Is.EqualTo(
+                    WorkerClaimReason.CounterexampleNotReplayable));
+            Assert.That(record.ProofCore, Is.Empty);
+            Assert.That(record.Model, Is.Empty);
+        }
+    }
+
+    [Test]
+    public async Task RelationalSummaryCallProducesTypedNonfatalUnreplayableCounterexample()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                private static int Identity(int value) => value;
+
+                public static int Call(int value) {
+                    Contract.Ensures(
+                        Contract.Result<int>() > value);
+                    return Identity(value);
                 }
             }
             """);
@@ -3027,10 +3466,12 @@ public sealed class WorkerTests
             """
             using SharpProof.Attributes;
             public static class Subject {
-                private static long Read(long value) => value;
+                private sealed class Reader {
+                    internal long Read(long value) => value;
+                }
                 public static long Unsupported(long value) {
                     Contract.Ensures(Contract.Result<long>() == value);
-                    return Read(value);
+                    return new Reader().Read(value);
                 }
                 public static long Deep(long value) {
                     Contract.Ensures(
@@ -4971,6 +5412,9 @@ public sealed class WorkerTests
 
     private sealed class TestProject : IDisposable
     {
+        private readonly List<string> _additionalReferencePaths = [];
+        private bool _useNetCoreReferencePack;
+
         private TestProject(string directory, string[] sourcePaths)
         {
             DirectoryPath = directory;
@@ -5016,6 +5460,11 @@ public sealed class WorkerTests
             return new TestProject(directory, sourcePaths);
         }
 
+        internal void UseNetCoreReferencePack()
+        {
+            _useNetCoreReferencePack = true;
+        }
+
         internal WorkerVerifyRequest CreateRequest(
             bool cacheEnabled,
             CSharpParseOptions? parseOptions = null,
@@ -5023,7 +5472,8 @@ public sealed class WorkerTests
             string targetFramework = "net8.0",
             WorkerFeatureSet features = WorkerFeatureSet.All,
             int maximumExpressionDepth =
-                WorkerBudgets.DefaultMaximumExpressionDepth)
+                WorkerBudgets.DefaultMaximumExpressionDepth,
+            ImmutableArray<string> specificationPacks = default)
         {
             var compilation = CreateCompilation(
                 parseOptions, compilationOptions);
@@ -5036,7 +5486,8 @@ public sealed class WorkerTests
                 features,
                 discovery,
                 maximumExpressionDepth,
-                CancellationToken.None);
+                CancellationToken.None,
+                specificationPacks: specificationPacks);
             var bytes = System.Text.Encoding.UTF8.GetBytes(
                 CompilerManifestArtifactJson.Serialize(artifact));
             var path = Path.Combine(
@@ -5066,6 +5517,39 @@ public sealed class WorkerTests
                     MaximumExpressionDepth = maximumExpressionDepth
                 }
             };
+        }
+
+        internal void AddImplementationReference(string source)
+        {
+            var path = Path.Combine(
+                DirectoryPath,
+                "implementation-" + Guid.NewGuid().ToString("N") +
+                ".dll");
+            var syntax = CSharpSyntaxTree.ParseText(
+                source,
+                CreateParseOptions(),
+                path + ".cs");
+            var compilation = CSharpCompilation.Create(
+                "Implementation" + Guid.NewGuid().ToString("N"),
+                [syntax],
+                GetReferences().Select(static referencePath =>
+                    MetadataReference.CreateFromFile(referencePath)),
+                CreateRoslynOptions().WithOptimizationLevel(
+                    OptimizationLevel.Release));
+            using var stream = new FileStream(
+                path,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None);
+            var emit = compilation.Emit(stream);
+            Assert.That(
+                emit.Success,
+                Is.True,
+                string.Join(
+                    Environment.NewLine,
+                    emit.Diagnostics.Select(static diagnostic =>
+                        diagnostic.ToString())));
+            _additionalReferencePaths.Add(path);
         }
 
         public void Dispose()
@@ -5104,6 +5588,44 @@ public sealed class WorkerTests
                 .OrderBy(static path => path, StringComparer.Ordinal)];
         }
 
+        private static string[] GetNetCoreReferencePack()
+        {
+            var runtimeDirectory = Path.GetDirectoryName(
+                typeof(object).Assembly.Location) ??
+                throw new InvalidOperationException(
+                    "The .NET runtime directory is unavailable.");
+            var dotnetRoot = Path.GetFullPath(Path.Combine(
+                runtimeDirectory,
+                "..",
+                "..",
+                ".."));
+            var packRoot = Path.Combine(
+                dotnetRoot,
+                "packs",
+                "Microsoft.NETCore.App.Ref");
+            var version = Directory.GetDirectories(packRoot)
+                .Select(Path.GetFileName)
+                .Where(static value => value != null)
+                .Select(static value => Version.Parse(value!))
+                .Where(value => value.Major == Environment.Version.Major)
+                .OrderByDescending(static value => value)
+                .First();
+            var references = Directory.GetFiles(
+                Path.Combine(
+                    packRoot,
+                    version.ToString(),
+                    "ref",
+                    "net" + version.Major.ToString(
+                        System.Globalization.CultureInfo.InvariantCulture) +
+                    ".0"),
+                "*.dll",
+                SearchOption.TopDirectoryOnly);
+            return [.. references
+                .Append(typeof(Contract).Assembly.Location)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(static path => path, StringComparer.Ordinal)];
+        }
+
         internal CSharpCompilation CreateCompilation(
             CSharpParseOptions? parseOptions = null,
             CSharpCompilationOptions? compilationOptions = null)
@@ -5118,8 +5640,12 @@ public sealed class WorkerTests
                         SourceHashAlgorithm.Sha256),
                     effectiveParseOptions,
                     path));
-            var references = GetReferences().Select(
-                static path => MetadataReference.CreateFromFile(path));
+            var references = (_useNetCoreReferencePack
+                    ? GetNetCoreReferencePack()
+                    : GetReferences())
+                .Concat(_additionalReferencePaths)
+                .Select(static path =>
+                    MetadataReference.CreateFromFile(path));
             return CSharpCompilation.Create(
                 "WorkerTest",
                 syntaxTrees,

@@ -1,0 +1,345 @@
+using NUnit.Framework;
+using SharpProof.Ir;
+
+namespace SharpProof.Summaries.Test;
+
+[TestFixture]
+public sealed class IrRelationalSummaryTests
+{
+    [Test]
+    public void ProvenanceRequiresPackIdentityOnlyForSpecificationPacks()
+    {
+        var digest = new string('a', 64);
+
+        Assert.Throws<ArgumentException>((Action)(() =>
+            _ = new IrSummaryProvenance(
+                IrSummaryOrigin.SpecificationPack,
+                digest)));
+        Assert.Throws<ArgumentException>((Action)(() =>
+            _ = new IrSummaryProvenance(
+                IrSummaryOrigin.Source,
+                digest,
+                "source-name")));
+
+        var pack = new IrSummaryProvenance(
+            IrSummaryOrigin.SpecificationPack,
+            digest,
+            "dotnet.scalar@1");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(pack.Origin, Is.EqualTo(IrSummaryOrigin.SpecificationPack));
+            Assert.That(pack.EvidenceSha256, Is.EqualTo(digest));
+            Assert.That(pack.EvidenceIdentity, Is.EqualTo("dotnet.scalar@1"));
+        }
+    }
+
+    [Test]
+    public void StraightLineSummaryRelatesInputsToResult()
+    {
+        var fixture = new SummaryFixture("Increment");
+        var bodyParameter = fixture.Factory.CreateVariable(
+            "body:value",
+            fixture.Factory.IntegerType);
+        var builder = new IrProgramBuilder(fixture.Factory);
+        var entry = builder.CreateBlock("entry");
+        builder.Return(
+            entry,
+            fixture.Factory.CreateOperation("return"),
+            fixture.Factory.Binary(
+                IrBinaryOperator.Add,
+                fixture.Factory.Variable(bodyParameter),
+                fixture.Factory.Integer(1)));
+
+        var built = IrRelationalSummaryBuilder.Build(
+            builder.Build(),
+            fixture.Signature,
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [bodyParameter] = fixture.Factory.Variable(fixture.Parameter)
+            });
+
+        Assert.That(built.IsSuccess, Is.True);
+        Assert.That(built.Summary!.Dependencies, Is.Empty);
+        Assert.That(
+            Evaluate(
+                fixture,
+                built.Summary.NormalRelation,
+                input: 4,
+                result: 5),
+            Is.True);
+        Assert.That(
+            Evaluate(
+                fixture,
+                built.Summary.NormalRelation,
+                input: 4,
+                result: 6),
+            Is.False);
+    }
+
+    [Test]
+    public void BranchSummaryJoinsAllNormalReturns()
+    {
+        var fixture = new SummaryFixture("Absolute");
+        var bodyParameter = fixture.Factory.CreateVariable(
+            "body:value",
+            fixture.Factory.IntegerType);
+        var builder = new IrProgramBuilder(fixture.Factory);
+        var entry = builder.CreateBlock("entry");
+        var nonnegative = builder.CreateBlock("nonnegative");
+        var negative = builder.CreateBlock("negative");
+        builder.Branch(
+            entry,
+            fixture.Factory.CreateOperation("test"),
+            fixture.Factory.Binary(
+                IrBinaryOperator.GreaterThanOrEqual,
+                fixture.Factory.Variable(bodyParameter),
+                fixture.Factory.Integer(0)),
+            nonnegative,
+            negative);
+        builder.Return(
+            nonnegative,
+            fixture.Factory.CreateOperation("positive-return"),
+            fixture.Factory.Variable(bodyParameter));
+        builder.Return(
+            negative,
+            fixture.Factory.CreateOperation("negative-return"),
+            fixture.Factory.Unary(
+                IrUnaryOperator.Negate,
+                fixture.Factory.Variable(bodyParameter)));
+
+        var built = IrRelationalSummaryBuilder.Build(
+            builder.Build(),
+            fixture.Signature,
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [bodyParameter] = fixture.Factory.Variable(fixture.Parameter)
+            });
+
+        Assert.That(built.IsSuccess, Is.True);
+        Assert.That(
+            Evaluate(fixture, built.Summary!.NormalRelation, -4, 4),
+            Is.True);
+        Assert.That(
+            Evaluate(fixture, built.Summary.NormalRelation, 7, 7),
+            Is.True);
+        Assert.That(
+            Evaluate(fixture, built.Summary.NormalRelation, -4, -4),
+            Is.False);
+    }
+
+    [Test]
+    public void CallCompositionUsesAReusableRelationAndFreshVariables()
+    {
+        var callee = new SummaryFixture("Double");
+        var bodyParameter = callee.Factory.CreateVariable(
+            "callee:value",
+            callee.Factory.IntegerType);
+        var calleeBuilder = new IrProgramBuilder(callee.Factory);
+        var calleeEntry = calleeBuilder.CreateBlock("entry");
+        calleeBuilder.Return(
+            calleeEntry,
+            callee.Factory.CreateOperation("return"),
+            callee.Factory.Binary(
+                IrBinaryOperator.Multiply,
+                callee.Factory.Variable(bodyParameter),
+                callee.Factory.Integer(2)));
+        var calleeSummary = IrRelationalSummaryBuilder.Build(
+            calleeBuilder.Build(),
+            callee.Signature,
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [bodyParameter] = callee.Factory.Variable(callee.Parameter)
+            }).Summary!;
+
+        var callerIdentity = callee.Factory.CreateIdentity();
+        var callerMember = callee.Factory.GetOrCreateMember(
+            callerIdentity,
+            callee.DeclaringType,
+            "AddOneAfterDouble",
+            callee.Factory.IntegerType,
+            isStatic: true,
+            callee.Factory.IntegerType);
+        var callerParameter = callee.Factory.CreateVariable(
+            "caller:parameter",
+            callee.Factory.IntegerType);
+        var callerResult = callee.Factory.CreateVariable(
+            "caller:result",
+            callee.Factory.IntegerType);
+        var callerBodyParameter = callee.Factory.CreateVariable(
+            "caller:body-parameter",
+            callee.Factory.IntegerType);
+        var callResult = callee.Factory.CreateVariable(
+            "caller:call-result",
+            callee.Factory.IntegerType);
+        var callerBuilder = new IrProgramBuilder(callee.Factory);
+        var callerEntry = callerBuilder.CreateBlock("entry");
+        var call = callerBuilder.Call(
+            callerEntry,
+            callee.Factory.CreateOperation("call"),
+            callResult,
+            callee.Member,
+            receiver: null,
+            callee.Factory.Variable(callerBodyParameter));
+        callerBuilder.Return(
+            callerEntry,
+            callee.Factory.CreateOperation("return"),
+            callee.Factory.Binary(
+                IrBinaryOperator.Add,
+                callee.Factory.Variable(callResult),
+                callee.Factory.Integer(1)));
+        var callerSignature = new IrSummarySignature(
+            callerMember,
+            receiver: null,
+            [callerParameter],
+            callerResult,
+            Provenance('b'));
+
+        var built = IrRelationalSummaryBuilder.Build(
+            callerBuilder.Build(),
+            callerSignature,
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [callerBodyParameter] =
+                    callee.Factory.Variable(callerParameter)
+            },
+            new Dictionary<IrInstructionId, IrRelationalSummary>
+            {
+                [call.Id] = calleeSummary
+            });
+
+        Assert.That(built.IsSuccess, Is.True);
+        Assert.That(
+            built.Summary!.Dependencies,
+            Is.EqualTo(new[] { callee.Member }));
+        Assert.That(
+            built.Summary.DependencyProvenance.Select(static item =>
+                item.EvidenceSha256),
+            Is.EqualTo(new[] { calleeSummary.Signature.Provenance.EvidenceSha256 }));
+        Assert.That(built.Summary.ExistentialVariables.Length, Is.EqualTo(1));
+        var internalResult = built.Summary.ExistentialVariables[0];
+        var values = new Dictionary<IrVarId, IrValue>
+        {
+            [callerParameter] = callee.Factory.CreateIntegerValue(3),
+            [callerResult] = callee.Factory.CreateIntegerValue(7),
+            [internalResult] = callee.Factory.CreateIntegerValue(6)
+        };
+        var evaluation = new IrInterpreter(callee.Factory).Evaluate(
+            built.Summary.NormalRelation,
+            values);
+        Assert.That(evaluation.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(evaluation.Value!.Boolean, Is.True);
+
+        var first = IrRelationalSummaryInstantiator.Instantiate(
+            calleeSummary,
+            receiver: null,
+            [callee.Factory.Integer(2)],
+            1);
+        var second = IrRelationalSummaryInstantiator.Instantiate(
+            calleeSummary,
+            receiver: null,
+            [callee.Factory.Integer(2)],
+            2);
+        Assert.That(first.Result, Is.Not.EqualTo(second.Result));
+    }
+
+    [Test]
+    public void CyclicControlFlowAbstainsWithTypedReason()
+    {
+        var fixture = new SummaryFixture("Loop");
+        var bodyParameter = fixture.Factory.CreateVariable(
+            "body:value",
+            fixture.Factory.IntegerType);
+        var builder = new IrProgramBuilder(fixture.Factory);
+        var entry = builder.CreateBlock("entry");
+        builder.Goto(
+            entry,
+            fixture.Factory.CreateOperation("loop"),
+            entry);
+
+        var built = IrRelationalSummaryBuilder.Build(
+            builder.Build(),
+            fixture.Signature,
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [bodyParameter] = fixture.Factory.Variable(fixture.Parameter)
+            });
+
+        Assert.That(built.IsSuccess, Is.False);
+        Assert.That(
+            built.Reason,
+            Is.EqualTo(IrSummaryAbstentionReason.CyclicControlFlow));
+    }
+
+    private static bool Evaluate(
+        SummaryFixture fixture,
+        IrTerm relation,
+        long input,
+        long result)
+    {
+        var evaluation = new IrInterpreter(fixture.Factory).Evaluate(
+            relation,
+            new Dictionary<IrVarId, IrValue>
+            {
+                [fixture.Parameter] =
+                    fixture.Factory.CreateIntegerValue(input),
+                [fixture.Result] =
+                    fixture.Factory.CreateIntegerValue(result)
+            });
+        Assert.That(evaluation.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        return evaluation.Value!.Boolean;
+    }
+
+    private static IrSummaryProvenance Provenance(char digit)
+    {
+        return new IrSummaryProvenance(
+            IrSummaryOrigin.Source,
+            new string(digit, 64));
+    }
+
+    private sealed class SummaryFixture
+    {
+        internal SummaryFixture(string name)
+        {
+            Factory = new IrFactory();
+            DeclaringType = Factory.GetOrCreateReferenceType(
+                Factory.CreateIdentity(),
+                "Functions");
+            Member = CreateMember(name);
+            Parameter = Factory.CreateVariable(
+                "parameter:0",
+                Factory.IntegerType);
+            Result = Factory.CreateVariable(
+                "result",
+                Factory.IntegerType);
+            Signature = new IrSummarySignature(
+                Member,
+                receiver: null,
+                [Parameter],
+                Result,
+                Provenance('a'));
+        }
+
+        internal IrFactory Factory { get; }
+
+        internal IrTypeId DeclaringType { get; }
+
+        internal IrMemberId Member { get; }
+
+        internal IrVarId Parameter { get; }
+
+        internal IrVarId Result { get; }
+
+        internal IrSummarySignature Signature { get; }
+
+        internal IrMemberId CreateMember(string name)
+        {
+            return Factory.GetOrCreateMember(
+                Factory.CreateIdentity(),
+                DeclaringType,
+                name,
+                Factory.IntegerType,
+                isStatic: true,
+                Factory.IntegerType);
+        }
+    }
+}

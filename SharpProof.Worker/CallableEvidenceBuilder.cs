@@ -1,5 +1,6 @@
 using static SharpProof.Worker.PostconditionObligationBuilder;
-using static SharpProof.Worker.SymbolicTermOperations;
+using static SharpProof.Ir.IrSemanticTerms;
+using static SharpProof.Ir.IrTermAnalysis;
 
 namespace SharpProof.Worker;
 
@@ -100,6 +101,46 @@ internal static class CallableEvidenceBuilder
                 "spec:" + specAssumption.WitnessIdentifier);
         }
 
+        foreach (var summaryAssumption in body.SummaryAssumptions)
+        {
+            if (!TryGetSummaryPrefix(
+                    summaryAssumption.Origin,
+                    out var summaryPrefix))
+            {
+                return CallableEvidenceBuildResult.Fail(
+                    WorkerClaimReason.UnsupportedBody);
+            }
+
+            var predicate = Guard(
+                factory,
+                summaryAssumption.Guard,
+                summaryAssumption.Predicate);
+            if (GetDepth(predicate) > maximumExpressionDepth)
+            {
+                return CallableEvidenceBuildResult.Fail(
+                    WorkerClaimReason.UnsupportedExpression);
+            }
+
+            var summaryEvidence = summaryAssumption.Origin ==
+                    CompilerSummaryOrigin.SpecificationPack
+                ? summaryPrefix + ":" +
+                    summaryAssumption.EvidenceIdentity
+                : summaryPrefix;
+
+            ProofJustification justification = new LoweredJustification(
+                factory.CreateOperation(
+                    summaryEvidence + ":" +
+                    summaryAssumption.EvidenceSha256));
+            assumptions.Add(new Assumption(
+                factory,
+                predicate,
+                justification));
+            labels.Add(
+                justification,
+                summaryEvidence + ":" +
+                summaryAssumption.CallIdentity);
+        }
+
         if (!TryAddSourceDomainAssumptions(
                 factory,
                 target.Variables,
@@ -152,6 +193,20 @@ internal static class CallableEvidenceBuilder
                 IsSupportedProofDomain(
                     factory,
                     assumption.Predicate))));
+    }
+
+    private static bool TryGetSummaryPrefix(
+        CompilerSummaryOrigin origin,
+        out string prefix)
+    {
+        prefix = origin switch
+        {
+            CompilerSummaryOrigin.Source => "source-summary",
+            CompilerSummaryOrigin.ImplementationIl => "il-summary",
+            CompilerSummaryOrigin.SpecificationPack => "spec-pack",
+            _ => string.Empty
+        };
+        return prefix.Length != 0;
     }
 
     internal static CallableEntryEvidenceBuildResult BuildEntry(
