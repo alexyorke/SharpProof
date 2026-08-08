@@ -30,16 +30,20 @@
     "manifestSchemaVersion": 4,
     "compilerArtifactSchemaVersion": 10,
     "maximumParallelism": 4,
+    "maximumWorkerProcesses": 4,
+    "maximumExpressionDepth": 64,
     "maximumMemoryMiB": 2048,
     "queryRlimit": 3000000,
     "methodRlimit": 20000000,
     "maximumMethodWallSeconds": 10,
     "maximumProjectWallSeconds": 300,
     "cancellationP95Milliseconds": 250,
-    "forcedTerminationMilliseconds": 1000
+    "forcedTerminationMilliseconds": 1000,
+    "maximumProjectDirectoryCharacters": 239
   },
   "cache": {
     "schemaVersion": 11,
+    "enabledByDefault": true,
     "maximumMiB": 512,
     "cacheableOutcomes": [
       "Refuted"

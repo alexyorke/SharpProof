@@ -1944,6 +1944,15 @@ public sealed class WorkerMsBuildIntegrationTests
     public void PackagePropertiesMatchProtocolDefaults()
     {
         var repository = ConsumerProject.FindRepositoryRoot();
+        using var acceptance = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            repository,
+            "eng",
+            "acceptance",
+            "contract.json")));
+        var maximumProjectDirectoryCharacters = acceptance.RootElement
+            .GetProperty("worker")
+            .GetProperty("maximumProjectDirectoryCharacters")
+            .GetInt32();
         var portableProps = XDocument.Load(Path.Combine(
             repository,
             "SharpProof.Package",
@@ -2035,6 +2044,11 @@ public sealed class WorkerMsBuildIntegrationTests
                         "SharpProofVerifyCacheMaximumBytes"],
                     CultureInfo.InvariantCulture),
                 Is.EqualTo(WorkerCacheOptions.DefaultMaximumBytes));
+            Assert.That(
+                int.Parse(properties[
+                        "_SharpProofMaximumProjectDirectoryLength"],
+                    CultureInfo.InvariantCulture),
+                Is.EqualTo(maximumProjectDirectoryCharacters));
             Assert.That(
                 properties.ContainsKey("SharpProofVerifySarifFile"),
                 Is.False,

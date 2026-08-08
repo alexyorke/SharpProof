@@ -14,6 +14,7 @@ jobs; they are not interchangeable sources of truth.
 | [Package-backed samples](../samples/README.md) | Evaluators and CI owners | Passing, diagnostic, mixed-outcome, strict-library, and host-rejection examples against packed artifacts |
 | [Analysis limits](analysis-limits.md) | Build and CI owners | Shipping profile/feature/policy properties, worker bounds, and acceptance-only budgets |
 | [Preview support boundary](preview-support.md) | Build and release owners | Normative Windows host, path, concurrency, and trusted-filesystem boundary |
+| [Release constants and ownership](release-constants.md) | Maintainers | Classification and authoritative sources for pins, defaults, and derived measurements |
 | [Typed abstention reasons](unknown-reasons.md) | Tool integrators | Exact typed reasons, run statuses, callable coverage, claim outcomes, and cache states |
 
 ## Normative and architectural documents

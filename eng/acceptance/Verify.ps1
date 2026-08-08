@@ -256,13 +256,17 @@ Assert-Equal $contract.worker.protocolVersion 9 'worker.protocolVersion'
 Assert-Equal $contract.worker.manifestSchemaVersion 4 'worker.manifestSchemaVersion'
 Assert-Equal $contract.worker.compilerArtifactSchemaVersion 10 'worker.compilerArtifactSchemaVersion'
 Assert-Equal $contract.worker.maximumParallelism 4 'worker.maximumParallelism'
+Assert-Equal $contract.worker.maximumWorkerProcesses 4 'worker.maximumWorkerProcesses'
+Assert-Equal $contract.worker.maximumExpressionDepth 64 'worker.maximumExpressionDepth'
 Assert-Equal $contract.worker.maximumMemoryMiB 2048 'worker.maximumMemoryMiB'
 Assert-Equal $contract.worker.queryRlimit 3000000 'worker.queryRlimit'
 Assert-Equal $contract.worker.methodRlimit 20000000 'worker.methodRlimit'
 Assert-Equal $contract.worker.maximumMethodWallSeconds 10 'worker.maximumMethodWallSeconds'
 Assert-Equal $contract.worker.maximumProjectWallSeconds 300 'worker.maximumProjectWallSeconds'
 Assert-Equal $contract.worker.forcedTerminationMilliseconds 1000 'worker.forcedTerminationMilliseconds'
+Assert-Equal $contract.worker.maximumProjectDirectoryCharacters 239 'worker.maximumProjectDirectoryCharacters'
 Assert-Equal $contract.cache.schemaVersion 11 'cache.schemaVersion'
+Assert-Equal $contract.cache.enabledByDefault $true 'cache.enabledByDefault'
 Assert-Equal $contract.cache.maximumMiB 512 'cache.maximumMiB'
 Assert-Equal ($contract.cache.cacheableOutcomes -join ',') 'Refuted' 'cache.cacheableOutcomes'
 Assert-Equal `
@@ -342,6 +346,14 @@ Assert-Equal `
     ([string]$contract.worker.maximumParallelism) `
     'SharpProofVerifyMaxParallelism'
 Assert-Equal `
+    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyMaxWorkerProcesses' 'verifier package') `
+    ([string]$contract.worker.maximumWorkerProcesses) `
+    'SharpProofVerifyMaxWorkerProcesses'
+Assert-Equal `
+    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyMaximumExpressionDepth' 'verifier package') `
+    ([string]$contract.worker.maximumExpressionDepth) `
+    'SharpProofVerifyMaximumExpressionDepth'
+Assert-Equal `
     (Get-MsBuildProperty $verifierProps 'SharpProofVerifyProcessMemoryLimitBytes' 'verifier package') `
     ([string]([int64]$contract.worker.maximumMemoryMiB * 1024 * 1024)) `
     'SharpProofVerifyProcessMemoryLimitBytes'
@@ -353,6 +365,14 @@ Assert-Equal `
     (Get-MsBuildProperty $verifierProps 'SharpProofVerifyCacheMaximumBytes' 'verifier package') `
     ([string]([int64]$contract.cache.maximumMiB * 1024 * 1024)) `
     'SharpProofVerifyCacheMaximumBytes'
+Assert-Equal `
+    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyCacheEnabled' 'verifier package') `
+    ([string]$contract.cache.enabledByDefault).ToLowerInvariant() `
+    'SharpProofVerifyCacheEnabled'
+Assert-Equal `
+    (Get-MsBuildProperty $verifierProps '_SharpProofMaximumProjectDirectoryLength' 'verifier package') `
+    ([string]$contract.worker.maximumProjectDirectoryCharacters) `
+    '_SharpProofMaximumProjectDirectoryLength'
 
 Push-Location $repositoryRoot
 try {

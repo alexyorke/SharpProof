@@ -4405,6 +4405,12 @@ public sealed class WorkerTests
                 worker.GetProperty("maximumParallelism").GetInt32(),
                 Is.EqualTo(WorkerBudgets.MaximumParallelism));
             Assert.That(
+                worker.GetProperty("maximumWorkerProcesses").GetInt32(),
+                Is.EqualTo(WorkerBudgets.MaximumParallelism));
+            Assert.That(
+                worker.GetProperty("maximumExpressionDepth").GetInt32(),
+                Is.EqualTo(WorkerBudgets.DefaultMaximumExpressionDepth));
+            Assert.That(
                 worker.GetProperty("maximumMemoryMiB").GetInt64() *
                 1024 * 1024,
                 Is.EqualTo(WorkerBudgets.DefaultProcessMemoryLimitBytes));
@@ -4435,6 +4441,9 @@ public sealed class WorkerTests
             Assert.That(
                 cache.GetProperty("maximumMiB").GetInt64() * 1024 * 1024,
                 Is.EqualTo(WorkerCacheOptions.DefaultMaximumBytes));
+            Assert.That(
+                cache.GetProperty("enabledByDefault").GetBoolean(),
+                Is.True);
         }
     }
 
