@@ -54,7 +54,7 @@ CFG/IR. It does not construct a Roslyn compilation, parse source, or reread
 reference files; compiler and reference identities are provenance only.
 Independent whole-body postcondition-counterexample replay and immutable
 tagged-byte promotion through a trusted-publishing workflow are implemented
-for the admitted scalar subset. Schema 9 also carries the compiler-neutral
+for the admitted scalar subset. Schema 10 retains schema 9's compiler-neutral
 unconditional managed object/array allocation event used by the worker's
 independent effect replayer. It can refute `ZeroAllocations` or an
 `EffectContract` excluding `Allocates`; other effect events remain fail-closed

@@ -157,7 +157,9 @@
         if (!aliasesReparse && !aliasesInput && !aliasesOutput &&
             !aliasesWorkerTree && !aliasesCache) {
             using (var publication =
-                new System.Threading.Mutex(false, @"Local\SharpProof.Publish")) {
+                new System.Threading.Mutex(
+                    false,
+                    WindowsPathIdentity.PublicationMutexName(ResultPath))) {
                 var ownsPublication = false;
                 try {
                     try {
@@ -300,40 +302,58 @@ public sealed class _SharpProofRunVerifier : Task, ICancelableTask
             throw new InvalidOperationException(
                 "SharpProofDotNetHost must name the direct dotnet.exe muxer.");
 
-        string candidate;
+        var disclosedHost = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
+        var trusted = !string.IsNullOrWhiteSpace(disclosedHost)
+            ? ValidateDotNetInstallation(disclosedHost)
+            : ValidateDotNetInstallation(ResolveDotNetFromPath());
         if (string.Equals(executable, "dotnet", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(executable, "dotnet.exe", StringComparison.OrdinalIgnoreCase))
         {
-            candidate = null;
-            foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ??
-                         string.Empty).Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                var path = System.IO.Path.Combine(
-                    directory.Trim().Trim('"'), "dotnet.exe");
-                if (System.IO.File.Exists(path))
-                {
-                    candidate = path;
-                    break;
-                }
-            }
-            if (candidate == null)
-                throw new InvalidOperationException(
-                    "SharpProofDotNetHost could not resolve dotnet.exe from PATH.");
+            return trusted;
         }
-        else
+        if (!System.IO.Path.IsPathRooted(executable) ||
+            !string.Equals(
+                System.IO.Path.GetFileName(executable),
+                "dotnet.exe",
+                StringComparison.OrdinalIgnoreCase))
         {
-            if (!System.IO.Path.IsPathRooted(executable) ||
-                !string.Equals(
-                    System.IO.Path.GetFileName(executable),
-                    "dotnet.exe",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException(
-                    "SharpProofDotNetHost must name the direct dotnet.exe muxer.");
-            }
-            candidate = executable;
+            throw new InvalidOperationException(
+                "SharpProofDotNetHost must name the direct dotnet.exe muxer.");
         }
+        var configured = ValidateDotNetInstallation(executable);
+        if (!WindowsPathIdentity.AreSameExistingFile(configured, trusted))
+            throw new InvalidOperationException(
+                "SharpProofDotNetHost must match the trusted current dotnet.exe muxer.");
+        return configured;
+    }
 
+    private static string ResolveDotNetFromPath()
+    {
+        foreach (var value in (Environment.GetEnvironmentVariable("PATH") ??
+                     string.Empty).Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var directory = value.Trim().Trim('"');
+            if (string.IsNullOrWhiteSpace(directory) ||
+                directory == "." ||
+                !System.IO.Path.IsPathRooted(directory))
+                continue;
+            var candidate = System.IO.Path.Combine(directory, "dotnet.exe");
+            if (System.IO.File.Exists(candidate))
+                return candidate;
+        }
+        throw new InvalidOperationException(
+            "SharpProofDotNetHost could not resolve a trusted dotnet.exe from PATH.");
+    }
+
+    private static string ValidateDotNetInstallation(string candidate)
+    {
+        if (!System.IO.Path.IsPathRooted(candidate) ||
+            !string.Equals(
+                System.IO.Path.GetFileName(candidate),
+                "dotnet.exe",
+                StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                "SharpProofDotNetHost must name the direct dotnet.exe muxer.");
         var resolved = WindowsPathIdentity.Canonicalize(candidate);
         var directoryPath = System.IO.Path.GetDirectoryName(resolved);
         if (!System.IO.File.Exists(resolved) ||

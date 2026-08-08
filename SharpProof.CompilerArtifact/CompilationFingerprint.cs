@@ -36,7 +36,7 @@ internal static class CompilationFingerprint
     private static bool ValidSnapshot(CompilerCompilationSnapshot? value)
     {
         return value != null &&
-        Path.IsPathRooted(value.ProjectDirectory) &&
+        IsCanonicalPath(value.ProjectDirectory) &&
         HasText(value.AssemblyName) &&
         HasText(value.AssemblyIdentity) &&
         HasText(value.TargetFramework) &&
@@ -89,11 +89,14 @@ internal static class CompilationFingerprint
         value.DocumentationMode is "None" or "Parse" or "Diagnose" &&
         value.Kind is "Regular" or "Script" &&
         All(value.PreprocessorSymbols, HasText) &&
+        IsOrdered(value.PreprocessorSymbols, unique: false) &&
         All(value.EffectivePreprocessorSymbols, HasText) &&
+        IsOrdered(value.EffectivePreprocessorSymbols, unique: true) &&
         !value.EffectivePreprocessorSymbols.Contains(
             RuntimeContractEvaluationSymbol,
             StringComparer.Ordinal) &&
-        All(value.Features, ValidFeature);
+        All(value.Features, ValidFeature) &&
+        IsOrdered(value.Features, static feature => feature.Key, unique: true);
     }
 
     private static bool ValidFeature(CompilerFeatureSnapshot? value)
@@ -106,6 +109,7 @@ internal static class CompilationFingerprint
         return value != null &&
         value.Kind is "Assembly" or "Module" &&
         All(value.Aliases, HasText) &&
+        IsOrdered(value.Aliases, unique: false) &&
         HasText(value.Identity) &&
         value.Modules is { Length: > 0 } &&
         (value.Kind == "Assembly" || value.Modules.Length == 1 &&
@@ -119,9 +123,15 @@ internal static class CompilationFingerprint
                     left.Name, right.Name) < 0)
             .All(static ordered => ordered) &&
         value.Modules.Select(static module => module.Path)
-            .Distinct(StringComparer.OrdinalIgnoreCase).Count() ==
+            .Distinct(PathComparer).Count() ==
         value.Modules.Length;
     }
+
+    private static StringComparer PathComparer =>
+        System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+            System.Runtime.InteropServices.OSPlatform.Windows)
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
 
     private static bool ValidReferenceModule(
         CompilerReferenceModuleSnapshot? value)
@@ -153,13 +163,42 @@ internal static class CompilationFingerprint
         try
         {
             return Path.IsPathRooted(path) &&
-                Path.GetFullPath(path).Replace('\\', '/') == path;
+                NormalizePath(Path.GetFullPath(path)) == path;
         }
         catch (Exception exception) when (
             exception is ArgumentException or IOException or NotSupportedException)
         {
             return false;
         }
+    }
+
+    private static string NormalizePath(string path)
+    {
+        return System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+            System.Runtime.InteropServices.OSPlatform.Windows)
+            ? path.Replace('\\', '/')
+            : path;
+    }
+
+    private static bool IsOrdered(string[]? values, bool unique)
+    {
+        return values != null && values.Zip(values.Skip(1), (left, right) =>
+        {
+            var comparison = StringComparer.Ordinal.Compare(left, right);
+            return unique ? comparison < 0 : comparison <= 0;
+        }).All(static ordered => ordered);
+    }
+
+    private static bool IsOrdered<T>(
+        T[]? values,
+        Func<T, string> key,
+        bool unique)
+    {
+        return values != null && values.Zip(values.Skip(1), (left, right) =>
+        {
+            var comparison = StringComparer.Ordinal.Compare(key(left), key(right));
+            return unique ? comparison < 0 : comparison <= 0;
+        }).All(static ordered => ordered);
     }
 
     private static int Compare(

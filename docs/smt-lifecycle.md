@@ -46,7 +46,7 @@ Project timeout and caller cancellation use the separate `TimedOut` and
 `Canceled` run statuses.
 
 Effect refutation replay is independent of this SMT lifecycle. Compiler
-artifact schema 9 can carry one unconditional definite managed object/array
+artifact schema 10 retains schema 9's unconditional definite managed object/array
 allocation event. A worker-owned interpreter validates the event identity,
 source-tree span, selected constraint, and sealed witness, then derives
 `Allocates` without trusting compiler effect bits or executing user code. That

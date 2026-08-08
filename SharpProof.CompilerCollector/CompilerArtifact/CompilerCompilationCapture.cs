@@ -289,7 +289,11 @@ internal static class CompilerCompilationCapture
 
     private static string NormalizePath(string path)
     {
-        return Path.GetFullPath(path).Replace('\\', '/');
+        var fullPath = Path.GetFullPath(path);
+        return System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+            System.Runtime.InteropServices.OSPlatform.Windows)
+            ? fullPath.Replace('\\', '/')
+            : fullPath;
     }
 
     private static string Hash(Stream stream, CancellationToken cancellationToken)

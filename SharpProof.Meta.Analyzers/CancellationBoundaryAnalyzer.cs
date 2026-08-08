@@ -59,25 +59,100 @@ internal static class CancellationBoundaryAnalyzer
                 return false;
             }
 
-            if (previous.Filter != null)
-            {
-                continue;
-            }
-
             if (previous.Declaration?.Type == null)
             {
-                return true;
+                if (previous.Filter == null ||
+                    FilterIncludesAllCancellation(
+                        previous, null, cancellationType, context))
+                {
+                    return true;
+                }
+                continue;
             }
 
             var previousType = context.SemanticModel.GetTypeInfo(
                 previous.Declaration.Type, context.CancellationToken).Type;
-            if (IsOrDerivesFrom(cancellationType, previousType))
+            if (IsOrDerivesFrom(cancellationType, previousType) &&
+                (previous.Filter == null ||
+                 FilterIncludesAllCancellation(
+                     previous, previousType, cancellationType, context)))
             {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static bool FilterIncludesAllCancellation(
+        CatchClauseSyntax clause,
+        ITypeSymbol? caughtType,
+        INamedTypeSymbol cancellationType,
+        SyntaxNodeAnalysisContext context)
+    {
+        var filter = clause.Filter?.FilterExpression;
+        if (filter == null)
+        {
+            return true;
+        }
+        if (context.SemanticModel.GetConstantValue(
+                filter, context.CancellationToken) is
+            { HasValue: true, Value: true })
+        {
+            return true;
+        }
+        if (clause.Declaration == null ||
+            context.SemanticModel.GetDeclaredSymbol(
+                clause.Declaration,
+                context.CancellationToken) is not ILocalSymbol caughtLocal)
+        {
+            return false;
+        }
+        var operation = Unwrap(context.SemanticModel.GetOperation(
+            filter, context.CancellationToken));
+        if (operation is IIsTypeOperation typeTest &&
+            Unwrap(typeTest.ValueOperand) is ILocalReferenceOperation typeTested)
+        {
+            if (!SymbolEqualityComparer.Default.Equals(
+                    typeTested.Local, caughtLocal))
+            {
+                return false;
+            }
+            return IsOrDerivesFrom(cancellationType, typeTest.TypeOperand);
+        }
+        if (operation is not IIsPatternOperation patternTest ||
+            Unwrap(patternTest.Value) is not ILocalReferenceOperation tested ||
+            !SymbolEqualityComparer.Default.Equals(tested.Local, caughtLocal))
+        {
+            return false;
+        }
+        return PatternIncludesAllCancellation(
+            patternTest.Pattern, caughtType, cancellationType);
+    }
+
+    private static bool PatternIncludesAllCancellation(
+        IPatternOperation pattern,
+        ITypeSymbol? caughtType,
+        INamedTypeSymbol cancellationType)
+    {
+        return pattern switch
+        {
+            ITypePatternOperation typePattern =>
+                IsOrDerivesFrom(cancellationType, typePattern.MatchedType),
+            IBinaryPatternOperation binary
+                when binary.OperatorKind == BinaryOperatorKind.Or =>
+                PatternIncludesAllCancellation(
+                    binary.LeftPattern, caughtType, cancellationType) ||
+                PatternIncludesAllCancellation(
+                    binary.RightPattern, caughtType, cancellationType),
+            IBinaryPatternOperation binary
+                when binary.OperatorKind == BinaryOperatorKind.And =>
+                PatternIncludesAllCancellation(
+                    binary.LeftPattern, caughtType, cancellationType) &&
+                PatternIncludesAllCancellation(
+                    binary.RightPattern, caughtType, cancellationType),
+            _ => false
+        };
     }
 
     private static bool CatchesCancellation(
@@ -109,21 +184,46 @@ internal static class CancellationBoundaryAnalyzer
             return true;
         }
 
-        if (clause.Declaration?.Identifier.ValueText is not { Length: > 0 } identifier ||
-            filter is not IsPatternExpressionSyntax
-            {
-                Expression: IdentifierNameSyntax tested
-            } ||
-            tested.Identifier.ValueText != identifier ||
-            context.SemanticModel.GetOperation(
-                filter, context.CancellationToken) is not IIsPatternOperation
-                patternTest)
+        ExpressionSyntax patternExpression = filter;
+        while (patternExpression is ParenthesizedExpressionSyntax parenthesized)
+        {
+            patternExpression = parenthesized.Expression;
+        }
+        if (clause.Declaration == null ||
+            patternExpression is not IsPatternExpressionSyntax ||
+            context.SemanticModel.GetDeclaredSymbol(
+                clause.Declaration,
+                context.CancellationToken) is not ILocalSymbol caughtLocal ||
+            Unwrap(context.SemanticModel.GetOperation(
+                patternExpression, context.CancellationToken)) is not
+                IIsPatternOperation patternTest ||
+            Unwrap(patternTest.Value) is not ILocalReferenceOperation tested ||
+            !SymbolEqualityComparer.Default.Equals(
+                tested.Local, caughtLocal))
         {
             return false;
         }
 
         return PatternExcludesCancellation(
             patternTest.Pattern, caughtType, cancellationType);
+    }
+
+    private static IOperation? Unwrap(IOperation? operation)
+    {
+        while (true)
+        {
+            switch (operation)
+            {
+                case IConversionOperation conversion:
+                    operation = conversion.Operand;
+                    continue;
+                case IParenthesizedOperation parenthesized:
+                    operation = parenthesized.Operand;
+                    continue;
+                default:
+                    return operation;
+            }
+        }
     }
 
     private static bool PatternExcludesCancellation(

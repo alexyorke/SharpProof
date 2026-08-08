@@ -103,10 +103,18 @@ public sealed class CompilerManifestArtifactTests
         Action<CompilerCompilationSnapshot>[] corruptions = [
             snapshot => snapshot.Options.ReferencesSupersedeLowerVersions = true,
             snapshot => snapshot.Options.Usings = [string.Empty],
+            snapshot => snapshot.ProjectDirectory += "/.",
             snapshot => snapshot.SyntaxTrees[0].Features = null!,
+            snapshot => snapshot.SyntaxTrees[0].Features = [
+                new() { Key = "z", Value = "1" },
+                new() { Key = "a", Value = "2" }
+            ],
+            snapshot => snapshot.SyntaxTrees[0].PreprocessorSymbols = ["z", "a"],
+            snapshot => snapshot.SyntaxTrees[0].EffectivePreprocessorSymbols = ["z", "a"],
             snapshot => snapshot.SyntaxTrees[0].Sha256 = "invalid",
             snapshot => snapshot.SyntaxTrees[0].TextLength = -1,
             snapshot => snapshot.References[0].Aliases = null!,
+            snapshot => snapshot.References[0].Aliases = ["z", "a"],
             snapshot => snapshot.References[0].Kind = "invalid",
             snapshot => snapshot.References[0].Kind = "Module",
             snapshot => snapshot.References[0].Modules[0].Mvid = "invalid",
@@ -147,6 +155,70 @@ public sealed class CompilerManifestArtifactTests
             Assert.Throws<JsonException>(
                 (Action)(() =>
                     CompilerManifestArtifactJson.Deserialize(json)));
+        }
+    }
+
+    [Test]
+    [Platform("Win")]
+    public void WindowsCaseAliasesCannotDuplicateModulePaths()
+    {
+        var artifact = CreateArtifact();
+        AddCaseVariantModule(artifact);
+
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(artifact))));
+    }
+
+    [Test]
+    public void UnixCaseDistinctModulePathsRemainDistinct()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("Unix path semantics are required.");
+        }
+        var artifact = CreateArtifact();
+        AddCaseVariantModule(artifact);
+
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(artifact))));
+    }
+
+    [Test]
+    public void UnixCapturePreservesBackslashFilenameCharacters()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("Unix filename semantics are required.");
+        }
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.BackslashPath." + Guid.NewGuid().ToString("N"));
+        var projectDirectory = Path.Combine(root, "literal\\backslash");
+        Directory.CreateDirectory(projectDirectory);
+        try
+        {
+            var compilation = CreateCompilation(
+                new CSharpParseOptions(LanguageVersion.CSharp12),
+                "internal sealed class Subject {}\n",
+                includeContractReference: false);
+            var artifact = CompilerManifestArtifactProducer.Create(
+                compilation,
+                projectDirectory,
+                "net8.0",
+                WorkerFeatureSet.All,
+                new ClaimManifestBuilder(compilation).Build(),
+                WorkerBudgets.DefaultMaximumExpressionDepth,
+                CancellationToken.None);
+
+            Assert.That(
+                artifact.Compilation.ProjectDirectory,
+                Does.Contain("literal\\backslash"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
         }
     }
 
@@ -973,6 +1045,33 @@ public sealed class CompilerManifestArtifactTests
                 .Replace('\\', '/'),
             Sha256 = new string(hash, 64)
         };
+    }
+
+    private static void AddCaseVariantModule(
+        CompilerManifestArtifact artifact)
+    {
+        var manifest = artifact.Compilation.References[0].Modules[0];
+        var characters = manifest.Path.ToCharArray();
+        var index = Array.FindIndex(characters, char.IsLetter);
+        Assert.That(index, Is.GreaterThanOrEqualTo(0));
+        characters[index] = char.IsUpper(characters[index])
+            ? char.ToLowerInvariant(characters[index])
+            : char.ToUpperInvariant(characters[index]);
+        var caseVariant = new string(characters);
+        Assert.That(caseVariant, Is.Not.EqualTo(manifest.Path));
+        Assert.That(caseVariant, Is.EqualTo(manifest.Path).IgnoreCase);
+        artifact.Compilation.References[0].Modules = [
+            manifest,
+            new CompilerReferenceModuleSnapshot
+            {
+                Name = "zz-linked.netmodule",
+                Mvid = Guid.NewGuid().ToString("D"),
+                Path = caseVariant,
+                Sha256 = new string('a', 64)
+            }
+        ];
+        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation, []);
     }
 
     private static CompilerDiagnosticArtifact Diagnostic(

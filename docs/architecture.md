@@ -283,8 +283,8 @@ direct candidates become `Unknown(CounterexampleNotReplayable)`.
 Conditional/path-dependent and may-only conflicts remain
 `Unknown(EffectContractNotEstablished)`. A semantic replay disagreement
 becomes `Unknown(CounterexampleReplayFailed)` and fails the run. Effect results
-remain noncacheable. Worker protocol version 9 and cache schema version 11 did
-not change with artifact schema 9.
+remain noncacheable. Under compiler artifact schema 10, worker protocol version
+9 and cache schema version 11 remain unchanged.
 
 Optional deterministic SARIF 2.1.0 projects the validated response under the
 same atomic publication boundary and does not participate in semantic

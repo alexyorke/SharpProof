@@ -384,13 +384,36 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     catch (CustomCancellationException exception)
                         when (exception is not IMarker) { }
                 }
+                static void ParenthesizedExclusion() {
+                    try { }
+                    catch (Exception exception)
+                        when ((exception is not OperationCanceledException)) { }
+                }
+                static void ParenthesizedPatternExclusion() {
+                    try { }
+                    catch (Exception exception)
+                        when (exception is (not OperationCanceledException)) { }
+                }
+                static void ExhaustiveEarlierFilter() {
+                    try { }
+                    catch (OperationCanceledException) when (true) { throw; }
+                    catch (Exception) { }
+                }
+                static void ExhaustiveEarlierTypePattern() {
+                    try { }
+                    catch (Exception exception)
+                        when (exception is OperationCanceledException) { throw; }
+                    catch (Exception) { }
+                }
             }
             """;
 
         var diagnostics = await Analyze(source);
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
-            Does.Not.Contain("SPMETA003"));
+            Does.Not.Contain("SPMETA003"),
+            string.Join(Environment.NewLine, diagnostics.Select(static diagnostic =>
+                diagnostic.ToString())));
     }
 
     [TestCase(

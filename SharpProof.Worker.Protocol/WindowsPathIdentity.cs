@@ -1,5 +1,8 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Win32.SafeHandles;
 
 namespace SharpProof.Worker.Protocol;
@@ -80,6 +83,67 @@ public static class WindowsPathIdentity
             suffix.Push(name);
             existingPath = parent;
         }
+    }
+
+    public static string PublicationMutexName(string resultPath)
+    {
+        var canonical = Canonicalize(resultPath);
+        var identity = PublicationIdentity(canonical);
+        using var hash = SHA256.Create();
+        var digest = hash.ComputeHash(Encoding.UTF8.GetBytes(identity));
+        return "Global\\SharpProof.Publish." + string.Concat(
+            digest.Select(static value => value.ToString(
+                "x2", CultureInfo.InvariantCulture)));
+    }
+
+    private static string PublicationIdentity(string canonicalPath)
+    {
+        var suffix = new Stack<string>();
+        var ancestor = canonicalPath;
+        while (true)
+        {
+            var name = Path.GetFileName(ancestor);
+            var parent = Path.GetDirectoryName(ancestor);
+            if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(parent))
+            {
+                throw new InvalidOperationException(
+                    "SharpProof could not establish a publication parent.");
+            }
+            suffix.Push(name.ToUpperInvariant());
+            ancestor = parent;
+            using var handle = Open(ancestor);
+            if (!handle.IsInvalid)
+            {
+                return FileIdentity(
+                    "path",
+                    Information(handle),
+                    string.Join("\\", suffix));
+            }
+            var error = Marshal.GetLastWin32Error();
+            if (error != ErrorFileNotFound && error != ErrorPathNotFound)
+            {
+                throw new Win32Exception(error,
+                    "SharpProof could not establish publication identity.");
+            }
+        }
+    }
+
+    private static string FileIdentity(
+        string kind,
+        ByHandleFileInformation information,
+        string suffix)
+    {
+        return string.Join("|", new[]
+        {
+            kind,
+            information.VolumeSerialNumber.ToString(
+                "x8", CultureInfo.InvariantCulture),
+            information.FileIndexHigh.ToString(
+                "x8", CultureInfo.InvariantCulture),
+            information.FileIndexLow.ToString(
+                "x8", CultureInfo.InvariantCulture),
+            suffix
+        });
     }
 
     public static bool AreSameExistingFile(string firstPath, string secondPath)

@@ -320,6 +320,26 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(artifact.Options.AllowUnsafe, Is.False);
             Assert.That(artifact.Options.Deterministic, Is.True);
             Assert.That(
+                artifact.Options.MetadataImportOptions,
+                Is.EqualTo("Public"));
+            Assert.That(artifact.Options.WarningLevel, Is.GreaterThanOrEqualTo(0));
+            Assert.That(
+                artifact.Options.GeneralDiagnosticOption,
+                Is.EqualTo("Default"));
+            Assert.That(
+                artifact.Options.SpecificDiagnosticOptions.Zip(
+                    artifact.Options.SpecificDiagnosticOptions.Skip(1),
+                    static (left, right) => StringComparer.Ordinal.Compare(
+                        left.Id, right.Id) < 0).All(static ordered => ordered),
+                Is.True);
+            Assert.That(
+                artifact.Options.AssemblyIdentityComparer,
+                Is.EqualTo("Desktop"));
+            Assert.That(artifact.Options.Usings, Is.Not.Null);
+            Assert.That(
+                artifact.Options.ResolverPolicy,
+                Is.EqualTo("EvidenceOnly"));
+            Assert.That(
                 artifact.Options.OutputKind,
                 Is.EqualTo("DynamicallyLinkedLibrary"));
             Assert.That(
@@ -413,6 +433,65 @@ public sealed class WorkerMsBuildIntegrationTests
             rejected.Output,
             Does.Contain(
                 "SharpProofDotNetHost must name the direct dotnet.exe muxer."));
+
+        var fakeDirectory = Path.Combine(
+            Path.GetDirectoryName(wrapper.ProjectPath)!, "fake-dotnet");
+        Directory.CreateDirectory(Path.Combine(fakeDirectory, "host", "fxr"));
+        var fakeHost = Path.Combine(fakeDirectory, "dotnet.exe");
+        File.Copy(
+            Path.ChangeExtension(typeof(Program).Assembly.Location, ".exe"),
+            fakeHost);
+        var fake = await wrapper.BuildAsync(
+            verify: true,
+            ("SharpProofDotNetHost", fakeHost));
+        Assert.That(fake.ExitCode, Is.Not.Zero, fake.Output);
+        Assert.That(
+            fake.Output,
+            Does.Contain(
+                "SharpProofDotNetHost must match the trusted current dotnet.exe muxer."));
+    }
+
+    [Test]
+    public void UnrelatedLegacyPublicationLockDoesNotBlockVerification()
+    {
+        RequireWindowsWorker();
+        using var legacyLock = new Mutex(
+            initiallyOwned: true,
+            "Local\\SharpProof.Publish",
+            out var ownsLegacyLock);
+        Assert.That(ownsLegacyLock, Is.True);
+        try
+        {
+            using var project = ConsumerProject.Create(IdentitySource);
+            var build = project.BuildAsync(verify: true)
+                .GetAwaiter().GetResult();
+
+            Assert.That(build.ExitCode, Is.Zero, build.Output);
+            Assert.That(File.Exists(project.ResultPath), Is.True, build.Output);
+        }
+        finally
+        {
+            legacyLock.ReleaseMutex();
+        }
+    }
+
+    [Test]
+    public void PublicationLockIsGlobalAndStableAcrossReplacement()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var directory = Path.GetDirectoryName(project.ProjectPath)!;
+        var result = Path.Combine(directory, "publication.json");
+
+        var before = WindowsPathIdentity.PublicationMutexName(result);
+        File.WriteAllText(result, "first");
+        var existing = WindowsPathIdentity.PublicationMutexName(result);
+        File.WriteAllText(result, "replacement");
+        var replaced = WindowsPathIdentity.PublicationMutexName(result);
+
+        Assert.That(before, Does.StartWith("Global\\SharpProof.Publish."));
+        Assert.That(existing, Is.EqualTo(before));
+        Assert.That(replaced, Is.EqualTo(before));
     }
 
     [Test]
@@ -2308,6 +2387,23 @@ public sealed class WorkerMsBuildIntegrationTests
                     options.GetProperty("platform").GetString() ??
                         string.Empty,
                     options.GetProperty("nullableContext").GetString() ??
+                        string.Empty,
+                    options.GetProperty("metadataImportOptions").GetString() ??
+                        string.Empty,
+                    options.GetProperty("warningLevel").GetInt32(),
+                    options.GetProperty("generalDiagnosticOption").GetString() ??
+                        string.Empty,
+                    [.. options.GetProperty("specificDiagnosticOptions")
+                        .EnumerateArray()
+                        .Select(static option => new CompilerDiagnosticOption(
+                            option.GetProperty("id").GetString() ?? string.Empty,
+                            option.GetProperty("reportDiagnostic").GetString() ??
+                                string.Empty))],
+                    options.GetProperty("assemblyIdentityComparer").GetString() ??
+                        string.Empty,
+                    [.. options.GetProperty("usings").EnumerateArray()
+                        .Select(static item => item.GetString() ?? string.Empty)],
+                    options.GetProperty("resolverPolicy").GetString() ??
                         string.Empty),
                 [.. compilation.GetProperty("syntaxTrees").EnumerateArray()
                     .Select(static tree => new CompilerSyntaxTree(
@@ -2323,8 +2419,10 @@ public sealed class WorkerMsBuildIntegrationTests
                     .SelectMany(static reference =>
                         reference.GetProperty("modules").EnumerateArray())
                     .Select(static module => new CompilerReference(
-                        module.GetProperty("path").GetString() ??
-                            string.Empty))]);
+                        module.GetProperty("name").GetString() ?? string.Empty,
+                        module.GetProperty("mvid").GetString() ?? string.Empty,
+                        module.GetProperty("path").GetString() ?? string.Empty,
+                        module.GetProperty("sha256").GetString() ?? string.Empty))]);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(
@@ -2345,6 +2443,12 @@ public sealed class WorkerMsBuildIntegrationTests
                 Assert.That(artifact.AssemblyName, Is.Not.Empty);
                 Assert.That(artifact.TargetFramework, Is.Not.Empty);
                 Assert.That(artifact.CompilerVersion, Is.Not.Empty);
+                Assert.That(
+                    artifact.References.All(static reference =>
+                        !string.IsNullOrWhiteSpace(reference.Name) &&
+                        Guid.TryParseExact(reference.Mvid, "D", out _) &&
+                        reference.Sha256.Length == 64),
+                    Is.True);
             }
             return artifact;
         }
@@ -2357,14 +2461,29 @@ public sealed class WorkerMsBuildIntegrationTests
         bool AllowUnsafe,
         bool Deterministic,
         string Platform,
-        string NullableContext);
+        string NullableContext,
+        string MetadataImportOptions,
+        int WarningLevel,
+        string GeneralDiagnosticOption,
+        CompilerDiagnosticOption[] SpecificDiagnosticOptions,
+        string AssemblyIdentityComparer,
+        string[] Usings,
+        string ResolverPolicy);
+
+    private sealed record CompilerDiagnosticOption(
+        string Id,
+        string ReportDiagnostic);
 
     private sealed record CompilerSyntaxTree(
         string Path,
         string LanguageVersion,
         string[] PreprocessorSymbols);
 
-    private sealed record CompilerReference(string Path);
+    private sealed record CompilerReference(
+        string Name,
+        string Mvid,
+        string Path,
+        string Sha256);
 
     private sealed class ConsumerProject : IDisposable
     {

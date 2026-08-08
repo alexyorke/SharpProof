@@ -73,7 +73,7 @@ internal static class Program
             exception is IOException or UnauthorizedAccessException or
                 ArgumentException or FormatException or OverflowException or
                 InvalidDataException or JsonException or KeyNotFoundException or
-                InvalidOperationException)
+                InvalidOperationException or System.ComponentModel.Win32Exception)
         {
             runtimeSnapshot?.Dispose();
             runtimeSnapshot = null;
@@ -145,7 +145,8 @@ internal static class Program
             }
             catch (Exception exception) when (
                 exception is IOException or InvalidDataException or
-                    UnauthorizedAccessException or ArgumentException)
+                    UnauthorizedAccessException or ArgumentException or
+                    System.ComponentModel.Win32Exception)
             {
                 Console.Error.WriteLine(
                     "SharpProof worker result could not be published.");
@@ -422,7 +423,10 @@ internal static class Program
             return;
         }
 
-        using var publication = new Mutex(false, "Local\\SharpProof.Publish");
+        using var publication = new Mutex(
+            false,
+            WindowsPathIdentity.PublicationMutexName(
+                arguments.PublishResultPath!));
         var ownsPublication = false;
         try
         {

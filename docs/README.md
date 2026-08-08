@@ -118,7 +118,7 @@ production-plan Step 4 is complete for the bounded verifier subset.
 Independent whole-body postcondition-counterexample replay is implemented for
 the admitted scalar program subset. The proof kernel checks exact model closure
 and the lowered assumptions/goal before the worker independently executes the
-compiler-produced whole-body CFG. Schema 9 also carries an independently
+compiler-produced whole-body CFG. Schema 10 retains schema 9's independently
 replayable event for an unconditional definite managed object/array allocation.
 The worker can use it to refute `ZeroAllocations` or an `EffectContract`
 excluding `Allocates`; other effect candidates still fail closed as typed

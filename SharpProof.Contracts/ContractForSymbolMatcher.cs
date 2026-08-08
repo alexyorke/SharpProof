@@ -427,6 +427,17 @@ internal static class ContractForSymbolMatcher
                 leftScope, rightScope, normalizeMappedTypeParameters);
         }
 
+        if (left is IFunctionPointerTypeSymbol leftFunction &&
+            right is IFunctionPointerTypeSymbol rightFunction)
+        {
+            return FunctionPointerSignaturesMatch(
+                leftFunction.Signature,
+                rightFunction.Signature,
+                leftScope,
+                rightScope,
+                normalizeMappedTypeParameters);
+        }
+
         if (left is not INamedTypeSymbol leftNamed || right is not INamedTypeSymbol rightNamed)
         {
             return SymbolEqualityComparer.IncludeNullability.Equals(left, right);
@@ -451,6 +462,69 @@ internal static class ContractForSymbolMatcher
                leftNamed.TupleElements.Select((element, index) =>
                        string.Equals(element.Name,
                            rightNamed.TupleElements[index].Name, StringComparison.Ordinal))
+                   .All(static matches => matches);
+    }
+
+    private static bool FunctionPointerSignaturesMatch(
+        IMethodSymbol left,
+        IMethodSymbol right,
+        ISymbol leftScope,
+        ISymbol rightScope,
+        bool normalizeMappedTypeParameters)
+    {
+        return (left.CallingConvention, left.ReturnsByRef,
+                   left.ReturnsByRefReadonly, left.Parameters.Length) ==
+               (right.CallingConvention, right.ReturnsByRef,
+                   right.ReturnsByRefReadonly, right.Parameters.Length) &&
+               TypesMatch(left.ReturnType, right.ReturnType,
+                   leftScope, rightScope, normalizeMappedTypeParameters) &&
+               CustomModifiersMatch(
+                   left.ReturnTypeCustomModifiers,
+                   right.ReturnTypeCustomModifiers) &&
+               CustomModifiersMatch(
+                   left.RefCustomModifiers,
+                   right.RefCustomModifiers) &&
+               left.UnmanagedCallingConventionTypes.Length ==
+                   right.UnmanagedCallingConventionTypes.Length &&
+               left.UnmanagedCallingConventionTypes.Select((type, index) =>
+                       SymbolEqualityComparer.Default.Equals(
+                           type,
+                           right.UnmanagedCallingConventionTypes[index]))
+                   .All(static matches => matches) &&
+               left.Parameters.Select((parameter, index) =>
+                       FunctionPointerParametersMatch(
+                           parameter,
+                           right.Parameters[index],
+                           leftScope,
+                           rightScope,
+                           normalizeMappedTypeParameters))
+                   .All(static matches => matches);
+    }
+
+    private static bool FunctionPointerParametersMatch(
+        IParameterSymbol left,
+        IParameterSymbol right,
+        ISymbol leftScope,
+        ISymbol rightScope,
+        bool normalizeMappedTypeParameters)
+    {
+        return (left.RefKind, left.ScopedKind) ==
+                   (right.RefKind, right.ScopedKind) &&
+               CustomModifiersMatch(left.CustomModifiers, right.CustomModifiers) &&
+               CustomModifiersMatch(left.RefCustomModifiers, right.RefCustomModifiers) &&
+               TypesMatch(left.Type, right.Type,
+                   leftScope, rightScope, normalizeMappedTypeParameters);
+    }
+
+    private static bool CustomModifiersMatch(
+        ImmutableArray<CustomModifier> left,
+        ImmutableArray<CustomModifier> right)
+    {
+        return left.Length == right.Length &&
+               left.Select((modifier, index) =>
+                       modifier.IsOptional == right[index].IsOptional &&
+                       SymbolEqualityComparer.Default.Equals(
+                           modifier.Modifier, right[index].Modifier))
                    .All(static matches => matches);
     }
 

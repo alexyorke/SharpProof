@@ -90,6 +90,58 @@ public sealed class ContractForValidatorGeneratorTests
     }
 
     [Test]
+    public void GenericFunctionPointerSignaturesMatchStructurally()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public unsafe interface ITransformer<T> where T : unmanaged {
+                delegate*<T, T> Map(delegate*<T, T> value);
+            }
+
+            [ContractFor(typeof(ITransformer<>))]
+            public static unsafe class TransformerContracts<T>
+                where T : unmanaged {
+                public static delegate*<T, T> Map(
+                    ITransformer<T> receiver,
+                    delegate*<T, T> value) => value;
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [TestCase(
+        "delegate* unmanaged[Cdecl]<T, T>",
+        "delegate* unmanaged[Stdcall]<T, T>")]
+    [TestCase("delegate*<ref T, T>", "delegate*<T, T>")]
+    public void FunctionPointerConventionAndRefKindsMustMatch(
+        string targetPointer,
+        string companionPointer)
+    {
+        var run = Run(
+            $$"""
+            using SharpProof.Attributes;
+
+            public unsafe interface ITransformer<T> where T : unmanaged {
+                {{targetPointer}} Map({{targetPointer}} value);
+            }
+
+            [ContractFor(typeof(ITransformer<>))]
+            public static unsafe class TransformerContracts<T>
+                where T : unmanaged {
+                public static {{companionPointer}} Map(
+                    ITransformer<T> receiver,
+                    {{companionPointer}} value) => value;
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Has.Length.EqualTo(1));
+        Assert.That(run.Diagnostics[0].Id, Is.EqualTo("SPCF0005"));
+    }
+
+    [Test]
     public void OpenGenericConstraintOrderIsSemanticallyMatched()
     {
         var run = Run(

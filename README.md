@@ -359,7 +359,7 @@ Each manifest claim receives:
 
 Effect claims use canonical compiler-produced evidence. They are `Proven` only
 when a complete effect summary establishes the selected contract. Compiler
-artifact schema 9 can additionally seal one independently replayable,
+artifact schema 10 retains schema 9's independently replayable,
 unconditional direct event for a definite managed object or array allocation.
 The worker validates the event's order, source-tree hash and span, semantic
 identity, selected constraint, and compiler witness, then derives the

@@ -465,6 +465,139 @@ public sealed class IrSmtBackendTests
         Assert.That(retired.FailureReason, Is.EqualTo(BackendFailureReason.Unavailable));
     }
 
+    [Test]
+    public void CancellationWhileQueuedAtTheBackendGateDoesNotRunTheQuery()
+    {
+        var factory = new IrFactory();
+        var member = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            factory.ObjectType,
+            "Queued",
+            factory.BooleanType,
+            isStatic: true);
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.PureOpaque(member, receiver: null),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        using var backend = new IrSmtBackend();
+        using var cancellation = new CancellationTokenSource();
+        var gate = typeof(IrSmtBackend).GetField(
+                "_gate",
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic)?
+            .GetValue(backend);
+        Assert.That(gate, Is.Not.Null);
+        var activeChecks = typeof(IrSmtBackend).GetField(
+            "_activeCheckCount",
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.NonPublic);
+        Assert.That(activeChecks, Is.Not.Null);
+
+        Task<BackendCheckResult> check;
+        lock (gate!)
+        {
+            check = backend.CheckAsync(query, cancellation.Token);
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => (int)activeChecks!.GetValue(backend)! == 1,
+                    TimeSpan.FromSeconds(5)),
+                Is.True);
+            cancellation.Cancel();
+        }
+
+        Func<Task> action = async () => await check;
+        Assert.That(
+            Assert.CatchAsync(action),
+            Is.InstanceOf<OperationCanceledException>());
+
+        var healthyQuery = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        var healthy = backend.CheckAsync(healthyQuery, CancellationToken.None)
+            .GetAwaiter().GetResult();
+        Assert.That(healthy.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
+    }
+
+    [Test]
+    public async Task UnsupportedModelVariablesAreRejectedBeforeEncoding()
+    {
+        var factory = new IrFactory();
+        var boolean = factory.CreateVariable("boolean", factory.BooleanType);
+        var text = factory.CreateVariable("text", factory.StringType);
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Variable(boolean),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)),
+            [boolean, text]);
+        using var backend = new IrSmtBackend();
+
+        var result = await backend.CheckAsync(query, CancellationToken.None);
+
+        Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unknown));
+        Assert.That(
+            result.FailureReason,
+            Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
+    }
+
+    [Test]
+    public async Task PublicBackendBoundsRecursiveEncodingDepth()
+    {
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("deep", factory.BooleanType);
+        var atBoundary = NestNot(factory, factory.Variable(variable), 255);
+        var beyondBoundary = NestNot(factory, factory.Variable(variable), 256);
+        using var backend = new IrSmtBackend();
+
+        var supported = await backend.CheckAsync(
+            Query(factory, variable, atBoundary), CancellationToken.None);
+        var unsupported = await backend.CheckAsync(
+            Query(factory, variable, beyondBoundary), CancellationToken.None);
+
+        Assert.That(supported.Status, Is.Not.EqualTo(BackendCheckStatus.Unknown));
+        Assert.That(unsupported.Status, Is.EqualTo(BackendCheckStatus.Unknown));
+        Assert.That(
+            unsupported.FailureReason,
+            Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
+
+        static IrTerm NestNot(IrFactory factory, IrTerm term, int count)
+        {
+            for (var index = 0; index < count; index++)
+            {
+                term = factory.Unary(IrUnaryOperator.Not, term);
+            }
+            return term;
+        }
+
+        static VerificationQuery Query(
+            IrFactory factory,
+            ScopedIrId<IrVariableTag> variable,
+            IrTerm goal)
+        {
+            return new VerificationQuery(
+                factory,
+                [],
+                new Goal(
+                    factory,
+                    goal,
+                    ProofDiagnosticKind.InternalConsistency,
+                    new SourceLocationId(0)),
+                [variable]);
+        }
+    }
+
     private static bool IsMonitorHeld(object gate)
     {
         if (!Monitor.TryEnter(gate))

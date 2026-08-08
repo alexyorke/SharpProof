@@ -146,7 +146,9 @@ public sealed class WorkerProgramTests
         {
             var compilation = new CompilerCompilationSnapshot
             {
-                ProjectDirectory = directory,
+                ProjectDirectory = OperatingSystem.IsWindows()
+                    ? directory.Replace('\\', '/')
+                    : directory,
                 AssemblyName = "Subject",
                 AssemblyIdentity = "Subject, Version=1.0.0.0",
                 TargetFramework = "net9.0",
