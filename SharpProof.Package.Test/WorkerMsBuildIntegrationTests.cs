@@ -1558,6 +1558,12 @@ public sealed class WorkerMsBuildIntegrationTests
         var protocolPath = Path.Combine(
             isolatedLauncherDirectory,
             "isolated-protocol.dll");
+        var isolatedRequestPath = Path.Combine(
+            isolatedLauncherDirectory,
+            "request.json");
+        var isolatedManifestPath = Path.Combine(
+            isolatedLauncherDirectory,
+            "compiler-manifest.json");
         File.Copy(LauncherProtocolOutputPath(), protocolPath);
         var expectedBytes = await File.ReadAllBytesAsync(protocolPath);
         var failed = await project.RunVerificationTargetAsync(
@@ -1566,6 +1572,8 @@ public sealed class WorkerMsBuildIntegrationTests
                 isolatedLauncherDirectory,
                 "isolated-launcher.dll")),
             ("_SharpProofWorkerProtocolPath", protocolPath),
+            ("SharpProofVerifyRequestFile", isolatedRequestPath),
+            ("SharpProofCompilerManifestFile", isolatedManifestPath),
             ("SharpProofVerifyResultFile", protocolPath));
         using (Assert.EnterMultipleScope())
         {
@@ -1573,9 +1581,14 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(
                 failed.Output,
                 Does.Contain("SharpProof output paths must not alias input paths."));
-            Assert.That(
-                await File.ReadAllBytesAsync(protocolPath),
-                Is.EqualTo(expectedBytes));
+            var protocolExists = File.Exists(protocolPath);
+            Assert.That(protocolExists, Is.True);
+            if (protocolExists)
+            {
+                Assert.That(
+                    await File.ReadAllBytesAsync(protocolPath),
+                    Is.EqualTo(expectedBytes));
+            }
         }
     }
 
