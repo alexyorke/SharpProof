@@ -181,6 +181,64 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void RichPredicateOperationKindsHaveStableSemanticIdentity()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+            public sealed class Subject<T>
+            {
+                public event Action? Changed;
+                public int this[int index] => index;
+                private static int Echo(int value) => value;
+
+                public object Check<U>(object value)
+                {
+                    Contract.Ensures(
+                        this != null &&
+                        new object() != null &&
+                        ((Func<int, int>)Echo) != null &&
+                        value is string &&
+                        new int[1].Length == 1 &&
+                        this[0] == 0 &&
+                        Changed == null &&
+                        typeof(U) != typeof(T) &&
+                        1.25f < 2.5f &&
+                        1.25d < 2.5d &&
+                        1.25m < 2.5m);
+                    Contract.Ensures(
+                        Contract.Result<object>() == value);
+                    return value;
+                }
+            }
+            """;
+        var first = Build(("First.cs", source));
+        var renamed = Build(("Renamed.cs", source));
+        var changed = Build((
+            "Changed.cs",
+            source.Replace("1.25m < 2.5m", "1.5m < 2.5m",
+                StringComparison.Ordinal)));
+        var firstIds = first.Manifest.Claims
+            .Select(static claim => claim.ClaimId)
+            .ToArray();
+        var renamedIds = renamed.Manifest.Claims
+            .Select(static claim => claim.ClaimId)
+            .ToArray();
+        var changedIds = changed.Manifest.Claims
+            .Select(static claim => claim.ClaimId)
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(firstIds, Has.Length.EqualTo(2));
+            Assert.That(firstIds, Is.Unique);
+            Assert.That(renamedIds, Is.EqualTo(firstIds));
+            Assert.That(changedIds.Intersect(firstIds), Has.Exactly(1).Items);
+        }
+    }
+
+    [Test]
     public void ReorderingDistinctClaimsPreservesTheirIdentitySet()
     {
         var first = Build(("Subject.cs", TwoClaims("==", ">=")));

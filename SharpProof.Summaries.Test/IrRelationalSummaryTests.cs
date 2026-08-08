@@ -34,6 +34,340 @@ public sealed class IrRelationalSummaryTests
     }
 
     [Test]
+    public void PublicSummaryGuardsRejectMalformedInputs()
+    {
+        var fixture = new SummaryFixture("Guards");
+        var digest = new string('a', 64);
+
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+            _ = new IrSummaryProvenance(
+                (IrSummaryOrigin)int.MaxValue,
+                digest)));
+        foreach (var invalidDigest in new[]
+                 {
+                     "",
+                     new string('a', 63),
+                     new string('A', 64),
+                     new string('g', 64)
+                 })
+        {
+            Assert.Throws<ArgumentException>((Action)(() =>
+                _ = new IrSummaryProvenance(
+                    IrSummaryOrigin.Source,
+                    invalidDigest)));
+        }
+
+        Assert.Throws<ArgumentNullException>((Action)(() =>
+            _ = new IrSummarySignature(
+                fixture.Member,
+                receiver: null,
+                parameters: null!,
+                fixture.Result,
+                Provenance('b'))));
+        Assert.Throws<ArgumentNullException>((Action)(() =>
+            _ = new IrSummarySignature(
+                fixture.Member,
+                receiver: null,
+                [fixture.Parameter],
+                fixture.Result,
+                provenance: null!)));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+            _ = new IrRelationalSummaryBuildLimits(maximumBlocks: 0)));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+            _ = new IrRelationalSummaryBuildLimits(maximumInstructions: 0)));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+            _ = new IrRelationalSummaryBuildLimits(
+                maximumExpressionDepth: 0)));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+            _ = new IrRelationalSummaryBuildLimits(
+                maximumSymbolicOperations: 0)));
+
+        var summary = BuildIdentitySummary(fixture);
+        Assert.Throws<ArgumentNullException>((Action)(() =>
+            IrRelationalSummaryInstantiator.Instantiate(
+                null!,
+                receiver: null,
+                [],
+                0)));
+        Assert.Throws<ArgumentNullException>((Action)(() =>
+            IrRelationalSummaryInstantiator.Instantiate(
+                summary,
+                receiver: null,
+                arguments: null!,
+                0)));
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+            IrRelationalSummaryInstantiator.Instantiate(
+                summary,
+                receiver: null,
+                [fixture.Factory.Integer(1)],
+                -1)));
+        Assert.Throws<ArgumentException>((Action)(() =>
+            IrRelationalSummaryInstantiator.Instantiate(
+                summary,
+                receiver: fixture.Factory.Integer(1),
+                [fixture.Factory.Integer(1)],
+                0)));
+        Assert.Throws<ArgumentException>((Action)(() =>
+            IrRelationalSummaryInstantiator.Instantiate(
+                summary,
+                receiver: null,
+                [],
+                0)));
+        Assert.Throws<ArgumentException>((Action)(() =>
+            IrRelationalSummaryInstantiator.Instantiate(
+                summary,
+                receiver: null,
+                [fixture.Factory.Boolean(true)],
+                0)));
+    }
+
+    [Test]
+    public void BuilderRejectsInvalidSignatureAndEnvironmentShapes()
+    {
+        var fixture = new SummaryFixture("InvalidShapes");
+        var bodyParameter = fixture.Factory.CreateVariable(
+            "body:value",
+            fixture.Factory.IntegerType);
+        var builder = new IrProgramBuilder(fixture.Factory);
+        var entry = builder.CreateBlock("entry");
+        builder.Return(
+            entry,
+            fixture.Factory.CreateOperation("return"),
+            fixture.Factory.Variable(bodyParameter));
+        var program = builder.Build();
+        var validEnvironment = new Dictionary<IrVarId, IrTerm>
+        {
+            [bodyParameter] = fixture.Factory.Variable(fixture.Parameter)
+        };
+        var boolean = fixture.Factory.CreateVariable(
+            "wrong:boolean",
+            fixture.Factory.BooleanType);
+        var invalidSignatures = new[]
+        {
+            new IrSummarySignature(
+                fixture.Member,
+                receiver: fixture.Parameter,
+                [fixture.Parameter],
+                fixture.Result,
+                Provenance('b')),
+            new IrSummarySignature(
+                fixture.Member,
+                receiver: null,
+                [],
+                fixture.Result,
+                Provenance('c')),
+            new IrSummarySignature(
+                fixture.Member,
+                receiver: null,
+                [boolean],
+                fixture.Result,
+                Provenance('d')),
+            new IrSummarySignature(
+                fixture.Member,
+                receiver: null,
+                [fixture.Parameter],
+                boolean,
+                Provenance('e')),
+            new IrSummarySignature(
+                fixture.Member,
+                receiver: null,
+                [fixture.Parameter],
+                fixture.Parameter,
+                Provenance('f'))
+        };
+
+        foreach (var signature in invalidSignatures)
+        {
+            var result = IrRelationalSummaryBuilder.Build(
+                program,
+                signature,
+                validEnvironment);
+            Assert.That(
+                result.Reason,
+                Is.EqualTo(IrSummaryAbstentionReason.InvalidSignature));
+        }
+
+        var unbound = fixture.Factory.CreateVariable(
+            "unbound",
+            fixture.Factory.IntegerType);
+        var foreignFactory = new IrFactory();
+        var invalidEnvironments = new IReadOnlyDictionary<IrVarId, IrTerm>[]
+        {
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [bodyParameter] = fixture.Factory.Boolean(true)
+            },
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [bodyParameter] = fixture.Factory.Variable(unbound)
+            },
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [bodyParameter] = foreignFactory.Integer(1)
+            }
+        };
+        foreach (var environment in invalidEnvironments)
+        {
+            var result = IrRelationalSummaryBuilder.Build(
+                program,
+                fixture.Signature,
+                environment);
+            Assert.That(
+                result.Reason,
+                Is.EqualTo(IrSummaryAbstentionReason.InvalidSignature));
+        }
+
+        Assert.Throws<ArgumentNullException>((Action)(() =>
+            IrRelationalSummaryBuilder.Build(
+                null!,
+                fixture.Signature,
+                validEnvironment)));
+        Assert.Throws<ArgumentNullException>((Action)(() =>
+            IrRelationalSummaryBuilder.Build(
+                program,
+                null!,
+                validEnvironment)));
+        Assert.Throws<ArgumentNullException>((Action)(() =>
+            IrRelationalSummaryBuilder.Build(
+                program,
+                fixture.Signature,
+                null!)));
+    }
+
+    [Test]
+    public void BuilderAbstainsAtDeclaredResourceBoundaries()
+    {
+        var fixture = new SummaryFixture("Boundaries");
+        var bodyParameter = fixture.Factory.CreateVariable(
+            "body:value",
+            fixture.Factory.IntegerType);
+        var environment = new Dictionary<IrVarId, IrTerm>
+        {
+            [bodyParameter] = fixture.Factory.Variable(fixture.Parameter)
+        };
+
+        var blockBuilder = new IrProgramBuilder(fixture.Factory);
+        var blockEntry = blockBuilder.CreateBlock("entry");
+        var whenTrue = blockBuilder.CreateBlock("true");
+        var whenFalse = blockBuilder.CreateBlock("false");
+        blockBuilder.Branch(
+            blockEntry,
+            fixture.Factory.CreateOperation("branch"),
+            fixture.Factory.Boolean(true),
+            whenTrue,
+            whenFalse);
+        blockBuilder.Return(
+            whenTrue,
+            fixture.Factory.CreateOperation("true-return"),
+            fixture.Factory.Variable(bodyParameter));
+        blockBuilder.Return(
+            whenFalse,
+            fixture.Factory.CreateOperation("false-return"),
+            fixture.Factory.Variable(bodyParameter));
+        Assert.That(
+            IrRelationalSummaryBuilder.Build(
+                blockBuilder.Build(),
+                fixture.Signature,
+                environment,
+                limits: new IrRelationalSummaryBuildLimits(
+                    maximumBlocks: 2)).Reason,
+            Is.EqualTo(IrSummaryAbstentionReason.ResourceLimit));
+
+        var instructionBuilder = new IrProgramBuilder(fixture.Factory);
+        var instructionEntry = instructionBuilder.CreateBlock("entry");
+        var temporary = fixture.Factory.CreateVariable(
+            "temporary",
+            fixture.Factory.IntegerType);
+        instructionBuilder.Assign(
+            instructionEntry,
+            fixture.Factory.CreateOperation("assign"),
+            temporary,
+            fixture.Factory.Variable(bodyParameter));
+        instructionBuilder.Return(
+            instructionEntry,
+            fixture.Factory.CreateOperation("return"),
+            fixture.Factory.Variable(temporary));
+        var instructionProgram = instructionBuilder.Build();
+        Assert.That(
+            IrRelationalSummaryBuilder.Build(
+                instructionProgram,
+                fixture.Signature,
+                environment,
+                limits: new IrRelationalSummaryBuildLimits(
+                    maximumInstructions: 1)).Reason,
+            Is.EqualTo(IrSummaryAbstentionReason.ResourceLimit));
+        Assert.That(
+            IrRelationalSummaryBuilder.Build(
+                instructionProgram,
+                fixture.Signature,
+                environment,
+                limits: new IrRelationalSummaryBuildLimits(
+                    maximumSymbolicOperations: 1)).Reason,
+            Is.EqualTo(IrSummaryAbstentionReason.ResourceLimit));
+
+        var depthBuilder = new IrProgramBuilder(fixture.Factory);
+        var depthEntry = depthBuilder.CreateBlock("entry");
+        depthBuilder.Return(
+            depthEntry,
+            fixture.Factory.CreateOperation("return"),
+            fixture.Factory.Binary(
+                IrBinaryOperator.Add,
+                fixture.Factory.Variable(bodyParameter),
+                fixture.Factory.Integer(1)));
+        Assert.That(
+            IrRelationalSummaryBuilder.Build(
+                depthBuilder.Build(),
+                fixture.Signature,
+                environment,
+                limits: new IrRelationalSummaryBuildLimits(
+                    maximumExpressionDepth: 1)).Reason,
+            Is.EqualTo(IrSummaryAbstentionReason.ExpressionDepth));
+    }
+
+    [Test]
+    public void InstanceSummaryInstantiationSubstitutesTheReceiver()
+    {
+        var factory = new IrFactory();
+        var declaringType = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(),
+            "InstanceFunctions");
+        var member = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            declaringType,
+            "Read",
+            factory.IntegerType,
+            isStatic: false);
+        var receiver = factory.CreateVariable("receiver", declaringType);
+        var result = factory.CreateVariable("result", factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        builder.Return(
+            entry,
+            factory.CreateOperation("return"),
+            factory.Integer(1));
+        var summary = IrRelationalSummaryBuilder.Build(
+            builder.Build(),
+            new IrSummarySignature(
+                member,
+                receiver,
+                [],
+                result,
+                Provenance('9')),
+            new Dictionary<IrVarId, IrTerm>()).Summary!;
+        var actualReceiver = factory.CreateVariable(
+            "actual-receiver",
+            declaringType);
+
+        var instantiated = IrRelationalSummaryInstantiator.Instantiate(
+            summary,
+            factory.Variable(actualReceiver),
+            [],
+            0);
+
+        Assert.That(instantiated.FreshVariables, Has.Length.EqualTo(1));
+    }
+
+    [Test]
     public void StraightLineSummaryRelatesInputsToResult()
     {
         var fixture = new SummaryFixture("Increment");
@@ -287,6 +621,27 @@ public sealed class IrRelationalSummaryTests
             });
         Assert.That(evaluation.Status, Is.EqualTo(IrEvaluationStatus.Value));
         return evaluation.Value!.Boolean;
+    }
+
+    private static IrRelationalSummary BuildIdentitySummary(
+        SummaryFixture fixture)
+    {
+        var bodyParameter = fixture.Factory.CreateVariable(
+            "identity:body-value",
+            fixture.Factory.IntegerType);
+        var builder = new IrProgramBuilder(fixture.Factory);
+        var entry = builder.CreateBlock("identity:entry");
+        builder.Return(
+            entry,
+            fixture.Factory.CreateOperation("identity:return"),
+            fixture.Factory.Variable(bodyParameter));
+        return IrRelationalSummaryBuilder.Build(
+            builder.Build(),
+            fixture.Signature,
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [bodyParameter] = fixture.Factory.Variable(fixture.Parameter)
+            }).Summary!;
     }
 
     private static IrSummaryProvenance Provenance(char digit)

@@ -5,6 +5,7 @@
   "projects": {
     "SharpProof.Analyzer": 91.71,
     "SharpProof.Attributes": 55.88,
+    "SharpProof.BuildTasks": 82.08,
     "SharpProof.CompilerArtifact": 95.46,
     "SharpProof.CompilerCollector": 91.19,
     "SharpProof.ContractForGenerator": 93.92,
@@ -17,6 +18,7 @@
     "SharpProof.Meta.Analyzers": 96.71,
     "SharpProof.Smt": 92.08,
     "SharpProof.Specs": 89.5,
+    "SharpProof.Summaries": 88.6,
     "SharpProof.Verify": 89.85,
     "SharpProof.Worker": 87.04,
     "SharpProof.Worker.Launcher": 55.0,

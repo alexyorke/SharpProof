@@ -588,6 +588,21 @@ public sealed class ArchitectureTests
             canonicalTcb.Distinct(StringComparer.Ordinal).Count(),
             Is.EqualTo(canonicalTcb.Length),
             "The canonical TCB union must not contain duplicate ownership.");
+        var mutationCatalog = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Test-SharpProofTrustedMutations.ps1"));
+        var mutationTargets = Regex.Matches(
+                mutationCatalog,
+                @"(?m)^\s*File\s*=\s*'([^']+)'\s*$")
+            .Select(static match => match.Groups[1].Value.Replace('\\', '/'))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        Assert.That(mutationTargets, Is.Not.Empty);
+        Assert.That(
+            mutationTargets.Except(canonicalTcb, StringComparer.Ordinal),
+            Is.Empty,
+            "Every trusted-mutation target must be owned by the canonical TCB.");
 
         // Every declared path must also resolve to a file inside the tree.
         foreach (var path in canonicalTcb)
@@ -1049,12 +1064,23 @@ public sealed class ArchitectureTests
             "SharpProof.Managed.runsettings"));
         using var coverageBaseline = JsonDocument.Parse(File.ReadAllText(
             Path.Combine(root, "eng", "coverage", "baseline.json")));
+        var actualCoverageProjects = coverageBaseline.RootElement
+            .GetProperty("projects")
+            .EnumerateObject()
+            .Select(static property => property.Name)
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
+        var expectedCoverageProjects = ProductionProjects
+            .Where(static name => name != "SharpProof.PortableAnalyzer")
+            .Append("SharpProof.Gates")
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
         Assert.That(
-            coverageBaseline.RootElement
-                .GetProperty("projects")
-                .TryGetProperty("SharpProof.CompilerCollector", out _),
-            Is.True,
-            "CompilerCollector must participate in project and aggregate coverage.");
+            actualCoverageProjects,
+            Is.EqualTo(expectedCoverageProjects),
+            "Every production source owner must participate in project and " +
+            "aggregate coverage; PortableAnalyzer is the explicit linked-source " +
+            "packaging exception.");
         Assert.That(
             managedSettings,
             Does.Contain(

@@ -811,6 +811,85 @@ public sealed class ProtocolJsonTests
                 .And.Contain("manifest.claim_membership"));
     }
 
+    [Test]
+    public void NullProtocolRootsAndArrayRequestsAreRejected()
+    {
+        var request = WorkerProtocolJson.Validate((WorkerVerifyRequest?)null);
+        var response = WorkerProtocolJson.Validate((WorkerVerifyResponse?)null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                request.Errors.Select(static error => error.Code),
+                Does.Contain("request.null"));
+            Assert.That(
+                response.Errors.Select(static error => error.Code),
+                Does.Contain("response.null"));
+            Assert.Throws<JsonException>((Action)(() =>
+                WorkerProtocolJson.DeserializeRequest("[]")));
+        }
+    }
+
+    [Test]
+    public void MissingResponseSubdocumentsAndInvalidExpectedManifestAreRejected()
+    {
+        var missingManifest = CreateResponse(CreateManifest());
+        missingManifest.Manifest = null!;
+        var missingSummary = CreateResponse(CreateManifest());
+        missingSummary.Summary = null!;
+        var missingAssumptions = CreateResponse(CreateManifest());
+        missingAssumptions.Summary.Assumptions = null!;
+        var expectedManifest = CreateManifest();
+        expectedManifest.SchemaVersion = int.MaxValue;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                WorkerProtocolJson.Validate(missingManifest).Errors
+                    .Select(static error => error.Code),
+                Does.Contain("manifest.null"));
+            Assert.That(
+                WorkerProtocolJson.Validate(missingSummary).Errors
+                    .Select(static error => error.Code),
+                Does.Contain("response.summary"));
+            Assert.That(
+                WorkerProtocolJson.Validate(missingAssumptions).Errors
+                    .Select(static error => error.Code),
+                Does.Contain("summary.assumptions"));
+            Assert.That(
+                WorkerProtocolJson.Validate(
+                        CreateResponse(CreateManifest()),
+                        InputHash,
+                        expectedManifest)
+                    .Errors.Select(static error => error.Code),
+                Does.Contain("response.expected_manifest"));
+        }
+    }
+
+    [Test]
+    public void ManifestHashAndExpectedInputHashValidateBoundaryValues()
+    {
+        var nullIdentity = CreateManifest();
+        nullIdentity.Callables[0].CallableId = null!;
+        var nullIdentityHash = WorkerProtocolJson.ComputeManifestHash(nullIdentity);
+        var unknownEnum = CreateManifest();
+        unknownEnum.Claims[0].Kind = (WorkerClaimKind)int.MaxValue;
+
+        var enumError = Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+            WorkerProtocolJson.ComputeManifestHash(unknownEnum)));
+        var hashError = Assert.Throws<ArgumentException>((Action)(() =>
+            WorkerProtocolJson.Validate(
+                CreateResponse(CreateManifest()),
+                "not-a-hash")));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(nullIdentityHash, Does.Match("^[0-9a-f]{64}$"));
+            Assert.That(enumError!.ParamName, Is.EqualTo("value"));
+            Assert.That(hashError!.ParamName, Is.EqualTo("expectedInputHash"));
+        }
+    }
+
     private static WorkerVerifyRequest CreateRequest()
     {
         return new()

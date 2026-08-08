@@ -60,7 +60,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "d775ede5e8f4f13efc80259e5c6cd6c976a67df3c214279e5f6b58dab41dad0c",
+    "inventorySha256": "30d39b2bee968a0d8aa41c77be2d1ebf2bcc3a291ea43934060a3adde18bfca9",
     "components": [
       {
         "name": "discovery",
@@ -101,6 +101,20 @@
           "SharpProof.Frontend/RoslynProgramLowerer.cs",
           "SharpProof.Frontend/OperationSupportCatalog.cs"
         ]
+      },
+      {
+        "name": "relationalSummaryAuthority",
+        "paths": [
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs",
+          "SharpProof.Ir/IrSemanticTerms.cs",
+          "SharpProof.Summaries/IrRelationalSummary.cs",
+          "SharpProof.Summaries/IrRelationalSummaryBuilder.cs",
+          "SharpProof.Summaries/IrRelationalSummaryInstantiator.cs",
+          "SharpProof.Specs/RelationalSpecPackCatalog.json"
+        ],
+        "rationale": "These files construct, authenticate, instantiate, and consume the sealed interprocedural relation trusted by the worker."
       },
       {
         "name": "execution",

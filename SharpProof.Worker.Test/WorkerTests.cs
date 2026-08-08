@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.CodeAnalysis;
@@ -2742,6 +2743,306 @@ public sealed class WorkerTests
                     result.ProofCore.Any(static item => item.StartsWith(
                         "il-summary:",
                         StringComparison.Ordinal))));
+        }
+    }
+
+    [Test]
+    public void ImplementationIlScalarOpcodeMatrixBuildsExactSummaries()
+    {
+        var signatures = new (string ReturnType, string Name, string Parameters,
+            string Arguments)[]
+        {
+            ("int", "MinusOne", "", ""),
+            ("int", "Small", "", ""),
+            ("int", "Wide", "", ""),
+            ("long", "Int64Literal", "", ""),
+            ("bool", "False", "", ""),
+            ("int", "Sub", "int a, int b", "a, b"),
+            ("int", "Mul", "int a, int b", "a, b"),
+            ("int", "Div", "int a, int b", "a, b"),
+            ("int", "Rem", "int a, int b", "a, b"),
+            ("int", "CheckedAdd", "int a, int b", "a, b"),
+            ("long", "CheckedLongAdd", "long a, long b", "a, b"),
+            ("long", "LongAdd", "long a, long b", "a, b"),
+            ("int", "Neg32", "int value", "value"),
+            ("long", "Neg64", "long value", "value"),
+            ("bool", "And", "bool a, bool b", "a, b"),
+            ("bool", "Or", "bool a, bool b", "a, b"),
+            ("bool", "Xor", "bool a, bool b", "a, b"),
+            ("bool", "Eq", "int a, int b", "a, b"),
+            ("bool", "Gt", "int a, int b", "a, b"),
+            ("bool", "Lt", "int a, int b", "a, b"),
+            ("bool", "BoolLiteralRight", "bool value", "value"),
+            ("bool", "BoolLiteralLeft", "bool value", "value"),
+            ("int", "EqBranch", "int a, int b, int yes, int no", "a, b, yes, no"),
+            ("int", "NeBranch", "int a, int b, int yes, int no", "a, b, yes, no"),
+            ("int", "LtBranch", "int a, int b, int yes, int no", "a, b, yes, no"),
+            ("int", "LeBranch", "int a, int b, int yes, int no", "a, b, yes, no"),
+            ("int", "GtBranch", "int a, int b, int yes, int no", "a, b, yes, no"),
+            ("int", "GeBranch", "int a, int b, int yes, int no", "a, b, yes, no"),
+            ("int", "IntegerCondition", "int value, int yes, int no", "value, yes, no"),
+            ("int", "PopCall", "int value", "value"),
+            ("int", "NestedCall", "int value", "value"),
+            ("int", "InadmissibleCall", "int value", "value")
+        };
+        var subjectMethods = string.Join(
+            Environment.NewLine,
+            signatures.Select(static signature =>
+                $$"""
+                public static {{signature.ReturnType}} Verify{{signature.Name}}(
+                    {{signature.Parameters}}) {
+                    Contract.Ensures(true);
+                    return ExternalIlMatrix.{{signature.Name}}(
+                        {{signature.Arguments}});
+                }
+                """));
+        using var project = TestProject.Create(
+            "using SharpProof.Attributes; public static class Subject {" +
+            subjectMethods +
+            "}");
+        project.AddImplementationReference(
+            """
+            public static class ExternalIlMatrix
+            {
+                public static int MinusOne() => -1;
+                public static int Small() => 42;
+                public static int Wide() => 1000;
+                public static long Int64Literal() => 0x123456789L;
+                public static bool False() => false;
+                public static int Sub(int a, int b) => unchecked(a - b);
+                public static int Mul(int a, int b) => unchecked(a * b);
+                public static int Div(int a, int b) => a / b;
+                public static int Rem(int a, int b) => a % b;
+                public static int CheckedAdd(int a, int b) => checked(a + b);
+                public static long CheckedLongAdd(long a, long b) =>
+                    checked(a + b);
+                public static long LongAdd(long a, long b) =>
+                    unchecked(a + b);
+                public static int Neg32(int value) => unchecked(-value);
+                public static long Neg64(long value) => unchecked(-value);
+                public static bool And(bool a, bool b) => a & b;
+                public static bool Or(bool a, bool b) => a | b;
+                public static bool Xor(bool a, bool b) => a ^ b;
+                public static bool Eq(int a, int b) => a == b;
+                public static bool Gt(int a, int b) => a > b;
+                public static bool Lt(int a, int b) => a < b;
+                public static bool BoolLiteralRight(bool value) =>
+                    value == false;
+                public static bool BoolLiteralLeft(bool value) =>
+                    false == value;
+                public static int EqBranch(
+                    int a, int b, int yes, int no) =>
+                    a == b ? yes : no;
+                public static int NeBranch(
+                    int a, int b, int yes, int no) =>
+                    a != b ? yes : no;
+                public static int LtBranch(
+                    int a, int b, int yes, int no) =>
+                    a < b ? yes : no;
+                public static int LeBranch(
+                    int a, int b, int yes, int no) =>
+                    a <= b ? yes : no;
+                public static int GtBranch(
+                    int a, int b, int yes, int no) =>
+                    a > b ? yes : no;
+                public static int GeBranch(
+                    int a, int b, int yes, int no) =>
+                    a >= b ? yes : no;
+                public static int IntegerCondition(
+                    int value, int yes, int no) =>
+                    value != 0 ? yes : no;
+
+                private static int Identity(int value) => value;
+
+                public static int PopCall(int value)
+                {
+                    Identity(value);
+                    return value;
+                }
+
+                private static string Text() => "text";
+
+                public static int InadmissibleCall(int value)
+                {
+                    _ = Text();
+                    return value;
+                }
+
+                private static class Nested
+                {
+                    internal static int Identity(int value) => value;
+                }
+
+                public static int NestedCall(int value) =>
+                    Nested.Identity(value);
+            }
+            """);
+        var compilation = project.CreateCompilation();
+        var targets = new ClaimManifestBuilder(compilation).Build().Targets.Values
+            .ToDictionary(static target => target.Method.Name, StringComparer.Ordinal);
+        var unsupported = new Dictionary<string, CompilerImplementationIlAbstentionReason>(
+            StringComparer.Ordinal)
+        {
+            ["VerifyLongAdd"] = CompilerImplementationIlAbstentionReason.UnsupportedIl,
+            ["VerifyNeg64"] = CompilerImplementationIlAbstentionReason.UnsupportedIl,
+            ["VerifyInadmissibleCall"] =
+                CompilerImplementationIlAbstentionReason.InadmissibleCallTarget
+        };
+        var successful = 0;
+
+        foreach (var signature in signatures)
+        {
+            var targetName = "Verify" + signature.Name;
+            var lowerer = new CompilerCallableLowerer(compilation, new IrFactory());
+            var preparation = lowerer.Prepare(targets[targetName]);
+            if (unsupported.TryGetValue(targetName, out var expectedReason))
+            {
+                Assert.That(preparation.IsSuccess, Is.False, targetName);
+                Assert.That(
+                    lowerer.LastImplementationIlAbstention,
+                    Is.EqualTo(expectedReason),
+                    targetName);
+                continue;
+            }
+
+            Assert.That(
+                preparation.IsSuccess,
+                Is.True,
+                targetName + ": " +
+                lowerer.LastImplementationIlAbstention);
+            var summary = preparation.Body!.SummaryCalls.Values.Single();
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    summary.Origin,
+                    Is.EqualTo(CompilerSummaryOrigin.ImplementationIl),
+                    targetName);
+                Assert.That(
+                    summary.EvidenceSha256,
+                    Does.Match("^[0-9a-f]{64}$"),
+                    targetName);
+                Assert.That(
+                    summary.EvidenceIdentity,
+                    Is.Empty,
+                    targetName);
+            }
+            successful++;
+        }
+
+        Assert.That(successful, Is.EqualTo(signatures.Length - unsupported.Count));
+    }
+
+    [Test]
+    public void DebugImplementationIlCoversLocalAndWideOperandForms()
+    {
+        var localDeclarations = string.Join(
+            Environment.NewLine,
+            Enumerable.Range(0, 257).Select(static index =>
+                index == 0
+                    ? "int local0 = value;"
+                    : $"int local{index} = local{index - 1};"));
+        var parameters = string.Join(
+            ", ",
+            Enumerable.Range(0, 257).Select(static index =>
+                $"int value{index}"));
+        var arguments = string.Join(
+            ", ",
+            Enumerable.Range(0, 257).Select(static index =>
+                index.ToString(CultureInfo.InvariantCulture)));
+        using var project = TestProject.Create(
+            $$"""
+            using SharpProof.Attributes;
+            public static class Subject
+            {
+                public static long VerifyRoundTrip(
+                    bool flag,
+                    int value,
+                    long wide)
+                {
+                    Contract.Ensures(true);
+                    return ExternalDebugLocals.RoundTrip(flag, value, wide);
+                }
+
+                public static int VerifyAssignmentValue(int value)
+                {
+                    Contract.Ensures(true);
+                    return ExternalDebugLocals.AssignmentValue(value);
+                }
+
+                public static int VerifyManyLocals(int value)
+                {
+                    Contract.Ensures(true);
+                    return ExternalDebugLocals.ManyLocals(value);
+                }
+
+                public static int VerifyManyParameters()
+                {
+                    Contract.Ensures(true);
+                    return ExternalDebugLocals.ManyParameters({{arguments}});
+                }
+            }
+            """);
+        project.AddImplementationReference(
+            $$"""
+            public static class ExternalDebugLocals
+            {
+                public static long RoundTrip(
+                    bool flag,
+                    int value,
+                    long wide)
+                {
+                    bool local0 = flag;
+                    int local1 = value;
+                    long local2 = wide;
+                    int local3 = local1;
+                    long local4 = local2;
+                    if (local0)
+                    {
+                        local3 = local1;
+                        local4 = local2;
+                    }
+
+                    return local4;
+                }
+
+                public static int AssignmentValue(int value)
+                {
+                    int local;
+                    return local = value;
+                }
+
+                public static int ManyLocals(int value)
+                {
+                    {{localDeclarations}}
+                    return local256;
+                }
+
+                public static int ManyParameters({{parameters}}) => value256;
+            }
+            """,
+            OptimizationLevel.Debug);
+        var compilation = project.CreateCompilation();
+        var targets = new ClaimManifestBuilder(compilation).Build().Targets.Values
+            .ToDictionary(static target => target.Method.Name, StringComparer.Ordinal);
+
+        foreach (var targetName in new[]
+                 {
+                     "VerifyRoundTrip",
+                     "VerifyAssignmentValue",
+                     "VerifyManyLocals",
+                     "VerifyManyParameters"
+                 })
+        {
+            var lowerer = new CompilerCallableLowerer(compilation, new IrFactory());
+            var preparation = lowerer.Prepare(targets[targetName]);
+            Assert.That(
+                preparation.IsSuccess,
+                Is.True,
+                targetName + ": " + lowerer.LastImplementationIlAbstention);
+            Assert.That(
+                preparation.Body!.SummaryCalls.Values.Single().Origin,
+                Is.EqualTo(CompilerSummaryOrigin.ImplementationIl),
+                targetName);
         }
     }
 
@@ -5521,7 +5822,9 @@ public sealed class WorkerTests
             };
         }
 
-        internal void AddImplementationReference(string source)
+        internal void AddImplementationReference(
+            string source,
+            OptimizationLevel optimizationLevel = OptimizationLevel.Release)
         {
             var path = Path.Combine(
                 DirectoryPath,
@@ -5537,7 +5840,7 @@ public sealed class WorkerTests
                 GetReferences().Select(static referencePath =>
                     MetadataReference.CreateFromFile(referencePath)),
                 CreateRoslynOptions().WithOptimizationLevel(
-                    OptimizationLevel.Release));
+                    optimizationLevel));
             using var stream = new FileStream(
                 path,
                 FileMode.CreateNew,

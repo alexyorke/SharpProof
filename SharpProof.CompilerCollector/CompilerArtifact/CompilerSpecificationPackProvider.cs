@@ -727,7 +727,7 @@ internal sealed class CompilerSpecificationPackProvider
         string context)
     {
         var value = RequiredProperty(element, name, context);
-        if (!value.TryGetInt32(out var result))
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out var result))
         {
             throw new InvalidDataException(
                 context + "." + name + " must be an Int32.");

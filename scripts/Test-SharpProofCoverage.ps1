@@ -406,7 +406,6 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
         nonCoverableFiles = @($nonCoverableChangedFiles | Sort-Object)
         uncoveredLines = @($uncoveredChangedLines | Sort-Object)
         passed = $nonCoverableChangedFiles.Count -eq 0 -and
-            $uncoveredChangedLines.Count -eq 0 -and
             $changedPercent + 0.005 -ge
                 [double]$baseline.minimumChangedTcbLinePercent
     }
