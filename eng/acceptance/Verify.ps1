@@ -365,10 +365,8 @@ try {
         -Scope 'trusted-kernel'
     Write-Host "Trusted-kernel paths: $($kernelPaths.Count)"
 
-    # contract.json is the single source of truth for the trusted computing
-    # base; the component names are no longer restated here. That removes the
-    # drift tripwire deliberately, so what remains is a coherence check: names
-    # must be present and unique, and every declared path must exist.
+    # contract.json owns path classification. A separately reviewed digest
+    # inside the contract makes path additions, removals, and moves explicit.
     $tcbComponents = @($contract.trustedComputingBase.components)
     if ($tcbComponents.Count -eq 0) {
         throw 'The trusted-computing-base contract must declare components.'
@@ -385,6 +383,19 @@ try {
         }
     }
     $canonicalTcbPaths = @(Get-SharpProofTcbPaths -Contract $contract)
+    $sortedTcbPaths = [string[]]@($canonicalTcbPaths)
+    [Array]::Sort($sortedTcbPaths, [StringComparer]::Ordinal)
+    $inventoryText = ($sortedTcbPaths -join "`n") + "`n"
+    $inventoryBytes = [Text.Encoding]::UTF8.GetBytes($inventoryText)
+    $inventoryDigest = [Convert]::ToHexString(
+        [Security.Cryptography.SHA256]::HashData($inventoryBytes)
+    ).ToLowerInvariant()
+    $expectedInventoryDigest =
+        [string]$contract.trustedComputingBase.inventorySha256
+    if ($inventoryDigest -cne $expectedInventoryDigest) {
+        throw "The trusted-computing-base inventory digest changed. " +
+            "Review path ownership and update the intentional digest pin."
+    }
     foreach ($component in $tcbComponents) {
         $name = [string]$component.name
         $paths = @($component.paths)

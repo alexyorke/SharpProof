@@ -1,5 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -541,12 +544,9 @@ public sealed class ArchitectureTests
                     .Select(static path => path.GetString() ?? "")
                     .ToArray(),
                 StringComparer.Ordinal);
-        // The declaration in contract.json is the single source of truth; this
-        // test no longer restates it. That removes the drift tripwire on purpose:
-        // a path can now be added to or removed from the trusted computing base
-        // without a second file being edited, so the review of contract.json is
-        // the only remaining control. What is still enforced below is that the
-        // declaration is internally coherent and matches the repository.
+        // contract.json is the source of path ownership. Its inventory digest
+        // is an intentional second field: a path edit must update both the
+        // declaration and the reviewed drift pin.
         Assert.That(actual, Is.Not.Empty);
         foreach (var component in actual)
         {
@@ -569,14 +569,23 @@ public sealed class ArchitectureTests
             .Select(static path => path.GetString() ?? "")
             .Concat(actual.Values.SelectMany(static paths => paths))
             .ToArray();
+        var expectedInventory = declaration.GetProperty("inventorySha256")
+            .GetString();
+        Assert.That(
+            TcbInventorySha256(canonicalTcb),
+            Is.EqualTo(expectedInventory),
+            "The trusted-computing-base path inventory changed. Review the " +
+            "ownership change and update its intentional digest pin.");
+        Assert.That(
+            TcbInventorySha256(canonicalTcb.Skip(1)),
+            Is.Not.EqualTo(expectedInventory),
+            "Deleting a required trusted path must fail the inventory pin.");
         Assert.That(
             canonicalTcb.Distinct(StringComparer.Ordinal).Count(),
             Is.EqualTo(canonicalTcb.Length),
             "The canonical TCB union must not contain duplicate ownership.");
 
-        // Nothing restates the declaration any more, so a typo or a path left
-        // behind by a rename would otherwise go unnoticed until a release gate
-        // failed. Every declared path must resolve to a file inside the tree.
+        // Every declared path must also resolve to a file inside the tree.
         foreach (var path in canonicalTcb)
         {
             var full = Path.GetFullPath(Path.Combine(RepositoryRoot(), path));
@@ -591,10 +600,8 @@ public sealed class ArchitectureTests
                 Is.True,
                 path + " is declared in the trusted computing base but missing.");
         }
-        // Kept deliberately. With the full declaration no longer restated here,
-        // this is the only remaining assertion about what the trusted computing
-        // base must contain, so it is a cheap tripwire on the paths whose silent
-        // removal would matter most rather than the redundancy it once was.
+        // Keep a readable tripwire for the highest-risk owners in addition to
+        // the exact inventory digest.
         Assert.That(
             canonicalTcb,
             Does.Contain("SharpProof.Verify/Evidence.cs")
@@ -636,6 +643,18 @@ public sealed class ArchitectureTests
                 .And.Contain("-IncludeAcceptanceContract")
                 .And.Contain("EndsWith('.cs'")
                 .And.Contain("changedMetadataFiles"));
+    }
+
+    private static string TcbInventorySha256(IEnumerable<string> paths)
+    {
+        var framed = string.Join(
+            "\n",
+            paths.OrderBy(static path => path, StringComparer.Ordinal)) + "\n";
+        return string.Concat(SHA256.HashData(
+            Encoding.UTF8.GetBytes(framed)).Select(
+                static value => value.ToString(
+                    "x2",
+                    CultureInfo.InvariantCulture)));
     }
 
     [Test]

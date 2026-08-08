@@ -16,6 +16,11 @@ $contract = Get-Content -LiteralPath $contractPath -Raw |
 if ($null -eq $contract.productionComplexity) {
     throw 'The active acceptance contract must define productionComplexity.'
 }
+$ceilingRationale =
+    [string]$contract.productionComplexity.ceilingRationale
+if ([string]::IsNullOrWhiteSpace($ceilingRationale)) {
+    throw 'Production-complexity ceilings require an architectural rationale.'
+}
 $maximumExpressionNodes =
     [int]$contract.productionComplexity.maximumExpressionNodes
 $maximumDecisionPoints =
@@ -63,6 +68,7 @@ foreach ($metric in @('expressionNodes', 'decisionPoints', 'members')) {
 $roots = @(
     'SharpProof.Attributes/',
     'SharpProof.Analyzer/',
+    'SharpProof.BuildTasks/',
     'SharpProof.CompilerArtifact/',
     'SharpProof.CompilerCollector/',
     'SharpProof.ContractForGenerator/',

@@ -54,6 +54,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
+    "inventorySha256": "5efedfd5f50e159803aedf931eadf99f3ab8f5d82bc91e5e0268c14d47a41b16",
     "components": [
       {
         "name": "discovery",
@@ -451,8 +452,9 @@
   },
   "productionComplexity": {
     "measurement": "Aggregate Roslyn expression nodes, decision points, and members across handwritten production C#; whitespace, comments, line wrapping, and optional braces are excluded.",
-    "maximumExpressionNodes": 99200,
-    "maximumDecisionPoints": 5200,
+    "ceilingRationale": "2026-08-07: extracting the cancellable verifier runner and invalidator from unmeasured inline MSBuild XML into the directly testable SharpProof.BuildTasks assembly moved that trusted-boundary logic under the production C# ratchet. The old inline implementation was removed.",
+    "maximumExpressionNodes": 100800,
+    "maximumDecisionPoints": 5230,
     "maximumMembers": 3900
   },
   "productionCoordinatorComplexity": {
