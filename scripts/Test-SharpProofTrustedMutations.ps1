@@ -954,6 +954,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~CanceledVerifierTaskDoesNotLaunchAProcess'
     },
     [pscustomobject]@{
+        Name = 'build-task-cancel-active-process'
+        File = 'SharpProof.BuildTasks\RunVerifier.cs'
+        Original = '            if (!process.HasExited)'
+        Mutated = '            if (process.HasExited)'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~ActiveVerifierTaskCancellationStopsTheProcess'
+    },
+    [pscustomobject]@{
         Name = 'compiler-linked-module-closure'
         File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerCompilationCapture.cs'
         Original = "            backingModules = [`n                backingModules[0],`n                .. backingModules.Skip(1).OrderBy(`n                    static module => ReadModuleName(module.GetMetadataReader()),`n                    StringComparer.Ordinal)`n            ];"

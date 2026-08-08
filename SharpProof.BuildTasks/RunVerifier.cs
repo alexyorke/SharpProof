@@ -30,6 +30,17 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
     [Output]
     public int ExitCode { get; set; }
 
+    internal bool HasActiveProcess
+    {
+        get
+        {
+            lock (_synchronization)
+            {
+                return _process != null && !_process.HasExited;
+            }
+        }
+    }
+
     [SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",

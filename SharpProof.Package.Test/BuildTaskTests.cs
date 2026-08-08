@@ -2,6 +2,7 @@ using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 using NUnit.Framework;
 using SharpProof.BuildTasks;
+using SharpProof.Worker;
 
 namespace SharpProof.Package.Test;
 
@@ -40,6 +41,68 @@ public sealed class BuildTaskTests
             Assert.That(task.ExitCode, Is.EqualTo(-1));
             Assert.That(engine.Errors, Is.Empty);
         }));
+    }
+
+    [Test]
+    [Platform("Win")]
+    public async System.Threading.Tasks.Task ActiveVerifierTaskCancellationStopsTheProcess()
+    {
+        var directory = Directory.CreateTempSubdirectory("sharpproof-cancel-");
+        try
+        {
+            var eventName = "Local\\SharpProof.BuildTask.Cancel." +
+                Guid.NewGuid().ToString("N");
+            using var startEvent = new EventWaitHandle(
+                false,
+                EventResetMode.ManualReset,
+                eventName);
+            var task = new RunVerifier
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                Executable = "dotnet",
+                WorkingDirectory = directory.FullName,
+                Arguments =
+                [
+                    new TaskItem(typeof(SharpProofWorker).Assembly.Location),
+                    new TaskItem("verify"),
+                    new TaskItem("--request"),
+                    new TaskItem(Path.Combine(directory.FullName, "request.json")),
+                    new TaskItem("--result"),
+                    new TaskItem(Path.Combine(directory.FullName, "result.json")),
+                    new TaskItem("--start-event"),
+                    new TaskItem(eventName)
+                ]
+            };
+
+            var execution = System.Threading.Tasks.Task.Run(task.Execute);
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => task.HasActiveProcess,
+                    TimeSpan.FromSeconds(5)),
+                Is.True,
+                "The verifier child did not start.");
+
+            task.Cancel();
+
+            var completed = await System.Threading.Tasks.Task.WhenAny(
+                execution,
+                System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(5)));
+            if (!ReferenceEquals(completed, execution))
+            {
+                startEvent.Set();
+                await execution.WaitAsync(TimeSpan.FromSeconds(5));
+            }
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(completed, Is.SameAs(execution));
+                Assert.That(await execution, Is.True);
+                Assert.That(task.ExitCode, Is.Not.Zero);
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
     }
 
     [Test]

@@ -394,16 +394,39 @@ public sealed class WorkerMsBuildIntegrationTests
     public async Task VerifierLaunchPreservesPercentCharactersInPaths()
     {
         RequireWindowsWorker();
-        using var project = ConsumerProject.CreateWithPercentPath(IdentitySource);
+        var visualStudioMsBuild = ConsumerProject.FindVisualStudioMsBuild();
+        if (visualStudioMsBuild == null)
+        {
+            Assert.Ignore("Visual Studio MSBuild is not installed.");
+            return;
+        }
+        using var project = ConsumerProject.CreateWithPercentPath(
+            IdentitySource,
+            ("TargetFrameworks", "netstandard2.0"));
+        var requestPath = project.VerifyOutputPath(
+            "netstandard2.0",
+            "request.json");
+        var resultPath = project.VerifyOutputPath(
+            "netstandard2.0",
+            "result.json");
+        var manifestPath = project.VerifyOutputPath(
+            "netstandard2.0",
+            "compiler-manifest.json");
 
         var build = await project.BuildAsync(verify: true);
+        var visualStudio = await project.BuildWithVisualStudioMsBuildAsync(
+            visualStudioMsBuild);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(build.ExitCode, Is.Zero, build.Output);
-            Assert.That(File.Exists(project.RequestPath), Is.True, build.Output);
-            Assert.That(File.Exists(project.ResultPath), Is.True, build.Output);
-            Assert.That(File.Exists(project.CompilerManifestPath), Is.True, build.Output);
+            Assert.That(
+                visualStudio.ExitCode,
+                Is.Zero,
+                visualStudio.Output);
+            Assert.That(File.Exists(requestPath), Is.True, build.Output);
+            Assert.That(File.Exists(resultPath), Is.True, build.Output);
+            Assert.That(File.Exists(manifestPath), Is.True, build.Output);
         }
     }
 
@@ -942,6 +965,75 @@ public sealed class WorkerMsBuildIntegrationTests
                     ? 1
                     : 0),
             "The stable request/result files must describe one completed invocation.");
+    }
+
+    [Test]
+    public async Task VisualStudioMsBuildSerializesCooperativePublications()
+    {
+        RequireWindowsWorker();
+        var visualStudioMsBuild = ConsumerProject.FindVisualStudioMsBuild();
+        if (visualStudioMsBuild == null)
+        {
+            Assert.Ignore("Visual Studio MSBuild is not installed.");
+            return;
+        }
+        using var project = ConsumerProject.CreateConfigured(
+            IdentitySource,
+            ("TargetFrameworks", "netstandard2.0"));
+        var publication = Directory.CreateDirectory(
+            Path.Combine(project.Root, "publication"));
+        var request = Path.Combine(publication.FullName, "request.json");
+        var result = Path.Combine(publication.FullName, "result.json");
+        var manifest = Path.Combine(publication.FullName, "manifest.json");
+        var sarif = Path.Combine(publication.FullName, "result.sarif");
+
+        Task<BuildResult> BuildAsync(string name, string features)
+        {
+            return project.BuildWithVisualStudioMsBuildAsync(
+                visualStudioMsBuild,
+                ("BaseIntermediateOutputPath",
+                    Path.Combine(project.Root, "obj-" + name) +
+                    Path.DirectorySeparatorChar),
+                ("BaseOutputPath",
+                    Path.Combine(project.Root, "bin-" + name) +
+                    Path.DirectorySeparatorChar),
+                ("SharpProofFeatures", features),
+                ("SharpProofVerifyRequestFile", request),
+                ("SharpProofVerifyResultFile", result),
+                ("SharpProofCompilerManifestFile", manifest),
+                ("SharpProofVerifySarifFile", sarif));
+        }
+
+        var firstIntermediate = Path.Combine(project.Root, "obj-first") +
+            Path.DirectorySeparatorChar;
+        var secondIntermediate = Path.Combine(project.Root, "obj-second") +
+            Path.DirectorySeparatorChar;
+        var restores = await Task.WhenAll(
+            project.RestoreAsync(("BaseIntermediateOutputPath", firstIntermediate)),
+            project.RestoreAsync(("BaseIntermediateOutputPath", secondIntermediate)));
+        Assert.That(restores, Has.All.Matches<BuildResult>(
+            static restore => restore.ExitCode == 0));
+
+        var builds = await Task.WhenAll(
+            BuildAsync("first", "effects"),
+            BuildAsync("second", "contracts"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(builds[0].ExitCode, Is.Zero, builds[0].Output);
+            Assert.That(builds[1].ExitCode, Is.Zero, builds[1].Output);
+            Assert.That(File.Exists(request), Is.True);
+            Assert.That(File.Exists(result), Is.True);
+            Assert.That(File.Exists(manifest), Is.True);
+            Assert.That(File.Exists(sarif), Is.True);
+        }
+        var publishedRequest = WorkerProtocolJson.DeserializeRequest(
+            await File.ReadAllTextAsync(request))!;
+        var publishedResponse = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(result))!;
+        await AssertPublicationBindingAsync(
+            publishedRequest,
+            publishedResponse);
     }
 
     [Test]
@@ -2828,12 +2920,13 @@ public sealed class WorkerMsBuildIntegrationTests
         }
 
         internal static ConsumerProject CreateWithPercentPath(
-            string source)
+            string source,
+            params (string Name, string Value)[] properties)
         {
             return CreateCore(
                 source,
                 useSpaces: false,
-                [],
+                properties,
                 "consumer-%TEMP%-" + Guid.NewGuid().ToString("N"));
         }
 
@@ -2959,15 +3052,20 @@ public sealed class WorkerMsBuildIntegrationTests
             return await RunDotNetAsync(arguments);
         }
 
-        internal Task<BuildResult> RestoreAsync()
+        internal Task<BuildResult> RestoreAsync(
+            params (string Name, string Value)[] properties)
         {
-            return RunDotNetAsync([
+            var arguments = new List<string>
+            {
                 "restore",
                 ProjectPath,
                 "--nologo",
                 "/nodeReuse:false",
                 "-p:SharpProofVerify=false"
-            ]);
+            };
+            arguments.AddRange(properties.Select(static property =>
+                "-p:" + property.Name + "=" + property.Value));
+            return RunDotNetAsync(arguments);
         }
 
         internal Task<BuildResult> BuildWithVisualStudioMsBuildAsync(
