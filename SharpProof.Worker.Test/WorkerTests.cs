@@ -2625,6 +2625,9 @@ public sealed class WorkerTests
             using SharpProof.Attributes;
             public static class Subject {
                 private static bool Local(bool value) =>
+                    Inner(value);
+
+                private static bool Inner(bool value) =>
                     ExternalMixed.Read(value);
 
                 public static bool Call(bool value) {
