@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "requiredHumanApprovals": 0,
+  "requiredEvidence": [
+    "executable-regression",
+    "mutation-evidence",
+    "soundness-note-when-semantics-change",
+    "exact-commit-release-artifacts",
+    "debug-solution-gate",
+    "release-acceptance-gate"
+  ]
+}

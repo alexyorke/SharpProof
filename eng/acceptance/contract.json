@@ -58,7 +58,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "cbcfd9b72003f949659021ddd4dc70677f0622d41c0d0a9b1676658ac063efb6",
+    "inventorySha256": "d775ede5e8f4f13efc80259e5c6cd6c976a67df3c214279e5f6b58dab41dad0c",
     "components": [
       {
         "name": "discovery",
@@ -373,7 +373,8 @@
         "scripts/Get-SharpProofTcbPaths.ps1",
         "scripts/Get-SharpProofReleaseDigests.ps1",
         "scripts/Test-SharpProofCoverage.ps1",
-        "eng/acceptance/Verify.ps1"
+        "eng/acceptance/Verify.ps1",
+        "eng/acceptance/preview-evidence.v1.json"
         ]
       },
       {

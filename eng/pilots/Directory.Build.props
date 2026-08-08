@@ -1,0 +1,22 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <NuGetAudit>false</NuGetAudit>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <SharpProofPilotVersion Condition="'$(SharpProofPilotVersion)' == ''">1.0.0-preview.1</SharpProofPilotVersion>
+    <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
+    <SharpProofFeatures>all</SharpProofFeatures>
+    <SharpProofVerify>true</SharpProofVerify>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SharpProof.Verifier.Win-x64"
+                      Version="$(SharpProofPilotVersion)"
+                      PrivateAssets="all" />
+  </ItemGroup>
+</Project>

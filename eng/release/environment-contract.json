@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexyorke/SharpProof",
+  "tagRuleset": {
+    "includes": [
+      "refs/tags/v1.0.0*",
+      "refs/tags/evidence/v*"
+    ],
+    "requiredRules": [
+      "deletion",
+      "update"
+    ]
+  },
+  "environments": [
+    {
+      "name": "nuget.private-preview",
+      "tags": [
+        "v1.0.0-preview.1"
+      ],
+      "variables": [
+        "NUGET_PRIVATE_SOURCE"
+      ],
+      "secrets": [
+        "NUGET_PRIVATE_API_KEY"
+      ]
+    },
+    {
+      "name": "nuget.org",
+      "tags": [
+        "v1.0.0-preview.2",
+        "v1.0.0-rc.1",
+        "v1.0.0"
+      ],
+      "variables": [
+        "NUGET_USER"
+      ],
+      "secrets": []
+    }
+  ]
+}

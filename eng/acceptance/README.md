@@ -78,15 +78,17 @@ exact Attributes -> portable analyzer -> Windows verifier dependency chain.
 The release workflow validates and promotes the already-tested bytes with
 hash, SBOM, repository, package-version, and tag checks. Optional SARIF 2.1.0
 projects only validated worker responses. Owner-enforced
-branch/tag/environment protection, pilot evidence, and independent human
-release reviews remain open gates.
+branch/tag/environment protection and exact-candidate publication remain owner
+release gates.
 
 Changes to the trusted-kernel paths, assumption construction, complete effect
 summaries, API specifications, or proof-producing outcome construction require
-two human reviewers and a soundness note identifying the executable regression
-that covers the change. CI enforces construction boundaries, exact TCB path
-ownership, and structural-complexity budgets; the two-approval rule must also
-be enabled in repository branch protection.
+the solo evidence contract in `preview-evidence.v1.json`: an executable
+regression, mutation evidence, a soundness note when proof outcomes or
+assumptions change, exact-commit release artifacts, and green Debug and Release
+acceptance gates. CI enforces construction boundaries, exact TCB path
+ownership, structural-complexity budgets, and the evidence contract. The
+preview has no reviewer-count or time-based freeze.
 
 Run the active local gate from the repository root:
 

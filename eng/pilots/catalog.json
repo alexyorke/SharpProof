@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "pilots": [
+    {
+      "id": "serilog-effects",
+      "category": "effect-heavy",
+      "project": "SerilogEffects/SerilogEffects.csproj",
+      "library": "Serilog",
+      "libraryVersion": "4.4.0",
+      "setupFriction": "No package conflict; external logger calls are expected to abstain because general source-callee verification is outside the preview."
+    },
+    {
+      "id": "polly-effects",
+      "category": "effect-heavy",
+      "project": "PollyEffects/PollyEffects.csproj",
+      "library": "Polly",
+      "libraryVersion": "8.7.0",
+      "setupFriction": "No package conflict; pipeline construction exercises allocation and external-call effect boundaries."
+    },
+    {
+      "id": "ardalis-contracts",
+      "category": "contract-heavy",
+      "project": "ArdalisContracts/ArdalisContracts.csproj",
+      "library": "Ardalis.GuardClauses",
+      "libraryVersion": "5.0.0",
+      "setupFriction": "The pilot keeps SharpProof contracts at the adapter boundary and treats the external guard implementation as opaque."
+    },
+    {
+      "id": "fluentvalidation-contracts",
+      "category": "contract-heavy",
+      "project": "FluentValidationContracts/FluentValidationContracts.csproj",
+      "library": "FluentValidation",
+      "libraryVersion": "12.1.1",
+      "setupFriction": "Validator construction remains unselected; direct SharpProof call-site contracts run alongside the library without analyzer conflicts."
+    },
+    {
+      "id": "oneof-mixed-strict",
+      "category": "mixed-strict",
+      "project": "OneOfMixedStrict/OneOfMixedStrict.csproj",
+      "library": "OneOf",
+      "libraryVersion": "3.0.271",
+      "setupFriction": "Strict mode selects only the bounded local effect and contract surface; the external union conversion remains an unselected compatibility surface."
+    }
+  ]
+}

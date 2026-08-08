@@ -139,8 +139,9 @@ separately in dependency order. A symbol collision or partial publication
 requires a new version. Deterministic SARIF 2.1.0 projection is available as an
 opt-in verifier output. Owner configuration of
 protected release environments and tags, pilot-library evidence, the first
-private/public NuGet publications, and the remaining release reviews are
-future work. Current behavior and limits are recorded in
+private/public NuGet publications, and exact-candidate release evidence are
+future work. Preview changes use the acceptance-owned solo evidence gate;
+stable 1.0 governance is separate. Current behavior and limits are recorded in
 [Coverage and limits](coverage-and-limits.md#closed-compiler-artifact-and-remaining-limits).
 
 ## Machine-owned Markdown

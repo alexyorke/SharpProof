@@ -659,8 +659,10 @@ trusted-publishing workflow, public API IntelliSense coverage, and
 package-backed samples are complete for this bounded subset, but SharpProof is
 not production-ready. Owner configuration of protected tags and the two NuGet
 publishing environments, the first private/public publications, pilot-library
-evidence, and the remaining independent release reviews are still
-outstanding.
+evidence, and the exact-candidate release run are still outstanding. Preview
+trusted-boundary changes use the solo executable-evidence gate; they do not
+require a reviewer count or time-based freeze. Stable 1.0 governance remains a
+separate post-preview policy.
 
 ## Package-backed examples
 

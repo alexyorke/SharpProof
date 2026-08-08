@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <SharpProofProfile>strict</SharpProofProfile>
+    <SharpProofVerifyPolicy>require-proven</SharpProofVerifyPolicy>
+    <SharpProofAssumptionPolicy>error</SharpProofAssumptionPolicy>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="OneOf" Version="3.0.271" />
+    <PackageReference Include="SharpProof"
+                      Version="$(SharpProofPilotVersion)"
+                      PrivateAssets="all" />
+  </ItemGroup>
+</Project>
