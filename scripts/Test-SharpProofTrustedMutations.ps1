@@ -980,8 +980,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'publication-rejects-unc'
         File = 'SharpProof.Worker.Protocol\WindowsPathIdentity.cs'
-        Original = '        if (fullPath.StartsWith(@"\\\\", StringComparison.Ordinal))'
-        Mutated = '        if (fullPath.StartsWith(@"\\\\", StringComparison.Ordinal) && string.IsNullOrEmpty(fullPath))'
+        Original = '        if (fullPath.StartsWith(@"\\", StringComparison.Ordinal))'
+        Mutated = '        if (fullPath.StartsWith(@"\\", StringComparison.Ordinal) && string.IsNullOrEmpty(fullPath))'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~RemotePublicationPathIsRejected'
     },
