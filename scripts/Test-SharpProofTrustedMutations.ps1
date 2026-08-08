@@ -949,7 +949,7 @@ $mutations = @(
         Name = 'build-task-cancel-before-launch'
         File = 'SharpProof.BuildTasks\RunVerifier.cs'
         Original = '                if (_canceled)'
-        Mutated = '                if (false)'
+        Mutated = '                if (_canceled && string.IsNullOrEmpty(Executable))'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~CanceledVerifierTaskDoesNotLaunchAProcess'
     },
@@ -981,7 +981,7 @@ $mutations = @(
         Name = 'publication-rejects-unc'
         File = 'SharpProof.Worker.Protocol\WindowsPathIdentity.cs'
         Original = '        if (fullPath.StartsWith(@"\\\\", StringComparison.Ordinal))'
-        Mutated = '        if (false)'
+        Mutated = '        if (fullPath.StartsWith(@"\\\\", StringComparison.Ordinal) && string.IsNullOrEmpty(fullPath))'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~RemotePublicationPathIsRejected'
     },
