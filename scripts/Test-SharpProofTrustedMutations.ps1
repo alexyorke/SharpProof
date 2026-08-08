@@ -1052,8 +1052,22 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'relational-instantiation-freshness'
         File = 'SharpProof.Summaries\IrRelationalSummaryInstantiator.cs'
-        Original = '            instanceOrdinal.ToString(System.Globalization.CultureInfo.InvariantCulture) +'
-        Mutated = '            (instanceOrdinal - instanceOrdinal).ToString(System.Globalization.CultureInfo.InvariantCulture) +'
+        Original = (@'
+        var type = factory.GetVariableInfo(template).Type;
+        return factory.CreateVariable(
+            "summary:" +
+            instanceOrdinal.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+            ":" + role + ":" +
+            ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            type);
+'@).Trim()
+        Mutated = (@'
+        _ = factory.GetVariableInfo(template);
+        _ = instanceOrdinal;
+        _ = role;
+        _ = ordinal;
+        return template;
+'@).Trim()
         Project = 'SharpProof.Summaries.Test\SharpProof.Summaries.Test.csproj'
         Filter = 'FullyQualifiedName~CallCompositionUsesAReusableRelationAndFreshVariables'
     },
