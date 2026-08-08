@@ -1552,10 +1552,19 @@ public sealed class WorkerMsBuildIntegrationTests
         using var project = ConsumerProject.Create(IdentitySource);
         var build = await project.BuildAsync(verify: true);
         Assert.That(build.ExitCode, Is.Zero, build.Output);
+        var protocolPath = LauncherProtocolOutputPath();
+        var expectedBytes = await File.ReadAllBytesAsync(protocolPath);
+        var isolatedLauncherDirectory = Path.GetDirectoryName(
+            project.CollisionWorkerPath)!;
+        Directory.CreateDirectory(isolatedLauncherDirectory);
         _ = await project.RunVerificationTargetAsync(
             ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
-            ("SharpProofVerifyResultFile", LauncherProtocolOutputPath()));
-        Assert.That(File.Exists(LauncherProtocolOutputPath()), Is.True);
+            ("SharpProofLauncherPath", Path.Combine(
+                isolatedLauncherDirectory,
+                "isolated-launcher.dll")),
+            ("SharpProofVerifyResultFile", protocolPath));
+        Assert.That(await File.ReadAllBytesAsync(protocolPath),
+            Is.EqualTo(expectedBytes));
     }
 
     [Test]

@@ -900,8 +900,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'targets-protect-protocol-companion-path'
         File = 'SharpProof.BuildTasks\InvalidatePublishedResult.cs'
-        Original = '            Path.Combine(directory, "SharpProof.Worker.Protocol.dll"),'
-        Mutated = '            Path.Combine(directory, "SharpProof.Worker.Missing.dll"),'
+        Original = '                WorkerProtocolPath)'
+        Mutated = '                InvocationManifestPath)'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~LauncherProtocolAssetRemainsProtectedByTargets'
     },
