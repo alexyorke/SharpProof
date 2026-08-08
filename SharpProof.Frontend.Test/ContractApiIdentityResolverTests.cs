@@ -11,6 +11,24 @@ public sealed class ContractApiIdentityResolverTests
     private static readonly ImmutableArray<MetadataReference>
         PlatformReferences = CreatePlatformReferences();
 
+    [Test]
+    public void ExactUnsignedPackagePayloadIsAccepted()
+    {
+        var assembly = typeof(SharpProof.Attributes.Contract).Assembly;
+        var reference = MetadataReference.CreateFromFile(assembly.Location);
+        var resolver = ContractApiIdentityResolver.ForCompilation(
+            CreateConsumer(reference));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(assembly.GetName().GetPublicKey(), Is.Empty);
+            Assert.That(resolver.Contract, Is.Not.Null);
+            Assert.That(
+                resolver.ResolveAttribute(ContractApiMetadata.NotNull),
+                Is.Not.Null);
+        }
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void UnapprovedContractPayloadRejectsSamePackageAttributes(

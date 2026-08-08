@@ -16,10 +16,6 @@ internal sealed class ContractApiIdentityResolver
         typeof(ContractApiIdentityResolver).Assembly.GetName().Version ??
         throw new InvalidOperationException(
             "SharpProof.Frontend has no assembly version.");
-    private static readonly ImmutableArray<byte> AttributesAssemblyPublicKey =
-        [.. typeof(ContractApiIdentityResolver).Assembly
-            .GetName()
-            .GetPublicKey() ?? []];
     private static readonly ConditionalWeakTable<
         Compilation, ContractApiIdentityResolver> Cache = new();
     private static readonly ImmutableHashSet<string> AttributeMetadataNames =
@@ -155,9 +151,7 @@ internal sealed class ContractApiIdentityResolver
                 AttributesAssemblyName,
                 StringComparison.Ordinal) &&
             identity.Version == AttributesAssemblyVersion &&
-            string.IsNullOrEmpty(identity.CultureName) &&
-            identity.PublicKey.SequenceEqual(
-                AttributesAssemblyPublicKey);
+            string.IsNullOrEmpty(identity.CultureName);
     }
 
     private bool IsCompilationReference(
