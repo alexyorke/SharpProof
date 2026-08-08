@@ -1439,7 +1439,8 @@ public sealed class WorkerMsBuildIntegrationTests
         var failed = await project.RunVerificationTargetAsync(
             ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
             ("SharpProofWorkerPath", collisionWorker),
-            ("SharpProofVerifyResultFile", collisionCompanion));
+            ("SharpProofVerifyResultFile", collisionCompanion),
+            ("_SharpProofSkipTestInvalidation", "true"));
 
         using (Assert.EnterMultipleScope())
         {
@@ -3360,7 +3361,8 @@ public sealed class WorkerMsBuildIntegrationTests
                   <Import Project="{verifierTargets}" />
                   <Target Name="_SharpProofTestInvalidatePublishedResult"
                           BeforeTargets="_SharpProofVerifyCore"
-                          Condition="'$(BuildingProject)' == 'false'">
+                          Condition="'$(BuildingProject)' == 'false' and
+                                     '$(_SharpProofSkipTestInvalidation)' != 'true'">
                     <SharpProof.BuildTasks.InvalidatePublishedResult
                         ResultPath="$(SharpProofVerifyResultFile)"
                         ProjectDirectory="$(MSBuildProjectDirectory)"
