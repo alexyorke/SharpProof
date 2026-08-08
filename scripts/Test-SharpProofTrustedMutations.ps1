@@ -1012,40 +1012,16 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'relational-source-call-admission'
         File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerRelationalSummaryProvider.cs'
-        Original = (@'
-        return _apiSpecs.IsSideEffectFree(method) ||
-            _specificationPacks.CanResolve(method) ||
-            IsSourceCandidate(method) ||
-            CompilerImplementationIlSummaryLowerer.IsCandidate(
-                _compilation,
-                method);
-'@).Trim()
-        Mutated = (@'
-        return _apiSpecs.IsSideEffectFree(method) ||
-            _specificationPacks.CanResolve(method) ||
-            CompilerImplementationIlSummaryLowerer.IsCandidate(
-                _compilation,
-                method);
-'@).Trim()
+        Original = '        return method.MethodKind == MethodKind.Ordinary &&'
+        Mutated = '        return method.MethodKind != MethodKind.Ordinary &&'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~DirectAcyclicSourceCallCarriesAReusableRelationalSummary'
     },
     [pscustomobject]@{
         Name = 'relational-implementation-il-admission'
-        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerRelationalSummaryProvider.cs'
-        Original = (@'
-        return _apiSpecs.IsSideEffectFree(method) ||
-            _specificationPacks.CanResolve(method) ||
-            IsSourceCandidate(method) ||
-            CompilerImplementationIlSummaryLowerer.IsCandidate(
-                _compilation,
-                method);
-'@).Trim()
-        Mutated = (@'
-        return _apiSpecs.IsSideEffectFree(method) ||
-            _specificationPacks.CanResolve(method) ||
-            IsSourceCandidate(method);
-'@).Trim()
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerImplementationIlSummaryLowerer.cs'
+        Original = '        if (!IsCandidate(compilation, method))'
+        Mutated = '        if (IsCandidate(compilation, method))'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~ExactImplementationIlSummaryProvesAnExternalCallChain'
     },
