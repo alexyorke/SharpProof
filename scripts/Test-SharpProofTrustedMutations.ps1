@@ -1053,7 +1053,7 @@ $mutations = @(
         Name = 'relational-instantiation-freshness'
         File = 'SharpProof.Summaries\IrRelationalSummaryInstantiator.cs'
         Original = '            instanceOrdinal.ToString(System.Globalization.CultureInfo.InvariantCulture) +'
-        Mutated = '            "0" +'
+        Mutated = '            (instanceOrdinal - instanceOrdinal).ToString(System.Globalization.CultureInfo.InvariantCulture) +'
         Project = 'SharpProof.Summaries.Test\SharpProof.Summaries.Test.csproj'
         Filter = 'FullyQualifiedName~CallCompositionUsesAReusableRelationAndFreshVariables'
     },
