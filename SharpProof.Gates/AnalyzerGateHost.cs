@@ -133,7 +133,7 @@ internal static class AnalyzerGateHost
             StringComparer.OrdinalIgnoreCase);
         if (mode != null)
         {
-            values.Add("sharpproof_mode", mode);
+            values.Add("sharpproof_features", mode);
         }
 
         var options = new AnalyzerOptions(
@@ -160,7 +160,7 @@ internal static class AnalyzerGateHost
             StringComparer.OrdinalIgnoreCase);
         if (mode != null)
         {
-            values.Add("sharpproof_mode", mode);
+            values.Add("sharpproof_features", mode);
         }
 
         return new AnalyzerOptions([], new GateOptionsProvider(values));
