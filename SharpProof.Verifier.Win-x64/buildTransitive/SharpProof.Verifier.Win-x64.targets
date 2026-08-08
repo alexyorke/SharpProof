@@ -38,6 +38,17 @@
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .Select(resolvePath)
             .ToArray();
+        var publicationPaths = new[] {
+            RequestPath, ResultPath, ManifestPath, SarifPath
+        }.Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(resolvePath)
+            .ToArray();
+        var publicationMarkerPaths = publicationPaths
+            .Select(WindowsPathIdentity.PublicationMarkerPath)
+            .ToArray();
+        var publicationMutationPaths = outputPaths
+            .Concat(publicationMarkerPaths)
+            .ToArray();
         var aliasesOutput = outputPaths
             .Distinct(System.StringComparer.OrdinalIgnoreCase)
             .Count() != outputPaths.Length ||
@@ -122,7 +133,7 @@
                 return true;
             }
         };
-        var aliasesReparse = outputPaths.Concat(protectedPaths)
+        var aliasesReparse = publicationMutationPaths.Concat(protectedPaths)
             .Concat(resolvedCachePath != null
                 ? new[] { resolvedCachePath }
                 : System.Array.Empty<string>())
@@ -130,12 +141,12 @@
         if (aliasesReparse)
             Log.LogError(
                 "SharpProof output paths must not traverse reparse points.");
-        var aliasesFileIdentity = outputPaths
+        var aliasesFileIdentity = publicationMutationPaths
             .Any(output => protectedPaths.Any(input =>
                 !string.Equals(
                     output, input, System.StringComparison.OrdinalIgnoreCase) &&
                 WindowsPathIdentity.AreSameExistingFile(output, input)));
-        var aliasesInput = aliasesFileIdentity || outputPaths
+        var aliasesInput = aliasesFileIdentity || publicationMutationPaths
             .Any(output => protectedPaths.Any(input => string.Equals(
                 output, input, System.StringComparison.OrdinalIgnoreCase)));
         if (aliasesFileIdentity)
@@ -143,10 +154,10 @@
                 "SharpProof output aliases a protected file identity.");
         var aliasesWorkerTree = workerTreeExists &&
             !string.IsNullOrWhiteSpace(workerDirectory) &&
-            outputPaths.Any(output => WindowsPathIdentity.IsSameOrDescendant(
+            publicationMutationPaths.Any(output => WindowsPathIdentity.IsSameOrDescendant(
                 output, workerDirectory));
         var aliasesCache = resolvedCachePath != null &&
-            (outputPaths.Any(output => WindowsPathIdentity.IsSameOrDescendant(
+            (publicationMutationPaths.Any(output => WindowsPathIdentity.IsSameOrDescendant(
                 output, resolvedCachePath)) ||
              protectedPaths.Any(input => WindowsPathIdentity.IsSameOrDescendant(
                 input, resolvedCachePath)) ||
@@ -156,30 +167,12 @@
                  resolvedCachePath, workerDirectory));
         if (!aliasesReparse && !aliasesInput && !aliasesOutput &&
             !aliasesWorkerTree && !aliasesCache) {
-            using (var publication =
-                new System.Threading.Mutex(
-                    false,
-                    WindowsPathIdentity.PublicationMutexName(ResultPath))) {
-                var ownsPublication = false;
-                try {
-                    try {
-                        ownsPublication = publication.WaitOne(
-                            System.TimeSpan.FromSeconds(30));
-                    }
-                    catch (System.Threading.AbandonedMutexException) {
-                        ownsPublication = true;
-                    }
-                    if (!ownsPublication)
-                        Log.LogError(
-                            "Timed out waiting to invalidate prior SharpProof outputs.");
-                    else
-                        foreach (var path in outputPaths)
-                            WindowsPathIdentity.DeleteIfUnprotected(
-                                path, protectedPaths);
-                }
-                finally {
-                    if (ownsPublication) publication.ReleaseMutex();
-                }
+            using (WindowsPathIdentity.AcquirePublicationSet(
+                publicationPaths,
+                System.TimeSpan.FromSeconds(30))) {
+                foreach (var path in outputPaths)
+                    WindowsPathIdentity.DeleteIfUnprotected(
+                        path, protectedPaths);
             }
         }
       ]]></Code>

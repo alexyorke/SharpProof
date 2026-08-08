@@ -12,14 +12,14 @@ release blocker.
 
 ## Active item
 
-`PREVIEW-001` is active. No other production item should be implemented in
+`PREVIEW-002` is active. No other production item should be implemented in
 parallel.
 
 ## Debt register
 
 | ID | Status | Debt and supported impact | Required regression or evidence | Closure evidence |
 |---|---|---|---|---|
-| PREVIEW-001 | Ready | Publication locks only one output. Cooperative builds with distinct result paths but a shared request, manifest, or SARIF path can interleave; partially overlapping publication sets cannot remain coherent. This affects supported local builds. | Concurrency tests for overlap on each output, reverse acquisition order, partial timeout cleanup, disjoint progress, and explicit rejection of partially overlapping configurations. Invalidation and publication must use the same canonical set. | Pending |
+| PREVIEW-001 | Implemented; final gates pending | Publication locks only one output. Cooperative builds with distinct result paths but a shared request, manifest, or SARIF path can interleave; partially overlapping publication sets cannot remain coherent. This affects supported local builds. | Concurrency tests for overlap on each output, reverse acquisition order, partial timeout cleanup, disjoint progress, and explicit rejection of partially overlapping configurations. Invalidation and publication must use the same canonical set. | Direct lock/set tests: 9 passed. Worker suite: 383 passed, 6 platform skips. Packaged partial-overlap regression: passed. Removing set binding failed its regression; acquiring only one mutex failed 3/4 member-overlap cases. Full gates remain pending for the convergence tranche. |
 | PREVIEW-002 | Ready | Full-framework MSBuild and Visual Studio long-path behavior is not qualified end to end. This affects the supported Windows/Visual Studio host matrix. | Packaged invalidation and publication beyond 260 characters under command-line and Visual Studio MSBuild, including cache and SARIF; either succeed consistently or fail early with a documented classified error. | Pending |
 | PREVIEW-003 | Ready | Compiler artifact schema 10 has no real emitted linked-netmodule provenance fixture. A regression could silently hash only the manifest module. | Emit and consume a manifest plus two linked netmodules; assert canonical order, path, MVID, and SHA-256, and reject stale or metadata-mismatched linked modules. | Pending |
 | PREVIEW-004 | Ready | Recent trusted-boundary changes have not all been mutation-audited. Existing experience shows tests can pass without reaching the changed branch. | Record one mutation verdict per trusted-boundary change; a surviving mutation requires a stronger test or deletion of redundant production code. | Pending |

@@ -495,6 +495,26 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task ChangingOneMemberOfAPublishedSetRequiresCleanOutputMetadata()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var first = await project.BuildAsync(verify: true);
+        Assert.That(first.ExitCode, Is.Zero, first.Output);
+        var alternateResult = Path.Combine(
+            Path.GetDirectoryName(project.ResultPath)!,
+            "alternate-result.json");
+
+        var second = await project.BuildAsync(
+            verify: true,
+            ("SharpProofVerifyResultFile", alternateResult));
+
+        Assert.That(second.ExitCode, Is.Not.Zero, second.Output);
+        Assert.That(second.Output, Does.Contain("partially overlap"));
+        Assert.That(File.Exists(alternateResult), Is.False);
+    }
+
+    [Test]
     public async Task VerificationPublishesCompilerManifestPerTargetFramework()
     {
         RequireWindowsWorker();

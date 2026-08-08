@@ -423,27 +423,17 @@ internal static class Program
             return;
         }
 
-        using var publication = new Mutex(
-            false,
-            WindowsPathIdentity.PublicationMutexName(
-                arguments.PublishResultPath!));
-        var ownsPublication = false;
+        using var publication = WindowsPathIdentity.AcquirePublicationSet(
+            new[]
+            {
+                arguments.PublishRequestPath,
+                arguments.PublishResultPath,
+                arguments.PublishCompilerManifestPath,
+                arguments.PublishSarifPath
+            }.OfType<string>(),
+            TimeSpan.FromSeconds(30));
         try
         {
-            try
-            {
-                ownsPublication = publication.WaitOne(TimeSpan.FromSeconds(30));
-            }
-            catch (AbandonedMutexException)
-            {
-                ownsPublication = true;
-            }
-            if (!ownsPublication)
-            {
-                throw new IOException(
-                    "Timed out waiting to publish SharpProof results.");
-            }
-
             DeleteIfExists(arguments.PublishResultPath);
             DeleteIfExists(arguments.PublishSarifPath);
             AtomicFile.WriteBytesAsync(arguments.PublishCompilerManifestPath!, artifactBytes)
@@ -473,13 +463,6 @@ internal static class Program
             DeleteIfExists(arguments.PublishResultPath);
             DeleteIfExists(arguments.PublishSarifPath);
             throw;
-        }
-        finally
-        {
-            if (ownsPublication)
-            {
-                publication.ReleaseMutex();
-            }
         }
     }
 
@@ -619,11 +602,16 @@ internal sealed partial class LauncherArguments
             Path.ChangeExtension(workerPath, ".deps.json"),
             Path.ChangeExtension(workerPath, ".runtimeconfig.json")
         };
+        var publicationPaths = new[] {
+            PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
+            PublishSarifPath
+        }.OfType<string>().ToArray();
         string?[] candidates = [..runtimeRoots,
             ..LauncherArguments.LauncherRuntimePaths,
             cacheDirectory, RequestPath, ResultPath, CompilerManifestPath,
-            PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
-            PublishSarifPath];
+            ..publicationPaths,
+            ..publicationPaths.Select(
+                WindowsPathIdentity.PublicationMarkerPath)];
         WorkerCachePath.ValidateNoReparsePoints(
             candidates.OfType<string>());
         var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -17,6 +18,10 @@ public static class WindowsPathIdentity
     private const uint FileFlagBackupSemantics = 0x02000000;
     private const int ErrorFileNotFound = 2;
     private const int ErrorPathNotFound = 3;
+    private const string PublicationMarkerSuffix =
+        ".sharpproof-publication-set";
+    private const string PublicationMarkerHeader =
+        "SharpProof.PublicationSet/1\n";
 
     public static string Canonicalize(string path)
     {
@@ -85,10 +90,83 @@ public static class WindowsPathIdentity
         }
     }
 
-    public static string PublicationMutexName(string resultPath)
+    public static string PublicationMutexName(string publicationPath)
     {
-        var canonical = Canonicalize(resultPath);
-        var identity = PublicationIdentity(canonical);
+        var canonical = Canonicalize(publicationPath);
+        return PublicationMutexNameForCanonicalPath(canonical);
+    }
+
+    public static string PublicationMarkerPath(string publicationPath)
+    {
+        return Canonicalize(publicationPath) + PublicationMarkerSuffix;
+    }
+
+    public static IDisposable AcquirePublicationSet(
+        IEnumerable<string> publicationPaths,
+        TimeSpan timeout)
+    {
+        if (publicationPaths == null)
+        {
+            throw new ArgumentNullException(nameof(publicationPaths));
+        }
+        if (timeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(timeout));
+        }
+
+        var requestedPaths = publicationPaths
+            .Where(static path => !string.IsNullOrWhiteSpace(path))
+            .ToArray();
+        if (requestedPaths.Length == 0)
+        {
+            throw new ArgumentException(
+                "At least one publication path is required.",
+                nameof(publicationPaths));
+        }
+        var canonicalPaths = CanonicalPublicationPaths(requestedPaths);
+        ValidatePublicationMarkerAliases(canonicalPaths);
+        var mutexes = canonicalPaths
+            .Select(PublicationMutexNameForCanonicalPath)
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .Select(static name => new Mutex(false, name))
+            .ToArray();
+        var acquired = 0;
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+            while (acquired != mutexes.Length)
+            {
+                var remaining = timeout - stopwatch.Elapsed;
+                if (remaining <= TimeSpan.Zero ||
+                    !WaitForMutex(mutexes[acquired], remaining))
+                {
+                    throw new IOException(
+                        "Timed out waiting for SharpProof publication paths.");
+                }
+                acquired++;
+            }
+
+            var confirmedPaths = CanonicalPublicationPaths(requestedPaths);
+            if (!canonicalPaths.SequenceEqual(
+                    confirmedPaths, StringComparer.OrdinalIgnoreCase))
+            {
+                throw new IOException(
+                    "SharpProof publication path identity changed while acquiring locks.");
+            }
+            BindPublicationSet(canonicalPaths);
+            return new PublicationLease(mutexes);
+        }
+        catch
+        {
+            ReleaseMutexes(mutexes, acquired);
+            throw;
+        }
+    }
+
+    private static string PublicationMutexNameForCanonicalPath(
+        string canonicalPath)
+    {
+        var identity = "path|" + canonicalPath.ToUpperInvariant();
         using var hash = SHA256.Create();
         var digest = hash.ComputeHash(Encoding.UTF8.GetBytes(identity));
         return "Global\\SharpProof.Publish." + string.Concat(
@@ -96,54 +174,134 @@ public static class WindowsPathIdentity
                 "x2", CultureInfo.InvariantCulture)));
     }
 
-    private static string PublicationIdentity(string canonicalPath)
+    private static string[] CanonicalPublicationPaths(
+        IEnumerable<string> publicationPaths)
     {
-        var suffix = new Stack<string>();
-        var ancestor = canonicalPath;
-        while (true)
+        return publicationPaths
+            .Select(Canonicalize)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(static path => path, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static bool WaitForMutex(Mutex mutex, TimeSpan timeout)
+    {
+        try
         {
-            var name = Path.GetFileName(ancestor);
-            var parent = Path.GetDirectoryName(ancestor);
-            if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(parent))
+            return mutex.WaitOne(timeout);
+        }
+        catch (AbandonedMutexException)
+        {
+            return true;
+        }
+    }
+
+    private static void ValidatePublicationMarkerAliases(
+        IReadOnlyCollection<string> canonicalPaths)
+    {
+        var markers = new HashSet<string>(
+            canonicalPaths.Select(
+                static path => path + PublicationMarkerSuffix),
+            StringComparer.OrdinalIgnoreCase);
+        if (canonicalPaths.Any(markers.Contains))
+        {
+            throw new ArgumentException(
+                "SharpProof publication paths must not alias publication metadata.");
+        }
+    }
+
+    private static void BindPublicationSet(string[] canonicalPaths)
+    {
+        var setId = PublicationSetId(canonicalPaths);
+        var marker = PublicationMarkerHeader + setId + "\n";
+        foreach (var path in canonicalPaths)
+        {
+            var markerPath = path + PublicationMarkerSuffix;
+            var directory = Path.GetDirectoryName(markerPath) ??
+                throw new IOException(
+                    "SharpProof publication metadata has no directory.");
+            Directory.CreateDirectory(directory);
+            if (File.Exists(markerPath))
             {
-                throw new InvalidOperationException(
-                    "SharpProof could not establish a publication parent.");
+                ValidatePublicationMarker(markerPath, marker);
+                continue;
             }
-            suffix.Push(name.ToUpperInvariant());
-            ancestor = parent;
-            using var handle = Open(ancestor);
-            if (!handle.IsInvalid)
+
+            try
             {
-                return FileIdentity(
-                    "path",
-                    Information(handle),
-                    string.Join("\\", suffix));
+                using var stream = new FileStream(
+                    markerPath,
+                    FileMode.CreateNew,
+                    FileAccess.Write,
+                    FileShare.Read);
+                var bytes = new UTF8Encoding(false).GetBytes(marker);
+                stream.Write(bytes, 0, bytes.Length);
+                stream.Flush();
             }
-            var error = Marshal.GetLastWin32Error();
-            if (error != ErrorFileNotFound && error != ErrorPathNotFound)
+            catch (IOException) when (File.Exists(markerPath))
             {
-                throw new Win32Exception(error,
-                    "SharpProof could not establish publication identity.");
+                ValidatePublicationMarker(markerPath, marker);
             }
         }
     }
 
-    private static string FileIdentity(
-        string kind,
-        ByHandleFileInformation information,
-        string suffix)
+    private static string PublicationSetId(IEnumerable<string> canonicalPaths)
     {
-        return string.Join("|", new[]
+        using var hash = SHA256.Create();
+        var bytes = Encoding.UTF8.GetBytes(string.Join(
+            "\n",
+            canonicalPaths.Select(static path => path.ToUpperInvariant())));
+        return string.Concat(hash.ComputeHash(bytes).Select(
+            static value => value.ToString(
+                "x2", CultureInfo.InvariantCulture)));
+    }
+
+    private static void ValidatePublicationMarker(
+        string markerPath,
+        string expected)
+    {
+        var information = new FileInfo(markerPath);
+        if (information.Length > 256 ||
+            !string.Equals(
+                File.ReadAllText(markerPath, new UTF8Encoding(false, true)),
+                expected,
+                StringComparison.Ordinal))
         {
-            kind,
-            information.VolumeSerialNumber.ToString(
-                "x8", CultureInfo.InvariantCulture),
-            information.FileIndexHigh.ToString(
-                "x8", CultureInfo.InvariantCulture),
-            information.FileIndexLow.ToString(
-                "x8", CultureInfo.InvariantCulture),
-            suffix
-        });
+            throw new IOException(
+                "SharpProof publication paths partially overlap another publication set. " +
+                "Clean the prior output set before changing publication paths.");
+        }
+    }
+
+    private static void ReleaseMutexes(Mutex[] mutexes, int acquired)
+    {
+        for (var index = acquired - 1; index >= 0; index--)
+        {
+            mutexes[index].ReleaseMutex();
+        }
+        foreach (var mutex in mutexes)
+        {
+            mutex.Dispose();
+        }
+    }
+
+    private sealed class PublicationLease : IDisposable
+    {
+        private Mutex[]? _mutexes;
+
+        internal PublicationLease(Mutex[] mutexes)
+        {
+            _mutexes = mutexes;
+        }
+
+        public void Dispose()
+        {
+            var mutexes = Interlocked.Exchange(ref _mutexes, null);
+            if (mutexes != null)
+            {
+                ReleaseMutexes(mutexes, mutexes.Length);
+            }
+        }
     }
 
     public static bool AreSameExistingFile(string firstPath, string secondPath)
