@@ -908,8 +908,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'launcher-normalizes-malformed-worker-deps'
         File = 'SharpProof.Worker.Launcher\Program.cs'
-        Original = "                InvalidDataException or JsonException or KeyNotFoundException or`n                InvalidOperationException)"
-        Mutated = "                InvalidDataException or KeyNotFoundException or`n                InvalidOperationException)"
+        Original = "                InvalidDataException or JsonException or KeyNotFoundException or`n                InvalidOperationException or System.ComponentModel.Win32Exception)"
+        Mutated = "                InvalidDataException or KeyNotFoundException or`n                InvalidOperationException or System.ComponentModel.Win32Exception)"
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~MainFailsClosedWhenWorkerDependencyManifestIsMalformed'
     },
