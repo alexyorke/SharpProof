@@ -548,7 +548,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'modeled-call-flow-definedness'
         File = 'SharpProof.Worker\AcyclicBlockPredicateExecutor.cs'
-        Original = 'predicate = application.Predicate;'
+        Original = 'predicate = application.Value.Predicate;'
         Mutated = 'predicate = factory.Boolean(true);'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~SpecCallArgumentDefinednessConstrainsSubsequentFlow'
@@ -556,16 +556,16 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'modeled-call-receiver-definedness'
         File = 'SharpProof.Worker\AcyclicBlockPredicateExecutor.cs'
-        Original = 'guard = receiverGuard;'
-        Mutated = 'guard = factory.Boolean(true);'
+        Original = "guard = receiverGuard;`n                substitutions.Add(template.Receiver.Value, receiver);"
+        Mutated = "guard = factory.Boolean(true);`n                substitutions.Add(template.Receiver.Value, receiver);"
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~SpecCallReceiverDefinednessConstrainsSubsequentFlow'
     },
     [pscustomobject]@{
         Name = 'modeled-call-argument-definedness'
         File = 'SharpProof.Worker\AcyclicBlockPredicateExecutor.cs'
-        Original = 'guard = argumentGuard;'
-        Mutated = 'guard = factory.Boolean(true);'
+        Original = "guard = argumentGuard;`n                substitutions.Add(template.Parameters[index], argument);"
+        Mutated = "guard = factory.Boolean(true);`n                substitutions.Add(template.Parameters[index], argument);"
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~SpecCallArgumentDefinednessConstrainsSubsequentFlow'
     },
