@@ -1,4 +1,9 @@
-# SharpProof agent fix queue
+# SharpProof historical agent fix queue
+
+The open-ended fix loop is frozen for preview convergence. The authoritative
+finite release-debt list is now `preview-debt.md`. This file remains as
+historical mutation and coverage evidence; do not refill its backlog while the
+preview register is active.
 
 One item per iteration. Both gates must pass before every commit:
 `dotnet test SharpProof.Dev.Tests.slnf` and `pwsh eng/acceptance/Verify.ps1`.
