@@ -2654,6 +2654,9 @@ public sealed class WorkerTests
 
         Assert.That(response.Errors, Is.Empty);
         var result = response.ClaimResults.Single();
+        var implementationEvidence = summary.DependencyEvidence
+            .SingleOrDefault(item =>
+                item.Origin == CompilerSummaryOrigin.ImplementationIl);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -2662,9 +2665,7 @@ public sealed class WorkerTests
                 summary.DependencyEvidence.Select(static item => item.Origin),
                 Does.Contain(CompilerSummaryOrigin.ImplementationIl));
             Assert.That(
-                summary.DependencyEvidence.Single(item =>
-                        item.Origin == CompilerSummaryOrigin.ImplementationIl)
-                    .EvidenceSha256,
+                implementationEvidence?.EvidenceSha256,
                 Has.Length.EqualTo(64));
             Assert.That(
                 result.ProofCore.Any(static item => item.StartsWith(
@@ -2673,9 +2674,7 @@ public sealed class WorkerTests
                 Is.True);
         }
 
-        summary.DependencyEvidence.Single(item =>
-                item.Origin == CompilerSummaryOrigin.ImplementationIl)
-            .EvidenceSha256 = new string('b', 64);
+        implementationEvidence!.EvidenceSha256 = new string('b', 64);
         Assert.That(
             (Action)(() => CompilerManifestArtifactJson.DecodeCallables(
                 artifact)),
