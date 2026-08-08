@@ -58,7 +58,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "5efedfd5f50e159803aedf931eadf99f3ab8f5d82bc91e5e0268c14d47a41b16",
+    "inventorySha256": "cbcfd9b72003f949659021ddd4dc70677f0622d41c0d0a9b1676658ac063efb6",
     "components": [
       {
         "name": "discovery",
@@ -441,6 +441,7 @@
           "SharpProof.Package/SharpProof.nuspec",
           "SharpProof.Package/buildTransitive/SharpProof.props",
           "SharpProof.Package/buildTransitive/SharpProof.targets",
+          "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.props",
           "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.targets"
         ]
       },

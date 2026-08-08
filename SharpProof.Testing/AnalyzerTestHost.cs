@@ -22,7 +22,7 @@ internal static class AnalyzerTestHost {
         GetDiagnosticsAsync(
             source,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
-                ["sharpproof_mode"] = "all-experimental"
+                ["sharpproof_features"] = "all"
             },
             [.. AnalyzerInstances.SelectMany(static analyzer => analyzer.SupportedDiagnostics)
                 .Select(static descriptor => descriptor.Id)]);

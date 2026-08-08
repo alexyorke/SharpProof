@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "msbuildProperties": [
+    "SharpProofAnalyzerDirectory",
+    "SharpProofAssumptionPolicy",
+    "SharpProofCollectorDirectory",
+    "SharpProofCompilerCollectorPath",
+    "SharpProofCompilerManifestFile",
+    "SharpProofDotNetHost",
+    "SharpProofFeatures",
+    "SharpProofLauncherPath",
+    "SharpProofPortableAnalyzerPath",
+    "SharpProofProfile",
+    "SharpProofToolsDirectory",
+    "SharpProofVerify",
+    "SharpProofVerifyCacheDirectory",
+    "SharpProofVerifyCacheEnabled",
+    "SharpProofVerifyCacheMaximumBytes",
+    "SharpProofVerifyMaxParallelism",
+    "SharpProofVerifyMaxWorkerProcesses",
+    "SharpProofVerifyMaximumExpressionDepth",
+    "SharpProofVerifyMethodRlimit",
+    "SharpProofVerifyMethodWallTimeMilliseconds",
+    "SharpProofVerifyPolicy",
+    "SharpProofVerifyProcessMemoryLimitBytes",
+    "SharpProofVerifyProjectWallTimeMilliseconds",
+    "SharpProofVerifyQueryRlimit",
+    "SharpProofVerifyRequestFile",
+    "SharpProofVerifyResultFile",
+    "SharpProofVerifySarifFile",
+    "SharpProofVerifyTerminationGraceMilliseconds",
+    "SharpProofWorkerPath"
+  ],
+  "retiredMsbuildProperties": [
+    "SharpProofMode"
+  ],
+  "versions": {
+    "workerProtocol": 9,
+    "workerManifest": 4,
+    "compilerArtifact": 10,
+    "workerCache": 11
+  }
+}

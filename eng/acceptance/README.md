@@ -62,8 +62,8 @@ effect-only artifacts exclude postcondition claims.
 `SharpProofProfile=strict` enables verification, defaults
 `SharpProofVerifyPolicy` to `require-proven`, and defaults
 `SharpProofAssumptionPolicy` to `error`. Fatal run states and refutations fail
-under every policy. `SharpProofMode` is a deprecated preview compatibility
-alias.
+under every policy. The removed `SharpProofMode` alias is rejected; the
+preview configuration surface is frozen on profile and feature properties.
 
 This acceptance contract covers compiler artifact schema version 10,
 generated-tree accountability, portable whole-body lowered CFG/IR, exact

@@ -29,8 +29,7 @@ public sealed class WorkerMsBuildIntegrationTests
         "SharpProofProfile",
         "SharpProofFeatures",
         "SharpProofVerifyPolicy",
-        "SharpProofAssumptionPolicy",
-        "SharpProofMode"
+        "SharpProofAssumptionPolicy"
     ];
     private static readonly string[] s_compilerManifestProperties = [
         "_SharpProofCompilerManifestPath",
@@ -829,7 +828,7 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
-    public async Task ProjectBodyConfigurationUsesNewPropertiesAndLegacyAliases()
+    public async Task ProjectBodyConfigurationRejectsRetiredMode()
     {
         RequireWindowsWorker();
         using var strict = ConsumerProject.CreateConfigured(
@@ -862,23 +861,11 @@ public sealed class WorkerMsBuildIntegrationTests
             ("SharpProofMode", "contracts"));
         var legacyBuild = await legacy.BuildAsync(verify: true);
 
-        Assert.That(legacyBuild.ExitCode, Is.Zero, legacyBuild.Output);
+        Assert.That(legacyBuild.ExitCode, Is.Not.Zero);
         Assert.That(
             legacyBuild.Output,
-            Does.Contain("SharpProofMode='contracts' is deprecated"));
-        var legacyRequest = WorkerProtocolJson.DeserializeRequest(
-            await File.ReadAllTextAsync(legacy.RequestPath))!;
-        var legacyArtifact = await CompilerManifestArtifact.ReadAsync(
-            legacyRequest.CompilerManifest.Path);
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                legacyArtifact.Features,
-                Is.EqualTo(WorkerFeatureSet.Contracts));
-            Assert.That(
-                legacyRequest.VerifyPolicy,
-                Is.EqualTo(WorkerVerifyPolicy.Advisory));
-        }
+            Does.Contain("SharpProofMode was removed before preview.1"));
+        Assert.That(File.Exists(legacy.RequestPath), Is.False);
     }
 
     [Test]

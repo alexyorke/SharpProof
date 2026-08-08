@@ -57,8 +57,8 @@ compiler-collection infrastructure error during Windows verification.
 | `SP0049` | Windows verification compiler manifest | Error, on | On artifact failure |
 | `SP0050` | Referenced contract API assembly | Error, on | On unreadable payload |
 
-`SharpProofFeatures=all` enables both feature pipelines. `SharpProofMode` and
-`all-experimental` are deprecated preview compatibility inputs.
+`SharpProofFeatures=all` enables both feature pipelines. The former
+`SharpProofMode` and `all-experimental` compatibility inputs are removed.
 
 <a id="sp0002"></a>
 ## SP0002 - purity not proven
@@ -115,13 +115,12 @@ silently interpreted.
 <a id="sp0025"></a>
 ## SP0025 - invalid analyzer configuration
 
-The compilation-global `sharpproof_profile`/`SharpProofProfile`,
-`sharpproof_features`/`SharpProofFeatures`, or deprecated
-`sharpproof_mode`/`SharpProofMode` value is invalid. Valid profile values are
+The compilation-global `sharpproof_profile`/`SharpProofProfile` or
+`sharpproof_features`/`SharpProofFeatures` value is invalid, or the removed
+`sharpproof_mode`/`SharpProofMode` alias was supplied. Valid profile values are
 `advisory`, `strict`, and `off`; feature values are `effects`, `contracts`, and
-`all`. The legacy alias temporarily accepts `off`, `effects`, `contracts`, and
-`all-experimental`. SharpProof reports a warning and analyzes an invalid
-configuration as `off`.
+`all`. SharpProof reports a warning and analyzes an invalid configuration as
+`off`.
 
 Tree-local attempts to set this compilation-global option are also invalid
 unless they exactly match the global value.

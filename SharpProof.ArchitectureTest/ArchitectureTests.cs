@@ -658,6 +658,92 @@ public sealed class ArchitectureTests
     }
 
     [Test]
+    public void PreviewConfigurationInterfaceMatchesFrozenSnapshot()
+    {
+        var repository = RepositoryRoot();
+        using var snapshotDocument = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(
+                repository,
+                "eng",
+                "acceptance",
+                "preview-interface.v1.json")));
+        using var contractDocument = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(repository, "eng", "acceptance", "contract.json")));
+        var snapshot = snapshotDocument.RootElement;
+        var active = snapshot.GetProperty("msbuildProperties")
+            .EnumerateArray()
+            .Select(static value => value.GetString() ?? string.Empty)
+            .ToArray();
+        var retired = snapshot.GetProperty("retiredMsbuildProperties")
+            .EnumerateArray()
+            .Select(static value => value.GetString() ?? string.Empty)
+            .ToArray();
+        string[] buildFilePaths =
+        [
+            "SharpProof.Package/buildTransitive/SharpProof.props",
+            "SharpProof.Package/buildTransitive/SharpProof.targets",
+            "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.props",
+            "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.targets"
+        ];
+        var buildFiles = buildFilePaths
+            .Select(path => File.ReadAllText(Path.Combine(repository, path)))
+            .ToArray();
+        var combinedBuildSurface = string.Join("\n", buildFiles);
+        var compilerVisible = XDocument.Parse(buildFiles[0])
+            .Descendants("CompilerVisibleProperty")
+            .Concat(XDocument.Parse(buildFiles[2])
+                .Descendants("CompilerVisibleProperty"))
+            .Select(static value => value.Attribute("Include")?.Value)
+            .Where(static value => value != null)
+            .ToArray();
+        var contract = contractDocument.RootElement;
+        var worker = contract.GetProperty("worker");
+        var cache = contract.GetProperty("cache");
+        var versions = snapshot.GetProperty("versions");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(snapshot.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+            Assert.That(
+                active,
+                Is.EqualTo(active.OrderBy(
+                    static value => value,
+                    StringComparer.Ordinal)));
+            Assert.That(active, Is.Unique);
+            Assert.That(retired, Is.Unique);
+            Assert.That(active.Intersect(retired, StringComparer.Ordinal), Is.Empty);
+            foreach (var property in active)
+            {
+                Assert.That(
+                    combinedBuildSurface,
+                    Does.Contain("$(" + property + ")")
+                        .Or.Contain("<" + property),
+                    property);
+            }
+            foreach (var property in retired)
+            {
+                Assert.That(compilerVisible, Does.Not.Contain(property));
+                Assert.That(
+                    combinedBuildSurface,
+                    Does.Contain(property + " was removed"),
+                    property);
+            }
+            Assert.That(
+                versions.GetProperty("workerProtocol").GetInt32(),
+                Is.EqualTo(worker.GetProperty("protocolVersion").GetInt32()));
+            Assert.That(
+                versions.GetProperty("workerManifest").GetInt32(),
+                Is.EqualTo(worker.GetProperty("manifestSchemaVersion").GetInt32()));
+            Assert.That(
+                versions.GetProperty("compilerArtifact").GetInt32(),
+                Is.EqualTo(worker.GetProperty("compilerArtifactSchemaVersion").GetInt32()));
+            Assert.That(
+                versions.GetProperty("workerCache").GetInt32(),
+                Is.EqualTo(cache.GetProperty("schemaVersion").GetInt32()));
+        }
+    }
+
+    [Test]
     public void WorkflowCommandsUsePowerShellSafeMsBuildSwitches()
     {
         var workflowRoot = Path.Combine(RepositoryRoot(), ".github", "workflows");

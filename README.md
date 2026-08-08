@@ -113,10 +113,9 @@ SP0015, and SP0030 remain reserved live-analyzer diagnostics; the current
 may-effect analyzer does not emit them. The opt-in worker separately replays
 the narrow allocation evidence described below.
 
-`SharpProofMode` and `sharpproof_mode` remain preview-only compatibility
-aliases with values `off`, `effects`, `contracts`, and `all-experimental`.
-They are deprecated, cannot be combined with the replacement profile/feature
-settings, and are planned for removal before RC.
+The retired `SharpProofMode`/`sharpproof_mode` preview alias is rejected.
+Use only `SharpProofProfile` and `SharpProofFeatures`; the preview interface is
+now frozen on those properties.
 
 For strict CI:
 

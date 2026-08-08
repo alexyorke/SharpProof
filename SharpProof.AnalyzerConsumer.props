@@ -1,9 +1,8 @@
 <Project>
   <!-- Import this file after the consuming project's SharpProof settings. -->
   <PropertyGroup>
-    <_SharpProofSourceLegacyModeNormalized>$([System.String]::Copy('$(SharpProofMode)').ToLowerInvariant())</_SharpProofSourceLegacyModeNormalized>
-    <SharpProofProfile Condition="'$(SharpProofProfile)' == '' AND '$(_SharpProofSourceLegacyModeNormalized)' == 'off'">off</SharpProofProfile>
     <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
+    <SharpProofFeatures Condition="'$(SharpProofFeatures)' == ''">all</SharpProofFeatures>
     <_SharpProofProfileNormalized>$([System.String]::Copy('$(SharpProofProfile)').ToLowerInvariant())</_SharpProofProfileNormalized>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">true</SharpProofVerify>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == ''">false</SharpProofVerify>
@@ -14,7 +13,6 @@
     <CompilerVisibleProperty Include="SharpProofFeatures" />
     <CompilerVisibleProperty Include="SharpProofVerifyPolicy" />
     <CompilerVisibleProperty Include="SharpProofAssumptionPolicy" />
-    <CompilerVisibleProperty Include="SharpProofMode" />
     <CompilerVisibleProperty Include="_SharpProofCompilerManifestPath" />
     <CompilerVisibleProperty Include="_SharpProofCompilationTargetFramework" />
     <CompilerVisibleProperty Include="_SharpProofProjectDirectory" />

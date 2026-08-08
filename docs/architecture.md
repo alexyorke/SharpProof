@@ -346,8 +346,8 @@ error. `SharpProofVerifyPolicy` controls incomplete selected analysis;
 `SharpProofAssumptionPolicy` controls SP0048 reporting for user assumptions and
 trusted evidence. A refutation, malformed response, backend/replay failure,
 containment failure, or other infrastructure failure is fatal regardless of
-policy. `SharpProofMode` and `all-experimental` remain deprecated preview
-compatibility inputs only.
+policy. The preview interface rejects the removed `SharpProofMode` and
+`all-experimental` compatibility inputs.
 
 The current gate includes:
 

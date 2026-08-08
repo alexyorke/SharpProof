@@ -295,9 +295,9 @@ or selected callable demands them.
 Effect and incomplete-proof diagnostics are enabled informational diagnostics
 by default. A concretely replayed false precondition is SP0027 at Warning.
 Configuration, contract-usage, and compiler-artifact errors remain enabled at
-their declared warning/error severity. `SharpProofMode`/`sharpproof_mode` and
-`all-experimental` are deprecated preview compatibility aliases and do not
-define the release interface.
+their declared warning/error severity. The removed
+`SharpProofMode`/`sharpproof_mode` and `all-experimental` compatibility inputs
+are rejected and do not define the release interface.
 
 A feature diagnostic may be promoted to `Warning` only after at least four
 consecutive weekly corpus cycles with no confirmed false positive, no
