@@ -26,9 +26,9 @@ public sealed class BuildTaskTests
         var task = new RunVerifier
         {
             BuildEngine = engine,
-            Executable = "definitely-not-a-host.exe",
+            Executable = "dotnet",
             WorkingDirectory = TestContext.CurrentContext.WorkDirectory,
-            Arguments = [new TaskItem("ignored")]
+            Arguments = [new TaskItem("--info")]
         };
 
         task.Cancel();
