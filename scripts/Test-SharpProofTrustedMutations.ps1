@@ -1037,7 +1037,7 @@ $mutations = @(
         Name = 'relational-spec-pack-explicit-opt-in'
         File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerSpecificationPackProvider.cs'
         Original = '        var selected = (enabledPacks ?? [])'
-        Mutated = '        var selected = (enabledPacks ?? catalog.Packs.Keys)'
+        Mutated = '        var selected = (enabledPacks ?? []).Concat(catalog.Packs.Keys)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~AuditedSpecificationPackRequiresExplicitOptIn'
     },
