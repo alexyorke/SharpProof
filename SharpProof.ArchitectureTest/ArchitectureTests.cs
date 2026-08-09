@@ -981,7 +981,11 @@ public sealed class ArchitectureTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(host, Does.Contain("RedirectStandardInput = true"));
+            Assert.That(
+                host.Contains(
+                    "RedirectStandardInput = true",
+                    StringComparison.Ordinal),
+                Is.True);
             Assert.That(host, Does.Contain("--parent-pid"));
             Assert.That(host, Does.Contain("EntryPoint = \"prctl\""));
             Assert.That(launcher, Does.Contain("LinuxWorkerProcess.Start"));
@@ -997,18 +1001,16 @@ public sealed class ArchitectureTests
             "SharpProof.Host",
             "ContainerNativeLibrary.cs"));
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                host,
-                Does.Contain(
-                    "NativeLibrary.Load(" + Environment.NewLine +
-                    "                " +
-                    "ContainerContract.ResolveZ3LibraryRequired());"));
-            Assert.That(
-                host,
-                Does.Not.Contain("NativeLibrary.Load(Z3ImportName);"));
-        }
+        var exactLoad =
+            "NativeLibrary.Load(" + Environment.NewLine +
+            "                " +
+            "ContainerContract.ResolveZ3LibraryRequired());";
+        Assert.That(
+            host.Contains(exactLoad, StringComparison.Ordinal) &&
+            !host.Contains(
+                "NativeLibrary.Load(Z3ImportName);",
+                StringComparison.Ordinal),
+            Is.True);
     }
 
     [Test]
