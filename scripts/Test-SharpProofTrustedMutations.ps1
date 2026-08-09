@@ -998,8 +998,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'publication-locks-every-member'
         File = 'SharpProof.Host\LinuxPathIdentity.cs'
-        Original = '        var canonicalPaths = CanonicalPublicationPaths(requestedPaths);'
-        Mutated = '        var canonicalPaths = CanonicalPublicationPaths(requestedPaths).Take(1).ToArray();'
+        Original = "        var locks = canonicalPaths`n            .Select(PublicationLockNameForCanonicalPath)`n            .OrderBy(static path => path, StringComparer.Ordinal)`n            .Select(static path => new PublicationLock(path))"
+        Mutated = "        var locks = canonicalPaths`n            .Select(PublicationLockNameForCanonicalPath)`n            .OrderBy(static path => path, StringComparer.Ordinal)`n            .Take(1)`n            .Select(static path => new PublicationLock(path))"
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~OverlapOnAnyPublicationMemberBlocks'
     },
