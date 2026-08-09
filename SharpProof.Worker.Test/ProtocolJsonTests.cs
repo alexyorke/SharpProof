@@ -61,8 +61,8 @@ public sealed class ProtocolJsonTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("10"));
-            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(12));
+            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("11"));
+            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(13));
             Assert.That(WorkerManifestVersions.Current, Is.EqualTo(4));
             Assert.That(
                 document.RootElement.EnumerateObject()
@@ -172,7 +172,7 @@ public sealed class ProtocolJsonTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(roundTrip.SchemaVersion, Is.EqualTo(11));
-            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("10"));
+            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("11"));
             Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(manifest.Hash));
             Assert.That(roundTrip.Manifest.Callables[0].Assumptions, Has.Length.EqualTo(2));
             Assert.That(
@@ -552,8 +552,6 @@ public sealed class ProtocolJsonTests
     [TestCase(nameof(WorkerBudgets.ProjectWallTimeMilliseconds))]
     [TestCase(nameof(WorkerBudgets.MaxParallelism))]
     [TestCase(nameof(WorkerBudgets.MaximumExpressionDepth))]
-    [TestCase(nameof(WorkerBudgets.ProcessMemoryLimitBytes))]
-    [TestCase(nameof(WorkerBudgets.MaxWorkerProcesses))]
     public void RequestValidationBindsEverySummaryBudget(string propertyName)
     {
         var request = CreateRequest();

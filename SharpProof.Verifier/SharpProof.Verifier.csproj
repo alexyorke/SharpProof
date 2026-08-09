@@ -6,17 +6,17 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <NuspecFile>SharpProof.Verifier.Win-x64.nuspec</NuspecFile>
+    <NuspecFile>SharpProof.Verifier.nuspec</NuspecFile>
     <NuspecBasePath>$(MSBuildProjectDirectory)</NuspecBasePath>
     <NoWarn>$(NoWarn);NU5128</NoWarn>
   </PropertyGroup>
   <PropertyGroup>
-    <PackageId>SharpProof.Verifier.Win-x64</PackageId>
-    <Title>SharpProof Verifier for Windows x64</Title>
-    <Description>Windows x64 postcondition verifier for SharpProof, including the worker, launcher, MSBuild integration, and one native Z3 payload.</Description>
-    <PackageReleaseNotes>Initial split Windows x64 verifier package for the soundness-first SharpProof preview.</PackageReleaseNotes>
+    <PackageId>SharpProof.Verifier</PackageId>
+    <Title>SharpProof Verifier</Title>
+    <Description>Container-only Linux amd64 postcondition verifier for SharpProof, including the worker, launcher, MSBuild integration, and the pinned native Z3 payload.</Description>
+    <PackageReleaseNotes>Initial container-first Linux amd64 verifier package for the soundness-first SharpProof preview.</PackageReleaseNotes>
     <Copyright>Copyright (c) Alex Yorke</Copyright>
-    <PackageTags>SharpProof;Verifier;Contracts;SMT;Z3;Windows;x64</PackageTags>
+    <PackageTags>SharpProof;Verifier;Contracts;SMT;Z3;Linux;Container;x64</PackageTags>
     <NoPackageAnalysis>true</NoPackageAnalysis>
   </PropertyGroup>
   <ItemGroup>
@@ -38,11 +38,19 @@
                       SkipGetTargetFrameworkProperties="true"
                       PrivateAssets="all"
                       TreatAsPackageReference="false" />
+    <ProjectReference Include="..\SharpProof.Host\SharpProof.Host.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      PrivateAssets="all"
+                      TreatAsPackageReference="false" />
   </ItemGroup>
   <Target Name="_SharpProofPrepareNuspecProperties"
           BeforeTargets="GenerateNuspec">
+    <Error Condition="'$(SHARPPROOF_CONTAINER)' != '1'"
+           Text="SharpProof.Verifier packages must be built inside the canonical Linux amd64 container." />
     <PropertyGroup>
-      <NuspecProperties>version=$(SharpProofPackageVersion);configuration=$(Configuration);repositorycommit=$(RepositoryCommit)</NuspecProperties>
+      <_SharpProofNativePayloadRoot Condition="'$(_SharpProofNativePayloadRoot)' == ''">$(SHARPPROOF_NATIVE_ROOT)</_SharpProofNativePayloadRoot>
+      <NuspecProperties>version=$(SharpProofPackageVersion);configuration=$(Configuration);repositorycommit=$(RepositoryCommit);nativeroot=$(_SharpProofNativePayloadRoot)</NuspecProperties>
     </PropertyGroup>
   </Target>
 </Project>

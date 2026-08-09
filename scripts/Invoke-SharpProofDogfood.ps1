@@ -5,10 +5,6 @@ param(
     [string]$Configuration = 'Debug',
 
     [Parameter()]
-    [ValidateRange(0, 1048576)]
-    [int]$MemoryLimitMb = 0,
-
-    [Parameter()]
     [ValidateRange(1, 86400)]
     [int]$TimeoutSeconds = 300,
 
@@ -38,7 +34,6 @@ Push-Location $repositoryRoot
 try
 {
     & $dotnetWrapper `
-        -MemoryLimitMb $MemoryLimitMb `
         -TimeoutSeconds $TimeoutSeconds `
         build $analyzerProject `
         --configuration $Configuration
@@ -52,7 +47,6 @@ try
         $projectPath = (Resolve-Path (Join-Path $repositoryRoot $relativeProject)).Path
         Write-Host "Dogfooding $relativeProject"
         & $dotnetWrapper `
-            -MemoryLimitMb $MemoryLimitMb `
             -TimeoutSeconds $TimeoutSeconds `
             build $projectPath `
             --configuration $Configuration `

@@ -693,9 +693,9 @@ public sealed class ApiSpecTests
             .Where(static constructor =>
                 constructor.Parameters.Length == 0 ||
                 constructor.Parameters is [
-                    {
-                        Type.SpecialType: SpecialType.System_String
-                    }])
+                {
+                    Type.SpecialType: SpecialType.System_String
+                }])
             .ToArray();
         var aggregateEnumerable = aggregate.InstanceConstructors.Single(
             static constructor =>
@@ -1127,8 +1127,23 @@ public sealed class ApiSpecTests
             dotnetRoot.FullName,
             "packs",
             "Microsoft.NETCore.App.Ref");
-        var candidates = Directory
-            .EnumerateDirectories(packRoot)
+        var packageRoot = Environment.GetEnvironmentVariable(
+            "NUGET_PACKAGES");
+        if (string.IsNullOrWhiteSpace(packageRoot))
+        {
+            packageRoot = Path.Combine(
+                Environment.GetFolderPath(
+                    Environment.SpecialFolder.UserProfile),
+                ".nuget",
+                "packages");
+        }
+        var candidates = new[]
+            {
+                packRoot,
+                Path.Combine(packageRoot, "microsoft.netcore.app.ref")
+            }
+            .Where(Directory.Exists)
+            .SelectMany(Directory.EnumerateDirectories)
             .Select(path => new
             {
                 Path = path,

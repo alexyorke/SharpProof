@@ -4,7 +4,7 @@ VisualStudioVersion = 17.11.35312.102
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Package", "SharpProof.Package\SharpProof.Package.csproj", "{5202DFF7-F5F6-44E6-8215-C819A84D1160}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Verifier.Win-x64", "SharpProof.Verifier.Win-x64\SharpProof.Verifier.Win-x64.csproj", "{6997D2DE-9A77-4BF4-9E3C-BC8346D3FFC5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Verifier", "SharpProof.Verifier\SharpProof.Verifier.csproj", "{6997D2DE-9A77-4BF4-9E3C-BC8346D3FFC5}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.BuildTasks", "SharpProof.BuildTasks\SharpProof.BuildTasks.csproj", "{E9D8F74B-2E6A-42B6-9A60-7B7642C1DB42}"
 EndProject
@@ -95,6 +95,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Gates.Test", "SharpProof.Gates.Test\SharpProof.Gates.Test.csproj", "{59644792-68BF-4416-9B73-681E95074515}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.CompilerProbe.TestAsset", "SharpProof.CompilerProbe.TestAsset\SharpProof.CompilerProbe.TestAsset.csproj", "{278ABED7-47E5-44AA-9D9C-4494A7AC8D62}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Host", "SharpProof.Host\SharpProof.Host.csproj", "{9E9EC2DB-4AAD-42A7-BA8C-CB65397BABEB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -290,6 +292,10 @@ Global
 		{278ABED7-47E5-44AA-9D9C-4494A7AC8D62}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{278ABED7-47E5-44AA-9D9C-4494A7AC8D62}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{278ABED7-47E5-44AA-9D9C-4494A7AC8D62}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9E9EC2DB-4AAD-42A7-BA8C-CB65397BABEB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9E9EC2DB-4AAD-42A7-BA8C-CB65397BABEB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9E9EC2DB-4AAD-42A7-BA8C-CB65397BABEB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9E9EC2DB-4AAD-42A7-BA8C-CB65397BABEB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

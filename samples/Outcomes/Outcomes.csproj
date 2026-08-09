@@ -4,7 +4,7 @@
     <SharpProofFeatures>contracts</SharpProofFeatures>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="SharpProof.Verifier.Win-x64"
+    <PackageReference Include="SharpProof.Verifier"
                       Version="$(SharpProofSamplePackageVersion)"
                       PrivateAssets="all" />
   </ItemGroup>

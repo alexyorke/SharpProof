@@ -11,10 +11,10 @@ internal static class LauncherRuntimeCompanionInventory
 {
     internal static string[] FileNames { get; } = [
         "SharpProof.CompilerArtifact.dll",
+        "SharpProof.Host.dll",
         "SharpProof.Ir.dll",
         "SharpProof.Specs.dll",
         "SharpProof.Worker.Protocol.dll",
-        "SharpProof.Worker.Launcher.exe",
         "System.IO.Pipelines.dll",
         "System.Text.Encodings.Web.dll",
         "System.Text.Json.dll",

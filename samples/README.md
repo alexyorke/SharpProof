@@ -15,17 +15,17 @@ project reference into the repository.
 | `Diagnostics` | SP0027, SP0045, and SP0047 without failing the build | Expected warnings are present |
 | `MalformedContract` | A late contract clause | Build fails with SP0024 |
 
-Run the complete matrix from the repository root:
+Run the complete matrix from the repository root in the canonical container:
 
-```powershell
-./scripts/Test-SharpProofSamples.ps1
+```text
+docker compose run --rm tooling dev -lc \
+  'pwsh -NoLogo -NoProfile -File ./scripts/Test-SharpProofSamples.ps1'
 ```
 
 The runner packs the current product when no feed is supplied, restores every
 sample from that isolated feed, redirects all `obj`, `bin`, and package-cache
 state to a temporary directory, and asserts exit codes, diagnostics, and worker
-records. On unsupported hosts it instead asserts the explicit Windows x64
-verifier rejection.
+records. Portable-only host jobs do not execute this verifier matrix.
 
 To test release-candidate bytes without repacking:
 
@@ -34,6 +34,5 @@ To test release-candidate bytes without repacking:
 ```
 
 Applications normally reference `SharpProof.Attributes` and keep `SharpProof`
-private. A strict Windows x64 CI job also references
-`SharpProof.Verifier.Win-x64` privately. The `Library` project shows that
-package shape directly.
+private. A strict container CI job also references `SharpProof.Verifier`
+privately. The `Library` project shows that package shape directly.

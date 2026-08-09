@@ -94,6 +94,7 @@ public sealed class PackageLayoutSmokeTests
         "tools/net9/SharpProof.BuildTasks.dll",
         "tools/net9/SharpProof.CompilerArtifact.dll",
         "tools/net9/SharpProof.Dataflow.dll",
+        "tools/net9/SharpProof.Host.dll",
         "tools/net9/SharpProof.Ir.dll",
         "tools/net9/SharpProof.Smt.dll",
         "tools/net9/SharpProof.Specs.dll",
@@ -108,13 +109,11 @@ public sealed class PackageLayoutSmokeTests
         "tools/net9/System.Collections.Immutable.dll",
         "tools/net9/System.IO.Pipelines.dll",
         "tools/net9/System.Text.Encodings.Web.dll",
-        "tools/net9/System.Text.Json.dll",
-        "tools/net9/runtimes/win/lib/net9.0/System.Text.Encodings.Web.dll",
-        "tools/net9/runtimes/win-x64/native/libz3.dll"
+        "tools/net9/System.Text.Json.dll"
     ];
 
     private static readonly string[] ExpectedNativeZ3Entries = [
-        "tools/net9/runtimes/win-x64/native/libz3.dll"
+        "runtimes/linux-x64/native/libz3.so"
     ];
     private static readonly string[] ExpectedDependencyAttributes = [
         "id",
@@ -548,7 +547,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             explicitVerification.Output,
             Does.Contain(
-                "requires the matching SharpProof.Verifier.Win-x64 package"));
+                "requires the matching SharpProof.Verifier package"));
 
         var strict = await RunDotNetAsync(
             workspace.ConsumerDirectory,
@@ -565,7 +564,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             strict.Output,
             Does.Contain(
-                "requires the matching SharpProof.Verifier.Win-x64 package"));
+                "requires the matching SharpProof.Verifier package"));
     }
 
     [Test]
@@ -633,7 +632,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             unsupported.Output,
             Does.Contain(
-                "SharpProof out-of-process verification is supported only on Windows x64"));
+                "supported only by Core MSBuild inside the canonical Linux amd64 container"));
     }
 
     [Test]
@@ -680,13 +679,6 @@ public sealed class PackageLayoutSmokeTests
     public async Task PortablePackageBuildsFrameworkConsumerFromIsolatedFeed(
         string targetFramework)
     {
-        if (targetFramework == "net472" && !OperatingSystem.IsWindows())
-        {
-            Assert.Ignore(
-                "The net472 package consumer is build-only and requires " +
-                "the Windows .NET Framework targeting pack.");
-        }
-
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
         workspace.WriteFrameworkConsumer(feed.Version, targetFramework);
@@ -694,7 +686,9 @@ public sealed class PackageLayoutSmokeTests
             workspace,
             feed,
             includeNetStandardFrameworkPackages:
-                targetFramework == "netstandard2.0");
+                targetFramework == "netstandard2.0",
+            includeNet472ReferenceAssemblies:
+                targetFramework == "net472");
         Assert.That(restore.ExitCode, Is.Zero, restore.Output);
 
         var enabledItems = await RunDotNetAsync(
@@ -765,36 +759,20 @@ public sealed class PackageLayoutSmokeTests
             "/nodeReuse:false",
             "-p:UseSharedCompilation=false",
             "-p:SharpProofVerify=true");
-        if (OperatingSystem.IsWindows() &&
-            RuntimeInformation.ProcessArchitecture == Architecture.X64 &&
-            RuntimeInformation.OSArchitecture == Architecture.X64)
-        {
-            Assert.That(
-                verification.ExitCode,
-                Is.Zero,
-                verification.Output);
-            Assert.That(
-                verification.Output,
-                Does.Contain("SharpProof Proven"));
-            Assert.That(File.Exists(workspace.ResultPath), Is.True);
-        }
-        else
-        {
-            Assert.That(
-                verification.ExitCode,
-                Is.Not.Zero,
-                verification.Output);
-            Assert.That(
-                verification.Output,
-                Does.Contain(
-                    "supported only on Windows x64"));
-        }
+        Assert.That(
+            verification.ExitCode,
+            Is.Zero,
+            verification.Output);
+        Assert.That(
+            verification.Output,
+            Does.Contain("SharpProof Proven"));
+        Assert.That(File.Exists(workspace.ResultPath), Is.True);
     }
 
     [Test]
     public async Task PackagedVerifierReplaysObjectAndArrayAllocationEffects()
     {
-        RequireWindowsX64Worker();
+        RequireContainerWorker();
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
         workspace.WriteEffectReplayVerifierConsumer(feed.Version);
@@ -942,7 +920,7 @@ public sealed class PackageLayoutSmokeTests
     [Test]
     public async Task PackagedVerifierPreservesLinkedAndMappedLocationsInSarif()
     {
-        RequireWindowsX64Worker();
+        RequireContainerWorker();
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
         workspace.WriteLinkedMappedVerifierConsumer(feed.Version);
@@ -1063,7 +1041,8 @@ public sealed class PackageLayoutSmokeTests
             verification.Output);
         Assert.That(
             verification.Output,
-            Does.Contain("supported only on Windows x64"));
+            Does.Contain(
+                "supported only by Core MSBuild inside the canonical Linux amd64 container"));
     }
 
     [Test]
@@ -1277,11 +1256,14 @@ public sealed class PackageLayoutSmokeTests
     private static Task<ProcessResult> RestoreConsumerAsync(
         PackageWorkspace workspace,
         PackagedProductFeed feed,
-        bool includeNetStandardFrameworkPackages = false)
+        bool includeNetStandardFrameworkPackages = false,
+        bool includeNet472ReferenceAssemblies = false)
     {
-        var offlineFrameworkSource =
-            includeNetStandardFrameworkPackages
-                ? workspace.PrepareNetStandardFrameworkSource()
+        var offlineFrameworkSource = includeNetStandardFrameworkPackages ||
+            includeNet472ReferenceAssemblies
+                ? workspace.PrepareFrameworkSource(
+                    includeNetStandardFrameworkPackages,
+                    includeNet472ReferenceAssemblies)
                 : null;
         var nugetConfig = IsolatedPackageFeedConfiguration.Write(
             workspace.ConsumerDirectory,
@@ -1302,14 +1284,18 @@ public sealed class PackageLayoutSmokeTests
             [.. arguments]);
     }
 
-    private static void RequireWindowsX64Worker()
+    private static void RequireContainerWorker()
     {
-        if (!OperatingSystem.IsWindows() ||
+        if (!OperatingSystem.IsLinux() ||
             RuntimeInformation.ProcessArchitecture != Architecture.X64 ||
-            RuntimeInformation.OSArchitecture != Architecture.X64)
+            RuntimeInformation.OSArchitecture != Architecture.X64 ||
+            !string.Equals(
+                Environment.GetEnvironmentVariable("SHARPPROOF_CONTAINER"),
+                "1",
+                StringComparison.Ordinal))
         {
             Assert.Ignore(
-                "The packaged worker is supported only on Windows x64.");
+                "The packaged worker is supported only in the canonical Linux amd64 container.");
         }
     }
 
@@ -1722,15 +1708,16 @@ public sealed class PackageLayoutSmokeTests
             [
                 "_rels/.rels",
                 "[Content_Types].xml",
-                "buildTransitive/SharpProof.Verifier.Win-x64.props",
-                "buildTransitive/SharpProof.Verifier.Win-x64.targets",
+                "buildTransitive/SharpProof.Verifier.props",
+                "buildTransitive/SharpProof.Verifier.targets",
                 "LICENSE",
                 "package/services/metadata/core-properties/" +
                     "<generated>.psmdcp",
                 "README.md",
-                "SharpProof.Verifier.Win-x64.nuspec",
+                "SharpProof.Verifier.nuspec",
                 "THIRD-PARTY-NOTICES.txt",
-                .. ExpectedToolEntries
+                .. ExpectedToolEntries,
+                .. ExpectedNativeZ3Entries
             ]);
         VerifyVerifierLayout(verifier.Path);
 
@@ -2064,6 +2051,45 @@ public sealed class PackageLayoutSmokeTests
             entries.Where(static entry =>
                 IsNativeZ3(entry)),
             Is.EquivalentTo(ExpectedNativeZ3Entries));
+        VerifyPinnedZ3Payload(archive);
+    }
+
+    private static void VerifyPinnedZ3Payload(ZipArchive archive)
+    {
+        using var catalog = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(
+                FindRepositoryRoot(),
+                "eng",
+                "container",
+                "toolchain.json")));
+        var z3 = catalog.RootElement.GetProperty("z3");
+        VerifyPackagePayload(
+            archive,
+            "runtimes/linux-x64/native/libz3.so",
+            z3.GetProperty("libraryBytes").GetInt64(),
+            z3.GetProperty("librarySha256").GetString()!);
+        VerifyPackagePayload(
+            archive,
+            "tools/net9/Microsoft.Z3.dll",
+            z3.GetProperty("managedAssemblyBytes").GetInt64(),
+            z3.GetProperty("managedAssemblySha256").GetString()!);
+    }
+
+    private static void VerifyPackagePayload(
+        ZipArchive archive,
+        string path,
+        long expectedBytes,
+        string expectedSha256)
+    {
+        var entry = archive.GetEntry(path) ??
+            throw new InvalidOperationException(
+                "Package entry was not found: " + path);
+        Assert.That(entry.Length, Is.EqualTo(expectedBytes), path);
+        using var stream = entry.Open();
+        Assert.That(
+            Convert.ToHexString(SHA256.HashData(stream)),
+            Is.EqualTo(expectedSha256.ToUpperInvariant()),
+            path);
     }
 
     private static string ReadArchiveText(
@@ -2415,20 +2441,36 @@ public sealed class PackageLayoutSmokeTests
                 "SP0016");
         }
 
-        internal string PrepareNetStandardFrameworkSource()
+        internal string PrepareFrameworkSource(
+            bool includeNetStandard,
+            bool includeNet472)
         {
             var frameworkSource = Path.Combine(
                 _root,
                 "framework package source");
             Directory.CreateDirectory(frameworkSource);
-            CopyGlobalPackageToSource(
-                frameworkSource,
-                "netstandard.library",
-                "2.0.3");
-            CopyGlobalPackageToSource(
-                frameworkSource,
-                "microsoft.netcore.platforms",
-                "1.1.0");
+            if (includeNetStandard)
+            {
+                CopyGlobalPackageToSource(
+                    frameworkSource,
+                    "netstandard.library",
+                    "2.0.3");
+                CopyGlobalPackageToSource(
+                    frameworkSource,
+                    "microsoft.netcore.platforms",
+                    "1.1.0");
+            }
+            if (includeNet472)
+            {
+                CopyGlobalPackageToSource(
+                    frameworkSource,
+                    "microsoft.netframework.referenceassemblies",
+                    "1.0.3");
+                CopyGlobalPackageToSource(
+                    frameworkSource,
+                    "microsoft.netframework.referenceassemblies.net472",
+                    "1.0.3");
+            }
             if (Directory.EnumerateFiles(
                     frameworkSource,
                     "SharpProof*.nupkg").Any())
@@ -2490,6 +2532,13 @@ public sealed class PackageLayoutSmokeTests
             var escapedVersion = SecurityElement.Escape(version);
             var escapedFramework =
                 SecurityElement.Escape(targetFramework);
+            var referenceAssemblies = targetFramework == "net472"
+                ? """
+                    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472"
+                                      Version="1.0.3"
+                                      PrivateAssets="all" />
+                  """
+                : string.Empty;
             File.WriteAllText(
                 ConsumerProject,
                 $"""
@@ -2506,6 +2555,7 @@ public sealed class PackageLayoutSmokeTests
                   <ItemGroup>
                     <PackageReference Include="SharpProof"
                                       Version="{escapedVersion}" />
+                    {referenceAssemblies}
                   </ItemGroup>
                 </Project>
                 """,
@@ -2577,7 +2627,7 @@ public sealed class PackageLayoutSmokeTests
                   <ItemGroup>
                     <Compile Include="{escapedSource}"
                              Link="Linked/Subject.cs" />
-                    <PackageReference Include="SharpProof.Verifier.Win-x64"
+                    <PackageReference Include="SharpProof.Verifier"
                                       Version="{escapedVersion}" />
                   </ItemGroup>
                 </Project>
@@ -2763,8 +2813,8 @@ public sealed class PackageLayoutSmokeTests
                       "versionInfo": "0.2.0-preview.1"
                     },
                     {
-                      "SPDXID": "SPDXRef-SharpProof-Verifier-Win-x64",
-                      "name": "SharpProof.Verifier.Win-x64",
+                      "SPDXID": "SPDXRef-SharpProof-Verifier",
+                      "name": "SharpProof.Verifier",
                       "versionInfo": "0.2.0-preview.1"
                     }
                   ]

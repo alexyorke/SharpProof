@@ -600,7 +600,7 @@ internal static class CompilerLoweredArtifact
             summaries.ToImmutable());
     }
 
-    private static HashSet<IrVarId> CollectProgramVariables(
+    internal static HashSet<IrVarId> CollectProgramVariables(
         IrProgram program)
     {
         var variables = new HashSet<IrVarId>();

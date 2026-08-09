@@ -181,9 +181,6 @@ $budgetDefaults = @{
     MaxParallelism = 'WorkerBudgets.MaximumParallelism'
     MaximumExpressionDepth = `
         'WorkerBudgets.DefaultMaximumExpressionDepth'
-    ProcessMemoryLimitBytes = `
-        'WorkerBudgets.DefaultProcessMemoryLimitBytes'
-    MaxWorkerProcesses = 'WorkerBudgets.MaximumParallelism'
 }
 $budgetFallbacks = @{
     QueryRlimit = 'queryRlimit'
@@ -192,8 +189,6 @@ $budgetFallbacks = @{
     ProjectWallTimeMilliseconds = 'projectWallTimeMilliseconds'
     MaxParallelism = 'maximumParallelism'
     MaximumExpressionDepth = 'maximumExpressionDepth'
-    ProcessMemoryLimitBytes = 'processMemoryLimitBytes'
-    MaxWorkerProcesses = 'maximumParallelism'
 }
 $seenBudgets = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)

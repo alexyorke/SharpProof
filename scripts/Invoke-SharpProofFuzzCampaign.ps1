@@ -97,9 +97,7 @@ function Invoke-FuzzRun {
     ) -join ','
     $escapedWrapper = $wrapper.Replace("'", "''")
     $command = (
-        "& '$escapedWrapper' -MemoryLimitMb " +
-        [string]$contract.worker.maximumMemoryMiB +
-        ' -TimeoutSeconds ' +
+        "& '$escapedWrapper' -TimeoutSeconds " +
         [string]$contract.worker.maximumProjectWallSeconds +
         " @($quotedArguments); exit " + '$LASTEXITCODE')
     $encodedCommand = [Convert]::ToBase64String(

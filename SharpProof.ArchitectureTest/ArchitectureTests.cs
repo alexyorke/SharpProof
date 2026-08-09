@@ -39,6 +39,7 @@ public sealed class ArchitectureTests
         "SharpProof.Specs",
         "SharpProof.Dataflow",
         "SharpProof.Frontend",
+        "SharpProof.Host",
         "SharpProof.Contracts",
         "SharpProof.Effects",
         "SharpProof.Verify",
@@ -153,7 +154,8 @@ public sealed class ArchitectureTests
                 "SharpProof.Specs"
             ],
             ["SharpProof.Attributes"] = [],
-            ["SharpProof.BuildTasks"] = ["SharpProof.Worker.Protocol"],
+            ["SharpProof.BuildTasks"] = ["SharpProof.Host"],
+            ["SharpProof.Host"] = [],
             ["SharpProof.Ir"] = [],
             ["SharpProof.Meta.Analyzers"] = [],
             ["SharpProof.PortableAnalyzer"] = ["SharpProof.Attributes"],
@@ -195,6 +197,7 @@ public sealed class ArchitectureTests
             ["SharpProof.Worker"] = [
                 "SharpProof.CompilerArtifact",
                 "SharpProof.Dataflow",
+                "SharpProof.Host",
                 "SharpProof.Ir",
                 "SharpProof.Smt",
                 "SharpProof.Specs",
@@ -203,6 +206,7 @@ public sealed class ArchitectureTests
             ],
             ["SharpProof.Worker.Launcher"] = [
                 "SharpProof.CompilerArtifact",
+                "SharpProof.Host",
                 "SharpProof.Ir",
                 "SharpProof.Specs",
                 "SharpProof.Worker.Protocol"
@@ -339,6 +343,7 @@ public sealed class ArchitectureTests
             "SharpProof.Dataflow",
             "SharpProof.Effects",
             "SharpProof.Frontend",
+            "SharpProof.Host",
             "SharpProof.Ir",
             "SharpProof.Smt",
             "SharpProof.Summaries",
@@ -709,8 +714,8 @@ public sealed class ArchitectureTests
         [
             "SharpProof.Package/buildTransitive/SharpProof.props",
             "SharpProof.Package/buildTransitive/SharpProof.targets",
-            "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.props",
-            "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.targets"
+            "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props",
+            "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets"
         ];
         var buildFiles = buildFilePaths
             .Select(path => File.ReadAllText(Path.Combine(repository, path)))
@@ -865,18 +870,28 @@ public sealed class ArchitectureTests
     [Test]
     public void ReleasePackageWorkflowBindsTheExactRepositoryCommit()
     {
+        var root = RepositoryRoot();
         var workflow = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            root,
             ".github",
             "workflows",
             "package-consumers.yml"));
-        var bindings = Regex.Matches(
-                workflow,
-                @"/p:RepositoryCommit=\$env:GITHUB_SHA",
-                RegexOptions.CultureInvariant)
-            .Count;
+        var container = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
 
-        Assert.That(bindings, Is.EqualTo(3));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                container,
+                Does.Contain(
+                    "'/p:RepositoryCommit=' + (& git rev-parse HEAD).Trim()"));
+            Assert.That(
+                workflow,
+                Does.Contain("docker compose run --rm tooling pack"));
+            Assert.That(workflow, Does.Contain("fetch-depth: 0"));
+        }
     }
 
     [Test]
@@ -888,7 +903,7 @@ public sealed class ArchitectureTests
             "workflows",
             "package-consumers.yml"));
         var primeStart = workflow.IndexOf(
-            "      - name: Prime the framework-only package cache",
+            "      - name: Prime portable framework reference packages",
             StringComparison.Ordinal);
         var primeEnd = workflow.IndexOf(
             "      - name: Download exact NuGet artifacts",
@@ -901,31 +916,36 @@ public sealed class ArchitectureTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(primeStep, Does.Contain("if ($IsWindows)"));
+            Assert.That(primeStep, Does.Contain("dotnet restore"));
             Assert.That(
                 primeStep,
                 Does.Contain(
-                    "Invoke-SharpProofDotnet.ps1\" @restoreArguments"));
-            Assert.That(primeStep, Does.Contain("& dotnet @restoreArguments"));
+                    "SharpProof.Smoke.Net472/SharpProof.Smoke.Net472.csproj"));
             Assert.That(
                 primeStep,
-                Does.Contain(
-                    "Framework-only package cache restore failed"));
+                Does.Not.Contain("Invoke-SharpProofDotnet.ps1"));
         }
     }
 
     [Test]
-    public void WorkerProcessCreationDisablesHandleInheritance()
+    public void WorkerProcessBoundaryUsesADirectLinuxChildAndStdinRelease()
     {
-        var source = File.ReadAllText(Path.Combine(
+        var host = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "SharpProof.Host",
+            "LinuxWorkerProcess.cs"));
+        var launcher = File.ReadAllText(Path.Combine(
             RepositoryRoot(),
             "SharpProof.Worker.Launcher",
             "Program.cs"));
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(source, Does.Contain("inheritHandles: false"));
-            Assert.That(source, Does.Not.Contain("inheritHandles: true"));
+            Assert.That(host, Does.Contain("RedirectStandardInput = true"));
+            Assert.That(host, Does.Contain("--parent-pid"));
+            Assert.That(host, Does.Contain("EntryPoint = \"prctl\""));
+            Assert.That(launcher, Does.Contain("LinuxWorkerProcess.Start"));
+            Assert.That(launcher, Does.Not.Contain("kernel32"));
         }
     }
 
@@ -998,10 +1018,10 @@ public sealed class ArchitectureTests
             "workflows",
             "ci.yml"));
         var performanceIndex = fastWorkflow.IndexOf(
-            "Invoke-SharpProofGateEvidence.ps1",
+            "tooling performance",
             StringComparison.Ordinal);
         var broadTestsIndex = fastWorkflow.IndexOf(
-            "test SharpProof.Dev.Tests.slnf",
+            "SharpProof.Dev.Tests.slnf",
             StringComparison.Ordinal);
         using (Assert.EnterMultipleScope())
         {
@@ -1020,10 +1040,6 @@ public sealed class ArchitectureTests
             Assert.That(
                 fastWorkflow,
                 Does.Contain(
-                    "-OutputPath artifacts/ci/performance.json"));
-            Assert.That(
-                fastWorkflow,
-                Does.Contain(
                     "fast-pr-performance-${{ github.sha }}-" +
                     "${{ github.run_attempt }}"));
             Assert.That(performanceIndex, Is.GreaterThanOrEqualTo(0));
@@ -1031,6 +1047,14 @@ public sealed class ArchitectureTests
                 broadTestsIndex,
                 Is.GreaterThan(performanceIndex));
         }
+
+        var containerCommands = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+        Assert.That(
+            containerCommands,
+            Does.Contain("artifacts/ci/performance.json"));
 
         var acceptance = File.ReadAllText(Path.Combine(
             root,
@@ -1077,6 +1101,13 @@ public sealed class ArchitectureTests
         Assert.That(
             coverageCollector,
             Does.Contain("TestCategory=Coverage"));
+        var coverageContainerCommands = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+        Assert.That(
+            coverageContainerCommands,
+            Does.Contain("Invoke-SharpProofCoverage.ps1"));
         foreach (var workflow in new[] {
                      ".github/workflows/coverage.yml",
                      ".github/workflows/package-consumers.yml"
@@ -1087,7 +1118,7 @@ public sealed class ArchitectureTests
                 workflow.Replace('/', Path.DirectorySeparatorChar)));
             Assert.That(
                 contents,
-                Does.Contain("Invoke-SharpProofCoverage.ps1"),
+                Does.Contain("tooling coverage"),
                 workflow);
         }
     }

@@ -191,12 +191,6 @@ public sealed class WorkerBinaryIdentityTests
                 Is.Not.EqualTo(snapshot.WorkerPath));
         }
 
-        if (OperatingSystem.IsWindows())
-        {
-            Assert.That(
-                (Action)(() => File.Delete(snapshot.ExecutionWorkerPath)),
-                Throws.TypeOf<IOException>());
-        }
     }
 
     [Test]
@@ -274,7 +268,7 @@ public sealed class WorkerBinaryIdentityTests
             var nestedAppLocalAsset = Path.Combine(
                 temporaryDirectory,
                 "runtimes",
-                "win",
+                "linux",
                 "lib",
                 "net9.0",
                 "System.Collections.Immutable.dll");
@@ -292,9 +286,11 @@ public sealed class WorkerBinaryIdentityTests
             var nativeZ3 = Path.Combine(
                 temporaryDirectory,
                 "runtimes",
-                "win-x64",
+                "linux-x64",
                 "native",
-                "libz3.dll");
+                "libz3.so");
+            Directory.CreateDirectory(Path.GetDirectoryName(nativeZ3)!);
+            File.WriteAllText(nativeZ3, "not-the-container-owned-native-library");
             using (var oversized = new FileStream(
                        heldComponent,
                        FileMode.Create,
@@ -346,14 +342,14 @@ public sealed class WorkerBinaryIdentityTests
                             "OnlyBrowser.dll")));
                     Assert.That(
                         snapshot.ComponentPaths,
-                        Does.Contain(Path.Combine(
+                        Does.Not.Contain(Path.Combine(
                             temporaryDirectory,
-                            "runtimes", "win-x64", "native", "libz3.dll")));
+                            "runtimes", "linux-x64", "native", "libz3.so")));
                     Assert.That(
                         snapshot.ComponentPaths,
-                        Does.Contain(Path.Combine(
+                        Does.Not.Contain(Path.Combine(
                             temporaryDirectory,
-                            "runtimes", "win", "lib", "net9.0",
+                            "runtimes", "linux", "lib", "net9.0",
                             "System.Text.Encodings.Web.dll")));
 
                     foreach (var componentPath in snapshot.ComponentPaths)
@@ -418,9 +414,11 @@ public sealed class WorkerBinaryIdentityTests
                 Is.EqualTo(appLocalChanged));
 
             Assert.That(File.Exists(nativeZ3), Is.True);
+            var beforeNativeMutation =
+                WorkerBinaryIdentity.ComputeSha256(worker);
             File.AppendAllText(nativeZ3, "mutated");
             var nativeChanged = WorkerBinaryIdentity.ComputeSha256(worker);
-            Assert.That(nativeChanged, Is.Not.EqualTo(dependencyChanged));
+            Assert.That(nativeChanged, Is.EqualTo(beforeNativeMutation));
 
             File.Delete(
                 Path.Combine(temporaryDirectory, "SharpProof.Verify.dll"));
@@ -432,22 +430,6 @@ public sealed class WorkerBinaryIdentityTests
         {
             Directory.Delete(temporaryDirectory, recursive: true);
         }
-    }
-
-    [Test]
-    public void IdentityIgnoresWindowsPathSpelling()
-    {
-        if (!OperatingSystem.IsWindows())
-        {
-            Assert.Ignore("Windows path spelling is case-insensitive.");
-        }
-
-        var worker = typeof(SharpProofWorker).Assembly.Location;
-        var differentlyCased = worker.ToUpperInvariant();
-
-        Assert.That(
-            WorkerBinaryIdentity.ComputeSha256(differentlyCased),
-            Is.EqualTo(WorkerBinaryIdentity.ComputeSha256(worker)));
     }
 
     private static void ValidateLength(string key, long length)

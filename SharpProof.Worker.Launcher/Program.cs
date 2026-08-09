@@ -1,15 +1,13 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
 using SharpProof.Specs;
+using SharpProof.Host;
 using SharpProof.Worker.Protocol;
-
-[assembly: DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
 
 namespace SharpProof.Worker.Launcher;
 
@@ -181,7 +179,8 @@ internal static class Program
                 "SharpProof launcher timeout is invalid."),
             PlatformNotSupportedException => new(125, WorkerRunStatus.Failed, WorkerRunFailureReason.ContainmentFailure,
                 "containment.unsupported", exception.Message, exception.Message),
-            InvalidOperationException or System.ComponentModel.Win32Exception => new(
+            InvalidOperationException or IOException or
+                System.ComponentModel.Win32Exception => new(
                 125, WorkerRunStatus.Failed, WorkerRunFailureReason.ContainmentFailure,
                 "containment.unavailable", "Required worker containment could not be established.",
                 "SharpProof worker containment could not be established."),
@@ -202,32 +201,22 @@ internal static class Program
         LauncherArguments arguments, WorkerVerifyRequest request,
         string projectDirectory, string workerPath)
     {
-        var hardLimit = ComputeHardLimit(
-            request.Budgets.ProjectWallTimeMilliseconds, arguments.TerminationGraceMilliseconds);
-        using var job = WindowsJob.CreateRequired(
-            request.Budgets.ProcessMemoryLimitBytes, request.Budgets.MaxWorkerProcesses);
-        var startEventName = "Local\\SharpProof.Worker." + Guid.NewGuid().ToString("N");
-        using var startEvent = new EventWaitHandle(false, EventResetMode.ManualReset,
-            startEventName);
-        using var process = job.StartSuspended(
+        var hardLimit = TimeSpan.FromMilliseconds(ComputeHardLimit(
+            request.Budgets.ProjectWallTimeMilliseconds,
+            arguments.TerminationGraceMilliseconds));
+        var terminationGrace = TimeSpan.FromMilliseconds(
+            arguments.TerminationGraceMilliseconds);
+        using var process = LinuxWorkerProcess.Start(
             ResolveDotNetHostPath(projectDirectory),
             [workerPath, "verify", "--request", arguments.RequestPath,
-                "--result", arguments.ResultPath, "--start-event", startEventName],
+                "--result", arguments.ResultPath, "--start-stdin"],
             projectDirectory);
-        process.Resume();
-        startEvent.Set();
-        if (process.WaitForExit(hardLimit))
+        var completion = process.WaitForExit(
+            hardLimit,
+            terminationGrace);
+        if (completion.Kind == LinuxWorkerCompletionKind.Exited)
         {
-            return process.ExitCode;
-        }
-
-        job.Terminate(124);
-        if (!SpinWait.SpinUntil(
-                job.HasNoActiveProcesses,
-                arguments.TerminationGraceMilliseconds))
-        {
-            throw new InvalidOperationException(
-                "The SharpProof worker job did not terminate within its grace period.");
+            return completion.ExitCode;
         }
         return 124;
     }
@@ -249,13 +238,12 @@ internal static class Program
         {
             projectRoot += Path.DirectorySeparatorChar;
         }
-        var hostFileName = OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet";
         if (!Path.IsPathFullyQualified(candidate) |
-            !string.Equals(Path.GetFileName(hostPath), hostFileName,
-                StringComparison.OrdinalIgnoreCase) |
+            !string.Equals(Path.GetFileName(hostPath), "dotnet",
+                StringComparison.Ordinal) |
             !File.Exists(hostPath) |
             !Directory.Exists(Path.Combine(hostRoot, "host", "fxr")) |
-            hostPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase))
+            hostPath.StartsWith(projectRoot, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 "The current process is not hosted by a trusted absolute .NET installation.");
@@ -266,7 +254,7 @@ internal static class Program
 
     internal static string NormalizeAbsolutePath(string path)
     {
-        return WindowsPathIdentity.Canonicalize(path);
+        return LinuxPathIdentity.Canonicalize(path);
     }
 
     internal static int ComputeHardLimit(
@@ -427,7 +415,7 @@ internal static class Program
             return;
         }
 
-        using var publication = WindowsPathIdentity.AcquirePublicationSet(
+        using var publication = LinuxPathIdentity.AcquirePublicationSet(
             new[]
             {
                 arguments.PublishRequestPath,
@@ -616,29 +604,31 @@ internal sealed partial class LauncherArguments
         }.OfType<string>().ToArray();
         foreach (var publicationPath in publicationPaths)
         {
-            WindowsPathIdentity.RequireLocalPath(publicationPath);
+            LinuxPathIdentity.RequireLocalPath(publicationPath);
         }
         string?[] candidates = [..runtimeRoots,
             ..LauncherArguments.LauncherRuntimePaths,
             cacheDirectory, RequestPath, ResultPath, CompilerManifestPath,
             ..publicationPaths,
             ..publicationPaths.Select(
-                WindowsPathIdentity.PublicationMarkerPath)];
-        WorkerCachePath.ValidateNoReparsePoints(
-            candidates.OfType<string>());
-        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                LinuxPathIdentity.PublicationMarkerPath)];
+        foreach (var candidate in candidates.OfType<string>())
+        {
+            LinuxPathIdentity.Canonicalize(candidate);
+        }
+        var paths = new HashSet<string>(StringComparer.Ordinal);
         if (candidates.OfType<string>().Any(path => !paths.Add(path)) ||
             runtimeSnapshot?.ComponentPaths.Any(path =>
-                !runtimeRoots.Contains(path, StringComparer.OrdinalIgnoreCase) &&
+                !runtimeRoots.Contains(path, StringComparer.Ordinal) &&
                 !LauncherArguments.LauncherRuntimePaths.Contains(
-                    path, StringComparer.OrdinalIgnoreCase) &&
+                    path, StringComparer.Ordinal) &&
                 !paths.Add(path)) is true ||
             candidates
                 .Skip(runtimeRoots.Length +
                     LauncherArguments.LauncherRuntimePaths.Length)
                 .OfType<string>()
-                .Any(path => WorkerCachePath.IsSameOrDescendant(
-                    Path.GetFullPath(path),
+                .Any(path => LinuxPathIdentity.IsSameOrDescendant(
+                    path,
                     Path.GetDirectoryName(workerPath)!)))
         {
             throw new ArgumentException("SharpProof I/O paths must be distinct.");
@@ -647,6 +637,7 @@ internal sealed partial class LauncherArguments
 
     internal void ValidatePreflight()
     {
+        ContainerContract.ValidateRequired();
         var graceMilliseconds = TerminationGraceMilliseconds;
         ArgumentOutOfRangeException.ThrowIfLessThan(
             graceMilliseconds, 1, "termination-grace-ms");
@@ -703,315 +694,5 @@ internal sealed partial class LauncherArguments
     {
         return _values.TryGetValue(key, out var value)
         ? bool.Parse(value) : fallback ?? bool.Parse(Required(key));
-    }
-}
-
-internal sealed partial class WindowsJob : IDisposable
-{
-    private const NativeMethods.JobObjectLimitFlags RequiredLimitFlags = NativeMethods.JobObjectLimitFlags.KillOnJobClose |
-        NativeMethods.JobObjectLimitFlags.JobMemory | NativeMethods.JobObjectLimitFlags.ActiveProcess;
-    private IntPtr _handle;
-
-    private WindowsJob(IntPtr handle)
-    {
-        _handle = handle;
-    }
-
-    internal static WindowsJob CreateRequired(
-        long memoryLimitBytes, int activeProcessLimit)
-    {
-        if (!OperatingSystem.IsWindows() | RuntimeInformation.ProcessArchitecture != Architecture.X64 |
-            RuntimeInformation.OSArchitecture != Architecture.X64)
-        {
-            throw new PlatformNotSupportedException("The SharpProof verifier requires Windows x64.");
-        }
-
-        var handle = NativeMethods.CreateJobObject(IntPtr.Zero, null);
-        if (handle == IntPtr.Zero)
-        {
-            throw new InvalidOperationException("A SharpProof worker Job Object could not be created.");
-        }
-
-        var job = new WindowsJob(handle);
-        var information = new NativeMethods.JobObjectExtendedLimitInformation();
-        information.LimitFlags = RequiredLimitFlags;
-        information.ActiveProcessLimit = checked((uint)activeProcessLimit);
-        information.JobMemoryLimit = checked((nuint)memoryLimitBytes);
-        var size = checked((uint)Marshal.SizeOf<NativeMethods.JobObjectExtendedLimitInformation>());
-        if (NativeMethods.SetInformationJobObject(handle, 9, ref information, size))
-        {
-            return job;
-        }
-
-        job.Dispose();
-        throw new InvalidOperationException("The SharpProof worker Job Object could not be configured.");
-    }
-
-    internal unsafe SuspendedProcess StartSuspended(
-        string applicationPath, IReadOnlyList<string> arguments,
-        string workingDirectory)
-    {
-        var startupInfo = new NativeMethods.StartupInfo
-        {
-            Size = checked((uint)Marshal.SizeOf<NativeMethods.StartupInfo>())
-        };
-        var commandLine = new StringBuilder(QuoteCommandLineArgument(applicationPath));
-        foreach (var argument in arguments)
-        {
-            commandLine.Append(' ').Append(QuoteCommandLineArgument(argument));
-        }
-
-        var commandLineCharacters = (commandLine.ToString() + '\0').ToCharArray();
-        NativeMethods.ProcessInformation processInformation;
-        fixed (char* commandLinePointer = commandLineCharacters)
-        {
-            if (!NativeMethods.CreateProcess(
-                    applicationPath, commandLinePointer, IntPtr.Zero, IntPtr.Zero,
-                    inheritHandles: false,
-                    NativeMethods.CreateSuspended | NativeMethods.CreateNoWindow,
-                    IntPtr.Zero, workingDirectory,
-                    &startupInfo, &processInformation))
-            {
-                throw new System.ComponentModel.Win32Exception(
-                    Marshal.GetLastWin32Error(),
-                    "The SharpProof worker could not be created suspended.");
-            }
-        }
-
-        if (_handle == IntPtr.Zero ||
-            !NativeMethods.AssignProcessToJobObject(
-                _handle, processInformation.Process))
-        {
-            var error = Marshal.GetLastWin32Error();
-            NativeMethods.TerminateProcess(processInformation.Process, 125);
-            NativeMethods.CloseHandle(processInformation.Thread);
-            NativeMethods.CloseHandle(processInformation.Process);
-            throw new System.ComponentModel.Win32Exception(
-                error,
-                "The SharpProof worker could not be assigned to its Job Object.");
-        }
-
-        return new SuspendedProcess(
-            processInformation.Process, processInformation.Thread);
-    }
-
-    internal void Terminate(uint exitCode)
-    {
-        if (_handle == IntPtr.Zero |
-            !NativeMethods.TerminateJobObject(_handle, exitCode))
-        {
-            throw new System.ComponentModel.Win32Exception(
-                Marshal.GetLastWin32Error(),
-                "The SharpProof worker Job Object could not be terminated.");
-        }
-    }
-
-    internal bool HasNoActiveProcesses()
-    {
-        var information = new NativeMethods.JobObjectBasicAccountingInformation();
-        var size = checked((uint)Marshal.SizeOf<
-            NativeMethods.JobObjectBasicAccountingInformation>());
-        if (_handle == IntPtr.Zero |
-            !NativeMethods.QueryInformationJobObject(
-                _handle, 1, ref information, size, IntPtr.Zero))
-        {
-            throw new System.ComponentModel.Win32Exception(
-                Marshal.GetLastWin32Error(),
-                "The SharpProof worker Job Object state is unavailable.");
-        }
-
-        return information.ActiveProcesses == 0;
-    }
-
-    private static string QuoteCommandLineArgument(string argument)
-    {
-        return "\"" + argument.Replace("\"", "\\\"", StringComparison.Ordinal) + "\"";
-    }
-
-    internal static bool KillsProcessesOnDispose =>
-        (RequiredLimitFlags & NativeMethods.JobObjectLimitFlags.KillOnJobClose) != 0;
-
-    public void Dispose()
-    {
-        var handle = Interlocked.Exchange(ref _handle, IntPtr.Zero);
-        if (handle != IntPtr.Zero)
-        {
-            NativeMethods.CloseHandle(handle);
-        }
-    }
-
-    internal static partial class NativeMethods
-    {
-        internal const uint CreateSuspended = 0x00000004;
-        internal const uint CreateNoWindow = 0x08000000;
-        [Flags]
-        internal enum JobObjectLimitFlags : uint
-        {
-            ActiveProcess = 0x00000008, JobMemory = 0x00000200,
-            KillOnJobClose = 0x00002000
-        }
-
-        // JOB_OBJECT_EXTENDED_LIMIT_INFORMATION is 144 bytes on the required x64
-        // host. Only the three fields configured by the launcher need names.
-        [StructLayout(LayoutKind.Explicit, Size = 144)]
-        internal struct JobObjectExtendedLimitInformation
-        {
-            [FieldOffset(16)] internal JobObjectLimitFlags LimitFlags;
-            [FieldOffset(40)] internal uint ActiveProcessLimit;
-            [FieldOffset(120)] internal nuint JobMemoryLimit;
-        }
-
-        [StructLayout(LayoutKind.Explicit, Size = 48)]
-        internal struct JobObjectBasicAccountingInformation
-        {
-            [FieldOffset(40)] internal uint ActiveProcesses;
-        }
-
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-        internal struct StartupInfo
-        {
-            internal uint Size;
-            internal IntPtr Reserved;
-            internal IntPtr Desktop;
-            internal IntPtr Title;
-            internal uint X;
-            internal uint Y;
-            internal uint XSize;
-            internal uint YSize;
-            internal uint XCountChars;
-            internal uint YCountChars;
-            internal uint FillAttribute;
-            internal uint Flags;
-            internal ushort ShowWindow;
-            internal ushort ReservedBytes;
-            internal IntPtr ReservedPointer;
-            internal IntPtr StandardInput;
-            internal IntPtr StandardOutput;
-            internal IntPtr StandardError;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        internal struct ProcessInformation
-        {
-            internal IntPtr Process;
-            internal IntPtr Thread;
-            internal uint ProcessId;
-            internal uint ThreadId;
-        }
-
-        [LibraryImport("kernel32.dll", EntryPoint = "CreateJobObjectW",
-            SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
-        internal static partial IntPtr CreateJobObject(IntPtr jobAttributes, string? name);
-
-        [LibraryImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        internal static partial bool SetInformationJobObject(
-            IntPtr job, int informationClass,
-            ref JobObjectExtendedLimitInformation information, uint informationLength);
-
-        [LibraryImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        internal static partial bool QueryInformationJobObject(
-            IntPtr job, int informationClass,
-            ref JobObjectBasicAccountingInformation information,
-            uint informationLength, IntPtr returnLength);
-
-        [LibraryImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        internal static partial bool AssignProcessToJobObject(IntPtr job, IntPtr process);
-
-        [LibraryImport("kernel32.dll", EntryPoint = "CreateProcessW",
-            SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        internal static unsafe partial bool CreateProcess(
-            string applicationName, char* commandLine,
-            IntPtr processAttributes, IntPtr threadAttributes,
-            [MarshalAs(UnmanagedType.Bool)] bool inheritHandles,
-            uint creationFlags, IntPtr environment, string currentDirectory,
-            StartupInfo* startupInfo, ProcessInformation* processInformation);
-
-        [LibraryImport("kernel32.dll", SetLastError = true)]
-        internal static partial uint ResumeThread(IntPtr thread);
-
-        [LibraryImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        internal static partial bool TerminateProcess(IntPtr process, uint exitCode);
-
-        [LibraryImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        internal static partial bool TerminateJobObject(IntPtr job, uint exitCode);
-
-        [LibraryImport("kernel32.dll", SetLastError = true)]
-        internal static partial uint WaitForSingleObject(IntPtr handle, uint milliseconds);
-
-        [LibraryImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        internal static partial bool GetExitCodeProcess(IntPtr process, out uint exitCode);
-
-        [LibraryImport("kernel32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        internal static partial bool CloseHandle(IntPtr handle);
-    }
-}
-
-internal sealed class SuspendedProcess : IDisposable
-{
-    private IntPtr _process;
-    private IntPtr _thread;
-
-    internal SuspendedProcess(IntPtr process, IntPtr thread)
-    {
-        _process = process;
-        _thread = thread;
-    }
-
-    internal int ExitCode
-    {
-        get
-        {
-            if (_process == IntPtr.Zero |
-                !WindowsJob.NativeMethods.GetExitCodeProcess(
-                    _process, out var exitCode))
-            {
-                throw new System.ComponentModel.Win32Exception(
-                    Marshal.GetLastWin32Error(),
-                    "The SharpProof worker exit code is unavailable.");
-            }
-
-            return unchecked((int)exitCode);
-        }
-    }
-
-    internal void Resume()
-    {
-        if (_thread == IntPtr.Zero |
-            WindowsJob.NativeMethods.ResumeThread(_thread) == uint.MaxValue)
-        {
-            throw new System.ComponentModel.Win32Exception(
-                Marshal.GetLastWin32Error(),
-                "The SharpProof worker could not be resumed.");
-        }
-    }
-
-    internal bool WaitForExit(int milliseconds)
-    {
-        var result = WindowsJob.NativeMethods.WaitForSingleObject(
-            _process, checked((uint)milliseconds));
-        return result switch
-        {
-            0 => true,
-            258 => false,
-            _ => throw new System.ComponentModel.Win32Exception(
-                Marshal.GetLastWin32Error(),
-                "Waiting for the SharpProof worker failed.")
-        };
-    }
-
-    public void Dispose()
-    {
-        var thread = Interlocked.Exchange(ref _thread, IntPtr.Zero);
-        var process = Interlocked.Exchange(ref _process, IntPtr.Zero);
-        WindowsJob.NativeMethods.CloseHandle(thread);
-        WindowsJob.NativeMethods.CloseHandle(process);
     }
 }

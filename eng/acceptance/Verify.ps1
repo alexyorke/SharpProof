@@ -17,6 +17,7 @@ $contractPath = Join-Path $acceptanceRoot 'contract.json'
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 . (Join-Path $repositoryRoot 'scripts\Get-SharpProofTcbPaths.ps1')
 . (Join-Path $repositoryRoot 'scripts\CSharpSourceMetrics.ps1')
+& (Join-Path $repositoryRoot 'scripts\Test-SharpProofContainerContract.ps1')
     & (Join-Path $repositoryRoot 'scripts\Generate-DiagnosticDescriptors.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-CSharpScalarSemantics.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-ContractApiCatalog.ps1') -Verify
@@ -59,11 +60,11 @@ $portableTargetsPath = Join-Path `
 [xml]$portableTargets = Get-Content -LiteralPath $portableTargetsPath -Raw
 $verifierPropsPath = Join-Path `
     $repositoryRoot `
-    'SharpProof.Verifier.Win-x64\buildTransitive\SharpProof.Verifier.Win-x64.props'
+    'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.props'
 [xml]$verifierProps = Get-Content -LiteralPath $verifierPropsPath -Raw
 $verifierTargetsPath = Join-Path `
     $repositoryRoot `
-    'SharpProof.Verifier.Win-x64\buildTransitive\SharpProof.Verifier.Win-x64.targets'
+    'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.targets'
 [xml]$verifierTargets = Get-Content -LiteralPath $verifierTargetsPath -Raw
 $packageManifestPath = Join-Path $repositoryRoot 'scripts\package-projects.json'
 $packageManifest = Get-Content -LiteralPath $packageManifestPath -Raw |
@@ -141,7 +142,6 @@ function Invoke-SharpProofDotnet {
     )
 
     & $wrapperPath `
-        -MemoryLimitMb ([int]$contract.worker.maximumMemoryMiB) `
         -TimeoutSeconds $TimeoutSeconds `
         @Arguments
     if ($LASTEXITCODE -ne 0) {
@@ -266,22 +266,19 @@ Assert-Equal `
     $contract.analyzer.defaultAssumptionPolicy `
     'SharpProofAssumptionPolicy'
 Assert-Equal ($contract.supportedTargetFrameworks -join ',') 'netstandard2.0,net8.0,net472' 'supportedTargetFrameworks'
-Assert-Equal $contract.worker.protocolVersion 10 'worker.protocolVersion'
+Assert-Equal $contract.worker.protocolVersion 11 'worker.protocolVersion'
 Assert-Equal $contract.worker.manifestSchemaVersion 4 'worker.manifestSchemaVersion'
 Assert-Equal $contract.worker.compilerArtifactSchemaVersion 11 'worker.compilerArtifactSchemaVersion'
 Assert-Equal $contract.worker.relationalSummarySchemaVersion 1 'worker.relationalSummarySchemaVersion'
 Assert-Equal $contract.worker.specificationPackSchemaVersion 1 'worker.specificationPackSchemaVersion'
 Assert-Equal $contract.worker.maximumParallelism 4 'worker.maximumParallelism'
-Assert-Equal $contract.worker.maximumWorkerProcesses 4 'worker.maximumWorkerProcesses'
 Assert-Equal $contract.worker.maximumExpressionDepth 64 'worker.maximumExpressionDepth'
-Assert-Equal $contract.worker.maximumMemoryMiB 2048 'worker.maximumMemoryMiB'
 Assert-Equal $contract.worker.queryRlimit 3000000 'worker.queryRlimit'
 Assert-Equal $contract.worker.methodRlimit 20000000 'worker.methodRlimit'
 Assert-Equal $contract.worker.maximumMethodWallSeconds 10 'worker.maximumMethodWallSeconds'
 Assert-Equal $contract.worker.maximumProjectWallSeconds 300 'worker.maximumProjectWallSeconds'
 Assert-Equal $contract.worker.forcedTerminationMilliseconds 1000 'worker.forcedTerminationMilliseconds'
-Assert-Equal $contract.worker.maximumProjectDirectoryCharacters 239 'worker.maximumProjectDirectoryCharacters'
-Assert-Equal $contract.cache.schemaVersion 12 'cache.schemaVersion'
+Assert-Equal $contract.cache.schemaVersion 13 'cache.schemaVersion'
 Assert-Equal $contract.cache.enabledByDefault $true 'cache.enabledByDefault'
 Assert-Equal $contract.cache.maximumMiB 512 'cache.maximumMiB'
 Assert-Equal ($contract.cache.cacheableOutcomes -join ',') 'Refuted' 'cache.cacheableOutcomes'
@@ -329,7 +326,7 @@ Assert-Equal `
 $expectedPackageProjects = @(
     'SharpProof.Attributes/SharpProof.Attributes.csproj',
     'SharpProof.Package/SharpProof.Package.csproj',
-    'SharpProof.Verifier.Win-x64/SharpProof.Verifier.Win-x64.csproj'
+    'SharpProof.Verifier/SharpProof.Verifier.csproj'
 )
 Assert-Equal `
     (@($packageManifest.projects) -join '|') `
@@ -362,17 +359,9 @@ Assert-Equal `
     ([string]$contract.worker.maximumParallelism) `
     'SharpProofVerifyMaxParallelism'
 Assert-Equal `
-    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyMaxWorkerProcesses' 'verifier package') `
-    ([string]$contract.worker.maximumWorkerProcesses) `
-    'SharpProofVerifyMaxWorkerProcesses'
-Assert-Equal `
     (Get-MsBuildProperty $verifierProps 'SharpProofVerifyMaximumExpressionDepth' 'verifier package') `
     ([string]$contract.worker.maximumExpressionDepth) `
     'SharpProofVerifyMaximumExpressionDepth'
-Assert-Equal `
-    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyProcessMemoryLimitBytes' 'verifier package') `
-    ([string]([int64]$contract.worker.maximumMemoryMiB * 1024 * 1024)) `
-    'SharpProofVerifyProcessMemoryLimitBytes'
 Assert-Equal `
     (Get-MsBuildProperty $verifierProps 'SharpProofVerifyTerminationGraceMilliseconds' 'verifier package') `
     ([string]$contract.worker.forcedTerminationMilliseconds) `
@@ -385,11 +374,6 @@ Assert-Equal `
     (Get-MsBuildProperty $verifierProps 'SharpProofVerifyCacheEnabled' 'verifier package') `
     ([string]$contract.cache.enabledByDefault).ToLowerInvariant() `
     'SharpProofVerifyCacheEnabled'
-Assert-Equal `
-    (Get-MsBuildProperty $verifierProps '_SharpProofMaximumProjectDirectoryLength' 'verifier package') `
-    ([string]$contract.worker.maximumProjectDirectoryCharacters) `
-    '_SharpProofMaximumProjectDirectoryLength'
-
 Push-Location $repositoryRoot
 try {
     $kernelPaths = @($contract.trustedKernel.paths)

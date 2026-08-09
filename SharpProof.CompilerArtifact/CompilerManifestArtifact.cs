@@ -31,9 +31,7 @@ internal static class CompilerArtifactInputHash
             "budget.method_wall_ms", request.Budgets.MethodWallTimeMilliseconds,
             "budget.project_wall_ms", request.Budgets.ProjectWallTimeMilliseconds,
             "budget.max_parallelism", request.Budgets.MaxParallelism,
-            "budget.expression_depth", request.Budgets.MaximumExpressionDepth,
-            "budget.process_memory", request.Budgets.ProcessMemoryLimitBytes,
-            "budget.max_worker_processes", request.Budgets.MaxWorkerProcesses);
+            "budget.expression_depth", request.Budgets.MaximumExpressionDepth);
         return hash.Add("compiler_manifest").Add(artifactBytes).Finish();
     }
 }
@@ -58,10 +56,6 @@ internal static class WorkerBinaryIdentity
         try
         {
             Directory.CreateDirectory(stagingDirectory);
-            WorkerCachePath.ValidateNoReparsePoints([
-                stagingDirectory,
-                path,
-                ChangeExtension(path, ".deps.json")]);
             using var dependency = OpenRead(ChangeExtension(path, ".deps.json"));
             var components = RuntimeComponents(path, dependency);
             stagedHandles = new FileStream[components.Count];
@@ -210,7 +204,7 @@ internal static class WorkerBinaryIdentity
             dependencyStream,
             new JsonDocumentOptions { MaxDepth = 32 });
         var root = document.RootElement;
-        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        var names = new HashSet<string>(StringComparer.Ordinal)
         {
             GetFileName(workerPath),
             GetFileName(ChangeExtension(workerPath, ".deps.json")),
@@ -218,12 +212,10 @@ internal static class WorkerBinaryIdentity
         };
         foreach (Match match in Regex.Matches(
                      root.GetRawText(),
-                     @"(?:runtimes/(?:win-x64|win)/[^""\r\n]+\.dll|(?<![A-Za-z0-9_./-])(?!runtimes/)(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.dll)"))
+                     @"(?<![A-Za-z0-9_./-])(?!runtimes/)(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.dll"))
         {
             var name = match.Value;
-            names.Add(name.StartsWith(
-                "runtimes/",
-                StringComparison.OrdinalIgnoreCase) ? name : GetFileName(name));
+            names.Add(GetFileName(name));
         }
         var optionalFrameworkAssembly = GetFileName(
             typeof(ImmutableArray<>).Assembly.Location);
@@ -234,7 +226,7 @@ internal static class WorkerBinaryIdentity
 
         ValidateComponentCount(names.Count);
         var result = new SortedDictionary<string, string>(
-            StringComparer.OrdinalIgnoreCase);
+            StringComparer.Ordinal);
         foreach (var name in names)
         {
             if (name.IndexOf('\\') >= 0 ||
@@ -249,7 +241,6 @@ internal static class WorkerBinaryIdentity
                 Combine(directory, name.Replace('/', DirectorySeparatorChar)));
         }
 
-        WorkerCachePath.ValidateNoReparsePoints(result.Values);
         return result;
     }
 

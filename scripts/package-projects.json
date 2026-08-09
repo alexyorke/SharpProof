@@ -3,6 +3,6 @@
   "projects": [
     "SharpProof.Attributes/SharpProof.Attributes.csproj",
     "SharpProof.Package/SharpProof.Package.csproj",
-    "SharpProof.Verifier.Win-x64/SharpProof.Verifier.Win-x64.csproj"
+    "SharpProof.Verifier/SharpProof.Verifier.csproj"
   ]
 }

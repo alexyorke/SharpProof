@@ -33,7 +33,7 @@ tranche.
   over-budget new entry, protects the just-written path, and deletes only owned
   SHA-256-named entries.
 - [x] MSBuild verifier output projects SP0047/SP0048 launcher lines as real
-  warnings, preserving warning-as-error, binlog, and Visual Studio behavior.
+  warnings, preserving warning-as-error, binlog, and Core-MSBuild behavior.
 - [x] Missing backend proof-label mappings fail closed rather than fabricating
   a `hygienic` justification.
 - [x] By-value struct copies no longer appear as caller-owned writes.
@@ -77,14 +77,14 @@ tranche.
 
 ## Deferred supported/release work
 
-- [ ] Visual Studio qualification still needs an isolated local-feed,
-  PackageReference-only x64 build and verification matrix, including net472,
-  long/percent paths, cache/SARIF, concurrency, and VS-hosted cancellation.
-- [ ] Release qualification must prove consumption of the exact package-job
-  artifact and seal required VS host identity/zero required skips in evidence.
-- [ ] Launcher cancellation has a suspended-process orphan window between
-  process creation and job assignment; a deterministic startup seam or atomic
-  job-list startup attribute is required.
+- [x] The verifier support boundary moved to the canonical Linux amd64
+  container. Visual Studio/full-framework verifier execution and native
+  Windows execution are no longer preview qualification requirements.
+- [x] Release qualification downloads the exact package-job artifact and
+  revalidates it with a real proof in the pinned container.
+- [x] The Windows suspended-process/Job Object startup path was removed. The
+  Linux launcher owns one direct child with a bounded startup message,
+  termination deadline, and parent-death signal.
 - [ ] Companions emitted by another source generator are not visible to the
   ContractFor generator input compilation; a final-compilation design is
   broader than this audit.
@@ -125,3 +125,25 @@ tranche.
   verify, maintained-readme verify, mutation evidence, and TCB inventory.
 - Baseline full Debug elapsed time was 1564.9 seconds. Its only failure was the
   noisy performance ratio gate (advisory p95 1.219 versus ceiling 1.2).
+
+## Container-port validation evidence
+
+- The canonical `linux/amd64` tooling image rebuilt from the pinned SDK,
+  PowerShell, .NET 8 runtime, and Z3 inputs; container-contract, launcher
+  generation, maintained-document, and solution membership checks passed.
+- The final Debug aggregate passed every functional project: Worker 421 passed
+  with 1 expected platform skip, Package 159 passed with 1 unsupported-host
+  skip, and all analyzer, semantic, architecture, fuzz, and package-consumer
+  suites were green. Its only failure was the known performance p95 assertion
+  while that probe competed with the parallel solution run (1.279 versus 1.2).
+- Canonical serialized Release acceptance passed in 791.8 seconds, including
+  deterministic generators, the 243-path TCB inventory, locked restore/build,
+  Release tests, 1,000-case differential fuzzing, corpus checks, and
+  performance. The authoritative performance p95 was 1.051, the
+  order-balanced median was 1.004, and forced termination was 700.7 ms.
+- Canonical container coverage passed with 26,312/28,888 aggregate lines
+  (91.08%), all 21 production-project floors, `SharpProof.Host` at 81.76%, and
+  519/565 changed-TCB lines (91.86%) with zero non-coverable changed files.
+- Architecture reran 52/52 after reducing the solution edit to only the
+  verifier rename, Host project membership, and four Any-CPU configurations;
+  no Windows runtime primitive remains in verifier production paths.

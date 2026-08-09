@@ -23,7 +23,7 @@ $resolvedPackageSource = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $Pack
 if (-not (Test-Path -LiteralPath $resolvedPackageSource -PathType Container)) {
     throw "Pilot package source is missing: '$resolvedPackageSource'."
 }
-foreach ($id in @('SharpProof.Attributes', 'SharpProof', 'SharpProof.Verifier.Win-x64')) {
+foreach ($id in @('SharpProof.Attributes', 'SharpProof', 'SharpProof.Verifier')) {
     $package = Join-Path $resolvedPackageSource "$id.$version.nupkg"
     if (-not (Test-Path -LiteralPath $package -PathType Leaf)) {
         throw "Pilot package source is missing '$([IO.Path]::GetFileName($package))'."
@@ -73,7 +73,6 @@ $payloadJson = [Text.Encoding]::UTF8.GetString(
     [Convert]::FromBase64String('__PAYLOAD__'))
 $payload = $payloadJson | ConvertFrom-Json
 & $payload.wrapper `
-    -MemoryLimitMb 3072 `
     -TimeoutSeconds 600 `
     -OutputPath $payload.log `
     -DotnetArgs @($payload.arguments)

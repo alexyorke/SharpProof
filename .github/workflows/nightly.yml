@@ -1,4 +1,4 @@
-name: Nightly soundness gates
+name: Nightly container soundness gates
 
 on:
   schedule:
@@ -8,77 +8,38 @@ on:
 permissions:
   contents: read
 
+env:
+  COMPOSE_PROJECT_NAME: sharpproof-nightly-${{ github.run_id }}-${{ github.run_attempt }}
+
 jobs:
-  fuzz:
-    runs-on: windows-latest
+  soundness:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - name: Setup required .NET SDKs
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          dotnet-version: "9.0.316"
-          global-json-file: global.json
-
-      - name: Restore and build
-        shell: pwsh
-        run: |
-          .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln --locked-mode
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          .\scripts\Invoke-SharpProofDotnet.ps1 build SharpProof.sln -c Release --no-restore
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Run rotating and retained fuzz campaigns
-        shell: pwsh
-        run: .\scripts\Invoke-SharpProofFuzzCampaign.ps1
-
-      - name: Exercise cache, cancellation, and timeout behavior
-        shell: pwsh
-        run: >-
-          .\scripts\Invoke-SharpProofDotnet.ps1
-          -MemoryLimitMb 8192
-          -TimeoutSeconds 600
-          test .\SharpProof.Worker.Test\SharpProof.Worker.Test.csproj
-          -c Release
-          --no-build
-          --filter
-          "FullyQualifiedName~Cache|FullyQualifiedName~Cancel|FullyQualifiedName~Timeout"
+      - name: Build the pinned toolchain
+        run: docker compose build tooling
 
       - name: Kill trusted-boundary mutations
-        shell: pwsh
-        run: |
-          .\scripts\Test-SharpProofTrustedMutations.ps1 `
-            -Configuration Release `
-            -OutputPath artifacts/nightly/mutations.json `
-            -ExpectedCommit $env:GITHUB_SHA
-          .\scripts\Test-SharpProofMutationCatalog.ps1 `
-            -EvidencePath artifacts/nightly/mutations.json `
-            -ExpectedCommit $env:GITHUB_SHA
-
-      - name: Retain performance outcome
-        shell: pwsh
         run: >-
-          .\scripts\Invoke-SharpProofGateEvidence.ps1
-          -Gate performance
-          -OutputPath artifacts/nightly/performance.json
+          docker compose run --rm tooling mutation
+          -Configuration Release
 
-      - name: Audit dependencies
-        shell: pwsh
+      - name: Retain fail-closed dependency audit evidence
+        run: docker compose run --rm tooling dependency-audit
+
+      - name: Run the complete acceptance cycle
         run: >-
-          .\scripts\Test-SharpProofDependencyAudit.ps1
-          -SolutionPath SharpProof.sln
-          -NuGetConfigurationPath NuGet.Config
-          -OutputPath artifacts/nightly/dependency-audit.json
+          docker compose run --rm tooling acceptance
+          -Configuration Release
 
       - name: Upload nightly evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: nightly-evidence-${{ github.run_id }}
-          path: |
-            artifacts/fuzz
-            artifacts/nightly
+          name: nightly-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts
           if-no-files-found: error
           retention-days: 30

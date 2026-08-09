@@ -13,10 +13,6 @@ param(
     [string]$ReportPath,
 
     [Parameter(ParameterSetName = 'Execute')]
-    [ValidateRange(1, 65536)]
-    [int]$MemoryLimitMb = 4096,
-
-    [Parameter(ParameterSetName = 'Execute')]
     [ValidateRange(1, 86400)]
     [int]$TimeoutSeconds = 600
 )
@@ -232,8 +228,8 @@ function Invoke-DependencyAudit {
     ) -join ','
     $escapedWrapper = $wrapper.Replace("'", "''")
     $command = (
-        "& '$escapedWrapper' -MemoryLimitMb $MemoryLimitMb " +
-        "-TimeoutSeconds $TimeoutSeconds @($quotedArguments); exit " +
+        "& '$escapedWrapper' -TimeoutSeconds $TimeoutSeconds " +
+        "@($quotedArguments); exit " +
         '$LASTEXITCODE')
     $encodedCommand = [Convert]::ToBase64String(
         [Text.Encoding]::Unicode.GetBytes($command))

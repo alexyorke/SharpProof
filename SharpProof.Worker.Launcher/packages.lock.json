@@ -26,6 +26,9 @@
           "System.Collections.Immutable": "[9.0.18, )"
         }
       },
+      "sharpproof.host": {
+        "type": "Project"
+      },
       "sharpproof.ir": {
         "type": "Project",
         "dependencies": {

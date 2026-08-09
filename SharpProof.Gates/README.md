@@ -117,7 +117,7 @@ measures cancel-to-exit latency, while a real launcher process test measures
 the forced-termination deadline independently. The unannotated advisory and
 IDE analyzer performance paths reference neither SMT nor Z3.
 
-Worker/package tests also exercise protocol version 10 manifest equality,
+Worker/package tests also exercise protocol version 11 manifest equality,
 stable claim IDs, policy-controlled SP0047/SP0048 output, cache validation
 against the current manifest, fatal run handling, and compiler artifact schema
 version 11, including generated contracts, portable whole-body CFG/IR,

@@ -1,0 +1,22 @@
+{
+  "name": "SharpProof Linux amd64",
+  "dockerComposeFile": "../compose.yaml",
+  "service": "tooling",
+  "workspaceFolder": "/workspace/SharpProof",
+  "containerUser": "root",
+  "remoteUser": "sharpproof",
+  "overrideCommand": true,
+  "shutdownAction": "stopCompose",
+  "containerEnv": {
+    "SHARPPROOF_REPO_ROOT": "/workspace/SharpProof"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.csdevkit",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  }
+}

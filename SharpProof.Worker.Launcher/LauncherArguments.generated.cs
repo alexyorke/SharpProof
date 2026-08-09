@@ -44,8 +44,6 @@ internal sealed partial class LauncherArguments
         "project-wall-ms",
         "max-parallelism",
         "max-expression-depth",
-        "process-memory-bytes",
-        "max-worker-processes",
         "cache-enabled",
         "cache-directory",
         "cache-maximum-bytes",
@@ -61,10 +59,10 @@ internal sealed partial class LauncherArguments
                 System.IO.Path.ChangeExtension(path, ".deps.json"),
                 System.IO.Path.ChangeExtension(path, ".runtimeconfig.json"),
                 System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.CompilerArtifact.dll"),
+                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Host.dll"),
                 System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Ir.dll"),
                 System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Specs.dll"),
                 System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Worker.Protocol.dll"),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Worker.Launcher.exe"),
                 System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, System.IO.Path.GetFileName(typeof(System.IO.Pipelines.Pipe).Assembly.Location)),
                 System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, System.IO.Path.GetFileName(typeof(System.Text.Encodings.Web.HtmlEncoder).Assembly.Location)),
                 System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, System.IO.Path.GetFileName(typeof(System.Text.Json.JsonSerializer).Assembly.Location))
@@ -106,9 +104,7 @@ internal sealed partial class LauncherArguments
             MethodWallTimeMilliseconds = Number("method-wall-ms", WorkerBudgets.DefaultMethodWallTimeMilliseconds),
             ProjectWallTimeMilliseconds = Number("project-wall-ms", WorkerBudgets.DefaultProjectWallTimeMilliseconds),
             MaxParallelism = Number("max-parallelism", WorkerBudgets.MaximumParallelism),
-            MaximumExpressionDepth = Number("max-expression-depth", WorkerBudgets.DefaultMaximumExpressionDepth),
-            ProcessMemoryLimitBytes = Number("process-memory-bytes", WorkerBudgets.DefaultProcessMemoryLimitBytes),
-            MaxWorkerProcesses = Number("max-worker-processes", WorkerBudgets.MaximumParallelism)
+            MaximumExpressionDepth = Number("max-expression-depth", WorkerBudgets.DefaultMaximumExpressionDepth)
         };
     }
 

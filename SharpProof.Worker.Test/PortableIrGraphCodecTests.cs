@@ -82,6 +82,23 @@ public sealed class PortableIrGraphCodecTests
     }
 
     [Test]
+    public void ProgramVariableCollectionCoversEveryInstructionAndLocationShape()
+    {
+        var fixture = CreateFixture();
+        var encoded = PortableIrGraphCodec.Encode(
+            fixture.Factory,
+            fixture.Program,
+            fixture.Roots);
+
+        var variables = CompilerLoweredArtifact.CollectProgramVariables(
+            fixture.Program);
+
+        Assert.That(
+            variables,
+            Is.EquivalentTo(encoded.VariableIndices.Keys));
+    }
+
+    [Test]
     public void RoundTripPreservesExplicitExtraVariables()
     {
         var fixture = CreateFixture();

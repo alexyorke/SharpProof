@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "containerContractVersion": 1,
+  "platform": "linux/amd64",
+  "dotnet": {
+    "sdkVersion": "9.0.316",
+    "baseImage": "mcr.microsoft.com/dotnet/sdk:9.0.316-bookworm-slim",
+    "baseImageDigest": "sha256:10e4355ee23eea62fddba62d35284d36e5fc682762561773ed76c8dae5fa8c9a",
+    "testRuntimeVersion": "8.0.29",
+    "testRuntimeImage": "mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim",
+    "testRuntimeImageDigest": "sha256:794b603ad8cf882df3a37dcb124eccdcd688c367864cd66e93e921cda9caba76"
+  },
+  "powershell": {
+    "versionLine": "7.5",
+    "image": "mcr.microsoft.com/powershell:7.5-debian-12",
+    "imageDigest": "sha256:7ab5bd5ca6f95a3351fa0c6a1205237d57048c94542355aab55519a0861a9b25"
+  },
+  "z3": {
+    "version": "4.12.2",
+    "archiveUrl": "https://github.com/Z3Prover/z3/releases/download/z3-4.12.2/z3-4.12.2-x64-glibc-2.31.zip",
+    "archiveSha256": "a198851a7403d8b25bab920bd4a4792efe1af5c28a5a932d840af0472d3a83eb",
+    "archiveLibraryPath": "z3-4.12.2-x64-glibc-2.31/bin/libz3.so",
+    "libraryBytes": 31553680,
+    "librarySha256": "b6cc142a234129de3e8aab68439d71751f16885e27aad4af962836b32d8b2980",
+    "archiveManagedAssemblyPath": "z3-4.12.2-x64-glibc-2.31/bin/Microsoft.Z3.dll",
+    "managedAssemblyBytes": 247808,
+    "managedAssemblySha256": "8b3621ad5e57edb52302ff75d2cdc894a8e5a2e71a1d48d9f3ffbd8d49a7ebb3"
+  },
+  "support": {
+    "verifierPackageId": "SharpProof.Verifier",
+    "msbuildRuntimeType": "Core",
+    "nativeHostInstallSupported": false,
+    "arm64Supported": false,
+    "sharedNetworkPublicationSupported": false
+  },
+  "resourceContract": "eng/acceptance/contract.json"
+}

@@ -1051,7 +1051,7 @@ internal static class PerformanceGate
             "buildTransitive");
         var verifierRoot = Path.Combine(
             repositoryRoot,
-            "SharpProof.Verifier.Win-x64",
+            "SharpProof.Verifier",
             "buildTransitive");
         var portableProps = XDocument.Load(Path.Combine(
             portableRoot,
@@ -1061,10 +1061,10 @@ internal static class PerformanceGate
             "SharpProof.targets"));
         var verifierProps = XDocument.Load(Path.Combine(
             verifierRoot,
-            "SharpProof.Verifier.Win-x64.props"));
+            "SharpProof.Verifier.props"));
         var verifierTargets = XDocument.Load(Path.Combine(
             verifierRoot,
-            "SharpProof.Verifier.Win-x64.targets"));
+            "SharpProof.Verifier.targets"));
         ValidateAdvisoryPackagePolicy(
             portableProps,
             portableTargets,
@@ -1163,7 +1163,9 @@ internal static class PerformanceGate
         var normalizedHostCondition = NormalizeMsBuildCondition(
             (string?)verifierHost?.Attribute("Condition"));
         const string expectedHostCondition =
-            "'$(OS)'=='Windows_NT'AND" +
+            "'$(OS)'!='Windows_NT'AND" +
+            "'$(MSBuildRuntimeType)'=='Core'AND" +
+            "'$(SHARPPROOF_CONTAINER)'=='1'AND" +
             "'$(_SharpProofVerifierHostArchitecture)'=='X64'AND" +
             "'$(_SharpProofVerifierProcessArchitecture)'=='X64'";
         const string expectedVerifierCondition =

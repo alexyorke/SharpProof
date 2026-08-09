@@ -16,9 +16,13 @@ public sealed class FinalCompilationProbeTests
     private const string NetStandardTargetFramework = "netstandard2.0";
     private const string NetTargetFramework = "net8.0";
     private static bool IsSupportedWorkerHost =>
-        OperatingSystem.IsWindows() &&
+        OperatingSystem.IsLinux() &&
         RuntimeInformation.ProcessArchitecture == Architecture.X64 &&
-        RuntimeInformation.OSArchitecture == Architecture.X64;
+        RuntimeInformation.OSArchitecture == Architecture.X64 &&
+        string.Equals(
+            Environment.GetEnvironmentVariable("SHARPPROOF_CONTAINER"),
+            "1",
+            StringComparison.Ordinal);
 
     [Test]
     public async Task MultiTargetBuildWritesOneIsolatedFinalCompilationPerTargetFramework()
@@ -205,7 +209,7 @@ public sealed class FinalCompilationProbeTests
         Assert.That(
             build.Output,
             Does.Contain(
-                "SharpProof out-of-process verification is supported only on Windows x64"));
+                "canonical Linux amd64 container"));
         _ = await ProbeArtifact.ReadAsync(workspace.PackedProbeArtifactPath);
         _ = await CompilerManifestArtifact.ReadAsync(
             workspace.CompilerManifestPath);
@@ -216,7 +220,8 @@ public sealed class FinalCompilationProbeTests
     {
         if (!IsSupportedWorkerHost)
         {
-            Assert.Ignore("The verifier is intentionally Windows x64 only.");
+            Assert.Ignore(
+                "The verifier is supported only in the canonical Linux amd64 container.");
         }
 
         var feed = await PackagedProductFeed.GetAsync();
@@ -296,7 +301,7 @@ public sealed class FinalCompilationProbeTests
         Assert.That(
             result.Output,
             Does.Contain(
-                "SharpProof out-of-process verification is supported only on Windows x64"));
+                "canonical Linux amd64 container"));
     }
 
     public enum ProbeSuppression
@@ -920,7 +925,7 @@ public sealed class FinalCompilationProbeTests
                     <WarningsAsErrors>AD0001;CS8032;CS8785</WarningsAsErrors>
                   </PropertyGroup>
                   <ItemGroup>
-                    <PackageReference Include="SharpProof.Verifier.Win-x64"
+                    <PackageReference Include="SharpProof.Verifier"
                                       Version="{Escape(packageVersion)}" />
                     <Analyzer Include="{analyzerPath}" />
                     <AdditionalFiles Include="{additionalFile}">

@@ -1,6 +1,6 @@
 SharpProof third-party notices
 
-The SharpProof analyzer and Windows x64 verifier packages redistribute the
+The SharpProof analyzer and container-only Linux amd64 verifier packages redistribute the
 following third-party components. The authoritative package-to-file inventory
 is eng/release/third-party-components.json and is validated against every
 release package.

@@ -260,7 +260,7 @@ function New-DeterministicPackageSbom {
     })
     $relationships.Add([pscustomobject][ordered]@{
         spdxElementId = Get-SpdxPackageId `
-            -Name 'SharpProof.Verifier.Win-x64'
+            -Name 'SharpProof.Verifier'
         relationshipType = 'DEPENDS_ON'
         relatedSpdxElement = Get-SpdxPackageId -Name 'SharpProof'
     })
@@ -334,9 +334,13 @@ function Test-ThirdPartyComponentVersions {
                     'SharpProof.CompilerCollector\obj\project.assets.json'
             }
         )
-        'SharpProof.Verifier.Win-x64' = @(
+        'SharpProof.Verifier' = @(
             @{
                 EntryPrefix = 'tools/net9/'
+                AssetsPath = 'SharpProof.Worker\obj\project.assets.json'
+            },
+            @{
+                EntryPrefix = 'runtimes/linux-x64/native/'
                 AssetsPath = 'SharpProof.Worker\obj\project.assets.json'
             }
         )
@@ -428,12 +432,15 @@ function Test-PackageThirdPartyInventory {
         $actualThirdPartyEntries = @(
             $archive.Entries |
                 Where-Object {
+                    ($_.FullName.EndsWith(
+                            '.dll',
+                            [StringComparison]::OrdinalIgnoreCase) -and
+                        -not [IO.Path]::GetFileName($_.FullName).StartsWith(
+                            'SharpProof.',
+                            [StringComparison]::Ordinal)) -or
                     $_.FullName.EndsWith(
-                        '.dll',
-                        [StringComparison]::OrdinalIgnoreCase) -and
-                    -not [IO.Path]::GetFileName($_.FullName).StartsWith(
-                        'SharpProof.',
-                        [StringComparison]::Ordinal)
+                        '.so',
+                        [StringComparison]::OrdinalIgnoreCase)
                 } |
                 ForEach-Object { $_.FullName } |
                 Sort-Object -Unique
@@ -542,7 +549,7 @@ if ($packageFiles.Count -ne 6) {
 $expectedIds = @(
     'SharpProof',
     'SharpProof.Attributes',
-    'SharpProof.Verifier.Win-x64'
+    'SharpProof.Verifier'
 ) | Sort-Object
 $identities = @(
     $packageFiles |
@@ -767,7 +774,7 @@ $expectedDependencies = @(
         to = Get-SpdxPackageId -Name 'SharpProof.Attributes'
     },
     [pscustomobject]@{
-        from = Get-SpdxPackageId -Name 'SharpProof.Verifier.Win-x64'
+        from = Get-SpdxPackageId -Name 'SharpProof.Verifier'
         to = Get-SpdxPackageId -Name 'SharpProof'
     }
 )

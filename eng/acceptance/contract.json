@@ -20,31 +20,34 @@
   "automation": {
     "solutionBuildWallSeconds": 600
   },
+  "container": {
+    "contractVersion": 1,
+    "platform": "linux/amd64",
+    "defaultCpuCount": 4,
+    "defaultMemoryMiB": 12288
+  },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 127,
-    "expectedCatalogSha256": "24a7f6ea3eab1750cd842e4822a381b743a2930b538736a928e832a85aab874a"
+    "expectedCatalogCount": 129,
+    "expectedCatalogSha256": "b41bb0babe2e152f5d77f504f49e45e02edd830326e672caea31aa3dd5cb528e"
   },
   "worker": {
-    "protocolVersion": 10,
+    "protocolVersion": 11,
     "manifestSchemaVersion": 4,
     "compilerArtifactSchemaVersion": 11,
     "relationalSummarySchemaVersion": 1,
     "specificationPackSchemaVersion": 1,
     "maximumParallelism": 4,
-    "maximumWorkerProcesses": 4,
     "maximumExpressionDepth": 64,
-    "maximumMemoryMiB": 2048,
     "queryRlimit": 3000000,
     "methodRlimit": 20000000,
     "maximumMethodWallSeconds": 10,
     "maximumProjectWallSeconds": 300,
     "cancellationP95Milliseconds": 250,
-    "forcedTerminationMilliseconds": 1000,
-    "maximumProjectDirectoryCharacters": 239
+    "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 12,
+    "schemaVersion": 13,
     "enabledByDefault": true,
     "maximumMiB": 512,
     "cacheableOutcomes": [
@@ -60,7 +63,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "f525f575c2ae7032929409e04c37a5fe86f0bf56e6612cc7d5a079d96cf8c98d",
+    "inventorySha256": "506a677d44b13754b4adf4292110bf27d28caeed1d688b32d2e940572370065a",
     "components": [
       {
         "name": "discovery",
@@ -437,7 +440,6 @@
         "paths": [
           "SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs",
           "SharpProof.CompilerArtifact/CompilerManifestArtifact.cs",
-          "SharpProof.Worker.Protocol/WorkerCachePath.cs",
           "SharpProof.Worker/WorkerInputSnapshot.cs",
           "SharpProof.Worker/VerificationCache.cs"
         ]
@@ -448,9 +450,13 @@
           "SharpProof.BuildTasks/SharpProof.BuildTasks.csproj",
           "SharpProof.BuildTasks/InvalidatePublishedResult.cs",
           "SharpProof.BuildTasks/RunVerifier.cs",
-          "SharpProof.Worker.Protocol/WindowsPathIdentity.cs"
+          "SharpProof.Host/SharpProof.Host.csproj",
+          "SharpProof.Host/ContainerContract.cs",
+          "SharpProof.Host/ContainerNativeLibrary.cs",
+          "SharpProof.Host/LinuxPathIdentity.cs",
+          "SharpProof.Host/LinuxWorkerProcess.cs"
         ],
-        "rationale": "The compiled MSBuild tasks and shared native Windows path identity helper own verifier launch cancellation, publication locking, invalidation, and filesystem alias rejection."
+        "rationale": "The compiled Core MSBuild tasks and Linux host assembly own verifier launch cancellation, canonical-container validation, verified native-library binding, publication locking, invalidation, and POSIX filesystem identity."
       },
       {
         "name": "portableShippingBoundary",
@@ -459,15 +465,21 @@
           "SharpProof.Package/SharpProof.nuspec",
           "SharpProof.Package/buildTransitive/SharpProof.props",
           "SharpProof.Package/buildTransitive/SharpProof.targets",
-          "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.props",
-          "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.targets"
+          "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props",
+          "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets"
         ]
       },
       {
         "name": "releaseContainment",
         "paths": [
-          "scripts/Invoke-SharpProofDotnet.ps1",
-          "scripts/JobObjectHelpers.ps1",
+          "eng/container/toolchain.json",
+          "eng/container/Dockerfile",
+          "eng/container/entrypoint.sh",
+          "eng/container/Prepare-NativePayload.ps1",
+          "eng/container/New-ContainerContract.ps1",
+          "compose.yaml",
+          "scripts/Invoke-SharpProofContainer.ps1",
+          "scripts/Test-SharpProofContainerContract.ps1",
           "scripts/Test-SharpProofPackageConsumers.ps1"
         ]
       }

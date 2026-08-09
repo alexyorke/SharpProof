@@ -16,7 +16,7 @@
     <SharpProofVerify>true</SharpProofVerify>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="SharpProof.Verifier.Win-x64"
+    <PackageReference Include="SharpProof.Verifier"
                       Version="$(SharpProofPilotVersion)"
                       PrivateAssets="all" />
   </ItemGroup>

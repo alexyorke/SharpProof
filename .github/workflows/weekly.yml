@@ -1,4 +1,4 @@
-name: Weekly acceptance
+name: Weekly container acceptance
 
 on:
   schedule:
@@ -8,40 +8,30 @@ on:
 permissions:
   contents: read
 
+env:
+  COMPOSE_PROJECT_NAME: sharpproof-weekly-${{ github.run_id }}-${{ github.run_attempt }}
+
 jobs:
   acceptance:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - name: Setup required .NET SDKs
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          dotnet-version: "9.0.316"
-          global-json-file: global.json
+      - name: Build the pinned toolchain
+        run: docker compose build tooling
 
-      - name: Restore and run the full acceptance cycle
-        shell: pwsh
-        run: |
-          .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln --locked-mode
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          .\eng\acceptance\Verify.ps1 -Configuration Release
-
-      - name: Retain corpus outcome summary
-        if: always()
-        shell: pwsh
+      - name: Run full acceptance
         run: >-
-          .\scripts\Invoke-SharpProofGateEvidence.ps1
-          -Gate corpus
-          -OutputPath artifacts/weekly/corpus.json
+          docker compose run --rm tooling acceptance
+          -Configuration Release
 
       - name: Upload weekly evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: weekly-acceptance-${{ github.run_id }}
-          path: artifacts/weekly
+          name: weekly-acceptance-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts
           if-no-files-found: error
           retention-days: 90

@@ -6,10 +6,10 @@
   ],
   "runtimeCompanionFiles": [
     "SharpProof.CompilerArtifact.dll",
+    "SharpProof.Host.dll",
     "SharpProof.Ir.dll",
     "SharpProof.Specs.dll",
     "SharpProof.Worker.Protocol.dll",
-    "SharpProof.Worker.Launcher.exe",
     "System.IO.Pipelines.dll",
     "System.Text.Encodings.Web.dll",
     "System.Text.Json.dll"
@@ -37,8 +37,6 @@
     { "key": "project-wall-ms", "category": "optional", "accessor": "none", "property": "", "fallback": "" },
     { "key": "max-parallelism", "category": "optional", "accessor": "none", "property": "", "fallback": "" },
     { "key": "max-expression-depth", "category": "optional", "accessor": "none", "property": "", "fallback": "" },
-    { "key": "process-memory-bytes", "category": "optional", "accessor": "none", "property": "", "fallback": "" },
-    { "key": "max-worker-processes", "category": "optional", "accessor": "none", "property": "", "fallback": "" },
     { "key": "cache-enabled", "category": "optional", "accessor": "none", "property": "", "fallback": "" },
     { "key": "cache-directory", "category": "optional", "accessor": "none", "property": "", "fallback": "" },
     { "key": "cache-maximum-bytes", "category": "optional", "accessor": "none", "property": "", "fallback": "" }
@@ -49,9 +47,7 @@
     { "property": "MethodWallTimeMilliseconds", "key": "method-wall-ms", "fallback": "methodWallTimeMilliseconds" },
     { "property": "ProjectWallTimeMilliseconds", "key": "project-wall-ms", "fallback": "projectWallTimeMilliseconds" },
     { "property": "MaxParallelism", "key": "max-parallelism", "fallback": "maximumParallelism" },
-    { "property": "MaximumExpressionDepth", "key": "max-expression-depth", "fallback": "maximumExpressionDepth" },
-    { "property": "ProcessMemoryLimitBytes", "key": "process-memory-bytes", "fallback": "processMemoryLimitBytes" },
-    { "property": "MaxWorkerProcesses", "key": "max-worker-processes", "fallback": "maximumParallelism" }
+    { "property": "MaximumExpressionDepth", "key": "max-expression-depth", "fallback": "maximumExpressionDepth" }
   ],
   "cache": [
     { "property": "Enabled", "key": "cache-enabled", "projection": "boolean", "fallback": "cacheEnabled" },

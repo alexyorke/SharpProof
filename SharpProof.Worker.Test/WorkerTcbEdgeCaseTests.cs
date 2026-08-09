@@ -7,6 +7,7 @@ using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Dataflow;
+using SharpProof.Host;
 using SharpProof.Ir;
 using SharpProof.Specs;
 using SharpProof.Verify;
@@ -18,17 +19,32 @@ namespace SharpProof.Worker.Test;
 public sealed class WorkerTcbEdgeCaseTests
 {
     [Test]
-    public void KnownWindowsReparsePointIsRejectedBeforeTraversal()
+    public void SymbolicLinkIsRejectedBeforeTraversal()
     {
-        if (!OperatingSystem.IsWindows() ||
-            !Directory.Exists(@"C:\Users\All Users"))
+        if (!OperatingSystem.IsLinux())
         {
-            Assert.Ignore("The qualification host has no stable system junction.");
+            Assert.Ignore("The verifier host is Linux-only.");
         }
 
-        Action validate = () => WorkerCachePath.ValidateNoReparsePoints([
-            Path.Combine(@"C:\Users\All Users", "SharpProof", "cache")]);
-        Assert.Throws<ArgumentException>(validate);
+        var root = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "symlink-rejection-" + Guid.NewGuid().ToString("N"));
+        var target = Path.Combine(root, "target");
+        var link = Path.Combine(root, "link");
+        Directory.CreateDirectory(target);
+        Directory.CreateSymbolicLink(link, target);
+        try
+        {
+            Action canonicalize = () =>
+                LinuxPathIdentity.Canonicalize(
+                    Path.Combine(link, "SharpProof", "cache"));
+            Assert.Throws<ArgumentException>(canonicalize);
+        }
+        finally
+        {
+            Directory.Delete(link);
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [TestCase(

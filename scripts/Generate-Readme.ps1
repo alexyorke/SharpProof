@@ -370,7 +370,7 @@ $requiredReadmeText = @(
     'Refuted',
     'Unknown',
     'SHARPPROOF_CONTRACTS',
-    'Windows x64',
+    'canonical Linux amd64 container',
     'compiler artifact',
     'SARIF',
     'docs/README.md'
@@ -379,7 +379,10 @@ $forbiddenReadmeText = @(
     'Deep Ensures',
     'DeepEnsures',
     'WorkerVerificationStatus',
-    'WorkerVerificationReason'
+    'WorkerVerificationReason',
+    'SharpProof.Verifier.Win-x64',
+    'supported only on Windows x64',
+    'Windows Job Object'
 )
 foreach ($required in $requiredReadmeText) {
     if (-not $readme.Contains($required, [StringComparison]::Ordinal)) {
@@ -503,7 +506,7 @@ $limitReference = Get-RequiredText 'docs\analysis-limits.md'
 $portablePackageProps = [xml](Get-RequiredText (
     'SharpProof.Package\buildTransitive\SharpProof.props'))
 $verifierPackageProps = [xml](Get-RequiredText (
-    'SharpProof.Verifier.Win-x64\buildTransitive\SharpProof.Verifier.Win-x64.props'))
+    'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.props'))
 $packagePropsDocuments = @(
     $portablePackageProps,
     $verifierPackageProps

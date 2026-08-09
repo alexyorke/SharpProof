@@ -33,16 +33,34 @@ or sequence reasoning are not implemented.
 ## Install and enable
 
 The portable analyzer and generator require a compiler host with Roslyn 4.14
-or newer. Repository development and command-line builds require the exact
-.NET SDK version pinned in `global.json` (currently 9.0.316; roll-forward is
-disabled). The package-consumer compatibility lane separately validates the
+or newer. The canonical development image supplies the exact .NET SDK version
+pinned in `global.json` (currently 9.0.316; roll-forward is disabled); it is
+not a host prerequisite. The package-consumer compatibility lane separately validates the
 `netstandard2.0` contract API with its minimum SDK, currently 9.0.300. The
 `SharpProof.Attributes` contract API alone remains a `netstandard2.0` library,
 and `SharpProofProfile=off` omits analyzer/generator loading on an older host.
-The preview verifier is qualified for Windows x64 command-line MSBuild and
-Visual Studio 2022 Build Tools 17.14 x64 MSBuild. Rider and Windows ARM64 are
-not supported for this preview. The exact host and filesystem boundary is
-listed in [Preview support boundary](docs/preview-support.md).
+The preview verifier is qualified only in the repository's pinned Linux amd64
+container using Core MSBuild. Docker Engine or Docker Desktop with Compose v2
+is the only host prerequisite. Native host execution, Visual Studio verifier
+execution, Rider, and ARM64 verifier containers are not supported for this
+preview. The portable analyzer remains separately cross-platform. The exact
+host and filesystem boundary is listed in
+[Preview support boundary](docs/preview-support.md).
+
+For repository development, Docker is the only required tool:
+
+```text
+docker compose build tooling
+docker compose run --rm tooling build
+docker compose run --rm tooling portable-tests
+docker compose run --rm tooling worker-tests
+docker compose run --rm tooling dev
+```
+
+Set a distinct `COMPOSE_PROJECT_NAME` for each worktree. NuGet and .NET home
+caches are then private to that worktree's Compose project, while task commands
+build in a temporary container workspace instead of writing shared `bin` or
+`obj` directories.
 
 The coordinates below are the intended preview packages, but no SharpProof
 package has been promoted to the public NuGet feed yet. Until the first
@@ -123,7 +141,7 @@ For strict CI:
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="SharpProof.Verifier.Win-x64"
+  <PackageReference Include="SharpProof.Verifier"
                     Version="1.0.0-preview.1"
                     PrivateAssets="all" />
 </ItemGroup>
@@ -315,10 +333,11 @@ public static class Choices {
 }
 ```
 
-Opt into worker execution on Windows x64:
+Opt into worker execution inside the canonical container:
 
-```powershell
-dotnet build /p:SharpProofVerify=true
+```text
+docker compose run --rm tooling dev -lc \
+  'dotnet build /p:SharpProofVerify=true'
 ```
 
 `SharpProofVerify` remains optional in `advisory`; the `strict` profile
@@ -336,7 +355,7 @@ set. The default result is published under:
 obj/<Configuration>/<TargetFramework>/SharpProof/result.json
 ```
 
-Worker protocol version 10 separates the project run from semantic claim
+Worker protocol version 11 separates the project run from semantic claim
 outcomes. The compiler artifact records the effective `SharpProofFeatures`
 selection before manifest construction. A compiler-symbol-based manifest
 selects callables and assigns stable `spc1:` semantic IDs to direct clauses,
@@ -405,7 +424,7 @@ under every policy. The worker uses deterministic query, method, project,
 expression-depth, memory, process, and parallelism limits. Its
 content-addressed cache defaults to
 `obj/<Configuration>/<TargetFramework>/SharpProof/cache` in the MSBuild
-integration. Cache schema version 12 stores only complete, postcondition-only
+integration. Cache schema version 13 stores only complete, postcondition-only
 responses whose claims are all `Refuted`. Before accepting a hit, the worker
 reconstructs every canonical Boolean/integer model against the current lowered
 callable, validates entry assumptions and source ranges, and independently
@@ -587,21 +606,20 @@ The checked-in acceptance contract declares these consumer target frameworks:
 
 The Attributes and portable SharpProof packages target `netstandard2.0` and
 contain no verifier, Z3, or native solver payload.
-`SharpProof.Verifier.Win-x64` carries `SharpProof.Worker` as a `net9.0` tool,
-the launcher, and one Windows x64 native Z3 payload with mandatory Windows Job
-Object containment.
-`SharpProofVerify=true` on an unsupported host fails with an explicit
-unsupported-host build error; portable analyzer features remain available.
+`SharpProof.Verifier` carries `SharpProof.Worker` as a `net9.0` tool, the
+launcher, build tasks, and one pinned Linux x64 native Z3 payload. Docker is the
+hard CPU and memory boundary; SharpProof retains semantic and wall-clock
+budgets but does not duplicate cgroup enforcement.
+`SharpProofVerify=true` outside the canonical Linux amd64 container fails with
+an explicit unsupported-host build error; portable analyzer features remain
+available.
 
-The full acceptance workflow runs on `windows-latest`. A separate
-package-consumer workflow restores the exact same three-package artifact graph
-and exercises portable analyzer consumers on Windows x64, Linux x64, macOS x64,
-and macOS ARM64. Only Windows x64 executes the packaged worker; every other
-matrix host asserts the explicit unsupported-host rejection. Windows x64
-command-line and Visual Studio 2022 Build Tools 17.14 x64 MSBuild are
-qualified, including percent-containing paths and local publication paths
-beyond 260 characters. Project directories longer than 239 characters fail
-before compiler launch with a classified build error. Rider, Windows ARM64,
+The full acceptance workflow runs in the pinned container. A separate
+package-consumer workflow exercises portable analyzer consumers on Linux,
+Windows, and macOS without running the verifier. Container qualification covers
+percent-containing, Unicode, space-containing, and long local paths, cache,
+SARIF, cancellation, and cooperative publication. Native host installs,
+Visual Studio verifier execution, Rider, ARM64 verifier containers,
 UNC/shared-network publication, and hostile concurrent filesystem mutation are
 outside this preview's supported boundary.
 
@@ -665,8 +683,8 @@ digests. Summary calls carry their source, exact implementation-IL, or audited
 pack identity plus their transitive dependency-evidence closure. For the admitted direct
 managed object/array allocations, it also seals the ordered unconditional
 event, exact constraint identity, semantic operation identity, and source-tree
-span needed for independent worker replay. Worker protocol version 10 and cache
-schema version 12 carry this wire break. Relational-summary schema version 1
+span needed for independent worker replay. Worker protocol version 11 and cache
+schema version 13 carry this wire break. Relational-summary schema version 1
 and specification-pack schema version 1 govern the new evidence. The artifact
 also records compiler error
 diagnostics with mapped locations,

@@ -23,7 +23,6 @@ public sealed class WorkerTests
         "budgets.method_rlimit",
         "budgets.parallelism",
         "budgets.expression_depth",
-        "budgets.worker_processes",
         "budgets.wall_order",
         "cache.maximum_bytes"
     ];
@@ -87,7 +86,6 @@ public sealed class WorkerTests
                 MethodRlimit = 0,
                 MaxParallelism = 5,
                 MaximumExpressionDepth = 300,
-                MaxWorkerProcesses = 5,
                 MethodWallTimeMilliseconds = 20,
                 ProjectWallTimeMilliseconds = 10
             },
@@ -1978,6 +1976,7 @@ public sealed class WorkerTests
 
         var response = await worker.VerifyAsync(request);
 
+        Assert.That(response.Errors, Is.Empty);
         var query = backend.Query;
         Assert.That(query.Assumptions, Has.Length.EqualTo(1));
         Assert.That(
@@ -5151,7 +5150,11 @@ public sealed class WorkerTests
         if (response.RunStatus == WorkerRunStatus.TimedOut)
         {
             Assert.That(reason, Is.EqualTo(WorkerClaimReason.ProjectTimeout));
-            Assert.That(backend.CallCount, Is.Zero);
+            Assert.That(
+                backend.CallCount,
+                Is.LessThanOrEqualTo(1),
+                "The project deadline may expire immediately before or " +
+                "after the single backend call completes.");
         }
         else
         {
@@ -5200,7 +5203,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public void DefaultsExposeRlimitAndLauncherJobBudgets()
+    public void DefaultsExposeLogicalAndWallClockBudgets()
     {
         var budgets = new WorkerBudgets();
         Assert.That(
@@ -5210,10 +5213,6 @@ public sealed class WorkerTests
             budgets.MethodRlimit,
             Is.EqualTo(WorkerBudgets.DefaultMethodRlimit));
         Assert.That(budgets.MaxParallelism, Is.EqualTo(4));
-        Assert.That(budgets.MaxWorkerProcesses, Is.EqualTo(4));
-        Assert.That(
-            budgets.ProcessMemoryLimitBytes,
-            Is.EqualTo(2L * 1024 * 1024 * 1024));
         Assert.That(
             new SharpProof.Smt.IrSmtBackendOptions(17).QueryRlimit,
             Is.EqualTo(17));
@@ -5244,15 +5243,8 @@ public sealed class WorkerTests
                 worker.GetProperty("maximumParallelism").GetInt32(),
                 Is.EqualTo(WorkerBudgets.MaximumParallelism));
             Assert.That(
-                worker.GetProperty("maximumWorkerProcesses").GetInt32(),
-                Is.EqualTo(WorkerBudgets.MaximumParallelism));
-            Assert.That(
                 worker.GetProperty("maximumExpressionDepth").GetInt32(),
                 Is.EqualTo(WorkerBudgets.DefaultMaximumExpressionDepth));
-            Assert.That(
-                worker.GetProperty("maximumMemoryMiB").GetInt64() *
-                1024 * 1024,
-                Is.EqualTo(WorkerBudgets.DefaultProcessMemoryLimitBytes));
             Assert.That(
                 worker.GetProperty("queryRlimit").GetUInt32(),
                 Is.EqualTo(WorkerBudgets.DefaultQueryRlimit));

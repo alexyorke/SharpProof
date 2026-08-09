@@ -12,7 +12,8 @@ public sealed class ReleaseCoverageBaselineTests
     private static readonly string[] s_upstreamResultExpressions =
     [
         "${{ needs.package.result }}",
-        "${{ needs.package-consumer.result }}",
+        "${{ needs.portable-consumer.result }}",
+        "${{ needs.container-verifier.result }}",
         "${{ needs.minimum-sdk-consumer.result }}",
         "${{ needs.security.result }}",
         "${{ needs.attest.result }}"
@@ -38,8 +39,8 @@ public sealed class ReleaseCoverageBaselineTests
             }
             Assert.That(
                 workflow,
-                Does.Contain("\"upstream-$($entry.Key)-" +
-                    "$($entry.Value.result)\""));
+                Does.Contain(
+                    "Where-Object { $_ -ne 'success' }"));
         }
     }
 
@@ -63,74 +64,48 @@ public sealed class ReleaseCoverageBaselineTests
         var qualification = workflow[
             qualificationStart..qualificationEnd];
         var tagValidation = qualification.IndexOf(
-            "Require an annotated immutable release tag",
-            StringComparison.Ordinal);
-        var initialization = qualification.IndexOf(
-            "Initialize honest release qualification status",
+            "Require successful upstream gates and an annotated exact tag",
             StringComparison.Ordinal);
         var setup = qualification.IndexOf(
-            "Setup required .NET SDKs",
+            "Build the pinned toolchain",
             StringComparison.Ordinal);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(initialization, Is.GreaterThanOrEqualTo(0));
-            Assert.That(tagValidation, Is.GreaterThan(initialization));
+            Assert.That(tagValidation, Is.GreaterThanOrEqualTo(0));
             Assert.That(setup, Is.GreaterThan(tagValidation));
             Assert.That(
                 qualification,
-                Does.Contain("$objectType -cne 'tag'"));
+                Does.Contain("cat-file -t $tagRef"));
             Assert.That(
                 qualification,
-                Does.Contain("$tagCommit -cne $env:GITHUB_SHA"));
+                Does.Contain("-cne $env:GITHUB_SHA"));
             Assert.That(
                 qualification,
-                Does.Not.Contain(
-                    "if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }"));
+                Does.Not.Contain("Setup required .NET SDKs"));
             Assert.That(
                 qualification.Split(
-                    "if (-not $?)",
+                    "docker compose run --rm tooling",
                     StringSplitOptions.None),
-                Has.Length.EqualTo(13));
+                Has.Length.GreaterThanOrEqualTo(5));
             Assert.That(
                 qualification,
-                Does.Contain("failure() || cancelled()"));
-            Assert.That(
-                qualification,
-                Does.Contain(
-                    "$qualificationScriptAvailable = Test-Path"));
-            Assert.That(
-                qualification,
-                Does.Contain("$recorded = $?"));
-            Assert.That(
-                qualification,
-                Does.Contain("if (-not $recorded)"));
-            Assert.That(
-                qualification,
-                Does.Contain("gateReceipts = [pscustomobject]$gateReceipts"));
-            Assert.That(
-                qualification,
-                Does.Contain(
-                    "Download immutable release gate receipts"));
-            Assert.That(
-                qualification,
-                Does.Contain("-ImmutableReceiptDirectory"));
+                Does.Contain("tooling acceptance"));
             Assert.That(
                 qualification.Split(
-                    "Seal ",
+                    "tooling mutation",
                     StringSplitOptions.None),
-                Has.Length.GreaterThanOrEqualTo(10));
+                Has.Length.EqualTo(2));
             Assert.That(
-                qualification.Split(
-                    "secrets.SHARPPROOF_PILOT_EVIDENCE_TOKEN",
-                    StringSplitOptions.None),
-                Has.Length.EqualTo(3));
+                qualification,
+                Does.Contain("tooling coverage"));
             Assert.That(
-                workflow.Split(
-                    "nuget-packages-${{ github.sha }}-" +
-                    "${{ github.run_attempt }}",
-                    StringSplitOptions.None),
-                Has.Length.EqualTo(7));
+                qualification,
+                Does.Contain("tooling package-consumers"));
+            Assert.That(qualification, Does.Contain("-PlanOnly"));
+            Assert.That(
+                qualification,
+                Does.Contain("qualification.json"));
         }
     }
 
@@ -169,27 +144,18 @@ public sealed class ReleaseCoverageBaselineTests
                 workflow.Split(
                     "Resolve-SharpProofReleaseCoverageBaseline.ps1",
                     StringSplitOptions.None),
-                Has.Length.EqualTo(3));
+                Has.Length.EqualTo(2));
             Assert.That(
                 workflow,
                 Does.Contain(
-                    "-ComparisonRef $env:SHARPPROOF_COVERAGE_BASELINE"));
+                    "SHARPPROOF_COVERAGE_COMPARISON_REF"));
             Assert.That(
                 workflow,
                 Does.Not.Contain("-ComparisonRef HEAD^"));
             Assert.That(
                 workflow,
-                Does.Contain(
-                    "$releaseCommit = [string]$selection.releaseCommit"));
-            Assert.That(
-                workflow,
-                Does.Contain(
-                    "$coverageBaseline = " +
-                    "[string]$selection.coverageBaselineCommit"));
-            Assert.That(
-                workflow,
-                Does.Contain(
-                    "SHARPPROOF_RELEASE_COMMIT=$releaseCommit"));
+                Does.Contain("-ReleaseCommit $env:GITHUB_SHA"));
+            Assert.That(workflow, Does.Contain("tooling coverage"));
         }
     }
 
@@ -258,12 +224,21 @@ public sealed class ReleaseCoverageBaselineTests
         Assert.That(nonDescendant.ExitCode, Is.Not.Zero);
         using (Assert.EnterMultipleScope())
         {
+            var normalizedError =
+                System.Text.RegularExpressions.Regex.Replace(
+                    nonDescendant.Error,
+                    @"\s+",
+                    " ",
+                    System.Text.RegularExpressions.RegexOptions.CultureInvariant);
             Assert.That(
-                nonDescendant.Error,
+                normalizedError,
                 Does.Contain("Coverage baseline"));
             Assert.That(
-                nonDescendant.Error,
-                Does.Contain("ancestor of release commit"));
+                normalizedError,
+                Does.Contain("ancestor of release"));
+            Assert.That(
+                normalizedError,
+                Does.Contain("commit"));
         }
 
         var releaseAncestor = await RunAsync(
@@ -289,7 +264,10 @@ public sealed class ReleaseCoverageBaselineTests
         Assert.That(wrongCheckout.ExitCode, Is.Not.Zero);
         Assert.That(
             wrongCheckout.Error,
-            Does.Contain("does not identify the"));
+            Does.Contain("does not"));
+        Assert.That(
+            wrongCheckout.Error,
+            Does.Contain("identify the"));
         Assert.That(
             wrongCheckout.Error,
             Does.Contain("checked-out HEAD"));
@@ -717,10 +695,22 @@ public sealed class ReleaseCoverageBaselineTests
         var output = process.StandardOutput.ReadToEndAsync();
         var error = process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
+        var standardOutput = await output;
+        var standardError = await error;
+        const string AnsiPattern =
+            "\\x1B\\[[0-?]*[ -/]*[@-~]";
         return new ProcessResult(
             process.ExitCode,
-            await output,
-            await error);
+            System.Text.RegularExpressions.Regex.Replace(
+                standardOutput,
+                AnsiPattern,
+                string.Empty,
+                System.Text.RegularExpressions.RegexOptions.CultureInvariant),
+            System.Text.RegularExpressions.Regex.Replace(
+                standardError,
+                AnsiPattern,
+                string.Empty,
+                System.Text.RegularExpressions.RegexOptions.CultureInvariant));
     }
 
     private static string RepositoryRoot()

@@ -722,20 +722,36 @@ $mutations = @(
         Filter = 'FullyQualifiedName~CustomArgumentsProjectEveryRequestValueExactly'
     },
     [pscustomobject]@{
-        Name = 'launcher-kill-on-close'
-        File = 'SharpProof.Worker.Launcher\Program.cs'
-        Original = 'NativeMethods.JobObjectLimitFlags.KillOnJobClose |'
-        Mutated = 'NativeMethods.JobObjectLimitFlags.ActiveProcess |'
+        Name = 'launcher-stdin-start-release'
+        File = 'SharpProof.Host\LinuxWorkerProcess.cs'
+        Original = '    public const string StartMessage = "SharpProof.Start/1";'
+        Mutated = '    public const string StartMessage = "SharpProof.Start/0";'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
-        Filter = 'FullyQualifiedName~WorkerContainmentIsMandatoryOnTheSupportedHost'
+        Filter = 'FullyQualifiedName~LinuxWorkerReceivesTheExactStartupRelease'
     },
     [pscustomobject]@{
-        Name = 'launcher-create-suspended'
-        File = 'SharpProof.Worker.Launcher\Program.cs'
-        Original = 'NativeMethods.CreateSuspended | NativeMethods.CreateNoWindow,'
-        Mutated = 'NativeMethods.CreateNoWindow,'
+        Name = 'worker-parent-death-boundary'
+        File = 'SharpProof.Host\LinuxWorkerProcess.cs'
+        Original = '    private const int ParentDeathSignal = 1;'
+        Mutated = '    private const int ParentDeathSignal = 0;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~ParentDeathKillsAWorkerBlockedBeforeStartupRelease'
+    },
+    [pscustomobject]@{
+        Name = 'container-z3-payload-hash'
+        File = 'SharpProof.Host\ContainerContract.cs'
+        Original = "        if (!string.Equals(`n                hash,`n                contract.Z3LibrarySha256,`n                StringComparison.OrdinalIgnoreCase))"
+        Mutated = "        if (false && !string.Equals(`n                hash,`n                contract.Z3LibrarySha256,`n                StringComparison.OrdinalIgnoreCase))"
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
-        Filter = 'FullyQualifiedName~WorkerCannotReachModuleInitializerBeforeResume'
+        Filter = 'FullyQualifiedName~ContainerZ3PayloadRejectsAHashMismatch'
+    },
+    [pscustomobject]@{
+        Name = 'container-z3-refuses-ambient-load'
+        File = 'SharpProof.Host\ContainerNativeLibrary.cs'
+        Original = "            var handle = NativeLibrary.Load(`n                ContainerContract.ResolveZ3LibraryRequired());"
+        Mutated = '            var handle = NativeLibrary.Load(Z3ImportName);'
+        Project = 'SharpProof.Smt.Test\SharpProof.Smt.Test.csproj'
+        Filter = 'FullyQualifiedName~UnsatProofReturnsAHygienicCore'
     },
     [pscustomobject]@{
         Name = 'launcher-timeout-owns-result'
@@ -916,7 +932,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'launcher-rejects-cache-inside-worker-tree'
         File = 'SharpProof.Worker.Launcher\Program.cs'
-        Original = "            candidates`n                .Skip(runtimeRoots.Length +`n                    LauncherArguments.LauncherRuntimePaths.Length)`n                .OfType<string>()`n                .Any(path => WorkerCachePath.IsSameOrDescendant(`n                    Path.GetFullPath(path),`n                    Path.GetDirectoryName(workerPath)!))"
+        Original = "            candidates`n                .Skip(runtimeRoots.Length +`n                    LauncherArguments.LauncherRuntimePaths.Length)`n                .OfType<string>()`n                .Any(path => LinuxPathIdentity.IsSameOrDescendant(`n                    path,`n                    Path.GetDirectoryName(workerPath)!))"
         Mutated = '            false'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~DirectLauncherRejectsCacheInsideWorkerRuntimeDirectory'
@@ -979,19 +995,19 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'publication-locks-every-member'
-        File = 'SharpProof.Worker.Protocol\WindowsPathIdentity.cs'
-        Original = '            .OrderBy(static name => name, StringComparer.Ordinal)'
-        Mutated = '            .OrderBy(static name => name, StringComparer.Ordinal).Take(1)'
+        File = 'SharpProof.Host\LinuxPathIdentity.cs'
+        Original = '            .OrderBy(static path => path, StringComparer.Ordinal)'
+        Mutated = '            .OrderBy(static path => path, StringComparer.Ordinal).Take(1)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~OverlapOnAnyPublicationMemberBlocks'
     },
     [pscustomobject]@{
-        Name = 'publication-rejects-unc'
-        File = 'SharpProof.Worker.Protocol\WindowsPathIdentity.cs'
-        Original = '        if (fullPath.StartsWith(@"\\", StringComparison.Ordinal))'
-        Mutated = '        if (fullPath.StartsWith(@"\\", StringComparison.Ordinal) && string.IsNullOrEmpty(fullPath))'
+        Name = 'publication-rejects-symbolic-links'
+        File = 'SharpProof.Host\LinuxPathIdentity.cs'
+        Original = '                if (type == FileTypeSymbolicLink)'
+        Mutated = '                if (type == FileTypeSymbolicLink && current.Length == 0)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
-        Filter = 'FullyQualifiedName~RemotePublicationPathIsRejected'
+        Filter = 'FullyQualifiedName~SymbolicLinksAndNonDirectoryAncestorsAreRejected'
     },
     [pscustomobject]@{
         Name = 'analyzer-rejects-retired-mode'
@@ -1156,7 +1172,6 @@ function Invoke-IsolatedDotnet {
     Push-Location $sourceRoot
     try {
         & (Join-Path $sourceRoot 'scripts\Invoke-SharpProofDotnet.ps1') `
-            -MemoryLimitMb 8192 `
             -TimeoutSeconds 600 `
             @Arguments *> $log
         return $LASTEXITCODE

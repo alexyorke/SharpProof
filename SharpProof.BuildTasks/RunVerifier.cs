@@ -2,10 +2,9 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Text;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
-using SharpProof.Worker.Protocol;
+using SharpProof.Host;
 
 namespace SharpProof.BuildTasks;
 
@@ -51,17 +50,13 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
         Process? process = null;
         try
         {
+            ContainerContract.ValidateRequired();
             var resolvedExecutable = ResolveDotNetHost(Executable);
-            var commandLine = string.Join(
-                " ",
-                Arguments.Select(static argument =>
-                    QuoteArgument(argument.ItemSpec)));
             process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = resolvedExecutable,
-                    Arguments = commandLine,
                     WorkingDirectory = Path.GetFullPath(WorkingDirectory),
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
@@ -69,6 +64,10 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
                     CreateNoWindow = true
                 }
             };
+            foreach (var argument in Arguments)
+            {
+                process.StartInfo.ArgumentList.Add(argument.ItemSpec);
+            }
             lock (_synchronization)
             {
                 if (_canceled)
@@ -188,7 +187,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
             : location;
         lineNumber = 0;
         columnNumber = 0;
-        if (!location.EndsWith(")", StringComparison.Ordinal))
+        if (!location.EndsWith(')'))
         {
             return true;
         }
@@ -197,14 +196,14 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
         var comma = location.LastIndexOf(',');
         if (openParenthesis <= 0 || comma <= openParenthesis ||
             !int.TryParse(
-                location.Substring(
+                location.AsSpan(
                     openParenthesis + 1,
                     comma - openParenthesis - 1),
                 NumberStyles.None,
                 CultureInfo.InvariantCulture,
                 out lineNumber) ||
             !int.TryParse(
-                location.Substring(
+                location.AsSpan(
                     comma + 1,
                     location.Length - comma - 2),
                 NumberStyles.None,
@@ -225,7 +224,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
         if (string.IsNullOrWhiteSpace(executable))
         {
             throw new InvalidOperationException(
-                "SharpProofDotNetHost must name the direct dotnet.exe muxer.");
+                "SharpProof verifier host must name the direct dotnet muxer.");
         }
 
         var disclosedHost = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
@@ -235,58 +234,26 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
         if (string.Equals(
                 executable,
                 "dotnet",
-                StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(
-                executable,
-                "dotnet.exe",
-                StringComparison.OrdinalIgnoreCase))
+                StringComparison.Ordinal))
         {
             return trusted;
         }
         if (!Path.IsPathRooted(executable) ||
             !string.Equals(
                 Path.GetFileName(executable),
-                "dotnet.exe",
-                StringComparison.OrdinalIgnoreCase))
+                "dotnet",
+                StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                "SharpProofDotNetHost must name the direct dotnet.exe muxer.");
+                "SharpProof verifier host must name the direct dotnet muxer.");
         }
         var configured = ValidateDotNetInstallation(executable);
-        if (!WindowsPathIdentity.AreSameExistingFile(configured, trusted))
+        if (!LinuxPathIdentity.AreSameExistingFile(configured, trusted))
         {
             throw new InvalidOperationException(
-                "SharpProofDotNetHost must match the trusted current dotnet.exe muxer.");
+                "SharpProof verifier host must match the trusted current dotnet muxer.");
         }
         return configured;
-    }
-
-    internal static string QuoteArgument(string argument)
-    {
-        var quoted = new StringBuilder(argument.Length + 2);
-        quoted.Append('"');
-        var backslashes = 0;
-        foreach (var character in argument)
-        {
-            if (character == '\\')
-            {
-                backslashes++;
-                continue;
-            }
-            if (character == '"')
-            {
-                quoted.Append('\\', (backslashes * 2) + 1);
-                quoted.Append(character);
-                backslashes = 0;
-                continue;
-            }
-            quoted.Append('\\', backslashes);
-            quoted.Append(character);
-            backslashes = 0;
-        }
-        quoted.Append('\\', backslashes * 2);
-        quoted.Append('"');
-        return quoted.ToString();
     }
 
     public void Cancel()
@@ -316,7 +283,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
     {
         foreach (var value in (Environment.GetEnvironmentVariable("PATH") ??
                      string.Empty).Split(
-                     [';'],
+                     [Path.PathSeparator],
                      StringSplitOptions.RemoveEmptyEntries))
         {
             var directory = value.Trim().Trim('"');
@@ -326,14 +293,14 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
             {
                 continue;
             }
-            var candidate = Path.Combine(directory, "dotnet.exe");
+            var candidate = Path.Combine(directory, "dotnet");
             if (File.Exists(candidate))
             {
                 return candidate;
             }
         }
         throw new InvalidOperationException(
-            "SharpProofDotNetHost could not resolve a trusted dotnet.exe from PATH.");
+            "SharpProof could not resolve a trusted dotnet muxer from PATH.");
     }
 
     private static string ValidateDotNetInstallation(string candidate)
@@ -341,22 +308,22 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
         if (!Path.IsPathRooted(candidate) ||
             !string.Equals(
                 Path.GetFileName(candidate),
-                "dotnet.exe",
-                StringComparison.OrdinalIgnoreCase))
+                "dotnet",
+                StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                "SharpProofDotNetHost must name the direct dotnet.exe muxer.");
+                "SharpProof verifier host must name the direct dotnet muxer.");
         }
-        var resolved = WindowsPathIdentity.Canonicalize(candidate);
+        var resolved = LinuxPathIdentity.Canonicalize(candidate);
         var directoryPath = Path.GetDirectoryName(resolved);
         if (!File.Exists(resolved) ||
             string.IsNullOrEmpty(directoryPath) ||
             !Directory.Exists(Path.Combine(directoryPath, "host", "fxr")))
         {
             throw new InvalidOperationException(
-                "SharpProofDotNetHost must be a complete dotnet.exe installation.");
+                "SharpProof verifier host must be a complete dotnet installation.");
         }
-        WindowsPathIdentity.Canonicalize(
+        LinuxPathIdentity.Canonicalize(
             Path.Combine(directoryPath, "host", "fxr"));
         return resolved;
     }

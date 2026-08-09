@@ -1,10 +1,6 @@
 [CmdletBinding()]
 param(
     [Parameter()]
-    [ValidateRange(0, 1048576)]
-    [int]$MemoryLimitMb = 0,
-
-    [Parameter()]
     [ValidateRange(0, 86400)]
     [int]$TimeoutSeconds = 0,
 
@@ -18,44 +14,101 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-. (Join-Path $PSScriptRoot 'JobObjectHelpers.ps1')
+if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
+    throw 'SharpProof .NET commands must run in the canonical Linux container. Use docker compose run --rm tooling <command>.'
+}
 
-$effectiveDotnetArgs = [System.Collections.Generic.List[string]]::new([string[]]$DotnetArgs)
-
-if ($effectiveDotnetArgs.Count -gt 0)
-{
-    $msbuildBackedCommands = [System.Collections.Generic.HashSet[string]]::new(
-        [string[]]@('build', 'clean', 'msbuild', 'pack', 'publish', 'restore', 'test'),
+$effectiveDotnetArgs = [Collections.Generic.List[string]]::new(
+    [string[]]$DotnetArgs)
+if ($effectiveDotnetArgs.Count -gt 0) {
+    $msbuildBackedCommands = [Collections.Generic.HashSet[string]]::new(
+        [string[]]@(
+            'build', 'clean', 'msbuild', 'pack', 'publish', 'restore', 'test'),
         [StringComparer]::OrdinalIgnoreCase)
-
-    if ($msbuildBackedCommands.Contains($effectiveDotnetArgs[0]))
-    {
-        $hasNodeReuseSetting = $effectiveDotnetArgs | Where-Object {
-            $_.Equals('/nodeReuse:false', [StringComparison]::OrdinalIgnoreCase) -or
-            $_.Equals('-nodeReuse:false', [StringComparison]::OrdinalIgnoreCase)
-        }
-        if (-not $hasNodeReuseSetting)
-        {
+    if ($msbuildBackedCommands.Contains($effectiveDotnetArgs[0])) {
+        if (-not ($effectiveDotnetArgs | Where-Object {
+                    $_.Equals(
+                        '/nodeReuse:false',
+                        [StringComparison]::OrdinalIgnoreCase) -or
+                    $_.Equals(
+                        '-nodeReuse:false',
+                        [StringComparison]::OrdinalIgnoreCase)
+                })) {
             $effectiveDotnetArgs.Add('/nodeReuse:false')
         }
-
-        $hasSharedCompilationSetting = $effectiveDotnetArgs | Where-Object {
-            $_.StartsWith('-p:UseSharedCompilation=', [StringComparison]::OrdinalIgnoreCase) -or
-            $_.StartsWith('/p:UseSharedCompilation=', [StringComparison]::OrdinalIgnoreCase)
-        }
-        if (-not $hasSharedCompilationSetting)
-        {
+        if (-not ($effectiveDotnetArgs | Where-Object {
+                    $_.StartsWith(
+                        '-p:UseSharedCompilation=',
+                        [StringComparison]::OrdinalIgnoreCase) -or
+                    $_.StartsWith(
+                        '/p:UseSharedCompilation=',
+                        [StringComparison]::OrdinalIgnoreCase)
+                })) {
             $effectiveDotnetArgs.Add('-p:UseSharedCompilation=false')
         }
     }
 }
 
-$exitCode = Invoke-ProcessUnderJobObject `
-    -FilePath 'dotnet' `
-    -ArgumentList $effectiveDotnetArgs `
-    -MemoryLimitMb $MemoryLimitMb `
-    -TimeoutSeconds $TimeoutSeconds `
-    -WorkingDirectory (Get-Location).Path `
-    -OutputPath $OutputPath
+$startInfo = [Diagnostics.ProcessStartInfo]::new()
+$startInfo.FileName = 'dotnet'
+$startInfo.WorkingDirectory = (Get-Location).Path
+$startInfo.UseShellExecute = $false
+$startInfo.CreateNoWindow = $true
+foreach ($argument in $effectiveDotnetArgs) {
+    [void]$startInfo.ArgumentList.Add($argument)
+}
+$capture = -not [string]::IsNullOrWhiteSpace($OutputPath)
+$startInfo.RedirectStandardOutput = $capture
+$startInfo.RedirectStandardError = $capture
 
-exit $exitCode
+$process = [Diagnostics.Process]::new()
+$process.StartInfo = $startInfo
+$started = $false
+try {
+    if (-not $process.Start()) {
+        throw 'The dotnet process could not be started.'
+    }
+    $started = $true
+    $standardOutput = if ($capture) {
+        $process.StandardOutput.ReadToEndAsync()
+    } else {
+        $null
+    }
+    $standardError = if ($capture) {
+        $process.StandardError.ReadToEndAsync()
+    } else {
+        $null
+    }
+
+    if ($TimeoutSeconds -gt 0 -and
+        -not $process.WaitForExit($TimeoutSeconds * 1000)) {
+        $process.Kill($true)
+        $process.WaitForExit()
+        $global:LASTEXITCODE = 124
+        exit 124
+    }
+    $process.WaitForExit()
+
+    if ($capture) {
+        $directory = Split-Path -Parent $OutputPath
+        if (-not [string]::IsNullOrWhiteSpace($directory)) {
+            [IO.Directory]::CreateDirectory($directory) | Out-Null
+        }
+        $output = $standardOutput.GetAwaiter().GetResult()
+        $errorOutput = $standardError.GetAwaiter().GetResult()
+        [IO.File]::WriteAllText(
+            $OutputPath,
+            $output + $errorOutput,
+            [Text.UTF8Encoding]::new($false))
+    }
+
+    $global:LASTEXITCODE = $process.ExitCode
+    exit $process.ExitCode
+}
+finally {
+    if ($started -and -not $process.HasExited) {
+        $process.Kill($true)
+        $process.WaitForExit()
+    }
+    $process.Dispose()
+}

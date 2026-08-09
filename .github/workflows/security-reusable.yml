@@ -27,61 +27,42 @@ jobs:
           deny-licenses: GPL-2.0-only, GPL-3.0-only, AGPL-1.0-only, AGPL-3.0-only
 
   dependency-audit:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE_PROJECT_NAME: sharpproof-security-deps-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup the repository SDK
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "9.0.316"
-          global-json-file: global.json
+          fetch-depth: 0
 
-      - name: Restore the locked graph with NuGet audit enforcement
-        shell: pwsh
-        run: >-
-          .\scripts\Invoke-SharpProofDotnet.ps1
-          restore SharpProof.sln
-          --locked-mode
+      - name: Build the pinned toolchain
+        run: docker compose build tooling
 
       - name: Reject vulnerable direct or transitive packages
-        shell: pwsh
-        run: >-
-          .\scripts\Test-SharpProofDependencyAudit.ps1
-          -SolutionPath SharpProof.sln
-          -NuGetConfigurationPath NuGet.Config
-          -OutputPath artifacts/security/dependency-audit.json
+        run: docker compose run --rm tooling dependency-audit
 
       - name: Retain fail-closed dependency-audit evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: >-
             security-dependency-audit-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/security/dependency-audit.json
+          path: artifacts/dependency-audit/dependency-audit.json
           if-no-files-found: error
 
   banned-apis:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE_PROJECT_NAME: sharpproof-security-banned-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup the repository SDK
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "9.0.316"
-          global-json-file: global.json
+          fetch-depth: 0
 
-      - name: Restore the locked graph
-        shell: pwsh
-        run: >-
-          .\scripts\Invoke-SharpProofDotnet.ps1
-          restore SharpProof.sln
-          --locked-mode
+      - name: Build the pinned toolchain
+        run: docker compose build tooling
 
       - name: Enforce banned APIs and production analyzer warnings
-        shell: pwsh
         run: >-
-          .\scripts\Invoke-SharpProofDotnet.ps1
-          build SharpProof.sln
-          --configuration Release
-          --no-restore
+          docker compose run --rm tooling build
+          -Configuration Release
+          -Target SharpProof.sln

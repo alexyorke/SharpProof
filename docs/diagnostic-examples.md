@@ -37,7 +37,7 @@ dotnet_diagnostic.SP0027.severity = warning
 `SP0024` is an error and `SP0025` is a warning. The `SPCF` rules are errors once
 the generator is loaded. Unsupported unannotated methods are quiet; an
 unsupported explicitly selected method produces SP0047. SP0049 is a fatal
-compiler-collection infrastructure error during Windows verification.
+compiler-collection infrastructure error during container verification.
 
 ## Main analyzer summary
 
@@ -54,7 +54,7 @@ compiler-collection infrastructure error during Windows verification.
 | `SP0045` | `effects` | Info, on | Yes |
 | `SP0046` | `effects` | Info, on | Yes |
 | `SP0047` | Explicitly selected unsupported method | Info, on | Yes |
-| `SP0049` | Windows verification compiler manifest | Error, on | On artifact failure |
+| `SP0049` | Container verification compiler manifest | Error, on | On artifact failure |
 | `SP0050` | Referenced contract API assembly | Error, on | On unreadable payload |
 
 `SharpProofFeatures=all` enables both feature pipelines. The former
@@ -73,7 +73,7 @@ This is a not-proven diagnostic. It does not claim a replayed impure trace.
 ## SP0013 - allocation in a zero-allocation method
 
 Reserved as a live-analyzer diagnostic. The current path-insensitive
-may-effect analyzer never emits SP0013. Separately, the opt-in Windows worker
+may-effect analyzer never emits SP0013. Separately, the opt-in container worker
 can publish a typed effect `Refuted` result after independently replaying the
 schema-10 event for an unconditional definite managed object/array allocation.
 
@@ -228,7 +228,7 @@ by the manifest. `SharpProofAssumptionPolicy=allow` reports information,
 <a id="sp0049"></a>
 ## SP0049 - final compiler manifest emission failed
 
-The production analyzer emits SP0049 when Windows verification requested a
+The production analyzer emits SP0049 when container verification requested a
 post-generator compiler-manifest artifact but could not collect or write it.
 This includes invalid compiler-visible expression depth; resolver-dependent
 `#r`/`#load` or missing-assembly resolution; reference supersession; a custom

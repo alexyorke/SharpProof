@@ -27,7 +27,7 @@ internal sealed class PackagedProductFeed : IDisposable
     internal const string AttributesPackageId = "SharpProof.Attributes";
     internal const string PortablePackageId = "SharpProof";
     internal const string VerifierPackageId =
-        "SharpProof.Verifier.Win-x64";
+        "SharpProof.Verifier";
     internal const string PackageSourceEnvironmentVariable =
         "SHARPPROOF_PACKAGE_SOURCE";
 
@@ -314,8 +314,8 @@ internal sealed class PackagedProductFeed : IDisposable
         var expectedProjects = new[] {
             "SharpProof.Attributes/SharpProof.Attributes.csproj",
             "SharpProof.Package/SharpProof.Package.csproj",
-            "SharpProof.Verifier.Win-x64/" +
-                "SharpProof.Verifier.Win-x64.csproj"
+            "SharpProof.Verifier/" +
+                "SharpProof.Verifier.csproj"
         };
         if (!projects.SequenceEqual(
                 expectedProjects,

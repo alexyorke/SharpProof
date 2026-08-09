@@ -12,7 +12,7 @@
     <PackageReference Include="SharpProof"
                       Version="$(SharpProofSamplePackageVersion)"
                       PrivateAssets="all" />
-    <PackageReference Include="SharpProof.Verifier.Win-x64"
+    <PackageReference Include="SharpProof.Verifier"
                       Version="$(SharpProofSamplePackageVersion)"
                       PrivateAssets="all"
                       Condition="'$(ContinuousIntegrationBuild)' == 'true'" />

@@ -40,11 +40,11 @@ public sealed class DependencyAutomationTests
             Assert.That(
                 workflow,
                 Does.Contain(
-                    @".\scripts\Test-SharpProofDependencyAudit.ps1"));
+                    "docker compose run --rm tooling dependency-audit"));
             Assert.That(
                 workflow,
                 Does.Contain(
-                    "-OutputPath artifacts/security/dependency-audit.json"));
+                    "artifacts/dependency-audit/dependency-audit.json"));
             Assert.That(
                 workflow,
                 Does.Contain(
@@ -78,19 +78,7 @@ public sealed class DependencyAutomationTests
             Assert.That(
                 workflow,
                 Does.Contain(
-                    @".\scripts\Test-SharpProofDependencyAudit.ps1"));
-            Assert.That(
-                workflow,
-                Does.Contain("-SolutionPath SharpProof.sln"));
-            Assert.That(
-                workflow,
-                Does.Contain(
-                    "-NuGetConfigurationPath NuGet.Config"));
-            Assert.That(
-                workflow,
-                Does.Contain(
-                    "-OutputPath " +
-                    "artifacts/nightly/dependency-audit.json"));
+                    "docker compose run --rm tooling dependency-audit"));
             Assert.That(
                 workflow,
                 Does.Not.Contain(
@@ -99,9 +87,7 @@ public sealed class DependencyAutomationTests
                 workflow,
                 Does.Not.Contain("--vulnerable"));
             Assert.That(uploadIndex, Is.GreaterThanOrEqualTo(0));
-            Assert.That(
-                upload,
-                Does.Contain("artifacts/nightly"));
+            Assert.That(upload, Does.Contain("path: artifacts"));
         }
     }
 

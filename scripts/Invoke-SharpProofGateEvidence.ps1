@@ -8,10 +8,6 @@ param(
     [string]$OutputPath,
 
     [Parameter()]
-    [ValidateRange(1, 65536)]
-    [int]$MemoryLimitMb = 8192,
-
-    [Parameter()]
     [ValidateRange(1, 86400)]
     [int]$TimeoutSeconds = 600
 )
@@ -56,9 +52,7 @@ $quotedArguments = @(
 ) -join ','
 $escapedWrapper = $wrapper.Replace("'", "''")
 $command = (
-    "& '$escapedWrapper' -MemoryLimitMb " +
-    [string]$MemoryLimitMb +
-    ' -TimeoutSeconds ' +
+    "& '$escapedWrapper' -TimeoutSeconds " +
     [string]$TimeoutSeconds +
     " @($quotedArguments); exit " + '$LASTEXITCODE')
 $encodedCommand = [Convert]::ToBase64String(

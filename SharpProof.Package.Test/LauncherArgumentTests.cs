@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using NUnit.Framework;
 using SharpProof.BuildTasks;
 using SharpProof.CompilerArtifact;
+using SharpProof.Host;
 using SharpProof.Worker;
 using SharpProof.Worker.Launcher;
 using SharpProof.Worker.Protocol;
@@ -14,61 +15,53 @@ public sealed class LauncherArgumentTests
 {
     [Test]
     [NonParallelizable]
-    public void WindowsJobContainsSuspendedDotNetProcessBeforeExecution()
+    public void LinuxWorkerReceivesTheExactStartupRelease()
     {
-        if (!OperatingSystem.IsWindows() ||
+        if (!OperatingSystem.IsLinux() ||
             RuntimeInformation.ProcessArchitecture != Architecture.X64)
         {
-            Assert.Ignore("Windows x64 Job Objects are required.");
+            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
         }
 
-        var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ??
-            throw new InvalidOperationException(
-                "The test host did not disclose its dotnet host path.");
-        using var job = WindowsJob.CreateRequired(
-            256L * 1024L * 1024L,
-            activeProcessLimit: 1);
-        using var process = job.StartSuspended(
-            host,
-            ["--version"],
+        using var process = LinuxWorkerProcess.Start(
+            "/bin/sh",
+            ["-c", "read line; test \"$line\" = \"SharpProof.Start/1\""],
             TestContext.CurrentContext.WorkDirectory);
-
-        Assert.That(process.WaitForExit(0), Is.False);
-        process.Resume();
+        var completion = process.WaitForExit(
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(1));
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(process.WaitForExit(30_000), Is.True);
-            Assert.That(process.ExitCode, Is.Zero);
-            Assert.That(
-                SpinWait.SpinUntil(job.HasNoActiveProcesses, 5_000),
-                Is.True);
+            Assert.That(completion.Kind, Is.EqualTo(LinuxWorkerCompletionKind.Exited));
+            Assert.That(completion.ExitCode, Is.Zero);
         }
     }
 
     [Test]
-    public void InvalidSuspendedProcessHandlesFailClosed()
+    public void LinuxWorkerTimeoutTerminatesTheDirectChild()
     {
-        if (!OperatingSystem.IsWindows())
+        if (!OperatingSystem.IsLinux() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64)
         {
-            Assert.Ignore("Windows process handles are required.");
+            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
         }
 
-        using var process = new SuspendedProcess(
-            IntPtr.Zero,
-            IntPtr.Zero);
+        using var process = LinuxWorkerProcess.Start(
+            "/bin/sh",
+            ["-c", "trap '' TERM; while :; do sleep 1; done"],
+            TestContext.CurrentContext.WorkDirectory);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var completion = process.WaitForExit(
+            TimeSpan.FromMilliseconds(100),
+            TimeSpan.FromMilliseconds(500));
+        stopwatch.Stop();
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                (Func<int>)(() => process.ExitCode),
-                Throws.TypeOf<System.ComponentModel.Win32Exception>());
-            Assert.That(
-                (Action)process.Resume,
-                Throws.TypeOf<System.ComponentModel.Win32Exception>());
-            Assert.That(
-                (Func<bool>)(() => process.WaitForExit(0)),
-                Throws.TypeOf<System.ComponentModel.Win32Exception>());
+            Assert.That(completion.Kind, Is.EqualTo(LinuxWorkerCompletionKind.TimedOut));
+            Assert.That(completion.ExitCode, Is.EqualTo(124));
+            Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(2)));
         }
     }
 
@@ -100,7 +93,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
-    [Platform("Win")]
+    [Platform("Linux")]
     public void CompletePublicationAcceptsSarif()
     {
         string[] arguments = [
@@ -120,7 +113,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
-    [Platform("Win")]
+    [Platform("Linux")]
     public void ParsedPathsAndTerminationGraceAreNormalized()
     {
         string[] arguments = [
@@ -187,10 +180,6 @@ public sealed class LauncherArgumentTests
             Assert.That(request.Budgets.MaxParallelism, Is.EqualTo(WorkerBudgets.MaximumParallelism));
             Assert.That(request.Budgets.MaximumExpressionDepth,
                 Is.EqualTo(WorkerBudgets.DefaultMaximumExpressionDepth));
-            Assert.That(request.Budgets.ProcessMemoryLimitBytes,
-                Is.EqualTo(WorkerBudgets.DefaultProcessMemoryLimitBytes));
-            Assert.That(request.Budgets.MaxWorkerProcesses,
-                Is.EqualTo(WorkerBudgets.MaximumParallelism));
             Assert.That(request.Cache.Enabled, Is.True);
             Assert.That(request.Cache.Directory, Is.Null);
             Assert.That(request.Cache.MaximumBytes,
@@ -209,8 +198,6 @@ public sealed class LauncherArgumentTests
             "--project-wall-ms", "104",
             "--max-parallelism", "2",
             "--max-expression-depth", "105",
-            "--process-memory-bytes", "106",
-            "--max-worker-processes", "3",
             "--cache-enabled", "false",
             "--cache-directory", "relative-cache",
             "--cache-maximum-bytes", "107"
@@ -229,8 +216,6 @@ public sealed class LauncherArgumentTests
             Assert.That(request.Budgets.ProjectWallTimeMilliseconds, Is.EqualTo(104));
             Assert.That(request.Budgets.MaxParallelism, Is.EqualTo(2));
             Assert.That(request.Budgets.MaximumExpressionDepth, Is.EqualTo(105));
-            Assert.That(request.Budgets.ProcessMemoryLimitBytes, Is.EqualTo(106));
-            Assert.That(request.Budgets.MaxWorkerProcesses, Is.EqualTo(3));
             Assert.That(request.Cache.Enabled, Is.False);
             Assert.That(request.Cache.Directory, Is.EqualTo("relative-cache"));
             Assert.That(request.Cache.MaximumBytes, Is.EqualTo(107));
@@ -272,7 +257,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
-    [Platform("Win")]
+    [Platform("Linux")]
     public void RequestProjectionRejectsReparsePointPathBeforeManifestRead()
     {
         var root = Path.Combine(
@@ -330,7 +315,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
-    [Platform("Win")]
+    [Platform("Linux")]
     public void RequestProjectionRejectsCollidingIoPathsBeforeManifestRead()
     {
         string[] arguments = [
@@ -352,7 +337,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
-    [Platform("Win")]
+    [Platform("Linux")]
     public void RequestProjectionRejectsCachePathCollisionBeforeManifestRead()
     {
         var requestPath = Path.Combine(
@@ -380,7 +365,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
-    [Platform("Win")]
+    [Platform("Linux")]
     public void RequestProjectionRejectsWorkerTreeOutputBeforeManifestRead()
     {
         var worker = Path.Combine(
@@ -409,7 +394,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
-    [Platform("Win")]
+    [Platform("Linux")]
     public void RequestProjectionRejectsWorkerPathCollisionBeforeManifestRead()
     {
         string[] arguments = [
@@ -447,7 +432,7 @@ public sealed class LauncherArgumentTests
 
     [TestCase("worker.deps.json")]
     [TestCase("worker.runtimeconfig.json")]
-    [Platform("Win")]
+    [Platform("Linux")]
     public void RequestProjectionRejectsWorkerRuntimeCompanionCollisionBeforeManifestRead(
         string resultPath)
     {
@@ -470,7 +455,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
-    [Platform("Win")]
+    [Platform("Linux")]
     public void RequestProjectionRejectsLauncherRuntimeCollisionBeforeManifestRead()
     {
         var launcher = LauncherArguments.LauncherRuntimePaths[0];
@@ -506,7 +491,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
-    [Platform("Win")]
+    [Platform("Linux")]
     public void RequestProjectionRejectsLauncherProtocolRuntimeCollisionBeforeManifestRead()
     {
         var launcher = LauncherArguments.LauncherRuntimePaths[0];
@@ -534,7 +519,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
-    [Platform("Win")]
+    [Platform("Linux")]
     public void RequestProjectionRejectsDiscoveredRuntimeAssetCollisionBeforeManifestRead()
     {
         var worker = typeof(SharpProofWorker).Assembly.Location;
@@ -610,32 +595,8 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
-    public void ProcessMemoryLimitHasFiniteProtocolBound()
-    {
-        var request = new WorkerVerifyRequest
-        {
-            CompilerManifest = new WorkerFileReference
-            {
-                Path = "compiler-manifest.json",
-                Sha256 = new('a', 64)
-            },
-            Budgets = new WorkerBudgets
-            {
-                ProcessMemoryLimitBytes = WorkerBudgets.MaximumProcessMemoryLimitBytes + 1
-            }
-        };
-
-        var validation = WorkerProtocolJson.Validate(request);
-
-        Assert.That(validation.IsValid, Is.False);
-        Assert.That(
-            validation.Errors.Select(static error => error.Code),
-            Does.Contain("budgets.process_memory"));
-    }
-
-    [Test]
     [NonParallelizable]
-    [Platform("Win")]
+    [Platform("Linux")]
     public async Task MainLeavesRequestAndResultSentinelsWhenManifestIsMalformed()
     {
         var directory = Path.Combine(
@@ -682,7 +643,7 @@ public sealed class LauncherArgumentTests
 
     [Test]
     [NonParallelizable]
-    [Platform("Win")]
+    [Platform("Linux")]
     public async Task MainFailsClosedWhenWorkerDependencyManifestIsMalformed()
     {
         var sourceWorker = typeof(SharpProofWorker).Assembly.Location;
@@ -828,14 +789,14 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
-    [Platform("Win")]
+    [Platform("Linux")]
     public void DotNetHostMustBeAbsoluteInstalledAndOutsideProject()
     {
         var project = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
             Guid.NewGuid().ToString("N"));
         var fakeRoot = Path.Combine(project, "fake-sdk");
-        var fakeHost = Path.Combine(fakeRoot, "dotnet.exe");
+        var fakeHost = Path.Combine(fakeRoot, "dotnet");
         Directory.CreateDirectory(Path.Combine(fakeRoot, "host", "fxr"));
         File.WriteAllBytes(fakeHost, []);
         var actualHost = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ??
@@ -846,25 +807,6 @@ public sealed class LauncherArgumentTests
             Assert.That(
                 Program.ValidateDotNetHostPath(actualHost, project),
                 Is.EqualTo(Path.GetFullPath(actualHost)));
-            if (OperatingSystem.IsWindows())
-            {
-                var extendedHost = @"\\?\" + Path.GetFullPath(actualHost);
-                var extendedProjectRoot = @"\\?\" +
-                    Path.GetPathRoot(actualHost)!;
-                Assert.That(
-                    Program.ValidateDotNetHostPath(extendedHost, project),
-                    Is.EqualTo(Path.GetFullPath(actualHost)));
-                Assert.That(
-                    (Action)(() => _ = Program.ValidateDotNetHostPath(
-                        extendedHost,
-                        Path.GetPathRoot(actualHost)!)),
-                    Throws.TypeOf<InvalidOperationException>());
-                Assert.That(
-                    (Action)(() => _ = Program.ValidateDotNetHostPath(
-                        actualHost,
-                        extendedProjectRoot)),
-                    Throws.TypeOf<InvalidOperationException>());
-            }
             Assert.That(
                 (Action)(() => _ = Program.ValidateDotNetHostPath(
                     actualHost,
@@ -872,7 +814,7 @@ public sealed class LauncherArgumentTests
                 Throws.TypeOf<InvalidOperationException>());
             Assert.That(
                 (Action)(() => _ = Program.ValidateDotNetHostPath(
-                    "dotnet.exe", project)),
+                    "dotnet", project)),
                 Throws.TypeOf<InvalidOperationException>());
             Assert.That(
                 (Action)(() => _ = Program.ValidateDotNetHostPath(

@@ -1,23 +1,44 @@
+using System.Runtime.InteropServices;
+using SharpProof.Host;
+
 namespace SharpProof.Worker;
 
 internal static class Program
 {
     internal static async Task<int> Main(string[] args)
     {
-        if (!TryParseArguments(args, out var requestPath, out var resultPath, out var startEventName))
+        if (!TryParseArguments(
+                args,
+                out var requestPath,
+                out var resultPath,
+                out var parentProcessId))
         {
-            Console.Error.WriteLine("Usage: SharpProof.Worker verify --request <request.json> --result <result.json> --start-event <name>");
+            Console.Error.WriteLine(
+                "Usage: SharpProof.Worker verify --request <request.json> --result <result.json> " +
+                "--start-stdin --parent-pid <pid>");
             return 2;
         }
-        if (!OperatingSystem.IsWindows() || System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture !=
-                System.Runtime.InteropServices.Architecture.X64 || System.Runtime.InteropServices.RuntimeInformation.OSArchitecture !=
-                System.Runtime.InteropServices.Architecture.X64)
+        try
         {
-            Console.Error.WriteLine("The SharpProof verifier requires Windows x64.");
-            return 125;
+            ContainerContract.ValidateRequired();
+            LinuxWorkerProcess.EnterChildBoundaryRequired(parentProcessId);
+            if (!await WaitForStartAsync(TimeSpan.FromSeconds(30))
+                    .ConfigureAwait(false))
+            {
+                return 125;
+            }
         }
-        if (!WaitForStart(startEventName))
+        catch (Exception exception) when (exception is
+            BadImageFormatException or DllNotFoundException or
+                EntryPointNotFoundException or FileLoadException or
+                FileNotFoundException or
+            ArgumentException or IOException or InvalidDataException or
+                InvalidOperationException or PlatformNotSupportedException or
+                UnauthorizedAccessException)
         {
+            Console.Error.WriteLine(
+                "The SharpProof worker containment boundary is unavailable: " +
+                exception.Message);
             return 125;
         }
 
@@ -48,9 +69,17 @@ internal static class Program
             cancellation.Cancel();
         };
         Console.CancelKeyPress += handler;
+        using var terminate = PosixSignalRegistration.Create(
+            PosixSignal.SIGTERM,
+            context =>
+            {
+                context.Cancel = true;
+                cancellation.Cancel();
+            });
         try
         {
-            using var worker = SharpProofWorker.Create(request?.Budgets ?? new WorkerBudgets());
+            var budgets = request?.Budgets ?? new WorkerBudgets();
+            using var worker = SharpProofWorker.Create(budgets);
             var response = await worker.VerifyAsync(request!, cancellation.Token).ConfigureAwait(false);
             return await Respond(response).ConfigureAwait(false);
         }
@@ -83,13 +112,23 @@ internal static class Program
     }
 
     private static bool TryParseArguments(
-        string[] args, out string request, out string result, out string startEvent)
+        string[] args,
+        out string request,
+        out string result,
+        out int parentProcessId)
     {
         if (args is not ["verify", "--request", var requestValue,
-                "--result", var resultValue, "--start-event", var eventValue] ||
-            string.IsNullOrWhiteSpace(eventValue))
+                "--result", var resultValue, "--start-stdin",
+                "--parent-pid", var parentProcessValue] ||
+            !int.TryParse(
+                parentProcessValue,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out parentProcessId) ||
+            parentProcessId <= 0)
         {
-            request = result = startEvent = string.Empty;
+            request = result = string.Empty;
+            parentProcessId = 0;
             return false;
         }
         try
@@ -100,30 +139,30 @@ internal static class Program
         catch (Exception exception) when (exception is
             ArgumentException or IOException or NotSupportedException)
         {
-            request = result = startEvent = string.Empty;
+            request = result = string.Empty;
+            parentProcessId = 0;
             return false;
         }
-        startEvent = eventValue;
-        return !string.Equals(request, result, StringComparison.OrdinalIgnoreCase);
+        return !string.Equals(request, result, StringComparison.Ordinal);
     }
-    private static bool WaitForStart(string eventName)
-    {
-        if (!OperatingSystem.IsWindows())
-        {
-            return false;
-        }
 
-        try
-        {
-            using var startEvent = EventWaitHandle.OpenExisting(eventName);
-            return startEvent.WaitOne(TimeSpan.FromSeconds(30));
-        }
-        catch (Exception exception) when (exception is
-            ArgumentException or IOException or UnauthorizedAccessException or
-                WaitHandleCannotBeOpenedException)
-        {
-            return false;
-        }
+    private static async Task<bool> WaitForStartAsync(TimeSpan timeout)
+    {
+        using var timeoutBoundary = new CancellationTokenSource(timeout);
+        var read = Console.In.ReadLineAsync(timeoutBoundary.Token).AsTask();
+        var line = await read.ContinueWith(
+                static completed =>
+                    completed.Status == TaskStatus.RanToCompletion
+                        ? completed.Result
+                        : null,
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default)
+            .ConfigureAwait(false);
+        return string.Equals(
+            line,
+            LinuxWorkerProcess.StartMessage,
+            StringComparison.Ordinal);
     }
     internal static bool IsBackendUnavailable(Exception exception)
     {

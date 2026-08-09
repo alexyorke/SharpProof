@@ -1,25 +1,26 @@
 # SharpProof preview qualification matrix
 
-The preview candidate is qualified on a local trusted Windows x64 build host.
-Every row below is executable in `SharpProof.Package.Test`; release evidence
-must record a green run from the exact candidate commit.
+The full verifier candidate is qualified only in the canonical SharpProof
+Linux amd64 container. Release evidence must bind every required row to the
+exact source commit, Dockerfile, container-toolchain catalog, base-image
+digests, verified Z3 payload, and package hashes.
 
-Reference Visual Studio host for `preview.1`:
+| Behavior | Required container evidence |
+|---|---|
+| Clean Docker-only build | Build the pinned image and run locked restore with no host .NET, PowerShell, Z3, or MSBuild dependency |
+| Ordinary packaged verification | Isolated-feed `SharpProof.Verifier` consumer produces a real proof |
+| Portable consumers | Isolated-feed netstandard2.0, net8.0, and net472 builds pass |
+| Percent, Unicode, spaces, and long local paths | Linux package integration matrix passes |
+| Cache and SARIF publication | Packaged verification publishes and validates both outputs |
+| Cooperative concurrent publication | Disjoint/equal sets complete coherently; each partial overlap is rejected; reverse lock order cannot deadlock |
+| Verifier cancellation | Before-start, startup, active verification, and publication cancellation tests pass with no surviving worker |
+| Native SMT closure | Packaged `libz3.so` size/hash match the toolchain catalog and hostile ambient library paths cannot redirect loading |
+| Package graph | Exactly `SharpProof.Attributes`, `SharpProof`, and `SharpProof.Verifier`, with one analyzer and one collector entry point |
+| Release gates | Debug, Release, acceptance, coverage, mutation, fuzz, corpus, performance, package, SBOM, pilots, and publication dry run pass in-container |
 
-- Visual Studio 2022 Build Tools MSBuild x64
-- file version `17.14.51.32402`
-- product version `17.14.51+25f168cee22fc5419a38fc8d2ffb6a8c0381b7a0`
+Portable analyzer consumers remain qualified independently on their declared
+Linux, Windows, and macOS matrix. Those jobs do not execute the verifier.
 
-| Behavior | Command-line MSBuild | Visual Studio MSBuild | Executable evidence |
-|---|---|---|---|
-| Ordinary packaged verification | Required | Required | `PackageReferenceRunsWorkerAndPublishesResult` and the full package suite |
-| Percent-containing local path | Required | Required | `VerifierLaunchPreservesPercentCharactersInPaths` |
-| Local paths beyond 260 characters | Required | Required | `LongLocalPublicationPathsWorkInDotNetAndVisualStudioMsBuild` |
-| Overlong project path classification | Required | Required | `OverlongProjectDirectoryFailsBeforeCompilerLaunch` |
-| Cache and SARIF publication | Required | Required | the long-path matrix publishes both cache and SARIF |
-| Cooperative concurrent publication | Required | Required | `ConcurrentInvocationsUseIsolatedWorkerFiles` and `VisualStudioMsBuildSerializesCooperativePublications` |
-| Verifier cancellation | Required | Same compiled task | `CanceledVerifierTaskDoesNotLaunchAProcess` and `ActiveVerifierTaskCancellationStopsTheProcess`; Visual Studio loads that packaged task in every Visual Studio row |
-
-Rider, Windows ARM64, hostile local filesystem mutation, and remote or UNC
-publication are outside this preview matrix. The normative boundary is
-`docs/preview-support.md`.
+Windows/Visual Studio verifier execution, native host installs, ARM64 verifier
+containers, Rider, hostile host mutation, and shared/network publication are
+outside this preview. The normative boundary is `docs/preview-support.md`.

@@ -3,8 +3,9 @@
 SharpProof's supported compile-time API is the `SharpProof.Attributes`
 package. The `SharpProof` package contributes portable analyzers, the
 `ContractFor` generator, and build-transitive configuration, but intentionally
-adds no compile-time assembly reference. `SharpProof.Verifier.Win-x64`
-contributes build tooling and a Windows x64 worker, not an application API.
+adds no compile-time assembly reference. `SharpProof.Verifier`
+contributes build tooling and a container-only Linux amd64 worker, not an
+application API.
 
 ## Contract clauses and expressions
 

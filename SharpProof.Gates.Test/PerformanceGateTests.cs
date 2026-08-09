@@ -420,14 +420,14 @@ public sealed class PerformanceGateTests
             "SharpProof.targets"));
         var verifierProps = XDocument.Load(Path.Combine(
             root,
-            "SharpProof.Verifier.Win-x64",
+            "SharpProof.Verifier",
             "buildTransitive",
-            "SharpProof.Verifier.Win-x64.props"));
+            "SharpProof.Verifier.props"));
         var verifierTargets = XDocument.Load(Path.Combine(
             root,
-            "SharpProof.Verifier.Win-x64",
+            "SharpProof.Verifier",
             "buildTransitive",
-            "SharpProof.Verifier.Win-x64.targets"));
+            "SharpProof.Verifier.targets"));
         var verifier = verifierTargets.Descendants("Target").Single(target =>
             string.Equals(
                 (string?)target.Attribute("Name"),
@@ -463,14 +463,14 @@ public sealed class PerformanceGateTests
             "SharpProof.targets"));
         var verifierProps = XDocument.Load(Path.Combine(
             root,
-            "SharpProof.Verifier.Win-x64",
+            "SharpProof.Verifier",
             "buildTransitive",
-            "SharpProof.Verifier.Win-x64.props"));
+            "SharpProof.Verifier.props"));
         var verifierTargets = XDocument.Load(Path.Combine(
             root,
-            "SharpProof.Verifier.Win-x64",
+            "SharpProof.Verifier",
             "buildTransitive",
-            "SharpProof.Verifier.Win-x64.targets"));
+            "SharpProof.Verifier.targets"));
         var verifier = verifierTargets.Descendants("Target").Single(target =>
             string.Equals(
                 (string?)target.Attribute("Name"),

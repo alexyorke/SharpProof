@@ -2,6 +2,7 @@ using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 using NUnit.Framework;
 using SharpProof.BuildTasks;
+using SharpProof.Host;
 using SharpProof.Worker;
 using SharpProof.Worker.Protocol;
 
@@ -10,17 +11,6 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 public sealed class BuildTaskTests
 {
-    [TestCase("plain", "\"plain\"")]
-    [TestCase("with space", "\"with space\"")]
-    [TestCase("ends\\", "\"ends\\\\\"")]
-    [TestCase("a\\\"b", "\"a\\\\\\\"b\"")]
-    public void VerifierArgumentsUseWindowsProcessQuoting(
-        string argument,
-        string expected)
-    {
-        Assert.That(RunVerifier.QuoteArgument(argument), Is.EqualTo(expected));
-    }
-
     [Test]
     public void CanceledVerifierTaskDoesNotLaunchAProcess()
     {
@@ -53,16 +43,19 @@ public sealed class BuildTaskTests
         task.LogStandardError(
             "source.cs(12,3): warning SP0047: incomplete" + Environment.NewLine +
             "SharpProof: warning SP0048: assumptions" + Environment.NewLine +
+            "source.cs(x,3): warning SP0047: malformed location" + Environment.NewLine +
             "worker stderr");
 
         Assert.Multiple((Action)(() =>
         {
             Assert.That(
                 engine.Warnings.Select(static warning => warning.Code),
-                Is.EqualTo((string[])["SP0047", "SP0048"]));
+                Is.EqualTo((string[])["SP0047", "SP0048", "SP0047"]));
             Assert.That(engine.Warnings[0].File, Is.EqualTo("source.cs"));
             Assert.That(engine.Warnings[0].LineNumber, Is.EqualTo(12));
             Assert.That(engine.Warnings[0].ColumnNumber, Is.EqualTo(3));
+            Assert.That(engine.Warnings[2].LineNumber, Is.Zero);
+            Assert.That(engine.Warnings[2].ColumnNumber, Is.Zero);
             Assert.That(
                 engine.Messages.Select(static message => message.Message),
                 Does.Contain("worker stderr"));
@@ -70,22 +63,128 @@ public sealed class BuildTaskTests
     }
 
     [Test]
-    [Platform("Win")]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void DotNetHostValidationRejectsUntrustedForms()
+    {
+        var originalHost = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
+        var originalPath = Environment.GetEnvironmentVariable("PATH");
+        var directory = Directory.CreateTempSubdirectory("sharpproof-dotnet-host-");
+        try
+        {
+            var trusted = RunVerifier.ResolveDotNetHost("dotnet");
+            Assert.That(
+                Assert.Throws<InvalidOperationException>(
+                    (Action)(() => RunVerifier.ResolveDotNetHost(string.Empty)))!.Message,
+                Does.Contain("direct dotnet muxer"));
+            Assert.That(
+                Assert.Throws<InvalidOperationException>(
+                    (Action)(() => RunVerifier.ResolveDotNetHost("./dotnet")))!.Message,
+                Does.Contain("direct dotnet muxer"));
+
+            Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", null);
+            Environment.SetEnvironmentVariable(
+                "PATH",
+                "relative" + Path.PathSeparator + ".");
+            Assert.That(
+                Assert.Throws<InvalidOperationException>(
+                    (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
+                Does.Contain("resolve a trusted dotnet muxer"));
+
+            var wrongName = Path.Combine(directory.FullName, "not-dotnet");
+            File.WriteAllText(wrongName, string.Empty);
+            Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", wrongName);
+            Assert.That(
+                Assert.Throws<InvalidOperationException>(
+                    (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
+                Does.Contain("direct dotnet muxer"));
+
+            var incompleteDirectory = Directory.CreateDirectory(
+                Path.Combine(directory.FullName, "incomplete"));
+            var incomplete = Path.Combine(incompleteDirectory.FullName, "dotnet");
+            File.WriteAllText(incomplete, string.Empty);
+            Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", incomplete);
+            Assert.That(
+                Assert.Throws<InvalidOperationException>(
+                    (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
+                Does.Contain("complete dotnet installation"));
+
+            var alternateDirectory = Directory.CreateDirectory(
+                Path.Combine(directory.FullName, "alternate"));
+            Directory.CreateDirectory(
+                Path.Combine(alternateDirectory.FullName, "host", "fxr"));
+            var alternate = Path.Combine(alternateDirectory.FullName, "dotnet");
+            File.Copy(trusted, alternate);
+            Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", trusted);
+            Assert.That(
+                Assert.Throws<InvalidOperationException>(
+                    (Action)(() => RunVerifier.ResolveDotNetHost(alternate)))!.Message,
+                Does.Contain("trusted current dotnet muxer"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", originalHost);
+            Environment.SetEnvironmentVariable("PATH", originalPath);
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    public void VerifierTaskCapturesDotNetOutputAndErrors()
+    {
+        var outputEngine = new RecordingBuildEngine();
+        var outputTask = new RunVerifier
+        {
+            BuildEngine = outputEngine,
+            Executable = "dotnet",
+            WorkingDirectory = TestContext.CurrentContext.WorkDirectory,
+            Arguments = [new TaskItem("--info")]
+        };
+        var errorEngine = new RecordingBuildEngine();
+        var errorTask = new RunVerifier
+        {
+            BuildEngine = errorEngine,
+            Executable = "dotnet",
+            WorkingDirectory = TestContext.CurrentContext.WorkDirectory,
+            Arguments = [new TaskItem("--not-a-sharpproof-dotnet-option")]
+        };
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(outputTask.Execute(), Is.True);
+            Assert.That(outputTask.ExitCode, Is.Zero);
+            Assert.That(outputEngine.Messages, Is.Not.Empty);
+            Assert.That(errorTask.Execute(), Is.True);
+            Assert.That(errorTask.ExitCode, Is.Not.Zero);
+            Assert.That(errorEngine.Messages, Is.Not.Empty);
+        }
+    }
+
+    [Test]
+    public void CanceledInvalidationDoesNotMutate()
+    {
+        var task = new InvalidatePublishedResult
+        {
+            BuildEngine = new RecordingBuildEngine()
+        };
+
+        task.Cancel();
+
+        Assert.That(task.Execute(), Is.False);
+    }
+
+    [Test]
+    [Platform("Linux")]
     public async System.Threading.Tasks.Task ActiveVerifierTaskCancellationStopsTheProcess()
     {
         var directory = Directory.CreateTempSubdirectory("sharpproof-cancel-");
         try
         {
-            var eventName = "Local\\SharpProof.BuildTask.Cancel." +
-                Guid.NewGuid().ToString("N");
-            using var startEvent = new EventWaitHandle(
-                false,
-                EventResetMode.ManualReset,
-                eventName);
             var task = new RunVerifier
             {
                 BuildEngine = new RecordingBuildEngine(),
-                Executable = "dotnet",
+                Executable = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
                 WorkingDirectory = directory.FullName,
                 Arguments =
                 [
@@ -95,8 +194,10 @@ public sealed class BuildTaskTests
                     new TaskItem(Path.Combine(directory.FullName, "request.json")),
                     new TaskItem("--result"),
                     new TaskItem(Path.Combine(directory.FullName, "result.json")),
-                    new TaskItem("--start-event"),
-                    new TaskItem(eventName)
+                    new TaskItem("--start-stdin"),
+                    new TaskItem("--parent-pid"),
+                    new TaskItem(Environment.ProcessId.ToString(
+                        System.Globalization.CultureInfo.InvariantCulture))
                 ]
             };
 
@@ -113,11 +214,6 @@ public sealed class BuildTaskTests
             var completed = await System.Threading.Tasks.Task.WhenAny(
                 execution,
                 System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(5)));
-            if (!ReferenceEquals(completed, execution))
-            {
-                startEvent.Set();
-                await execution.WaitAsync(TimeSpan.FromSeconds(5));
-            }
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(completed, Is.SameAs(execution));
@@ -132,7 +228,7 @@ public sealed class BuildTaskTests
     }
 
     [Test]
-    [Platform("Win")]
+    [Platform("Linux")]
     public void InvalidationDeletesOnlyThePublishedOutputs()
     {
         var directory = Directory.CreateTempSubdirectory("sharpproof-task-");
@@ -149,7 +245,7 @@ public sealed class BuildTaskTests
             var worker = Path.Combine(tools.FullName, "worker.dll");
             var launcher = Path.Combine(tools.FullName, "launcher.dll");
             var protocol = Path.Combine(tools.FullName, "protocol.dll");
-            using (WindowsPathIdentity.AcquirePublicationSet(
+            using (LinuxPathIdentity.AcquirePublicationSet(
                        [request, result, manifest, sarif],
                        TimeSpan.FromSeconds(5)))
             {
@@ -203,7 +299,7 @@ public sealed class BuildTaskTests
     }
 
     [Test]
-    [Platform("Win")]
+    [Platform("Linux")]
     public async System.Threading.Tasks.Task InvalidationCancellationInterruptsPublicationLockWait()
     {
         var directory = Directory.CreateTempSubdirectory(
@@ -219,7 +315,7 @@ public sealed class BuildTaskTests
             var launcher = Path.Combine(tools.FullName, "launcher.dll");
             var protocol = Path.Combine(tools.FullName, "protocol.dll");
             var publicationPaths = new[] { request, result, manifest };
-            using (WindowsPathIdentity.AcquirePublicationSet(
+            using (LinuxPathIdentity.AcquirePublicationSet(
                        publicationPaths,
                        TimeSpan.FromSeconds(5)))
             {
@@ -258,7 +354,7 @@ public sealed class BuildTaskTests
             using var releaseLock = new ManualResetEventSlim();
             var lockTask = System.Threading.Tasks.Task.Run(() =>
             {
-                using var held = WindowsPathIdentity.AcquirePublicationSet(
+                using var held = LinuxPathIdentity.AcquirePublicationSet(
                     publicationPaths,
                     TimeSpan.FromSeconds(5));
                 lockAcquired.Set();

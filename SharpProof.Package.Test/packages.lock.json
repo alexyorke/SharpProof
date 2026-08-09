@@ -224,7 +224,7 @@
       "sharpproof.buildtasks": {
         "type": "Project",
         "dependencies": {
-          "SharpProof.Worker.Protocol": "[1.0.0-preview.1, )"
+          "SharpProof.Host": "[1.0.0-preview.1, )"
         }
       },
       "sharpproof.compilerartifact": {
@@ -247,6 +247,9 @@
         "dependencies": {
           "System.Collections.Immutable": "[9.0.18, )"
         }
+      },
+      "sharpproof.host": {
+        "type": "Project"
       },
       "sharpproof.ir": {
         "type": "Project",
@@ -282,6 +285,7 @@
         "dependencies": {
           "SharpProof.CompilerArtifact": "[1.0.0-preview.1, )",
           "SharpProof.Dataflow": "[1.0.0-preview.1, )",
+          "SharpProof.Host": "[1.0.0-preview.1, )",
           "SharpProof.Ir": "[1.0.0-preview.1, )",
           "SharpProof.Smt": "[1.0.0-preview.1, )",
           "SharpProof.Specs": "[1.0.0-preview.1, )",
@@ -294,6 +298,7 @@
         "type": "Project",
         "dependencies": {
           "SharpProof.CompilerArtifact": "[1.0.0-preview.1, )",
+          "SharpProof.Host": "[1.0.0-preview.1, )",
           "SharpProof.Ir": "[1.0.0-preview.1, )",
           "SharpProof.Specs": "[1.0.0-preview.1, )",
           "SharpProof.Worker.Protocol": "[1.0.0-preview.1, )"

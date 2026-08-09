@@ -23,7 +23,7 @@ depends on a modeled call which the independent interpreter cannot execute is
 also `Unknown`; it is never reported as a refutation. Backend unavailability,
 infrastructure failure, malformed backend output, containment failure, and a
 failed replay of an otherwise replayable counterexample make protocol version
-10 mark the whole run `Failed`; these conditions are fatal under every build
+11 mark the whole run `Failed`; these conditions are fatal under every build
 policy. Unsupported unannotated analyzer callables remain silent. Explicitly
 selected unsupported callables produce SP0047.
 
@@ -40,7 +40,7 @@ exhaustion, and all `Unknown` outcomes are not reusable proof-cache entries.
 
 ## Accountable selection and worker runs
 
-Worker protocol version 10 separates `WorkerRunStatus` from
+Worker protocol version 11 separates `WorkerRunStatus` from
 `WorkerClaimOutcome`. The compiler-symbol-based manifest is sealed before
 verification. It contains every selected callable, every discovered
 postcondition, and every selected effect-attribute occurrence with a stable
@@ -385,8 +385,8 @@ metadata. It also carries canonical relational-summary calls and their complete
 source, implementation-IL, or audited-pack dependency provenance, plus the
 admitted unconditional managed-allocation replay
 events, their selected-constraint and semantic-operation hashes, and their
-source-tree identities and spans. Worker protocol version 10 and semantic cache
-schema version 12 carry the current wire break. Relational-summary schema
+source-tree identities and spans. Worker protocol version 11 and semantic cache
+schema version 13 carry the current wire break. Relational-summary schema
 version 1 and specification-pack schema version 1 govern the new evidence. The
 artifact further carries compiler error
 diagnostics and mapped locations, handwritten and generated tree hashes, raw

@@ -225,7 +225,8 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             return;
         }
 
-        WorkerCachePath.ValidateNoReparsePoints([directory, path]);
+        SharpProof.Host.LinuxPathIdentity.RequireLocalPath(directory);
+        SharpProof.Host.LinuxPathIdentity.Canonicalize(path);
     }
 
     private string GetPath(string inputHash)

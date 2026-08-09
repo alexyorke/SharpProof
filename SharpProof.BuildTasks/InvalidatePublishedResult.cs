@@ -1,6 +1,6 @@
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
-using SharpProof.Worker.Protocol;
+using SharpProof.Host;
 
 namespace SharpProof.BuildTasks;
 
@@ -69,6 +69,7 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
 
     private bool Execute(CancellationToken cancellationToken)
     {
+        ContainerContract.ValidateRequired();
         var lexicalProjectDirectory = Path.GetFullPath(ProjectDirectory);
         string ResolveLexicalPath(string path)
         {
@@ -78,7 +79,7 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
         }
         string ResolvePath(string path)
         {
-            return WindowsPathIdentity.RequireLocalPath(ResolveLexicalPath(path));
+            return LinuxPathIdentity.RequireLocalPath(ResolveLexicalPath(path));
         }
 
         var outputPaths = Present(ResultPath, SarifPath)
@@ -92,16 +93,16 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
             .Select(ResolvePath)
             .ToArray();
         var publicationMarkerPaths = publicationPaths
-            .Select(WindowsPathIdentity.PublicationMarkerPath)
+            .Select(LinuxPathIdentity.PublicationMarkerPath)
             .ToArray();
         var publicationMutationPaths = outputPaths
             .Concat(publicationMarkerPaths)
             .ToArray();
         var aliasesOutput = outputPaths
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Distinct(StringComparer.Ordinal)
             .Count() != outputPaths.Length ||
             Pairs(outputPaths).Any(static pair =>
-                WindowsPathIdentity.AreSameExistingFile(pair[0], pair[1]));
+                LinuxPathIdentity.AreSameExistingFile(pair[0], pair[1]));
         var resolvedLauncherPath = ResolvePath(LauncherPath);
         var toolPaths = Present(WorkerPath, LauncherPath)
             .SelectMany(static path => new[]
@@ -135,32 +136,32 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
             protectedPaths.Any(input => !string.Equals(
                     output,
                     input,
-                    StringComparison.OrdinalIgnoreCase) &&
-                WindowsPathIdentity.AreSameExistingFile(output, input)));
+                    StringComparison.Ordinal) &&
+                LinuxPathIdentity.AreSameExistingFile(output, input)));
         var aliasesInput = aliasesFileIdentity ||
             publicationMutationPaths.Any(output => protectedPaths.Any(input =>
                 string.Equals(
                     output,
                     input,
-                    StringComparison.OrdinalIgnoreCase)));
+                    StringComparison.Ordinal)));
         var aliasesWorkerTree = workerTreeExists &&
             !string.IsNullOrWhiteSpace(workerDirectory) &&
             publicationMutationPaths.Any(output =>
-                WindowsPathIdentity.IsSameOrDescendant(
+                LinuxPathIdentity.IsSameOrDescendant(
                     output,
                     workerDirectory));
         var aliasesCache = resolvedCachePath != null &&
             (publicationMutationPaths.Any(output =>
-                 WindowsPathIdentity.IsSameOrDescendant(
+                 LinuxPathIdentity.IsSameOrDescendant(
                      output,
                      resolvedCachePath)) ||
              protectedPaths.Any(input =>
-                 WindowsPathIdentity.IsSameOrDescendant(
+                 LinuxPathIdentity.IsSameOrDescendant(
                      input,
                      resolvedCachePath)) ||
              workerTreeExists &&
              !string.IsNullOrWhiteSpace(workerDirectory) &&
-             WindowsPathIdentity.IsSameOrDescendant(
+             LinuxPathIdentity.IsSameOrDescendant(
                  resolvedCachePath,
                  workerDirectory));
 
@@ -191,7 +192,7 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
 
         try
         {
-            using (WindowsPathIdentity.AcquirePublicationSet(
+            using (LinuxPathIdentity.AcquirePublicationSet(
                        publicationPaths,
                        TimeSpan.FromSeconds(30),
                        cancellationToken))
@@ -199,7 +200,7 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
                 foreach (var path in outputPaths)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    WindowsPathIdentity.DeleteIfUnprotected(path, protectedPaths);
+                    LinuxPathIdentity.DeleteIfUnprotected(path, protectedPaths);
                 }
             }
         }

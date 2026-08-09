@@ -1,4 +1,5 @@
 using static SharpProof.Worker.CallableVerificationPolicy;
+using SharpProof.Host;
 
 namespace SharpProof.Worker;
 
@@ -27,7 +28,13 @@ public sealed class SharpProofWorker : IDisposable
     {
         ArgumentNullException.ThrowIfNull(budgets);
         return new SharpProofWorker(
-            () => new IrSmtBackend(new IrSmtBackendOptions(budgets.QueryRlimit)));
+            () =>
+            {
+                ContainerNativeLibrary.InstallZ3ResolverRequired(
+                    typeof(Microsoft.Z3.Context).Assembly);
+                return new IrSmtBackend(
+                    new IrSmtBackendOptions(budgets.QueryRlimit));
+            });
     }
     public async Task<WorkerVerifyResponse> VerifyAsync(
         WorkerVerifyRequest request, CancellationToken cancellationToken = default)

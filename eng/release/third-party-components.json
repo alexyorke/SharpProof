@@ -100,14 +100,14 @@
       }
     ],
     "SharpProof.Attributes": [],
-    "SharpProof.Verifier.Win-x64": [
+    "SharpProof.Verifier": [
       {
         "id": "Microsoft.Z3",
         "version": "4.12.2",
         "license": "MIT",
         "entries": [
           "tools/net9/Microsoft.Z3.dll",
-          "tools/net9/runtimes/win-x64/native/libz3.dll"
+          "runtimes/linux-x64/native/libz3.so"
         ]
       },
       {
@@ -131,8 +131,7 @@
         "version": "10.0.10",
         "license": "MIT",
         "entries": [
-          "tools/net9/System.Text.Encodings.Web.dll",
-          "tools/net9/runtimes/win/lib/net9.0/System.Text.Encodings.Web.dll"
+          "tools/net9/System.Text.Encodings.Web.dll"
         ]
       },
       {
