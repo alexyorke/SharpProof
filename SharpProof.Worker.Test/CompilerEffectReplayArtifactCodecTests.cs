@@ -136,6 +136,33 @@ public sealed class CompilerEffectReplayArtifactCodecTests
         });
     }
 
+    [Test]
+    public void CodecRejectsNoncanonicalAllowedExceptionOrdering()
+    {
+        var evidence = new CompilerEffectClaimArtifact
+        {
+            ClaimId = "allowed-exceptions",
+            ContractKind = WorkerEffectContractKind.AllowedExceptions,
+            Outcome = WorkerClaimOutcome.Proven,
+            Reason = WorkerClaimReason.None,
+            Certainty =
+                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary,
+            Constraint = new CompilerEffectConstraintArtifact
+            {
+                AllowedExceptionTypes = ["exception-a", "exception-b"]
+            },
+            Evidence = "complete-exception-summary"
+        };
+        CompilerEffectClaimArtifactCodec.Seal(evidence);
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerEffectClaimArtifactCodec.Validate(evidence)));
+
+        Array.Reverse(evidence.Constraint.AllowedExceptionTypes);
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerEffectClaimArtifactCodec.Validate(evidence)));
+    }
+
     private static void AssertRejected(
         Action<CompilerEffectClaimArtifact> mutate)
     {

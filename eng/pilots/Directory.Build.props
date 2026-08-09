@@ -1,4 +1,5 @@
 <Project>
+  <Import Project="..\..\SharpProof.Release.props" />
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>12.0</LangVersion>
@@ -9,7 +10,7 @@
     <EnableNETAnalyzers>false</EnableNETAnalyzers>
     <NuGetAudit>false</NuGetAudit>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
-    <SharpProofPilotVersion Condition="'$(SharpProofPilotVersion)' == ''">1.0.0-preview.1</SharpProofPilotVersion>
+    <SharpProofPilotVersion Condition="'$(SharpProofPilotVersion)' == ''">$(SharpProofPackageVersion)</SharpProofPilotVersion>
     <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
     <SharpProofFeatures>all</SharpProofFeatures>
     <SharpProofVerify>true</SharpProofVerify>

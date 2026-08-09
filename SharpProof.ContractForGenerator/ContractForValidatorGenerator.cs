@@ -22,18 +22,25 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator
             .Collect()
             .WithTrackingName("ContractForCandidates");
         context.RegisterSourceOutput(
-            context.CompilationProvider.Combine(candidates)
+            context.CompilationProvider
+                .Combine(candidates)
+                .Combine(context.AnalyzerConfigOptionsProvider)
                 .WithTrackingName("ContractForValidationInput"),
-            static (output, value) => Execute(output, value.Left, value.Right));
+            static (output, value) => Execute(
+                output,
+                value.Left.Left,
+                value.Left.Right,
+                value.Right));
     }
 
     private static void Execute(
         SourceProductionContext context,
         Compilation compilation,
-        ImmutableArray<INamedTypeSymbol> candidates)
+        ImmutableArray<INamedTypeSymbol> candidates,
+        AnalyzerConfigOptionsProvider optionsProvider)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
-        if (candidates.IsDefaultOrEmpty)
+        if (candidates.IsDefaultOrEmpty || IsProfileOff(optionsProvider))
         {
             return;
         }
@@ -93,6 +100,40 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator
                          System.Globalization.CultureInfo.InvariantCulture), StringComparer.Ordinal))
         {
             context.ReportDiagnostic(diagnostic);
+        }
+    }
+
+    private static bool IsProfileOff(
+        AnalyzerConfigOptionsProvider optionsProvider)
+    {
+        try
+        {
+            var options = optionsProvider.GlobalOptions;
+            foreach (var key in new[]
+                     {
+                         SharpProofConfigurationCatalog.ProfileKey,
+                         "build_property." +
+                         SharpProofConfigurationCatalog.ProfileKey,
+                         "build_property." +
+                         SharpProofConfigurationCatalog.ProfileBuildPropertyName
+                     })
+            {
+                if (options.TryGetValue(key, out var value) &&
+                    string.Equals(
+                        value.Trim(),
+                        SharpProofConfigurationCatalog.ProfileOff,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        catch (Exception exception) when (
+            exception is not OperationCanceledException)
+        {
+            return true;
         }
     }
 

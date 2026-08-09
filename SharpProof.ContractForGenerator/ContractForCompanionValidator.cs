@@ -39,6 +39,9 @@ internal static class ContractForCompanionValidator
                 ContractForSymbolMatcher.MemberSignaturesMatch(target, candidate))
                 .ToImmutableArray(),
             comparer);
+        var targetSurfaceIsComplete = targets.All(target =>
+            byTarget[target] is { Length: 1 } matches &&
+            byCandidate[matches[0]].Length == 1);
         var diagnosed = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
 
         void Diagnose(
@@ -111,11 +114,8 @@ internal static class ContractForCompanionValidator
                     candidate,
                     candidate.Name);
             }
-            else if (matches.IsDefaultOrEmpty &&
-                     targets.Any(target => string.Equals(
-                         target.Name,
-                         candidate.Name,
-                         StringComparison.Ordinal)) &&
+            else if (targetSurfaceIsComplete &&
+                     matches.IsDefaultOrEmpty &&
                      diagnosed.Add(candidate))
             {
                 Diagnose(

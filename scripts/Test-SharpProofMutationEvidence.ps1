@@ -97,6 +97,47 @@ function Assert-Throws {
 $zeroInfrastructure = 'error="0" timeout="0" aborted="0" inconclusive="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" passedButRunAborted="0"'
 
 try {
+    $catalogAuthority = [pscustomobject][ordered]@{
+        Name = 'authority'
+        File = 'Project\Source.cs'
+        Project = 'Project.Test\Project.Test.csproj'
+        Filter = 'FullyQualifiedName~AuthorityTest'
+        Original = "before`ntext"
+        Mutated = "after`ntext"
+    }
+    $catalogDigest = Get-SharpProofMutationCatalogSha256 `
+        -Mutations @($catalogAuthority)
+    if ($catalogDigest -ne (
+            Get-SharpProofMutationCatalogSha256 `
+                -Mutations @($catalogAuthority))) {
+        throw 'Mutation catalog authority digest is not deterministic.'
+    }
+    foreach ($change in @(
+            @{ Name = 'authority-2' },
+            @{ File = 'Project\Other.cs' },
+            @{ Project = 'Other.Test\Other.Test.csproj' },
+            @{ Filter = 'FullyQualifiedName~OtherTest' },
+            @{ Original = "different`noriginal" },
+            @{ Mutated = "different`nmutation" })) {
+        $changed = [ordered]@{
+            Name = $catalogAuthority.Name
+            File = $catalogAuthority.File
+            Project = $catalogAuthority.Project
+            Filter = $catalogAuthority.Filter
+            Original = $catalogAuthority.Original
+            Mutated = $catalogAuthority.Mutated
+        }
+        foreach ($entry in $change.GetEnumerator()) {
+            $changed[$entry.Key] = $entry.Value
+        }
+        if ((Get-SharpProofMutationCatalogSha256 `
+                -Mutations @([pscustomobject]$changed)) -eq $catalogDigest) {
+            throw (
+                "Mutation catalog digest ignored authority field " +
+                ($change.Keys -join ', ') + '.')
+        }
+    }
+
     $passing = New-TestParts -Outcome Passed -Message ''
     $passingPath = Write-Fixture `
         -Name passing `

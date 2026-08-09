@@ -23,12 +23,15 @@ internal sealed partial class AcyclicBlockPredicateExecutor
         ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> specCalls,
         ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall> summaryCalls,
         ImmutableDictionary<IrVarId, IrTerm> initialEnvironment,
-        ImmutableDictionary<IrVarId, IrVarId> parameterBindings)
+        ImmutableDictionary<IrVarId, IrVarId> parameterBindings,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(factory);
         ArgumentNullException.ThrowIfNull(program);
+        cancellationToken.ThrowIfCancellationRequested();
         return new Run(variables, factory, program, specCalls, summaryCalls, initialEnvironment,
-            parameterBindings, _maximumExpressionDepth, _maximumSymbolicOperations).Execute();
+            parameterBindings, _maximumExpressionDepth, _maximumSymbolicOperations,
+            cancellationToken).Execute();
     }
 
     private sealed partial class Run(
@@ -38,7 +41,8 @@ internal sealed partial class AcyclicBlockPredicateExecutor
         ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall> summaryCalls,
         ImmutableDictionary<IrVarId, IrTerm> initialEnvironment,
         ImmutableDictionary<IrVarId, IrVarId> parameterBindings,
-        int maximumExpressionDepth, int remainingOperations)
+        int maximumExpressionDepth, int remainingOperations,
+        CancellationToken cancellationToken)
     {
         private readonly Dictionary<IrBlockId, List<FlowState>> _incoming = [];
         private readonly ImmutableArray<SymbolicReturn>.Builder _returns = ImmutableArray.CreateBuilder<SymbolicReturn>();
@@ -52,6 +56,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
 
         internal SymbolicBodyExecution Execute()
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var order = CreateOrder();
             if (order.IsDefault)
             {
@@ -60,6 +65,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
 
             foreach (var blockId in order)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var state = Merge(blockId);
                 if (state == null)
                 {
@@ -75,6 +81,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                     return Failed();
                 }
             }
+            cancellationToken.ThrowIfCancellationRequested();
             return _returns.Count == 0 ? SymbolicBodyExecution.Failed(WorkerClaimReason.UnsupportedBody) :
                 new SymbolicBodyExecution(WorkerClaimReason.None, _returns.ToImmutable(),
                     _projections.ToImmutable(), _assumptions.ToImmutable(),
@@ -407,7 +414,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
         private SpecApplication? ApplySummary(
             IrCallInstruction call,
             CompilerPreparedSummaryCall prepared,
-            IReadOnlyDictionary<IrVarId, IrTerm> environment,
+            ImmutableDictionary<IrVarId, IrTerm> environment,
             IrTerm guard)
         {
             if (!call.Target.HasValue ||
@@ -455,6 +462,10 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             };
             if (freeVariables.Count !=
                     prepared.ExistentialVariables.Length + 1 ||
+                freeVariables.Overlaps(environment.Keys) ||
+                environment.Values.Any(value =>
+                    freeVariables.Overlaps(
+                        IrTermAnalysis.CollectVariables(value))) ||
                 Substitute(
                     prepared.NormalRelation,
                     environment,
@@ -591,6 +602,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             IReadOnlyDictionary<IrVarId, IrTerm> environment,
             HashSet<IrVarId>? freeVariables = null)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!IrTraversal.CollectVariables(term).All(variable =>
                     environment.ContainsKey(variable) ||
                     freeVariables?.Contains(variable) == true))
@@ -601,6 +613,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             try
             {
                 var result = IrSubstitution.Substitute(factory, term, environment);
+                cancellationToken.ThrowIfCancellationRequested();
                 return Supported(result) ? result : null;
             }
             catch (ArgumentException) { return null; }
@@ -608,11 +621,13 @@ internal sealed partial class AcyclicBlockPredicateExecutor
 
         private bool Supported(IrTerm term)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return IrTermAnalysis.GetDepth(term) <= maximumExpressionDepth;
         }
 
         private bool Spend(int amount = 1)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (amount <= remainingOperations)
             {
                 remainingOperations -= amount;

@@ -867,6 +867,41 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void RequestBoundValidationRequiresAndTotallyComparesManifests()
+    {
+        var request = CreateRequest();
+        var expected = CreateManifest();
+        var response = CreateResponse(expected);
+        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+
+        var nullError = Assert.Throws<ArgumentNullException>((Action)(() =>
+            WorkerProtocolJson.ValidateForRequest(
+                response,
+                response.RequestHash,
+                InputHash,
+                null!,
+                request.Budgets)));
+
+        response.Manifest.Claims[0].Kind =
+            (WorkerClaimKind)int.MaxValue;
+        var validation = WorkerProtocolJson.ValidateForRequest(
+            response,
+            response.RequestHash,
+            InputHash,
+            expected,
+            request.Budgets);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(nullError!.ParamName, Is.EqualTo("expectedManifest"));
+            Assert.That(validation.IsValid, Is.False);
+            Assert.That(
+                validation.Errors.Select(static error => error.Code),
+                Does.Contain("manifest.claim_kind"));
+        }
+    }
+
+    [Test]
     public void ManifestHashAndExpectedInputHashValidateBoundaryValues()
     {
         var nullIdentity = CreateManifest();

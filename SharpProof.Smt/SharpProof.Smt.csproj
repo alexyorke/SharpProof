@@ -14,6 +14,9 @@
              Link="ArgumentNullGuard.cs" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Smt.Test" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
     <ProjectReference Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj"
                       OutputItemType="Analyzer"

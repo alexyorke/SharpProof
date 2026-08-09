@@ -23,6 +23,37 @@ public sealed class SharpProofSoundnessAnalyzerTests
     [TestCase(
         """
         using Microsoft.CodeAnalysis;
+        namespace SharpProof.CompilerArtifact;
+        sealed class C {
+            void M(Compilation compilation) =>
+                _ = compilation.GetSymbolsWithName(static _ => true);
+        }
+        """,
+        "SPMETA001")]
+    [TestCase(
+        """
+        namespace SharpProof.CompilerArtifact;
+        sealed class C {
+            bool M(string reason) {
+                if (reason == "ir_condition_both_branches_feasible")
+                    return true;
+                return false;
+            }
+        }
+        """,
+        "SPMETA004")]
+    [TestCase(
+        """
+        namespace SharpProof.CompilerArtifact;
+        static class C {
+            static string M(string name) =>
+                "(" + name + ") is not null";
+        }
+        """,
+        "SPMETA009")]
+    [TestCase(
+        """
+        using Microsoft.CodeAnalysis;
         namespace SharpProof.Frontend;
         sealed class C {
             Compilation M(Compilation compilation, SyntaxTree tree) =>
@@ -538,7 +569,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
-    public async Task AllowsImmediateRethrowAndAuditedWorkerBoundaries()
+    public async Task RejectsArbitraryWorkerMainCancellationTranslation()
     {
         const string source =
             """
@@ -577,11 +608,14 @@ public sealed class SharpProofSoundnessAnalyzerTests
             """;
 
         var diagnostics = await Analyze(source);
-        Assert.That(diagnostics, Is.Empty);
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(1));
     }
 
     [Test]
-    public async Task AllowsExactWorkerVerifyAsyncCancellationBoundary()
+    public async Task RejectsBodyBlindWorkerVerifyAsyncCancellationTranslation()
     {
         const string source =
             """
@@ -602,6 +636,83 @@ public sealed class SharpProofSoundnessAnalyzerTests
                         try { throw new OperationCanceledException(); }
                         catch (OperationCanceledException) {
                             return new WorkerVerifyResponse();
+                        }
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task AllowsExactWorkerCancellationReificationShapes()
+    {
+        const string source =
+            """
+            using System;
+            using System.Threading;
+            using System.Threading.Tasks;
+
+            namespace SharpProof.Worker.Protocol {
+                sealed class WorkerVerifyRequest { }
+                sealed class WorkerVerifyResponse { }
+                enum WorkerRunStatus { Canceled, TimedOut }
+                enum WorkerCallableCoverageReason { Canceled, ProjectTimeout }
+                enum WorkerClaimReason { Canceled, ProjectTimeout }
+                static class WorkerResultAssembler {
+                    internal static WorkerVerifyResponse Create(
+                        WorkerRunStatus runStatus) => new();
+                    internal static WorkerVerifyResponse CreateIncomplete(
+                        WorkerRunStatus status,
+                        WorkerCallableCoverageReason callableReason,
+                        WorkerClaimReason claimReason) => new();
+                }
+            }
+
+            namespace SharpProof.Worker {
+                using SharpProof.Worker.Protocol;
+
+                static class Program {
+                    internal static async Task<int> Main(string[] args) {
+                        async Task<int> Respond(WorkerVerifyResponse response) {
+                            await Task.Yield();
+                            return 0;
+                        }
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) {
+                            return await Respond(WorkerResultAssembler.Create(
+                                WorkerRunStatus.Canceled));
+                        }
+                    }
+                }
+
+                sealed class SharpProofWorker {
+                    internal async Task<WorkerVerifyResponse> VerifyAsync(
+                        WorkerVerifyRequest request,
+                        CancellationToken cancellationToken) {
+                        WorkerVerifyResponse Interrupted(object input = null) {
+                            var canceled =
+                                cancellationToken.IsCancellationRequested;
+                            return WorkerResultAssembler.CreateIncomplete(
+                                canceled
+                                    ? WorkerRunStatus.Canceled
+                                    : WorkerRunStatus.TimedOut,
+                                canceled
+                                    ? WorkerCallableCoverageReason.Canceled
+                                    : WorkerCallableCoverageReason.ProjectTimeout,
+                                canceled
+                                    ? WorkerClaimReason.Canceled
+                                    : WorkerClaimReason.ProjectTimeout);
+                        }
+                        await Task.Yield();
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) {
+                            return Interrupted();
                         }
                     }
                 }
@@ -959,7 +1070,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
-    public async Task AllowsDisplayStringsOutsideSoundnessCriticalLayers()
+    public async Task RejectsDisplayStringsRegardlessOfProductionNamespace()
     {
         const string source =
             """
@@ -971,7 +1082,9 @@ public sealed class SharpProofSoundnessAnalyzerTests
             """;
 
         var diagnostics = await Analyze(source);
-        Assert.That(diagnostics, Is.Empty);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SPMETA001"));
     }
 
     [Test]

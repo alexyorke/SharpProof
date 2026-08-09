@@ -10,6 +10,7 @@ public sealed class BoundaryEnforcementTests
 {
     private static readonly string[] BannedApiProjects = [
         "SharpProof.Analyzer",
+        "SharpProof.Analyzer.Core",
         "SharpProof.Attributes",
         "SharpProof.BuildTasks",
         "SharpProof.CompilerArtifact",
@@ -33,6 +34,7 @@ public sealed class BoundaryEnforcementTests
 
     private static readonly string[] SoundnessCriticalProjects = [
         "SharpProof.Analyzer",
+        "SharpProof.Analyzer.Core",
         "SharpProof.CompilerArtifact",
         "SharpProof.CompilerCollector",
         "SharpProof.ContractForGenerator",
@@ -409,6 +411,7 @@ public sealed class BoundaryEnforcementTests
     {
         string[] expected = [
             @"SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj",
+            @"SharpProof.Analyzer.Core\SharpProof.Analyzer.Core.csproj",
             @"SharpProof.Analyzer\SharpProof.Analyzer.csproj",
             @"SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj",
             @"SharpProof.Attributes.Test\SharpProof.Attributes.Test.csproj",

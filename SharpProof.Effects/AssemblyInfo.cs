@@ -1,5 +1,7 @@
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("SharpProof.Analyzer")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo(
+    "SharpProof.Analyzer.Core")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(
     "SharpProof.Analyzer.Test")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo(
     "SharpProof.CompilerCollector")]

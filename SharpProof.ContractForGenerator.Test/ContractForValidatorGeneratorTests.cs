@@ -680,6 +680,77 @@ public sealed class ContractForValidatorGeneratorTests
     }
 
     [Test]
+    public void ExtraOrdinaryCompanionMemberFailsOneToOneMapping()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                void M();
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void M(ITarget receiver) {
+                }
+
+                public static void Ghost(ITarget receiver) {
+                }
+            }
+            """);
+
+        var diagnostic = AssertSingle(run, "SPCF0005");
+        Assert.That(GetLocatedText(diagnostic), Is.EqualTo("Ghost"));
+    }
+
+    [Test]
+    public void VarargCallingConventionMustMatchExactly()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                void M(__arglist);
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void M(ITarget receiver) {
+                }
+            }
+            """);
+
+        Assert.That(
+            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SPCF0005"));
+    }
+
+    [Test]
+    public void ObliviousInstanceReceiverMatchesCompanion()
+    {
+        var run = Run(
+            """
+            #nullable disable
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                string M(string value);
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static string M(
+                    ITarget receiver,
+                    string value) => value;
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
     public void NestedGenericOwnerScopesDoNotAliasByOrdinal()
     {
         var run = Run(
@@ -893,6 +964,38 @@ public sealed class ContractForValidatorGeneratorTests
                 }
             }
             """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [TestCase("sharpproof_profile")]
+    [TestCase("build_property.sharpproof_profile")]
+    [TestCase("build_property.SharpProofProfile")]
+    public void CompilationGlobalProfileOffDisablesValidationInCustomHosts(
+        string optionKey)
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Subject.cs",
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                void Invoke();
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Ghost(ITarget receiver) { }
+            }
+            """));
+
+        var run = GeneratorTestHost.Run(
+            compilation,
+            globalOptions: new Dictionary<string, string>(
+                StringComparer.OrdinalIgnoreCase)
+            {
+                [optionKey] = " OFF "
+            });
 
         Assert.That(run.Diagnostics, Is.Empty);
     }

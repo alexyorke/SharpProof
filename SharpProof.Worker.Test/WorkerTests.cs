@@ -4321,12 +4321,70 @@ public sealed class WorkerTests
             targetFramework: "net8.0-windows");
         secondRequest.Cache.MaximumBytes = maximumBytes;
         var second = await worker.VerifyAsync(secondRequest);
+        var thirdRequest = project.CreateRequest(
+            cacheEnabled: true,
+            targetFramework: "net9.0-windows");
+        thirdRequest.Cache.MaximumBytes = maximumBytes;
+        var third = await worker.VerifyAsync(thirdRequest);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(backend.CallCount, Is.EqualTo(3));
             Assert.That(second.Errors, Is.Empty);
+            Assert.That(third.Errors, Is.Empty);
             Assert.That(File.Exists(firstCacheFile), Is.True);
+            Assert.That(
+                Directory.GetFiles(
+                    project.CacheDirectory,
+                    "*.sharp-proof-cache.json"),
+                Is.EqualTo([firstCacheFile]));
+        }
+    }
+
+    [Test]
+    public async Task CacheEvictionPreservesUnownedSuffixMatches()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var backend = new SpuriousModelBackend();
+        using var worker = new SharpProofWorker(backend);
+        var firstRequest = project.CreateRequest(cacheEnabled: true);
+        var first = await worker.VerifyAsync(firstRequest);
+        Assert.That(
+            first.Summary.CacheStatus,
+            Is.EqualTo(WorkerCacheStatus.Written));
+        var owned = Directory.GetFiles(
+            project.CacheDirectory,
+            "*.sharp-proof-cache.json").Single();
+        var maximumBytes = new FileInfo(owned).Length + 16;
+        File.Delete(owned);
+
+        Directory.CreateDirectory(project.CacheDirectory);
+        var unowned = new[]
+        {
+            Path.Combine(
+                project.CacheDirectory,
+                "important.sharp-proof-cache.json"),
+            Path.Combine(
+                project.CacheDirectory,
+                new string('A', 64) + ".sharp-proof-cache.json")
+        };
+        foreach (var path in unowned)
+        {
+            await File.WriteAllBytesAsync(
+                path,
+                new byte[maximumBytes]);
+        }
+
+        var request = project.CreateRequest(
+            cacheEnabled: true,
+            targetFramework: "net8.0-windows");
+        request.Cache.MaximumBytes = maximumBytes;
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.Errors, Is.Empty);
+            Assert.That(unowned.Select(File.Exists), Is.All.True);
         }
     }
 
@@ -4785,6 +4843,43 @@ public sealed class WorkerTests
                     WorkerClaimReason.MethodTimeout,
                     WorkerClaimReason.None
                 ]));
+        }
+    }
+
+    [Test]
+    public async Task FactorylessTimeoutClassifiesEveryUnclaimedTargetAsTimedOut()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long A(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return value;
+                }
+                public static long B(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        request.Budgets.MaxParallelism = 1;
+        request.Budgets.MethodWallTimeMilliseconds = 30;
+        request.Budgets.ProjectWallTimeMilliseconds = 1_000;
+        using var worker = new SharpProofWorker(new DelayingBackend());
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.TimedOut));
+            Assert.That(
+                response.CallableResults.Select(static result => result.Reason),
+                Is.All.EqualTo(WorkerCallableCoverageReason.MethodTimeout));
+            Assert.That(
+                response.ClaimResults.Select(static result => result.Reason),
+                Is.All.EqualTo(WorkerClaimReason.MethodTimeout));
         }
     }
 

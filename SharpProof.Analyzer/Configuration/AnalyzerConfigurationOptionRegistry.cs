@@ -2,7 +2,10 @@ namespace SharpProof.Analyzer.Configuration;
 internal static class AnalyzerConfigurationOptionRegistry
 {
     internal static AnalyzerConfigurationOption Profile { get; } =
-        new("sharpproof_profile", ["advisory", "strict", "off"], "SharpProofProfile");
+        new(
+            SharpProofConfigurationCatalog.ProfileKey,
+            ["advisory", "strict", SharpProofConfigurationCatalog.ProfileOff],
+            SharpProofConfigurationCatalog.ProfileBuildPropertyName);
 
     internal static AnalyzerConfigurationOption Features { get; } =
         new("sharpproof_features", ["effects", "contracts", "all"], "SharpProofFeatures");

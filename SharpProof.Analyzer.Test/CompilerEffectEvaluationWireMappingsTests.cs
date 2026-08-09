@@ -1,7 +1,16 @@
+extern alias AnalyzerCore;
+
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
+using CoreEffectEvaluationCertainty =
+    AnalyzerCore::SharpProof.Analyzer.EffectEvaluationCertainty;
+using CoreEffectEvaluationContractKind =
+    AnalyzerCore::SharpProof.Analyzer.EffectEvaluationContractKind;
+using CoreEffectEvaluationOutcome =
+    AnalyzerCore::SharpProof.Analyzer.EffectEvaluationOutcome;
+using CoreEffectEvaluationReason =
+    AnalyzerCore::SharpProof.Analyzer.EffectEvaluationReason;
 
 namespace SharpProof.Analyzer.Test;
 
@@ -12,13 +21,13 @@ public sealed class CompilerEffectEvaluationWireMappingsTests
     public void EveryNeutralEffectEvaluationValueHasAClosedWireMapping()
     {
         Assert.That(
-            Enum.GetValues<EffectEvaluationContractKind>()
+            Enum.GetValues<CoreEffectEvaluationContractKind>()
                 .Select(CompilerEffectEvaluationWireMappings.ToWorker),
             Is.EqualTo(Enum.GetValues<WorkerEffectContractKind>()
                 .Where(static value => value !=
                     WorkerEffectContractKind.Unspecified)));
         Assert.That(
-            Enum.GetValues<EffectEvaluationOutcome>()
+            Enum.GetValues<CoreEffectEvaluationOutcome>()
                 .Select(CompilerEffectEvaluationWireMappings.ToWorker),
             Is.EqualTo(new[]
             {
@@ -27,7 +36,7 @@ public sealed class CompilerEffectEvaluationWireMappingsTests
                 WorkerClaimOutcome.Unknown
             }));
         Assert.That(
-            Enum.GetValues<EffectEvaluationReason>()
+            Enum.GetValues<CoreEffectEvaluationReason>()
                 .Select(CompilerEffectEvaluationWireMappings.ToWorker),
             Is.EqualTo(new[]
             {
@@ -39,7 +48,7 @@ public sealed class CompilerEffectEvaluationWireMappingsTests
                 WorkerClaimReason.UnsupportedBody
             }));
         Assert.That(
-            Enum.GetValues<EffectEvaluationCertainty>()
+            Enum.GetValues<CoreEffectEvaluationCertainty>()
                 .Select(CompilerEffectEvaluationWireMappings.ToWorker),
             Is.EqualTo(new[]
             {
@@ -56,15 +65,15 @@ public sealed class CompilerEffectEvaluationWireMappingsTests
     {
         Assert.Throws<ArgumentOutOfRangeException>(
             (Action)(() => CompilerEffectEvaluationWireMappings.ToWorker(
-                (EffectEvaluationContractKind)int.MaxValue)));
+                (CoreEffectEvaluationContractKind)int.MaxValue)));
         Assert.Throws<ArgumentOutOfRangeException>(
             (Action)(() => CompilerEffectEvaluationWireMappings.ToWorker(
-                (EffectEvaluationOutcome)int.MaxValue)));
+                (CoreEffectEvaluationOutcome)int.MaxValue)));
         Assert.Throws<ArgumentOutOfRangeException>(
             (Action)(() => CompilerEffectEvaluationWireMappings.ToWorker(
-                (EffectEvaluationReason)int.MaxValue)));
+                (CoreEffectEvaluationReason)int.MaxValue)));
         Assert.Throws<ArgumentOutOfRangeException>(
             (Action)(() => CompilerEffectEvaluationWireMappings.ToWorker(
-                (EffectEvaluationCertainty)int.MaxValue)));
+                (CoreEffectEvaluationCertainty)int.MaxValue)));
     }
 }

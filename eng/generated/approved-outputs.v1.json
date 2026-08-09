@@ -5,6 +5,7 @@
     "SharpProof.Analyzer/DeclarativeModels.generated.cs",
     "SharpProof.Analyzer/EffectEvaluationProjections.generated.cs",
     "SharpProof.Analyzer/GeneratedDiagnosticDescriptors.generated.cs",
+    "SharpProof.BuildTasks/LauncherRuntimeCompanionInventory.generated.cs",
     "SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs",
     "SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs",
     "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",

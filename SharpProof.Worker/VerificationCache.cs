@@ -98,7 +98,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             ValidatePath(path);
             await AtomicFile.WriteUtf8Async(path, json, cancellationToken).ConfigureAwait(false);
             ValidatePath(path);
-            return Evict(cancellationToken);
+            return Evict(path, cancellationToken);
         }
         catch (Exception exception) when (exception is
             ArgumentException or IOException or UnauthorizedAccessException or
@@ -136,11 +136,14 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         }
     }
 
-    private bool Evict(CancellationToken cancellationToken)
+    private bool Evict(
+        string protectedPath,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var files = new DirectoryInfo(_directory)
             .EnumerateFiles("*.sharp-proof-cache.json", SearchOption.TopDirectoryOnly)
+            .Where(static file => IsOwnedCacheEntry(file.Name))
             .OrderBy(static file => file.LastWriteTimeUtc)
             .ThenBy(static file => file.Name, StringComparer.Ordinal)
             .ToArray();
@@ -160,6 +163,13 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             {
                 break;
             }
+            if (string.Equals(
+                    file.FullName,
+                    protectedPath,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
 
             try
             {
@@ -171,11 +181,35 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             catch (Exception exception) when (exception is
                 ArgumentException or IOException or UnauthorizedAccessException)
             {
-                return false;
+                // One unavailable old entry must not prevent eviction of
+                // other cache-owned entries.
             }
         }
 
-        return true;
+        if (total <= _maximumBytes)
+        {
+            return true;
+        }
+
+        try
+        {
+            ValidatePath(protectedPath);
+            File.Delete(protectedPath);
+        }
+        catch (Exception exception) when (exception is
+            ArgumentException or IOException or UnauthorizedAccessException)
+        {
+        }
+        return false;
+    }
+
+    private static bool IsOwnedCacheEntry(string fileName)
+    {
+        const string suffix = ".sharp-proof-cache.json";
+        return fileName.Length == 64 + suffix.Length &&
+            fileName.EndsWith(suffix, StringComparison.Ordinal) &&
+            fileName.Take(64).All(static character =>
+                character is >= '0' and <= '9' or >= 'a' and <= 'f');
     }
 
     private void ValidatePath(string path)

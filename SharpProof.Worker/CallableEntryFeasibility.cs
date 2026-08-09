@@ -81,9 +81,12 @@ internal static class CallableEntryFeasibilityEvaluator
         int maximumExpressionDepth,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var build = CallableEvidenceBuilder.BuildEntry(
             target,
-            maximumExpressionDepth);
+            maximumExpressionDepth,
+            cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         if (!build.IsSuccess)
         {
             return CallableEntryFeasibility.Unknown(
@@ -129,7 +132,9 @@ internal static class CallableEntryFeasibilityEvaluator
                 query,
                 cancellationToken)
             .ConfigureAwait(false);
-        if (resourceBudget.IsExceeded)
+        var resourceLimitExceeded = resourceBudget.IsExceeded;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (resourceLimitExceeded)
         {
             return CallableEntryFeasibility.Unknown(
                 WorkerClaimReason.ResourceLimit);

@@ -328,16 +328,24 @@ internal static class CancellationBoundaryAnalyzer
         if (IsAuditedWorkerMain(
                 method,
                 symbols[SharpProofSoundnessAnalyzer.KnownType.WorkerProgram],
-                symbols.TaskOfInt32) ||
-            IsAuditedWorkerMain(
+                symbols.TaskOfInt32))
+        {
+            return ReifiesWorkerProgramCancellation(
+                clause,
+                context,
                 method,
-                symbols[SharpProofSoundnessAnalyzer.KnownType.WorkerLauncherProgram],
-                symbols.TaskOfInt32) ||
-            SymbolEqualityComparer.Default.Equals(
+                symbols);
+        }
+
+        if (SymbolEqualityComparer.Default.Equals(
                 method,
                 symbols.WorkerVerifyAsync))
         {
-            return true;
+            return ReifiesWorkerVerificationCancellation(
+                clause,
+                context,
+                method,
+                symbols);
         }
 
         if (method is not
@@ -366,6 +374,199 @@ internal static class CancellationBoundaryAnalyzer
                    method,
                    symbols) ||
                ReifiesCallerCancellation(clause, context, method, symbols);
+    }
+
+    private static bool ReifiesWorkerProgramCancellation(
+        CatchClauseSyntax clause,
+        SyntaxNodeAnalysisContext context,
+        IMethodSymbol method,
+        SharpProofSoundnessAnalyzer.KnownSymbols symbols)
+    {
+        if (SoleReturn(clause.Block)?.Expression is not
+                ExpressionSyntax returnExpression)
+        {
+            return false;
+        }
+
+        var returnOperation = context.SemanticModel.GetOperation(
+                returnExpression,
+                context.CancellationToken);
+        var operations = returnOperation?.DescendantsAndSelf().ToArray() ?? [];
+        var respond = operations.OfType<IInvocationOperation>().FirstOrDefault(
+            candidate => candidate.TargetMethod is
+            {
+                Name: "Respond",
+                MethodKind: MethodKind.LocalFunction,
+                Parameters.Length: 1
+            } &&
+            SymbolEqualityComparer.Default.Equals(
+                candidate.TargetMethod.ContainingSymbol,
+                method));
+        if (respond == null)
+        {
+            return false;
+        }
+
+        var create = operations.OfType<IInvocationOperation>().FirstOrDefault(
+            candidate => candidate.TargetMethod.Name == "Create" &&
+                IsSameType(
+                    candidate.TargetMethod.ContainingType,
+                    symbols[
+                        SharpProofSoundnessAnalyzer.KnownType.WorkerResultAssembler]));
+        if (create == null)
+        {
+            return false;
+        }
+
+        return operations.Any(operation => IsNamedStaticField(
+            operation,
+            symbols[SharpProofSoundnessAnalyzer.KnownType.WorkerRunStatus],
+            "Canceled"));
+    }
+
+    private static bool ReifiesWorkerVerificationCancellation(
+        CatchClauseSyntax clause,
+        SyntaxNodeAnalysisContext context,
+        IMethodSymbol method,
+        SharpProofSoundnessAnalyzer.KnownSymbols symbols)
+    {
+        if (SoleReturn(clause.Block)?.Expression is not
+                ExpressionSyntax returnExpression ||
+            Unwrap(context.SemanticModel.GetOperation(
+                returnExpression,
+                context.CancellationToken)) is not
+                IInvocationOperation interrupted ||
+            interrupted.TargetMethod is not
+            {
+                Name: "Interrupted",
+                MethodKind: MethodKind.LocalFunction,
+                Parameters.Length: 1
+            } localFunction ||
+            !localFunction.Parameters[0].HasExplicitDefaultValue ||
+            localFunction.Parameters[0].ExplicitDefaultValue != null ||
+            !SymbolEqualityComparer.Default.Equals(
+                localFunction.ContainingSymbol,
+                method) ||
+            !IsSameType(
+                localFunction.ReturnType,
+                symbols[
+                    SharpProofSoundnessAnalyzer.KnownType.WorkerVerifyResponse]))
+        {
+            return false;
+        }
+
+        var localSyntax = localFunction.DeclaringSyntaxReferences
+            .SingleOrDefault()?
+            .GetSyntax(context.CancellationToken) as
+            LocalFunctionStatementSyntax;
+        if (localSyntax?.Body is not { Statements.Count: 2 } body ||
+            body.Statements[0] is not
+                LocalDeclarationStatementSyntax declaration ||
+            body.Statements[1] is not
+                ReturnStatementSyntax { Expression: { } resultExpression } ||
+            declaration.Declaration.Variables.Count != 1)
+        {
+            return false;
+        }
+
+        var cancellationVariable = declaration.Declaration.Variables[0];
+        if (cancellationVariable.Identifier.ValueText != "canceled" ||
+            cancellationVariable.Initializer?.Value is not { } cancellationExpression ||
+            context.SemanticModel.GetDeclaredSymbol(
+                cancellationVariable,
+                context.CancellationToken) is not ILocalSymbol canceled ||
+            Unwrap(context.SemanticModel.GetOperation(
+                cancellationExpression,
+                context.CancellationToken)) is not
+                IPropertyReferenceOperation cancellationRequested ||
+            cancellationRequested.Property.Name != "IsCancellationRequested" ||
+            !IsSameType(
+                cancellationRequested.Property.ContainingType,
+                symbols[
+                    SharpProofSoundnessAnalyzer.KnownType.CancellationToken]) ||
+            !ReferencesParameter(
+                cancellationRequested.Instance,
+                method.Parameters[1]) ||
+            Unwrap(context.SemanticModel.GetOperation(
+                resultExpression,
+                context.CancellationToken)) is not
+                IInvocationOperation create ||
+            create.TargetMethod.Name != "CreateIncomplete" ||
+            !IsSameType(
+                create.TargetMethod.ContainingType,
+                symbols[
+                    SharpProofSoundnessAnalyzer.KnownType.WorkerResultAssembler]))
+        {
+            return false;
+        }
+
+        return IsCancellationProjection(
+                   create,
+                   "status",
+                   canceled,
+                   symbols[SharpProofSoundnessAnalyzer.KnownType.WorkerRunStatus],
+                   "Canceled",
+                   "TimedOut") &&
+               IsCancellationProjection(
+                   create,
+                   "callableReason",
+                   canceled,
+                   symbols[
+                       SharpProofSoundnessAnalyzer.KnownType.WorkerCallableCoverageReason],
+                   "Canceled",
+                   "ProjectTimeout") &&
+               IsCancellationProjection(
+                   create,
+                   "claimReason",
+                   canceled,
+                   symbols[
+                       SharpProofSoundnessAnalyzer.KnownType.WorkerClaimReason],
+                   "Canceled",
+                   "ProjectTimeout");
+    }
+
+    private static bool IsCancellationProjection(
+        IInvocationOperation invocation,
+        string parameterName,
+        ILocalSymbol canceled,
+        INamedTypeSymbol? expectedType,
+        string canceledName,
+        string timeoutName)
+    {
+        var argument = invocation.Arguments.FirstOrDefault(candidate =>
+            string.Equals(
+                candidate.Parameter?.Name,
+                parameterName,
+                StringComparison.Ordinal));
+        if (Unwrap(argument?.Value) is not IConditionalOperation conditional ||
+            Unwrap(conditional.Condition) is not
+                ILocalReferenceOperation condition ||
+            !SymbolEqualityComparer.Default.Equals(
+                condition.Local,
+                canceled))
+        {
+            return false;
+        }
+
+        return IsNamedStaticField(
+                   conditional.WhenTrue,
+                   expectedType,
+                   canceledName) &&
+               IsNamedStaticField(
+                   conditional.WhenFalse,
+                   expectedType,
+                   timeoutName);
+    }
+
+    private static bool IsNamedStaticField(
+        IOperation? operation,
+        INamedTypeSymbol? expectedType,
+        string name)
+    {
+        return Unwrap(operation) is IFieldReferenceOperation field &&
+               field.Field is { IsStatic: true } &&
+               string.Equals(field.Field.Name, name, StringComparison.Ordinal) &&
+               IsSameType(field.Field.ContainingType, expectedType);
     }
 
     private static bool ThrowsIfCallerCancellationRequested(

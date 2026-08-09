@@ -103,9 +103,13 @@ internal static class Program
                     runtimeSnapshot.ExecutionWorkerPath);
             }
         }
-        // Matches the worker's own discipline (Worker/Program.cs): everything
-        // except OOM and StackOverflow is caught, so the launcher always leaves
-        // a fail-closed result file instead of crashing with none.
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        // Matches the worker's own discipline (Worker/Program.cs): ordinary
+        // failures are caught so the launcher leaves a fail-closed result, while
+        // cancellation and process-fatal exceptions remain observable.
         catch (Exception exception) when (
             exception is not OutOfMemoryException and not StackOverflowException)
         {
@@ -457,6 +461,10 @@ internal static class Program
 
             AtomicFile.WriteUtf8(
                 arguments.PublishResultPath!, WorkerProtocolJson.SerializeResponse(response));
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {

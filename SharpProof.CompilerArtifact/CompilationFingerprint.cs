@@ -83,6 +83,7 @@ internal static class CompilationFingerprint
     private static bool ValidTree(CompilerSyntaxTreeSnapshot? value)
     {
         return value != null &&
+        value.Path != null &&
         WorkerProtocolJson.IsSha256(value.Sha256) &&
         value.TextLength >= 0 &&
         HasText(value.LanguageVersion) &&
@@ -147,7 +148,7 @@ internal static class CompilationFingerprint
     {
         return values != null &&
         All(values, ValidAdditionalFile) &&
-        values.Select(static value => value.Path).Distinct(StringComparer.Ordinal).Count() == values.Length &&
+        values.Select(static value => value.Path).Distinct(PathComparer).Count() == values.Length &&
         values.Zip(values.Skip(1), static (left, right) => Compare(left, right) < 0).All(static ordered => ordered);
     }
 

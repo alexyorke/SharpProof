@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Runtime.InteropServices;
 using NUnit.Framework;
+using SharpProof.BuildTasks;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker;
 using SharpProof.Worker.Launcher;
@@ -468,47 +469,40 @@ public sealed class LauncherArgumentTests
             Throws.TypeOf<ArgumentException>());
     }
 
-    [TestCase("launcher")]
-    [TestCase(".deps.json")]
-    [TestCase(".runtimeconfig.json")]
-    [TestCase("SharpProof.CompilerArtifact.dll")]
-    [TestCase("SharpProof.Ir.dll")]
-    [TestCase("SharpProof.Specs.dll")]
-    [TestCase("SharpProof.Worker.Protocol.dll")]
-    [TestCase("SharpProof.Worker.Launcher.exe")]
-    [TestCase("System.IO.Pipelines.dll")]
-    [TestCase("System.Text.Encodings.Web.dll")]
-    [TestCase("System.Text.Json.dll")]
+    [Test]
     [Platform("Win")]
-    public void RequestProjectionRejectsLauncherRuntimeCollisionBeforeManifestRead(
-        string extension)
+    public void RequestProjectionRejectsLauncherRuntimeCollisionBeforeManifestRead()
     {
         var launcher = LauncherArguments.LauncherRuntimePaths[0];
-        var resultPath = extension switch
+        Assert.That(
+            LauncherArguments.LauncherRuntimePaths
+                .Skip(3)
+                .Select(Path.GetFileName),
+            Is.EqualTo(LauncherRuntimeCompanionInventory.FileNames));
+        foreach (var resultPath in LauncherArguments.LauncherRuntimePaths)
         {
-            "launcher" => launcher,
-            _ when extension.Length > 0 && extension[0] == '.' =>
-                Path.ChangeExtension(launcher, extension),
-            _ => Path.Combine(Path.GetDirectoryName(launcher)!, extension)
-        };
-        string[] arguments = [
-            "verify",
-            "--worker", Path.Combine(
-                Path.GetTempPath(),
-                "SharpProof-isolated-worker-" + Guid.NewGuid().ToString("N"),
-                "worker.dll"),
-            "--request", "request.json",
-            "--result", resultPath,
-            "--compiler-manifest", "missing-compiler-manifest.json",
-            "--verify-policy", "advisory",
-            "--assumption-policy", "allow"
-        ];
-        Assert.That(
-            LauncherArguments.TryParse(arguments, out var parsed),
-            Is.True);
-        Assert.That(
-            (Action)(() => parsed.ValidateDistinctPaths(null)),
-            Throws.TypeOf<ArgumentException>());
+            string[] arguments = [
+                "verify",
+                "--worker", Path.Combine(
+                    Path.GetTempPath(),
+                    "SharpProof-isolated-worker-" +
+                    Guid.NewGuid().ToString("N"),
+                    "worker.dll"),
+                "--request", "request.json",
+                "--result", resultPath,
+                "--compiler-manifest", "missing-compiler-manifest.json",
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow"
+            ];
+            Assert.That(
+                LauncherArguments.TryParse(arguments, out var parsed),
+                Is.True,
+                resultPath);
+            Assert.That(
+                (Action)(() => parsed.ValidateDistinctPaths(null)),
+                Throws.TypeOf<ArgumentException>(),
+                resultPath);
+        }
     }
 
     [Test]

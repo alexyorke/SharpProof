@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Text;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
@@ -93,7 +94,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
             }
             if (!string.IsNullOrWhiteSpace(error))
             {
-                Log.LogMessage(MessageImportance.High, "{0}", error);
+                LogStandardError(error);
             }
             ExitCode = process.ExitCode;
         }
@@ -116,6 +117,106 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
             }
             process?.Dispose();
         }
+        return true;
+    }
+
+    internal void LogStandardError(string standardError)
+    {
+        using var reader = new StringReader(standardError);
+        while (reader.ReadLine() is { } line)
+        {
+            if (TryParseWarning(
+                    line,
+                    out var code,
+                    out var file,
+                    out var lineNumber,
+                    out var columnNumber,
+                    out var message))
+            {
+                Log.LogWarning(
+                    string.Empty,
+                    code,
+                    string.Empty,
+                    file,
+                    lineNumber,
+                    columnNumber,
+                    0,
+                    0,
+                    message);
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(line))
+            {
+                Log.LogMessage(MessageImportance.High, "{0}", line);
+            }
+        }
+    }
+
+    private static bool TryParseWarning(
+        string line,
+        out string code,
+        out string file,
+        out int lineNumber,
+        out int columnNumber,
+        out string message)
+    {
+        const string sp0047Marker = ": warning SP0047: ";
+        const string sp0048Marker = ": warning SP0048: ";
+        var marker = line.IndexOf(sp0047Marker, StringComparison.Ordinal);
+        var markerText = sp0047Marker;
+        code = "SP0047";
+        if (marker <= 0)
+        {
+            marker = line.IndexOf(sp0048Marker, StringComparison.Ordinal);
+            markerText = sp0048Marker;
+            code = "SP0048";
+        }
+        if (marker <= 0)
+        {
+            file = string.Empty;
+            lineNumber = 0;
+            columnNumber = 0;
+            message = string.Empty;
+            return false;
+        }
+
+        var location = line.Substring(0, marker);
+        message = line.Substring(marker + markerText.Length);
+        file = string.Equals(location, "SharpProof", StringComparison.Ordinal)
+            ? string.Empty
+            : location;
+        lineNumber = 0;
+        columnNumber = 0;
+        if (!location.EndsWith(")", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var openParenthesis = location.LastIndexOf('(');
+        var comma = location.LastIndexOf(',');
+        if (openParenthesis <= 0 || comma <= openParenthesis ||
+            !int.TryParse(
+                location.Substring(
+                    openParenthesis + 1,
+                    comma - openParenthesis - 1),
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out lineNumber) ||
+            !int.TryParse(
+                location.Substring(
+                    comma + 1,
+                    location.Length - comma - 2),
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out columnNumber))
+        {
+            lineNumber = 0;
+            columnNumber = 0;
+            return true;
+        }
+
+        file = location.Substring(0, openParenthesis);
         return true;
     }
 

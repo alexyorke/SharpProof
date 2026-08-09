@@ -1,6 +1,49 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Get-SharpProofMutationCatalogSha256 {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Mutations
+    )
+
+    $frames = [Collections.Generic.List[string]]::new()
+    foreach ($mutation in $Mutations) {
+        $filterProperty = $mutation.PSObject.Properties['Filter']
+        $filter = if ($null -ne $filterProperty) {
+            [string]$filterProperty.Value
+        }
+        else {
+            [string]$mutation.Test
+        }
+        $fields = @(
+            [string]$mutation.Name,
+            ([string]$mutation.File).Replace('\', '/'),
+            ([string]$mutation.Project).Replace('\', '/'),
+            $filter,
+            [string]$mutation.Original,
+            [string]$mutation.Mutated
+        )
+        foreach ($field in $fields) {
+            $frames.Add(
+                $field.Length.ToString(
+                    [Globalization.CultureInfo]::InvariantCulture) +
+                ':' + $field)
+        }
+    }
+
+    $canonical = [string]::Concat($frames)
+    $hasher = [Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [Text.UTF8Encoding]::new($false).GetBytes($canonical)
+        return [Convert]::ToHexString(
+            $hasher.ComputeHash($bytes)).ToLowerInvariant()
+    }
+    finally {
+        $hasher.Dispose()
+    }
+}
+
 function Test-NUnitMultipleAssertionLines {
     param(
         [Parameter(Mandatory = $true)]
@@ -481,4 +524,7 @@ function Read-SharpProofMutationTestEvidence {
     }
 }
 
-Export-ModuleMember -Function Read-SharpProofMutationTestEvidence
+Export-ModuleMember -Function @(
+    'Get-SharpProofMutationCatalogSha256',
+    'Read-SharpProofMutationTestEvidence'
+)

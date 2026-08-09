@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using static System.IO.Path;
@@ -326,7 +327,18 @@ internal static class CompilerManifestArtifactJson
             .. artifact.Callables.OrderBy(static item => item.CallableId, StringComparer.Ordinal)
         ];
         Validate(artifact);
-        return JsonSerializer.Serialize(artifact, WorkerProtocolJson.Options) + "\n";
+        var json = JsonSerializer.Serialize(
+                artifact,
+                WorkerProtocolJson.Options) +
+            "\n";
+        if (Encoding.UTF8.GetByteCount(json) >
+            CompilerManifestArtifactFile.MaximumBytes)
+        {
+            throw new JsonException(
+                "The compiler manifest exceeds the worker input byte limit.");
+        }
+
+        return json;
     }
 
     internal static CompilerManifestArtifact Deserialize(string json)

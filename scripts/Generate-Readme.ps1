@@ -19,6 +19,8 @@ $currentMaintainedDocuments = @(
     'docs\diagnostic-examples.md',
     'docs\unknown-reasons.md',
     'docs\native-smt-packaging.md',
+    'docs\preview-support.md',
+    'docs\release-constants.md',
     'docs\smt-lifecycle.md',
     'samples\README.md',
     'eng\acceptance\README.md',
@@ -303,6 +305,15 @@ foreach ($relativePath in $maintainedDocuments) {
                 "Maintained documentation still uses obsolete worker term " +
                 "'$obsoleteWorkerTerm': $relativePath")
         }
+    }
+    if ([regex]::IsMatch(
+            $maintainedText,
+            '\b(?:requires?|must)\b[^.]{0,200}\bpublic(?:-|\s+)key\b' +
+            '[^.]{0,100}\bmatch\b',
+            [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)) {
+        throw (
+            'Maintained documentation makes an obsolete public-key ' +
+            "matching claim: $relativePath")
     }
 }
 foreach ($relativePath in @(

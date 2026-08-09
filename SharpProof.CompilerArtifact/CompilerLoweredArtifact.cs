@@ -457,6 +457,8 @@ internal static class CompilerLoweredArtifact
         var specs = ImmutableDictionary.CreateBuilder<IrInstructionId, CompilerPreparedSpecCall>();
         var summaries = ImmutableDictionary.CreateBuilder<IrInstructionId, CompilerPreparedSummaryCall>();
         var calls = graph.Instructions.OfType<IrCallInstruction>().ToArray();
+        var programVariables = CollectProgramVariables(graph.Program);
+        var summaryVariables = new HashSet<IrVarId>();
         var portableCalls = portable.Blocks.SelectMany(static block => block.Instructions).Where(
             static instruction => instruction.Kind == IrInstructionKind.Call).ToArray();
         if (row.Calls.Length != calls.Length ||
@@ -559,11 +561,15 @@ internal static class CompilerLoweredArtifact
                 graph.Factory.GetVariableInfo(call.Target.Value).Type !=
                 graph.Factory.GetVariableInfo(result).Type ||
                 free.Distinct().Count() != free.Length ||
+                free.Any(canonical.Contains) ||
+                free.Any(programVariables.Contains) ||
+                free.Any(summaryVariables.Contains) ||
                 relation.Type != graph.Factory.BooleanType)
             {
                 throw new InvalidDataException(
                     "A lowered source-call relation is invalid.");
             }
+            summaryVariables.UnionWith(free);
 
             summaries.Add(call.Id, new CompilerPreparedSummaryCall(
                 call.Id,
@@ -592,6 +598,87 @@ internal static class CompilerLoweredArtifact
             bindings.ToImmutable(),
             specs.ToImmutable(),
             summaries.ToImmutable());
+    }
+
+    private static HashSet<IrVarId> CollectProgramVariables(
+        IrProgram program)
+    {
+        var variables = new HashSet<IrVarId>();
+
+        void AddTerm(IrTerm? term)
+        {
+            if (term != null)
+            {
+                variables.UnionWith(
+                    IrTermAnalysis.CollectVariables(term));
+            }
+        }
+
+        void AddLocation(IrLocation location)
+        {
+            switch (location)
+            {
+                case IrMemberLocation member:
+                    AddTerm(member.Receiver);
+                    foreach (var argument in member.Arguments)
+                    {
+                        AddTerm(argument);
+                    }
+                    break;
+                case IrSequenceLocation sequence:
+                    AddTerm(sequence.Sequence);
+                    AddTerm(sequence.Index);
+                    break;
+            }
+        }
+
+        foreach (var instruction in program.Blocks.SelectMany(
+                     static block => block.Instructions))
+        {
+            switch (instruction)
+            {
+                case IrAssignInstruction assign:
+                    variables.Add(assign.Target);
+                    AddTerm(assign.Value);
+                    break;
+                case IrLoadInstruction load:
+                    variables.Add(load.Target);
+                    AddLocation(load.Location);
+                    break;
+                case IrStoreInstruction store:
+                    AddLocation(store.Location);
+                    AddTerm(store.Value);
+                    break;
+                case IrCallInstruction call:
+                    if (call.Target.HasValue)
+                    {
+                        variables.Add(call.Target.Value);
+                    }
+                    AddTerm(call.Receiver);
+                    foreach (var argument in call.Arguments)
+                    {
+                        AddTerm(argument);
+                    }
+                    break;
+                case IrAssumeInstruction assume:
+                    AddTerm(assume.Condition);
+                    break;
+                case IrAssertInstruction assert:
+                    AddTerm(assert.Condition);
+                    break;
+                case IrHavocInstruction havoc:
+                    variables.UnionWith(havoc.Variables);
+                    break;
+                case IrBranchInstruction branch:
+                    AddTerm(branch.Condition);
+                    break;
+                case IrReturnInstruction @return:
+                    AddTerm(@return.Value);
+                    break;
+            }
+        }
+
+        return variables;
     }
 
     private static bool ValidSummaryEvidenceIdentity(

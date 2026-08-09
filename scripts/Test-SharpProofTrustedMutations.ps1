@@ -1110,22 +1110,7 @@ $acceptanceContract = Get-Content -LiteralPath (
     ConvertFrom-Json
 $mutationPolicy = $acceptanceContract.mutationEvidence
 $catalogCount = @($mutations).Count
-$catalogLines = @(
-    $mutations |
-        ForEach-Object {
-            $file = $_.File.Replace('\', '/')
-            "$($_.Name)`t$file`t$($_.Filter)"
-        })
-$catalogText = [string]::Join("`n", $catalogLines) + "`n"
-$catalogHasher = [Security.Cryptography.SHA256]::Create()
-try {
-    $catalogBytes = [Text.UTF8Encoding]::new($false).GetBytes($catalogText)
-    $catalogSha256 = [Convert]::ToHexString(
-        $catalogHasher.ComputeHash($catalogBytes)).ToLowerInvariant()
-}
-finally {
-    $catalogHasher.Dispose()
-}
+$catalogSha256 = Get-SharpProofMutationCatalogSha256 -Mutations $mutations
 if ($catalogCount -ne [int]$mutationPolicy.expectedCatalogCount -or
     $catalogSha256 -ne [string]$mutationPolicy.expectedCatalogSha256) {
     throw (
@@ -1333,6 +1318,9 @@ try {
                 name = $mutation.Name
                 file = $mutation.File.Replace('\', '/')
                 test = $mutation.Filter
+                project = $mutation.Project.Replace('\', '/')
+                original = $mutation.Original
+                mutated = $mutation.Mutated
                 killed = $true
                 exitCode = $testExit
                 executedCount = $testEvidence.executedCount

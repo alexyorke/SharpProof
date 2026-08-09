@@ -22,6 +22,7 @@ public sealed class AnalyzerArchitectureTests
 
     private static readonly string[] ExpectedAnalyzerOutputAssemblies = [
         "SharpProof.Analyzer",
+        "SharpProof.Analyzer.Core",
         "SharpProof.Attributes",
         "SharpProof.CompilerArtifact",
         "SharpProof.CompilerCollector",

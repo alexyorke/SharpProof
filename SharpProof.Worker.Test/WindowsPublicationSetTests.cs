@@ -174,6 +174,80 @@ public sealed class WindowsPublicationSetTests
     }
 
     [Test]
+    public void PublicationMarkerNamespaceIsReservedAcrossSets()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var reserved = Path.Combine(
+            directory.Path,
+            "foreign.sharpproof-publication-set");
+
+        var error = Assert.Throws<ArgumentException>((Action)(() =>
+        {
+            using var publication = WindowsPathIdentity.AcquirePublicationSet(
+                [reserved],
+                TimeSpan.FromSeconds(1));
+        }));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(error!.Message, Does.Contain("publication metadata"));
+            Assert.That(File.Exists(reserved), Is.False);
+            Assert.That(
+                File.Exists(WindowsPathIdentity.PublicationMarkerPath(reserved)),
+                Is.False);
+        }
+    }
+
+    [Test]
+    public void ExistingUnownedDestinationCannotBeAdopted()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var result = Path.Combine(directory.Path, "result.json");
+        const string sentinel = "user-owned source bytes";
+        File.WriteAllText(result, sentinel);
+
+        var error = Assert.Throws<IOException>((Action)(() =>
+        {
+            using var publication = WindowsPathIdentity.AcquirePublicationSet(
+                [result],
+                TimeSpan.FromSeconds(1));
+        }));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(error!.Message, Does.Contain("pre-existing"));
+            Assert.That(File.ReadAllText(result), Is.EqualTo(sentinel));
+            Assert.That(
+                File.Exists(WindowsPathIdentity.PublicationMarkerPath(result)),
+                Is.False);
+        }
+    }
+
+    [Test]
+    public void RejectedPartialOverlapLeavesNoNewOwnershipMarkers()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var shared = Path.Combine(directory.Path, "z-shared.json");
+        using (WindowsPathIdentity.AcquirePublicationSet(
+                   [shared, Path.Combine(directory.Path, "z-first.json")],
+                   TimeSpan.FromSeconds(1)))
+        {
+        }
+        var disjoint = Path.Combine(directory.Path, "a-disjoint.json");
+
+        Assert.Throws<IOException>((Action)(() =>
+        {
+            using var publication = WindowsPathIdentity.AcquirePublicationSet(
+                [disjoint, shared],
+                TimeSpan.FromSeconds(1));
+        }));
+
+        Assert.That(
+            File.Exists(WindowsPathIdentity.PublicationMarkerPath(disjoint)),
+            Is.False);
+    }
+
+    [Test]
     public void InvalidPublicationArgumentsFailBeforeTouchingDisk()
     {
         var pathError = Assert.Throws<ArgumentException>((Action)(() =>

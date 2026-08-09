@@ -647,6 +647,53 @@ public sealed class WorkerTcbEdgeCaseTests
     }
 
     [Test]
+    public void ProvenOutcomeWithUnmappedEvidenceFailsClosed()
+    {
+        var factory = new IrFactory();
+        var outcome = CreateProvenOutcome([
+            new LoweredJustification(factory.CreateOperation("unmapped"))
+        ]);
+
+        var result = CallableClaimResultAssembler.FromOutcome(
+            CreateTrivialTarget(),
+            0,
+            outcome,
+            [],
+            new Dictionary<ProofJustification, string>(),
+            new Dictionary<ProofJustification, string>(),
+            WorkerClaimReason.None,
+            WorkerVacuityKind.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.MalformedBackendResult));
+            Assert.That(result.ProofCore, Is.Empty);
+        }
+    }
+
+    [Test]
+    public void ProvenOutcomeWithEmptyEvidenceCoreRemainsValid()
+    {
+        var result = CallableClaimResultAssembler.FromOutcome(
+            CreateTrivialTarget(),
+            0,
+            CreateProvenOutcome([]),
+            [],
+            new Dictionary<ProofJustification, string>(),
+            new Dictionary<ProofJustification, string>(),
+            WorkerClaimReason.None,
+            WorkerVacuityKind.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(result.ProofCore, Is.Empty);
+        }
+    }
+
+    [Test]
     public void CounterexampleModelFormattingCoversEveryIrValueKind()
     {
         var factory = new IrFactory();
@@ -1042,6 +1089,15 @@ public sealed class WorkerTcbEdgeCaseTests
             factory.Boolean(true),
             [],
             CompilerPreparedBody.Trivial());
+    }
+
+    private static ProvenOutcome CreateProvenOutcome(
+        ImmutableArray<ProofJustification> core)
+    {
+        return (ProvenOutcome)typeof(ProvenOutcome)
+            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Single()
+            .Invoke([core]);
     }
 
     private static CompilerCallablePreparation CreateMalformedProgramTarget(

@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace SharpProof.ContractForGenerator.Test;
 
@@ -58,9 +59,10 @@ internal static class GeneratorTestHost
 
     internal static GeneratorRun Run(
         CSharpCompilation compilation,
-        GeneratorDriver? previousDriver = null)
+        GeneratorDriver? previousDriver = null,
+        IReadOnlyDictionary<string, string>? globalOptions = null)
     {
-        var driver = previousDriver ?? CreateDriver();
+        var driver = previousDriver ?? CreateDriver(globalOptions);
         driver = driver.RunGeneratorsAndUpdateCompilation(
             compilation,
             out var outputCompilation,
@@ -98,13 +100,17 @@ internal static class GeneratorTestHost
             diagnostic.GetMessage(CultureInfo.InvariantCulture))];
     }
 
-    private static CSharpGeneratorDriver CreateDriver()
+    private static CSharpGeneratorDriver CreateDriver(
+        IReadOnlyDictionary<string, string>? globalOptions)
     {
         return CSharpGeneratorDriver.Create(
             generators: [
                 new ContractForValidatorGenerator().AsSourceGenerator()
             ],
             parseOptions: ParseOptions,
+            optionsProvider: globalOptions == null
+                ? null
+                : new TestAnalyzerConfigOptionsProvider(globalOptions),
             driverOptions: new GeneratorDriverOptions(
                 IncrementalGeneratorOutputKind.None,
                 trackIncrementalGeneratorSteps: true));
@@ -142,6 +148,38 @@ internal static class GeneratorTestHost
                 Environment.NewLine,
                 errors.Select(static diagnostic => diagnostic.ToString())));
         }
+    }
+}
+
+internal sealed class TestAnalyzerConfigOptionsProvider(
+    IReadOnlyDictionary<string, string> globalValues) :
+    AnalyzerConfigOptionsProvider
+{
+    private readonly AnalyzerConfigOptions _globalOptions =
+        new TestAnalyzerConfigOptions(globalValues);
+
+    public override AnalyzerConfigOptions GlobalOptions => _globalOptions;
+
+    public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
+    {
+        return TestAnalyzerConfigOptions.Empty;
+    }
+
+    public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
+    {
+        return TestAnalyzerConfigOptions.Empty;
+    }
+}
+
+internal sealed class TestAnalyzerConfigOptions(
+    IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
+{
+    internal static TestAnalyzerConfigOptions Empty { get; } =
+        new(ImmutableDictionary<string, string>.Empty);
+
+    public override bool TryGetValue(string key, out string value)
+    {
+        return values.TryGetValue(key, out value!);
     }
 }
 

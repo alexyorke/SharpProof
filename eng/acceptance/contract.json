@@ -23,7 +23,7 @@
   "mutationEvidence": {
     "schemaVersion": 1,
     "expectedCatalogCount": 127,
-    "expectedCatalogSha256": "ddd6fd5b22975bf794eb84ad9b02d2c5b5c003ab648b31eacbdce2b5c8b32c3b"
+    "expectedCatalogSha256": "24a7f6ea3eab1750cd842e4822a381b743a2930b538736a928e832a85aab874a"
   },
   "worker": {
     "protocolVersion": 10,
@@ -60,7 +60,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "30d39b2bee968a0d8aa41c77be2d1ebf2bcc3a291ea43934060a3adde18bfca9",
+    "inventorySha256": "f525f575c2ae7032929409e04c37a5fe86f0bf56e6612cc7d5a079d96cf8c98d",
     "components": [
       {
         "name": "discovery",
@@ -233,7 +233,8 @@
         "paths": [
           "SharpProof.Worker.Launcher/LauncherArguments.catalog.json",
           "scripts/Generate-LauncherArguments.ps1",
-          "SharpProof.Worker.Launcher/LauncherArguments.generated.cs"
+          "SharpProof.Worker.Launcher/LauncherArguments.generated.cs",
+          "SharpProof.BuildTasks/LauncherRuntimeCompanionInventory.generated.cs"
         ]
       },
       {
@@ -474,9 +475,9 @@
   },
   "productionComplexity": {
     "measurement": "Aggregate Roslyn expression nodes, decision points, and members across handwritten production C#; whitespace, comments, line wrapping, and optional braces are excluded.",
-    "ceilingRationale": "2026-08-07: extracting the cancellable verifier runner and invalidator from unmeasured inline MSBuild XML into the directly testable SharpProof.BuildTasks assembly moved that trusted-boundary logic under the production C# ratchet. 2026-08-08: bounded relational interprocedural verification added one reusable typed-IR summary engine, an isolated exact implementation-PE decoder, and a strict data-driven specification-pack parser; source, IL, and audited packs now share one Z3 composition path instead of growing method-specific verifier branches. Dead dependency-graph scaffolding was removed, production roots are derived from Directory.Build.props, and each new semantic layer has its own narrow ratchet below.",
-    "maximumExpressionNodes": 111400,
-    "maximumDecisionPoints": 5950,
+    "ceilingRationale": "2026-08-07: extracting the cancellable verifier runner and invalidator from unmeasured inline MSBuild XML into the directly testable SharpProof.BuildTasks assembly moved that trusted-boundary logic under the production C# ratchet. 2026-08-08: bounded relational interprocedural verification added one reusable typed-IR summary engine, an isolated exact implementation-PE decoder, and a strict data-driven specification-pack parser; source, IL, and audited packs now share one Z3 composition path instead of growing method-specific verifier branches. Dead dependency-graph scaffolding was removed, production roots are derived from Directory.Build.props, and each new semantic layer has its own narrow ratchet below. 2026-08-08 audit: atomic publication ownership and cancellation, total malformed-evidence and cache validation, worker cancellation/evidence checks, and the non-entrypoint analyzer Core boundary added supported-surface safeguards with mutation-discriminating regressions; ceilings:113500/6050/3900.",
+    "maximumExpressionNodes": 113500,
+    "maximumDecisionPoints": 6050,
     "maximumMembers": 3900
   },
   "productionCoordinatorComplexity": {

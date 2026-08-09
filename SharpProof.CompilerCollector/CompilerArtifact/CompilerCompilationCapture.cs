@@ -224,7 +224,8 @@ internal static class CompilerCompilationCapture
 
     internal static string ResolveSiblingModule(string manifestPath, string name)
     {
-        if (!string.Equals(Path.GetFileName(name), name, StringComparison.Ordinal))
+        if (!string.Equals(Path.GetFileName(name), name, StringComparison.Ordinal) ||
+            !HasSafeWindowsFileName(name))
         {
             throw new InvalidDataException(
                 "A linked compiler module must be a safe sibling.");
@@ -242,6 +243,34 @@ internal static class CompilerCompilationCapture
                 "A linked compiler module must be a safe sibling.");
         }
         return path;
+    }
+
+    private static bool HasSafeWindowsFileName(string name)
+    {
+        if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                System.Runtime.InteropServices.OSPlatform.Windows))
+        {
+            return true;
+        }
+
+        if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+            name.EndsWith(".", StringComparison.Ordinal) ||
+            name.EndsWith(" ", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var separator = name.IndexOf('.');
+        var stem = (separator < 0 ? name : name.Substring(0, separator))
+            .ToUpperInvariant();
+        if (stem is "CON" or "PRN" or "AUX" or "NUL")
+        {
+            return false;
+        }
+
+        return stem.Length != 4 ||
+            stem.Substring(0, 3) is not ("COM" or "LPT") ||
+            stem[3] is < '1' or > '9';
     }
 
     internal static string ReadModuleName(MetadataReader reader)

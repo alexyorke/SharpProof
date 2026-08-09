@@ -512,6 +512,21 @@ public sealed class FinalCompilationCollectorTests
         }
     }
 
+    [TestCase("part.netmodule:payload")]
+    [TestCase("CON.netmodule")]
+    [Platform("Win")]
+    public void LinkedNetmoduleMustHaveARegularWindowsFileName(
+        string moduleName)
+    {
+        using var workspace = new CollectorWorkspace();
+        var manifestPath = Path.Combine(workspace.Path, "Linked.dll");
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerCompilationCapture.ResolveSiblingModule(
+                manifestPath,
+                moduleName)));
+    }
+
     [Test]
     public async Task TreeLocalConfigurationPreventsArtifactEmission()
     {

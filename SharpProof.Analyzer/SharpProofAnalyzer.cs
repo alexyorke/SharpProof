@@ -2,7 +2,9 @@ using System.Reflection.Metadata;
 
 namespace SharpProof.Analyzer;
 
+#if !SHARPPROOF_ANALYZER_LIBRARY
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
+#endif
 public sealed partial class SharpProofAnalyzer : DiagnosticAnalyzer
 {
     private readonly IAnalyzerSessionFactory _sessionFactory;

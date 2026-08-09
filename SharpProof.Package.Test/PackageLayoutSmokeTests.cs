@@ -1,12 +1,16 @@
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Reflection;
 using System.Reflection.Metadata;
+using System.Runtime.Loader;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Xml.Linq;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.CompilerProbe.TestAsset;
 using SharpProof.Worker;
@@ -42,7 +46,7 @@ public sealed class PackageLayoutSmokeTests
 
     private static readonly string[] ExpectedCollectorDependencyFileNames = [
         "Microsoft.Bcl.AsyncInterfaces.dll",
-        "SharpProof.Analyzer.dll",
+        "SharpProof.Analyzer.Core.dll",
         "SharpProof.CompilerArtifact.dll",
         "SharpProof.Contracts.dll",
         "SharpProof.Dataflow.dll",
@@ -68,7 +72,7 @@ public sealed class PackageLayoutSmokeTests
         "tools/analyzers/dotnet/cs/System.Text.Encoding.CodePages.dll",
         "tools/analyzers/dotnet/cs/System.Threading.Tasks.Extensions.dll",
         "tools/collector/Microsoft.Bcl.AsyncInterfaces.dll",
-        "tools/collector/SharpProof.Analyzer.dll",
+        "tools/collector/SharpProof.Analyzer.Core.dll",
         "tools/collector/SharpProof.CompilerArtifact.dll",
         "tools/collector/SharpProof.CompilerCollector.dll",
         "tools/collector/SharpProof.Contracts.dll",
@@ -124,6 +128,92 @@ public sealed class PackageLayoutSmokeTests
 
         VerifyPackageGraph(feed);
         VerifyPackageLayouts(feed);
+    }
+
+    [Test]
+    public async Task StrictAnalyzerSetDiscoversEachEntrypointOnce()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-analyzer-discovery-");
+        try
+        {
+            ZipFile.ExtractToDirectory(
+                feed.GetPackagePath(PackagedProductFeed.PortablePackageId),
+                directory.FullName);
+            var analyzerDirectory = Path.Combine(
+                directory.FullName,
+                "tools",
+                "analyzers",
+                "dotnet",
+                "cs");
+            var collectorDirectory = Path.Combine(
+                directory.FullName,
+                "tools",
+                "collector");
+            using var loader = new PackageAnalyzerAssemblyLoader();
+            foreach (var dependency in Directory.EnumerateFiles(
+                         directory.FullName,
+                         "*.dll",
+                         SearchOption.AllDirectories))
+            {
+                loader.AddDependencyLocation(dependency);
+            }
+
+            var failures = new List<string>();
+            var analyzers = new List<DiagnosticAnalyzer>();
+            var generators = new List<ISourceGenerator>();
+            foreach (var path in new[]
+                     {
+                         Path.Combine(
+                             analyzerDirectory,
+                             "SharpProof.PortableAnalyzer.dll"),
+                         Path.Combine(
+                             collectorDirectory,
+                             "SharpProof.CompilerCollector.dll"),
+                         Path.Combine(
+                             collectorDirectory,
+                             "SharpProof.Analyzer.Core.dll")
+                     })
+            {
+                var reference = new AnalyzerFileReference(path, loader);
+                reference.AnalyzerLoadFailed += (_, args) => failures.Add(
+                    args.ErrorCode + ": " + args.Message);
+                analyzers.AddRange(reference.GetAnalyzers(
+                    LanguageNames.CSharp));
+                generators.AddRange(reference.GetGenerators(
+                    LanguageNames.CSharp));
+            }
+
+            Assert.Multiple((Action)(() =>
+            {
+                Assert.That(failures, Is.Empty);
+                Assert.That(
+                    analyzers.Count(analyzer =>
+                        string.Equals(
+                            analyzer.GetType().FullName,
+                            "SharpProof.Analyzer.SharpProofAnalyzer",
+                            StringComparison.Ordinal)),
+                    Is.EqualTo(1));
+                Assert.That(
+                    analyzers.Count(analyzer =>
+                        string.Equals(
+                            analyzer.GetType().FullName,
+                            "SharpProof.CompilerCollector.FinalCompilationCollectorAnalyzer",
+                            StringComparison.Ordinal)),
+                    Is.EqualTo(1));
+                Assert.That(
+                    analyzers,
+                    Has.Count.EqualTo(2));
+                Assert.That(
+                    generators,
+                    Has.Count.EqualTo(1));
+            }));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
     }
 
     [Test]
@@ -2748,6 +2838,82 @@ public sealed class PackageLayoutSmokeTests
     private readonly record struct SourceConsumerAnalyzerItems(
         string[] EntryFileNames,
         string[] DependencyFileNames);
+
+    private sealed class PackageAnalyzerAssemblyLoader :
+        IAnalyzerAssemblyLoader,
+        IDisposable
+    {
+        private readonly Dictionary<string, string> _dependencies =
+            new(StringComparer.OrdinalIgnoreCase);
+        private readonly PackageAnalyzerLoadContext _context;
+
+        internal PackageAnalyzerAssemblyLoader()
+        {
+            _context = new PackageAnalyzerLoadContext(_dependencies);
+        }
+
+        public void AddDependencyLocation(string fullPath)
+        {
+            var name = AssemblyName.GetAssemblyName(fullPath).Name;
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                _dependencies[name] = Path.GetFullPath(fullPath);
+            }
+        }
+
+        public Assembly LoadFromPath(string fullPath)
+        {
+            return _context.LoadPackageAssembly(Path.GetFullPath(fullPath));
+        }
+
+        public void Dispose()
+        {
+            _context.Unload();
+        }
+
+        private sealed class PackageAnalyzerLoadContext(
+            IReadOnlyDictionary<string, string> dependencies) :
+            AssemblyLoadContext(isCollectible: true)
+        {
+            internal Assembly LoadPackageAssembly(string path)
+            {
+                var identity = AssemblyName.GetAssemblyName(path);
+                var loaded = Assemblies.FirstOrDefault(assembly =>
+                    AssemblyName.ReferenceMatchesDefinition(
+                        assembly.GetName(),
+                        identity));
+                return loaded ?? LoadWithoutLock(path);
+            }
+
+            protected override Assembly? Load(AssemblyName identity)
+            {
+                var compilerAssembly = Default.Assemblies.FirstOrDefault(
+                    assembly => AssemblyName.ReferenceMatchesDefinition(
+                        assembly.GetName(),
+                        identity));
+                if (compilerAssembly != null)
+                {
+                    return compilerAssembly;
+                }
+                return identity.Name != null &&
+                    dependencies.TryGetValue(identity.Name, out var path)
+                    ? LoadWithoutLock(path)
+                    : null;
+            }
+
+            private Assembly LoadWithoutLock(string path)
+            {
+                using var assembly = File.OpenRead(path);
+                var symbolsPath = Path.ChangeExtension(path, ".pdb");
+                if (!File.Exists(symbolsPath))
+                {
+                    return LoadFromStream(assembly);
+                }
+                using var symbols = File.OpenRead(symbolsPath);
+                return LoadFromStream(assembly, symbols);
+            }
+        }
+    }
 
     private readonly record struct ProcessResult(
         int ExitCode,

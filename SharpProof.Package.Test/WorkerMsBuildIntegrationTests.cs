@@ -972,6 +972,16 @@ public sealed class WorkerMsBuildIntegrationTests
         Assert.That(warning.ExitCode, Is.Zero, warning.Output);
         Assert.That(warning.Output, Does.Contain("warning SP0047"));
 
+        var promotedWarning = await project.BuildAsync(
+            verify: true,
+            ("SharpProofVerifyPolicy", "warn-on-unknown"),
+            ("MSBuildWarningsAsErrors", "SP0047"));
+        Assert.That(
+            promotedWarning.ExitCode,
+            Is.Not.Zero,
+            promotedWarning.Output);
+        Assert.That(promotedWarning.Output, Does.Contain("SP0047"));
+
         var required = await project.BuildAsync(
             verify: true,
             ("SharpProofVerifyPolicy", "require-proven"));
@@ -1236,6 +1246,36 @@ public sealed class WorkerMsBuildIntegrationTests
                 response.Errors.Select(static error => error.Code),
                 Does.Contain("launcher.infrastructure"));
         }
+    }
+
+    [Test]
+    public async Task LauncherPropagatesWorkerCancellation()
+    {
+        RequireWindowsWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+        var requestPath = project.VerifyOutputPath(
+            "net8.0", "in-process-canceled-request.json");
+        var resultPath = project.VerifyOutputPath(
+            "net8.0", "in-process-canceled-result.json");
+
+        Assert.ThrowsAsync<OperationCanceledException>(
+            (Func<Task>)(async () => await Program.RunMain(
+                [
+                    "verify",
+                    "--worker", WorkerOutputPath(),
+                    "--request", requestPath,
+                    "--result", resultPath,
+                    "--compiler-manifest", project.CompilerManifestPath,
+                    "--verify-policy", "advisory",
+                    "--assumption-policy", "allow"
+                ],
+                static path => WorkerBinaryIdentity.ComputeSha256(path),
+                static (_, _, _, _) => throw new OperationCanceledException(
+                    "canceled"))));
+
+        Assert.That(File.Exists(resultPath), Is.False);
     }
 
     [Test]
@@ -1668,16 +1708,9 @@ public sealed class WorkerMsBuildIntegrationTests
 
         var launcherDirectory = Path.GetDirectoryName(
             LauncherProtocolOutputPath())!;
-        foreach (var fileName in new[] {
-                     "SharpProof.CompilerArtifact.dll",
-                     "SharpProof.Ir.dll",
-                     "SharpProof.Specs.dll",
-                     "SharpProof.Worker.Protocol.dll",
-                     "SharpProof.Worker.Launcher.exe",
-                     "System.IO.Pipelines.dll",
-                     "System.Text.Encodings.Web.dll",
-                     "System.Text.Json.dll"
-                 })
+        foreach (var fileName in
+                 SharpProof.BuildTasks.LauncherRuntimeCompanionInventory
+                     .FileNames)
         {
             var collisionPath = Path.Combine(launcherDirectory, fileName);
             Assert.That(File.Exists(collisionPath), Is.True, collisionPath);

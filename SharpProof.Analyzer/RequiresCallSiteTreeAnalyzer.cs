@@ -156,10 +156,17 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             if (potentialOwners.Contains(caller))
             {
                 _visitedPotentialOwners.Add(caller);
-                var outcome = session
-                    .TryBeginRequiresCallSiteAnalysis(caller)
-                    ? RequiresCallSiteAnalyzer
-                        .AnalyzeCallable(
+                var outcome = AnalyzerSemanticOutcome.NotApplicable;
+                if (session.TryBeginRequiresCallSiteAnalysis(caller))
+                {
+                    outcome = SharpProofControlAttributePolicy
+                        .ValidateAndShouldSuppress(
+                            caller,
+                            session,
+                            reportDiagnostic,
+                            cancellationToken)
+                        ? AnalyzerSemanticOutcome.Suppressed
+                        : RequiresCallSiteAnalyzer.AnalyzeCallable(
                             caller,
                             declaration,
                             semanticModel,
@@ -169,9 +176,8 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                             operationRoot,
                             screenForPotentialCalls: false,
                             cancellationToken:
-                                cancellationToken)
-                    : AnalyzerSemanticOutcome
-                        .NotApplicable;
+                                cancellationToken);
+                }
                 if (isRoot)
                 {
                     _rootOutcome = outcome;

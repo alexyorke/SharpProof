@@ -131,6 +131,17 @@ public static class WindowsPathIdentity
         IEnumerable<string> publicationPaths,
         TimeSpan timeout)
     {
+        return AcquirePublicationSet(
+            publicationPaths,
+            timeout,
+            CancellationToken.None);
+    }
+
+    public static IDisposable AcquirePublicationSet(
+        IEnumerable<string> publicationPaths,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
         if (publicationPaths == null)
         {
             throw new ArgumentNullException(nameof(publicationPaths));
@@ -159,18 +170,24 @@ public static class WindowsPathIdentity
         var acquired = 0;
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var stopwatch = Stopwatch.StartNew();
             while (acquired != mutexes.Length)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var remaining = timeout - stopwatch.Elapsed;
                 if (remaining <= TimeSpan.Zero ||
-                    !WaitForMutex(mutexes[acquired], remaining))
+                    !WaitForMutex(
+                        mutexes[acquired],
+                        remaining,
+                        cancellationToken))
                 {
                     throw new IOException(
                         "Timed out waiting for SharpProof publication paths.");
                 }
                 acquired++;
             }
+            cancellationToken.ThrowIfCancellationRequested();
 
             var confirmedPaths = CanonicalPublicationPaths(requestedPaths);
             if (!canonicalPaths.SequenceEqual(
@@ -210,11 +227,26 @@ public static class WindowsPathIdentity
             .ToArray();
     }
 
-    private static bool WaitForMutex(Mutex mutex, TimeSpan timeout)
+    private static bool WaitForMutex(
+        Mutex mutex,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
     {
         try
         {
-            return mutex.WaitOne(timeout);
+            if (!cancellationToken.CanBeCanceled)
+            {
+                return mutex.WaitOne(timeout);
+            }
+
+            var signaled = WaitHandle.WaitAny(
+                [mutex, cancellationToken.WaitHandle],
+                timeout);
+            if (signaled == 1)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+            return signaled == 0;
         }
         catch (AbandonedMutexException)
         {
@@ -225,6 +257,14 @@ public static class WindowsPathIdentity
     private static void ValidatePublicationMarkerAliases(
         IReadOnlyCollection<string> canonicalPaths)
     {
+        if (canonicalPaths.Any(static path => path.EndsWith(
+                PublicationMarkerSuffix,
+                StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new ArgumentException(
+                "SharpProof publication paths must not use the publication metadata namespace.");
+        }
+
         var markers = new HashSet<string>(
             canonicalPaths.Select(
                 static path => path + PublicationMarkerSuffix),
@@ -240,34 +280,80 @@ public static class WindowsPathIdentity
     {
         var setId = PublicationSetId(canonicalPaths);
         var marker = PublicationMarkerHeader + setId + "\n";
+        var pending = new List<(string Path, string MarkerPath)>();
         foreach (var path in canonicalPaths)
         {
             var markerPath = path + PublicationMarkerSuffix;
-            var directory = Path.GetDirectoryName(markerPath) ??
-                throw new IOException(
-                    "SharpProof publication metadata has no directory.");
-            Directory.CreateDirectory(directory);
             if (File.Exists(markerPath))
             {
                 ValidatePublicationMarker(markerPath, marker);
                 continue;
             }
 
-            try
+            if (File.Exists(path) || Directory.Exists(path))
             {
-                using var stream = new FileStream(
-                    markerPath,
-                    FileMode.CreateNew,
-                    FileAccess.Write,
-                    FileShare.Read);
-                var bytes = new UTF8Encoding(false).GetBytes(marker);
-                stream.Write(bytes, 0, bytes.Length);
-                stream.Flush();
+                throw new IOException(
+                    "SharpProof refuses to adopt a pre-existing publication destination without an exact ownership marker.");
             }
-            catch (IOException) when (File.Exists(markerPath))
+
+            pending.Add((path, markerPath));
+        }
+
+        foreach (var item in pending)
+        {
+            var directory = Path.GetDirectoryName(item.MarkerPath) ??
+                throw new IOException(
+                    "SharpProof publication metadata has no directory.");
+            Directory.CreateDirectory(directory);
+        }
+
+        var created = new List<string>();
+        try
+        {
+            var bytes = new UTF8Encoding(false).GetBytes(marker);
+            foreach (var item in pending)
             {
-                ValidatePublicationMarker(markerPath, marker);
+                if (File.Exists(item.Path) || Directory.Exists(item.Path))
+                {
+                    throw new IOException(
+                        "SharpProof refuses to adopt a pre-existing publication destination without an exact ownership marker.");
+                }
+
+                try
+                {
+                    using var stream = new FileStream(
+                        item.MarkerPath,
+                        FileMode.CreateNew,
+                        FileAccess.Write,
+                        FileShare.Read);
+                    created.Add(item.MarkerPath);
+                    stream.Write(bytes, 0, bytes.Length);
+                    stream.Flush();
+                }
+                catch (IOException) when (File.Exists(item.MarkerPath))
+                {
+                    ValidatePublicationMarker(item.MarkerPath, marker);
+                }
             }
+        }
+        catch
+        {
+            foreach (var markerPath in created.AsEnumerable().Reverse())
+            {
+                try
+                {
+                    File.Delete(markerPath);
+                }
+                catch (Exception exception) when (exception is
+                    IOException or UnauthorizedAccessException)
+                {
+                    // The original binding failure remains authoritative. A
+                    // retained marker cannot authorize publication because its
+                    // full-set identity will fail every partial-overlap check.
+                }
+            }
+
+            throw;
         }
     }
 

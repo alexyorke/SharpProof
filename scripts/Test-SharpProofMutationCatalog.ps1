@@ -10,6 +10,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
+
 if ($ExpectedCommit -notmatch '^[0-9a-f]{40}$') {
     throw "ExpectedCommit must be a 40-character commit SHA: '$ExpectedCommit'."
 }
@@ -21,32 +23,6 @@ $contract = Get-Content -LiteralPath $contractPath -Raw |
 $policy = $contract.mutationEvidence
 $expectedCatalogCount = [int]$policy.expectedCatalogCount
 $expectedCatalogSha256 = [string]$policy.expectedCatalogSha256
-
-function Get-CatalogSha256 {
-    param(
-        [Parameter(Mandatory = $true)]
-        [object[]]$Mutations
-    )
-
-    $lines = @(
-        $Mutations |
-            ForEach-Object {
-                $name = [string]$_.name
-                $file = ([string]$_.file).Replace('\', '/')
-                $test = [string]$_.test
-                "$name`t$file`t$test"
-            })
-    $canonical = [string]::Join("`n", $lines) + "`n"
-    $hasher = [Security.Cryptography.SHA256]::Create()
-    try {
-        $bytes = [Text.UTF8Encoding]::new($false).GetBytes($canonical)
-        return [Convert]::ToHexString(
-            $hasher.ComputeHash($bytes)).ToLowerInvariant()
-    }
-    finally {
-        $hasher.Dispose()
-    }
-}
 
 $resolvedEvidence = [IO.Path]::GetFullPath($EvidencePath)
 if (-not [IO.File]::Exists($resolvedEvidence)) {
@@ -73,7 +49,8 @@ if ([string]$evidence.commit -ne $ExpectedCommit) {
         "expected commit '$ExpectedCommit'.")
 }
 
-$actualCatalogSha256 = Get-CatalogSha256 -Mutations $mutations
+$actualCatalogSha256 = Get-SharpProofMutationCatalogSha256 `
+    -Mutations $mutations
 if ($actualCatalogSha256 -ne $expectedCatalogSha256) {
     throw 'Mutation evidence catalog descriptors do not match the policy.'
 }

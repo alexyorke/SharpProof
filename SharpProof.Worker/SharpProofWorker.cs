@@ -135,18 +135,31 @@ public sealed class SharpProofWorker : IDisposable
                 IEnumerable<WorkerCallableResult> callables, IEnumerable<WorkerClaimResult> claims,
                 WorkerCacheStatus resultCacheStatus, IEnumerable<WorkerProtocolError>? errors = null)
             {
-                return WorkerResultAssembler.Create(snapshot.InputHash, manifest, status, reason, callables, claims,
+                projectBoundary.Token.ThrowIfCancellationRequested();
+                var assembled = WorkerResultAssembler.Create(snapshot.InputHash, manifest, status, reason, callables, claims,
                     request.Budgets, resultCacheStatus, Elapsed(started), errors,
                     requestHash, Versions());
+                projectBoundary.Token.ThrowIfCancellationRequested();
+                return assembled;
             }
-
             WorkerVerifyResponse Canceled(WorkerCacheStatus status)
             {
                 var lanes = targets.Select(target => Unknown(
                     target, WorkerClaimReason.Canceled, WorkerCallableCoverageReason.Canceled)).ToArray();
-                return Assemble(WorkerRunStatus.Canceled, WorkerRunFailureReason.None,
-                    lanes.Select(static lane => lane.Callable), lanes.SelectMany(static lane => lane.Claims), status);
+                return WorkerResultAssembler.Create(
+                    snapshot.InputHash,
+                    manifest,
+                    WorkerRunStatus.Canceled,
+                    WorkerRunFailureReason.None,
+                    lanes.Select(static lane => lane.Callable),
+                    lanes.SelectMany(static lane => lane.Claims),
+                    request.Budgets,
+                    status,
+                    Elapsed(started),
+                    requestHash: requestHash,
+                    versions: Versions());
             }
+
             var cache = CreateCacheIfEnabled(request,
                 snapshot.CompilerManifest.Compilation.ProjectDirectory, out var cacheStatus);
             if (cache != null)
@@ -174,6 +187,29 @@ public sealed class SharpProofWorker : IDisposable
                 static target => target.Entry.CallableId, StringComparer.Ordinal).ToArray();
             var results = new CallableVerificationResult[orderedTargets.Length];
             var nextTarget = -1;
+            var retirementSynchronization = new object();
+            var retirementCallableReason = WorkerCallableCoverageReason.InfrastructureFailure;
+            var retirementClaimReason = WorkerClaimReason.InfrastructureFailure;
+            var hasRetirementReason = false;
+            void RecordRetirement(WorkerCallableCoverageReason reason)
+            {
+                lock (retirementSynchronization)
+                {
+                    if (hasRetirementReason)
+                    {
+                        return;
+                    }
+                    retirementCallableReason = reason;
+                    retirementClaimReason = reason switch
+                    {
+                        WorkerCallableCoverageReason.Canceled => WorkerClaimReason.Canceled,
+                        WorkerCallableCoverageReason.ProjectTimeout => WorkerClaimReason.ProjectTimeout,
+                        WorkerCallableCoverageReason.MethodTimeout => WorkerClaimReason.MethodTimeout,
+                        _ => WorkerClaimReason.InfrastructureFailure
+                    };
+                    hasRetirementReason = true;
+                }
+            }
             async Task RunLane(VerificationLane lane)
             {
                 while (true)
@@ -194,6 +230,7 @@ public sealed class SharpProofWorker : IDisposable
                         !projectBoundary.IsCancellationRequested &&
                         !lane.TryRenew(solverLanes, request.Budgets.MaximumExpressionDepth))
                     {
+                        RecordRetirement(result.Callable.Reason);
                         return;
                     }
                 }
@@ -203,16 +240,26 @@ public sealed class SharpProofWorker : IDisposable
             {
                 return Canceled(cacheStatus);
             }
+            projectBoundary.Token.ThrowIfCancellationRequested();
 
             for (var index = 0; index < results.Length; index++)
             {
-                results[index] ??= Unknown(orderedTargets[index],
-                    WorkerClaimReason.InfrastructureFailure,
-                    WorkerCallableCoverageReason.InfrastructureFailure);
+                projectBoundary.Token.ThrowIfCancellationRequested();
+                if (results[index] == null)
+                {
+                    lock (retirementSynchronization)
+                    {
+                        results[index] = Unknown(
+                            orderedTargets[index],
+                            retirementClaimReason,
+                            retirementCallableReason);
+                    }
+                }
             }
 
             var callableResults = results.Select(static result => result.Callable).ToArray();
             var claimResults = results.SelectMany(static result => result.Claims).ToArray();
+            projectBoundary.Token.ThrowIfCancellationRequested();
             var run = WorkerResultAssembler.Classify(callableResults, claimResults);
             var response = Assemble(run.Status, run.Failure, callableResults, claimResults, cacheStatus);
             var responseValidation = WorkerProtocolJson.Validate(response, snapshot.InputHash, manifest);
@@ -238,6 +285,7 @@ public sealed class SharpProofWorker : IDisposable
                 response = Assemble(run.Status, run.Failure, callableResults, claimResults,
                     written ? WorkerCacheStatus.Written : WorkerCacheStatus.Unavailable);
             }
+            projectBoundary.Token.ThrowIfCancellationRequested();
             return response;
         }
         catch (OperationCanceledException) { return Interrupted(snapshot); }

@@ -1834,6 +1834,53 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ByValueStructMutationStaysOnTheLocalCopy()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public struct Counter {
+                public int Value;
+                public void ClearValue() => Value = 0;
+            }
+
+            public static class Sample {
+                public static void WriteCopyField(Counter value) =>
+                    value.Value = 0;
+                public static void MutateCopy(Counter value) =>
+                    value.ClearValue();
+                public static void WriteRef(ref Counter value) =>
+                    value.Value = 0;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var fieldCopy = session.Analyze(
+            Method(compilation, "WriteCopyField")).Summary;
+        var mutatorCopy = session.Analyze(
+            Method(compilation, "MutateCopy")).Summary;
+        var byReference = session.Analyze(
+            Method(compilation, "WriteRef")).Summary;
+        var mutableThis = session.Analyze(
+            EffectTestHost.RequireMethod(
+                compilation,
+                "Counter",
+                "ClearValue")).Summary;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(fieldCopy.Writes.IsEmpty, Is.True);
+            Assert.That(fieldCopy.Completeness, Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(mutatorCopy.Writes.IsEmpty, Is.True);
+            Assert.That(mutatorCopy.Completeness, Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(
+                byReference.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.True);
+            Assert.That(
+                mutableThis.Writes.Contains(EffectRegionId.Receiver),
+                Is.True);
+        }
+    }
+
+    [Test]
     public void RecursiveSccStartsConservative()
     {
         var result = Analyze(

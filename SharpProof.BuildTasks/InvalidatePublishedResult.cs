@@ -4,8 +4,12 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.BuildTasks;
 
-public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task
+public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, ICancelableTask
 {
+    private readonly object _synchronization = new();
+    private Action? _cancelExecution;
+    private bool _canceled;
+
     [Required]
     public string ResultPath { get; set; } = string.Empty;
 
@@ -36,6 +40,34 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task
     public string? CachePath { get; set; }
 
     public override bool Execute()
+    {
+        using var cancellation = new CancellationTokenSource();
+        Action cancel = cancellation.Cancel;
+        lock (_synchronization)
+        {
+            if (_canceled)
+            {
+                return false;
+            }
+            _cancelExecution = cancel;
+        }
+        try
+        {
+            return Execute(cancellation.Token);
+        }
+        finally
+        {
+            lock (_synchronization)
+            {
+                if (ReferenceEquals(_cancelExecution, cancel))
+                {
+                    _cancelExecution = null;
+                }
+            }
+        }
+    }
+
+    private bool Execute(CancellationToken cancellationToken)
     {
         var lexicalProjectDirectory = Path.GetFullPath(ProjectDirectory);
         string ResolveLexicalPath(string path)
@@ -157,16 +189,36 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task
             return false;
         }
 
-        using (WindowsPathIdentity.AcquirePublicationSet(
-                   publicationPaths,
-                   TimeSpan.FromSeconds(30)))
+        try
         {
-            foreach (var path in outputPaths)
+            using (WindowsPathIdentity.AcquirePublicationSet(
+                       publicationPaths,
+                       TimeSpan.FromSeconds(30),
+                       cancellationToken))
             {
-                WindowsPathIdentity.DeleteIfUnprotected(path, protectedPaths);
+                foreach (var path in outputPaths)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    WindowsPathIdentity.DeleteIfUnprotected(path, protectedPaths);
+                }
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
         return !Log.HasLoggedErrors;
+    }
+
+    public void Cancel()
+    {
+        Action? cancel;
+        lock (_synchronization)
+        {
+            _canceled = true;
+            cancel = _cancelExecution;
+        }
+        cancel?.Invoke();
     }
 
     private static IEnumerable<string> Present(params string?[] paths)
@@ -192,15 +244,7 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task
             throw new InvalidOperationException(
                 "The SharpProof launcher path has no directory.");
         return
-        [
-            Path.Combine(directory, "SharpProof.CompilerArtifact.dll"),
-            Path.Combine(directory, "SharpProof.Ir.dll"),
-            Path.Combine(directory, "SharpProof.Specs.dll"),
-            Path.Combine(directory, "SharpProof.Worker.Protocol.dll"),
-            Path.Combine(directory, "SharpProof.Worker.Launcher.exe"),
-            Path.Combine(directory, "System.IO.Pipelines.dll"),
-            Path.Combine(directory, "System.Text.Encodings.Web.dll"),
-            Path.Combine(directory, "System.Text.Json.dll")
-        ];
+            LauncherRuntimeCompanionInventory.FileNames.Select(
+                file => Path.Combine(directory, file));
     }
 }

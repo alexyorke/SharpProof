@@ -3,6 +3,7 @@ using Microsoft.Build.Utilities;
 using NUnit.Framework;
 using SharpProof.BuildTasks;
 using SharpProof.Worker;
+using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Package.Test;
 
@@ -40,6 +41,31 @@ public sealed class BuildTaskTests
             Assert.That(task.Execute(), Is.True);
             Assert.That(task.ExitCode, Is.EqualTo(-1));
             Assert.That(engine.Errors, Is.Empty);
+        }));
+    }
+
+    [Test]
+    public void VerifierWarningsReachTheMsBuildWarningChannel()
+    {
+        var engine = new RecordingBuildEngine();
+        var task = new RunVerifier { BuildEngine = engine };
+
+        task.LogStandardError(
+            "source.cs(12,3): warning SP0047: incomplete" + Environment.NewLine +
+            "SharpProof: warning SP0048: assumptions" + Environment.NewLine +
+            "worker stderr");
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(
+                engine.Warnings.Select(static warning => warning.Code),
+                Is.EqualTo((string[])["SP0047", "SP0048"]));
+            Assert.That(engine.Warnings[0].File, Is.EqualTo("source.cs"));
+            Assert.That(engine.Warnings[0].LineNumber, Is.EqualTo(12));
+            Assert.That(engine.Warnings[0].ColumnNumber, Is.EqualTo(3));
+            Assert.That(
+                engine.Messages.Select(static message => message.Message),
+                Does.Contain("worker stderr"));
         }));
     }
 
@@ -123,6 +149,11 @@ public sealed class BuildTaskTests
             var worker = Path.Combine(tools.FullName, "worker.dll");
             var launcher = Path.Combine(tools.FullName, "launcher.dll");
             var protocol = Path.Combine(tools.FullName, "protocol.dll");
+            using (WindowsPathIdentity.AcquirePublicationSet(
+                       [request, result, manifest, sarif],
+                       TimeSpan.FromSeconds(5)))
+            {
+            }
             foreach (var path in new[]
                      {
                          result,
@@ -171,9 +202,101 @@ public sealed class BuildTaskTests
         }
     }
 
+    [Test]
+    [Platform("Win")]
+    public async System.Threading.Tasks.Task InvalidationCancellationInterruptsPublicationLockWait()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-invalidation-cancel-");
+        try
+        {
+            var tools = Directory.CreateDirectory(
+                Path.Combine(directory.FullName, "tools"));
+            var result = Path.Combine(directory.FullName, "result.json");
+            var request = Path.Combine(directory.FullName, "request.json");
+            var manifest = Path.Combine(directory.FullName, "manifest.json");
+            var worker = Path.Combine(tools.FullName, "worker.dll");
+            var launcher = Path.Combine(tools.FullName, "launcher.dll");
+            var protocol = Path.Combine(tools.FullName, "protocol.dll");
+            var publicationPaths = new[] { request, result, manifest };
+            using (WindowsPathIdentity.AcquirePublicationSet(
+                       publicationPaths,
+                       TimeSpan.FromSeconds(5)))
+            {
+            }
+            foreach (var path in new[]
+                     {
+                         result,
+                         request,
+                         manifest,
+                         worker,
+                         launcher,
+                         protocol
+                     })
+            {
+                await File.WriteAllTextAsync(path, Path.GetFileName(path));
+            }
+
+            var task = new InvalidatePublishedResult
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                ResultPath = result,
+                RequestPath = request,
+                ManifestPath = manifest,
+                ProjectDirectory = directory.FullName,
+                WorkerPath = worker,
+                LauncherPath = launcher,
+                WorkerProtocolPath = protocol
+            };
+            if ((object)task is not ICancelableTask cancelable)
+            {
+                Assert.Fail("Invalidation must implement the MSBuild cancellation boundary.");
+                return;
+            }
+
+            using var lockAcquired = new ManualResetEventSlim();
+            using var releaseLock = new ManualResetEventSlim();
+            var lockTask = System.Threading.Tasks.Task.Run(() =>
+            {
+                using var held = WindowsPathIdentity.AcquirePublicationSet(
+                    publicationPaths,
+                    TimeSpan.FromSeconds(5));
+                lockAcquired.Set();
+                releaseLock.Wait(TimeSpan.FromSeconds(10));
+            });
+            try
+            {
+                Assert.That(
+                    lockAcquired.Wait(TimeSpan.FromSeconds(5)),
+                    Is.True);
+                var execution = System.Threading.Tasks.Task.Run(task.Execute);
+                await System.Threading.Tasks.Task.Delay(100);
+                Assert.That(execution.IsCompleted, Is.False);
+
+                cancelable.Cancel();
+
+                Assert.That(
+                    await execution.WaitAsync(TimeSpan.FromSeconds(2)),
+                    Is.False);
+                Assert.That(File.Exists(result), Is.True);
+            }
+            finally
+            {
+                releaseLock.Set();
+                await lockTask.WaitAsync(TimeSpan.FromSeconds(5));
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     private sealed class RecordingBuildEngine : IBuildEngine
     {
         public List<BuildErrorEventArgs> Errors { get; } = [];
+        public List<BuildWarningEventArgs> Warnings { get; } = [];
+        public List<BuildMessageEventArgs> Messages { get; } = [];
 
         public bool ContinueOnError => false;
 
@@ -188,9 +311,15 @@ public sealed class BuildTaskTests
             Errors.Add(e);
         }
 
-        public void LogWarningEvent(BuildWarningEventArgs e) { }
+        public void LogWarningEvent(BuildWarningEventArgs e)
+        {
+            Warnings.Add(e);
+        }
 
-        public void LogMessageEvent(BuildMessageEventArgs e) { }
+        public void LogMessageEvent(BuildMessageEventArgs e)
+        {
+            Messages.Add(e);
+        }
 
         public void LogCustomEvent(CustomBuildEventArgs e) { }
 

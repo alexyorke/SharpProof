@@ -20,7 +20,7 @@
     </Analyzer>
     <Analyzer Include="
         $(_SharpProofCollectorDirectory)/Microsoft.Bcl.AsyncInterfaces.dll;
-        $(_SharpProofCollectorDirectory)/SharpProof.Analyzer.dll;
+        $(_SharpProofCollectorDirectory)/SharpProof.Analyzer.Core.dll;
         $(_SharpProofCollectorDirectory)/SharpProof.CompilerArtifact.dll;
         $(_SharpProofCollectorDirectory)/SharpProof.Contracts.dll;
         $(_SharpProofCollectorDirectory)/SharpProof.Dataflow.dll;

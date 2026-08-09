@@ -27,6 +27,7 @@ public sealed class ArchitectureTests
 
     private static readonly string[] ProductionProjects = [
         "SharpProof.Analyzer",
+        "SharpProof.Analyzer.Core",
         "SharpProof.Attributes",
         "SharpProof.BuildTasks",
         "SharpProof.Ir",
@@ -144,6 +145,13 @@ public sealed class ArchitectureTests
                 "SharpProof.Ir",
                 "SharpProof.Specs"
             ],
+            ["SharpProof.Analyzer.Core"] = [
+                "SharpProof.Contracts",
+                "SharpProof.Effects",
+                "SharpProof.Frontend",
+                "SharpProof.Ir",
+                "SharpProof.Specs"
+            ],
             ["SharpProof.Attributes"] = [],
             ["SharpProof.BuildTasks"] = ["SharpProof.Worker.Protocol"],
             ["SharpProof.Ir"] = [],
@@ -154,7 +162,7 @@ public sealed class ArchitectureTests
                 "SharpProof.Worker.Protocol"
             ],
             ["SharpProof.CompilerCollector"] = [
-                "SharpProof.Analyzer",
+                "SharpProof.Analyzer.Core",
                 "SharpProof.CompilerArtifact",
                 "SharpProof.Contracts",
                 "SharpProof.Effects",
@@ -708,6 +716,27 @@ public sealed class ArchitectureTests
             .Select(path => File.ReadAllText(Path.Combine(repository, path)))
             .ToArray();
         var combinedBuildSurface = string.Join("\n", buildFiles);
+        var actualPublicProperties = buildFiles
+            .SelectMany(static text =>
+                XDocument.Parse(text)
+                    .Descendants("PropertyGroup")
+                    .Elements()
+                    .Select(static element => element.Name.LocalName)
+                    .Concat(Regex.Matches(
+                            text,
+                            @"\$\((SharpProof[A-Za-z0-9_]+)\)",
+                            RegexOptions.CultureInvariant)
+                        .Select(static match => match.Groups[1].Value)))
+            .Where(static name => name.StartsWith(
+                "SharpProof",
+                StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
+        var frozenPublicProperties = active
+            .Concat(retired)
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
         var compilerVisible = XDocument.Parse(buildFiles[0])
             .Descendants("CompilerVisibleProperty")
             .Concat(XDocument.Parse(buildFiles[2])
@@ -731,6 +760,11 @@ public sealed class ArchitectureTests
             Assert.That(active, Is.Unique);
             Assert.That(retired, Is.Unique);
             Assert.That(active.Intersect(retired, StringComparer.Ordinal), Is.Empty);
+            Assert.That(
+                actualPublicProperties,
+                Is.EqualTo(frozenPublicProperties),
+                "Every SharpProof* MSBuild property consumed or declared by " +
+                "the shipping build files must be frozen in the preview snapshot.");
             foreach (var property in active)
             {
                 Assert.That(
@@ -757,8 +791,38 @@ public sealed class ArchitectureTests
                 versions.GetProperty("compilerArtifact").GetInt32(),
                 Is.EqualTo(worker.GetProperty("compilerArtifactSchemaVersion").GetInt32()));
             Assert.That(
+                versions.GetProperty("relationalSummary").GetInt32(),
+                Is.EqualTo(worker.GetProperty("relationalSummarySchemaVersion").GetInt32()));
+            Assert.That(
+                versions.GetProperty("specificationPack").GetInt32(),
+                Is.EqualTo(worker.GetProperty("specificationPackSchemaVersion").GetInt32()));
+            Assert.That(
                 versions.GetProperty("workerCache").GetInt32(),
                 Is.EqualTo(cache.GetProperty("schemaVersion").GetInt32()));
+        }
+    }
+
+    [Test]
+    public void PilotPackageVersionDerivesFromReleaseOwner()
+    {
+        var pilotProps = XDocument.Load(Path.Combine(
+            RepositoryRoot(),
+            "eng",
+            "pilots",
+            "Directory.Build.props"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                pilotProps.Descendants("Import")
+                    .Select(static element =>
+                        element.Attribute("Project")?.Value),
+                Does.Contain(@"..\..\SharpProof.Release.props"));
+            Assert.That(
+                pilotProps.Descendants("SharpProofPilotVersion")
+                    .Single()
+                    .Value,
+                Is.EqualTo("$(SharpProofPackageVersion)"));
         }
     }
 
@@ -1071,7 +1135,9 @@ public sealed class ArchitectureTests
             .OrderBy(static name => name, StringComparer.Ordinal)
             .ToArray();
         var expectedCoverageProjects = ProductionProjects
-            .Where(static name => name != "SharpProof.PortableAnalyzer")
+            .Where(static name =>
+                name != "SharpProof.Analyzer.Core" &&
+                name != "SharpProof.PortableAnalyzer")
             .Append("SharpProof.Gates")
             .OrderBy(static name => name, StringComparer.Ordinal)
             .ToArray();
@@ -1079,8 +1145,8 @@ public sealed class ArchitectureTests
             actualCoverageProjects,
             Is.EqualTo(expectedCoverageProjects),
             "Every production source owner must participate in project and " +
-            "aggregate coverage; PortableAnalyzer is the explicit linked-source " +
-            "packaging exception.");
+            "aggregate coverage; Analyzer.Core and PortableAnalyzer are explicit " +
+            "linked-source packaging exceptions.");
         Assert.That(
             managedSettings,
             Does.Contain(
@@ -1179,6 +1245,30 @@ public sealed class ArchitectureTests
 
         Assert.That(references, Does.Contain("SharpProof.Package"));
         Assert.That(references, Does.Contain("SharpProof.Worker"));
+    }
+
+    [Test]
+    public void ProductionComplexityRationaleBindsTheExactCeilings()
+    {
+        using var contract = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "eng",
+            "acceptance",
+            "contract.json")));
+        var complexity = contract.RootElement.GetProperty(
+            "productionComplexity");
+        var maximumExpressionNodes = complexity.GetProperty(
+            "maximumExpressionNodes").GetInt32();
+        var maximumDecisionPoints = complexity.GetProperty(
+            "maximumDecisionPoints").GetInt32();
+        var maximumMembers = complexity.GetProperty(
+            "maximumMembers").GetInt32();
+        var binding = FormattableString.Invariant(
+            $"ceilings:{maximumExpressionNodes}/{maximumDecisionPoints}/{maximumMembers}");
+
+        Assert.That(
+            complexity.GetProperty("ceilingRationale").GetString(),
+            Does.Contain(binding));
     }
 
     [Test]
