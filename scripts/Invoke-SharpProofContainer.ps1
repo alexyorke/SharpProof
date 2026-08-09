@@ -165,7 +165,8 @@ switch ($Command) {
         & (Join-Path $repositoryRoot 'scripts/Test-SharpProofTrustedMutations.ps1') `
             -Configuration $Configuration `
             -OutputPath $mutationOutput `
-            -ExpectedCommit $commit
+            -ExpectedCommit $commit `
+            -Resume
         if ($LASTEXITCODE -ne 0) { throw 'Trusted mutation validation failed.' }
     }
     'dependency-audit' {

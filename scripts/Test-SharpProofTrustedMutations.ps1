@@ -10,6 +10,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ExpectedCommit,
 
+    [switch]$Resume,
+
     [switch]$KeepWorkspace
 )
 
@@ -1148,6 +1150,62 @@ else {
     $selection = 'full'
 }
 
+if ($Resume -and $selection -ne 'full') {
+    throw 'Resume is supported only for the complete mutation catalog.'
+}
+
+$completedResults = @()
+if ($Resume -and (Test-Path -LiteralPath $output -PathType Leaf)) {
+    $checkpoint = Get-Content -LiteralPath $output -Raw | ConvertFrom-Json
+    $checkpointMutations = @($checkpoint.mutations)
+    if ([int]$checkpoint.schemaVersion -ne 2 -or
+        [string]$checkpoint.commit -ne $sourceCommit -or
+        [string]$checkpoint.configuration -ne $Configuration -or
+        [string]$checkpoint.selection -notin @('inProgress', 'full') -or
+        [int]$checkpoint.catalogCount -ne $catalogCount -or
+        [string]$checkpoint.catalogSha256 -ne $catalogSha256 -or
+        [int]$checkpoint.mutationCount -ne $checkpointMutations.Count -or
+        [int]$checkpoint.killedCount -ne $checkpointMutations.Count) {
+        throw 'Mutation checkpoint does not match the current exact catalog run.'
+    }
+
+    if ($checkpointMutations.Count -gt $mutations.Count) {
+        throw 'Mutation checkpoint contains more results than the catalog.'
+    }
+    for ($index = 0; $index -lt $checkpointMutations.Count; $index++) {
+        $result = $checkpointMutations[$index]
+        $registered = $mutations[$index]
+        $name = [string]$result.name
+        if ($name -ne [string]$registered.Name) {
+            throw 'Mutation checkpoint is not a canonical catalog prefix.'
+        }
+        if ([string]$result.file -ne ([string]$registered.File).Replace('\', '/') -or
+            [string]$result.project -ne ([string]$registered.Project).Replace('\', '/') -or
+            [string]$result.test -ne [string]$registered.Filter -or
+            [string]$result.original -ne [string]$registered.Original -or
+            [string]$result.mutated -ne [string]$registered.Mutated -or
+            -not [bool]$result.killed -or
+            [int]$result.exitCode -eq 0 -or
+            [int]$result.assertionFailureCount -lt 1) {
+            throw 'Mutation checkpoint result does not match its catalog entry.'
+        }
+    }
+    $completedResults = $checkpointMutations
+    if ([string]$checkpoint.selection -eq 'full') {
+        if ($completedResults.Count -ne $catalogCount) {
+            throw 'Completed mutation evidence does not cover the full catalog.'
+        }
+        Write-Host "Mutation evidence is already complete: $output"
+        return
+    }
+}
+
+$completedMutationNames = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal)
+foreach ($result in $completedResults) {
+    [void]$completedMutationNames.Add([string]$result.name)
+}
+
 $mutationRoot = Join-Path ([IO.Path]::GetTempPath()) 'SharpProof-mutation'
 $workspace = Join-Path $mutationRoot (
     'workspace-' + [Guid]::NewGuid().ToString('N'))
@@ -1157,7 +1215,9 @@ $runId = $sourceCommit.Substring(0, 12) + '-' +
     [Guid]::NewGuid().ToString('N')
 $logs = Join-Path (Join-Path (Split-Path -Parent $output) 'mutation-logs') $runId
 New-Item -ItemType Directory -Path $sourceRoot, $logs -Force | Out-Null
-Remove-Item -LiteralPath $output -Force -ErrorAction SilentlyContinue
+if (-not $Resume) {
+    Remove-Item -LiteralPath $output -Force -ErrorAction SilentlyContinue
+}
 
 function Invoke-IsolatedDotnet {
     param(
@@ -1206,6 +1266,35 @@ function Assert-UniqueMutationTarget {
     }
 }
 
+function Write-MutationEvidence {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Results,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('inProgress', 'selected', 'full')]
+        [string]$EvidenceSelection
+    )
+
+    $outputDirectory = Split-Path -Parent $output
+    New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
+    $temporaryOutput =
+        $output + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
+    [pscustomobject]@{
+        schemaVersion = 2
+        commit = $sourceCommit
+        configuration = $Configuration
+        selection = $EvidenceSelection
+        catalogCount = $catalogCount
+        catalogSha256 = $catalogSha256
+        mutationCount = $Results.Count
+        killedCount = @($Results | Where-Object killed).Count
+        mutations = $Results
+    } | ConvertTo-Json -Depth 5 |
+        Set-Content -LiteralPath $temporaryOutput -Encoding utf8NoBOM
+    Move-Item -LiteralPath $temporaryOutput -Destination $output -Force
+}
+
 try {
     & git -C $repositoryRoot archive `
         --format=zip `
@@ -1224,6 +1313,9 @@ try {
     }
 
     foreach ($mutation in $mutations) {
+        if ($completedMutationNames.Contains([string]$mutation.Name)) {
+            continue
+        }
         $baselineTrxName = $mutation.Name + '-baseline.trx'
         $baselineTrx = Join-Path $logs $baselineTrxName
         Remove-Item -LiteralPath $baselineTrx -Force -ErrorAction SilentlyContinue
@@ -1261,8 +1353,11 @@ try {
             -NotePropertyValue @($baselineEvidence.testLedger)
     }
 
-    $results = @()
+    $results = @($completedResults)
     foreach ($mutation in $mutations) {
+        if ($completedMutationNames.Contains([string]$mutation.Name)) {
+            continue
+        }
         $path = Join-Path $sourceRoot $mutation.File
         $originalContent = [IO.File]::ReadAllText($path)
         Assert-UniqueMutationTarget `
@@ -1345,6 +1440,9 @@ try {
                 log = "mutation-logs/$runId/$($mutation.Name)-test.log"
                 trx = "mutation-logs/$runId/$testTrxName"
             }
+            Write-MutationEvidence `
+                -Results @($results) `
+                -EvidenceSelection inProgress
         }
         finally {
             [IO.File]::WriteAllText(
@@ -1354,8 +1452,6 @@ try {
         }
     }
 
-    $outputDirectory = Split-Path -Parent $output
-    New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
     $currentCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
     & git -C $repositoryRoot diff --quiet --
     $trackedTreeChanged = $LASTEXITCODE -ne 0
@@ -1365,20 +1461,7 @@ try {
         $trackedTreeChanged -or $trackedIndexChanged) {
         throw 'Repository identity changed while mutation evidence was produced.'
     }
-    $temporaryOutput = $output + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
-    [pscustomobject]@{
-        schemaVersion = 2
-        commit = $sourceCommit
-        configuration = $Configuration
-        selection = $selection
-        catalogCount = $catalogCount
-        catalogSha256 = $catalogSha256
-        mutationCount = $results.Count
-        killedCount = @($results | Where-Object killed).Count
-        mutations = $results
-    } | ConvertTo-Json -Depth 5 |
-        Set-Content -LiteralPath $temporaryOutput -Encoding utf8NoBOM
-    Move-Item -LiteralPath $temporaryOutput -Destination $output -Force
+    Write-MutationEvidence -Results @($results) -EvidenceSelection $selection
     Write-Host "Killed $($results.Count) trusted-boundary mutations."
     Write-Host "Evidence: $output"
 }

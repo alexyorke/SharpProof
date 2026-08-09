@@ -910,11 +910,23 @@ public sealed class ArchitectureTests
                     "$mutationOutput = " +
                     "'artifacts/mutation/trusted-mutations.json'"));
             Assert.That(container, Does.Contain("-OutputPath $mutationOutput"));
+            Assert.That(container, Does.Contain("-Resume"));
             Assert.That(
                 container,
                 Does.Not.Contain(
                     "-OutputPath (Join-Path $mutationRoot " +
                     "'trusted-mutations.json')"));
+
+            var mutationDriver = File.ReadAllText(Path.Combine(
+                RepositoryRoot(),
+                "scripts",
+                "Test-SharpProofTrustedMutations.ps1"));
+            Assert.That(
+                mutationDriver,
+                Does.Contain("-EvidenceSelection inProgress"));
+            Assert.That(
+                mutationDriver,
+                Does.Contain("$completedMutationNames.Contains"));
         }
     }
 
