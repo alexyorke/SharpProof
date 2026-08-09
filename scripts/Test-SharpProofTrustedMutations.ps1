@@ -826,12 +826,12 @@ $mutations = @(
         Filter = 'FullyQualifiedName~MissingWorkerWithoutDllSuffixIsRejectedBeforeHashing'
     },
     [pscustomobject]@{
-        Name = 'launcher-disables-inherited-handles'
-        File = 'SharpProof.Worker.Launcher\Program.cs'
-        Original = '                    inheritHandles: false,'
-        Mutated = '                    inheritHandles: true,'
+        Name = 'linux-worker-startup-release-uses-private-stdin'
+        File = 'SharpProof.Host\LinuxWorkerProcess.cs'
+        Original = '            RedirectStandardInput = true,'
+        Mutated = '            RedirectStandardInput = false,'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
-        Filter = 'FullyQualifiedName~WorkerProcessCreationDisablesHandleInheritance'
+        Filter = 'FullyQualifiedName~WorkerProcessBoundaryUsesADirectLinuxChildAndStdinRelease'
     },
     [pscustomobject]@{
         Name = 'closure-retains-staged-component-handles'
