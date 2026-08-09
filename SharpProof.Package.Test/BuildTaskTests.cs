@@ -1,5 +1,7 @@
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.BuildTasks;
 using SharpProof.Host;
@@ -181,6 +183,7 @@ public sealed class BuildTaskTests
         var directory = Directory.CreateTempSubdirectory("sharpproof-cancel-");
         try
         {
+            var helper = CreateTimedProcessAssembly(directory.FullName);
             var task = new RunVerifier
             {
                 BuildEngine = new RecordingBuildEngine(),
@@ -188,16 +191,7 @@ public sealed class BuildTaskTests
                 WorkingDirectory = directory.FullName,
                 Arguments =
                 [
-                    new TaskItem(typeof(SharpProofWorker).Assembly.Location),
-                    new TaskItem("verify"),
-                    new TaskItem("--request"),
-                    new TaskItem(Path.Combine(directory.FullName, "request.json")),
-                    new TaskItem("--result"),
-                    new TaskItem(Path.Combine(directory.FullName, "result.json")),
-                    new TaskItem("--start-stdin"),
-                    new TaskItem("--parent-pid"),
-                    new TaskItem(Environment.ProcessId.ToString(
-                        System.Globalization.CultureInfo.InvariantCulture))
+                    new TaskItem(helper)
                 ]
             };
 
@@ -213,10 +207,12 @@ public sealed class BuildTaskTests
 
             var completed = await System.Threading.Tasks.Task.WhenAny(
                 execution,
-                System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(5)));
+                System.Threading.Tasks.Task.Delay(TimeSpan.FromMilliseconds(500)));
+            var canceledPromptly = ReferenceEquals(completed, execution);
+            await execution.WaitAsync(TimeSpan.FromSeconds(5));
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(completed, Is.SameAs(execution));
+                Assert.That(canceledPromptly, Is.True);
                 Assert.That(await execution, Is.True);
                 Assert.That(task.ExitCode, Is.Not.Zero);
             }
@@ -225,6 +221,47 @@ public sealed class BuildTaskTests
         {
             directory.Delete(recursive: true);
         }
+    }
+
+    private static string CreateTimedProcessAssembly(string directory)
+    {
+        var assemblyPath = Path.Combine(directory, "TimedProcess.dll");
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            "using System.Threading; Thread.Sleep(3000);");
+        var trustedPlatformAssemblies =
+            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
+            throw new InvalidOperationException(
+                "The trusted platform assembly list is unavailable.");
+        var references = trustedPlatformAssemblies
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            .Select(static path => MetadataReference.CreateFromFile(path));
+        var compilation = CSharpCompilation.Create(
+            "TimedProcess",
+            [syntaxTree],
+            references,
+            new CSharpCompilationOptions(OutputKind.ConsoleApplication));
+        using (var stream = File.Create(assemblyPath))
+        {
+            var result = compilation.Emit(stream);
+            Assert.That(
+                result.Success,
+                Is.True,
+                string.Join(Environment.NewLine, result.Diagnostics));
+        }
+        File.WriteAllText(
+            Path.ChangeExtension(assemblyPath, ".runtimeconfig.json"),
+            """
+            {
+              "runtimeOptions": {
+                "tfm": "net9.0",
+                "framework": {
+                  "name": "Microsoft.NETCore.App",
+                  "version": "9.0.0"
+                }
+              }
+            }
+            """);
+        return assemblyPath;
     }
 
     [Test]
