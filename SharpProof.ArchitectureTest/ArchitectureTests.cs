@@ -886,7 +886,14 @@ public sealed class ArchitectureTests
             Assert.That(
                 container,
                 Does.Contain(
-                    "'/p:RepositoryCommit=' + (& git rev-parse HEAD).Trim()"));
+                    "$repositoryCommitProperty = \"/p:RepositoryCommit=$repositoryCommit\""));
+            Assert.That(container, Does.Contain("$repositoryCommitProperty)"));
+            Assert.That(
+                container,
+                Does.Contain("'/p:GeneratePackageOnBuild=false'"));
+            Assert.That(
+                container,
+                Does.Contain("'--no-build', '--no-restore'"));
             Assert.That(
                 workflow,
                 Does.Contain("docker compose run --rm tooling pack"));

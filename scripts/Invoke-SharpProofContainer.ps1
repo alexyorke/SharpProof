@@ -211,11 +211,21 @@ switch ($Command) {
         }
         [System.IO.Directory]::CreateDirectory($output) | Out-Null
         $manifest = Get-Content (Join-Path $repositoryRoot 'scripts/package-projects.json') -Raw | ConvertFrom-Json
+        $repositoryCommit = (& git rev-parse HEAD).Trim()
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repositoryCommit)) {
+            throw 'Could not resolve the repository commit for package provenance.'
+        }
+        $repositoryCommitProperty = "/p:RepositoryCommit=$repositoryCommit"
+        Invoke-DotNet @(
+            'build', 'SharpProof.sln', '--configuration', 'Release',
+            '--no-restore', '/p:GeneratePackageOnBuild=false',
+            $repositoryCommitProperty)
         foreach ($project in @($manifest.projects)) {
             Invoke-DotNet @(
                 'pack', [string]$project, '--configuration', 'Release',
-                '--output', $output,
-                '/p:RepositoryCommit=' + (& git rev-parse HEAD).Trim())
+                '--output', $output, '--no-build', '--no-restore',
+                '/p:GeneratePackageOnBuild=false',
+                $repositoryCommitProperty)
         }
         & (Join-Path $repositoryRoot 'scripts/Test-SharpProofPackageConsumers.ps1') `
             -PackageSource $output `
