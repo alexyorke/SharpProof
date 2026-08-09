@@ -158,12 +158,13 @@ switch ($Command) {
         if ($LASTEXITCODE -ne 0) { throw 'Coverage validation failed.' }
     }
     'mutation' {
-        $mutationRoot = Join-Path $repositoryRoot 'artifacts/mutation'
-        [IO.Directory]::CreateDirectory($mutationRoot) | Out-Null
+        $mutationOutput = 'artifacts/mutation/trusted-mutations.json'
+        [IO.Directory]::CreateDirectory((Join-Path $repositoryRoot (
+                    Split-Path -Parent $mutationOutput))) | Out-Null
         $commit = (& git rev-parse HEAD).Trim()
         & (Join-Path $repositoryRoot 'scripts/Test-SharpProofTrustedMutations.ps1') `
             -Configuration $Configuration `
-            -OutputPath (Join-Path $mutationRoot 'trusted-mutations.json') `
+            -OutputPath $mutationOutput `
             -ExpectedCommit $commit
         if ($LASTEXITCODE -ne 0) { throw 'Trusted mutation validation failed.' }
     }

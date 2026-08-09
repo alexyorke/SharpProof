@@ -895,6 +895,30 @@ public sealed class ArchitectureTests
     }
 
     [Test]
+    public void ContainerMutationEvidenceUsesAPersistentRelativePath()
+    {
+        var container = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                container,
+                Does.Contain(
+                    "$mutationOutput = " +
+                    "'artifacts/mutation/trusted-mutations.json'"));
+            Assert.That(container, Does.Contain("-OutputPath $mutationOutput"));
+            Assert.That(
+                container,
+                Does.Not.Contain(
+                    "-OutputPath (Join-Path $mutationRoot " +
+                    "'trusted-mutations.json')"));
+        }
+    }
+
+    [Test]
     public void CrossPlatformPackageCachePrimingUsesTheNativeDotnetPath()
     {
         var workflow = File.ReadAllText(Path.Combine(
