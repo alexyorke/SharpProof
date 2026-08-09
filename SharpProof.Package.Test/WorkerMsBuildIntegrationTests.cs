@@ -1627,6 +1627,15 @@ public sealed class WorkerMsBuildIntegrationTests
         var isolatedManifestPath = Path.Combine(
             isolatedLauncherDirectory,
             "compiler-manifest.json");
+        using (LinuxPathIdentity.AcquirePublicationSet(
+                   [
+                       isolatedRequestPath,
+                       protocolPath,
+                       isolatedManifestPath
+                   ],
+                   TimeSpan.FromSeconds(5)))
+        {
+        }
         File.Copy(LauncherProtocolOutputPath(), protocolPath);
         var expectedBytes = await File.ReadAllBytesAsync(protocolPath);
         var failed = await project.RunVerificationTargetAsync(
@@ -1641,9 +1650,12 @@ public sealed class WorkerMsBuildIntegrationTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(failed.ExitCode, Is.Not.Zero, failed.Output);
+            var reportsProtectedAlias = failed.Output.Contains(
+                "SharpProof output paths must not alias input paths.",
+                StringComparison.Ordinal);
             Assert.That(
-                failed.Output,
-                Does.Contain("SharpProof output paths must not alias input paths."));
+                reportsProtectedAlias,
+                Is.True);
             var protocolExists = File.Exists(protocolPath);
             Assert.That(protocolExists, Is.True);
             if (protocolExists)
