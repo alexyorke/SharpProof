@@ -832,6 +832,30 @@ public sealed class ArchitectureTests
     }
 
     [Test]
+    public void PilotRunnerPreservesRootedInputAndOutputPaths()
+    {
+        var script = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Test-SharpProofPilots.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(script, Does.Contain("[IO.Path]::IsPathRooted($Path)"));
+            Assert.That(
+                script,
+                Does.Contain("$resolvedPackageSource = Resolve-RepositoryPath $PackageSource"));
+            Assert.That(
+                script,
+                Does.Contain("$resolvedOutput = Resolve-RepositoryPath $OutputPath"));
+            Assert.That(script, Does.Not.Contain("Get-CimInstance"));
+            Assert.That(
+                script,
+                Does.Contain("[IO.Directory]::EnumerateDirectories('/proc')"));
+        }
+    }
+
+    [Test]
     public void WorkflowCommandsUsePowerShellSafeMsBuildSwitches()
     {
         var workflowRoot = Path.Combine(RepositoryRoot(), ".github", "workflows");
