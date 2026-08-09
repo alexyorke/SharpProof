@@ -854,7 +854,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'worker-rejects-request-result-alias'
         File = 'SharpProof.Worker\Program.cs'
-        Original = '        return !string.Equals(request, result, StringComparison.OrdinalIgnoreCase);'
+        Original = '        return !string.Equals(request, result, StringComparison.Ordinal);'
         Mutated = '        return true;'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~DirectInvocationRejectsRequestResultAliasBeforeStartBarrier'
@@ -886,7 +886,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'launcher-checks-discovered-runtime-paths'
         File = 'SharpProof.Worker.Launcher\Program.cs'
-        Original = "            runtimeSnapshot?.ComponentPaths.Any(path =>`n                !runtimeRoots.Contains(path, StringComparer.OrdinalIgnoreCase) &&`n                !LauncherArguments.LauncherRuntimePaths.Contains(`n                    path, StringComparer.OrdinalIgnoreCase) &&`n                !paths.Add(path)) is true"
+        Original = "            runtimeSnapshot?.ComponentPaths.Any(path =>`n                !runtimeRoots.Contains(path, StringComparer.Ordinal) &&`n                !LauncherArguments.LauncherRuntimePaths.Contains(`n                    path, StringComparer.Ordinal) &&`n                !paths.Add(path)) is true"
         Mutated = '            runtimeSnapshot?.ComponentPaths.Any(path => path.Length == 0) == true'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~RequestProjectionRejectsDiscoveredRuntimeAssetCollisionBeforeManifestRead'
@@ -998,8 +998,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'publication-locks-every-member'
         File = 'SharpProof.Host\LinuxPathIdentity.cs'
-        Original = '            .OrderBy(static path => path, StringComparer.Ordinal)'
-        Mutated = '            .OrderBy(static path => path, StringComparer.Ordinal).Take(1)'
+        Original = '        var canonicalPaths = CanonicalPublicationPaths(requestedPaths);'
+        Mutated = '        var canonicalPaths = CanonicalPublicationPaths(requestedPaths).Take(1).ToArray();'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~OverlapOnAnyPublicationMemberBlocks'
     },
@@ -1305,6 +1305,15 @@ try {
     }
     Expand-Archive -LiteralPath $archive -DestinationPath $sourceRoot
 
+    foreach ($mutation in $mutations) {
+        $path = Join-Path $sourceRoot $mutation.File
+        $content = [IO.File]::ReadAllText($path)
+        Assert-UniqueMutationTarget `
+            -Content $content `
+            -Needle $mutation.Original `
+            -Name $mutation.Name
+    }
+
     $restoreExit = Invoke-IsolatedDotnet `
         -Arguments @('restore', 'SharpProof.sln') `
         -LogName 'restore.log'
@@ -1360,10 +1369,6 @@ try {
         }
         $path = Join-Path $sourceRoot $mutation.File
         $originalContent = [IO.File]::ReadAllText($path)
-        Assert-UniqueMutationTarget `
-            -Content $originalContent `
-            -Needle $mutation.Original `
-            -Name $mutation.Name
         $mutatedContent = $originalContent.Replace(
             $mutation.Original,
             $mutation.Mutated,

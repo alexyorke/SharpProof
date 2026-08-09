@@ -935,6 +935,38 @@ public sealed class ArchitectureTests
     }
 
     [Test]
+    public void MutationCatalogTargetsArePreflightedBeforeTests()
+    {
+        var mutationDriver = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Test-SharpProofTrustedMutations.ps1"));
+        var archiveExpansion = mutationDriver.IndexOf(
+            "Expand-Archive -LiteralPath $archive -DestinationPath $sourceRoot",
+            StringComparison.Ordinal);
+        var preflight = mutationDriver.IndexOf(
+            "Assert-UniqueMutationTarget `",
+            archiveExpansion,
+            StringComparison.Ordinal);
+        var restore = mutationDriver.IndexOf(
+            "$restoreExit = Invoke-IsolatedDotnet",
+            archiveExpansion,
+            StringComparison.Ordinal);
+        var baseline = mutationDriver.IndexOf(
+            "$baselineTrxName =",
+            archiveExpansion,
+            StringComparison.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(archiveExpansion, Is.GreaterThanOrEqualTo(0));
+            Assert.That(preflight, Is.GreaterThan(archiveExpansion));
+            Assert.That(restore, Is.GreaterThan(preflight));
+            Assert.That(baseline, Is.GreaterThan(restore));
+        }
+    }
+
+    [Test]
     public void CrossPlatformPackageCachePrimingUsesTheNativeDotnetPath()
     {
         var workflow = File.ReadAllText(Path.Combine(
