@@ -178,19 +178,34 @@ public sealed class WorkerBinaryIdentityTests
     [Test]
     public void RuntimeClosureComponentPathsAreImmutable()
     {
-        using var snapshot = WorkerBinaryIdentity.CreateSnapshot(
+#pragma warning disable CA2000 // The alias mutant is deliberately not disposed through an unowned source path.
+        var snapshot = WorkerBinaryIdentity.CreateSnapshot(
             typeof(SharpProofWorker).Assembly.Location);
-
-        using (Assert.EnterMultipleScope())
+#pragma warning restore CA2000
+        try
         {
-            Assert.That(
-                snapshot.ComponentPaths.GetType(),
-                Is.EqualTo(typeof(ImmutableArray<string>)));
-            Assert.That(
-                snapshot.ExecutionWorkerPath,
-                Is.Not.EqualTo(snapshot.WorkerPath));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    snapshot.ComponentPaths.GetType(),
+                    Is.EqualTo(typeof(ImmutableArray<string>)));
+                Assert.That(
+                    snapshot.ExecutionWorkerPath,
+                    Is.Not.EqualTo(snapshot.WorkerPath));
+            }
         }
-
+        finally
+        {
+            // Disposal removes the directory containing ExecutionWorkerPath.
+            // Do not let the deliberate alias mutation erase the test output.
+            if (!string.Equals(
+                    snapshot.ExecutionWorkerPath,
+                    snapshot.WorkerPath,
+                    StringComparison.Ordinal))
+            {
+                snapshot.Dispose();
+            }
+        }
     }
 
     [Test]
