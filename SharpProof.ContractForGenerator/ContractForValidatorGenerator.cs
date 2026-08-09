@@ -65,26 +65,25 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator
         var companions = ResolveCompanions(
             contractFor, candidates, diagnostics, context.CancellationToken);
         var clauses = ContractClauseInventoryBuilder.ForCompilation(compilation);
-        foreach (var group in companions.GroupBy(
-                     static companion => companion.Target,
-                     (IEqualityComparer<INamedTypeSymbol>)SymbolEqualityComparer.Default))
+        var overlapping = FindOverlappingCompanions(
+            companions,
+            ContractForSymbolMatcher.DiscoverCompanions(
+                compilation, context.CancellationToken),
+            context.CancellationToken);
+        foreach (var companion in companions)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
-            var resolved = group.ToImmutableArray();
-            if (resolved.Length == 1)
+            if (!overlapping.Contains(companion))
             {
                 ContractForCompanionValidator.Validate(
-                    resolved[0],
+                    companion,
                     clauses,
                     diagnostics,
                     context.CancellationToken);
                 continue;
             }
-            foreach (var duplicate in resolved)
-            {
-                diagnostics.Add(At(GeneratedDiagnosticDescriptors.DuplicateCompanion,
-                    duplicate.AttributeLocation, duplicate.Target.Name));
-            }
+            diagnostics.Add(At(GeneratedDiagnosticDescriptors.DuplicateCompanion,
+                companion.AttributeLocation, companion.Target.Name));
         }
         foreach (var diagnostic in diagnostics
                      .OrderBy(static diagnostic => diagnostic.Location.SourceTree?.FilePath, StringComparer.Ordinal)
@@ -95,6 +94,28 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator
         {
             context.ReportDiagnostic(diagnostic);
         }
+    }
+
+    private static HashSet<ResolvedCompanion> FindOverlappingCompanions(
+        ImmutableArray<ResolvedCompanion> companions,
+        ImmutableArray<ContractForSymbolMatcher.CompanionDescriptor> discovered,
+        CancellationToken cancellationToken)
+    {
+        var overlapping = new HashSet<ResolvedCompanion>();
+        foreach (var source in companions)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (discovered.Any(candidate =>
+                    !SymbolEqualityComparer.Default.Equals(
+                        candidate.Type, source.Companion) &&
+                    ContractForSymbolMatcher.TargetsOverlap(
+                        candidate.ContractTarget,
+                        (source.Target, source.IsOpenTarget))))
+            {
+                overlapping.Add(source);
+            }
+        }
+        return overlapping;
     }
 
     private static ImmutableArray<ResolvedCompanion> ResolveCompanions(

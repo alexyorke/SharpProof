@@ -31,6 +31,7 @@ public sealed class AnalyzerArchitectureTests
         "SharpProof.Frontend",
         "SharpProof.Ir",
         "SharpProof.Specs",
+        "SharpProof.Summaries",
         "SharpProof.Worker.Protocol"
     ];
 
@@ -224,7 +225,7 @@ public sealed class AnalyzerArchitectureTests
             Assert.That(
                 unshipped.Keys,
                 Is.EquivalentTo(descriptors.Keys));
-            Assert.That(unshipped, Has.Count.EqualTo(12));
+            Assert.That(unshipped, Has.Count.EqualTo(13));
         }
         foreach (var descriptor in descriptors.Values)
         {

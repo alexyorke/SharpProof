@@ -158,6 +158,7 @@
           "SharpProof.Frontend": "[1.0.0-preview.1, )",
           "SharpProof.Ir": "[1.0.0-preview.1, )",
           "SharpProof.Specs": "[1.0.0-preview.1, )",
+          "SharpProof.Summaries": "[1.0.0-preview.1, )",
           "SharpProof.Worker.Protocol": "[1.0.0-preview.1, )",
           "System.Collections.Immutable": "[9.0.18, )"
         }
@@ -217,6 +218,13 @@
         "type": "Project",
         "dependencies": {
           "SharpProof.Ir": "[1.0.0-preview.1, )"
+        }
+      },
+      "sharpproof.summaries": {
+        "type": "Project",
+        "dependencies": {
+          "SharpProof.Ir": "[1.0.0-preview.1, )",
+          "System.Collections.Immutable": "[9.0.18, )"
         }
       },
       "sharpproof.verify": {

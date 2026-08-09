@@ -1,9 +1,14 @@
 # Release-owner evidence
 
-The repository can enforce code, package, protocol, coverage, fuzz, corpus,
-performance, security, provenance, and exact-SHA gates. It cannot manufacture
-pilot-library history, independent human review, or GitHub repository
-protection settings.
+The repository enforces the preview's code, package, protocol, coverage, fuzz,
+corpus, performance, security, provenance, mutation, pilot, and exact-SHA
+evidence. The preview has no reviewer-count or time-based freeze. GitHub
+repository protection and publishing credentials remain owner-controlled.
+
+`environment-contract.json` is the repository-owned release configuration.
+Run `scripts/Test-SharpProofReleaseConfiguration.ps1` before tagging. It checks
+the active immutable-tag ruleset, exact environment tag policies, required
+variable and secret names, and NuGet OIDC wiring without reading secret values.
 
 The preview and RC tags run the automated exact-SHA qualification job. Coverage
 is measured across the complete release delta: `preview.1` is anchored to the
@@ -12,7 +17,9 @@ resolved commit of its allowlisted predecessor tag. The qualification evidence
 records both immutable commit SHAs, and the job rejects a missing, equal, or
 non-ancestor baseline.
 
-Before creating `v1.0.0`, freeze the exact RC package bytes, production digest,
+The remaining human-evidence schema in this document applies to a future
+stable `v1.0.0`, not to the preview. Before creating `v1.0.0`, freeze the exact
+RC package bytes, production digest,
 and trusted-computing-base digest for the four pilot cycles. The stable product
 commit may differ from the qualified RC commit only in approved version,
 changelog, and release metadata; its independently computed production and TCB

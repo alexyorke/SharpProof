@@ -30,7 +30,7 @@ public sealed class CompilerRuntimeSymbolArtifactTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(artifact.SchemaVersion, Is.EqualTo(9));
+                Assert.That(artifact.SchemaVersion, Is.EqualTo(11));
                 Assert.That(
                     tree.PreprocessorSymbols,
                     Does.Contain(Contract.ConditionalSymbol));
@@ -57,7 +57,7 @@ public sealed class CompilerRuntimeSymbolArtifactTests
         artifact.Compilation.SyntaxTrees.Single()
             .EffectivePreprocessorSymbols = [Contract.ConditionalSymbol];
         artifact.CompilationSha256 =
-            CompilationFingerprint.ComputeSha256(artifact.Compilation);
+            CompilationFingerprint.ComputeSha256(artifact.Compilation, []);
         var json = JsonSerializer.Serialize(
             artifact,
             WorkerProtocolJson.Options) + "\n";

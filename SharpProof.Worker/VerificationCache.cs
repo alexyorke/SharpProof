@@ -120,15 +120,19 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             FileMode.OpenOrCreate,
             FileAccess.ReadWrite,
             FileShare.None);
+        var ownershipTransferred = false;
         try
         {
             ValidatePath(directory, lockPath);
+            ownershipTransferred = true;
             return cacheLock;
         }
-        catch
+        finally
         {
-            cacheLock.Dispose();
-            throw;
+            if (!ownershipTransferred)
+            {
+                cacheLock.Dispose();
+            }
         }
     }
 

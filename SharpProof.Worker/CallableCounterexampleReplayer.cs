@@ -48,7 +48,8 @@ internal static class CallableCounterexampleReplayer
                 if (execution.Status != IrProgramExecutionStatus.Returned)
                 {
                     return execution is { Status: IrProgramExecutionStatus.Unsupported, Instruction: IrCallInstruction call } &&
-                           body.SpecCalls.ContainsKey(call.Id)
+                           (body.SpecCalls.ContainsKey(call.Id) ||
+                            body.SummaryCalls.ContainsKey(call.Id))
                         ? WorkerClaimReason.CounterexampleNotReplayable : WorkerClaimReason.CounterexampleReplayFailed;
                 }
 
@@ -77,6 +78,7 @@ internal static class CallableCounterexampleReplayer
             }
             else if (body.Kind != CompilerPreparedBodyKind.Trivial || body.Program != null ||
                      !body.ParameterBindings.IsEmpty || !body.SpecCalls.IsEmpty ||
+                     !body.SummaryCalls.IsEmpty ||
                      target.Variables.Any(static variable => variable.Role == CompilerVariableRole.Result))
             {
                 return WorkerClaimReason.CounterexampleReplayFailed;

@@ -51,6 +51,30 @@ public sealed class DataflowAnalysisResult<T>
 }
 
 /// <summary>
+/// Raised when the solver reaches its iteration limit without reaching a fixed
+/// point. This is a resource bound rather than a defect, so callers that must
+/// degrade gracefully can catch it specifically instead of every
+/// <see cref="InvalidOperationException"/>.
+/// </summary>
+public sealed class DataflowConvergenceException : InvalidOperationException
+{
+    public DataflowConvergenceException()
+        : this("The dataflow analysis did not converge within its iteration limit.")
+    {
+    }
+
+    public DataflowConvergenceException(string message)
+        : base(message)
+    {
+    }
+
+    public DataflowConvergenceException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
+/// <summary>
 /// Deterministic, round-based forward worklist solver.
 /// </summary>
 public static class ForwardDataflowAnalysis
@@ -99,8 +123,7 @@ public static class ForwardDataflowAnalysis
         {
             if (iterations >= options.MaxIterations)
             {
-                throw new InvalidOperationException(
-                    "The dataflow analysis did not converge within its iteration limit.");
+                throw new DataflowConvergenceException();
             }
 
             iterations++;

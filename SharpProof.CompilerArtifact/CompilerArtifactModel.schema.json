@@ -4,7 +4,7 @@
   "jsonNamingPolicy": "camelCase",
   "artifactEnvelope": {
     "schema": "SharpProof.CompilerManifest",
-    "version": 9
+    "version": 11
   },
   "declarations": [
     {
@@ -21,7 +21,31 @@
           "accessibility": "internal",
           "name": "Current",
           "type": "int",
-          "value": 9
+          "value": 11
+        }
+      ]
+    },
+    {
+      "kind": "staticClass",
+      "name": "CompilerRelationalSummaryVersions",
+      "constants": [
+        {
+          "accessibility": "internal",
+          "name": "Current",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "kind": "staticClass",
+      "name": "CompilerSpecificationPackVersions",
+      "constants": [
+        {
+          "accessibility": "internal",
+          "name": "Current",
+          "type": "int",
+          "value": 1
         }
       ]
     },
@@ -94,6 +118,24 @@
         {
           "name": "Program",
           "value": 1
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "CompilerSummaryOrigin",
+      "members": [
+        {
+          "name": "Source",
+          "value": 0
+        },
+        {
+          "name": "ImplementationIl",
+          "value": 1
+        },
+        {
+          "name": "SpecificationPack",
+          "value": 2
         }
       ]
     },
@@ -249,6 +291,10 @@
         {
           "name": "SpecCalls",
           "type": "ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>"
+        },
+        {
+          "name": "SummaryCalls",
+          "type": "ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>"
         }
       ]
     },
@@ -271,6 +317,66 @@
         {
           "name": "ConsumesMemoryHavoc",
           "type": "bool"
+        }
+      ]
+    },
+    {
+      "kind": "record",
+      "name": "CompilerPreparedSummaryEvidence",
+      "parameters": [
+        {
+          "name": "Origin",
+          "type": "CompilerSummaryOrigin"
+        },
+        {
+          "name": "EvidenceSha256",
+          "type": "string"
+        },
+        {
+          "name": "EvidenceIdentity",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "kind": "record",
+      "name": "CompilerPreparedSummaryCall",
+      "parameters": [
+        {
+          "name": "Instruction",
+          "type": "IrInstructionId"
+        },
+        {
+          "name": "CallIdentity",
+          "type": "string"
+        },
+        {
+          "name": "Origin",
+          "type": "CompilerSummaryOrigin"
+        },
+        {
+          "name": "Result",
+          "type": "IrVarId"
+        },
+        {
+          "name": "ExistentialVariables",
+          "type": "ImmutableArray<IrVarId>"
+        },
+        {
+          "name": "NormalRelation",
+          "type": "IrTerm"
+        },
+        {
+          "name": "EvidenceSha256",
+          "type": "string"
+        },
+        {
+          "name": "EvidenceIdentity",
+          "type": "string"
+        },
+        {
+          "name": "DependencyEvidence",
+          "type": "ImmutableArray<CompilerPreparedSummaryEvidence>"
         }
       ]
     },
@@ -1811,6 +1917,16 @@
           "default": {
             "kind": "emptyArray"
           }
+        },
+        {
+          "name": "SummaryCalls",
+          "jsonName": "summaryCalls",
+          "type": "CompilerSummaryCallArtifact[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
         }
       ]
     },
@@ -1902,6 +2018,141 @@
           "set": "set",
           "default": {
             "kind": "implicit"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerSummaryEvidenceArtifact",
+      "properties": [
+        {
+          "name": "Origin",
+          "jsonName": "origin",
+          "type": "CompilerSummaryOrigin",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "EvidenceSha256",
+          "jsonName": "evidenceSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "EvidenceIdentity",
+          "jsonName": "evidenceIdentity",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerSummaryCallArtifact",
+      "properties": [
+        {
+          "name": "Instruction",
+          "jsonName": "instruction",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "Identity",
+          "jsonName": "identity",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Origin",
+          "jsonName": "origin",
+          "type": "CompilerSummaryOrigin",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Result",
+          "jsonName": "result",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "ExistentialVariables",
+          "jsonName": "existentialVariables",
+          "type": "int[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "NormalRelationRoot",
+          "jsonName": "normalRelationRoot",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "EvidenceSha256",
+          "jsonName": "evidenceSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "EvidenceIdentity",
+          "jsonName": "evidenceIdentity",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "DependencyEvidence",
+          "jsonName": "dependencyEvidence",
+          "type": "CompilerSummaryEvidenceArtifact[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
           }
         }
       ]
@@ -2086,6 +2337,18 @@
     },
     {
       "kind": "enum",
+      "name": "CompilerReportDiagnostic",
+      "members": [
+        { "name": "Default", "value": 0 },
+        { "name": "Error", "value": 1 },
+        { "name": "Warn", "value": 2 },
+        { "name": "Info", "value": 3 },
+        { "name": "Hidden", "value": 4 },
+        { "name": "Suppress", "value": 5 }
+      ]
+    },
+    {
+      "kind": "enum",
       "name": "CompilerAssemblyIdentityComparer",
       "members": [
         { "name": "Default", "value": 0 },
@@ -2154,6 +2417,36 @@
           }
         },
         {
+          "name": "WarningLevel",
+          "jsonName": "warningLevel",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "GeneralDiagnosticOption",
+          "jsonName": "generalDiagnosticOption",
+          "type": "CompilerReportDiagnostic",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "SpecificDiagnosticOptions",
+          "jsonName": "specificDiagnosticOptions",
+          "type": "CompilerDiagnosticOptionSnapshot[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
           "name": "CheckOverflow",
           "jsonName": "checkOverflow",
           "type": "bool",
@@ -2217,6 +2510,32 @@
           "name": "ResolverPolicy",
           "jsonName": "resolverPolicy",
           "type": "CompilerResolverPolicy",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerDiagnosticOptionSnapshot",
+      "properties": [
+        {
+          "name": "Id",
+          "jsonName": "id",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "ReportDiagnostic",
+          "jsonName": "reportDiagnostic",
+          "type": "CompilerReportDiagnostic",
           "accessibility": "public",
           "set": "set",
           "default": {
@@ -2326,16 +2645,6 @@
       "name": "CompilerReferenceSnapshot",
       "properties": [
         {
-          "name": "Path",
-          "jsonName": "path",
-          "type": "string",
-          "accessibility": "public",
-          "set": "set",
-          "default": {
-            "kind": "stringEmpty"
-          }
-        },
-        {
           "name": "Kind",
           "jsonName": "kind",
           "type": "string",
@@ -2368,6 +2677,52 @@
         {
           "name": "Identity",
           "jsonName": "identity",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Modules",
+          "jsonName": "modules",
+          "type": "CompilerReferenceModuleSnapshot[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerReferenceModuleSnapshot",
+      "properties": [
+        {
+          "name": "Name",
+          "jsonName": "name",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Mvid",
+          "jsonName": "mvid",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Path",
+          "jsonName": "path",
           "type": "string",
           "accessibility": "public",
           "set": "set",
@@ -2510,6 +2865,28 @@
           "default": {
             "kind": "member",
             "value": "WorkerProtocolVersions.Current"
+          }
+        },
+        {
+          "name": "RelationalSummarySchemaVersion",
+          "jsonName": "relationalSummarySchemaVersion",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "member",
+            "value": "CompilerRelationalSummaryVersions.Current"
+          }
+        },
+        {
+          "name": "SpecificationPackSchemaVersion",
+          "jsonName": "specificationPackSchemaVersion",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "member",
+            "value": "CompilerSpecificationPackVersions.Current"
           }
         },
         {
@@ -2855,6 +3232,23 @@
         { "source": "Public", "target": "Public" },
         { "source": "Internal", "target": "Internal" },
         { "source": "All", "target": "All" }
+      ]
+    },
+    {
+      "name": "ReportDiagnostic",
+      "owner": "CompilerOptionWireMappings",
+      "method": "Map",
+      "kind": "enum",
+      "sourceType": "ReportDiagnostic",
+      "targetType": "CompilerReportDiagnostic",
+      "unknownException": "InvalidOperationException",
+      "rows": [
+        { "source": "Default", "target": "Default" },
+        { "source": "Error", "target": "Error" },
+        { "source": "Warn", "target": "Warn" },
+        { "source": "Info", "target": "Info" },
+        { "source": "Hidden", "target": "Hidden" },
+        { "source": "Suppress", "target": "Suppress" }
       ]
     },
     {

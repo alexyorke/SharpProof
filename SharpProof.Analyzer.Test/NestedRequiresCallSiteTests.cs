@@ -259,6 +259,105 @@ public sealed class NestedRequiresCallSiteTests
         Assert.That(diagnostics, Is.Empty);
     }
 
+    [Test]
+    public async Task LambdasInUnreachableBlocksAreNotAnalyzed()
+    {
+        var diagnostics = await Analyze(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    if (false) {
+                        Func<int> unreachable =
+                            () => Positive(-1);
+                        return unreachable();
+                    }
+
+                    return 0;
+                }
+            }
+            """);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task UnreferencedLocalFunctionsAreNotAnalyzed()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    return Reachable();
+
+                    int Dead() => Positive(-1);
+                    int ThroughSibling() => Positive(-2);
+                    int Reachable() => ThroughSibling();
+                }
+            }
+            """;
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 1);
+        Assert.That(
+            diagnostics[0].Location.SourceSpan.Start,
+            Is.EqualTo(source.IndexOf(
+                "Positive(-2)", StringComparison.Ordinal)));
+    }
+
+    [Test]
+    public async Task GenericAndMethodGroupReferencesReachLocalFunctions()
+    {
+        const string source =
+            """
+            using System;
+            using System.Linq.Expressions;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    Expression<Func<int>> quoted = () => Dead();
+                    Func<int> explicitReference = Reachable<int>;
+                    return explicitReference() + Inferred(0);
+
+                    int Dead() => Positive(-1);
+                    int Reachable<T>() => Positive(-2);
+                    int Inferred<T>(T value) => Positive(-3);
+                }
+            }
+            """;
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 2);
+        Assert.That(
+            diagnostics.Select(static diagnostic =>
+                diagnostic.Location.SourceSpan.Start),
+            Is.EqualTo(new[]
+            {
+                source.IndexOf("Positive(-2)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-3)", StringComparison.Ordinal)
+            }));
+    }
+
     private static Task<ImmutableArray<Diagnostic>> Analyze(
         string source,
         IAnalyzerSessionFactory? sessionFactory = null)

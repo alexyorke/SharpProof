@@ -9,7 +9,7 @@ is acceptable only when:
 - the supported-language gate is exhaustive, unsupported unannotated analyzer
   methods remain quiet, and unsupported explicitly selected methods report
   SP0047;
-- protocol version 9 binds compiler-manifest evidence and manifests every
+- protocol version 10 binds compiler-manifest evidence and manifests every
   selected callable, postcondition, and selected effect-attribute occurrence
   with a stable semantic ID, every lowered callable exactly matches that manifest,
   and every response has exact manifest/result equality;
@@ -62,10 +62,11 @@ effect-only artifacts exclude postcondition claims.
 `SharpProofProfile=strict` enables verification, defaults
 `SharpProofVerifyPolicy` to `require-proven`, and defaults
 `SharpProofAssumptionPolicy` to `error`. Fatal run states and refutations fail
-under every policy. `SharpProofMode` is a deprecated preview compatibility
-alias.
+under every policy. The removed `SharpProofMode` alias is rejected; the
+preview configuration surface is frozen on profile and feature properties.
 
-This acceptance contract covers compiler artifact schema version 9,
+This acceptance contract covers compiler artifact schema version 11,
+relational-summary schema version 1, specification-pack schema version 1,
 generated-tree accountability, portable whole-body lowered CFG/IR, exact
 manifest/lowered-callable/result equality, compiler-diagnostic propagation, and
 fail-closed option/provenance validation. The worker consumes that closed
@@ -78,15 +79,17 @@ exact Attributes -> portable analyzer -> Windows verifier dependency chain.
 The release workflow validates and promotes the already-tested bytes with
 hash, SBOM, repository, package-version, and tag checks. Optional SARIF 2.1.0
 projects only validated worker responses. Owner-enforced
-branch/tag/environment protection, pilot evidence, and independent human
-release reviews remain open gates.
+branch/tag/environment protection and exact-candidate publication remain owner
+release gates.
 
 Changes to the trusted-kernel paths, assumption construction, complete effect
 summaries, API specifications, or proof-producing outcome construction require
-two human reviewers and a soundness note identifying the executable regression
-that covers the change. CI enforces construction boundaries, exact TCB path
-ownership, and structural-complexity budgets; the two-approval rule must also
-be enabled in repository branch protection.
+the solo evidence contract in `preview-evidence.v1.json`: an executable
+regression, mutation evidence, a soundness note when proof outcomes or
+assumptions change, exact-commit release artifacts, and green Debug and Release
+acceptance gates. CI enforces construction boundaries, exact TCB path
+ownership, structural-complexity budgets, and the evidence contract. The
+preview has no reviewer-count or time-based freeze.
 
 Run the active local gate from the repository root:
 

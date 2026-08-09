@@ -26,6 +26,7 @@ $currentMaintainedDocuments = @(
     'SharpProof.Gates\Corpus\README.md'
 )
 $datedEvidenceDocuments = @(
+    'docs\soundness-notes\2026-08-08-relational-interprocedural-verification.md',
     'docs\soundness-notes\2026-07-25-api-spec-result-domains.md',
     'docs\soundness-notes\2026-07-25-hardening.md',
     'docs\soundness-notes\2026-07-29-formatting-neutral-source-metrics.md',
@@ -613,13 +614,21 @@ $compilerArtifactSource = Get-RequiredText (
 $compilerArtifactVersion = [regex]::Match(
     $compilerArtifactSource,
     'CompilerManifestArtifactVersions\s*\{[\s\S]*?\bCurrent\s*=\s*(?<value>\d+)\s*;')
+$relationalSummaryVersion = [regex]::Match(
+    $compilerArtifactSource,
+    'CompilerRelationalSummaryVersions\s*\{[\s\S]*?\bCurrent\s*=\s*(?<value>\d+)\s*;')
+$specificationPackVersion = [regex]::Match(
+    $compilerArtifactSource,
+    'CompilerSpecificationPackVersions\s*\{[\s\S]*?\bCurrent\s*=\s*(?<value>\d+)\s*;')
 if (-not $protocolVersion.Success -or
     -not $cacheVersion.Success -or
     -not $manifestVersion.Success -or
-    -not $compilerArtifactVersion.Success) {
+    -not $compilerArtifactVersion.Success -or
+    -not $relationalSummaryVersion.Success -or
+    -not $specificationPackVersion.Success) {
     throw (
-        'Could not derive worker protocol, cache, manifest, and compiler-' +
-        'artifact versions.')
+        'Could not derive worker protocol, cache, manifest, compiler-' +
+        'artifact, relational-summary, and specification-pack versions.')
 }
 
 $derivedVersions = [ordered]@{
@@ -627,6 +636,8 @@ $derivedVersions = [ordered]@{
     Cache = $cacheVersion.Groups['value'].Value
     Manifest = $manifestVersion.Groups['value'].Value
     CompilerArtifact = $compilerArtifactVersion.Groups['value'].Value
+    RelationalSummary = $relationalSummaryVersion.Groups['value'].Value
+    SpecificationPack = $specificationPackVersion.Groups['value'].Value
 }
 $acceptanceContract = Get-RequiredText 'eng\acceptance\contract.json' |
     ConvertFrom-Json
@@ -635,6 +646,8 @@ $contractVersions = [ordered]@{
     Cache = $acceptanceContract.cache.schemaVersion
     Manifest = $acceptanceContract.worker.manifestSchemaVersion
     CompilerArtifact = $acceptanceContract.worker.compilerArtifactSchemaVersion
+    RelationalSummary = $acceptanceContract.worker.relationalSummarySchemaVersion
+    SpecificationPack = $acceptanceContract.worker.specificationPackSchemaVersion
 }
 foreach ($name in $derivedVersions.Keys) {
     $expected = $derivedVersions[$name]
@@ -650,7 +663,9 @@ foreach ($expected in @(
         "protocol version $($derivedVersions.Protocol)",
         "cache schema version $($derivedVersions.Cache)",
         "manifest schema version $($derivedVersions.Manifest)",
-        "compiler artifact schema version $($derivedVersions.CompilerArtifact)")) {
+        "compiler artifact schema version $($derivedVersions.CompilerArtifact)",
+        "relational-summary schema version $($derivedVersions.RelationalSummary)",
+        "specification-pack schema version $($derivedVersions.SpecificationPack)")) {
     if (-not $readme.Contains($expected, [StringComparison]::OrdinalIgnoreCase)) {
         throw "README.md is missing code-derived worker text: $expected"
     }
@@ -681,6 +696,16 @@ $versionMentionRules = @(
         Name = 'compiler-artifact schema'
         Pattern = '\bschema-(?<value>\d+)\s+compiler(?:\s+artifact|\s+evidence|\s+snapshot|-manifest)\b'
         Expected = $derivedVersions.CompilerArtifact
+    },
+    [pscustomobject]@{
+        Name = 'relational-summary schema'
+        Pattern = '\brelational-summary\s+schema\s+version\s+(?<value>\d+)\b'
+        Expected = $derivedVersions.RelationalSummary
+    },
+    [pscustomobject]@{
+        Name = 'specification-pack schema'
+        Pattern = '\bspecification-pack\s+schema\s+version\s+(?<value>\d+)\b'
+        Expected = $derivedVersions.SpecificationPack
     }
 )
 foreach ($relativePath in $currentMaintainedDocuments) {
@@ -703,7 +728,8 @@ foreach ($relativePath in $currentMaintainedDocuments) {
 if ($Verify) {
     Write-Host (
         "SharpProof documentation matches code-derived package, protocol, " +
-        'cache, manifest, and compiler-artifact versions, acceptance-contract ' +
+        'cache, manifest, compiler-artifact, relational-summary, and ' +
+        'specification-pack versions, acceptance-contract ' +
         'versions, configuration, diagnostics, API specs, worker options, ' +
         'protocol enums, links, anchors, and parseable XML/PowerShell fences.')
 }

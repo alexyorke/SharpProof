@@ -52,6 +52,21 @@ public sealed partial class SharpProofAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        // A contract API that is referenced but unreadable disables every
+        // contract silently, which is indistinguishable from "nothing to
+        // report". Surface it instead.
+        if (SharpProof.Frontend.ContractApiIdentityResolver
+                .ForCompilation(context.Compilation)
+                .UnreadableContractApiReason is { } unreadableContractApi)
+        {
+            context.RegisterCompilationEndAction(
+                compilationContext => compilationContext.ReportDiagnostic(
+                    Diagnostic.Create(
+                        GeneratedDiagnosticDescriptors.ContractApiUnverifiableRule,
+                        Location.None,
+                        unreadableContractApi)));
+        }
+
         if (ContractRuntimePolicy.IsRuntimeEvaluationEnabled(
                 context.Compilation,
                 context.CancellationToken))
@@ -96,6 +111,21 @@ public sealed partial class SharpProofAnalyzer : DiagnosticAnalyzer
                     symbolContext,
                     session),
                 SymbolKind.Method);
+            context.RegisterSymbolAction(
+                symbolContext =>
+                    SharpProofControlAttributePolicy.ValidateDeclaredScope(
+                        symbolContext.Symbol,
+                        session,
+                        symbolContext.ReportDiagnostic,
+                        symbolContext.CancellationToken),
+                SymbolKind.NamedType);
+            context.RegisterCompilationEndAction(
+                compilationContext =>
+                    SharpProofControlAttributePolicy.ValidateDeclaredScope(
+                        compilationContext.Compilation.Assembly,
+                        session,
+                        compilationContext.ReportDiagnostic,
+                        compilationContext.CancellationToken));
         }
         if (activation.RequiresOperationAnalysis)
         {
@@ -462,6 +492,10 @@ public sealed partial class SharpProofAnalyzer : DiagnosticAnalyzer
                 name.Identifier.ValueText);
     }
 
+    // Decomposed deliberately: ToDisplayString and other string-based symbol
+    // identity are banned in this layer (RS0030 / SPMETA001), so the namespace
+    // is matched structurally rather than compared against
+    // ContractApiMetadata.AttributesNamespace as a string.
     private static bool IsSharpProofAttributesNamespace(
         INamespaceSymbol? @namespace)
     {

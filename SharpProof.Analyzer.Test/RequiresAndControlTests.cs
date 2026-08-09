@@ -1634,4 +1634,118 @@ public sealed class RequiresAndControlTests
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EquivalentTo(["SP0002", "SP0024", "SP0024"]));
     }
+
+    [Test]
+    public async Task EmptyTypesReportMalformedControlReasonsWithoutMethods()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            [SharpProofSuppress("")]
+            public sealed class Empty { }
+
+            public sealed class Outer {
+                [SharpProofTrusted(" ")]
+                public sealed class Nested { }
+            }
+            """,
+            "all-experimental",
+            ["SP0024"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0024", "SP0024"]));
+    }
+
+    [Test]
+    public async Task MethodlessAssemblyReportsMalformedControlReason()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            [assembly: SharpProofTrusted("")]
+            """,
+            "all-experimental",
+            ["SP0024"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0024"]));
+    }
+
+    [Test]
+    public async Task ReversedPreconditionsRefineAgainstCallSiteFacts()
+    {
+        // The variable-on-the-right branch used to evaluate the other operand
+        // against an empty environment rather than the live one.
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static void Reversed(long value) {
+                    Contract.Requires(0 < value);
+                }
+
+                public static void Call() {
+                    Reversed(-1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
+    public void ReversedRequiresRefinesTheEntryStateAtUnitLevel()
+    {
+        // Driven directly at ApplyRequires rather than through the analyzer.
+        // In a full analysis ManagedAbstractFlow.Transfer re-derives the same
+        // fact when it walks the Contract.Requires invocation in the body, which
+        // masks this path and makes it impossible to discriminate end to end.
+        // Here nothing walks a body, so the refinement can only come from
+        // ManagedContractFacts.
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static void Caller(long value) {
+                    Contract.Requires(3 == value);
+                }
+            }
+            """,
+            []);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Caller");
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+
+        var binding = new SharpProof.Contracts.ContractBinder(
+            compilation,
+            new SharpProof.Ir.IrFactory()).BindRequires(method);
+        Assert.That(binding.Contracts, Is.Not.Null);
+
+        var flow = SharpProof.Effects.ManagedAbstractFlow.ForCompilation(compilation);
+        var refined = SharpProof.Analyzer.ManagedContractFacts.ApplyRequires(
+            flow.CreateEntryState(method),
+            binding.Contracts);
+
+        // "3 == value" puts the literal on the left, so only the
+        // Right: IrVariableTerm arm can match. Without it the parameter stays
+        // unconstrained.
+        var value = refined.Get(method.Parameters[0]);
+        Assert.That(value.TryGetInteger(out var interval), Is.True);
+        Assert.That(
+            interval,
+            Is.EqualTo(SharpProof.Dataflow.IntervalValue.Constant(3)));
+    }
 }

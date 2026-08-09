@@ -161,6 +161,37 @@ public sealed class ConstructedGenericContractTests
             expectedClauses: 1);
     }
 
+    [Test]
+    public void FunctionPointerTargetTypesAreRecursivelySpecialized()
+    {
+        AssertBinds(
+            """
+            using SharpProof.Attributes;
+
+            public unsafe interface ITransformer<T> where T : unmanaged {
+                delegate*<T, T> Map(delegate*<T, T> value);
+            }
+
+            [ContractFor(typeof(ITransformer<>))]
+            public static unsafe class TransformerContracts<T>
+                where T : unmanaged {
+                public static delegate*<T, T> Map(
+                    ITransformer<T> receiver,
+                    delegate*<T, T> value) {
+                    Contract.Requires(value != null);
+                    return value;
+                }
+            }
+
+            public static unsafe class Caller {
+                public static delegate*<int, int> Call(
+                    ITransformer<int> transformer,
+                    delegate*<int, int> value) => transformer.Map(value);
+            }
+            """,
+            expectedClauses: 1);
+    }
+
     private static void AssertBinds(string source, int expectedClauses)
     {
         var compilation = CreateCompilation(source);

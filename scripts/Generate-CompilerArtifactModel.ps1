@@ -395,8 +395,11 @@ foreach ($declaration in $declarations) {
     elseif ($name -in @(
             'CompilerCompilationSnapshot',
             'CompilerCompilationOptionsSnapshot',
+            'CompilerReportDiagnostic',
+            'CompilerDiagnosticOptionSnapshot',
             'CompilerSyntaxTreeSnapshot',
             'CompilerReferenceSnapshot',
+            'CompilerReferenceModuleSnapshot',
             'CompilerAdditionalFileSnapshot',
             'CompilerFeatureSnapshot')) {
         ,$compilationLines
@@ -497,20 +500,25 @@ foreach ($declaration in $declarations) {
             $lines.Add('            null,')
             $lines.Add('            ImmutableDictionary<IrVarId, IrVarId>.Empty,')
             $lines.Add(
-                '            ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty);')
+                '            ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,')
+            $lines.Add(
+                '            ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty);')
             $lines.Add('')
             $lines.Add('    internal static CompilerPreparedBody ProgramBody(')
             $lines.Add('        IrProgram program,')
             $lines.Add(
                 '        ImmutableDictionary<IrVarId, IrVarId> parameterBindings,')
             $lines.Add(
-                '        ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> specCalls) =>')
+                '        ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> specCalls,')
+            $lines.Add(
+                '        ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall> summaryCalls) =>')
             $lines.Add('        new(')
             $lines.Add('            CompilerPreparedBodyKind.Program,')
             $lines.Add(
                 '            program ?? throw new ArgumentNullException(nameof(program)),')
             $lines.Add('            parameterBindings,')
-            $lines.Add('            specCalls);')
+            $lines.Add('            specCalls,')
+            $lines.Add('            summaryCalls);')
         }
         else {
             Add-RecordMembers $lines $members $name
@@ -544,8 +552,8 @@ foreach ($declaration in $declarations) {
 $envelope = Get-RequiredMember $schema 'artifactEnvelope' 'schema'
 if ([string](Get-RequiredMember $envelope 'schema' 'artifact envelope') -ne
         'SharpProof.CompilerManifest' -or
-    [int](Get-RequiredMember $envelope 'version' 'artifact envelope') -ne 9) {
-    throw 'The compiler-artifact envelope must remain schema version 9.'
+    [int](Get-RequiredMember $envelope 'version' 'artifact envelope') -ne 11) {
+    throw 'The compiler-artifact envelope must remain schema version 11.'
 }
 
 $catalogs = @(Get-RequiredMember $schema 'wireEnumCatalogs' 'schema')

@@ -1743,7 +1743,17 @@ foreach ($pilot in $pilots) {
             $tool `
             'compilerArtifactSchemaVersion' `
             "$pilotOwner tool") -ne
-                [int]$acceptance.worker.compilerArtifactSchemaVersion) {
+                [int]$acceptance.worker.compilerArtifactSchemaVersion -or
+        [int](Get-RequiredProperty `
+            $tool `
+            'relationalSummarySchemaVersion' `
+            "$pilotOwner tool") -ne
+                [int]$acceptance.worker.relationalSummarySchemaVersion -or
+        [int](Get-RequiredProperty `
+            $tool `
+            'specificationPackSchemaVersion' `
+            "$pilotOwner tool") -ne
+                [int]$acceptance.worker.specificationPackSchemaVersion) {
         throw (
             "$pilotOwner tool identity must match the exact qualified RC " +
             'commit, package version, and current worker protocol schemas.')

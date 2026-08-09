@@ -30,8 +30,8 @@ as `UnsupportedBody` until base-constructor and field-initializer semantics are
 lowered. Only canonical user-model variables are exposed in the result;
 lowered temporaries remain internal.
 
-An executed spec-modeled call cannot be independently replayed, so the
-candidate is reported as claim `Unknown` with
+An executed API-spec or relational-summary call cannot be independently
+replayed, so the candidate is reported as claim `Unknown` with
 `CounterexampleNotReplayable`; an operation on an unselected CFG path does not
 block replay. Other unsupported or inconsistent replay state remains the
 fatal `CounterexampleReplayFailed` discrepancy. An UNSAT result becomes
@@ -40,13 +40,13 @@ encoding, resource limits, and method boundaries produce typed claim-level
 `Unknown` results. An undefined postcondition is also a typed `Unknown`
 result. Backend unavailability, malformed backend results, failure to replay
 an otherwise replayable counterexample, containment failure, and
-infrastructure failure make the protocol version 9 run `Failed` and fail the
+infrastructure failure make the protocol version 10 run `Failed` and fail the
 build under every policy.
 Project timeout and caller cancellation use the separate `TimedOut` and
 `Canceled` run statuses.
 
 Effect refutation replay is independent of this SMT lifecycle. Compiler
-artifact schema 9 can carry one unconditional definite managed object/array
+artifact schema 11 retains schema 10's unconditional definite managed object/array
 allocation event. A worker-owned interpreter validates the event identity,
 source-tree span, selected constraint, and sealed witness, then derives
 `Allocates` without trusting compiler effect bits or executing user code. That
@@ -54,8 +54,8 @@ evidence can refute `ZeroAllocations` or an `EffectContract` excluding
 `Allocates`; observable `EnforcePure` permits fresh allocation. Unsupported
 definite effect candidates become `CounterexampleNotReplayable`, while an
 otherwise valid semantic replay disagreement becomes the fatal
-`CounterexampleReplayFailed`. Effect results remain outside cache schema 11.
-Protocol version 9 is unchanged.
+`CounterexampleReplayFailed`. Effect results remain outside cache schema 12.
+Protocol version 10 carries relational-summary evidence.
 
 `SharpProofVerifyPolicy` controls whether otherwise valid incomplete selected
 analysis is informational, warning, or error SP0047 output.
@@ -68,7 +68,7 @@ are all replay-validated `Refuted` enter the content-addressed disk cache.
 Cache keys include protocol, semantics, tool identity and canonical packaged
 worker runtime-closure digest, target framework, the exact closed compiler
 artifact and lowered IR, budgets, spec versions, and a canonical digest of the
-complete trusted spec content. Cache schema version 11 revalidates the stored
+complete trusted spec content. Cache schema version 12 revalidates the stored
 payload against the complete current manifest, reconstructs each supported
 scalar model, checks entry assumptions and source ranges, and repeats
 whole-body replay. Proven claims, effect claims, and unsupported models are not

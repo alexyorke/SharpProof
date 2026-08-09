@@ -6,19 +6,19 @@ internal static class CompilerManifestArtifactProducer
     internal static CompilerManifestArtifact Create(CSharpCompilation compilation, string projectDirectory,
         string targetFramework, WorkerFeatureSet features, ClaimManifestBuildResult discovery,
         int maximumExpressionDepth, CancellationToken cancellationToken,
-        ImmutableArray<AdditionalText> additionalFiles = default)
+        ImmutableArray<AdditionalText> additionalFiles = default,
+        ImmutableArray<string> specificationPacks = default)
     {
         var snapshot = CompilerCompilationCapture.Capture(
             compilation, projectDirectory, targetFramework, additionalFiles, cancellationToken);
         var diagnostics = compilation.GetDiagnostics(cancellationToken)
             .Where(static item => item.Severity == DiagnosticSeverity.Error)
-            .OrderBy(static item => item.Location.SourceTree?.FilePath, StringComparer.Ordinal)
-            .ThenBy(static item => item.Location.SourceSpan.Start)
-            .ThenBy(static item => item.Id, StringComparer.Ordinal)
-            .Select(CreateDiagnostic).ToArray();
+            .Select(CreateDiagnostic);
+        var diagnosticArtifacts =
+            CompilerDiagnosticArtifactOrdering.Canonicalize(diagnostics);
         var targets = discovery.Targets.Values.OrderBy(static item => item.Entry.CallableId, StringComparer.Ordinal);
         CompilerCallableArtifact[] callables;
-        if (diagnostics.Length != 0)
+        if (diagnosticArtifacts.Length != 0)
         {
             callables = [.. targets.Select(static item => new CompilerCallableArtifact {
                 CallableId = item.Entry.CallableId, FailureReason = WorkerClaimReason.UnsupportedCallable,
@@ -27,7 +27,10 @@ internal static class CompilerManifestArtifactProducer
         }
         else
         {
-            var lowerer = new CompilerCallableLowerer(compilation, new IrFactory());
+            var lowerer = new CompilerCallableLowerer(
+                compilation,
+                new IrFactory(),
+                specificationPacks.IsDefault ? [] : specificationPacks);
             callables = [.. targets.Select(item => {
                 var artifact = CompilerLoweredArtifact.Encode(
                     lowerer.Prepare(item, cancellationToken));
@@ -39,11 +42,12 @@ internal static class CompilerManifestArtifactProducer
         var artifact = new CompilerManifestArtifact
         {
             Features = features,
-            CompilationSha256 = CompilationFingerprint.ComputeSha256(snapshot),
+            CompilationSha256 = CompilationFingerprint.ComputeSha256(
+                snapshot, diagnosticArtifacts),
             Compilation = snapshot,
             Manifest = discovery.Manifest,
             MaximumExpressionDepth = maximumExpressionDepth,
-            CompilerDiagnostics = diagnostics,
+            CompilerDiagnostics = diagnosticArtifacts,
             Callables = callables
         };
         CompilerManifestArtifactJson.Validate(artifact);

@@ -852,6 +852,138 @@ public sealed class ContractBinderTests
     }
 
     [Test]
+    public void ConstructedNestedGenericTargetSpecializesEveryCompanionLayer()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public sealed class Outer<TOuter> where TOuter : class {
+                public interface ITarget<TInner> where TInner : struct {
+                    void Read(TOuter outer, TInner inner);
+                }
+            }
+            public static class CompanionOuter<TOuter> where TOuter : class {
+                [ContractFor(typeof(Outer<>.ITarget<>))]
+                public static class TargetContracts<TInner> where TInner : struct {
+                    public static void Read(
+                        Outer<TOuter>.ITarget<TInner> receiver,
+                        TOuter outer,
+                        TInner inner) {
+                        Contract.Requires(outer != null);
+                    }
+                }
+            }
+            public static class Caller {
+                public static void Call(
+                    Outer<string>.ITarget<int> target,
+                    string outer,
+                    int inner) => target.Read(outer, inner);
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.BindCallRequires("Caller", "Call", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.UsesCompanion, Is.True);
+        Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
+    }
+
+    [Test]
+    public void NonGenericTargetWrapperDoesNotRequireCompanionWrapper()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Outer {
+                public interface ITarget<T> {
+                    void Read(T value);
+                }
+            }
+            [ContractFor(typeof(Outer.ITarget<>))]
+            public static class TargetContracts<T> {
+                public static void Read(
+                    Outer.ITarget<T> receiver,
+                    T value) {
+                    Contract.Requires(receiver != null);
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Outer+ITarget`1", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.UsesCompanion, Is.True);
+    }
+
+    [TestCase(
+        "public static class CompanionOuter<TOuter> where TOuter : struct { " +
+        "[ContractFor(typeof(Outer<>.ITarget<>))] " +
+        "public static class TargetContracts<TInner> { " +
+        "public static void Read(Outer<TOuter>.ITarget<TInner> receiver, TOuter outer, TInner inner) { } } } ")]
+    [TestCase(
+        "[ContractFor(typeof(Outer<>.ITarget<>))] " +
+        "public static class TargetContracts<TOuter, TInner> { " +
+        "public static void Read(Outer<TOuter>.ITarget<TInner> receiver, TOuter outer, TInner inner) { } } ")]
+    [TestCase(
+        "public static class CompanionOuter<TOuter> { " +
+        "[ContractFor(typeof(Outer<>.ITarget<>))] " +
+        "public static class TargetContracts<TInner> { " +
+        "public static void Read(Outer<TInner>.ITarget<TOuter> receiver, TOuter outer, TInner inner) { } } } ")]
+    public void NestedGenericCompanionLayersMustMatchExactly(string companion)
+    {
+        var source =
+            """
+            using SharpProof.Attributes;
+            public sealed class Outer<TOuter> {
+                public interface ITarget<TInner> {
+                    void Read(TOuter outer, TInner inner);
+                }
+            }
+            """ + companion;
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("Outer`1+ITarget`1", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.CompanionSignatureMismatch));
+    }
+
+    [Test]
+    public void ClosedNestedTargetRejectsOpenContainingCompanionLayer()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public sealed class Outer<TOuter> {
+                public interface ITarget<TInner> {
+                    void Read(TOuter outer, TInner inner);
+                }
+            }
+            public static class CompanionOuter<TOuter> {
+                [ContractFor(typeof(Outer<string>.ITarget<int>))]
+                public static class TargetContracts {
+                    public static void Read(
+                        Outer<string>.ITarget<int> receiver,
+                        string outer,
+                        int inner) { }
+                }
+            }
+            public static class Caller {
+                public static void Call(
+                    Outer<string>.ITarget<int> target,
+                    string outer,
+                    int inner) => target.Read(outer, inner);
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.BindCallRequires("Caller", "Call", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.CompanionSignatureMismatch));
+    }
+
+    [Test]
     public void ConstructedGenericMethodUsesGenericCompanionMember()
     {
         const string source =

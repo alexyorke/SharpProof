@@ -561,7 +561,7 @@ public sealed class FinalCompilationProbeTests
             PackageCache = Path.Combine(root, "package-cache");
             CompilerManifestPath = Path.Combine(
                 root,
-                "manifest",
+                "published",
                 "compiler-manifest.json");
             PackedProbeArtifactPath = Path.Combine(
                 root,
@@ -714,6 +714,14 @@ public sealed class FinalCompilationProbeTests
         {
             var runDirectory = Path.Combine(_root, "verify-run");
             var publishDirectory = Path.Combine(_root, "published");
+            Directory.CreateDirectory(runDirectory);
+            var invocationManifestPath = Path.Combine(
+                runDirectory,
+                "compiler-manifest.json");
+            File.Copy(
+                CompilerManifestPath,
+                invocationManifestPath,
+                overwrite: true);
             return RunDotNetAsync([
                 "msbuild",
                 ProjectPath,
@@ -721,9 +729,10 @@ public sealed class FinalCompilationProbeTests
                 "/nologo",
                 "/nodeReuse:false",
                 "-p:Configuration=Release",
+                "-p:TargetFramework=" + NetTargetFramework,
                 "-p:SharpProofVerify=true",
                 "-p:_SharpProofCompilerManifestPath=" +
-                    CompilerManifestPath,
+                    invocationManifestPath,
                 "-p:_SharpProofInvocationDirectory=" + runDirectory,
                 "-p:_SharpProofInvocationRequestFile=" +
                     Path.Combine(runDirectory, "request.json"),
@@ -734,7 +743,7 @@ public sealed class FinalCompilationProbeTests
                 "-p:SharpProofVerifyResultFile=" +
                     Path.Combine(publishDirectory, "result.json"),
                 "-p:SharpProofCompilerManifestFile=" +
-                    Path.Combine(publishDirectory, "compiler-manifest.json"),
+                    CompilerManifestPath,
                 "-p:SharpProofVerifyCacheDirectory=" +
                     Path.Combine(publishDirectory, "cache")
             ]);
@@ -901,7 +910,7 @@ public sealed class FinalCompilationProbeTests
                     <SharpProofVerify>true</SharpProofVerify>
                     <SharpProofVerifyRequestFile>{Escape(Path.Combine(_root, "published", "request.json"))}</SharpProofVerifyRequestFile>
                     <SharpProofVerifyResultFile>{Escape(VerifyResultPath)}</SharpProofVerifyResultFile>
-                    <SharpProofCompilerManifestFile>{Escape(CompilerManifestPath)}</SharpProofCompilerManifestFile>
+                    <SharpProofCompilerManifestFile>{Escape(Path.Combine(_root, "published", "compiler-manifest.json"))}</SharpProofCompilerManifestFile>
                     <_SharpProofCompilerManifestPath>{Escape(CompilerManifestPath)}</_SharpProofCompilerManifestPath>
                     <SharpProofVerifyCacheDirectory>{Escape(Path.Combine(_root, "published", "cache"))}</SharpProofVerifyCacheDirectory>
                     <_SharpProofCompilationTargetFramework>$(TargetFramework)</_SharpProofCompilationTargetFramework>

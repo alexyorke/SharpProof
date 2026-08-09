@@ -34,6 +34,9 @@ $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofMutationEvidence.ps1')
 & (Join-Path $repositoryRoot 'scripts\Generate-DeclarativeModels.ps1') -Verify
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
+$previewEvidence = Get-Content -LiteralPath (
+    Join-Path $acceptanceRoot 'preview-evidence.v1.json') -Raw |
+    ConvertFrom-Json
 $directoryBuildPropsPath = Join-Path `
     $repositoryRoot `
     'Directory.Build.props'
@@ -231,10 +234,21 @@ Assert-Equal $contract.analyzer.unsupportedUnannotatedCallableBehavior 'silent' 
 Assert-Equal $contract.analyzer.unsupportedSelectedCallableDiagnostic 'SP0047' 'analyzer.unsupportedSelectedCallableDiagnostic'
 Assert-Equal $contract.automation.solutionBuildWallSeconds 600 'automation.solutionBuildWallSeconds'
 Assert-Equal $contract.mutationEvidence.schemaVersion 1 'mutationEvidence.schemaVersion'
-Assert-Equal $contract.mutationEvidence.expectedCatalogCount 111 'mutationEvidence.expectedCatalogCount'
+if ([int]$contract.mutationEvidence.expectedCatalogCount -le 0) {
+    throw 'mutationEvidence.expectedCatalogCount must be positive.'
+}
 if ([string]$contract.mutationEvidence.expectedCatalogSha256 -notmatch '^[0-9a-f]{64}$') {
     throw 'mutationEvidence.expectedCatalogSha256 must be a lowercase SHA-256 digest.'
 }
+Assert-Equal $previewEvidence.schemaVersion 1 'previewEvidence.schemaVersion'
+Assert-Equal `
+    $previewEvidence.requiredHumanApprovals `
+    0 `
+    'previewEvidence.requiredHumanApprovals'
+Assert-Equal `
+    (@($previewEvidence.requiredEvidence) -join ',') `
+    'executable-regression,mutation-evidence,soundness-note-when-semantics-change,exact-commit-release-artifacts,debug-solution-gate,release-acceptance-gate' `
+    'previewEvidence.requiredEvidence'
 Assert-Equal `
     (Get-MsBuildDefault $portableTargets 'SharpProofProfile' 'portable package') `
     $contract.analyzer.defaultProfile `
@@ -252,17 +266,23 @@ Assert-Equal `
     $contract.analyzer.defaultAssumptionPolicy `
     'SharpProofAssumptionPolicy'
 Assert-Equal ($contract.supportedTargetFrameworks -join ',') 'netstandard2.0,net8.0,net472' 'supportedTargetFrameworks'
-Assert-Equal $contract.worker.protocolVersion 9 'worker.protocolVersion'
+Assert-Equal $contract.worker.protocolVersion 10 'worker.protocolVersion'
 Assert-Equal $contract.worker.manifestSchemaVersion 4 'worker.manifestSchemaVersion'
-Assert-Equal $contract.worker.compilerArtifactSchemaVersion 9 'worker.compilerArtifactSchemaVersion'
+Assert-Equal $contract.worker.compilerArtifactSchemaVersion 11 'worker.compilerArtifactSchemaVersion'
+Assert-Equal $contract.worker.relationalSummarySchemaVersion 1 'worker.relationalSummarySchemaVersion'
+Assert-Equal $contract.worker.specificationPackSchemaVersion 1 'worker.specificationPackSchemaVersion'
 Assert-Equal $contract.worker.maximumParallelism 4 'worker.maximumParallelism'
+Assert-Equal $contract.worker.maximumWorkerProcesses 4 'worker.maximumWorkerProcesses'
+Assert-Equal $contract.worker.maximumExpressionDepth 64 'worker.maximumExpressionDepth'
 Assert-Equal $contract.worker.maximumMemoryMiB 2048 'worker.maximumMemoryMiB'
 Assert-Equal $contract.worker.queryRlimit 3000000 'worker.queryRlimit'
 Assert-Equal $contract.worker.methodRlimit 20000000 'worker.methodRlimit'
 Assert-Equal $contract.worker.maximumMethodWallSeconds 10 'worker.maximumMethodWallSeconds'
 Assert-Equal $contract.worker.maximumProjectWallSeconds 300 'worker.maximumProjectWallSeconds'
 Assert-Equal $contract.worker.forcedTerminationMilliseconds 1000 'worker.forcedTerminationMilliseconds'
-Assert-Equal $contract.cache.schemaVersion 11 'cache.schemaVersion'
+Assert-Equal $contract.worker.maximumProjectDirectoryCharacters 239 'worker.maximumProjectDirectoryCharacters'
+Assert-Equal $contract.cache.schemaVersion 12 'cache.schemaVersion'
+Assert-Equal $contract.cache.enabledByDefault $true 'cache.enabledByDefault'
 Assert-Equal $contract.cache.maximumMiB 512 'cache.maximumMiB'
 Assert-Equal ($contract.cache.cacheableOutcomes -join ',') 'Refuted' 'cache.cacheableOutcomes'
 Assert-Equal `
@@ -342,6 +362,14 @@ Assert-Equal `
     ([string]$contract.worker.maximumParallelism) `
     'SharpProofVerifyMaxParallelism'
 Assert-Equal `
+    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyMaxWorkerProcesses' 'verifier package') `
+    ([string]$contract.worker.maximumWorkerProcesses) `
+    'SharpProofVerifyMaxWorkerProcesses'
+Assert-Equal `
+    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyMaximumExpressionDepth' 'verifier package') `
+    ([string]$contract.worker.maximumExpressionDepth) `
+    'SharpProofVerifyMaximumExpressionDepth'
+Assert-Equal `
     (Get-MsBuildProperty $verifierProps 'SharpProofVerifyProcessMemoryLimitBytes' 'verifier package') `
     ([string]([int64]$contract.worker.maximumMemoryMiB * 1024 * 1024)) `
     'SharpProofVerifyProcessMemoryLimitBytes'
@@ -353,6 +381,14 @@ Assert-Equal `
     (Get-MsBuildProperty $verifierProps 'SharpProofVerifyCacheMaximumBytes' 'verifier package') `
     ([string]([int64]$contract.cache.maximumMiB * 1024 * 1024)) `
     'SharpProofVerifyCacheMaximumBytes'
+Assert-Equal `
+    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyCacheEnabled' 'verifier package') `
+    ([string]$contract.cache.enabledByDefault).ToLowerInvariant() `
+    'SharpProofVerifyCacheEnabled'
+Assert-Equal `
+    (Get-MsBuildProperty $verifierProps '_SharpProofMaximumProjectDirectoryLength' 'verifier package') `
+    ([string]$contract.worker.maximumProjectDirectoryCharacters) `
+    '_SharpProofMaximumProjectDirectoryLength'
 
 Push-Location $repositoryRoot
 try {
@@ -365,54 +401,37 @@ try {
         -Scope 'trusted-kernel'
     Write-Host "Trusted-kernel paths: $($kernelPaths.Count)"
 
-    $requiredTcbComponents = @(
-        'discovery',
-        'lowering',
-        'execution',
-        'obligationGeneration',
-        'encoding',
-        'apiSpecifications',
-        'apiSpecificationIdentity',
-        'apiSpecificationCatalog',
-        'scalarSemanticsCatalog',
-        'contractApiCatalog',
-        'analyzerDiagnosticCatalog',
-        'diagnosticDescriptorCatalog',
-        'projectionCatalog',
-        'launcherArgumentCatalog',
-        'generatedOutputPolicy',
-        'mutationEvidencePolicy',
-        'declarativeModelsCatalog',
-        'boundContractModelCatalog',
-        'effectContractCatalog',
-        'operationSupportCatalog',
-        'irModelCatalog',
-        'compilerWireCatalog',
-        'effectAnalysis',
-        'replay',
-        'effectResultAssembly',
-        'policy',
-        'resultAssembly',
-        'compilerInputIdentity',
-        'canonicalIdentityEncoding',
-        'protocolValidation',
-        'cacheValidation',
-        'portableShippingBoundary',
-        'releaseContainment'
-    )
+    # contract.json owns path classification. A separately reviewed digest
+    # inside the contract makes path additions, removals, and moves explicit.
     $tcbComponents = @($contract.trustedComputingBase.components)
-    $actualTcbComponents = @(
-        $tcbComponents |
-            ForEach-Object { [string]$_.name } |
-            Sort-Object
-    )
-    $expectedTcbComponents = @($requiredTcbComponents | Sort-Object)
-    if (($actualTcbComponents -join ',') -ne
-        ($expectedTcbComponents -join ',')) {
-        throw "Trusted-computing-base components must be exactly: " +
-            ($requiredTcbComponents -join ', ') + "."
+    if ($tcbComponents.Count -eq 0) {
+        throw 'The trusted-computing-base contract must declare components.'
+    }
+    $seenTcbComponents = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($component in $tcbComponents) {
+        $name = [string]$component.name
+        if ([string]::IsNullOrWhiteSpace($name)) {
+            throw 'Every trusted-computing-base component must be named.'
+        }
+        if (-not $seenTcbComponents.Add($name)) {
+            throw "Trusted-computing-base component '$name' is declared twice."
+        }
     }
     $canonicalTcbPaths = @(Get-SharpProofTcbPaths -Contract $contract)
+    $sortedTcbPaths = [string[]]@($canonicalTcbPaths)
+    [Array]::Sort($sortedTcbPaths, [StringComparer]::Ordinal)
+    $inventoryText = ($sortedTcbPaths -join "`n") + "`n"
+    $inventoryBytes = [Text.Encoding]::UTF8.GetBytes($inventoryText)
+    $inventoryDigest = [Convert]::ToHexString(
+        [Security.Cryptography.SHA256]::HashData($inventoryBytes)
+    ).ToLowerInvariant()
+    $expectedInventoryDigest =
+        [string]$contract.trustedComputingBase.inventorySha256
+    if ($inventoryDigest -cne $expectedInventoryDigest) {
+        throw "The trusted-computing-base inventory digest changed. " +
+            "Review path ownership and update the intentional digest pin."
+    }
     foreach ($component in $tcbComponents) {
         $name = [string]$component.name
         $paths = @($component.paths)
@@ -490,6 +509,7 @@ try {
         'SharpProof.Package.Test\SharpProof.Package.Test.csproj',
         'SharpProof.Smt.Test\SharpProof.Smt.Test.csproj',
         'SharpProof.Specs.Test\SharpProof.Specs.Test.csproj',
+        'SharpProof.Summaries.Test\SharpProof.Summaries.Test.csproj',
         'SharpProof.Testing.Test\SharpProof.Testing.Test.csproj',
         'SharpProof.Gates.Test\SharpProof.Gates.Test.csproj',
         'SharpProof.Fuzz.Test\SharpProof.Fuzz.Test.csproj',

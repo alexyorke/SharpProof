@@ -1,4 +1,8 @@
 using System.Collections.Immutable;
+using System.Globalization;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -126,8 +130,8 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(first.Take(3), Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
             Assert.That(first, Does.Not.Contain((byte)'\r'));
             Assert.That(artifact.Schema, Is.EqualTo("SharpProof.CompilerManifest"));
-            Assert.That(artifact.SchemaVersion, Is.EqualTo(9));
-            Assert.That(artifact.ProtocolVersion, Is.EqualTo("9"));
+            Assert.That(artifact.SchemaVersion, Is.EqualTo(11));
+            Assert.That(artifact.ProtocolVersion, Is.EqualTo("10"));
             Assert.That(artifact.Compilation.TargetFramework, Is.EqualTo("net9.0"));
             Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.All));
             Assert.That(
@@ -216,6 +220,67 @@ public sealed class FinalCompilationCollectorTests
     }
 
     [Test]
+    public async Task DiagnosticPolicyAndRealizedErrorsInvalidateTheSeal()
+    {
+        using var workspace = new CollectorWorkspace();
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            internal static class Fixture {
+                internal static int Method() {
+                    int unused;
+                    Contract.Ensures(Contract.Result<int>() == 1);
+                    return 1;
+                }
+            }
+            """);
+        var baseline = await EmitArtifact(
+            compilation, workspace.SealPath("diagnostic-baseline"));
+        var warningLevel = await EmitArtifact(
+            compilation.WithOptions(compilation.Options.WithWarningLevel(0)),
+            workspace.SealPath("diagnostic-warning-level"));
+        var generalError = await EmitArtifact(
+            compilation.WithOptions(compilation.Options
+                .WithGeneralDiagnosticOption(ReportDiagnostic.Error)),
+            workspace.SealPath("diagnostic-general"));
+        var specificError = await EmitArtifact(
+            compilation.WithOptions(compilation.Options
+                .WithSpecificDiagnosticOptions(
+                    compilation.Options.SpecificDiagnosticOptions.SetItem(
+                        "CS0168", ReportDiagnostic.Error))),
+            workspace.SealPath("diagnostic-specific"));
+        var providerError = await EmitArtifact(
+            compilation.WithOptions(compilation.Options
+                .WithSyntaxTreeOptionsProvider(
+                    new FixedDiagnosticProvider(
+                        "CS0168", ReportDiagnostic.Error))),
+            workspace.SealPath("diagnostic-provider"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(baseline.CompilerDiagnostics, Is.Empty);
+            Assert.That(warningLevel.CompilerDiagnostics, Is.Empty);
+            Assert.That(
+                new[] { generalError, specificError, providerError },
+                Has.All.Matches<CompilerManifestArtifact>(artifact =>
+                    artifact.CompilerDiagnostics.Any(diagnostic =>
+                        diagnostic.Code == "compiler.CS0168")));
+            Assert.That(
+                new[] {
+                    baseline.CompilationSha256,
+                    warningLevel.CompilationSha256,
+                    generalError.CompilationSha256,
+                    specificError.CompilationSha256,
+                    providerError.CompilationSha256
+                }.Distinct(StringComparer.Ordinal).Count(),
+                Is.EqualTo(5));
+            Assert.That(
+                providerError.Callables.Single().FailureReason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
+        }
+    }
+
+    [Test]
     public async Task EmissionFailureIsTypedAndDoesNotEscapeAsAd0001()
     {
         using var workspace = new CollectorWorkspace();
@@ -268,6 +333,183 @@ public sealed class FinalCompilationCollectorTests
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(["SP0049"]));
+    }
+
+    [Test]
+    public async Task ReferencePathMustMatchLoadedMetadata()
+    {
+        using var workspace = new CollectorWorkspace();
+        var imageA = EmitImage(
+            "internal static class VersionA { const int Value = 1; }",
+            "TwinReference");
+        var imageB = EmitImage(
+            "internal static class VersionB { const int Value = 2; }",
+            "TwinReference");
+        var backingPath = Path.Combine(workspace.Path, "TwinReference.dll");
+        await File.WriteAllBytesAsync(backingPath, imageB);
+        var mismatched = MetadataReference.CreateFromImage(
+            imageA,
+            filePath: backingPath);
+        var artifactPath = workspace.SealPath("reference-mismatch");
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation().AddReferences(mismatched),
+            Options(artifactPath));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0049"]));
+            Assert.That(File.Exists(artifactPath), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task ReferencePathMustMatchRawMetadataWhenMvidIsUnchanged()
+    {
+        using var workspace = new CollectorWorkspace();
+        var image = EmitImage(
+            "internal static class OriginalMarker { const int Value = 1; }",
+            "PatchedReference");
+        var patched = PatchAscii(image, "OriginalMarker", "XriginalMarker");
+        var backingPath = Path.Combine(workspace.Path, "PatchedReference.dll");
+        await File.WriteAllBytesAsync(backingPath, patched);
+        var mismatched = MetadataReference.CreateFromImage(
+            image,
+            filePath: backingPath);
+        var artifactPath = workspace.SealPath("patched-reference-mismatch");
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation().AddReferences(mismatched),
+            Options(artifactPath));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0049"]));
+            Assert.That(File.Exists(artifactPath), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task LinkedNetmoduleProvenanceCapturesCompleteClosure()
+    {
+        using var workspace = new CollectorWorkspace();
+        var firstPath = Path.Combine(workspace.Path, "A.netmodule");
+        var secondPath = Path.Combine(workspace.Path, "B.netmodule");
+        var manifestPath = Path.Combine(workspace.Path, "Linked.dll");
+        var firstImage = EmitImage(
+            "public static class A { public static int Value => 1; }",
+            "A",
+            OutputKind.NetModule);
+        var secondImage = EmitImage(
+            "public static class B { public static int Value => 2; }",
+            "B",
+            OutputKind.NetModule);
+        await File.WriteAllBytesAsync(firstPath, firstImage);
+        await File.WriteAllBytesAsync(secondPath, secondImage);
+        var moduleProperties = new MetadataReferenceProperties(
+            MetadataImageKind.Module);
+        var firstReference = MetadataReference.CreateFromImage(
+            firstImage,
+            moduleProperties,
+            filePath: firstPath);
+        var secondReference = MetadataReference.CreateFromImage(
+            secondImage,
+            moduleProperties,
+            filePath: secondPath);
+        var manifest = CreateCompilation(
+                "public static class Linked { public static int Value => A.Value + B.Value; }")
+            .WithAssemblyName("Linked")
+            .AddReferences(
+                firstReference,
+                secondReference);
+        var manifestImage = EmitImage(manifest);
+        await File.WriteAllBytesAsync(manifestPath, manifestImage);
+        using var assemblyMetadata = AssemblyMetadata.Create(
+            ModuleMetadata.CreateFromImage(manifestImage),
+            ModuleMetadata.CreateFromImage(firstImage),
+            ModuleMetadata.CreateFromImage(secondImage));
+        var reference = assemblyMetadata.GetReference(filePath: manifestPath);
+        var subject = CreateCompilation().AddReferences(reference);
+        Assert.That(subject.GetAssemblyOrModuleSymbol(reference), Is.Not.Null);
+
+        var artifact = await EmitArtifact(
+            subject,
+            workspace.SealPath("linked-modules"));
+        var captured = artifact.Compilation.References.Single(item =>
+            item.Modules[0].Path.EndsWith(
+                "/Linked.dll",
+                StringComparison.Ordinal));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                captured.Modules.Select(static module => module.Name),
+                Is.EqualTo(["Linked.dll", "A.netmodule", "B.netmodule"]));
+            Assert.That(
+                captured.Modules.Select(static module => module.Path),
+                Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
+                    .Select(NormalizePath)));
+            Assert.That(
+                captured.Modules.Select(static module => module.Mvid),
+                Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
+                    .Select(ReadMvid)));
+            Assert.That(
+                captured.Modules.Select(static module => module.Sha256),
+                Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
+                    .Select(ReadSha256)));
+        }
+    }
+
+    [Test]
+    public async Task StaleLinkedNetmoduleIsRejected()
+    {
+        using var workspace = new CollectorWorkspace();
+        var modulePath = Path.Combine(workspace.Path, "LinkedPart.netmodule");
+        var manifestPath = Path.Combine(workspace.Path, "StaleLinked.dll");
+        var moduleImage = EmitImage(
+            "public static class LinkedPart { public static int Value => 1; }",
+            "LinkedPart",
+            OutputKind.NetModule);
+        await File.WriteAllBytesAsync(modulePath, moduleImage);
+        var moduleReference = MetadataReference.CreateFromImage(
+            moduleImage,
+            new MetadataReferenceProperties(MetadataImageKind.Module),
+            filePath: modulePath);
+        var manifest = CreateCompilation(
+                "public static class StaleLinked { public static int Value => LinkedPart.Value; }")
+            .WithAssemblyName("StaleLinked")
+            .AddReferences(moduleReference);
+        var manifestImage = EmitImage(manifest);
+        await File.WriteAllBytesAsync(manifestPath, manifestImage);
+        using var assemblyMetadata = AssemblyMetadata.Create(
+            ModuleMetadata.CreateFromImage(manifestImage),
+            ModuleMetadata.CreateFromImage(moduleImage));
+        var reference = assemblyMetadata.GetReference(filePath: manifestPath);
+        var subject = CreateCompilation().AddReferences(reference);
+        Assert.That(subject.GetAssemblyOrModuleSymbol(reference), Is.Not.Null);
+        await File.WriteAllBytesAsync(
+            modulePath,
+            EmitImage(
+                "public static class LinkedPart { public static int Value => 2; }",
+                "LinkedPart",
+                OutputKind.NetModule));
+        var artifactPath = workspace.SealPath("stale-linked-module");
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            subject,
+            Options(artifactPath));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0049"]));
+            Assert.That(File.Exists(artifactPath), Is.False);
+        }
     }
 
     [Test]
@@ -360,6 +602,18 @@ public sealed class FinalCompilationCollectorTests
         return artifact.CompilationSha256;
     }
 
+    private static async Task<CompilerManifestArtifact> EmitArtifact(
+        CSharpCompilation compilation,
+        string path)
+    {
+        var diagnostics = await AnalyzeCollectorAsync(
+            compilation,
+            Options(path));
+        Assert.That(diagnostics, Is.Empty);
+        return CompilerManifestArtifactJson.Deserialize(
+            await File.ReadAllTextAsync(path));
+    }
+
     private static Task<ImmutableArray<Diagnostic>> AnalyzeCollectorAsync(
         CSharpCompilation compilation,
         IReadOnlyDictionary<string, string> values,
@@ -386,6 +640,73 @@ public sealed class FinalCompilationCollectorTests
         string source = "internal static class Fixture { const int Value = 1; }")
     {
         return AnalyzerTestHost.CreateCompilation(source, []);
+    }
+
+    private static byte[] EmitImage(
+        string source,
+        string assemblyName,
+        OutputKind outputKind = OutputKind.DynamicallyLinkedLibrary)
+    {
+        var compilation = CreateCompilation(source);
+        return EmitImage(compilation
+            .WithAssemblyName(assemblyName)
+            .WithOptions(compilation.Options
+                .WithOutputKind(outputKind)));
+    }
+
+    private static byte[] EmitImage(CSharpCompilation compilation)
+    {
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        if (!result.Success)
+        {
+            throw new InvalidOperationException(string.Join(
+                Environment.NewLine,
+                result.Diagnostics.Select(static diagnostic =>
+                    diagnostic.ToString())));
+        }
+        return stream.ToArray();
+    }
+
+    private static string NormalizePath(string path)
+    {
+        return Path.GetFullPath(path).Replace('\\', '/');
+    }
+
+    private static string ReadMvid(string path)
+    {
+        using var stream = File.OpenRead(path);
+        using var reader = new PEReader(stream);
+        var metadata = reader.GetMetadataReader();
+        return metadata.GetGuid(metadata.GetModuleDefinition().Mvid)
+            .ToString("D");
+    }
+
+    private static string ReadSha256(string path)
+    {
+        using var stream = File.OpenRead(path);
+        using var hash = SHA256.Create();
+        return string.Concat(hash.ComputeHash(stream).Select(
+            static value => value.ToString("x2", CultureInfo.InvariantCulture)));
+    }
+
+    private static byte[] PatchAscii(
+        byte[] image,
+        string original,
+        string replacement)
+    {
+        var originalBytes = Encoding.ASCII.GetBytes(original);
+        var replacementBytes = Encoding.ASCII.GetBytes(replacement);
+        Assert.That(replacementBytes, Has.Length.EqualTo(originalBytes.Length));
+        var offsets = Enumerable.Range(
+                0, image.Length - originalBytes.Length + 1)
+            .Where(offset => image.AsSpan(offset, originalBytes.Length)
+                .SequenceEqual(originalBytes))
+            .ToArray();
+        Assert.That(offsets, Has.Length.EqualTo(1));
+        var patched = (byte[])image.Clone();
+        replacementBytes.CopyTo(patched, offsets[0]);
+        return patched;
     }
 
     private static Dictionary<string, string> Options(
@@ -467,6 +788,41 @@ public sealed class FinalCompilationCollectorTests
         public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
         {
             throw new InvalidOperationException("additional options unavailable");
+        }
+    }
+
+    private sealed class FixedDiagnosticProvider(
+        string diagnosticId,
+        ReportDiagnostic reportDiagnostic)
+        : SyntaxTreeOptionsProvider
+    {
+        public override GeneratedKind IsGenerated(
+            SyntaxTree tree,
+            CancellationToken cancellationToken)
+        {
+            return GeneratedKind.Unknown;
+        }
+
+        public override bool TryGetDiagnosticValue(
+            SyntaxTree tree,
+            string requestedDiagnosticId,
+            CancellationToken cancellationToken,
+            out ReportDiagnostic severity)
+        {
+            severity = reportDiagnostic;
+            return string.Equals(
+                requestedDiagnosticId,
+                diagnosticId,
+                StringComparison.Ordinal);
+        }
+
+        public override bool TryGetGlobalDiagnosticValue(
+            string requestedDiagnosticId,
+            CancellationToken cancellationToken,
+            out ReportDiagnostic severity)
+        {
+            severity = ReportDiagnostic.Default;
+            return false;
         }
     }
 

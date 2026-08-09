@@ -262,6 +262,36 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void BoxingConversionsOfConstantsCannotLowerToNull()
+    {
+        foreach (var expression in new[] { "(object)5", "(object)\"x\"", "(object)true" })
+        {
+            using var compiled = CompiledMethod.Create(
+                "public static object Target() => " + expression + ";");
+            var conversion = (IConversionOperation)compiled.TargetExpression;
+
+            // A boxing conversion is not a constant expression in C#, so Roslyn
+            // reports no ConstantValue on the conversion even though the operand
+            // keeps one. Lowering must not read that absence as a null constant.
+            Assert.That(
+                conversion.Operand.ConstantValue.HasValue,
+                Is.True,
+                expression + ": the operand should still carry its constant.");
+
+            var result = compiled.Lower();
+            Assert.That(
+                result.Term,
+                Is.Not.TypeOf<IrNullTerm>(),
+                expression + " lowered to a null term (conversion.ConstantValue.HasValue=" +
+                conversion.ConstantValue.HasValue.ToString(CultureInfo.InvariantCulture) + ").");
+            Assert.That(
+                result.Classification.Decision,
+                Is.EqualTo(FrontendSubsetDecision.ClosedAbstention),
+                expression + " should abstain rather than claim an exact value.");
+        }
+    }
+
+    [Test]
     public void DefaultAndUnknownSubsetDecisionsCannotBecomeExact()
     {
         var classification = default(FrontendSubsetClassification);

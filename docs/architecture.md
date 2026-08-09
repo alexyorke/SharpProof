@@ -1,8 +1,9 @@
 # SharpProof 1.0 preview architecture
 
 SharpProof 1.0 is an effect-first, soundness-first preview. The supported
-product is the effect cluster plus compiler-bound call-site preconditions.
-Unsupported code is an abstention, not an invitation to guess.
+product is the effect cluster, compiler-bound call-site preconditions, and the
+bounded out-of-process postcondition verifier. Unsupported code is an
+abstention, not an invitation to guess.
 
 ## Dependency direction
 
@@ -18,11 +19,12 @@ Contracts             -> Frontend, Ir
 Effects               -> Dataflow, Frontend, Specs
 Verify                -> Ir, Specs
 Smt                   -> Ir, Verify
+Summaries             -> Ir
 CompilerArtifact      -> Ir, Worker.Protocol
 ContractForGenerator  -> Contracts
 Analyzer              -> Contracts, Effects, Frontend, Ir, Specs
 CompilerCollector     -> Analyzer, CompilerArtifact, Contracts, Effects,
-                         Frontend, Ir, Specs, Worker.Protocol
+                         Frontend, Ir, Specs, Summaries, Worker.Protocol
 PortableAnalyzer      -> Attributes (build-only payload identity)
 Worker.Protocol
 Worker                -> CompilerArtifact, Dataflow, Ir, Smt, Specs, Verify,
@@ -126,7 +128,10 @@ External effect analysis uses a symbol-resolved `ApiSpecTable` or an explicitly
 trusted, complete effect contract. Compiler-side callable lowering binds only
 eligible resolved `ApiSpec` rows into exact witness metadata; the worker
 revalidates those witnesses against its matching table. Unmodeled or untrusted
-metadata is unknown; there is no IL interpreter.
+metadata effect behavior is unknown; relational postcondition summaries do not
+act as effect summaries. The separate build-time implementation-IL relation
+decoder is bounded to exact static scalar bodies and is not a general IL
+interpreter.
 
 Importing a source or metadata effect summary is also conditional on the
 callee's entry contract. Analyzer and compiler-artifact runs use the exact
@@ -146,9 +151,13 @@ validated by an incremental, no-source generator using exact symbol identity,
 including generics, constraints, ref/scoped kinds, nullability, defaults, and
 return shape.
 
-At inlining depth zero, the current verifier consumes only facts from
-compiler-bound `ApiSpec` rows within its admitted call boundary. This is not
-general source-callee modular assume/guarantee verification. The analyzer
+The worker composes quantifier-free callee relations inferred from exact
+acyclic source bodies, exact implementation PE bodies, or explicitly enabled
+audited specification packs. Each origin produces the same typed IR relation;
+Z3 proves the resulting caller obligation, while schema-1 evidence records the
+complete transitive dependency closure. This remains a direct static scalar
+boundary, not general recursive, virtual, or heap-aware source-callee modular
+verification. The analyzer
 combines exact compiler-bound replay with a managed CFG abstract interpreter
 over Boolean, nullness, integer-interval, sequence-cardinality, and effect
 facts. Comparison edges refine both scalar operands and retain only joined facts
@@ -177,7 +186,7 @@ indices. Formula construction, worklists, specs, proof cores, diagnostics, and
 serialized responses are stably ordered. Z3 uses resource limits; wall time is
 an outer process kill boundary.
 
-Protocol version 9 binds each request to a compiler-produced closed artifact.
+Protocol version 10 binds each request to a compiler-produced closed artifact.
 Stable semantic IDs identify selected callables, postcondition/effect claims, and
 user/trusted evidence independently of formatting. The protocol separates run
 status, callable coverage, and per-claim outcome. Central validation requires
@@ -191,15 +200,19 @@ artifacts exclude effect annotations and effect-only artifacts exclude
 postcondition claims. On the supported Windows x64 worker host, the
 launcher creates a startup barrier, assigns the worker to a Job Object with
 process and memory limits, and only then releases verification work. Concurrent
-builds use isolated artifact/request/result paths. After validating a response,
-a cross-process mutex serializes publication. The stable result is deleted
-first, the manifest and request are atomically replaced, and the result is
-written last as the commit marker. A failed publication therefore cannot leave
-a stale successful result associated with a partly updated evidence set. The
+builds use isolated artifact/request/result paths. A packaged netstandard2.0
+MSBuild task assembly owns host resolution, cancellation, path validation, and
+pre-verification invalidation for both command-line and Visual Studio MSBuild.
+After validating a response, ordered cross-process locks cover the canonical
+request, result, manifest, and optional SARIF publication set. Partial overlap
+with another declared set is rejected. The stable result is deleted first, the
+manifest and request are atomically replaced, and the result is written last as
+the commit marker. A failed publication therefore cannot leave a stale
+successful result associated with a partly updated evidence set. The
 content-addressed cache includes semantic, protocol, tool, compilation,
 reference, option, target-framework, canonical packaged worker runtime-closure,
 and spec-content identity.
-Cache schema version 11 stores only complete, postcondition-only, all-refuted
+Cache schema version 12 stores only complete, postcondition-only, all-refuted
 semantic payloads. A hit is accepted only when its manifest hash and complete
 result set match the current manifest and every canonical Boolean/integer model
 can be reconstructed against the hydrated callable. The worker rechecks entry
@@ -209,15 +222,18 @@ models are not cacheable.
 
 During Windows verification, the build-only compiler collector observes the
 final post-generator Roslyn `Compilation` and atomically emits compiler
-artifact schema version 9. The compiler owns selection, contract/spec binding,
-effect evaluation, and body lowering. Every selected callable has either a
+artifact schema version 11. The compiler owns selection, contract/spec binding,
+effect evaluation, relational-summary inference, and body lowering. Every selected callable has either a
 typed failure record or a portable graph containing its bound clauses,
 canonical variables, whole-body CFG/IR, body start, initial environment,
-parameter mappings, and exact API-spec witness metadata. Every selected
+parameter mappings, exact API-spec witness metadata, and canonical source,
+implementation-IL, or audited-pack summary calls. Summary evidence includes
+the complete transitive origin/digest/pack-identity closure under summary and
+pack schema version 1. Every selected
 effect-attribute occurrence also has one compiler-sealed `Proven`, candidate
 `Refuted`, or typed `Unknown` evidence record. Repeated attributes retain
 distinct claim IDs while sharing their effective combined
-constraint/evidence. Schema 9 additionally carries an ordered,
+constraint/evidence. Schema 11 retains the ordered,
 compiler-neutral replay event for an unconditional definite managed object or
 array allocation. It seals the selected-constraint hash, semantic-operation
 hash, exact compiler tree/span identity, type/member identity, mapped location,
@@ -266,7 +282,7 @@ callables.
 This closes both the compiler-to-worker lowered-artifact cutover and the
 independent whole-body postcondition-replay gate for the bounded verifier
 subset. Postcondition replay executes only the concrete CFG path selected by
-the model, so unsupported operations or spec-modeled calls on other paths do
+the model, so unsupported operations or modeled calls on other paths do
 not block a refutation. If a modeled call is executed, the candidate becomes
 `Unknown` with `CounterexampleNotReplayable`; other unsupported or
 inconsistent replay state is a fatal `CounterexampleReplayFailed`. Result JSON
@@ -283,8 +299,8 @@ direct candidates become `Unknown(CounterexampleNotReplayable)`.
 Conditional/path-dependent and may-only conflicts remain
 `Unknown(EffectContractNotEstablished)`. A semantic replay disagreement
 becomes `Unknown(CounterexampleReplayFailed)` and fails the run. Effect results
-remain noncacheable. Worker protocol version 9 and cache schema version 11 did
-not change with artifact schema 9.
+remain noncacheable. Under compiler artifact schema 11, worker protocol version
+10 and cache schema version 12 carry the relational-summary wire break.
 
 Optional deterministic SARIF 2.1.0 projects the validated response under the
 same atomic publication boundary and does not participate in semantic
@@ -342,8 +358,8 @@ error. `SharpProofVerifyPolicy` controls incomplete selected analysis;
 `SharpProofAssumptionPolicy` controls SP0048 reporting for user assumptions and
 trusted evidence. A refutation, malformed response, backend/replay failure,
 containment failure, or other infrastructure failure is fatal regardless of
-policy. `SharpProofMode` and `all-experimental` remain deprecated preview
-compatibility inputs only.
+policy. The preview interface rejects the removed `SharpProofMode` and
+`all-experimental` compatibility inputs.
 
 The current gate includes:
 

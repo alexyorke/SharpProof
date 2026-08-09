@@ -758,6 +758,7 @@ $plan = [pscustomobject][ordered]@{
     schemaVersion = 1
     planOnly = [bool]$PlanOnly
     packageVersion = $release.version
+    repositoryCommit = $repositoryHead
     source = if ([string]::IsNullOrWhiteSpace($Source)) {
         $null
     }

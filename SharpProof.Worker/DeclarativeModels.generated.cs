@@ -62,7 +62,8 @@ internal sealed partial record SymbolicBodyExecution(
     WorkerClaimReason Reason,
     ImmutableArray<SymbolicReturn> Returns,
     ImmutableDictionary<IrVarId, SpecResultProjection> SpecResultProjections,
-    ImmutableArray<GuardedBodySpecAssumption> SpecAssumptions
+    ImmutableArray<GuardedBodySpecAssumption> SpecAssumptions,
+    ImmutableArray<GuardedBodySummaryAssumption> SummaryAssumptions
 );
 
 internal readonly partial record struct SymbolicReturn(
@@ -74,6 +75,15 @@ internal readonly partial record struct SymbolicReturn(
 internal readonly partial record struct GuardedBodySpecAssumption(
     SpecId Spec,
     string WitnessIdentifier,
+    IrTerm Guard,
+    IrTerm Predicate
+);
+
+internal readonly partial record struct GuardedBodySummaryAssumption(
+    string CallIdentity,
+    CompilerSummaryOrigin Origin,
+    string EvidenceSha256,
+    string EvidenceIdentity,
     IrTerm Guard,
     IrTerm Predicate
 );

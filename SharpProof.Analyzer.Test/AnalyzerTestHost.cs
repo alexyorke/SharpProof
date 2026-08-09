@@ -81,7 +81,22 @@ internal static class AnalyzerTestHost
             StringComparer.OrdinalIgnoreCase);
         if (mode != null)
         {
-            values.Add("sharpproof_mode", mode);
+            switch (mode.ToUpperInvariant())
+            {
+                case "OFF":
+                    profile ??= "off";
+                    break;
+                case "EFFECTS":
+                case "CONTRACTS":
+                    features ??= mode;
+                    break;
+                case "ALL-EXPERIMENTAL":
+                    features ??= "all";
+                    break;
+                default:
+                    values.Add("sharpproof_mode", mode);
+                    break;
+            }
         }
 
         if (profile != null)

@@ -7,16 +7,12 @@ internal static class AnalyzerConfigurationOptionRegistry
     internal static AnalyzerConfigurationOption Features { get; } =
         new("sharpproof_features", ["effects", "contracts", "all"], "SharpProofFeatures");
 
-    internal static AnalyzerConfigurationOption LegacyMode { get; } =
-        new("sharpproof_mode", ["off", "effects", "contracts", "all-experimental"], "SharpProofMode");
-
     public static ImmutableArray<AnalyzerConfigurationOption> All
     {
         get;
     } = [
         Profile,
-        Features,
-        LegacyMode
+        Features
     ];
 
     internal static bool IsAcceptedValue(AnalyzerConfigurationOption option, string? value)

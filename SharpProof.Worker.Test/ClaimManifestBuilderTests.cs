@@ -181,6 +181,64 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void RichPredicateOperationKindsHaveStableSemanticIdentity()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+            public sealed class Subject<T>
+            {
+                public event Action? Changed;
+                public int this[int index] => index;
+                private static int Echo(int value) => value;
+
+                public object Check<U>(object value)
+                {
+                    Contract.Ensures(
+                        this != null &&
+                        new object() != null &&
+                        ((Func<int, int>)Echo) != null &&
+                        value is string &&
+                        new int[1].Length == 1 &&
+                        this[0] == 0 &&
+                        Changed == null &&
+                        typeof(U) != typeof(T) &&
+                        1.25f < 2.5f &&
+                        1.25d < 2.5d &&
+                        1.25m < 2.5m);
+                    Contract.Ensures(
+                        Contract.Result<object>() == value);
+                    return value;
+                }
+            }
+            """;
+        var first = Build(("First.cs", source));
+        var renamed = Build(("Renamed.cs", source));
+        var changed = Build((
+            "Changed.cs",
+            source.Replace("1.25m < 2.5m", "1.5m < 2.5m",
+                StringComparison.Ordinal)));
+        var firstIds = first.Manifest.Claims
+            .Select(static claim => claim.ClaimId)
+            .ToArray();
+        var renamedIds = renamed.Manifest.Claims
+            .Select(static claim => claim.ClaimId)
+            .ToArray();
+        var changedIds = changed.Manifest.Claims
+            .Select(static claim => claim.ClaimId)
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(firstIds, Has.Length.EqualTo(2));
+            Assert.That(firstIds, Is.Unique);
+            Assert.That(renamedIds, Is.EqualTo(firstIds));
+            Assert.That(changedIds.Intersect(firstIds), Has.Exactly(1).Items);
+        }
+    }
+
+    [Test]
     public void ReorderingDistinctClaimsPreservesTheirIdentitySet()
     {
         var first = Build(("Subject.cs", TwoClaims("==", ">=")));
@@ -2009,6 +2067,34 @@ public sealed class ClaimManifestBuilderTests
             }
         }
         """;
+    }
+
+    [Test]
+    public void DeeplyNestedPredicatesStillProduceAClaimIdentity()
+    {
+        // The claim fingerprint walks the operation tree recursively. Beyond its
+        // depth budget it truncates rather than recursing, because
+        // StackOverflowException is uncatchable and would take the compiler down.
+        // Truncation is safe: identity also carries a duplicate rank, so claims
+        // that fingerprint alike still receive distinct ids.
+        var predicate = string.Join(" + ", Enumerable.Repeat("value", 400));
+        var source = $$"""
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                public static long Deep(long value) {
+                    Contract.Ensures({{predicate}} >= 0);
+                    return value;
+                }
+            }
+            """;
+
+        var result = Build(("Subject.cs", source));
+
+        var claims = result.Manifest.Claims.Where(static claim =>
+            claim.Kind == WorkerClaimKind.Postcondition).ToArray();
+        Assert.That(claims, Has.Length.EqualTo(1));
+        Assert.That(claims[0].ClaimId, Is.Not.Empty);
     }
 
     private static ClaimManifestBuildResult Build(

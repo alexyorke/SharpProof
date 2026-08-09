@@ -273,11 +273,147 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     try { }
                     catch (OperationCanceledException) { throw; }
                 }
+                static void BroadCatchAfterCancellationRethrow() {
+                    try { }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception) { }
+                }
             }
             """;
 
         var diagnostics = await Analyze(source);
         Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task RejectsDerivedBroadAndBareCancellationCatches()
+    {
+        const string source =
+            """
+            using System;
+            using System.Threading.Tasks;
+            namespace SharpProof.Verify;
+            interface IMarker { }
+            sealed class CustomCancellationException : OperationCanceledException, IMarker { }
+            static class C {
+                static void TaskCanceled() {
+                    try { } catch (TaskCanceledException) { }
+                }
+                static void Custom() {
+                    try { } catch (CustomCancellationException) { }
+                }
+                static void SystemBase() {
+                    try { } catch (SystemException) { }
+                }
+                static void ExceptionBase() {
+                    try { } catch (Exception) { }
+                }
+                static void Bare() {
+                    try { } catch { }
+                }
+                static void InterfaceFilter() {
+                    try { }
+                    catch (Exception exception) when (exception is IMarker) { }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(6));
+    }
+
+    [Test]
+    public async Task RejectsRethrowDeferredUntilAfterCleanupOrDivergence()
+    {
+        const string source =
+            """
+            using System;
+            namespace SharpProof.Verify;
+            static class C {
+                static void Cleanup(IDisposable cleanup) {
+                    try { }
+                    catch {
+                        cleanup.Dispose();
+                        throw;
+                    }
+                }
+                static void Diverge() {
+                    try { }
+                    catch {
+                        while (true) { }
+                        throw;
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task AllowsCatchFiltersThatExcludeCancellation()
+    {
+        const string source =
+            """
+            using System;
+            namespace SharpProof.Verify;
+            interface IMarker { }
+            sealed class CustomCancellationException : OperationCanceledException, IMarker { }
+            static class C {
+                static void ExcludedType() {
+                    try { }
+                    catch (Exception exception)
+                        when (exception is not OperationCanceledException) { }
+                }
+                static void Never() {
+                    try { }
+                    catch (Exception) when (false) { }
+                }
+                static void UnrelatedTypes() {
+                    try { }
+                    catch (Exception exception)
+                        when (exception is ArgumentException or InvalidOperationException) { }
+                }
+                static void ExcludedImplementedInterface() {
+                    try { }
+                    catch (CustomCancellationException exception)
+                        when (exception is not IMarker) { }
+                }
+                static void ParenthesizedExclusion() {
+                    try { }
+                    catch (Exception exception)
+                        when ((exception is not OperationCanceledException)) { }
+                }
+                static void ParenthesizedPatternExclusion() {
+                    try { }
+                    catch (Exception exception)
+                        when (exception is (not OperationCanceledException)) { }
+                }
+                static void ExhaustiveEarlierFilter() {
+                    try { }
+                    catch (OperationCanceledException) when (true) { throw; }
+                    catch (Exception) { }
+                }
+                static void ExhaustiveEarlierTypePattern() {
+                    try { }
+                    catch (Exception exception)
+                        when (exception is OperationCanceledException) { throw; }
+                    catch (Exception) { }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SPMETA003"),
+            string.Join(Environment.NewLine, diagnostics.Select(static diagnostic =>
+                diagnostic.ToString())));
     }
 
     [TestCase(
@@ -936,6 +1072,296 @@ public sealed class SharpProofSoundnessAnalyzerTests
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Does.Contain("SPMETA001"));
+    }
+
+    [Test]
+    public async Task AuditsCancellationCatchFilterSemantics()
+    {
+        const string source =
+            """
+            using System;
+            namespace SharpProof.Verify;
+
+            sealed class CustomCancellationException :
+                OperationCanceledException { }
+
+            static class C
+            {
+                static void BareExhaustive()
+                {
+                    try { }
+                    catch when (true) { throw; }
+                    catch (Exception) { }
+                }
+
+                static void BareSelective(bool include)
+                {
+                    try { }
+                    catch when (include) { throw; }
+                    catch (Exception) { }
+                }
+
+                static void WrongTypeTestLocal()
+                {
+                    Exception other = new Exception();
+                    try { }
+                    catch (Exception caught)
+                        when (other is OperationCanceledException) { throw; }
+                    catch (Exception) { }
+                }
+
+                static void WrongPatternTestLocal()
+                {
+                    Exception other = new Exception();
+                    try { }
+                    catch (Exception caught)
+                        when (other is
+                            OperationCanceledException or ArgumentException)
+                    {
+                        throw;
+                    }
+                    catch (Exception) { }
+                }
+
+                static void ExhaustiveOrLeft()
+                {
+                    try { }
+                    catch (Exception caught)
+                        when (caught is
+                            OperationCanceledException or ArgumentException)
+                    {
+                        throw;
+                    }
+                    catch (Exception) { }
+                }
+
+                static void ExhaustiveOrRight()
+                {
+                    try { }
+                    catch (Exception caught)
+                        when (caught is
+                            ArgumentException or OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception) { }
+                }
+
+                static void ExhaustiveAnd()
+                {
+                    try { }
+                    catch (Exception caught)
+                        when (caught is
+                            OperationCanceledException and Exception)
+                    {
+                        throw;
+                    }
+                    catch (Exception) { }
+                }
+
+                static void UnsupportedExhaustivePattern()
+                {
+                    try { }
+                    catch (Exception caught)
+                        when (caught is not null) { throw; }
+                    catch (Exception) { }
+                }
+
+                static void ParenthesizedTypeTest()
+                {
+                    try { }
+                    catch (Exception caught)
+                        when (caught is (OperationCanceledException))
+                    {
+                        throw;
+                    }
+                    catch (Exception) { }
+                }
+
+                static void ConvertedTypeTest()
+                {
+                    try { }
+                    catch (Exception caught)
+                        when (((object)caught) is OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception) { }
+                }
+
+                static void ExcludesExactCaughtType()
+                {
+                    try { }
+                    catch (CustomCancellationException caught)
+                        when (caught is not CustomCancellationException) { }
+                }
+
+                static void ExcludesParenthesizedPattern()
+                {
+                    try { }
+                    catch (Exception caught)
+                        when (caught is (not OperationCanceledException)) { }
+                }
+
+                static void DoesNotExcludeCancellation()
+                {
+                    try { }
+                    catch (Exception caught)
+                        when (caught is not ArgumentException) { }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        var cancellationDiagnostics = diagnostics
+            .Where(static diagnostic => diagnostic.Id == "SPMETA003")
+            .ToArray();
+        Assert.That(
+            cancellationDiagnostics,
+            Has.Length.EqualTo(5),
+            string.Join(
+                ", ",
+                cancellationDiagnostics.Select(static diagnostic =>
+                    diagnostic.Location.GetLineSpan().StartLinePosition.Line + 1)));
+    }
+
+    [Test]
+    public async Task AuditedWorkerReificationHandlesConversionsAndBlocksExactly()
+    {
+        const string source =
+            """
+            using System;
+            using System.Threading;
+            using System.Threading.Tasks;
+
+            namespace SharpProof.Worker.Protocol
+            {
+                enum WorkerClaimReason
+                {
+                    ProjectTimeout,
+                    Canceled
+                }
+
+                enum WorkerCallableCoverageReason
+                {
+                    ProjectTimeout,
+                    Canceled
+                }
+            }
+
+            namespace SharpProof.Worker
+            {
+                using SharpProof.Worker.Protocol;
+
+                sealed class CallableVerificationResult { }
+
+                static class CallableVerificationPolicy
+                {
+                    private static CallableVerificationResult Unknown(
+                        object target,
+                        WorkerClaimReason claimReason,
+                        WorkerCallableCoverageReason callableReason) =>
+                        new();
+
+                    private static CallableVerificationResult Unknown(
+                        object target,
+                        int claimReason,
+                        int callableReason) =>
+                        new();
+
+                    private static async Task<CallableVerificationResult>
+                        VerifyTargetAsync(
+                            object verifier,
+                            string target,
+                            object budgets,
+                            object parallelism,
+                            object resourceGate,
+                            object projectBoundary,
+                            CancellationToken callerCancellation)
+                    {
+                        await Task.Yield();
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException)
+                        {
+                            if (callerCancellation.IsCancellationRequested)
+                            {
+                                return Unknown(
+                                    target,
+                                    (WorkerClaimReason)(int)
+                                        WorkerClaimReason.Canceled,
+                                    (WorkerCallableCoverageReason)(int)
+                                        WorkerCallableCoverageReason.Canceled);
+                            }
+
+                            return Unknown(
+                                target,
+                                WorkerClaimReason.ProjectTimeout,
+                                WorkerCallableCoverageReason.ProjectTimeout);
+                        }
+                    }
+
+                    private static async Task<CallableVerificationResult>
+                        VerifyTargetAsync(
+                            string verifier,
+                            object target,
+                            object budgets,
+                            object parallelism,
+                            object resourceGate,
+                            object projectBoundary,
+                            CancellationToken callerCancellation)
+                    {
+                        await Task.Yield();
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException)
+                        {
+                            if (callerCancellation.IsCancellationRequested)
+                            {
+                                _ = target;
+                                return Unknown(
+                                    target,
+                                    WorkerClaimReason.Canceled,
+                                    WorkerCallableCoverageReason.Canceled);
+                            }
+
+                            return Unknown(
+                                target,
+                                WorkerClaimReason.ProjectTimeout,
+                                WorkerCallableCoverageReason.ProjectTimeout);
+                        }
+                    }
+
+                    private static async Task<CallableVerificationResult>
+                        VerifyTargetAsync(
+                            int verifier,
+                            object target,
+                            object budgets,
+                            object parallelism,
+                            object resourceGate,
+                            object projectBoundary,
+                            CancellationToken callerCancellation)
+                    {
+                        await Task.Yield();
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException)
+                        {
+                            if (callerCancellation.IsCancellationRequested)
+                                return Unknown(target, 0, 0);
+
+                            return Unknown(
+                                target,
+                                WorkerClaimReason.ProjectTimeout,
+                                WorkerCallableCoverageReason.ProjectTimeout);
+                        }
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(2));
     }
 
     private static async Task<ImmutableArray<Diagnostic>> Analyze(string source)

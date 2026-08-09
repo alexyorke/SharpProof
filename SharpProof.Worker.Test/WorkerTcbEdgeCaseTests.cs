@@ -134,6 +134,61 @@ public sealed class WorkerTcbEdgeCaseTests
     }
 
     [Test]
+    public async Task MoreEnsuresClausesThanClaimIdsFailsClosedWithoutIndexing()
+    {
+        var factory = new IrFactory();
+        var target = new CompilerCallablePreparation(
+            factory,
+            new WorkerCallableManifestEntry
+            {
+                CallableId = "M:Test.Subject.Verify",
+                ClaimIds = ["only-claim"]
+            },
+            [
+                new CompilerPreparedClause(
+                    CompilerContractKind.Ensures,
+                    factory.Boolean(true),
+                    CompilerContractEvidence.CompilerBoundInvocation,
+                    "only-claim",
+                    null),
+                new CompilerPreparedClause(
+                    CompilerContractKind.Ensures,
+                    factory.Boolean(true),
+                    CompilerContractEvidence.CompilerBoundInvocation,
+                    "surplus-claim",
+                    null)
+            ],
+            [],
+            WorkerClaimReason.None,
+            CompilerPreparedBody.Trivial());
+        var backend = new UnexpectedBackend();
+
+        var results = await new CallableVerifier(
+            backend,
+            WorkerBudgets.DefaultMaximumExpressionDepth).VerifyAsync(
+                target,
+                CreateResourceBudget(),
+                CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(backend.CallCount, Is.Zero);
+
+            // The surplus clause has no claim id to report against, so the
+            // response is clamped to the declared claims. Reporting the
+            // manifest defect must not itself throw and be laundered into an
+            // InfrastructureFailure.
+            Assert.That(results, Has.Length.EqualTo(1));
+            Assert.That(
+                results[0].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                results[0].Reason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedContract));
+        }
+    }
+
+    [Test]
     public async Task MissingPreparedBodyFailsClosedBeforeBackendInvocation()
     {
         var factory = new IrFactory();
@@ -331,7 +386,10 @@ public sealed class WorkerTcbEdgeCaseTests
                 ImmutableDictionary<IrVarId, IrVarId>.Empty,
                 ImmutableDictionary<
                     IrInstructionId,
-                    CompilerPreparedSpecCall>.Empty));
+                    CompilerPreparedSpecCall>.Empty,
+                ImmutableDictionary<
+                    IrInstructionId,
+                    CompilerPreparedSummaryCall>.Empty));
 
         var result = await VerifyWithSmtAsync(target);
 
@@ -1078,7 +1136,10 @@ public sealed class WorkerTcbEdgeCaseTests
                 ImmutableDictionary<IrVarId, IrVarId>.Empty,
                 ImmutableDictionary<
                     IrInstructionId,
-                    CompilerPreparedSpecCall>.Empty));
+                    CompilerPreparedSpecCall>.Empty,
+                ImmutableDictionary<
+                    IrInstructionId,
+                    CompilerPreparedSummaryCall>.Empty));
     }
 
     private static CompilerCallablePreparation CreateDivisionTarget(
@@ -1132,7 +1193,10 @@ public sealed class WorkerTcbEdgeCaseTests
                     parameter),
                 ImmutableDictionary<
                     IrInstructionId,
-                    CompilerPreparedSpecCall>.Empty));
+                    CompilerPreparedSpecCall>.Empty,
+                ImmutableDictionary<
+                    IrInstructionId,
+                    CompilerPreparedSummaryCall>.Empty));
     }
 
     private static CompilerCallablePreparation CreateTarget(

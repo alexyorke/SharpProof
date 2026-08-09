@@ -151,9 +151,9 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     private T Append<T>(IrBlockId blockId, Func<IrInstructionId, T> create) where T : IrInstruction
     {
+        EnsureMutable();
         var instruction = create(new IrInstructionId(_scope, _nextInstruction));
         ValidateInstruction(instruction);
-        EnsureMutable();
         var block = GetBlock(blockId);
         if (block.Instructions.Count != 0 &&
             block.Instructions[block.Instructions.Count - 1].IsTerminal)

@@ -142,6 +142,17 @@ internal static class GeneratedDiagnosticDescriptors
         helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0049",
         customTags: []);
 
+    internal static readonly DiagnosticDescriptor ContractApiUnverifiableRule = new(
+        id: "SP0050",
+        title: "Contract API Could Not Be Verified",
+        messageFormat: "SharpProof could not verify the referenced SharpProof.Attributes assembly, so contract analysis is disabled: {0}",
+        category: "Infrastructure",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Reports that the contract API assembly could not be read or attested, which silently disables all contract analysis.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0050",
+        customTags: []);
+
     internal static readonly ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics = [
         PurityNotVerifiedRule,
         AllocationInZeroAllocationMethodRule,
@@ -154,6 +165,7 @@ internal static class GeneratedDiagnosticDescriptors
         ZeroAllocationsNotVerifiedRule,
         ExceptionContractNotVerifiedRule,
         SelectedAnalysisIncompleteRule,
-        CompilerManifestFailureRule
+        CompilerManifestFailureRule,
+        ContractApiUnverifiableRule
     ];
 }

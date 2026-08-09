@@ -21,12 +21,14 @@ SP0047 instead of disappearing. Diagnostic silence is still not a proof.
 |---|---|---|
 | Effect analyzer | Checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, and `[AllowedExceptions]` over the admitted source subset | Advisory "not proven" diagnostics on selected code |
 | Contract analyzer | Replays definitely executed, compiler-bound `Contract.Requires(...)` clauses with exact call inputs | SP0027 only when the precondition concretely evaluates to false |
-| Worker | Builds an accountable claim manifest, verifies bounded `Contract.Ensures(...)` obligations over acyclic Boolean bodies, and independently replays the admitted direct-allocation effect evidence | One `Proven`, replay-validated `Refuted`, or typed `Unknown` result for every manifest claim |
+| Worker | Builds an accountable claim manifest, verifies bounded `Contract.Ensures(...)` obligations over acyclic scalar bodies, composes bounded relational callee summaries, and independently replays the admitted direct-allocation effect evidence | One `Proven`, replay-validated `Refuted`, or typed `Unknown` result for every manifest claim |
 
-The analyzer does not run SMT or load Z3. General source-callee
-assume/guarantee verification, loops in the worker, mutable-heap
-postconditions, points-to analysis, and broad reference or sequence reasoning
-are not implemented.
+The analyzer does not run SMT or load Z3. The worker can compose inferred,
+quantifier-free relations for direct, acyclic, static scalar callees from
+current source or an exact implementation PE, plus explicitly enabled audited
+specification packs. General modular source-callee verification, loops,
+recursion, mutable-heap postconditions, points-to analysis, and broad reference
+or sequence reasoning are not implemented.
 
 ## Install and enable
 
@@ -37,8 +39,10 @@ disabled). The package-consumer compatibility lane separately validates the
 `netstandard2.0` contract API with its minimum SDK, currently 9.0.300. The
 `SharpProof.Attributes` contract API alone remains a `netstandard2.0` library,
 and `SharpProofProfile=off` omits analyzer/generator loading on an older host.
-Visual Studio and Rider qualification with Roslyn 4.14 or newer remains a
-release gate.
+The preview verifier is qualified for Windows x64 command-line MSBuild and
+Visual Studio 2022 Build Tools 17.14 x64 MSBuild. Rider and Windows ARM64 are
+not supported for this preview. The exact host and filesystem boundary is
+listed in [Preview support boundary](docs/preview-support.md).
 
 The coordinates below are the intended preview packages, but no SharpProof
 package has been promoted to the public NuGet feed yet. Until the first
@@ -81,7 +85,7 @@ both implemented feature groups:
   verification.
 
 `SharpProofFeatures` values are `effects`, `contracts`, and `all` (the
-default). The effective selection is sealed into the schema-9 compiler
+default). The effective selection is sealed into the schema-11 compiler
 artifact and filters its manifest: `contracts` excludes effect-only
 annotations, `effects` excludes postcondition claims and contract assumptions,
 and `all` selects both surfaces. Every effective effect contract has one typed
@@ -111,10 +115,9 @@ SP0015, and SP0030 remain reserved live-analyzer diagnostics; the current
 may-effect analyzer does not emit them. The opt-in worker separately replays
 the narrow allocation evidence described below.
 
-`SharpProofMode` and `sharpproof_mode` remain preview-only compatibility
-aliases with values `off`, `effects`, `contracts`, and `all-experimental`.
-They are deprecated, cannot be combined with the replacement profile/feature
-settings, and are planned for removal before RC.
+The retired `SharpProofMode`/`sharpproof_mode` preview alias is rejected.
+Use only `SharpProofProfile` and `SharpProofFeatures`; the preview interface is
+now frozen on those properties.
 
 For strict CI:
 
@@ -321,17 +324,19 @@ dotnet build /p:SharpProofVerify=true
 `SharpProofVerify` remains optional in `advisory`; the `strict` profile
 requires it. It runs after compilation, outside design-time builds. Each
 invocation uses isolated compiler-artifact, request, and result paths. After
-protocol validation, a cross-process mutex serializes publication. The stable
-result is removed first; the manifest and request are atomically replaced, and
-the validated result is written last as the commit marker. An interrupted
-publication therefore leaves no successful result that can be mistaken for a
-current manifest/request/result set. The default result is published under:
+protocol validation, one ordered cross-process lock set covers the request,
+result, manifest, and optional SARIF paths. Partially overlapping publication
+configurations are rejected. The stable result is removed first; the manifest
+and request are atomically replaced, and the validated result is written last
+as the commit marker. An interrupted publication therefore leaves no
+successful result that can be mistaken for a current manifest/request/result
+set. The default result is published under:
 
 ```text
 obj/<Configuration>/<TargetFramework>/SharpProof/result.json
 ```
 
-Worker protocol version 9 separates the project run from semantic claim
+Worker protocol version 10 separates the project run from semantic claim
 outcomes. The compiler artifact records the effective `SharpProofFeatures`
 selection before manifest construction. A compiler-symbol-based manifest
 selects callables and assigns stable `spc1:` semantic IDs to direct clauses,
@@ -359,7 +364,7 @@ Each manifest claim receives:
 
 Effect claims use canonical compiler-produced evidence. They are `Proven` only
 when a complete effect summary establishes the selected contract. Compiler
-artifact schema 9 can additionally seal one independently replayable,
+artifact schema 11 retains schema 10's independently replayable,
 unconditional direct event for a definite managed object or array allocation.
 The worker validates the event's order, source-tree hash and span, semantic
 identity, selected constraint, and compiler witness, then derives the
@@ -400,7 +405,7 @@ under every policy. The worker uses deterministic query, method, project,
 expression-depth, memory, process, and parallelism limits. Its
 content-addressed cache defaults to
 `obj/<Configuration>/<TargetFramework>/SharpProof/cache` in the MSBuild
-integration. Cache schema version 11 stores only complete, postcondition-only
+integration. Cache schema version 12 stores only complete, postcondition-only
 responses whose claims are all `Refuted`. Before accepting a hit, the worker
 reconstructs every canonical Boolean/integer model against the current lowered
 callable, validates entry assumptions and source ranges, and independently
@@ -426,9 +431,47 @@ paths or states. Its exact scalar subset includes Boolean logic,
 equality and ordering over bounded integer types through `uint`, and checked
 `long` arithmetic. Arithmetic over narrower or unsigned types, `ulong`,
 native integers, floating-point, `decimal`, enum equality, unchecked
-wrapping, loops, arbitrary source calls, loads/stores, mutable heap state,
+wrapping, loops, calls outside the admitted relational/specification boundary,
+loads/stores, mutable heap state,
 unsupported conversions, excessive expression depth, and exceeded bounds
 produce `Unknown`.
+
+### Bounded relational callee summaries
+
+For an eligible direct call, the build-time compiler collector derives the
+callee relation instead of relying on a method-name-specific verifier branch.
+All admitted origins lower to the same typed IR relation and are composed into
+the caller's Z3 obligation:
+
+1. a single current-compilation source declaration with an exact acyclic body;
+2. an exact file-backed implementation PE whose metadata is byte-equal to the
+   Roslyn reference and which is not marked as a reference assembly; or
+3. an explicitly enabled, embedded, schema-1 audited specification pack.
+
+The initial boundary is static, non-generic Boolean and supported-integer
+parameters/results with no `ref` shape, virtual dispatch, heap access, loops,
+or recursion. Implementation IL is decoded only through a bounded scalar
+opcode allowlist. Reference assemblies, facades, missing or changed bodies,
+unsupported opcodes, recursive dependencies, and exhausted budgets abstain as
+typed `Unknown`; they are never treated as implementation proof authority.
+Every composed call seals its origin, evidence digest, optional pack identity,
+and complete transitive dependency-evidence closure into compiler artifact
+schema 11. Relational-summary schema version 1 and specification-pack schema
+version 1 govern those evidence records.
+
+Specification packs are off by default. The preview ships one data-driven
+pack, `dotnet.scalar@1`, whose current audited relation covers
+`System.Math.Max(int, int)`. Enable it explicitly:
+
+```xml
+<PropertyGroup>
+  <SharpProofSpecificationPacks>dotnet.scalar</SharpProofSpecificationPacks>
+</PropertyGroup>
+```
+
+Unknown pack IDs fail artifact collection. Pack selection and exact catalog
+content are sealed into the artifact; a pack cannot be supplied from an
+arbitrary consumer file.
 
 Manifest discovery also accounts for postconditions in local functions,
 lambdas, anonymous methods, and top-level statements exactly once. Those
@@ -491,8 +534,9 @@ must be direct expression statements in one contiguous method-body prologue.
 `Ensures` and cannot be nested.
 
 SharpProof accepts these APIs only from the `SharpProof.Attributes` assembly
-whose version and public key match the analyzer payload. It also validates the
-exact `Contract` type and requires one real
+whose exact name/version identity and payload SHA-256 match the analyzer
+payload. The unsigned package makes no public-key authenticity claim. It also
+validates the exact `Contract` type and requires one real
 `[Conditional("SHARPPROOF_CONTRACTS")]` on each clause method. Source or
 project lookalikes, mismatched package identities, and malformed clause APIs
 contribute no facts and report SP0047; a rejected `ContractFor` lookalike
@@ -553,8 +597,13 @@ The full acceptance workflow runs on `windows-latest`. A separate
 package-consumer workflow restores the exact same three-package artifact graph
 and exercises portable analyzer consumers on Windows x64, Linux x64, macOS x64,
 and macOS ARM64. Only Windows x64 executes the packaged worker; every other
-matrix host asserts the explicit unsupported-host rejection. Real Visual
-Studio, Rider, and Windows ARM64 validation remain outstanding release gates.
+matrix host asserts the explicit unsupported-host rejection. Windows x64
+command-line and Visual Studio 2022 Build Tools 17.14 x64 MSBuild are
+qualified, including percent-containing paths and local publication paths
+beyond 260 characters. Project directories longer than 239 characters fail
+before compiler launch with a classified build error. Rider, Windows ARM64,
+UNC/shared-network publication, and hostile concurrent filesystem mutation are
+outside this preview's supported boundary.
 
 Every package build runs SDK package validation and emits a matching `.snupkg`
 with portable PDBs. Package tests require the main packages to remain PDB-free,
@@ -606,16 +655,20 @@ host shadowing and arbitrary relative overrides are rejected before any push.
 
 ## Closed compiler artifact and remaining release gaps
 
-The build-only collector now emits compiler artifact schema version 9 from the
+The build-only collector now emits compiler artifact schema version 11 from the
 final post-generator Roslyn `Compilation`. It seals the feature-selected claim
 manifest and, for each selected callable, either a typed lowering failure or
 portable whole-body CFG/IR with bound contract clauses, canonical variables,
 body-entry state, parameter mappings, exact API-spec witness metadata, and
-canonical per-effect outcome/reason/evidence digests. For the admitted direct
+canonical relational-summary calls and per-effect outcome/reason/evidence
+digests. Summary calls carry their source, exact implementation-IL, or audited
+pack identity plus their transitive dependency-evidence closure. For the admitted direct
 managed object/array allocations, it also seals the ordered unconditional
 event, exact constraint identity, semantic operation identity, and source-tree
-span needed for independent worker replay. Worker protocol version 9 and cache
-schema version 11 are unchanged. The artifact also records compiler error
+span needed for independent worker replay. Worker protocol version 10 and cache
+schema version 12 carry this wire break. Relational-summary schema version 1
+and specification-pack schema version 1 govern the new evidence. The artifact
+also records compiler error
 diagnostics with mapped locations,
 handwritten and generated tree hashes and parse settings, a bounded
 proof-relevant compilation-option set, assembly/target identity, and
@@ -650,8 +703,10 @@ trusted-publishing workflow, public API IntelliSense coverage, and
 package-backed samples are complete for this bounded subset, but SharpProof is
 not production-ready. Owner configuration of protected tags and the two NuGet
 publishing environments, the first private/public publications, pilot-library
-evidence, and the remaining independent release reviews are still
-outstanding.
+evidence, and the exact-candidate release run are still outstanding. Preview
+trusted-boundary changes use the solo executable-evidence gate; they do not
+require a reviewer count or time-based freeze. Stable 1.0 governance remains a
+separate post-preview policy.
 
 ## Package-backed examples
 

@@ -17,4 +17,5 @@ global using SharpProof.Effects;
 global using SharpProof.Frontend;
 global using SharpProof.Ir;
 global using SharpProof.Specs;
+global using SharpProof.Summaries;
 global using SharpProof.Worker.Protocol;

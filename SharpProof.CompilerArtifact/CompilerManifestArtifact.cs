@@ -53,6 +53,7 @@ internal static class WorkerBinaryIdentity
         var stagingDirectory = CreateStagingDirectory();
         FileStream[] stagedHandles = [];
         var stagedCount = 0;
+        var ownershipTransferred = false;
         try
         {
             Directory.CreateDirectory(stagingDirectory);
@@ -99,22 +100,25 @@ internal static class WorkerBinaryIdentity
                 stagedHandles[stagedCount++] = OpenRead(stagedPath);
             }
 #pragma warning restore CA2000
-            return new WorkerRuntimeClosureSnapshot(
+            var snapshot = new WorkerRuntimeClosureSnapshot(
                 path,
                 Combine(stagingDirectory, GetFileName(path)),
                 components.Values.ToArray(),
                 hash.Finish(),
                 stagedHandles);
+            ownershipTransferred = true;
+            return snapshot;
         }
-        catch
+        finally
         {
-            for (var index = 0; index < stagedCount; index++)
+            if (!ownershipTransferred)
             {
-                stagedHandles[index].Dispose();
+                for (var index = 0; index < stagedCount; index++)
+                {
+                    stagedHandles[index].Dispose();
+                }
+                DeleteStagingDirectory(stagingDirectory);
             }
-            DeleteStagingDirectory(stagingDirectory);
-
-            throw;
         }
     }
 
@@ -309,13 +313,15 @@ internal static class CompilerManifestArtifactJson
     {
         artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
 
+        if (!HasValidDiagnosticShapes(artifact.CompilerDiagnostics))
+        {
+            throw new JsonException("The compiler diagnostics are invalid.");
+        }
+
         WorkerProtocolJson.Canonicalize(artifact.Manifest);
-        artifact.CompilerDiagnostics = [
-            .. artifact.CompilerDiagnostics
-                .OrderBy(static item => item.Location.Path, StringComparer.Ordinal)
-                .ThenBy(static item => item.Location.Start)
-                .ThenBy(static item => item.Code, StringComparer.Ordinal)
-        ];
+        artifact.CompilerDiagnostics =
+            CompilerDiagnosticArtifactOrdering.Canonicalize(
+                artifact.CompilerDiagnostics);
         artifact.Callables = [
             .. artifact.Callables.OrderBy(static item => item.CallableId, StringComparer.Ordinal)
         ];
@@ -351,8 +357,8 @@ internal static class CompilerManifestArtifactJson
 
     internal static void Validate(CompilerManifestArtifact value)
     {
-        if (!HasValidEnvelope(value) ||
-            !HasValidDiagnostics(value.CompilerDiagnostics) ||
+        if (!HasValidDiagnostics(value.CompilerDiagnostics) ||
+            !HasValidEnvelope(value) ||
             !HasMatchingCallables(value.Callables, value.Manifest) ||
             !HasValidEffectReplayTrees(value.Callables, value.Compilation))
         {
@@ -369,22 +375,41 @@ internal static class CompilerManifestArtifactJson
             Schema: CompilerManifestArtifactVersions.Schema,
             SchemaVersion: CompilerManifestArtifactVersions.Current,
             ProtocolVersion: WorkerProtocolVersions.Current,
+            RelationalSummarySchemaVersion:
+                CompilerRelationalSummaryVersions.Current,
+            SpecificationPackSchemaVersion:
+                CompilerSpecificationPackVersions.Current,
             Compilation: not null,
             MaximumExpressionDepth: >= 1 and <= 256
         } &&
         WorkerProtocolJson.IsDefined(value.Features, WorkerFeatureSet.Unspecified) &&
         WorkerProtocolJson.IsSha256(value.CompilationSha256) &&
-        value.CompilationSha256 == CompilationFingerprint.ComputeSha256(value.Compilation) &&
+        value.CompilationSha256 == CompilationFingerprint.ComputeSha256(
+            value.Compilation, value.CompilerDiagnostics) &&
         WorkerProtocolJson.ValidateManifest(value.Manifest).IsValid;
     }
 
     private static bool HasValidDiagnostics(CompilerDiagnosticArtifact[]? diagnostics)
     {
+        return HasValidDiagnosticShapes(diagnostics) &&
+        CompilerDiagnosticArtifactOrdering.IsCanonical(diagnostics!);
+    }
+
+    private static bool HasValidDiagnosticShapes(
+        CompilerDiagnosticArtifact[]? diagnostics)
+    {
         return diagnostics?.All(static item =>
             item != null &&
             !string.IsNullOrWhiteSpace(item.Code) &&
             !string.IsNullOrWhiteSpace(item.Message) &&
-            item.Location is { Start: >= 0, Length: >= 0, Line: >= 0, Column: >= 0 }) == true;
+            item.Location is
+            {
+                Path: not null,
+                Start: >= 0,
+                Length: >= 0,
+                Line: >= 0,
+                Column: >= 0
+            }) == true;
     }
 
     private static bool HasMatchingCallables(

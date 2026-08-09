@@ -418,8 +418,7 @@ internal static partial class RequiresCallSiteAnalyzer
 
     private static bool IsDefinitelyString(IOperation operation)
     {
-        return DefiniteOperationFacts.UnwrapHarmlessValue(operation)
-            .Type?.SpecialType == SpecialType.System_String;
+        return DefiniteOperationFacts.IsDefinitelyString(operation);
     }
 
 }

@@ -183,7 +183,7 @@ public sealed class AnalyzerModeAndEffectTests
 
     [TestCase(null, "everything", null, "advisory, strict, off")]
     [TestCase(null, null, "everything", "effects, contracts, all")]
-    [TestCase("everything", null, null, "off, effects, contracts, all-experimental")]
+    [TestCase("everything", null, null, "option was removed")]
     public async Task InvalidConfigurationReportsAllowedValuesAndFailsClosed(
         string? mode,
         string? profile,
@@ -231,74 +231,31 @@ public sealed class AnalyzerModeAndEffectTests
         Assert.That(factory.CreateCount, Is.Zero);
     }
 
-    [TestCase("off", null)]
-    [TestCase(null, "contracts")]
-    [TestCase("strict", "all")]
-    public async Task ConflictingLegacyAndReplacementOptionsFailClosed(
-        string? profile,
-        string? features)
+    [TestCase("off")]
+    [TestCase("effects")]
+    [TestCase("contracts")]
+    [TestCase("all-experimental")]
+    public async Task RetiredModeOptionFailsClosed(string retiredMode)
     {
-        var factory = new ThrowingSessionFactory();
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+        var compilation = AnalyzerTestHost.CreateCompilation(
             ModeFixture,
-            "effects",
-            ["SP0025", "SP0045", "SP0027"],
-            new SharpProofAnalyzer(factory),
-            profile: profile,
-            features: features);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0025"]));
-        Assert.That(
-            diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
-            Does.Contain("conflicts"));
-        Assert.That(factory.CreateCount, Is.Zero);
-    }
-
-    [TestCase("off", "off", "all")]
-    [TestCase("effects", "advisory", "effects")]
-    [TestCase("contracts", "strict", "contracts")]
-    [TestCase("all-experimental", "advisory", "all")]
-    public async Task EquivalentLegacyAndReplacementOptionsRemainCompatible(
-        string mode,
-        string profile,
-        string features)
-    {
+            ["SP0025", "SP0045", "SP0027"]);
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            ModeFixture,
-            mode,
-            ["SP0025"],
-            profile: profile,
-            features: features);
+            compilation,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["sharpproof_mode"] = retiredMode
+            });
 
-        Assert.That(diagnostics, Is.Empty);
-    }
-
-    [TestCase("off", null, "all", new string[0])]
-    [TestCase("off", null, "effects", new string[0])]
-    [TestCase("effects", "advisory", null, new[] { "SP0045" })]
-    [TestCase("effects", "strict", null, new[] { "SP0045" })]
-    [TestCase("effects", null, "effects", new[] { "SP0045" })]
-    [TestCase("contracts", "advisory", null, new[] { "SP0027" })]
-    [TestCase("contracts", "strict", null, new[] { "SP0027" })]
-    [TestCase("all-experimental", "strict", null, new[] { "SP0045", "SP0027" })]
-    public async Task PartialReplacementOptionsInheritTheMissingLegacyDimension(
-        string mode,
-        string? profile,
-        string? features,
-        string[] expected)
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            ModeFixture,
-            mode,
-            ["SP0025", "SP0045", "SP0027"],
-            profile: profile,
-            features: features);
-
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EquivalentTo(expected));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0025"]));
+            Assert.That(
+                diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("option was removed"));
+        }
     }
 
     [TestCase("off", "all", new string[0])]
@@ -2590,8 +2547,12 @@ public sealed class AnalyzerModeAndEffectTests
     public void AdvisoryDescriptorsUseProductionDefaults()
     {
         var descriptors = new SharpProofAnalyzer().SupportedDiagnostics;
+        // SP0050 joins SP0049 as an infrastructure error: both report that
+        // SharpProof could not do its job, which is not an advisory finding
+        // about the user's code.
         var informational = descriptors.Where(static descriptor =>
-            descriptor.Id is not ("SP0024" or "SP0025" or "SP0027" or "SP0049"));
+            descriptor.Id is not
+                ("SP0024" or "SP0025" or "SP0027" or "SP0049" or "SP0050"));
 
         Assert.That(
             informational.Select(static descriptor => descriptor.DefaultSeverity),

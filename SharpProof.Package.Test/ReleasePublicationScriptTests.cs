@@ -109,6 +109,21 @@ public sealed class ReleasePublicationScriptTests
     [Test]
     public async Task OfflinePlanIsOrderedAndRejectsEveryExistingArtifact()
     {
+        var repositoryRoot = FindRepositoryRoot();
+        var repositoryHead = await RunProcessAsync(
+            repositoryRoot,
+            "git",
+            "rev-parse",
+            "HEAD");
+        Assert.That(
+            repositoryHead.ExitCode,
+            Is.Zero,
+            repositoryHead.Output);
+        var expectedRepositoryCommit = repositoryHead.Output.Trim();
+        Assert.That(
+            expectedRepositoryCommit,
+            Does.Match("^[0-9a-f]{40}$"));
+
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PublicationWorkspace.Create();
         foreach (var package in feed.Packages.Concat(feed.SymbolPackages))
@@ -121,7 +136,7 @@ public sealed class ReleasePublicationScriptTests
         }
 
         var evidence = await RunProcessAsync(
-            FindRepositoryRoot(),
+            repositoryRoot,
             "pwsh",
             "-NoLogo",
             "-NoProfile",
@@ -138,6 +153,7 @@ public sealed class ReleasePublicationScriptTests
         {
             AssertPlan(
                 absentPlan.RootElement,
+                expectedRepositoryCommit,
                 remoteState: "Absent",
                 action: "Push");
         }
@@ -322,6 +338,7 @@ public sealed class ReleasePublicationScriptTests
 
     private static void AssertPlan(
         JsonElement root,
+        string expectedRepositoryCommit,
         string remoteState,
         string action)
     {
@@ -331,6 +348,9 @@ public sealed class ReleasePublicationScriptTests
         Assert.That(
             root.GetProperty("planOnly").GetBoolean(),
             Is.True);
+        Assert.That(
+            root.GetProperty("repositoryCommit").GetString(),
+            Is.EqualTo(expectedRepositoryCommit));
         var packages = root.GetProperty("packages")
             .EnumerateArray()
             .ToArray();

@@ -255,11 +255,20 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     NestedCallable>();
             var seen = new HashSet<IMethodSymbol>(
                 SymbolEqualityComparer.Default);
-            foreach (var local in graph.LocalFunctions)
+            var localMethods = ImmutableHashSet.CreateRange<IMethodSymbol>(
+                SymbolEqualityComparer.Default,
+                graph.LocalFunctions.Select(
+                    static method => ContractClauseInventoryBuilder
+                        .NormalizeCallable(method).OriginalDefinition));
+            var reachableLocals = GetReachableLocalFunctions(
+                graph, localMethods);
+            foreach (var method in localMethods)
             {
-                var method =
-                    ContractClauseInventoryBuilder
-                        .NormalizeCallable(local);
+                if (!reachableLocals.Contains(method))
+                {
+                    _visitedPotentialOwners.Add(method);
+                    continue;
+                }
                 var declaration =
                     GetDeclaration(method);
                 if (declaration != null &&
@@ -301,6 +310,143 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             ];
         }
 
+        private ImmutableHashSet<IMethodSymbol>
+            GetReachableLocalFunctions(
+                ControlFlowGraph graph,
+                ImmutableHashSet<IMethodSymbol> candidates)
+        {
+            if (candidates.IsEmpty)
+            {
+                return candidates;
+            }
+            var reachable = new HashSet<IMethodSymbol>(
+                SymbolEqualityComparer.Default);
+            var scannedAnonymous = new HashSet<IMethodSymbol>(
+                SymbolEqualityComparer.Default);
+            if (!TryCollectLocalReferences(
+                    graph, candidates, reachable, scannedAnonymous))
+            {
+                return candidates;
+            }
+            var pending = new Queue<IMethodSymbol>(reachable);
+            var scannedLocals = new HashSet<IMethodSymbol>(
+                SymbolEqualityComparer.Default);
+            while (pending.Count != 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var method = pending.Dequeue();
+                if (!scannedLocals.Add(method))
+                {
+                    continue;
+                }
+                ControlFlowGraph child;
+                try
+                {
+                    child = graph.GetLocalFunctionControlFlowGraph(
+                        method, cancellationToken);
+                }
+                catch (Exception exception) when (
+                    exception is ArgumentException or
+                        InvalidOperationException)
+                {
+                    return candidates;
+                }
+                var count = reachable.Count;
+                if (!TryCollectLocalReferences(
+                        child, candidates, reachable, scannedAnonymous))
+                {
+                    return candidates;
+                }
+                if (reachable.Count != count)
+                {
+                    foreach (var discovered in reachable)
+                    {
+                        if (!scannedLocals.Contains(discovered))
+                        {
+                            pending.Enqueue(discovered);
+                        }
+                    }
+                }
+            }
+            return reachable.ToImmutableHashSet<IMethodSymbol>(
+                SymbolEqualityComparer.Default);
+        }
+
+        private bool TryCollectLocalReferences(
+            ControlFlowGraph graph,
+            ImmutableHashSet<IMethodSymbol> candidates,
+            HashSet<IMethodSymbol> reachable,
+            HashSet<IMethodSymbol> scannedAnonymous)
+        {
+            foreach (var operation in ReachableOperations(graph))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var referenced = operation switch
+                {
+                    IInvocationOperation invocation =>
+                        invocation.TargetMethod,
+                    IMethodReferenceOperation methodReference =>
+                        methodReference.Method,
+                    _ => null
+                };
+                if (referenced != null)
+                {
+                    referenced = ContractClauseInventoryBuilder
+                        .NormalizeCallable(referenced).OriginalDefinition;
+                    if (candidates.Contains(referenced))
+                    {
+                        reachable.Add(referenced);
+                    }
+                }
+            }
+            foreach (var anonymous in GetAnonymousFunctions(graph))
+            {
+                if (IsExpressionTree(anonymous.Syntax))
+                {
+                    continue;
+                }
+                var method = ContractClauseInventoryBuilder
+                    .NormalizeCallable(anonymous.Symbol);
+                if (!scannedAnonymous.Add(method))
+                {
+                    continue;
+                }
+                try
+                {
+                    var child = graph
+                        .GetAnonymousFunctionControlFlowGraph(
+                            anonymous, cancellationToken);
+                    if (!TryCollectLocalReferences(
+                            child, candidates, reachable,
+                            scannedAnonymous))
+                    {
+                        return false;
+                    }
+                }
+                catch (Exception exception) when (
+                    exception is ArgumentException or
+                        InvalidOperationException)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static IEnumerable<IOperation> ReachableOperations(
+            ControlFlowGraph graph)
+        {
+            return graph.Blocks
+                .Where(static block => block.IsReachable)
+                .SelectMany(static block =>
+                    block.Operations.Concat(
+                        block.BranchValue == null
+                            ? []
+                            : [block.BranchValue]))
+                .SelectMany(static operation =>
+                    operation.DescendantsAndSelf());
+        }
+
         private SyntaxNode? GetDeclaration(
             IMethodSymbol method)
         {
@@ -340,6 +486,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 ControlFlowGraph graph)
         {
             return graph.Blocks
+                .Where(static block => block.IsReachable)
                 .SelectMany(static block =>
                     block.Operations.Concat(
                         block.BranchValue == null

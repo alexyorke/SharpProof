@@ -16,10 +16,6 @@ internal sealed class ContractApiIdentityResolver
         typeof(ContractApiIdentityResolver).Assembly.GetName().Version ??
         throw new InvalidOperationException(
             "SharpProof.Frontend has no assembly version.");
-    private static readonly ImmutableArray<byte> AttributesAssemblyPublicKey =
-        [.. typeof(ContractApiIdentityResolver).Assembly
-            .GetName()
-            .GetPublicKey() ?? []];
     private static readonly ConditionalWeakTable<
         Compilation, ContractApiIdentityResolver> Cache = new();
     private static readonly ImmutableHashSet<string> AttributeMetadataNames =
@@ -155,9 +151,7 @@ internal sealed class ContractApiIdentityResolver
                 AttributesAssemblyName,
                 StringComparison.Ordinal) &&
             identity.Version == AttributesAssemblyVersion &&
-            string.IsNullOrEmpty(identity.CultureName) &&
-            identity.PublicKey.SequenceEqual(
-                AttributesAssemblyPublicKey);
+            string.IsNullOrEmpty(identity.CultureName);
     }
 
     private bool IsCompilationReference(
@@ -170,6 +164,17 @@ internal sealed class ContractApiIdentityResolver
             SymbolEqualityComparer.Default.Equals(
                 assembly,
                 referenced));
+    }
+
+    /// <summary>
+    /// Set when the contract API assembly was located but could not be read, as
+    /// opposed to being absent or not matching. Surfaced as SP0050 so the
+    /// analyzer does not silently disable every contract.
+    /// </summary>
+    internal string? UnreadableContractApiReason
+    {
+        get;
+        private set;
     }
 
     private bool HasTrustedAttributesPayload(
@@ -188,19 +193,32 @@ internal sealed class ContractApiIdentityResolver
                         reference)))
             .ToImmutableArray();
         if (matches.Length != 1 ||
-            matches[0] is not
-                PortableExecutableReference matched ||
-            string.IsNullOrEmpty(matched.FilePath))
+            matches[0] is not PortableExecutableReference
+            {
+                FilePath: { Length: > 0 } path
+            })
         {
             return false;
         }
 
-        return matched.FilePath is { } path &&
-            HasExpectedPayloadHash(path);
+        var trusted = HasExpectedPayloadHash(path, out var unreadableReason);
+        if (unreadableReason != null)
+        {
+            UnreadableContractApiReason = unreadableReason;
+        }
+
+        return trusted;
     }
 
-    private static bool HasExpectedPayloadHash(string path)
+    /// <summary>
+    /// Distinguishes a payload that does not match from a payload that could not
+    /// be read at all. Both disable contract analysis, but only the second is an
+    /// environment fault the user can act on, and reporting it is the difference
+    /// between an explained failure and the analyzer silently doing nothing.
+    /// </summary>
+    private static bool HasExpectedPayloadHash(string path, out string? unreadableReason)
     {
+        unreadableReason = null;
         try
         {
             using var stream = File.Open(
@@ -212,28 +230,15 @@ internal sealed class ContractApiIdentityResolver
             return algorithm.ComputeHash(stream).SequenceEqual(
                 AttributesAssemblyPayloadSha256);
         }
-        catch (ArgumentException)
+        catch (Exception exception) when (
+            exception is ArgumentException or
+                IOException or
+                NotSupportedException or
+                UnauthorizedAccessException or
+                SecurityException or
+                CryptographicException)
         {
-            return false;
-        }
-        catch (IOException)
-        {
-            return false;
-        }
-        catch (NotSupportedException)
-        {
-            return false;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return false;
-        }
-        catch (SecurityException)
-        {
-            return false;
-        }
-        catch (CryptographicException)
-        {
+            unreadableReason = exception.Message;
             return false;
         }
     }

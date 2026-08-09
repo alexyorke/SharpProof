@@ -284,15 +284,7 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
     private static bool IsDefinitelyString(
         IOperation operation)
     {
-        operation =
-            DefiniteOperationFacts
-                .UnwrapHarmlessValue(operation);
-        return operation.Type?.SpecialType ==
-            SpecialType.System_String ||
-            operation is IConversionOperation
-            {
-                Operand.Type.SpecialType:
-                    SpecialType.System_String
-            };
+        return DefiniteOperationFacts
+            .IsDefinitelyString(operation);
     }
 }

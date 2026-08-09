@@ -73,7 +73,7 @@ internal static class Program
             exception is IOException or UnauthorizedAccessException or
                 ArgumentException or FormatException or OverflowException or
                 InvalidDataException or JsonException or KeyNotFoundException or
-                InvalidOperationException)
+                InvalidOperationException or System.ComponentModel.Win32Exception)
         {
             runtimeSnapshot?.Dispose();
             runtimeSnapshot = null;
@@ -103,8 +103,13 @@ internal static class Program
                     runtimeSnapshot.ExecutionWorkerPath);
             }
         }
-        catch (Exception exception) when (ClassifyLauncherFailure(exception) is { } failure)
+        // Matches the worker's own discipline (Worker/Program.cs): everything
+        // except OOM and StackOverflow is caught, so the launcher always leaves
+        // a fail-closed result file instead of crashing with none.
+        catch (Exception exception) when (
+            exception is not OutOfMemoryException and not StackOverflowException)
         {
+            var failure = ClassifyLauncherFailure(exception);
             exitCode = failure.ExitCode;
             Console.Error.WriteLine(failure.ConsoleMessage);
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
@@ -140,7 +145,8 @@ internal static class Program
             }
             catch (Exception exception) when (
                 exception is IOException or InvalidDataException or
-                    UnauthorizedAccessException or ArgumentException)
+                    UnauthorizedAccessException or ArgumentException or
+                    System.ComponentModel.Win32Exception)
             {
                 Console.Error.WriteLine(
                     "SharpProof worker result could not be published.");
@@ -162,7 +168,7 @@ internal static class Program
         return exitCode;
     }
 
-    private static LauncherFailure? ClassifyLauncherFailure(Exception exception)
+    private static LauncherFailure ClassifyLauncherFailure(Exception exception)
     {
         return exception switch
         {
@@ -175,7 +181,12 @@ internal static class Program
                 125, WorkerRunStatus.Failed, WorkerRunFailureReason.ContainmentFailure,
                 "containment.unavailable", "Required worker containment could not be established.",
                 "SharpProof worker containment could not be established."),
-            _ => null
+            // Anything unclassified (an IOException out of RunWorker, say) still
+            // has to produce a result file rather than escape Main.
+            _ => new(3, WorkerRunStatus.Failed, WorkerRunFailureReason.InfrastructureFailure,
+                "launcher.infrastructure",
+                "The SharpProof launcher failed before the worker produced a result.",
+                "SharpProof launcher failed before the worker produced a result.")
         };
     }
 
@@ -227,10 +238,13 @@ internal static class Program
     internal static string ValidateDotNetHostPath(
         string candidate, string projectDirectory)
     {
-        var hostPath = Path.GetFullPath(candidate);
+        var hostPath = NormalizeAbsolutePath(candidate);
         var hostRoot = Path.GetDirectoryName(hostPath) ?? string.Empty;
-        var projectRoot = Path.TrimEndingDirectorySeparator(
-            Path.GetFullPath(projectDirectory)) + Path.DirectorySeparatorChar;
+        var projectRoot = NormalizeAbsolutePath(projectDirectory);
+        if (!Path.EndsInDirectorySeparator(projectRoot))
+        {
+            projectRoot += Path.DirectorySeparatorChar;
+        }
         var hostFileName = OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet";
         if (!Path.IsPathFullyQualified(candidate) |
             !string.Equals(Path.GetFileName(hostPath), hostFileName,
@@ -244,6 +258,11 @@ internal static class Program
         }
 
         return hostPath;
+    }
+
+    internal static string NormalizeAbsolutePath(string path)
+    {
+        return WindowsPathIdentity.Canonicalize(path);
     }
 
     internal static int ComputeHardLimit(
@@ -404,24 +423,17 @@ internal static class Program
             return;
         }
 
-        using var publication = new Mutex(false, "Local\\SharpProof.Publish");
-        var ownsPublication = false;
+        using var publication = WindowsPathIdentity.AcquirePublicationSet(
+            new[]
+            {
+                arguments.PublishRequestPath,
+                arguments.PublishResultPath,
+                arguments.PublishCompilerManifestPath,
+                arguments.PublishSarifPath
+            }.OfType<string>(),
+            TimeSpan.FromSeconds(30));
         try
         {
-            try
-            {
-                ownsPublication = publication.WaitOne(TimeSpan.FromSeconds(30));
-            }
-            catch (AbandonedMutexException)
-            {
-                ownsPublication = true;
-            }
-            if (!ownsPublication)
-            {
-                throw new IOException(
-                    "Timed out waiting to publish SharpProof results.");
-            }
-
             DeleteIfExists(arguments.PublishResultPath);
             DeleteIfExists(arguments.PublishSarifPath);
             AtomicFile.WriteBytesAsync(arguments.PublishCompilerManifestPath!, artifactBytes)
@@ -451,13 +463,6 @@ internal static class Program
             DeleteIfExists(arguments.PublishResultPath);
             DeleteIfExists(arguments.PublishSarifPath);
             throw;
-        }
-        finally
-        {
-            if (ownsPublication)
-            {
-                publication.ReleaseMutex();
-            }
         }
     }
 
@@ -597,11 +602,20 @@ internal sealed partial class LauncherArguments
             Path.ChangeExtension(workerPath, ".deps.json"),
             Path.ChangeExtension(workerPath, ".runtimeconfig.json")
         };
+        var publicationPaths = new[] {
+            PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
+            PublishSarifPath
+        }.OfType<string>().ToArray();
+        foreach (var publicationPath in publicationPaths)
+        {
+            WindowsPathIdentity.RequireLocalPath(publicationPath);
+        }
         string?[] candidates = [..runtimeRoots,
             ..LauncherArguments.LauncherRuntimePaths,
             cacheDirectory, RequestPath, ResultPath, CompilerManifestPath,
-            PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
-            PublishSarifPath];
+            ..publicationPaths,
+            ..publicationPaths.Select(
+                WindowsPathIdentity.PublicationMarkerPath)];
         WorkerCachePath.ValidateNoReparsePoints(
             candidates.OfType<string>());
         var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -650,12 +664,14 @@ internal sealed partial class LauncherArguments
 
     private string FullPath(string key)
     {
-        return Path.GetFullPath(Required(key));
+        return Program.NormalizeAbsolutePath(Required(key));
     }
 
     private string? OptionalFullPath(string key)
     {
-        return Optional(key) is { } value ? Path.GetFullPath(value) : null;
+        return Optional(key) is { } value
+            ? Program.NormalizeAbsolutePath(value)
+            : null;
     }
 
     private string Required(string key)

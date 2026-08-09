@@ -61,8 +61,8 @@ public sealed class ProtocolJsonTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("9"));
-            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(11));
+            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("10"));
+            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(12));
             Assert.That(WorkerManifestVersions.Current, Is.EqualTo(4));
             Assert.That(
                 document.RootElement.EnumerateObject()
@@ -171,8 +171,8 @@ public sealed class ProtocolJsonTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(roundTrip.SchemaVersion, Is.EqualTo(9));
-            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("9"));
+            Assert.That(roundTrip.SchemaVersion, Is.EqualTo(11));
+            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("10"));
             Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(manifest.Hash));
             Assert.That(roundTrip.Manifest.Callables[0].Assumptions, Has.Length.EqualTo(2));
             Assert.That(
@@ -745,8 +745,54 @@ public sealed class ProtocolJsonTests
         Assert.That(
             WorkerProtocolJson.Validate(response).Errors
                 .Select(static error => error.Code),
-            Does.Contain("summary.totals")
+                Does.Contain("summary.totals")
                 .And.Contain("response.claim_payload"));
+    }
+
+    [Test]
+    public void SummaryCountBucketsMustHaveUniqueKinds()
+    {
+        var manifest = CreateManifest();
+        var first = manifest.Claims[0];
+        manifest.Callables[0].ClaimIds = [.. manifest.Callables[0].ClaimIds, "claim.identity.1"];
+        manifest.Claims = [.. manifest.Claims, new WorkerClaimManifestEntry {
+            ClaimId = "claim.identity.1",
+            CallableId = first.CallableId,
+            Ordinal = 1,
+            Kind = first.Kind,
+            Evidence = first.Evidence,
+            Location = new WorkerSourceLocation {
+                Path = first.Location.Path,
+                Start = first.Location.Start,
+                Length = first.Location.Length,
+                Line = first.Location.Line,
+                Column = first.Location.Column
+            }
+        }];
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = CreateResponse(manifest);
+        SetUnknown(response, WorkerClaimReason.UnsupportedBody, index: 1);
+        response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
+        response.CallableResults[0].Reason = WorkerCallableCoverageReason.SemanticUnknown;
+        response.Summary = CreateSummary(response);
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+
+        response.Summary.OutcomeCounts = [
+            new WorkerClaimOutcomeCount { Outcome = WorkerClaimOutcome.Proven, Count = 1 },
+            new WorkerClaimOutcomeCount { Outcome = WorkerClaimOutcome.Proven, Count = 1 }
+        ];
+        Assert.That(
+            WorkerProtocolJson.Validate(response).Errors.Select(static error => error.Code),
+            Does.Contain("summary.outcomes"));
+
+        response.Summary = CreateSummary(response);
+        response.Summary.ReasonCounts = [
+            new WorkerClaimReasonCount { Reason = WorkerClaimReason.None, Count = 1 },
+            new WorkerClaimReasonCount { Reason = WorkerClaimReason.None, Count = 1 }
+        ];
+        Assert.That(
+            WorkerProtocolJson.Validate(response).Errors.Select(static error => error.Code),
+            Does.Contain("summary.reasons"));
     }
 
     [Test]
@@ -763,6 +809,85 @@ public sealed class ProtocolJsonTests
                 .Select(static error => error.Code),
             Does.Contain("manifest.dense_ordinals")
                 .And.Contain("manifest.claim_membership"));
+    }
+
+    [Test]
+    public void NullProtocolRootsAndArrayRequestsAreRejected()
+    {
+        var request = WorkerProtocolJson.Validate((WorkerVerifyRequest?)null);
+        var response = WorkerProtocolJson.Validate((WorkerVerifyResponse?)null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                request.Errors.Select(static error => error.Code),
+                Does.Contain("request.null"));
+            Assert.That(
+                response.Errors.Select(static error => error.Code),
+                Does.Contain("response.null"));
+            Assert.Throws<JsonException>((Action)(() =>
+                WorkerProtocolJson.DeserializeRequest("[]")));
+        }
+    }
+
+    [Test]
+    public void MissingResponseSubdocumentsAndInvalidExpectedManifestAreRejected()
+    {
+        var missingManifest = CreateResponse(CreateManifest());
+        missingManifest.Manifest = null!;
+        var missingSummary = CreateResponse(CreateManifest());
+        missingSummary.Summary = null!;
+        var missingAssumptions = CreateResponse(CreateManifest());
+        missingAssumptions.Summary.Assumptions = null!;
+        var expectedManifest = CreateManifest();
+        expectedManifest.SchemaVersion = int.MaxValue;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                WorkerProtocolJson.Validate(missingManifest).Errors
+                    .Select(static error => error.Code),
+                Does.Contain("manifest.null"));
+            Assert.That(
+                WorkerProtocolJson.Validate(missingSummary).Errors
+                    .Select(static error => error.Code),
+                Does.Contain("response.summary"));
+            Assert.That(
+                WorkerProtocolJson.Validate(missingAssumptions).Errors
+                    .Select(static error => error.Code),
+                Does.Contain("summary.assumptions"));
+            Assert.That(
+                WorkerProtocolJson.Validate(
+                        CreateResponse(CreateManifest()),
+                        InputHash,
+                        expectedManifest)
+                    .Errors.Select(static error => error.Code),
+                Does.Contain("response.expected_manifest"));
+        }
+    }
+
+    [Test]
+    public void ManifestHashAndExpectedInputHashValidateBoundaryValues()
+    {
+        var nullIdentity = CreateManifest();
+        nullIdentity.Callables[0].CallableId = null!;
+        var nullIdentityHash = WorkerProtocolJson.ComputeManifestHash(nullIdentity);
+        var unknownEnum = CreateManifest();
+        unknownEnum.Claims[0].Kind = (WorkerClaimKind)int.MaxValue;
+
+        var enumError = Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+            WorkerProtocolJson.ComputeManifestHash(unknownEnum)));
+        var hashError = Assert.Throws<ArgumentException>((Action)(() =>
+            WorkerProtocolJson.Validate(
+                CreateResponse(CreateManifest()),
+                "not-a-hash")));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(nullIdentityHash, Does.Match("^[0-9a-f]{64}$"));
+            Assert.That(enumError!.ParamName, Is.EqualTo("value"));
+            Assert.That(hashError!.ParamName, Is.EqualTo("expectedInputHash"));
+        }
     }
 
     private static WorkerVerifyRequest CreateRequest()
@@ -1058,10 +1183,11 @@ public sealed class ProtocolJsonTests
 
     private static void SetUnknown(
         WorkerVerifyResponse response,
-        WorkerClaimReason reason)
+        WorkerClaimReason reason,
+        int index = 0)
     {
-        response.ClaimResults[0].Outcome = WorkerClaimOutcome.Unknown;
-        response.ClaimResults[0].Reason = reason;
+        response.ClaimResults[index].Outcome = WorkerClaimOutcome.Unknown;
+        response.ClaimResults[index].Reason = reason;
     }
 
     private static WorkerEffectViolationWitness CreateEffectWitness(

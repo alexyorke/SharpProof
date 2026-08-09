@@ -163,4 +163,53 @@ public sealed class ForwardDataflowAnalysisTests
                 new(3, 4)
             ]);
     }
+
+    [Test]
+    public void NonConvergenceRaisesATypedConvergenceFailure()
+    {
+        var domain = IntervalDomain.Instance;
+
+        // A self-loop that keeps incrementing never reaches a fixed point while
+        // widening is disabled, so the solver must hit its iteration bound.
+        var graph = new DataflowGraph<IntervalValue>(
+            [
+                new(0, value => value),
+                new(1, value => domain.AddConstant(value, 1))
+            ],
+            [
+                new(0, 1),
+                new(1, 1)
+            ]);
+
+        var failure = Assert.Throws<DataflowConvergenceException>((Action)(() =>
+            ForwardDataflowAnalysis.Analyze(
+                graph,
+                domain,
+                IntervalValue.Constant(0),
+                new ForwardDataflowAnalysisOptions(
+                    widenAfter: int.MaxValue,
+                    maxIterations: 8))));
+
+        // Callers that must degrade gracefully catch this specific type rather
+        // than every InvalidOperationException.
+        Assert.That(failure, Is.InstanceOf<InvalidOperationException>());
+        Assert.That(failure!.Message, Does.Contain("did not converge"));
+    }
+
+    [Test]
+    public void ConvergenceFailureExposesTheStandardExceptionSurface()
+    {
+        // CA1032 requires the full constructor set on a public exception type,
+        // so the surface is exercised rather than left as untested ceremony.
+        var inner = new InvalidOperationException("inner");
+        var withMessage = new DataflowConvergenceException("explicit");
+        var withInner = new DataflowConvergenceException("wrapped", inner);
+
+        Assert.That(
+            new DataflowConvergenceException().Message,
+            Does.Contain("did not converge"));
+        Assert.That(withMessage.Message, Is.EqualTo("explicit"));
+        Assert.That(withInner.Message, Is.EqualTo("wrapped"));
+        Assert.That(withInner.InnerException, Is.SameAs(inner));
+    }
 }

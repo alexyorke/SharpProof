@@ -48,26 +48,65 @@ public static class IrSubstitution
         return Rewrite(factory, root, replacements, memo);
     }
 
+    /// <summary>
+    /// Rewrites the term bottom-up using an explicit stack. Terms are a
+    /// hash-consed DAG whose depth is bounded only by the source expression, and
+    /// StackOverflowException is uncatchable, so this must not recurse.
+    /// </summary>
     private static IrTerm Rewrite(
         IrFactory factory,
-        IrTerm term,
+        IrTerm root,
         IReadOnlyDictionary<IrVarId, IrTerm> replacements,
-        IDictionary<IrId, IrTerm> memo)
+        Dictionary<IrId, IrTerm> memo)
     {
-        if (term is IrVariableTerm variable &&
-            replacements.TryGetValue(variable.Variable, out var replacement))
+        var pending = new Stack<(IrTerm Term, bool ChildrenReady)>();
+        pending.Push((root, false));
+        while (pending.Count != 0)
         {
-            return replacement;
+            var (term, childrenReady) = pending.Pop();
+            if (memo.ContainsKey(term.Id))
+            {
+                continue;
+            }
+
+            if (term is IrVariableTerm variable &&
+                replacements.TryGetValue(variable.Variable, out var replacement))
+            {
+                memo.Add(term.Id, replacement);
+                continue;
+            }
+
+            var children = IrTraversal.GetChildren(term);
+            if (!childrenReady && children.Length != 0)
+            {
+                // Re-queue below the children so every child is rewritten by the
+                // time this term is popped again.
+                pending.Push((term, true));
+                foreach (var child in children)
+                {
+                    if (!memo.ContainsKey(child.Id))
+                    {
+                        pending.Push((child, false));
+                    }
+                }
+
+                continue;
+            }
+
+            memo.Add(term.Id, RewriteNode(factory, term, memo));
         }
 
-        if (memo.TryGetValue(term.Id, out var existing))
-        {
-            return existing;
-        }
+        return memo[root.Id];
+    }
 
+    private static IrTerm RewriteNode(
+        IrFactory factory,
+        IrTerm term,
+        Dictionary<IrId, IrTerm> memo)
+    {
         IrTerm Visit(IrTerm child)
         {
-            return Rewrite(factory, child, replacements, memo);
+            return memo[child.Id];
         }
 
         IrTerm? VisitNullable(IrTerm? child)
@@ -80,7 +119,7 @@ public static class IrSubstitution
             return [.. children.Select(Visit)];
         }
 
-        var rewritten = term switch
+        return term switch
         {
             IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrNullTerm or IrVariableTerm => term,
             IrOpaqueTerm { Purity: IrOpaquePurity.Pure } opaque =>
@@ -110,7 +149,5 @@ public static class IrSubstitution
                 Visit(access.Index)),
             _ => throw new InvalidOperationException("Unknown IR term kind: " + term.Kind + ".")
         };
-        memo.Add(term.Id, rewritten);
-        return rewritten;
     }
 }

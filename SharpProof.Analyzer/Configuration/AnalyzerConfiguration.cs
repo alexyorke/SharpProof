@@ -45,10 +45,9 @@ internal sealed class AnalyzerConfiguration
             var optionsByKind = AnalyzerConfigurationOptionRegistry.All;
             var hasProfile = TryGet(options, optionsByKind[0], out var profile);
             var hasFeatures = TryGet(options, optionsByKind[1], out var features);
-            var hasLegacy = TryGet(options, optionsByKind[2], out var legacy);
             return new(
-                ParseProfile(hasProfile ? profile : hasLegacy && Is(legacy, "off") ? "off" : "advisory"),
-                ParseFeatures(hasFeatures ? features : hasLegacy ? legacy : "all"),
+                ParseProfile(hasProfile ? profile : "advisory"),
+                ParseFeatures(hasFeatures ? features : "all"),
                 invalidConfigurationValues);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -80,18 +79,12 @@ internal sealed class AnalyzerConfiguration
             return builder.ToImmutable();
         }
 
-        var legacyOption = AnalyzerConfigurationOptionRegistry.LegacyMode;
-        var hasProfile = TryGet(options, AnalyzerConfigurationOptionRegistry.Profile, out var profile);
-        var hasFeatures = TryGet(options, AnalyzerConfigurationOptionRegistry.Features, out var features);
-        if (TryGet(options, legacyOption, out var legacy) &&
-            (hasProfile || hasFeatures) &&
-            !IsLegacyEquivalent(
-                legacy,
-                hasProfile ? profile : Is(legacy, "off") ? "off" : "advisory",
-                hasFeatures ? features : LegacyFeatures(legacy)))
+        if (TryGetRetiredMode(options, out var retiredMode))
         {
-            builder.Add(new(legacyOption.Key, legacy.Trim(),
-                "deprecated option conflicts with sharpproof_profile or sharpproof_features"));
+            builder.Add(new(
+                "sharpproof_mode",
+                retiredMode.Trim(),
+                "option was removed; use sharpproof_profile and sharpproof_features"));
         }
 
         return builder.ToImmutable();
@@ -115,21 +108,13 @@ internal sealed class AnalyzerConfiguration
             "configuration provider failed; analysis was disabled");
     }
 
-    private static bool IsLegacyEquivalent(string legacy, string profile, string features)
+    private static bool TryGetRetiredMode(
+        AnalyzerOptions options,
+        out string value)
     {
-        return Is(legacy, "off")
-            ? Is(profile, "off")
-            : !Is(profile, "off") &&
-              (Is(legacy, "effects") && Is(features, "effects") ||
-               Is(legacy, "contracts") && Is(features, "contracts") ||
-               Is(legacy, "all-experimental") && Is(features, "all"));
-    }
-
-    private static string LegacyFeatures(string legacy)
-    {
-        return Is(legacy, "effects") ? "effects" :
-        Is(legacy, "contracts") ? "contracts" :
-        "all";
+        return TryGetRetiredMode(
+            options.AnalyzerConfigOptionsProvider.GlobalOptions,
+            out value);
     }
 
     internal static ImmutableArray<InvalidAnalyzerConfigurationValue> GetInvalidTreeConfigurationValues(
@@ -154,7 +139,25 @@ internal sealed class AnalyzerConfiguration
             builder.Add(new InvalidAnalyzerConfigurationValue(option.Key, value.Trim(),
                 "option is compilation-global; set it in a global AnalyzerConfig or MSBuild property"));
         }
+        if (TryGetRetiredMode(options, out var retiredMode))
+        {
+            builder.Add(new InvalidAnalyzerConfigurationValue(
+                "sharpproof_mode",
+                retiredMode.Trim(),
+                "option was removed; use sharpproof_profile and sharpproof_features"));
+        }
         return builder.ToImmutable();
+    }
+
+    private static bool TryGetRetiredMode(
+        AnalyzerConfigOptions options,
+        out string value)
+    {
+        return (options.TryGetValue("sharpproof_mode", out value!) ||
+                options.TryGetValue(
+                    "build_property.SharpProofMode",
+                    out value!)) &&
+            !string.IsNullOrWhiteSpace(value);
     }
 
     private static bool TryGet(

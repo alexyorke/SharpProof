@@ -17,6 +17,7 @@ using NullableContextOptions = Microsoft.CodeAnalysis.NullableContextOptions;
 using OptimizationLevel = Microsoft.CodeAnalysis.OptimizationLevel;
 using OutputKind = Microsoft.CodeAnalysis.OutputKind;
 using Platform = Microsoft.CodeAnalysis.Platform;
+using ReportDiagnostic = Microsoft.CodeAnalysis.ReportDiagnostic;
 
 namespace SharpProof.Worker.Test;
 
@@ -257,6 +258,8 @@ public sealed class CompilerArtifactModelSchemaTests
                 (typeof(NullableContextOptions), typeof(CompilerNullableContext)),
             [nameof(MetadataImportOptions)] =
                 (typeof(MetadataImportOptions), typeof(CompilerMetadataImportOptions)),
+            [nameof(ReportDiagnostic)] =
+                (typeof(ReportDiagnostic), typeof(CompilerReportDiagnostic)),
             [nameof(AssemblyIdentityComparer)] =
                 (typeof(AssemblyIdentityComparer),
                     typeof(CompilerAssemblyIdentityComparer)),
@@ -292,6 +295,7 @@ public sealed class CompilerArtifactModelSchemaTests
             nameof(Platform),
             nameof(NullableContextOptions),
             nameof(MetadataImportOptions),
+            nameof(ReportDiagnostic),
             nameof(AssemblyIdentityComparer),
             nameof(EffectEvaluationContractKind),
             nameof(EffectEvaluationOutcome),
@@ -322,11 +326,11 @@ public sealed class CompilerArtifactModelSchemaTests
         {
             var name = mapping.GetProperty("name").GetString()!;
             var types = expectedTypes[name];
-            var isOption = Array.IndexOf(expectedNames, name) < 6;
+            var isOption = Array.IndexOf(expectedNames, name) < 7;
             var isEvaluation =
-                Array.IndexOf(expectedNames, name) is >= 6 and < 10;
+                Array.IndexOf(expectedNames, name) is >= 7 and < 11;
             var isLowering =
-                Array.IndexOf(expectedNames, name) is >= 12 and < 17;
+                Array.IndexOf(expectedNames, name) is >= 13 and < 18;
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(

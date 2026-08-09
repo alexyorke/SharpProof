@@ -55,9 +55,10 @@ compiler-collection infrastructure error during Windows verification.
 | `SP0046` | `effects` | Info, on | Yes |
 | `SP0047` | Explicitly selected unsupported method | Info, on | Yes |
 | `SP0049` | Windows verification compiler manifest | Error, on | On artifact failure |
+| `SP0050` | Referenced contract API assembly | Error, on | On unreadable payload |
 
-`SharpProofFeatures=all` enables both feature pipelines. `SharpProofMode` and
-`all-experimental` are deprecated preview compatibility inputs.
+`SharpProofFeatures=all` enables both feature pipelines. The former
+`SharpProofMode` and `all-experimental` compatibility inputs are removed.
 
 <a id="sp0002"></a>
 ## SP0002 - purity not proven
@@ -74,7 +75,7 @@ This is a not-proven diagnostic. It does not claim a replayed impure trace.
 Reserved as a live-analyzer diagnostic. The current path-insensitive
 may-effect analyzer never emits SP0013. Separately, the opt-in Windows worker
 can publish a typed effect `Refuted` result after independently replaying the
-schema-9 event for an unconditional definite managed object/array allocation.
+schema-10 event for an unconditional definite managed object/array allocation.
 
 A possible allocation is reported as SP0045 instead.
 
@@ -114,13 +115,12 @@ silently interpreted.
 <a id="sp0025"></a>
 ## SP0025 - invalid analyzer configuration
 
-The compilation-global `sharpproof_profile`/`SharpProofProfile`,
-`sharpproof_features`/`SharpProofFeatures`, or deprecated
-`sharpproof_mode`/`SharpProofMode` value is invalid. Valid profile values are
+The compilation-global `sharpproof_profile`/`SharpProofProfile` or
+`sharpproof_features`/`SharpProofFeatures` value is invalid, or the removed
+`sharpproof_mode`/`SharpProofMode` alias was supplied. Valid profile values are
 `advisory`, `strict`, and `off`; feature values are `effects`, `contracts`, and
-`all`. The legacy alias temporarily accepts `off`, `effects`, `contracts`, and
-`all-experimental`. SharpProof reports a warning and analyzes an invalid
-configuration as `off`.
+`all`. SharpProof reports a warning and analyzes an invalid configuration as
+`off`.
 
 Tree-local attempts to set this compilation-global option are also invalid
 unless they exactly match the global value.
@@ -237,13 +237,32 @@ artifact lowering, serialization, or write failure. The diagnostic is an error
 because the required closed compiler evidence is missing. It is an
 infrastructure failure, never a contract or proof outcome.
 
-Compiler artifact schema version 9 includes the sealed selected-claim manifest,
+Compiler artifact schema version 11 includes the sealed selected-claim manifest,
 compiler diagnostics, source/generated-tree hashes and parse evidence, and,
 for each supported selected callable, bound contract/spec metadata plus
 portable whole-body lowered CFG/IR. It contains no source text. The worker
 hydrates this artifact without constructing a Roslyn compilation or rereading
 references. Exact manifest/lowered-callable equality and the expression-depth
 match are required before cache lookup or backend creation.
+
+<a id="sp0050"></a>
+## SP0050 - contract API could not be verified
+
+SharpProof pins the exact payload of the `SharpProof.Attributes` assembly it
+was built against. SP0050 is emitted when that assembly is referenced and
+located but cannot be read to check the pin -- a sharing violation, an
+antivirus scanner, a permission failure, or an unreadable network share.
+
+The diagnostic exists because the failure is otherwise invisible. An
+unverifiable contract API leaves every `Contract.Requires`, `Contract.Ensures`,
+and closed contract attribute unresolvable, so the whole contract surface
+silently disappears and the analyzer reports nothing at all -- which is
+indistinguishable from code that has no contracts. It is an infrastructure
+failure, never a contract or proof outcome.
+
+A payload that reads successfully but does not match the pin is not SP0050.
+That is a genuine identity mismatch rather than an environment fault, and it
+continues to disable contract analysis without a diagnostic.
 
 <a id="contractfor-generator-diagnostics"></a>
 ## ContractFor generator diagnostics

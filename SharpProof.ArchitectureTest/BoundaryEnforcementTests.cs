@@ -11,6 +11,7 @@ public sealed class BoundaryEnforcementTests
     private static readonly string[] BannedApiProjects = [
         "SharpProof.Analyzer",
         "SharpProof.Attributes",
+        "SharpProof.BuildTasks",
         "SharpProof.CompilerArtifact",
         "SharpProof.CompilerCollector",
         "SharpProof.ContractForGenerator",
@@ -23,6 +24,7 @@ public sealed class BoundaryEnforcementTests
         "SharpProof.PortableAnalyzer",
         "SharpProof.Smt",
         "SharpProof.Specs",
+        "SharpProof.Summaries",
         "SharpProof.Verify",
         "SharpProof.Worker",
         "SharpProof.Worker.Launcher",
@@ -42,6 +44,7 @@ public sealed class BoundaryEnforcementTests
         "SharpProof.PortableAnalyzer",
         "SharpProof.Smt",
         "SharpProof.Specs",
+        "SharpProof.Summaries",
         "SharpProof.Verify",
         "SharpProof.Worker"
     ];
@@ -410,6 +413,7 @@ public sealed class BoundaryEnforcementTests
             @"SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj",
             @"SharpProof.Attributes.Test\SharpProof.Attributes.Test.csproj",
             @"SharpProof.Attributes\SharpProof.Attributes.csproj",
+            @"SharpProof.BuildTasks\SharpProof.BuildTasks.csproj",
             @"SharpProof.CompilerProbe.TestAsset\SharpProof.CompilerProbe.TestAsset.csproj",
             @"SharpProof.CompilerArtifact\SharpProof.CompilerArtifact.csproj",
             @"SharpProof.CompilerCollector\SharpProof.CompilerCollector.csproj",
@@ -435,6 +439,8 @@ public sealed class BoundaryEnforcementTests
             @"SharpProof.Smt\SharpProof.Smt.csproj",
             @"SharpProof.Specs.Test\SharpProof.Specs.Test.csproj",
             @"SharpProof.Specs\SharpProof.Specs.csproj",
+            @"SharpProof.Summaries.Test\SharpProof.Summaries.Test.csproj",
+            @"SharpProof.Summaries\SharpProof.Summaries.csproj",
             @"SharpProof.Testing.Test\SharpProof.Testing.Test.csproj",
             @"SharpProof.Testing\SharpProof.Testing.csproj",
             @"SharpProof.Verifier.Win-x64\SharpProof.Verifier.Win-x64.csproj",

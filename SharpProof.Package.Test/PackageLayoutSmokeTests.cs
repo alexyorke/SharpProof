@@ -50,6 +50,7 @@ public sealed class PackageLayoutSmokeTests
         "SharpProof.Frontend.dll",
         "SharpProof.Ir.dll",
         "SharpProof.Specs.dll",
+        "SharpProof.Summaries.dll",
         "SharpProof.Worker.Protocol.dll",
         "System.IO.Pipelines.dll",
         "System.Text.Encodings.Web.dll",
@@ -76,6 +77,8 @@ public sealed class PackageLayoutSmokeTests
         "tools/collector/SharpProof.Frontend.dll",
         "tools/collector/SharpProof.Ir.dll",
         "tools/collector/SharpProof.Specs.dll",
+        "tools/collector/SharpProof.Summaries.dll",
+        "tools/collector/RelationalSpecPackCatalog.json",
         "tools/collector/SharpProof.Worker.Protocol.dll",
         "tools/collector/System.IO.Pipelines.dll",
         "tools/collector/System.Text.Encodings.Web.dll",
@@ -84,6 +87,7 @@ public sealed class PackageLayoutSmokeTests
 
     private static readonly string[] ExpectedToolEntries = [
         "tools/net9/Microsoft.Z3.dll",
+        "tools/net9/SharpProof.BuildTasks.dll",
         "tools/net9/SharpProof.CompilerArtifact.dll",
         "tools/net9/SharpProof.Dataflow.dll",
         "tools/net9/SharpProof.Ir.dll",
@@ -744,7 +748,7 @@ public sealed class PackageLayoutSmokeTests
                 manifest.RootElement
                     .GetProperty("schemaVersion")
                     .GetInt32(),
-                Is.EqualTo(9));
+                Is.EqualTo(11));
             var effectClaims = manifest.RootElement
                 .GetProperty("callables")
                 .EnumerateArray()

@@ -210,6 +210,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
             factory,
             builder.Build(),
             ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty,
             ImmutableDictionary<IrVarId, IrTerm>.Empty,
             ImmutableDictionary<IrVarId, IrVarId>.Empty);
 
@@ -245,6 +246,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
             factory,
             program,
             ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty,
             environment,
             ImmutableDictionary<IrVarId, IrVarId>.Empty);
         var exact = new AcyclicBlockPredicateExecutor(
@@ -254,6 +256,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
             factory,
             program,
             ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty,
             environment,
             ImmutableDictionary<IrVarId, IrVarId>.Empty);
 
@@ -313,6 +316,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
             factory,
             program,
             specCalls,
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty,
             environment,
             ImmutableDictionary<IrVarId, IrVarId>.Empty);
         var execution = new AcyclicBlockPredicateExecutor(
@@ -321,6 +325,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
             factory,
             program,
             specCalls,
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty,
             environment,
             ImmutableDictionary<IrVarId, IrVarId>.Empty);
 
@@ -391,6 +396,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
             factory,
             program,
             specCalls,
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty,
             environment,
             ImmutableDictionary<IrVarId, IrVarId>.Empty);
         var execution = new AcyclicBlockPredicateExecutor(
@@ -399,6 +405,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
             factory,
             program,
             specCalls,
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty,
             environment,
             ImmutableDictionary<IrVarId, IrVarId>.Empty);
 
@@ -409,6 +416,88 @@ public sealed class AcyclicBlockPredicateExecutorTests
             factory,
             execution,
             divisor);
+    }
+
+    [Test]
+    public void SourceCallContributesItsGuardedRelationalAssumption()
+    {
+        var factory = new IrFactory();
+        var input = factory.CreateVariable("input", factory.IntegerType);
+        var callTarget = factory.CreateVariable(
+            "call-target",
+            factory.IntegerType);
+        var summaryResult = factory.CreateVariable(
+            "summary-result",
+            factory.IntegerType);
+        var member = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            factory.ObjectType,
+            "Increment",
+            factory.IntegerType,
+            true,
+            factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var call = builder.Call(
+            entry,
+            factory.CreateOperation(),
+            callTarget,
+            member,
+            null,
+            factory.Variable(input));
+        builder.Return(
+            entry,
+            factory.CreateOperation(),
+            factory.Variable(callTarget));
+        var relation = factory.Binary(
+            IrBinaryOperator.Equal,
+            factory.Variable(summaryResult),
+            factory.Binary(
+                IrBinaryOperator.Add,
+                factory.Variable(input),
+                factory.Integer(1)));
+        var sourceCalls = ImmutableDictionary<
+            IrInstructionId,
+            CompilerPreparedSummaryCall>.Empty.Add(
+                call.Id,
+                new CompilerPreparedSummaryCall(
+                    call.Id,
+                    "M:Subject.Increment(System.Int32)",
+                    CompilerSummaryOrigin.Source,
+                    summaryResult,
+                    [],
+                    relation,
+                    new string('a', 64),
+                    string.Empty,
+                    []));
+
+        var execution = new AcyclicBlockPredicateExecutor(
+            WorkerBudgets.DefaultMaximumExpressionDepth).Execute(
+                [],
+                factory,
+                builder.Build(),
+                ImmutableDictionary<
+                    IrInstructionId,
+                    CompilerPreparedSpecCall>.Empty,
+                sourceCalls,
+                ImmutableDictionary<IrVarId, IrTerm>.Empty.Add(
+                    input,
+                    factory.Variable(input)),
+                ImmutableDictionary<IrVarId, IrVarId>.Empty);
+
+        var assumption = execution.SummaryAssumptions.Single();
+        var result = execution.Returns.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(execution.IsSuccess, Is.True);
+            Assert.That(execution.SpecAssumptions, Is.Empty);
+            Assert.That(assumption.CallIdentity, Does.Contain("Increment"));
+            Assert.That(
+                assumption.Origin,
+                Is.EqualTo(CompilerSummaryOrigin.Source));
+            Assert.That(assumption.Predicate, Is.SameAs(relation));
+            Assert.That(result.ReturnTerm, Is.SameAs(factory.Variable(summaryResult)));
+        }
     }
 
     private static SymbolicBodyExecution Execute(
@@ -424,6 +513,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
             factory,
             program,
             ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+            ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty,
             environment,
             ImmutableDictionary<IrVarId, IrVarId>.Empty);
     }
@@ -502,7 +592,8 @@ public sealed class AcyclicBlockPredicateExecutorTests
             CompilerPreparedBody.ProgramBody(
                 program,
                 parameterBindings,
-                ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty));
+                ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+                ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty));
     }
 
     private sealed class CompletionThenProofBackend : ISmtBackend

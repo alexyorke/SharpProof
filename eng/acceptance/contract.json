@@ -22,24 +22,30 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 111,
-    "expectedCatalogSha256": "06a6d40cccfd568fb8e9797edae10949b5ae79f7ea6205e00ec2ac649169e586"
+    "expectedCatalogCount": 127,
+    "expectedCatalogSha256": "ddd6fd5b22975bf794eb84ad9b02d2c5b5c003ab648b31eacbdce2b5c8b32c3b"
   },
   "worker": {
-    "protocolVersion": 9,
+    "protocolVersion": 10,
     "manifestSchemaVersion": 4,
-    "compilerArtifactSchemaVersion": 9,
+    "compilerArtifactSchemaVersion": 11,
+    "relationalSummarySchemaVersion": 1,
+    "specificationPackSchemaVersion": 1,
     "maximumParallelism": 4,
+    "maximumWorkerProcesses": 4,
+    "maximumExpressionDepth": 64,
     "maximumMemoryMiB": 2048,
     "queryRlimit": 3000000,
     "methodRlimit": 20000000,
     "maximumMethodWallSeconds": 10,
     "maximumProjectWallSeconds": 300,
     "cancellationP95Milliseconds": 250,
-    "forcedTerminationMilliseconds": 1000
+    "forcedTerminationMilliseconds": 1000,
+    "maximumProjectDirectoryCharacters": 239
   },
   "cache": {
-    "schemaVersion": 11,
+    "schemaVersion": 12,
+    "enabledByDefault": true,
     "maximumMiB": 512,
     "cacheableOutcomes": [
       "Refuted"
@@ -54,6 +60,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
+    "inventorySha256": "30d39b2bee968a0d8aa41c77be2d1ebf2bcc3a291ea43934060a3adde18bfca9",
     "components": [
       {
         "name": "discovery",
@@ -94,6 +101,20 @@
           "SharpProof.Frontend/RoslynProgramLowerer.cs",
           "SharpProof.Frontend/OperationSupportCatalog.cs"
         ]
+      },
+      {
+        "name": "relationalSummaryAuthority",
+        "paths": [
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs",
+          "SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs",
+          "SharpProof.Ir/IrSemanticTerms.cs",
+          "SharpProof.Summaries/IrRelationalSummary.cs",
+          "SharpProof.Summaries/IrRelationalSummaryBuilder.cs",
+          "SharpProof.Summaries/IrRelationalSummaryInstantiator.cs",
+          "SharpProof.Specs/RelationalSpecPackCatalog.json"
+        ],
+        "rationale": "These files construct, authenticate, instantiate, and consume the sealed interprocedural relation trusted by the worker."
       },
       {
         "name": "execution",
@@ -368,7 +389,8 @@
         "scripts/Get-SharpProofTcbPaths.ps1",
         "scripts/Get-SharpProofReleaseDigests.ps1",
         "scripts/Test-SharpProofCoverage.ps1",
-        "eng/acceptance/Verify.ps1"
+        "eng/acceptance/Verify.ps1",
+        "eng/acceptance/preview-evidence.v1.json"
         ]
       },
       {
@@ -420,12 +442,23 @@
         ]
       },
       {
+        "name": "publicationContainment",
+        "paths": [
+          "SharpProof.BuildTasks/SharpProof.BuildTasks.csproj",
+          "SharpProof.BuildTasks/InvalidatePublishedResult.cs",
+          "SharpProof.BuildTasks/RunVerifier.cs",
+          "SharpProof.Worker.Protocol/WindowsPathIdentity.cs"
+        ],
+        "rationale": "The compiled MSBuild tasks and shared native Windows path identity helper own verifier launch cancellation, publication locking, invalidation, and filesystem alias rejection."
+      },
+      {
         "name": "portableShippingBoundary",
         "paths": [
           "SharpProof.PortableAnalyzer/SharpProof.PortableAnalyzer.csproj",
           "SharpProof.Package/SharpProof.nuspec",
           "SharpProof.Package/buildTransitive/SharpProof.props",
           "SharpProof.Package/buildTransitive/SharpProof.targets",
+          "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.props",
           "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.targets"
         ]
       },
@@ -441,8 +474,9 @@
   },
   "productionComplexity": {
     "measurement": "Aggregate Roslyn expression nodes, decision points, and members across handwritten production C#; whitespace, comments, line wrapping, and optional braces are excluded.",
-    "maximumExpressionNodes": 94400,
-    "maximumDecisionPoints": 5200,
+    "ceilingRationale": "2026-08-07: extracting the cancellable verifier runner and invalidator from unmeasured inline MSBuild XML into the directly testable SharpProof.BuildTasks assembly moved that trusted-boundary logic under the production C# ratchet. 2026-08-08: bounded relational interprocedural verification added one reusable typed-IR summary engine, an isolated exact implementation-PE decoder, and a strict data-driven specification-pack parser; source, IL, and audited packs now share one Z3 composition path instead of growing method-specific verifier branches. Dead dependency-graph scaffolding was removed, production roots are derived from Directory.Build.props, and each new semantic layer has its own narrow ratchet below.",
+    "maximumExpressionNodes": 111400,
+    "maximumDecisionPoints": 5950,
     "maximumMembers": 3900
   },
   "productionCoordinatorComplexity": {
@@ -501,6 +535,30 @@
         "path": "SharpProof.Worker.Protocol/ProtocolJson.cs",
         "maximumExpressionNodes": 3450,
         "maximumDecisionPoints": 135
+      },
+      {
+        "name": "relational-summary-builder",
+        "path": "SharpProof.Summaries/IrRelationalSummaryBuilder.cs",
+        "maximumExpressionNodes": 1950,
+        "maximumDecisionPoints": 120
+      },
+      {
+        "name": "relational-summary-provider",
+        "path": "SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs",
+        "maximumExpressionNodes": 800,
+        "maximumDecisionPoints": 50
+      },
+      {
+        "name": "implementation-il-summary-lowerer",
+        "path": "SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs",
+        "maximumExpressionNodes": 4150,
+        "maximumDecisionPoints": 340
+      },
+      {
+        "name": "specification-pack-provider",
+        "path": "SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs",
+        "maximumExpressionNodes": 2000,
+        "maximumDecisionPoints": 125
       }
     ]
   },

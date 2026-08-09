@@ -996,6 +996,11 @@ jobs:
 
   publish-private-preview:
     name: Promote preview.1 to the private feed
+    # Serialized, not cancelled: a re-pushed tag or a re-run must queue behind an
+    # in-flight promotion rather than race it or abort it midway.
+    concurrency:
+      group: sharpproof-publish-${{ github.ref_name }}
+      cancel-in-progress: false
     if: >-
       github.event_name == 'push' &&
       github.ref_name == 'v1.0.0-preview.1' &&
@@ -1053,6 +1058,11 @@ jobs:
 
   publish:
     name: Promote tested packages to public NuGet
+    # See publish-private-preview: queue re-runs of the same tag, never cancel a
+    # promotion that is already pushing to nuget.org.
+    concurrency:
+      group: sharpproof-publish-${{ github.ref_name }}
+      cancel-in-progress: false
     if: >-
       github.event_name == 'push' &&
       (github.ref_name == 'v1.0.0-preview.2' ||

@@ -63,8 +63,11 @@ internal static class WorkerResultAssembler
                 EffectCertainty = claim.Kind == WorkerClaimKind.Effect
                     ? WorkerEffectEvidenceCertainty.Unavailable
                     : WorkerEffectEvidenceCertainty.Unspecified,
-                Assumptions = manifest.Callables.First(callable =>
-                    callable.CallableId == claim.CallableId).Assumptions
+                // This runs on the failure path, where the manifest may already be
+                // malformed. A claim naming an absent callable must not turn a
+                // reported failure into an unhandled exception.
+                Assumptions = manifest.Callables.FirstOrDefault(callable =>
+                    callable.CallableId == claim.CallableId)?.Assumptions ?? []
             }),
             budgets, WorkerCacheStatus.Disabled, elapsedMilliseconds, errors, requestHash, versions);
     }

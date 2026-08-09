@@ -1,4 +1,5 @@
-using static SharpProof.Worker.SymbolicTermOperations;
+using static SharpProof.Ir.IrSemanticTerms;
+using static SharpProof.Ir.IrTermAnalysis;
 using static SharpProof.Worker.PostconditionObligationBuilder;
 
 namespace SharpProof.Worker;
@@ -102,7 +103,8 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             { Kind: CompilerPreparedBodyKind.Trivial } => TrivialBody(factory),
             { Kind: CompilerPreparedBodyKind.Program, Program: not null } prepared =>
                 _executor.Execute(target.Variables, factory, prepared.Program,
-                    prepared.SpecCalls, prepared.ParameterBindings.ToImmutableDictionary(
+                    prepared.SpecCalls, prepared.SummaryCalls,
+                    prepared.ParameterBindings.ToImmutableDictionary(
                         static item => item.Key, item => (IrTerm)factory.Variable(item.Value)),
                     prepared.ParameterBindings),
             _ => SymbolicBodyExecution.Failed(WorkerClaimReason.UnsupportedBody)
@@ -323,6 +325,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 null,
                 ImmutableDictionary<IrVarId, IrTerm>.Empty)],
             ImmutableDictionary<IrVarId, SpecResultProjection>.Empty,
+            [],
             []);
     }
 

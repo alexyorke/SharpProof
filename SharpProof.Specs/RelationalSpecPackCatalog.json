@@ -1,0 +1,64 @@
+{
+  "schema": "SharpProof.RelationalSpecPackCatalog",
+  "schemaVersion": 1,
+  "packs": [
+    {
+      "id": "dotnet.scalar",
+      "version": "1",
+      "evidence": "dotnet-api-contract:System.Math.Max(System.Int32,System.Int32)",
+      "methods": [
+        {
+          "documentationCommentId": "M:System.Math.Max(System.Int32,System.Int32)",
+          "assemblies": [
+            {
+              "name": "System.Private.CoreLib",
+              "publicKeyToken": "7cec85d7bea7798e"
+            },
+            {
+              "name": "System.Runtime",
+              "publicKeyToken": "b03f5f7f11d50a3a"
+            },
+            {
+              "name": "mscorlib",
+              "publicKeyToken": "b77a5c561934e089"
+            }
+          ],
+          "parameterTypes": [
+            "Integer",
+            "Integer"
+          ],
+          "resultType": "Integer",
+          "result": {
+            "kind": "conditional",
+            "type": "Integer",
+            "condition": {
+              "kind": "binary",
+              "type": "Boolean",
+              "operator": "GreaterThanOrEqual",
+              "left": {
+                "kind": "parameter",
+                "type": "Integer",
+                "ordinal": 0
+              },
+              "right": {
+                "kind": "parameter",
+                "type": "Integer",
+                "ordinal": 1
+              }
+            },
+            "whenTrue": {
+              "kind": "parameter",
+              "type": "Integer",
+              "ordinal": 0
+            },
+            "whenFalse": {
+              "kind": "parameter",
+              "type": "Integer",
+              "ordinal": 1
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

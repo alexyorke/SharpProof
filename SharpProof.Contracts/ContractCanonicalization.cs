@@ -61,6 +61,35 @@ internal sealed class ContractCanonicalization(
                     : null;
             }
 
+            if (type is IFunctionPointerTypeSymbol functionPointer)
+            {
+                var signature = functionPointer.Signature;
+                var returnType = Specialize(signature.ReturnType);
+                if (returnType == null)
+                {
+                    return null;
+                }
+                var parameterTypes = ImmutableArray.CreateBuilder<ITypeSymbol>(
+                    signature.Parameters.Length);
+                foreach (var functionParameter in signature.Parameters)
+                {
+                    var parameterType = Specialize(functionParameter.Type);
+                    if (parameterType == null)
+                    {
+                        return null;
+                    }
+                    parameterTypes.Add(parameterType);
+                }
+                return _compilation.CreateFunctionPointerTypeSymbol(
+                    returnType,
+                    signature.RefKind,
+                    parameterTypes.ToImmutable(),
+                    [.. signature.Parameters.Select(static parameter =>
+                        parameter.RefKind)],
+                    signature.CallingConvention,
+                    signature.UnmanagedCallingConventionTypes);
+            }
+
             if (type is not INamedTypeSymbol named ||
                 named.IsUnboundGenericType)
             {

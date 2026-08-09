@@ -548,7 +548,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'modeled-call-flow-definedness'
         File = 'SharpProof.Worker\AcyclicBlockPredicateExecutor.cs'
-        Original = 'predicate = application.Predicate;'
+        Original = 'predicate = application.Value.Predicate;'
         Mutated = 'predicate = factory.Boolean(true);'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~SpecCallArgumentDefinednessConstrainsSubsequentFlow'
@@ -556,16 +556,16 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'modeled-call-receiver-definedness'
         File = 'SharpProof.Worker\AcyclicBlockPredicateExecutor.cs'
-        Original = 'guard = receiverGuard;'
-        Mutated = 'guard = factory.Boolean(true);'
+        Original = "guard = receiverGuard;`n                substitutions.Add(template.Receiver.Value, receiver);"
+        Mutated = "guard = factory.Boolean(true);`n                substitutions.Add(template.Receiver.Value, receiver);"
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~SpecCallReceiverDefinednessConstrainsSubsequentFlow'
     },
     [pscustomobject]@{
         Name = 'modeled-call-argument-definedness'
         File = 'SharpProof.Worker\AcyclicBlockPredicateExecutor.cs'
-        Original = 'guard = argumentGuard;'
-        Mutated = 'guard = factory.Boolean(true);'
+        Original = "guard = argumentGuard;`n                substitutions.Add(template.Parameters[index], argument);"
+        Mutated = "guard = factory.Boolean(true);`n                substitutions.Add(template.Parameters[index], argument);"
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~SpecCallArgumentDefinednessConstrainsSubsequentFlow'
     },
@@ -899,17 +899,17 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'targets-protect-protocol-companion-path'
-        File = 'SharpProof.Verifier.Win-x64\buildTransitive\SharpProof.Verifier.Win-x64.targets'
-        Original = '                    "SharpProof.Worker.Protocol.dll")'
-        Mutated = '                    "SharpProof.Worker.Missing.dll")'
+        File = 'SharpProof.BuildTasks\InvalidatePublishedResult.cs'
+        Original = '                WorkerProtocolPath)'
+        Mutated = '                InvocationManifestPath)'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~LauncherProtocolAssetRemainsProtectedByTargets'
     },
     [pscustomobject]@{
         Name = 'launcher-normalizes-malformed-worker-deps'
         File = 'SharpProof.Worker.Launcher\Program.cs'
-        Original = "                InvalidDataException or JsonException or KeyNotFoundException or`n                InvalidOperationException)"
-        Mutated = "                InvalidDataException or KeyNotFoundException or`n                InvalidOperationException)"
+        Original = "                InvalidDataException or JsonException or KeyNotFoundException or`n                InvalidOperationException or System.ComponentModel.Win32Exception)"
+        Mutated = "                InvalidDataException or KeyNotFoundException or`n                InvalidOperationException or System.ComponentModel.Win32Exception)"
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~MainFailsClosedWhenWorkerDependencyManifestIsMalformed'
     },
@@ -944,6 +944,164 @@ $mutations = @(
         Mutated = '        if (length > maximum && totalBytes > MaximumClosureBytes - length)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~RuntimeClosureLimitsFailClosedAtEveryBoundary'
+    },
+    [pscustomobject]@{
+        Name = 'build-task-cancel-before-launch'
+        File = 'SharpProof.BuildTasks\RunVerifier.cs'
+        Original = '                if (_canceled)'
+        Mutated = '                if (_canceled && string.IsNullOrEmpty(Executable))'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~CanceledVerifierTaskDoesNotLaunchAProcess'
+    },
+    [pscustomobject]@{
+        Name = 'build-task-cancel-active-process'
+        File = 'SharpProof.BuildTasks\RunVerifier.cs'
+        Original = '            if (!process.HasExited)'
+        Mutated = '            if (process.HasExited)'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~ActiveVerifierTaskCancellationStopsTheProcess'
+    },
+    [pscustomobject]@{
+        Name = 'compiler-linked-module-closure'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerCompilationCapture.cs'
+        Original = "            backingModules = [`n                backingModules[0],`n                .. backingModules.Skip(1).OrderBy(`n                    static module => ReadModuleName(module.GetMetadataReader()),`n                    StringComparer.Ordinal)`n            ];"
+        Mutated = '            backingModules = [backingModules[0]];'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~LinkedNetmoduleProvenanceCapturesCompleteClosure'
+    },
+    [pscustomobject]@{
+        Name = 'compiler-reference-raw-metadata-binding'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerCompilationCapture.cs'
+        Original = '        return left.MetadataLength == right.MetadataLength &&'
+        Mutated = '        return left.MetadataLength == right.MetadataLength ||'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ReferencePathMustMatchRawMetadataWhenMvidIsUnchanged'
+    },
+    [pscustomobject]@{
+        Name = 'publication-locks-every-member'
+        File = 'SharpProof.Worker.Protocol\WindowsPathIdentity.cs'
+        Original = '            .OrderBy(static name => name, StringComparer.Ordinal)'
+        Mutated = '            .OrderBy(static name => name, StringComparer.Ordinal).Take(1)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~OverlapOnAnyPublicationMemberBlocks'
+    },
+    [pscustomobject]@{
+        Name = 'publication-rejects-unc'
+        File = 'SharpProof.Worker.Protocol\WindowsPathIdentity.cs'
+        Original = '        if (fullPath.StartsWith(@"\\", StringComparison.Ordinal))'
+        Mutated = '        if (fullPath.StartsWith(@"\\", StringComparison.Ordinal) && string.IsNullOrEmpty(fullPath))'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~RemotePublicationPathIsRejected'
+    },
+    [pscustomobject]@{
+        Name = 'analyzer-rejects-retired-mode'
+        File = 'SharpProof.Analyzer\Configuration\AnalyzerConfiguration.cs'
+        Original = '        return (options.TryGetValue("sharpproof_mode", out value!) ||'
+        Mutated = '        return (options.TryGetValue("sharpproof_removed", out value!) ||'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~RetiredModeOptionFailsClosed'
+    },
+    [pscustomobject]@{
+        Name = 'package-rejects-retired-mode'
+        File = 'SharpProof.Package\buildTransitive\SharpProof.targets'
+        Original = '    <Error Condition="''$(SharpProofMode)'' != ''''"'
+        Mutated = '    <Error Condition="''false'' == ''true''"'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~ProjectBodyConfigurationRejectsRetiredMode'
+    },
+    [pscustomobject]@{
+        Name = 'relational-source-call-admission'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerRelationalSummaryProvider.cs'
+        Original = '        return method.MethodKind == MethodKind.Ordinary &&'
+        Mutated = '        return method.MethodKind != MethodKind.Ordinary &&'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~DirectAcyclicSourceCallCarriesAReusableRelationalSummary'
+    },
+    [pscustomobject]@{
+        Name = 'relational-implementation-il-admission'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerImplementationIlSummaryLowerer.cs'
+        Original = '        if (!IsCandidate(compilation, method))'
+        Mutated = '        if (IsCandidate(compilation, method))'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~ExactImplementationIlSummaryProvesAnExternalCallChain'
+    },
+    [pscustomobject]@{
+        Name = 'relational-reference-assembly-rejection'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerImplementationIlSummaryLowerer.cs'
+        Original = '        if (IsReferenceAssembly(method.ContainingAssembly))'
+        Mutated = '        if (false && IsReferenceAssembly(method.ContainingAssembly))'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~ReferenceAssemblyIsNotImplementationProofAuthority'
+    },
+    [pscustomobject]@{
+        Name = 'relational-spec-pack-explicit-opt-in'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerSpecificationPackProvider.cs'
+        Original = '        var selected = (enabledPacks ?? [])'
+        Mutated = '        var selected = (enabledPacks ?? []).Concat(catalog.Packs.Keys)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~AuditedSpecificationPackRequiresExplicitOptIn'
+    },
+    [pscustomobject]@{
+        Name = 'relational-transitive-provenance'
+        File = 'SharpProof.Summaries\IrRelationalSummaryBuilder.cs'
+        Original = '            foreach (var provenance in dependency.DependencyProvenance)'
+        Mutated = '            foreach (var provenance in Array.Empty<IrSummaryProvenance>())'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~MixedSourceAndImplementationSummariesSealDependencyEvidence'
+    },
+    [pscustomobject]@{
+        Name = 'relational-instantiation-freshness'
+        File = 'SharpProof.Summaries\IrRelationalSummaryInstantiator.cs'
+        Original = (@'
+        var type = factory.GetVariableInfo(template).Type;
+        return factory.CreateVariable(
+            "summary:" +
+            instanceOrdinal.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+            ":" + role + ":" +
+            ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            type);
+'@).Trim()
+        Mutated = (@'
+        _ = factory.GetVariableInfo(template);
+        _ = instanceOrdinal;
+        _ = role;
+        _ = ordinal;
+        return template;
+'@).Trim()
+        Project = 'SharpProof.Summaries.Test\SharpProof.Summaries.Test.csproj'
+        Filter = 'FullyQualifiedName~CallCompositionUsesAReusableRelationAndFreshVariables'
+    },
+    [pscustomobject]@{
+        Name = 'relational-worker-assumption-binding'
+        File = 'SharpProof.Worker\AcyclicBlockPredicateExecutor.cs'
+        Original = (@'
+            _summaryAssumptions.Add(new GuardedBodySummaryAssumption(
+                prepared.CallIdentity,
+                prepared.Origin,
+                prepared.EvidenceSha256,
+                prepared.EvidenceIdentity,
+                guard,
+                relation));
+'@).Trim()
+        Mutated = (@'
+            _summaryAssumptions.Add(new GuardedBodySummaryAssumption(
+                prepared.CallIdentity,
+                prepared.Origin,
+                prepared.EvidenceSha256,
+                prepared.EvidenceIdentity,
+                guard,
+                factory.Boolean(true)));
+'@).Trim()
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~SourceCallContributesItsGuardedRelationalAssumption'
+    },
+    [pscustomobject]@{
+        Name = 'relational-counterexample-classification'
+        File = 'SharpProof.Worker\CallableCounterexampleReplayer.cs'
+        Original = '                            body.SummaryCalls.ContainsKey(call.Id))'
+        Mutated = '                            false)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~ExecutedRelationalSummaryCallIsNotAReplayableCounterexample'
     }
 )
 

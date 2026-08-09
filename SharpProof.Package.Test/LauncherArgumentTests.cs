@@ -99,6 +99,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    [Platform("Win")]
     public void CompletePublicationAcceptsSarif()
     {
         string[] arguments = [
@@ -118,6 +119,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    [Platform("Win")]
     public void ParsedPathsAndTerminationGraceAreNormalized()
     {
         string[] arguments = [
@@ -269,6 +271,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    [Platform("Win")]
     public void RequestProjectionRejectsReparsePointPathBeforeManifestRead()
     {
         var root = Path.Combine(
@@ -326,6 +329,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    [Platform("Win")]
     public void RequestProjectionRejectsCollidingIoPathsBeforeManifestRead()
     {
         string[] arguments = [
@@ -347,6 +351,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    [Platform("Win")]
     public void RequestProjectionRejectsCachePathCollisionBeforeManifestRead()
     {
         var requestPath = Path.Combine(
@@ -374,6 +379,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    [Platform("Win")]
     public void RequestProjectionRejectsWorkerTreeOutputBeforeManifestRead()
     {
         var worker = Path.Combine(
@@ -402,6 +408,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    [Platform("Win")]
     public void RequestProjectionRejectsWorkerPathCollisionBeforeManifestRead()
     {
         string[] arguments = [
@@ -439,6 +446,7 @@ public sealed class LauncherArgumentTests
 
     [TestCase("worker.deps.json")]
     [TestCase("worker.runtimeconfig.json")]
+    [Platform("Win")]
     public void RequestProjectionRejectsWorkerRuntimeCompanionCollisionBeforeManifestRead(
         string resultPath)
     {
@@ -471,6 +479,7 @@ public sealed class LauncherArgumentTests
     [TestCase("System.IO.Pipelines.dll")]
     [TestCase("System.Text.Encodings.Web.dll")]
     [TestCase("System.Text.Json.dll")]
+    [Platform("Win")]
     public void RequestProjectionRejectsLauncherRuntimeCollisionBeforeManifestRead(
         string extension)
     {
@@ -503,6 +512,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    [Platform("Win")]
     public void RequestProjectionRejectsLauncherProtocolRuntimeCollisionBeforeManifestRead()
     {
         var launcher = LauncherArguments.LauncherRuntimePaths[0];
@@ -530,6 +540,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    [Platform("Win")]
     public void RequestProjectionRejectsDiscoveredRuntimeAssetCollisionBeforeManifestRead()
     {
         var worker = typeof(SharpProofWorker).Assembly.Location;
@@ -630,6 +641,7 @@ public sealed class LauncherArgumentTests
 
     [Test]
     [NonParallelizable]
+    [Platform("Win")]
     public async Task MainLeavesRequestAndResultSentinelsWhenManifestIsMalformed()
     {
         var directory = Path.Combine(
@@ -676,6 +688,7 @@ public sealed class LauncherArgumentTests
 
     [Test]
     [NonParallelizable]
+    [Platform("Win")]
     public async Task MainFailsClosedWhenWorkerDependencyManifestIsMalformed()
     {
         var sourceWorker = typeof(SharpProofWorker).Assembly.Location;
@@ -821,6 +834,7 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    [Platform("Win")]
     public void DotNetHostMustBeAbsoluteInstalledAndOutsideProject()
     {
         var project = Path.Combine(
@@ -838,6 +852,30 @@ public sealed class LauncherArgumentTests
             Assert.That(
                 Program.ValidateDotNetHostPath(actualHost, project),
                 Is.EqualTo(Path.GetFullPath(actualHost)));
+            if (OperatingSystem.IsWindows())
+            {
+                var extendedHost = @"\\?\" + Path.GetFullPath(actualHost);
+                var extendedProjectRoot = @"\\?\" +
+                    Path.GetPathRoot(actualHost)!;
+                Assert.That(
+                    Program.ValidateDotNetHostPath(extendedHost, project),
+                    Is.EqualTo(Path.GetFullPath(actualHost)));
+                Assert.That(
+                    (Action)(() => _ = Program.ValidateDotNetHostPath(
+                        extendedHost,
+                        Path.GetPathRoot(actualHost)!)),
+                    Throws.TypeOf<InvalidOperationException>());
+                Assert.That(
+                    (Action)(() => _ = Program.ValidateDotNetHostPath(
+                        actualHost,
+                        extendedProjectRoot)),
+                    Throws.TypeOf<InvalidOperationException>());
+            }
+            Assert.That(
+                (Action)(() => _ = Program.ValidateDotNetHostPath(
+                    actualHost,
+                    Path.GetPathRoot(actualHost)!)),
+                Throws.TypeOf<InvalidOperationException>());
             Assert.That(
                 (Action)(() => _ = Program.ValidateDotNetHostPath(
                     "dotnet.exe", project)),

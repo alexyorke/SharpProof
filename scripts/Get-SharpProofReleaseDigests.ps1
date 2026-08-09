@@ -17,20 +17,19 @@ $ErrorActionPreference = 'Stop'
 $resolvedRepository = (Resolve-Path `
     -LiteralPath $RepositoryPath `
     -ErrorAction Stop).Path
-$tcbHelperRevision =
-    $Commit + ':scripts/Get-SharpProofTcbPaths.ps1'
-$tcbHelper = @(
-    & git -C $resolvedRepository show `
-        '--format=' `
-        '--no-ext-diff' `
-        $tcbHelperRevision `
-        2>$null)
-if ($LASTEXITCODE -ne 0 -or $tcbHelper.Count -eq 0) {
+# The trusted-computing-base path list is derived from eng/acceptance/contract.json
+# read out of the measured commit, and that data is what keeps a digest
+# reproducible. The helper that flattens it is code, so it is dot-sourced from
+# this checkout rather than read back out of the revision under measurement: a
+# tool that evaluates script text supplied by the artifact it is measuring
+# cannot attest to that artifact, and a tampered helper could also return a
+# truncated path list and shrink the measured TCB.
+$tcbHelperPath = Join-Path $PSScriptRoot 'Get-SharpProofTcbPaths.ps1'
+if (-not (Test-Path -LiteralPath $tcbHelperPath -PathType Leaf)) {
     throw (
-        "Reading '$tcbHelperRevision' from commit '$Commit' failed. " +
-        'The release digest helper must be present in the committed tree.')
+        "The release digest helper '$tcbHelperPath' is missing from this checkout.")
 }
-Invoke-Expression ($tcbHelper -join [Environment]::NewLine)
+. $tcbHelperPath
 $approvedMetadataRootFiles =
     [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)

@@ -1,22 +1,9 @@
 <Project>
   <PropertyGroup>
-    <_SharpProofProfileProvided Condition="'$(SharpProofProfile)' != ''">true</_SharpProofProfileProvided>
-    <_SharpProofFeaturesProvided Condition="'$(SharpProofFeatures)' != ''">true</_SharpProofFeaturesProvided>
-    <_SharpProofLegacyModeProvided Condition="'$(SharpProofMode)' != ''">true</_SharpProofLegacyModeProvided>
-    <_SharpProofLegacyModeValue>$(SharpProofMode)</_SharpProofLegacyModeValue>
-    <_SharpProofLegacyModeNormalized>$([System.String]::Copy('$(SharpProofMode)').ToLowerInvariant())</_SharpProofLegacyModeNormalized>
-    <SharpProofProfile Condition="'$(SharpProofProfile)' == '' AND '$(_SharpProofLegacyModeNormalized)' == 'off'">off</SharpProofProfile>
     <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
-    <SharpProofFeatures Condition="'$(SharpProofFeatures)' == '' AND '$(_SharpProofLegacyModeNormalized)' == 'effects'">effects</SharpProofFeatures>
-    <SharpProofFeatures Condition="'$(SharpProofFeatures)' == '' AND '$(_SharpProofLegacyModeNormalized)' == 'contracts'">contracts</SharpProofFeatures>
     <SharpProofFeatures Condition="'$(SharpProofFeatures)' == ''">all</SharpProofFeatures>
     <_SharpProofProfileNormalized>$([System.String]::Copy('$(SharpProofProfile)').ToLowerInvariant())</_SharpProofProfileNormalized>
     <_SharpProofFeaturesNormalized>$([System.String]::Copy('$(SharpProofFeatures)').ToLowerInvariant())</_SharpProofFeaturesNormalized>
-    <_SharpProofEffectiveLegacyMode Condition="'$(_SharpProofProfileNormalized)' == 'off'">off</_SharpProofEffectiveLegacyMode>
-    <_SharpProofEffectiveLegacyMode Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofFeaturesNormalized)' == 'effects'">effects</_SharpProofEffectiveLegacyMode>
-    <_SharpProofEffectiveLegacyMode Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofFeaturesNormalized)' == 'contracts'">contracts</_SharpProofEffectiveLegacyMode>
-    <_SharpProofEffectiveLegacyMode Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofFeaturesNormalized)' == 'all'">all-experimental</_SharpProofEffectiveLegacyMode>
-    <SharpProofMode>$(_SharpProofEffectiveLegacyMode)</SharpProofMode>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">true</SharpProofVerify>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == ''">false</SharpProofVerify>
     <_SharpProofContractsRuntimeEnabled
@@ -41,6 +28,7 @@
         $(_SharpProofCollectorDirectory)/SharpProof.Frontend.dll;
         $(_SharpProofCollectorDirectory)/SharpProof.Ir.dll;
         $(_SharpProofCollectorDirectory)/SharpProof.Specs.dll;
+        $(_SharpProofCollectorDirectory)/SharpProof.Summaries.dll;
         $(_SharpProofCollectorDirectory)/SharpProof.Worker.Protocol.dll;
         $(_SharpProofCollectorDirectory)/System.IO.Pipelines.dll;
         $(_SharpProofCollectorDirectory)/System.Text.Encodings.Web.dll;
@@ -55,10 +43,8 @@
           Condition="'$(DesignTimeBuild)' != 'true'">
     <Error Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(NETCoreSdkVersion)' != '' AND $([MSBuild]::VersionLessThan('$(NETCoreSdkVersion)', '9.0.300'))"
            Text="SharpProof analysis requires .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). Set SharpProofProfile=off to omit the analyzer on an older compiler host." />
-    <Error Condition="'$(_SharpProofLegacyModeProvided)' == 'true' AND '$(_SharpProofLegacyModeNormalized)' != 'off' AND '$(_SharpProofLegacyModeNormalized)' != 'effects' AND '$(_SharpProofLegacyModeNormalized)' != 'contracts' AND '$(_SharpProofLegacyModeNormalized)' != 'all-experimental'"
-           Text="SharpProofMode must be off, effects, contracts, or all-experimental while the preview compatibility alias remains available." />
-    <Error Condition="'$(_SharpProofLegacyModeProvided)' == 'true' AND ('$(_SharpProofProfileProvided)' == 'true' OR '$(_SharpProofFeaturesProvided)' == 'true') AND '$(_SharpProofLegacyModeNormalized)' != '$(_SharpProofEffectiveLegacyMode)'"
-           Text="Deprecated SharpProofMode conflicts with the effective SharpProofProfile and SharpProofFeatures values." />
+    <Error Condition="'$(SharpProofMode)' != ''"
+           Text="SharpProofMode was removed before preview.1. Use SharpProofProfile and SharpProofFeatures." />
     <Error Condition="'$(_SharpProofProfileNormalized)' != 'advisory' AND '$(_SharpProofProfileNormalized)' != 'strict' AND '$(_SharpProofProfileNormalized)' != 'off'"
            Text="SharpProofProfile must be advisory, strict, or off." />
     <Error Condition="'$(_SharpProofFeaturesNormalized)' != 'effects' AND '$(_SharpProofFeaturesNormalized)' != 'contracts' AND '$(_SharpProofFeaturesNormalized)' != 'all'"
@@ -69,8 +55,6 @@
            Text="SharpProofProfile=strict requires SharpProofVerify=true; use the advisory profile to make verification optional." />
     <Error Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofContractsRuntimeEnabled)' == 'true'"
            Text="SHARPPROOF_CONTRACTS enables runtime evaluation of ghost contracts and is not supported while SharpProof analysis is enabled. Remove it from DefineConstants or set SharpProofProfile=off." />
-    <Warning Condition="'$(_SharpProofLegacyModeProvided)' == 'true'"
-             Text="SharpProofMode='$(_SharpProofLegacyModeValue)' is deprecated during preview. Use SharpProofProfile and SharpProofFeatures; all-experimental maps to SharpProofFeatures=all." />
   </Target>
 
   <Target Name="_SharpProofRequireVerifierPackage"

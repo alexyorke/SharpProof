@@ -416,10 +416,11 @@ public static partial class WorkerProtocolJson
     {
         var expected = values.GroupBy(static value => value)
             .ToDictionary(static group => group.Key, static group => group.Count());
+        var seen = new HashSet<TKind>();
         return actual != null &&
             actual.Length == expected.Count &&
             actual.All(value => value != null && count(value) > 0 &&
-                IsDefined(kind(value), unspecified) &&
+                IsDefined(kind(value), unspecified) && seen.Add(kind(value)) &&
                 expected.TryGetValue(kind(value), out var expectedCount) &&
                 count(value) == expectedCount);
     }

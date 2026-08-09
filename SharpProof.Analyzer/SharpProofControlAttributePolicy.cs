@@ -10,26 +10,19 @@ internal static class SharpProofControlAttributePolicy
         var suppress = false;
         foreach (var symbol in EnumerateScopes(method))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            foreach (var attribute in symbol.GetAttributes())
-            {
-                var suppressing = IsSuppressing(attribute, session.Attributes);
-                if (!suppressing.HasValue)
-                {
-                    continue;
-                }
-
-                if (TryGetReason(attribute, out var reason))
-                {
-                    suppress |= suppressing.Value;
-                    continue;
-                }
-                ReportInvalidReason(
-                    method, attribute, suppressing.Value, reason, session,
-                    reportDiagnostic, cancellationToken);
-            }
+            suppress |= ValidateScope(
+                symbol, session, reportDiagnostic, cancellationToken);
         }
         return suppress;
+    }
+
+    internal static void ValidateDeclaredScope(
+        ISymbol symbol, AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken)
+    {
+        _ = ValidateScope(
+            symbol, session, reportDiagnostic, cancellationToken);
     }
 
     internal static IEnumerable<ISymbol> EnumerateScopes(IMethodSymbol method)
@@ -60,8 +53,35 @@ internal static class SharpProofControlAttributePolicy
         return !string.IsNullOrWhiteSpace(reason);
     }
 
+    private static bool ValidateScope(
+        ISymbol symbol, AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken)
+    {
+        var suppress = false;
+        cancellationToken.ThrowIfCancellationRequested();
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            var suppressing = IsSuppressing(attribute, session.Attributes);
+            if (!suppressing.HasValue)
+            {
+                continue;
+            }
+
+            if (TryGetReason(attribute, out var reason))
+            {
+                suppress |= suppressing.Value;
+                continue;
+            }
+            ReportInvalidReason(
+                symbol, attribute, suppressing.Value, reason, session,
+                reportDiagnostic, cancellationToken);
+        }
+        return suppress;
+    }
+
     private static void ReportInvalidReason(
-        IMethodSymbol method, AttributeData attribute, bool suppressing,
+        ISymbol symbol, AttributeData attribute, bool suppressing,
         string reason, AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
@@ -73,7 +93,8 @@ internal static class SharpProofControlAttributePolicy
 
         var location =
             attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation() ??
-            AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(method, cancellationToken);
+            symbol.Locations.FirstOrDefault(static candidate => candidate.IsInSource) ??
+            Location.None;
         reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
             suppressing ? "[SharpProofSuppress]" : "[SharpProofTrusted]",
             string.IsNullOrEmpty(reason) ? "<empty>" : reason,

@@ -339,6 +339,14 @@ public sealed class RoslynOperationLowerer
 
     private LoweredExpression LowerConstant(IOperation operation)
     {
+        // An absent constant is not a null constant. Without this guard the
+        // null-valued branch below would turn "Roslyn folded nothing here" into
+        // an exact null term.
+        if (!operation.ConstantValue.HasValue)
+        {
+            return Opaque(operation, FrontendAbstention.UnsupportedType);
+        }
+
         var value = operation.ConstantValue.Value;
         var type = GetTypeId(operation.Type);
         if (operation.Type is { IsValueType: true, SpecialType: SpecialType.None })
@@ -746,6 +754,10 @@ public sealed class RoslynOperationLowerer
                 return operand;
             }
 
+            // Routing stays keyed on the operand's constant so the abstention
+            // reasons keep their existing split. LowerConstant is what guards
+            // against the conversion itself carrying no constant, which is the
+            // case for boxing.
             if (operation.Operand.ConstantValue.HasValue)
             {
                 return _owner.LowerConstant(operation);

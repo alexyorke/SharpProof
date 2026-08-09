@@ -13,6 +13,8 @@ jobs; they are not interchangeable sources of truth.
 | [Diagnostics](diagnostic-examples.md) | Analyzer and verifier users | Current `SP`, `SPCF`, SP0047, SP0048, and SP0049 diagnostics, defaults, policies, and examples |
 | [Package-backed samples](../samples/README.md) | Evaluators and CI owners | Passing, diagnostic, mixed-outcome, strict-library, and host-rejection examples against packed artifacts |
 | [Analysis limits](analysis-limits.md) | Build and CI owners | Shipping profile/feature/policy properties, worker bounds, and acceptance-only budgets |
+| [Preview support boundary](preview-support.md) | Build and release owners | Normative Windows host, path, concurrency, and trusted-filesystem boundary |
+| [Release constants and ownership](release-constants.md) | Maintainers | Classification and authoritative sources for pins, defaults, and derived measurements |
 | [Typed abstention reasons](unknown-reasons.md) | Tool integrators | Exact typed reasons, run statuses, callable coverage, claim outcomes, and cache states |
 
 ## Normative and architectural documents
@@ -30,13 +32,20 @@ The implementation remains the authority for enumerated surfaces:
   types, operation kinds, and operation shapes.
 - `SharpProof.Specs/ApiSpecTable.cs` declares typed API specifications. Not
   every witnessed facet is consumed by the worker.
+- `SharpProof.Specs/RelationalSpecPackCatalog.json` declares the embedded,
+  explicitly enabled relational specification packs. The schema-1 catalog is
+  strict data; relation parsing and identity validation remain handwritten in
+  the build-time compiler collector.
+- `SharpProof.Summaries` owns reusable typed-IR relational construction,
+  instantiation, dependency analysis, and transitive provenance independent of
+  Roslyn, PE metadata, and Z3.
 - `eng/diagnostics/diagnostic-descriptors.v1.json` declares analyzer,
   `ContractFor`, and soundness-meta diagnostic IDs, severities, defaults,
   messages, order, and help links. The corresponding
   `*DiagnosticDescriptors.generated.cs` files are checked-in compiled
   projections.
 - `SharpProof.Worker.Protocol/ProtocolModel.schema.json` declares protocol
-  version 9, manifest schema version 4, cache schema version 11, policies, run
+  version 10, manifest schema version 4, cache schema version 12, policies, run
   statuses, callable coverage, claim outcomes/reasons, and summary records.
   `ProtocolModel.generated.cs` is the checked-in compiled projection.
 - `SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json` is the
@@ -90,6 +99,7 @@ The implementation remains the authority for enumerated surfaces:
 | [Acceptance contract](../eng/acceptance/README.md) | Active | Defines the release checks for the 1.0 preview. |
 | [Release gates](../SharpProof.Gates/README.md) | Active | Documents the corpus, metamorphic, performance, and cancellation runners. |
 | [Open-source corpus](../SharpProof.Gates/Corpus/README.md) | Active | Records corpus provenance, licensing, instrumentation, and update procedure. |
+| [2026-08-08 relational interprocedural verification](soundness-notes/2026-08-08-relational-interprocedural-verification.md) | Dated evidence | Records the bounded source, exact implementation-IL, and audited-pack relation boundary and its executable evidence. |
 | [2026-07-30 allocation effect replay](soundness-notes/2026-07-30-allocation-effect-replay.md) | Dated evidence | Records the independently interpreted allocation-effect refutation boundary and executable evidence. |
 | [2026-07-29 formatting-neutral source metrics](soundness-notes/2026-07-29-formatting-neutral-source-metrics.md) | Dated evidence | Records removal of compression-oriented formatting and LOC gates. |
 | [2026-07-27 product bug sweep](soundness-notes/2026-07-27-product-sweep.md) | Dated evidence | Records analyzer, contract, effect, and worker adversarial fixes plus exact validation evidence. |
@@ -102,9 +112,10 @@ the current coverage inventory or normative semantics.
 ## Known production gaps
 
 During Windows verification, the production analyzer emits a deterministic
-schema-9 compiler artifact from the final post-generator Roslyn
+schema-11 compiler artifact from the final post-generator Roslyn
 `Compilation`. It contains the selected-claim manifest and portable lowered
-whole-body CFG/IR for supported selected callables, plus bound contract/spec
+whole-body CFG/IR for supported selected callables, plus bounded relational
+source/implementation-IL/audited-pack calls, bound contract/spec
 metadata, compiler diagnostics, generated-tree hashes, bounded options, mapped
 locations, and identity/provenance evidence. It contains no source text.
 
@@ -118,12 +129,14 @@ production-plan Step 4 is complete for the bounded verifier subset.
 Independent whole-body postcondition-counterexample replay is implemented for
 the admitted scalar program subset. The proof kernel checks exact model closure
 and the lowered assumptions/goal before the worker independently executes the
-compiler-produced whole-body CFG. Schema 9 also carries an independently
+compiler-produced whole-body CFG. Schema 11 retains the independently
 replayable event for an unconditional definite managed object/array allocation.
 The worker can use it to refute `ZeroAllocations` or an `EffectContract`
 excluding `Allocates`; other effect candidates still fail closed as typed
-`Unknown`. Effect results remain noncacheable, and worker protocol 9 and cache
-schema 11 are unchanged. The three-package split, portable SourceLink symbols,
+`Unknown`. Effect results remain noncacheable. Worker protocol 10, cache schema
+12, relational-summary schema version 1, and specification-pack schema version
+1 carry the
+current wire contract. The three-package split, portable SourceLink symbols,
 package validation, deterministic hashes, SPDX 2.3 package/component SBOM
 generation, separately permissioned GitHub build/SBOM attestations, immutable
 tagged-byte validation, trusted-publishing workflow, package-backed sample
@@ -137,8 +150,9 @@ separately in dependency order. A symbol collision or partial publication
 requires a new version. Deterministic SARIF 2.1.0 projection is available as an
 opt-in verifier output. Owner configuration of
 protected release environments and tags, pilot-library evidence, the first
-private/public NuGet publications, and the remaining release reviews are
-future work. Current behavior and limits are recorded in
+private/public NuGet publications, and exact-candidate release evidence are
+future work. Preview changes use the acceptance-owned solo evidence gate;
+stable 1.0 governance is separate. Current behavior and limits are recorded in
 [Coverage and limits](coverage-and-limits.md#closed-compiler-artifact-and-remaining-limits).
 
 ## Machine-owned Markdown

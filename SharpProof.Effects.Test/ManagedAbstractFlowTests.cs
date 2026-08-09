@@ -1100,4 +1100,103 @@ public sealed class ManagedAbstractFlowTests
             interval,
             Is.EqualTo(IntervalValue.Range(int.MinValue, int.MaxValue)));
     }
+
+    [Test]
+    public void NonConvergentAnalysisDegradesToAnIncompleteSummary()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static long Calls(long value) {
+                    var total = 0L;
+                    if (value > 0) { total = value; } else { total = -value; }
+                    if (value > 10) { total += 1; } else { total += 2; }
+                    return total;
+                }
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+
+        // The body must be ACYCLIC: a loop is rejected by the IsAcyclic gate
+        // before the solver ever runs, so a cyclic fixture would report Cyclic
+        // and never exercise the convergence catch at all. Branching gives a
+        // multi-block graph that cannot settle within one worklist round.
+        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
+            .AnalyzeWithIterationLimitForTesting(
+                method,
+                ControlFlowGraph.Create(root),
+                null,
+                maxIterations: 1,
+                default);
+
+        // Assert the specific status. "not Complete" would also be satisfied by
+        // Cyclic, which is how the previous version of this test passed without
+        // reaching the catch.
+        Assert.That(
+            analysis.Status,
+            Is.EqualTo(ManagedFlowStatus.BudgetExceeded));
+    }
+
+    [Test]
+    public void DeepExpressionEvaluationAbstainsInsteadOfExhaustingTheStack()
+    {
+        static (ManagedAbstractValue Value, ManagedAbstractFlow Flow) Evaluate(int terms)
+        {
+            var chain = string.Join(" + ", Enumerable.Repeat("value", terms));
+            var compilation = EffectTestHost.CreateCompilation(
+                $$"""
+                public static class Sample {
+                    public static long Calls(long value) => {{chain}};
+                }
+                """);
+            var syntax = compilation.SyntaxTrees.Single().GetRoot()
+                .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+            var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+            var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+            var expression = model.GetOperation(syntax.ExpressionBody!.Expression)!;
+            var state = ManagedFlowState.Empty.Set(
+                method.Parameters[0],
+                ManagedAbstractValue.Integer(IntervalValue.Constant(1)));
+            var flow = ManagedAbstractFlow.ForCompilation(compilation);
+            return (flow.Evaluate(expression, state), flow);
+        }
+
+        // Entered directly, so the walk budget is spent here rather than in
+        // Transfer, which is what makes this guard reachable at all.
+        var shallow = Evaluate(4).Value;
+        var deep = Evaluate(400).Value;
+
+        // With the parameter bound, a shallow chain folds to an exact interval.
+        // Past the depth budget the walk stops and the operand becomes unknown,
+        // which widens the result to the whole domain rather than recursing.
+        Assert.That(shallow.TryGetInteger(out var shallowInterval), Is.True);
+        Assert.That(shallowInterval, Is.EqualTo(IntervalValue.Constant(4)));
+        Assert.That(deep.TryGetInteger(out var deepInterval), Is.True);
+        Assert.That(deepInterval, Is.EqualTo(
+            IntervalValue.Range(long.MinValue, long.MaxValue)));
+    }
+
+    [Test]
+    public void IrScalarArithmeticKeepsTheIntervalItComputes()
+    {
+        var ten = ManagedAbstractValue.Integer(IntervalValue.Constant(10));
+        var one = ManagedAbstractValue.Integer(IntervalValue.Constant(1));
+
+        // No Roslyn type symbol is available for an IR term, and the general
+        // Binary overload discards a computed interval when it cannot bound it.
+        // The IR integer domain is exactly Int64 and TryArithmetic already
+        // refuses anything outside it, so the result is kept.
+        var kept = ManagedAbstractValue.BinaryOverIrScalars(
+            BinaryOperatorKind.Subtract, ten, one);
+        var discarded = ManagedAbstractValue.Binary(
+            BinaryOperatorKind.Subtract, ten, one);
+
+        Assert.That(kept.TryGetInteger(out var keptInterval), Is.True);
+        Assert.That(keptInterval, Is.EqualTo(IntervalValue.Constant(9)));
+        Assert.That(discarded.IsUnknown, Is.True);
+    }
 }

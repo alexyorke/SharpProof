@@ -437,7 +437,8 @@
             {"type": "WorkerClaimReason", "name": "Reason"},
             {"type": "ImmutableArray<SymbolicReturn>", "name": "Returns"},
             {"type": "ImmutableDictionary<IrVarId, SpecResultProjection>", "name": "SpecResultProjections"},
-            {"type": "ImmutableArray<GuardedBodySpecAssumption>", "name": "SpecAssumptions"}
+            {"type": "ImmutableArray<GuardedBodySpecAssumption>", "name": "SpecAssumptions"},
+            {"type": "ImmutableArray<GuardedBodySummaryAssumption>", "name": "SummaryAssumptions"}
           ]
         },
         {
@@ -459,6 +460,20 @@
           "parameters": [
             {"type": "SpecId", "name": "Spec"},
             {"type": "string", "name": "WitnessIdentifier"},
+            {"type": "IrTerm", "name": "Guard"},
+            {"type": "IrTerm", "name": "Predicate"}
+          ]
+        },
+        {
+          "kind": "recordStruct",
+          "accessibility": "internal",
+          "modifiers": ["readonly"],
+          "name": "GuardedBodySummaryAssumption",
+          "parameters": [
+            {"type": "string", "name": "CallIdentity"},
+            {"type": "CompilerSummaryOrigin", "name": "Origin"},
+            {"type": "string", "name": "EvidenceSha256"},
+            {"type": "string", "name": "EvidenceIdentity"},
             {"type": "IrTerm", "name": "Guard"},
             {"type": "IrTerm", "name": "Predicate"}
           ]
