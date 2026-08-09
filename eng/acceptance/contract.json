@@ -29,7 +29,7 @@
   "mutationEvidence": {
     "schemaVersion": 1,
     "expectedCatalogCount": 129,
-    "expectedCatalogSha256": "4e31683992325598f803fb4caf6577759c0e94e6cfb8e3aadcd853cdae5af53c"
+    "expectedCatalogSha256": "2952fa0c13685fe9a113aa40033dba48d8f7390294f4bf878ddf23c05a8975ce"
   },
   "worker": {
     "protocolVersion": 11,

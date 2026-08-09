@@ -194,6 +194,47 @@ public sealed class WorkerBinaryIdentityTests
     }
 
     [Test]
+    [Platform("Linux")]
+    public void IdentityDistinguishesLinuxComponentNameCase()
+    {
+        var temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.ComponentCase." + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temporaryDirectory);
+        try
+        {
+            static string WriteClosure(string directory, string workerName)
+            {
+                Directory.CreateDirectory(directory);
+                var worker = Path.Combine(directory, workerName + ".dll");
+                File.WriteAllBytes(worker, [1, 2, 3]);
+                File.WriteAllText(
+                    Path.Combine(directory, workerName + ".deps.json"),
+                    "{}");
+                File.WriteAllText(
+                    Path.Combine(directory, workerName + ".runtimeconfig.json"),
+                    "{}");
+                return worker;
+            }
+
+            var upper = WriteClosure(
+                Path.Combine(temporaryDirectory, "upper"),
+                "Worker");
+            var lower = WriteClosure(
+                Path.Combine(temporaryDirectory, "lower"),
+                "worker");
+
+            Assert.That(
+                WorkerBinaryIdentity.ComputeSha256(lower),
+                Is.Not.EqualTo(WorkerBinaryIdentity.ComputeSha256(upper)));
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    [Test]
     public void IdentityCoversTheCompleteTrustedRuntimeClosure()
     {
         Assert.That(

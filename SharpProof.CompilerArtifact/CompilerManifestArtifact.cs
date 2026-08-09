@@ -90,7 +90,7 @@ internal static class WorkerBinaryIdentity
                     EnsureStagedComponentConsistency(
                         component.Value,
                         stagedPath);
-                    hash.Add(component.Key.ToUpperInvariant()).Add(stagedRead);
+                    hash.Add(component.Key).Add(stagedRead);
                 }
                 stagedHandles[stagedCount++] = OpenRead(stagedPath);
             }
