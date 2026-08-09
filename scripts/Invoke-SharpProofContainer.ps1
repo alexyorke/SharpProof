@@ -162,11 +162,22 @@ switch ($Command) {
         [IO.Directory]::CreateDirectory((Join-Path $repositoryRoot (
                     Split-Path -Parent $mutationOutput))) | Out-Null
         $commit = (& git rev-parse HEAD).Trim()
+        $mutationArguments = @{
+            Configuration = $Configuration
+            OutputPath = $mutationOutput
+            ExpectedCommit = $commit
+        }
+        $resolvedMutationOutput = Join-Path $repositoryRoot $mutationOutput
+        if (Test-Path -LiteralPath $resolvedMutationOutput -PathType Leaf) {
+            $existingMutationEvidence = Get-Content `
+                -LiteralPath $resolvedMutationOutput `
+                -Raw | ConvertFrom-Json
+            if ([string]$existingMutationEvidence.commit -eq $commit) {
+                $mutationArguments.Resume = $true
+            }
+        }
         & (Join-Path $repositoryRoot 'scripts/Test-SharpProofTrustedMutations.ps1') `
-            -Configuration $Configuration `
-            -OutputPath $mutationOutput `
-            -ExpectedCommit $commit `
-            -Resume
+            @mutationArguments
         if ($LASTEXITCODE -ne 0) { throw 'Trusted mutation validation failed.' }
     }
     'dependency-audit' {

@@ -909,8 +909,12 @@ public sealed class ArchitectureTests
                 Does.Contain(
                     "$mutationOutput = " +
                     "'artifacts/mutation/trusted-mutations.json'"));
-            Assert.That(container, Does.Contain("-OutputPath $mutationOutput"));
-            Assert.That(container, Does.Contain("-Resume"));
+            Assert.That(
+                container,
+                Does.Contain("OutputPath = $mutationOutput"));
+            Assert.That(
+                container,
+                Does.Contain("$mutationArguments.Resume = $true"));
             Assert.That(
                 container,
                 Does.Not.Contain(
@@ -982,6 +986,28 @@ public sealed class ArchitectureTests
             Assert.That(host, Does.Contain("EntryPoint = \"prctl\""));
             Assert.That(launcher, Does.Contain("LinuxWorkerProcess.Start"));
             Assert.That(launcher, Does.Not.Contain("kernel32"));
+        }
+    }
+
+    [Test]
+    public void NativeZ3ResolverLoadsOnlyTheContainerVerifiedPath()
+    {
+        var host = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "SharpProof.Host",
+            "ContainerNativeLibrary.cs"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                host,
+                Does.Contain(
+                    "NativeLibrary.Load(" + Environment.NewLine +
+                    "                " +
+                    "ContainerContract.ResolveZ3LibraryRequired());"));
+            Assert.That(
+                host,
+                Does.Not.Contain("NativeLibrary.Load(Z3ImportName);"));
         }
     }
 

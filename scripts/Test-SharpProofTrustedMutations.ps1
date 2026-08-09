@@ -752,8 +752,8 @@ $mutations = @(
         File = 'SharpProof.Host\ContainerNativeLibrary.cs'
         Original = "            var handle = NativeLibrary.Load(`n                ContainerContract.ResolveZ3LibraryRequired());"
         Mutated = '            var handle = NativeLibrary.Load(Z3ImportName);'
-        Project = 'SharpProof.Smt.Test\SharpProof.Smt.Test.csproj'
-        Filter = 'FullyQualifiedName~UnsatProofReturnsAHygienicCore'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~NativeZ3ResolverLoadsOnlyTheContainerVerifiedPath'
     },
     [pscustomobject]@{
         Name = 'launcher-timeout-owns-result'
