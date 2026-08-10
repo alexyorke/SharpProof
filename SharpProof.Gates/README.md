@@ -2,12 +2,16 @@
 
 `SharpProof.Gates` is a deterministic console gate:
 
-```powershell
-.\scripts\Invoke-SharpProofDotnet.ps1 run --project SharpProof.Gates\SharpProof.Gates.csproj -- corpus
-.\scripts\Invoke-SharpProofDotnet.ps1 run --project SharpProof.Gates\SharpProof.Gates.csproj -- corpus-update
-.\scripts\Invoke-SharpProofDotnet.ps1 run --project SharpProof.Gates\SharpProof.Gates.csproj -- performance
-.\scripts\Invoke-SharpProofDotnet.ps1 run --project SharpProof.Gates\SharpProof.Gates.csproj -- all
+```text
+docker compose run --rm tooling corpus -Configuration Release
+docker compose run --rm tooling performance
+docker compose run --rm tooling gates -Configuration Release
 ```
+
+Run `sp corpus-update -Configuration Release` from the persistent Dev
+Container when intentionally updating checked-in corpus evidence. The update
+then occurs in the container-owned Git workspace rather than a disposable task
+checkout.
 
 ## Analyzer corpus
 

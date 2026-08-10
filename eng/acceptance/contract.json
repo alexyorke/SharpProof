@@ -90,7 +90,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "a55a9c483cd8711ff5ae94ab6d2fdea32c1558690b2746bac1162c63a8892691",
+    "inventorySha256": "2f0f9c59ace67e8db8bba1fb9bf93771c6f0769a786b54535d2da94a094c85f4",
     "components": [
       {
         "name": "discovery",
@@ -504,6 +504,9 @@
       {
         "name": "releaseContainment",
         "paths": [
+          ".devcontainer/devcontainer.json",
+          ".dockerignore",
+          "Directory.Build.targets",
           "eng/container/toolchain.json",
           "eng/container/Dockerfile",
           "eng/container/entrypoint.sh",

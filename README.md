@@ -61,10 +61,11 @@ docker compose run --rm tooling dev
 
 For a permanent editor environment, open the repository in VS Code and choose
 **Dev Containers: Reopen in Container**. The container validates its pinned
-contract and performs a locked restore once. Its terminal runs as the non-root
-`sharpproof` user and exposes the same commands without requiring nested
+contract, clones the configured remote branch with container Git, and performs
+a locked restore once. No host initialization command runs. Its terminal runs
+as the non-root `sharpproof` user and exposes the same commands without nested
 Docker. Source, Git state, build outputs, and artifacts live in a persistent
-Compose workspace volume; the host checkout is only its first-start seed:
+Compose workspace volume:
 
 ```text
 sp build
@@ -80,12 +81,13 @@ changing `SHARPPROOF_CONTAINER_CPU_LIMIT` also changes orchestration without a
 second hardcoded worker count. `SHARPPROOF_TEST_PROJECT_PARALLELISM` is an
 explicit diagnostic override and cannot exceed the visible CPU count.
 
-Compose derives its default project name from the worktree directory. Set an
-explicit distinct `COMPOSE_PROJECT_NAME` when two worktrees share the same
-directory basename. The persistent source volume, NuGet cache, and .NET home
-are then private to that Compose project. Finite task commands clone into a
-temporary container workspace instead of writing host `bin` or `obj` trees;
-only deliberate evidence is copied to that seed worktree's `artifacts` folder.
+Compose derives its default project name from the source directory. Put a
+distinct `COMPOSE_PROJECT_NAME` and optional `SHARPPROOF_DEV_REF` in each
+checkout's untracked `.env` file. The persistent source volume, NuGet cache,
+and .NET home are then private to that Compose project. Finite task commands
+clone into a temporary container workspace instead of writing host `bin` or
+`obj` trees; only deliberate evidence is copied to the mounted checkout's
+`artifacts` folder.
 
 The coordinates below are the intended preview packages, but no SharpProof
 package has been promoted to the public NuGet feed yet. Until the first

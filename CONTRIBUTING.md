@@ -22,7 +22,9 @@ must remain visible as a typed incomplete result, never silent success.
 Do not install or invoke repository .NET, PowerShell, MSBuild, Z3, test, pack,
 mutation, or release tooling on the host. Open the `dev` service for permanent
 work, or use the finite `tooling` commands for disposable validation. The
-container owns process cleanup and all wall deadlines.
+container owns Git initialization, process cleanup, and all wall deadlines.
+The host-side repository contract is Docker Compose only; Make, Just, and host
+bootstrap scripts are deliberately unnecessary.
 
 ## Pull request expectations
 

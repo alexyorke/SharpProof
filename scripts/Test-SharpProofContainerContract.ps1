@@ -18,6 +18,13 @@ $dockerfile = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'eng/container/Dockerfile') -Raw
 $compose = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'compose.yaml') -Raw
+$devContainer = Get-Content -LiteralPath (
+    Join-Path $repositoryRoot '.devcontainer/devcontainer.json') -Raw |
+    ConvertFrom-Json
+$devInitializer = Get-Content -LiteralPath (
+    Join-Path $repositoryRoot 'eng/container/dev-init.sh') -Raw
+$directoryBuildTargets = Get-Content -LiteralPath (
+    Join-Path $repositoryRoot 'Directory.Build.targets') -Raw
 $packages = [xml](Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'Directory.Packages.props') -Raw)
 $packageProjects = Get-Content -LiteralPath (
@@ -82,6 +89,33 @@ if ($dockerfile -cnotmatch [regex]::Escape(
 }
 if ($compose -cnotmatch '(?m)^\s*platform:\s*linux/amd64\s*$') {
     throw 'Compose must pin linux/amd64.'
+}
+if ($compose -cmatch '/workspace/seed|SHARPPROOF_SEED_ROOT') {
+    throw 'The Dev Container must not depend on a host seed checkout.'
+}
+if ($devContainer.PSObject.Properties.Name -contains 'initializeCommand') {
+    throw 'Dev Container initialization must not invoke host tooling.'
+}
+Assert-Exact `
+    $devContainer.postCreateCommand `
+    'sharpproof-dev-init' `
+    'Dev Container initializer'
+Assert-Exact `
+    $devContainer.postStartCommand `
+    'sp contract' `
+    'Dev Container startup validation'
+if ($devInitializer -cnotmatch 'SHARPPROOF_ORIGIN_URL' -or
+    $devInitializer -cnotmatch 'SHARPPROOF_DEV_REF' -or
+    $devInitializer -cnotmatch 'git "\$\{clone_arguments\[@\]\}"') {
+    throw 'The Dev Container must clone its checkout entirely in-container.'
+}
+if ($devInitializer -cmatch 'git bundle|repository\.bundle|SHARPPROOF_SEED_ROOT') {
+    throw 'The Dev Container initializer retains a host Git bootstrap.'
+}
+if ($directoryBuildTargets -cnotmatch '_RequireSharpProofCanonicalContainer' -or
+    $directoryBuildTargets -cnotmatch 'SHARPPROOF_CONTAINER' -or
+    $directoryBuildTargets -cnotmatch '/etc/sharpproof/container-contract\.json') {
+    throw 'Repository MSBuild entry points must reject host execution.'
 }
 if ($compose -cnotmatch [regex]::Escape(
         "cpus: `${SHARPPROOF_CONTAINER_CPU_LIMIT:-$($acceptance.container.defaultCpuCount)}")) {

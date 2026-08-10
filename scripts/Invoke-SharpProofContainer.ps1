@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('contract', 'restore', 'build', 'test', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'performance', 'coverage', 'mutation', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
+    [ValidateSet('contract', 'restore', 'build', 'test', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'gates', 'coverage', 'mutation', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -124,6 +124,15 @@ switch ($Command) {
             -ExpectedSmt Required `
             -PackageSource $PackageSource
         if ($LASTEXITCODE -ne 0) { throw 'Sample validation failed.' }
+    }
+    { $_ -in @('corpus', 'corpus-update', 'gates') } {
+        $gateMode = if ($Command -ceq 'gates') { 'all' } else { $Command }
+        $gateProject = 'SharpProof.Gates/SharpProof.Gates.csproj'
+        Invoke-DotNet @('restore', $gateProject, '--locked-mode')
+        Invoke-DotNet @(
+            'run', '--project', $gateProject,
+            '--configuration', $Configuration,
+            '--no-restore', '--', $gateMode)
     }
     'performance' {
         $output = Join-Path $repositoryRoot 'artifacts/ci/performance.json'

@@ -1,31 +1,40 @@
 # Container development
 
 The canonical Linux amd64 Dev Container is the primary SharpProof development
-environment. The host needs Docker Engine or Docker Desktop, Compose v2, Git,
-and an editor that supports Dev Containers. It does not need .NET, PowerShell,
-MSBuild, Visual Studio, or Z3.
+environment. The host needs Docker Engine or Docker Desktop, Compose v2, and
+an editor that supports Dev Containers. It does not need Git, .NET,
+PowerShell, MSBuild, Visual Studio, Z3, Make, or Just for repository execution.
+The source directory containing `compose.yaml` may be obtained as an archive,
+through an editor's repository-clone command, or with any source-control
+client; SharpProof never invokes that host client.
 
 ## Open the permanent environment
 
-1. Clone or create a Git worktree.
-2. If another worktree has the same directory basename, give this one a unique
-   `COMPOSE_PROJECT_NAME`; otherwise Compose derives a suitable default.
-3. In VS Code, choose **Dev Containers: Reopen in Container**.
+1. Open the source directory that contains `compose.yaml`.
+2. Give each independent checkout a unique `COMPOSE_PROJECT_NAME`. The easiest
+   OS-neutral configuration is an untracked `.env` file beside `compose.yaml`:
 
-Before Compose starts, Dev Containers asks host Git to create a local bundle
-under `.devcontainer`; this works for ordinary clones and linked Git worktrees
-without exposing the host Git directory to the container. The first start
-builds the checksum-pinned image, clones that read-only bundle into a
-Compose-owned `sharpproof-workspace` volume, and validates the
-installed container contract, and performs a locked restore. All edits, Git
-operations, `bin`/`obj` trees, and local artifacts then live in that volume.
-The host checkout is only the first-start seed; it is never a shared build
-output directory. Later starts reuse the workspace, NuGet, and .NET-home
-volumes. The terminal and editor server run as the non-root `sharpproof` user.
-Only committed `HEAD` and its reachable refs seed a new volume; commit
-host-side work before the first open. After that first open, edit and commit
-inside the persistent Linux volume so Windows line endings and Git-worktree
-metadata never enter the build tree.
+   ```text
+   COMPOSE_PROJECT_NAME=sharpproof-feature-a
+   SHARPPROOF_ORIGIN_URL=https://github.com/alexyorke/SharpProof.git
+   SHARPPROOF_DEV_REF=feature-a
+   ```
+
+3. Ensure `SHARPPROOF_DEV_REF`, when set, names a branch or tag available from
+   that origin, then choose **Dev Containers: Reopen in Container** in VS Code.
+
+No initialization command runs on the host. The first start builds the
+checksum-pinned image and runs container Git to clone the configured origin
+and optional ref into the Compose-owned `sharpproof-workspace` volume. It then
+validates the installed container contract and performs a locked restore. All
+edits, Git operations, `bin`/`obj` trees, and local artifacts live in that
+volume. Later starts reuse the workspace, NuGet, and .NET-home volumes, so they
+work offline when the required source and packages are already present. The
+terminal and editor server run as the non-root `sharpproof` user.
+
+An existing workspace is never fetched, reset, or switched automatically.
+Commit and push from inside the container. Set a new project name when a clean
+checkout of another ref is required.
 
 Use the short `sp` command inside the container:
 
@@ -35,6 +44,7 @@ sp test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj
 sp portable-tests
 sp worker-tests
 sp package-tests
+sp corpus -Configuration Release
 sp coverage
 sp mutation -Configuration Release
 sp acceptance -Configuration Release
@@ -57,23 +67,23 @@ run in separate test processes instead. Z3 retains its query and method
 instruction limits. Whole-process wall deadlines remain necessary for compiler,
 MSBuild, filesystem, or child-process hangs that solver limits cannot observe.
 
-## Multiple worktrees
+## Multiple independent workspaces
 
-Each host seed checkout must use a different Compose project name. This gives
-it a private persistent source volume, cache volumes, and output tree:
+Each source directory or remote ref must use a different Compose project name.
+This gives it a private persistent source volume, cache volumes, and output
+tree. Put the project name and ref in each checkout's untracked `.env` file,
+then use the same commands on every operating system:
 
 ```text
-COMPOSE_PROJECT_NAME=sharpproof-feature-a docker compose up -d dev
-COMPOSE_PROJECT_NAME=sharpproof-feature-b docker compose up -d dev
+docker compose up -d dev
+docker compose exec dev sharpproof-dev-init
+docker compose exec dev bash
 ```
 
-When starting Compose directly, initialize each volume once with
-`git bundle create .devcontainer/repository.bundle HEAD --branches --tags`
-followed by `docker compose exec dev sharpproof-dev-init`. Open a shell with
-`docker compose exec dev bash`, or attach with Dev Containers (which runs the
-initializer automatically).
-Commit and push from that shell. To deliberately discard a container workspace,
-stop the Compose project and remove only that project's named workspace volume.
+Dev Containers runs the initializer automatically. When starting Compose
+directly, invoke it once as shown above. To deliberately discard a container
+workspace, stop the Compose project and remove only that project's named
+workspace volume.
 
 Do not run two builds against the same Compose project. One project-owned
 workspace volume is the isolation boundary; there is no Docker socket,

@@ -6,18 +6,9 @@
   "containerUser": "sharpproof",
   "remoteUser": "sharpproof",
   "overrideCommand": false,
-  "initializeCommand": [
-    "git",
-    "bundle",
-    "create",
-    ".devcontainer/repository.bundle",
-    "HEAD",
-    "--branches",
-    "--tags"
-  ],
   "shutdownAction": "stopCompose",
   "postCreateCommand": "sharpproof-dev-init",
-  "postStartCommand": "pwsh -NoLogo -NoProfile -File scripts/Test-SharpProofContainerContract.ps1",
+  "postStartCommand": "sp contract",
   "containerEnv": {
     "SHARPPROOF_REPO_ROOT": "/workspace/SharpProof",
     "SHARPPROOF_DEV_CONTAINER": "1"

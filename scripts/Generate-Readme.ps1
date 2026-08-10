@@ -317,6 +317,21 @@ foreach ($relativePath in $maintainedDocuments) {
             "matching claim: $relativePath")
     }
 }
+foreach ($relativePath in $currentMaintainedDocuments) {
+    $currentText = Get-RequiredText $relativePath
+    foreach ($obsoleteHostBootstrap in @(
+            'git bundle create',
+            'repository.bundle',
+            'Invoke-SharpProofDotnet.ps1')) {
+        if ($currentText.Contains(
+                $obsoleteHostBootstrap,
+                [StringComparison]::Ordinal)) {
+            throw (
+                'Current documentation invokes obsolete host tooling ' +
+                "'$obsoleteHostBootstrap': $relativePath")
+        }
+    }
+}
 foreach ($relativePath in @(
         'eng\diagnostics\diagnostic-descriptors.v1.json')) {
     Assert-RepositoryLinksInSource $relativePath

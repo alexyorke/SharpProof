@@ -1182,6 +1182,10 @@ public sealed class ArchitectureTests
             ".devcontainer",
             "devcontainer.json")));
         var configuration = document.RootElement;
+        var rawConfiguration = File.ReadAllText(Path.Combine(
+            root,
+            ".devcontainer",
+            "devcontainer.json"));
         var dockerfile = File.ReadAllText(Path.Combine(
             root,
             "eng",
@@ -1215,19 +1219,28 @@ public sealed class ArchitectureTests
             Assert.That(
                 configuration.GetProperty("postCreateCommand").GetString(),
                 Is.EqualTo("sharpproof-dev-init"));
+            Assert.That(
+                configuration.GetProperty("postStartCommand").GetString(),
+                Is.EqualTo("sp contract"));
+            Assert.That(
+                configuration.TryGetProperty("initializeCommand", out _),
+                Is.False,
+                "Dev Containers must not invoke host Git or other host tooling.");
+            Assert.That(rawConfiguration, Does.Not.Contain("pwsh"));
             Assert.That(dockerfile, Does.Contain("/usr/local/bin/sp"));
             Assert.That(
                 dockerfile,
                 Does.Contain("/usr/local/bin/sharpproof-dev-init"));
-            Assert.That(initialization, Does.Contain("git clone \"${bundle}\""));
+            Assert.That(initialization, Does.Contain("SHARPPROOF_ORIGIN_URL"));
+            Assert.That(initialization, Does.Contain("SHARPPROOF_DEV_REF"));
             Assert.That(
                 initialization,
-                Does.Contain("git bundle list-heads \"${bundle}\" HEAD"));
+                Does.Contain("git \"${clone_arguments[@]}\""));
+            Assert.That(initialization, Does.Not.Contain("git bundle"));
+            Assert.That(initialization, Does.Not.Contain("repository.bundle"));
+            Assert.That(initialization, Does.Not.Contain("SHARPPROOF_SEED_ROOT"));
             Assert.That(initialization, Does.Not.Contain("tar "));
             Assert.That(initialization, Does.Not.Contain("reset --mixed"));
-            Assert.That(
-                configuration.GetProperty("initializeCommand")[1].GetString(),
-                Is.EqualTo("bundle"));
             Assert.That(initialization, Does.Contain("sp restore"));
             Assert.That(initialization, Does.Not.Contain("docker"));
             Assert.That(developerCommand, Does.Contain("Invoke-SharpProofContainer.ps1"));
@@ -1235,13 +1248,31 @@ public sealed class ArchitectureTests
             Assert.That(
                 compose,
                 Does.Contain("sharpproof-workspace:/workspace/SharpProof"));
-            Assert.That(compose, Does.Contain(".:/workspace/seed:ro"));
+            Assert.That(compose, Does.Not.Contain("/workspace/seed"));
+            Assert.That(compose, Does.Not.Contain("SHARPPROOF_SEED_ROOT"));
+            Assert.That(gitIgnore, Does.Not.Contain("repository.bundle"));
+            Assert.That(dockerIgnore, Does.Not.Contain("repository.bundle"));
+        }
+    }
+
+    [Test]
+    public void RepositoryMsBuildEntryPointsRejectHostExecution()
+    {
+        var targets = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "Directory.Build.targets"));
+
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(
-                gitIgnore,
-                Does.Contain(".devcontainer/repository.bundle"));
+                targets,
+                Does.Contain("_RequireSharpProofCanonicalContainer"));
+            Assert.That(targets, Does.Contain("BeforeTargets=\"Restore;PrepareForBuild\""));
+            Assert.That(targets, Does.Contain("'$(SHARPPROOF_CONTAINER)' != '1'"));
             Assert.That(
-                dockerIgnore,
-                Does.Contain(".devcontainer/repository.bundle"));
+                targets,
+                Does.Contain("/etc/sharpproof/container-contract.json"));
+            Assert.That(targets, Does.Contain("Docker Compose tooling container"));
         }
     }
 
