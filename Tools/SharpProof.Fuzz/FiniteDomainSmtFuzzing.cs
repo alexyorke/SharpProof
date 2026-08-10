@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using SharpProof.Host;
 using SharpProof.Ir;
 using SharpProof.Smt;
 using SharpProof.Verify;
@@ -175,6 +176,8 @@ public sealed class FiniteDomainSmtDifferentialOracle
                 factory.Unary(IrUnaryOperator.Not, formula),
                 ProofDiagnosticKind.InternalConsistency,
                 new SourceLocationId(0)));
+        ContainerNativeLibrary.InstallZ3ResolverRequired(
+            typeof(Microsoft.Z3.Context).Assembly);
         using var backend = new IrSmtBackend();
         var outcome = await new ProofKernel(backend)
             .VerifyAsync(query, cancellationToken)

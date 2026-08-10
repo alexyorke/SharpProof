@@ -224,7 +224,8 @@ internal static class CompilerCompilationCapture
 
     internal static string ResolveSiblingModule(string manifestPath, string name)
     {
-        if (!string.Equals(Path.GetFileName(name), name, StringComparison.Ordinal))
+        if (!string.Equals(Path.GetFileName(name), name, StringComparison.Ordinal) ||
+            !HasSafeModuleFileName(name))
         {
             throw new InvalidDataException(
                 "A linked compiler module must be a safe sibling.");
@@ -236,12 +237,20 @@ internal static class CompilerCompilationCapture
         if (!string.Equals(
                 Path.GetDirectoryName(path),
                 directory,
-                StringComparison.OrdinalIgnoreCase))
+                StringComparison.Ordinal))
         {
             throw new InvalidDataException(
                 "A linked compiler module must be a safe sibling.");
         }
         return path;
+    }
+
+    private static bool HasSafeModuleFileName(string name)
+    {
+        return !string.IsNullOrEmpty(name) &&
+            name is not "." and not ".." &&
+            name.IndexOf('\0') < 0 &&
+            name.IndexOf('/') < 0;
     }
 
     internal static string ReadModuleName(MetadataReader reader)
@@ -289,11 +298,7 @@ internal static class CompilerCompilationCapture
 
     private static string NormalizePath(string path)
     {
-        var fullPath = Path.GetFullPath(path);
-        return System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-            System.Runtime.InteropServices.OSPlatform.Windows)
-            ? fullPath.Replace('\\', '/')
-            : fullPath;
+        return Path.GetFullPath(path);
     }
 
     internal static string Hash(Stream stream, CancellationToken cancellationToken)

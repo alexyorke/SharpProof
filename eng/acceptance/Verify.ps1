@@ -15,8 +15,138 @@ $acceptanceRoot = $PSScriptRoot
 $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
+
+$timingDirectory = Join-Path $repositoryRoot 'artifacts\timings'
+$timingOutput = Join-Path $timingDirectory (
+    'acceptance-' + $Configuration.ToLowerInvariant() + '.json')
+$timingStartedUtc = [DateTime]::UtcNow
+$timingPhases = [Collections.Generic.List[object]]::new()
+$activeTimingName = $null
+$activeTimingStopwatch = $null
+$timingWritten = $false
+
+function Add-AcceptanceTimingPhase {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [long]$ElapsedMilliseconds,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('passed', 'failed', 'skipped')]
+        [string]$Status
+    )
+
+    $timingPhases.Add([pscustomobject]@{
+        name = $Name
+        elapsedMilliseconds = $ElapsedMilliseconds
+        status = $Status
+    })
+}
+
+function Start-AcceptanceTimingPhase {
+    param([Parameter(Mandatory = $true)][string]$Name)
+
+    if ($null -ne $activeTimingStopwatch) {
+        throw "Acceptance timing phase '$activeTimingName' is still active."
+    }
+    $script:activeTimingName = $Name
+    $script:activeTimingStopwatch = [Diagnostics.Stopwatch]::StartNew()
+}
+
+function Complete-AcceptanceTimingPhase {
+    param(
+        [ValidateSet('passed', 'failed')]
+        [string]$Status = 'passed'
+    )
+
+    if ($null -eq $activeTimingStopwatch) {
+        throw 'No acceptance timing phase is active.'
+    }
+    $activeTimingStopwatch.Stop()
+    Add-AcceptanceTimingPhase `
+        -Name $activeTimingName `
+        -ElapsedMilliseconds ([long]$activeTimingStopwatch.Elapsed.TotalMilliseconds) `
+        -Status $Status
+    $script:activeTimingName = $null
+    $script:activeTimingStopwatch = $null
+}
+
+function Write-AcceptanceTimingEvidence {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('passed', 'failed')]
+        [string]$Status,
+
+        [string]$Failure = ''
+    )
+
+    if ($timingWritten) {
+        return
+    }
+    if ($Status -eq 'passed') {
+        $expectedPhases = @(
+            $contract.automation.acceptanceTimingPhases |
+                ForEach-Object { [string]$_ })
+        $actualPhases = @($timingPhases | ForEach-Object name)
+        if (($actualPhases -join ',') -cne ($expectedPhases -join ',')) {
+            throw (
+                'Acceptance timing phases do not match the acceptance ' +
+                "contract. Expected '$($expectedPhases -join ',')'; " +
+                "actual '$($actualPhases -join ',')'.")
+        }
+    }
+    $script:timingWritten = $true
+    [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
+    $temporary = $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
+    $totalMilliseconds = [long](
+        ($timingPhases | Measure-Object elapsedMilliseconds -Sum).Sum)
+    [pscustomobject]@{
+        schemaVersion = 1
+        command = 'acceptance'
+        configuration = $Configuration
+        commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+        startedUtc = $timingStartedUtc.ToString('o')
+        completedUtc = [DateTime]::UtcNow.ToString('o')
+        status = $Status
+        failure = $Failure
+        totalElapsedMilliseconds = $totalMilliseconds
+        phases = @($timingPhases)
+    } | ConvertTo-Json -Depth 5 |
+        Set-Content -LiteralPath $temporary -Encoding utf8NoBOM
+    Move-Item -LiteralPath $temporary -Destination $timingOutput -Force
+}
+
+$restoreMilliseconds = 0L
+if (-not [string]::IsNullOrWhiteSpace(
+        $env:SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS) -and
+    -not [long]::TryParse(
+        $env:SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS,
+        [ref]$restoreMilliseconds)) {
+    throw 'The acceptance restore timing is invalid.'
+}
+if ($restoreMilliseconds -gt 0) {
+    Add-AcceptanceTimingPhase `
+        -Name 'restore' `
+        -ElapsedMilliseconds $restoreMilliseconds `
+        -Status passed
+}
+
+trap {
+    if ($null -ne $activeTimingStopwatch) {
+        Complete-AcceptanceTimingPhase -Status failed
+    }
+    Write-AcceptanceTimingEvidence `
+        -Status failed `
+        -Failure $_.Exception.Message
+    throw
+}
+
+Start-AcceptanceTimingPhase -Name 'static-validation'
 . (Join-Path $repositoryRoot 'scripts\Get-SharpProofTcbPaths.ps1')
 . (Join-Path $repositoryRoot 'scripts\CSharpSourceMetrics.ps1')
+& (Join-Path $repositoryRoot 'scripts\Test-SharpProofContainerContract.ps1')
     & (Join-Path $repositoryRoot 'scripts\Generate-DiagnosticDescriptors.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-CSharpScalarSemantics.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-ContractApiCatalog.ps1') -Verify
@@ -32,6 +162,7 @@ $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 & (Join-Path $repositoryRoot 'scripts\Generate-CompilerArtifactModel.ps1') -Verify
 & (Join-Path $repositoryRoot 'scripts\Test-CompilerArtifactModelGenerator.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofMutationEvidence.ps1')
+& (Join-Path $repositoryRoot 'scripts\Test-SharpProofMutationScheduling.ps1')
 & (Join-Path $repositoryRoot 'scripts\Generate-DeclarativeModels.ps1') -Verify
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
 $previewEvidence = Get-Content -LiteralPath (
@@ -59,11 +190,11 @@ $portableTargetsPath = Join-Path `
 [xml]$portableTargets = Get-Content -LiteralPath $portableTargetsPath -Raw
 $verifierPropsPath = Join-Path `
     $repositoryRoot `
-    'SharpProof.Verifier.Win-x64\buildTransitive\SharpProof.Verifier.Win-x64.props'
+    'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.props'
 [xml]$verifierProps = Get-Content -LiteralPath $verifierPropsPath -Raw
 $verifierTargetsPath = Join-Path `
     $repositoryRoot `
-    'SharpProof.Verifier.Win-x64\buildTransitive\SharpProof.Verifier.Win-x64.targets'
+    'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.targets'
 [xml]$verifierTargets = Get-Content -LiteralPath $verifierTargetsPath -Raw
 $packageManifestPath = Join-Path $repositoryRoot 'scripts\package-projects.json'
 $packageManifest = Get-Content -LiteralPath $packageManifestPath -Raw |
@@ -141,7 +272,6 @@ function Invoke-SharpProofDotnet {
     )
 
     & $wrapperPath `
-        -MemoryLimitMb ([int]$contract.worker.maximumMemoryMiB) `
         -TimeoutSeconds $TimeoutSeconds `
         @Arguments
     if ($LASTEXITCODE -ne 0) {
@@ -266,22 +396,19 @@ Assert-Equal `
     $contract.analyzer.defaultAssumptionPolicy `
     'SharpProofAssumptionPolicy'
 Assert-Equal ($contract.supportedTargetFrameworks -join ',') 'netstandard2.0,net8.0,net472' 'supportedTargetFrameworks'
-Assert-Equal $contract.worker.protocolVersion 10 'worker.protocolVersion'
+Assert-Equal $contract.worker.protocolVersion 11 'worker.protocolVersion'
 Assert-Equal $contract.worker.manifestSchemaVersion 4 'worker.manifestSchemaVersion'
 Assert-Equal $contract.worker.compilerArtifactSchemaVersion 11 'worker.compilerArtifactSchemaVersion'
 Assert-Equal $contract.worker.relationalSummarySchemaVersion 1 'worker.relationalSummarySchemaVersion'
 Assert-Equal $contract.worker.specificationPackSchemaVersion 1 'worker.specificationPackSchemaVersion'
 Assert-Equal $contract.worker.maximumParallelism 4 'worker.maximumParallelism'
-Assert-Equal $contract.worker.maximumWorkerProcesses 4 'worker.maximumWorkerProcesses'
 Assert-Equal $contract.worker.maximumExpressionDepth 64 'worker.maximumExpressionDepth'
-Assert-Equal $contract.worker.maximumMemoryMiB 2048 'worker.maximumMemoryMiB'
 Assert-Equal $contract.worker.queryRlimit 3000000 'worker.queryRlimit'
 Assert-Equal $contract.worker.methodRlimit 20000000 'worker.methodRlimit'
 Assert-Equal $contract.worker.maximumMethodWallSeconds 10 'worker.maximumMethodWallSeconds'
 Assert-Equal $contract.worker.maximumProjectWallSeconds 300 'worker.maximumProjectWallSeconds'
 Assert-Equal $contract.worker.forcedTerminationMilliseconds 1000 'worker.forcedTerminationMilliseconds'
-Assert-Equal $contract.worker.maximumProjectDirectoryCharacters 239 'worker.maximumProjectDirectoryCharacters'
-Assert-Equal $contract.cache.schemaVersion 12 'cache.schemaVersion'
+Assert-Equal $contract.cache.schemaVersion 13 'cache.schemaVersion'
 Assert-Equal $contract.cache.enabledByDefault $true 'cache.enabledByDefault'
 Assert-Equal $contract.cache.maximumMiB 512 'cache.maximumMiB'
 Assert-Equal ($contract.cache.cacheableOutcomes -join ',') 'Refuted' 'cache.cacheableOutcomes'
@@ -329,7 +456,7 @@ Assert-Equal `
 $expectedPackageProjects = @(
     'SharpProof.Attributes/SharpProof.Attributes.csproj',
     'SharpProof.Package/SharpProof.Package.csproj',
-    'SharpProof.Verifier.Win-x64/SharpProof.Verifier.Win-x64.csproj'
+    'SharpProof.Verifier/SharpProof.Verifier.csproj'
 )
 Assert-Equal `
     (@($packageManifest.projects) -join '|') `
@@ -362,17 +489,9 @@ Assert-Equal `
     ([string]$contract.worker.maximumParallelism) `
     'SharpProofVerifyMaxParallelism'
 Assert-Equal `
-    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyMaxWorkerProcesses' 'verifier package') `
-    ([string]$contract.worker.maximumWorkerProcesses) `
-    'SharpProofVerifyMaxWorkerProcesses'
-Assert-Equal `
     (Get-MsBuildProperty $verifierProps 'SharpProofVerifyMaximumExpressionDepth' 'verifier package') `
     ([string]$contract.worker.maximumExpressionDepth) `
     'SharpProofVerifyMaximumExpressionDepth'
-Assert-Equal `
-    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyProcessMemoryLimitBytes' 'verifier package') `
-    ([string]([int64]$contract.worker.maximumMemoryMiB * 1024 * 1024)) `
-    'SharpProofVerifyProcessMemoryLimitBytes'
 Assert-Equal `
     (Get-MsBuildProperty $verifierProps 'SharpProofVerifyTerminationGraceMilliseconds' 'verifier package') `
     ([string]$contract.worker.forcedTerminationMilliseconds) `
@@ -385,11 +504,6 @@ Assert-Equal `
     (Get-MsBuildProperty $verifierProps 'SharpProofVerifyCacheEnabled' 'verifier package') `
     ([string]$contract.cache.enabledByDefault).ToLowerInvariant() `
     'SharpProofVerifyCacheEnabled'
-Assert-Equal `
-    (Get-MsBuildProperty $verifierProps '_SharpProofMaximumProjectDirectoryLength' 'verifier package') `
-    ([string]$contract.worker.maximumProjectDirectoryCharacters) `
-    '_SharpProofMaximumProjectDirectoryLength'
-
 Push-Location $repositoryRoot
 try {
     $kernelPaths = @($contract.trustedKernel.paths)
@@ -489,69 +603,51 @@ try {
         throw 'The production C# structural-complexity ratchet failed.'
     }
 
+    Complete-AcceptanceTimingPhase
+
     if (-not $SkipBuild) {
+        Start-AcceptanceTimingPhase -Name 'build'
         Invoke-SharpProofDotnet `
             -Arguments @('build', 'SharpProof.sln', '-c', $Configuration, '--no-restore') `
             -TimeoutSeconds ([int]$contract.automation.solutionBuildWallSeconds)
+        Complete-AcceptanceTimingPhase
     }
-
-    $testProjects = @(
-        'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj',
-        'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj',
-        'SharpProof.Attributes.Test\SharpProof.Attributes.Test.csproj',
-        'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj',
-        'SharpProof.Contracts.Test\SharpProof.Contracts.Test.csproj',
-        'SharpProof.Dataflow.Test\SharpProof.Dataflow.Test.csproj',
-        'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj',
-        'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj',
-        'SharpProof.Ir.Test\SharpProof.Ir.Test.csproj',
-        'SharpProof.Meta.Analyzers.Test\SharpProof.Meta.Analyzers.Test.csproj',
-        'SharpProof.Package.Test\SharpProof.Package.Test.csproj',
-        'SharpProof.Smt.Test\SharpProof.Smt.Test.csproj',
-        'SharpProof.Specs.Test\SharpProof.Specs.Test.csproj',
-        'SharpProof.Summaries.Test\SharpProof.Summaries.Test.csproj',
-        'SharpProof.Testing.Test\SharpProof.Testing.Test.csproj',
-        'SharpProof.Gates.Test\SharpProof.Gates.Test.csproj',
-        'SharpProof.Fuzz.Test\SharpProof.Fuzz.Test.csproj',
-        'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj',
-        'SharpProof.Verify.Test\SharpProof.Verify.Test.csproj'
-    )
-
-    foreach ($testProject in $testProjects) {
-        if ($SkipTests) {
-            break
-        }
-        $resolvedTestProject = Join-Path $repositoryRoot $testProject
-        if (-not (Test-Path -LiteralPath $resolvedTestProject -PathType Leaf)) {
-            throw "Required test project is missing: $testProject"
-        }
-
-        $testTimeoutSeconds = if ($testProject -like 'SharpProof.Package.Test*') {
-            1800
-        } else {
-            300
-        }
-        $testArguments = @(
-            'test',
-            $testProject,
-            '-c',
-            $Configuration,
-            '--no-build',
-            '--logger',
-            'console;verbosity=minimal'
-        )
-        if ($testProject -like 'SharpProof.Gates.Test*') {
-            $testArguments += @(
-                '--filter',
-                'TestCategory!=Performance&TestCategory!=Coverage'
-            )
-        }
-        Invoke-SharpProofDotnet `
-            -TimeoutSeconds $testTimeoutSeconds `
-            -Arguments $testArguments
+    else {
+        Add-AcceptanceTimingPhase `
+            -Name 'build' -ElapsedMilliseconds 0 -Status skipped
     }
 
     if (-not $SkipTests) {
+        Start-AcceptanceTimingPhase -Name 'semantic-tests'
+        & (Join-Path `
+            $repositoryRoot 'scripts/Invoke-SharpProofSemanticTests.ps1') `
+            -Configuration $Configuration `
+            -NoBuild `
+            -TimeoutSeconds ([int]$contract.automation.solutionTestWallSeconds)
+        Complete-AcceptanceTimingPhase
+
+        Start-AcceptanceTimingPhase -Name 'package-tests'
+        $packageTestArguments = @{
+            Configuration = $Configuration
+            TimeoutSeconds = [int]$contract.automation.solutionTestWallSeconds
+        }
+        if ($Configuration -eq 'Release') {
+            $packageTestArguments.NoBuild = $true
+        }
+        & (Join-Path `
+            $repositoryRoot 'scripts/Invoke-SharpProofPackageTests.ps1') `
+            @packageTestArguments
+        Complete-AcceptanceTimingPhase
+    }
+    else {
+        Add-AcceptanceTimingPhase `
+            -Name 'semantic-tests' -ElapsedMilliseconds 0 -Status skipped
+        Add-AcceptanceTimingPhase `
+            -Name 'package-tests' -ElapsedMilliseconds 0 -Status skipped
+    }
+
+    if (-not $SkipTests) {
+        Start-AcceptanceTimingPhase -Name 'fuzz'
         Invoke-SharpProofDotnet -Arguments @(
             'run',
             '--project',
@@ -567,7 +663,9 @@ try {
             '--max-parallelism',
             [string]$contract.fuzz.maximumParallelism
         )
+        Complete-AcceptanceTimingPhase
 
+        Start-AcceptanceTimingPhase -Name 'corpus-and-performance'
         Invoke-SharpProofDotnet -Arguments @(
             'run',
             '--project',
@@ -578,10 +676,21 @@ try {
             '--',
             'all'
         )
+        Complete-AcceptanceTimingPhase
+    }
+    else {
+        Add-AcceptanceTimingPhase `
+            -Name 'fuzz' -ElapsedMilliseconds 0 -Status skipped
+        Add-AcceptanceTimingPhase `
+            -Name 'corpus-and-performance' `
+            -ElapsedMilliseconds 0 `
+            -Status skipped
     }
 }
 finally {
     Pop-Location
 }
 
+Write-AcceptanceTimingEvidence -Status passed
+Write-Host "Acceptance timing evidence: $timingOutput"
 Write-Host 'SharpProof acceptance checks passed.'

@@ -7,10 +7,17 @@
           <Format>Cobertura</Format>
           <IncludeTestAssembly>False</IncludeTestAssembly>
           <CodeCoverage>
+            <ModulePaths>
+              <Exclude>
+                <ModulePath>.*SharpProof\.Attributes\.dll$</ModulePath>
+              </Exclude>
+            </ModulePaths>
             <UseVerifiableInstrumentation>True</UseVerifiableInstrumentation>
             <AllowLowIntegrityProcesses>False</AllowLowIntegrityProcesses>
             <CollectFromChildProcesses>False</CollectFromChildProcesses>
             <CollectAspDotNet>False</CollectAspDotNet>
+            <EnableStaticManagedInstrumentation>True</EnableStaticManagedInstrumentation>
+            <EnableDynamicManagedInstrumentation>False</EnableDynamicManagedInstrumentation>
             <EnableStaticNativeInstrumentation>False</EnableStaticNativeInstrumentation>
             <EnableDynamicNativeInstrumentation>False</EnableDynamicNativeInstrumentation>
           </CodeCoverage>

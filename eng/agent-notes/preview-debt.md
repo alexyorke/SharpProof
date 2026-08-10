@@ -1,5 +1,12 @@
 # SharpProof preview convergence register
 
+> Historical note: this register records the completed Windows-hosted preview
+> candidate that preceded the container-first Linux port. Its platform rows,
+> test counts, mutation digest, and qualification evidence are not the active
+> release contract. See `docs/preview-support.md`,
+> `eng/release/preview-qualification.md`, and `eng/acceptance/contract.json`
+> for the current container-only boundary.
+
 This is the finite technical-debt register for the `1.0.0-preview` release.
 Feature expansion is frozen until every item below is closed or explicitly
 removed from the supported preview contract.
@@ -45,8 +52,6 @@ the Debug solution result, and the full Release acceptance result.
 
 ## Completion rule
 
-The locally controlled register is complete when every row except an explicit
-owner/external blocker has status `Closed`, both repository gates pass, five
-pilots are reviewed, Windows CLI and Visual Studio qualification pass, and the
-release dry run is tied to the exact candidate commit. Unsupported post-preview
-features do not reopen this register.
+This historical register was complete under its former Windows qualification
+contract. Current release completion is defined by the container-native
+acceptance and exact-commit qualification documents linked above.

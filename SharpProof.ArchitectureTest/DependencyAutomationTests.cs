@@ -1,3 +1,4 @@
+using System.Text.Json;
 using NUnit.Framework;
 
 namespace SharpProof.ArchitectureTest;
@@ -40,11 +41,11 @@ public sealed class DependencyAutomationTests
             Assert.That(
                 workflow,
                 Does.Contain(
-                    @".\scripts\Test-SharpProofDependencyAudit.ps1"));
+                    "docker compose run --rm tooling dependency-audit"));
             Assert.That(
                 workflow,
                 Does.Contain(
-                    "-OutputPath artifacts/security/dependency-audit.json"));
+                    "artifacts/dependency-audit/dependency-audit.json"));
             Assert.That(
                 workflow,
                 Does.Contain(
@@ -78,19 +79,7 @@ public sealed class DependencyAutomationTests
             Assert.That(
                 workflow,
                 Does.Contain(
-                    @".\scripts\Test-SharpProofDependencyAudit.ps1"));
-            Assert.That(
-                workflow,
-                Does.Contain("-SolutionPath SharpProof.sln"));
-            Assert.That(
-                workflow,
-                Does.Contain(
-                    "-NuGetConfigurationPath NuGet.Config"));
-            Assert.That(
-                workflow,
-                Does.Contain(
-                    "-OutputPath " +
-                    "artifacts/nightly/dependency-audit.json"));
+                    "docker compose run --rm tooling dependency-audit"));
             Assert.That(
                 workflow,
                 Does.Not.Contain(
@@ -99,9 +88,7 @@ public sealed class DependencyAutomationTests
                 workflow,
                 Does.Not.Contain("--vulnerable"));
             Assert.That(uploadIndex, Is.GreaterThanOrEqualTo(0));
-            Assert.That(
-                upload,
-                Does.Contain("artifacts/nightly"));
+            Assert.That(upload, Does.Contain("path: artifacts"));
         }
     }
 
@@ -267,61 +254,44 @@ public sealed class DependencyAutomationTests
     }
 
     [Test]
-    public void RepositoryWorkflowsUseThePinnedRepositorySdk()
+    public void RepositoryWorkflowsUseOnlyThePinnedContainerSdk()
     {
-        var workflowDirectory = Path.Combine(
-            RepositoryRoot(),
-            ".github",
-            "workflows");
-        var versions = Directory.EnumerateFiles(workflowDirectory)
+        var root = RepositoryRoot();
+        var workflowDirectory = Path.Combine(root, ".github", "workflows");
+        var workflows = string.Join("\n", Directory
+            .EnumerateFiles(workflowDirectory)
             .Where(static path =>
-                string.Equals(
-                    Path.GetExtension(path),
-                    ".yml",
-                    StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(
-                    Path.GetExtension(path),
-                    ".yaml",
-                    StringComparison.OrdinalIgnoreCase))
+                Path.GetExtension(path) is ".yml" or ".yaml")
             .OrderBy(static path => path, StringComparer.Ordinal)
-            .SelectMany(path => File.ReadLines(path)
-                .Select((line, index) => new
-                {
-                    Path = path,
-                    Value = line,
-                    Number = index + 1
-                }))
-            .Where(static entry => entry.Value.TrimStart().StartsWith(
-                "dotnet-version:",
-                StringComparison.Ordinal))
-            .Select(static entry => new
-            {
-                entry.Path,
-                entry.Number,
-                Value = entry.Value.TrimStart()["dotnet-version:".Length..]
-                    .Split('#')[0]
-                    .Trim()
-                    .Trim('"', '\'')
-            })
-            .ToArray();
+            .Select(File.ReadAllText));
+        using var toolchain = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "container",
+            "toolchain.json")));
+        var dotnet = toolchain.RootElement.GetProperty("dotnet");
+        var dockerfile = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "container",
+            "Dockerfile"));
 
-        Assert.That(versions, Is.Not.Empty);
         using (Assert.EnterMultipleScope())
         {
-            foreach (var version in versions)
-            {
-                Assert.That(
-                    version.Value,
-                    Is.AnyOf("9.0.316", "9.0.300"),
-                    $"{version.Path}:{version.Number}");
-            }
-
             Assert.That(
-                versions.Count(static version => version.Value == "9.0.316"),
-                Is.GreaterThan(0));
+                dotnet.GetProperty("sdkVersion").GetString(),
+                Is.EqualTo("9.0.316"));
             Assert.That(
-                versions.Count(static version => version.Value == "9.0.300"),
-                Is.EqualTo(1));
+                dotnet.GetProperty("minimumSdkVersion").GetString(),
+                Is.EqualTo("9.0.300"));
+            Assert.That(workflows, Does.Not.Contain("actions/setup-dotnet"));
+            Assert.That(workflows, Does.Not.Contain("dotnet-version:"));
+            Assert.That(workflows, Does.Contain("docker compose build tooling"));
+            Assert.That(dockerfile, Does.Contain("DOTNET_SDK_IMAGE="));
+            Assert.That(dockerfile, Does.Contain("DOTNET_MINIMUM_SDK_IMAGE="));
+            Assert.That(
+                dockerfile,
+                Does.Contain("DOTNET_MINIMUM_FRAMEWORK_IMAGE="));
         }
     }
 

@@ -186,7 +186,7 @@ indices. Formula construction, worklists, specs, proof cores, diagnostics, and
 serialized responses are stably ordered. Z3 uses resource limits; wall time is
 an outer process kill boundary.
 
-Protocol version 10 binds each request to a compiler-produced closed artifact.
+Protocol version 11 binds each request to a compiler-produced closed artifact.
 Stable semantic IDs identify selected callables, postcondition/effect claims, and
 user/trusted evidence independently of formatting. The protocol separates run
 status, callable coverage, and per-claim outcome. Central validation requires
@@ -197,12 +197,13 @@ The request carries only the compiler-artifact path/digest, policies, budgets,
 and cache controls. The artifact carries `WorkerFeatureSet` and applies the same
 `effects`/`contracts`/`all` selection before manifest discovery: contract-only
 artifacts exclude effect annotations and effect-only artifacts exclude
-postcondition claims. On the supported Windows x64 worker host, the
-launcher creates a startup barrier, assigns the worker to a Job Object with
-process and memory limits, and only then releases verification work. Concurrent
-builds use isolated artifact/request/result paths. A packaged netstandard2.0
-MSBuild task assembly owns host resolution, cancellation, path validation, and
-pre-verification invalidation for both command-line and Visual Studio MSBuild.
+postcondition claims. In the supported Linux amd64 container, the launcher
+validates the container and runtime closure, starts one direct child worker,
+and releases it through an exact stdin startup message. Docker owns the hard
+CPU and memory boundary. Concurrent builds use isolated
+artifact/request/result paths. A packaged net9.0 Core-MSBuild task assembly
+owns host validation, cancellation, path validation, and pre-verification
+invalidation.
 After validating a response, ordered cross-process locks cover the canonical
 request, result, manifest, and optional SARIF publication set. Partial overlap
 with another declared set is rejected. The stable result is deleted first, the
@@ -212,7 +213,7 @@ successful result associated with a partly updated evidence set. The
 content-addressed cache includes semantic, protocol, tool, compilation,
 reference, option, target-framework, canonical packaged worker runtime-closure,
 and spec-content identity.
-Cache schema version 12 stores only complete, postcondition-only, all-refuted
+Cache schema version 13 stores only complete, postcondition-only, all-refuted
 semantic payloads. A hit is accepted only when its manifest hash and complete
 result set match the current manifest and every canonical Boolean/integer model
 can be reconstructed against the hydrated callable. The worker rechecks entry
@@ -220,7 +221,7 @@ assumptions and source ranges, then independently executes the whole body and
 postcondition before reuse. Proven claims, effect claims, and unsupported
 models are not cacheable.
 
-During Windows verification, the build-only compiler collector observes the
+During container verification, the build-only compiler collector observes the
 final post-generator Roslyn `Compilation` and atomically emits compiler
 artifact schema version 11. The compiler owns selection, contract/spec binding,
 effect evaluation, relational-summary inference, and body lowering. Every selected callable has either a
@@ -300,7 +301,7 @@ Conditional/path-dependent and may-only conflicts remain
 `Unknown(EffectContractNotEstablished)`. A semantic replay disagreement
 becomes `Unknown(CounterexampleReplayFailed)` and fails the run. Effect results
 remain noncacheable. Under compiler artifact schema 11, worker protocol version
-10 and cache schema version 12 carry the relational-summary wire break.
+11 and cache schema version 13 carry the current request and cache wire break.
 
 Optional deterministic SARIF 2.1.0 projects the validated response under the
 same atomic publication boundary and does not participate in semantic
@@ -383,7 +384,7 @@ path. The package policy separately proves that `SharpProofProfile=off` omits
 analyzer items and verifier invocation, while retained-memory checks exercise
 the call-free unannotated advisory analyzer driver and its no-session fast
 path. The worker is isolated in
-`SharpProof.Verifier.Win-x64`; the portable `SharpProof` package contains only
+`SharpProof.Verifier`; the portable `SharpProof` package contains only
 analyzer/generator assets and depends exactly on `SharpProof.Attributes`. Each
 package has a portable-PDB symbol package with SourceLink, and the package
 workflow records exact SHA-256 hashes, an SPDX SBOM, and GitHub

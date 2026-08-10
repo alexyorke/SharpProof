@@ -18,33 +18,63 @@
     "unsupportedSelectedCallableDiagnostic": "SP0047"
   },
   "automation": {
-    "solutionBuildWallSeconds": 600
+    "solutionBuildWallSeconds": 600,
+    "solutionTestWallSeconds": 1800,
+    "mutationShardWallSeconds": 3600,
+    "testProjectCpuDivisor": 2,
+    "mutationParallelism": 4,
+    "mutationDefaultWeight": 1,
+    "acceptanceTimingPhases": [
+      "restore",
+      "static-validation",
+      "build",
+      "semantic-tests",
+      "package-tests",
+      "fuzz",
+      "corpus-and-performance"
+    ],
+    "mutationProjectWeights": {
+      "SharpProof.Package.Test\\SharpProof.Package.Test.csproj": 8,
+      "SharpProof.Worker.Test\\SharpProof.Worker.Test.csproj": 4,
+      "SharpProof.Analyzer.Test\\SharpProof.Analyzer.Test.csproj": 3,
+      "SharpProof.Effects.Test\\SharpProof.Effects.Test.csproj": 3,
+      "SharpProof.ArchitectureTest\\SharpProof.ArchitectureTest.csproj": 2,
+      "SharpProof.Contracts.Test\\SharpProof.Contracts.Test.csproj": 2,
+      "SharpProof.Frontend.Test\\SharpProof.Frontend.Test.csproj": 2,
+      "SharpProof.Ir.Test\\SharpProof.Ir.Test.csproj": 2,
+      "SharpProof.Smt.Test\\SharpProof.Smt.Test.csproj": 2,
+      "SharpProof.Specs.Test\\SharpProof.Specs.Test.csproj": 2,
+      "SharpProof.Summaries.Test\\SharpProof.Summaries.Test.csproj": 2
+    }
+  },
+  "container": {
+    "contractVersion": 1,
+    "platform": "linux/amd64",
+    "defaultCpuCount": 16,
+    "defaultMemoryMiB": 40960
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 127,
-    "expectedCatalogSha256": "ddd6fd5b22975bf794eb84ad9b02d2c5b5c003ab648b31eacbdce2b5c8b32c3b"
+    "expectedCatalogCount": 129,
+    "expectedCatalogSha256": "62e55480a9faef47298c30a5f08583e049d894708bb35bdbbb8cd6508d8d3922"
   },
   "worker": {
-    "protocolVersion": 10,
+    "protocolVersion": 11,
     "manifestSchemaVersion": 4,
     "compilerArtifactSchemaVersion": 11,
     "relationalSummarySchemaVersion": 1,
     "specificationPackSchemaVersion": 1,
     "maximumParallelism": 4,
-    "maximumWorkerProcesses": 4,
     "maximumExpressionDepth": 64,
-    "maximumMemoryMiB": 2048,
     "queryRlimit": 3000000,
     "methodRlimit": 20000000,
     "maximumMethodWallSeconds": 10,
     "maximumProjectWallSeconds": 300,
     "cancellationP95Milliseconds": 250,
-    "forcedTerminationMilliseconds": 1000,
-    "maximumProjectDirectoryCharacters": 239
+    "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 12,
+    "schemaVersion": 13,
     "enabledByDefault": true,
     "maximumMiB": 512,
     "cacheableOutcomes": [
@@ -60,7 +90,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "30d39b2bee968a0d8aa41c77be2d1ebf2bcc3a291ea43934060a3adde18bfca9",
+    "inventorySha256": "6e89bc13001368b905f7fd0b4525eed15626a0d8b8988233d399a7e16705b697",
     "components": [
       {
         "name": "discovery",
@@ -233,7 +263,8 @@
         "paths": [
           "SharpProof.Worker.Launcher/LauncherArguments.catalog.json",
           "scripts/Generate-LauncherArguments.ps1",
-          "SharpProof.Worker.Launcher/LauncherArguments.generated.cs"
+          "SharpProof.Worker.Launcher/LauncherArguments.generated.cs",
+          "SharpProof.BuildTasks/LauncherRuntimeCompanionInventory.generated.cs"
         ]
       },
       {
@@ -249,8 +280,11 @@
         "name": "mutationEvidencePolicy",
         "paths": [
           "scripts/SharpProof.MutationEvidence.psm1",
+          "scripts/SharpProof.MutationScheduling.psm1",
+          "scripts/Test-SharpProofMutationScheduling.ps1",
           "scripts/Test-SharpProofMutationEvidence.ps1",
           "scripts/Test-SharpProofTrustedMutations.ps1",
+          "scripts/Invoke-SharpProofTrustedMutationsParallel.ps1",
           "scripts/Test-SharpProofMutationCatalog.ps1"
         ]
       },
@@ -389,6 +423,8 @@
         "scripts/Get-SharpProofTcbPaths.ps1",
         "scripts/Get-SharpProofReleaseDigests.ps1",
         "scripts/Test-SharpProofCoverage.ps1",
+        "scripts/SharpProof.ContainerExecution.psm1",
+        "SharpProof.Semantic.Tests.slnf",
         "eng/acceptance/Verify.ps1",
         "eng/acceptance/preview-evidence.v1.json"
         ]
@@ -436,7 +472,6 @@
         "paths": [
           "SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs",
           "SharpProof.CompilerArtifact/CompilerManifestArtifact.cs",
-          "SharpProof.Worker.Protocol/WorkerCachePath.cs",
           "SharpProof.Worker/WorkerInputSnapshot.cs",
           "SharpProof.Worker/VerificationCache.cs"
         ]
@@ -447,9 +482,13 @@
           "SharpProof.BuildTasks/SharpProof.BuildTasks.csproj",
           "SharpProof.BuildTasks/InvalidatePublishedResult.cs",
           "SharpProof.BuildTasks/RunVerifier.cs",
-          "SharpProof.Worker.Protocol/WindowsPathIdentity.cs"
+          "SharpProof.Host/SharpProof.Host.csproj",
+          "SharpProof.Host/ContainerContract.cs",
+          "SharpProof.Host/ContainerNativeLibrary.cs",
+          "SharpProof.Host/LinuxPathIdentity.cs",
+          "SharpProof.Host/LinuxWorkerProcess.cs"
         ],
-        "rationale": "The compiled MSBuild tasks and shared native Windows path identity helper own verifier launch cancellation, publication locking, invalidation, and filesystem alias rejection."
+        "rationale": "The compiled Core MSBuild tasks and Linux host assembly own verifier launch cancellation, canonical-container validation, verified native-library binding, publication locking, invalidation, and POSIX filesystem identity."
       },
       {
         "name": "portableShippingBoundary",
@@ -458,15 +497,31 @@
           "SharpProof.Package/SharpProof.nuspec",
           "SharpProof.Package/buildTransitive/SharpProof.props",
           "SharpProof.Package/buildTransitive/SharpProof.targets",
-          "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.props",
-          "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.targets"
+          "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props",
+          "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets"
         ]
       },
       {
         "name": "releaseContainment",
         "paths": [
-          "scripts/Invoke-SharpProofDotnet.ps1",
-          "scripts/JobObjectHelpers.ps1",
+          ".devcontainer/devcontainer.json",
+          ".dockerignore",
+          "Directory.Build.targets",
+          "eng/container/toolchain.json",
+          "eng/container/Dockerfile",
+          "eng/container/entrypoint.sh",
+          "eng/container/dev-command.sh",
+          "eng/container/dev-init.sh",
+          "eng/container/Prepare-NativePayload.ps1",
+          "eng/container/New-ContainerContract.ps1",
+          "compose.yaml",
+          "scripts/Invoke-SharpProofContainer.ps1",
+          "scripts/Invoke-SharpProofChangedTests.ps1",
+          "scripts/Invoke-SharpProofDevCheck.ps1",
+          "scripts/Invoke-SharpProofReleaseContainer.ps1",
+          "scripts/Invoke-SharpProofPackageTests.ps1",
+          "scripts/Invoke-SharpProofSemanticTests.ps1",
+          "scripts/Test-SharpProofContainerContract.ps1",
           "scripts/Test-SharpProofPackageConsumers.ps1"
         ]
       }
@@ -474,9 +529,9 @@
   },
   "productionComplexity": {
     "measurement": "Aggregate Roslyn expression nodes, decision points, and members across handwritten production C#; whitespace, comments, line wrapping, and optional braces are excluded.",
-    "ceilingRationale": "2026-08-07: extracting the cancellable verifier runner and invalidator from unmeasured inline MSBuild XML into the directly testable SharpProof.BuildTasks assembly moved that trusted-boundary logic under the production C# ratchet. 2026-08-08: bounded relational interprocedural verification added one reusable typed-IR summary engine, an isolated exact implementation-PE decoder, and a strict data-driven specification-pack parser; source, IL, and audited packs now share one Z3 composition path instead of growing method-specific verifier branches. Dead dependency-graph scaffolding was removed, production roots are derived from Directory.Build.props, and each new semantic layer has its own narrow ratchet below.",
-    "maximumExpressionNodes": 111400,
-    "maximumDecisionPoints": 5950,
+    "ceilingRationale": "2026-08-07: extracting the cancellable verifier runner and invalidator from unmeasured inline MSBuild XML into the directly testable SharpProof.BuildTasks assembly moved that trusted-boundary logic under the production C# ratchet. 2026-08-08: bounded relational interprocedural verification added one reusable typed-IR summary engine, an isolated exact implementation-PE decoder, and a strict data-driven specification-pack parser; source, IL, and audited packs now share one Z3 composition path instead of growing method-specific verifier branches. Dead dependency-graph scaffolding was removed, production roots are derived from Directory.Build.props, and each new semantic layer has its own narrow ratchet below. 2026-08-08 audit: atomic publication ownership and cancellation, total malformed-evidence and cache validation, worker cancellation/evidence checks, and the non-entrypoint analyzer Core boundary added supported-surface safeguards with mutation-discriminating regressions; ceilings:113500/6050/3900.",
+    "maximumExpressionNodes": 113500,
+    "maximumDecisionPoints": 6050,
     "maximumMembers": 3900
   },
   "productionCoordinatorComplexity": {
@@ -570,6 +625,9 @@
   "performance": {
     "warmups": 5,
     "samples": 30,
+    "smokeWarmups": 1,
+    "smokeSamples": 4,
+    "smokeMaximumRatio": 2.0,
     "maximumMedianRatio": 1.10,
     "maximumP95Ratio": 1.20,
     "maximumRetainedMemoryRatio": 1.05,

@@ -36,7 +36,7 @@
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\Microsoft.Bcl.AsyncInterfaces.dll" />
-    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\SharpProof.Analyzer.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer.Core\bin\$(Configuration)\netstandard2.0\SharpProof.Analyzer.Core.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\SharpProof.CompilerArtifact.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\SharpProof.Contracts.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\SharpProof.Dataflow.dll" />

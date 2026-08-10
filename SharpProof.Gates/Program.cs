@@ -71,9 +71,18 @@ internal static class Program
                     JsonSerializer.Serialize(result, JsonDefaults.Indented));
                 return result.Passed ? 0 : 1;
             }
+            if (command == "performance-smoke")
+            {
+                var result = await PerformanceGate.RunSmokeAsync(root)
+                    .ConfigureAwait(false);
+                Console.WriteLine(
+                    JsonSerializer.Serialize(result, JsonDefaults.Indented));
+                return result.Passed ? 0 : 1;
+            }
             Console.Error.WriteLine(
                 "Usage: SharpProof.Gates " +
-                "[all|corpus|corpus-print|corpus-update|performance]");
+                "[all|corpus|corpus-print|corpus-update|performance|" +
+                "performance-smoke]");
             return 2;
         }
         catch (Exception exception)

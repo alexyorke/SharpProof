@@ -62,13 +62,19 @@ function Invoke-GeneratorCase {
     if (-not $ShouldPass -and $exitCode -eq 0) {
         throw "Malformed generator case '$Name' was accepted."
     }
+    $generatorLog = [IO.File]::ReadAllText(
+        (Join-Path $caseRoot 'generator.log'))
+    $normalizedGeneratorLog = [Text.RegularExpressions.Regex]::Replace(
+        $generatorLog,
+        '[\s|]+',
+        ' ')
     if (-not $ShouldPass -and
-        -not [IO.File]::ReadAllText((Join-Path $caseRoot 'generator.log')).Contains(
+        -not $normalizedGeneratorLog.Contains(
             $ExpectedMessage,
             [StringComparison]::Ordinal)) {
         throw (
             "Malformed generator case '$Name' did not fail for the " +
-            "expected reason '$ExpectedMessage'.")
+            "expected reason '$ExpectedMessage'. Output: $generatorLog")
     }
 }
 

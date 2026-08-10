@@ -39,6 +39,7 @@ internal static class CompilerEffectClaimArtifactCodec
             (WorkerClaimOutcome.Proven, WorkerClaimReason.None, _, null, null) => true,
             (WorkerClaimOutcome.Refuted, WorkerClaimReason.None,
                 _, { } witness, { }) => WorkerProtocolJson.HasValidEffectWitness(witness) &&
+                    HasCanonicalStrings(witness.ExactExceptionTypeHierarchy) &&
                     WorkerProtocolJson.HasValidLocation(witness.Location),
             (WorkerClaimOutcome.Unknown,
                 var reason, _, null, null) when
@@ -54,7 +55,7 @@ internal static class CompilerEffectClaimArtifactCodec
         if (constraint is not { } value ||
             !WorkerProtocolJson.HasKnownEffects(
                 value.AllowedEffects, value.AllowedCapabilities) ||
-            !WorkerProtocolJson.AreDistinctNonblank(value.AllowedExceptionTypes))
+            !HasCanonicalStrings(value.AllowedExceptionTypes))
         {
             return false;
         }
@@ -122,6 +123,16 @@ internal static class CompilerEffectClaimArtifactCodec
     private static bool HasOptionalText(string? value)
     {
         return value == null || !string.IsNullOrWhiteSpace(value);
+    }
+
+    private static bool HasCanonicalStrings(string[]? values)
+    {
+        return WorkerProtocolJson.AreDistinctNonblank(values) &&
+            values!.Zip(
+                    values.Skip(1),
+                    static (left, right) =>
+                        StringComparer.Ordinal.Compare(left, right) < 0)
+                .All(static ordered => ordered);
     }
 
     internal static string ComputeConstraintSha256(

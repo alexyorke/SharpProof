@@ -191,6 +191,48 @@ public sealed class IrRelationalSummaryTests
             "unbound",
             fixture.Factory.IntegerType);
         var foreignFactory = new IrFactory();
+        var foreignVariable = foreignFactory.CreateVariable(
+            "foreign",
+            foreignFactory.IntegerType);
+        var instanceMember = fixture.Factory.GetOrCreateMember(
+            fixture.Factory.CreateIdentity(),
+            fixture.DeclaringType,
+            "InstanceInvalidShape",
+            fixture.Factory.IntegerType,
+            isStatic: false,
+            fixture.Factory.IntegerType);
+        var foreignSignatures = new[]
+        {
+            new IrSummarySignature(
+                fixture.Member,
+                receiver: null,
+                [foreignVariable],
+                fixture.Result,
+                Provenance('a')),
+            new IrSummarySignature(
+                fixture.Member,
+                receiver: null,
+                [fixture.Parameter],
+                foreignVariable,
+                Provenance('b')),
+            new IrSummarySignature(
+                instanceMember,
+                foreignVariable,
+                [fixture.Parameter],
+                fixture.Result,
+                Provenance('c'))
+        };
+        foreach (var signature in foreignSignatures)
+        {
+            var result = IrRelationalSummaryBuilder.Build(
+                program,
+                signature,
+                validEnvironment);
+            Assert.That(
+                result.Reason,
+                Is.EqualTo(IrSummaryAbstentionReason.InvalidSignature));
+        }
+
         var invalidEnvironments = new IReadOnlyDictionary<IrVarId, IrTerm>[]
         {
             new Dictionary<IrVarId, IrTerm>
@@ -204,6 +246,10 @@ public sealed class IrRelationalSummaryTests
             new Dictionary<IrVarId, IrTerm>
             {
                 [bodyParameter] = foreignFactory.Integer(1)
+            },
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [bodyParameter] = null!
             }
         };
         foreach (var environment in invalidEnvironments)
@@ -321,6 +367,57 @@ public sealed class IrRelationalSummaryTests
                 environment,
                 limits: new IrRelationalSummaryBuildLimits(
                     maximumExpressionDepth: 1)).Reason,
+            Is.EqualTo(IrSummaryAbstentionReason.ExpressionDepth));
+    }
+
+    [Test]
+    public void CallCompositionPreservesExpressionDepthAbstention()
+    {
+        var fixture = new SummaryFixture("DepthDependency");
+        var dependency = BuildIdentitySummary(fixture);
+        var callerMember = fixture.CreateMember("DepthCaller");
+        var bodyParameter = fixture.Factory.CreateVariable(
+            "caller:body-value",
+            fixture.Factory.IntegerType);
+        var callResult = fixture.Factory.CreateVariable(
+            "caller:call-result",
+            fixture.Factory.IntegerType);
+        var builder = new IrProgramBuilder(fixture.Factory);
+        var entry = builder.CreateBlock("entry");
+        var call = builder.Call(
+            entry,
+            fixture.Factory.CreateOperation("call"),
+            callResult,
+            fixture.Member,
+            receiver: null,
+            fixture.Factory.Variable(bodyParameter));
+        builder.Return(
+            entry,
+            fixture.Factory.CreateOperation("return"),
+            fixture.Factory.Variable(callResult));
+
+        var built = IrRelationalSummaryBuilder.Build(
+            builder.Build(),
+            new IrSummarySignature(
+                callerMember,
+                receiver: null,
+                [fixture.Parameter],
+                fixture.Result,
+                Provenance('d')),
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [bodyParameter] =
+                    fixture.Factory.Variable(fixture.Parameter)
+            },
+            new Dictionary<IrInstructionId, IrRelationalSummary>
+            {
+                [call.Id] = dependency
+            },
+            new IrRelationalSummaryBuildLimits(
+                maximumExpressionDepth: 1));
+
+        Assert.That(
+            built.Reason,
             Is.EqualTo(IrSummaryAbstentionReason.ExpressionDepth));
     }
 

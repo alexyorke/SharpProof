@@ -21,7 +21,7 @@
              Link="Polyfills\IsExternalInit.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" />
+    <ProjectReference Include="..\SharpProof.Analyzer.Core\SharpProof.Analyzer.Core.csproj" />
     <ProjectReference Include="..\SharpProof.CompilerArtifact\SharpProof.CompilerArtifact.csproj" />
     <ProjectReference Include="..\SharpProof.Contracts\SharpProof.Contracts.csproj" />
     <ProjectReference Include="..\SharpProof.Effects\SharpProof.Effects.csproj" />

@@ -22,7 +22,6 @@ function Invoke-DotnetFormat {
         $effectiveArguments.Add('--verify-no-changes')
     }
     & $wrapperPath `
-        -MemoryLimitMb 8192 `
         -TimeoutSeconds 900 `
         @effectiveArguments
     if ($LASTEXITCODE -ne 0) {

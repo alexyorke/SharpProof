@@ -10,6 +10,78 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+
+function Resolve-RepositoryPath([string]$Path) {
+    if ([IO.Path]::IsPathRooted($Path)) {
+        return [IO.Path]::GetFullPath($Path)
+    }
+
+    return [IO.Path]::GetFullPath((Join-Path $repositoryRoot $Path))
+}
+
+function Get-OwnedWorkingSetBytes([int]$RootProcessId) {
+    $snapshot = [Collections.Generic.Dictionary[int, object]]::new()
+    foreach ($directory in [IO.Directory]::EnumerateDirectories('/proc')) {
+        [int]$processId = 0
+        if (-not [int]::TryParse(
+                [IO.Path]::GetFileName($directory),
+                [ref]$processId)) {
+            continue
+        }
+
+        try {
+            $stat = [IO.File]::ReadAllText((Join-Path $directory 'stat'))
+        }
+        catch [IO.IOException] {
+            continue
+        }
+        catch [UnauthorizedAccessException] {
+            continue
+        }
+
+        $commandEnd = $stat.LastIndexOf(')')
+        if ($commandEnd -lt 0) {
+            continue
+        }
+        $fields = $stat.Substring($commandEnd + 1).Split(
+            ' ', [StringSplitOptions]::RemoveEmptyEntries)
+        if ($fields.Length -le 21) {
+            continue
+        }
+
+        [int]$parentProcessId = 0
+        [long]$residentPages = 0
+        if (-not [int]::TryParse($fields[1], [ref]$parentProcessId) -or
+            -not [long]::TryParse($fields[21], [ref]$residentPages)) {
+            continue
+        }
+        $snapshot[$processId] = [pscustomobject]@{
+            parent = $parentProcessId
+            residentPages = $residentPages
+        }
+    }
+
+    $owned = [Collections.Generic.HashSet[int]]::new()
+    [void]$owned.Add($RootProcessId)
+    do {
+        $before = $owned.Count
+        foreach ($entry in $snapshot.GetEnumerator()) {
+            if ($owned.Contains([int]$entry.Value.parent)) {
+                [void]$owned.Add([int]$entry.Key)
+            }
+        }
+    } while ($owned.Count -ne $before)
+
+    [long]$workingSet = 0
+    foreach ($processId in $owned) {
+        if ($snapshot.ContainsKey($processId)) {
+            $workingSet += [long]$snapshot[$processId].residentPages *
+                [Environment]::SystemPageSize
+        }
+    }
+    return $workingSet
+}
+
 $pilotRoot = Join-Path $repositoryRoot 'eng\pilots'
 $catalog = Get-Content -LiteralPath (Join-Path $pilotRoot 'catalog.json') -Raw |
     ConvertFrom-Json
@@ -19,11 +91,11 @@ $versionPrefix = [string]$releaseProps.Project.PropertyGroup.SharpProofVersionPr
 $version = ([string]$releaseProps.Project.PropertyGroup.SharpProofPackageVersion).Replace(
     '$(SharpProofVersionPrefix)',
     $versionPrefix)
-$resolvedPackageSource = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $PackageSource))
+$resolvedPackageSource = Resolve-RepositoryPath $PackageSource
 if (-not (Test-Path -LiteralPath $resolvedPackageSource -PathType Container)) {
     throw "Pilot package source is missing: '$resolvedPackageSource'."
 }
-foreach ($id in @('SharpProof.Attributes', 'SharpProof', 'SharpProof.Verifier.Win-x64')) {
+foreach ($id in @('SharpProof.Attributes', 'SharpProof', 'SharpProof.Verifier')) {
     $package = Join-Path $resolvedPackageSource "$id.$version.nupkg"
     if (-not (Test-Path -LiteralPath $package -PathType Leaf)) {
         throw "Pilot package source is missing '$([IO.Path]::GetFileName($package))'."
@@ -60,7 +132,6 @@ function Invoke-PilotDotNet {
     $startInfo.WorkingDirectory = $WorkingDirectory
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
-    $startInfo.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
     $payload = [ordered]@{
         wrapper = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
         log = $LogPath
@@ -73,7 +144,6 @@ $payloadJson = [Text.Encoding]::UTF8.GetString(
     [Convert]::FromBase64String('__PAYLOAD__'))
 $payload = $payloadJson | ConvertFrom-Json
 & $payload.wrapper `
-    -MemoryLimitMb 3072 `
     -TimeoutSeconds 600 `
     -OutputPath $payload.log `
     -DotnetArgs @($payload.arguments)
@@ -88,24 +158,7 @@ exit $LASTEXITCODE
     $stopwatch = [Diagnostics.Stopwatch]::StartNew()
     [long]$peakWorkingSet = 0
     while (-not $process.WaitForExit(100)) {
-        $processes = @(Get-CimInstance Win32_Process)
-        $owned = [Collections.Generic.HashSet[int]]::new()
-        [void]$owned.Add($process.Id)
-        do {
-            $before = $owned.Count
-            foreach ($candidate in $processes) {
-                if ($owned.Contains([int]$candidate.ParentProcessId)) {
-                    [void]$owned.Add([int]$candidate.ProcessId)
-                }
-            }
-        } while ($owned.Count -ne $before)
-        [long]$workingSet = 0
-        foreach ($id in $owned) {
-            $ownedProcess = Get-Process -Id $id -ErrorAction SilentlyContinue
-            if ($null -ne $ownedProcess) {
-                $workingSet += [long]$ownedProcess.WorkingSet64
-            }
-        }
+        $workingSet = Get-OwnedWorkingSetBytes $process.Id
         $peakWorkingSet = [Math]::Max($peakWorkingSet, $workingSet)
     }
     $stopwatch.Stop()
@@ -240,7 +293,7 @@ $report = [ordered]@{
     pilotCount = $results.Count
     pilots = $results
 }
-$resolvedOutput = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputPath))
+$resolvedOutput = Resolve-RepositoryPath $OutputPath
 if (-not $resolvedOutput.StartsWith(
         $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
         [StringComparison]::OrdinalIgnoreCase)) {

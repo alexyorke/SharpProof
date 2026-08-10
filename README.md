@@ -33,16 +33,68 @@ or sequence reasoning are not implemented.
 ## Install and enable
 
 The portable analyzer and generator require a compiler host with Roslyn 4.14
-or newer. Repository development and command-line builds require the exact
-.NET SDK version pinned in `global.json` (currently 9.0.316; roll-forward is
-disabled). The package-consumer compatibility lane separately validates the
+or newer. The canonical development image supplies the exact .NET SDK version
+pinned in `global.json` (currently 9.0.316; roll-forward is disabled); it is
+not a host prerequisite. The package-consumer compatibility lane separately validates the
 `netstandard2.0` contract API with its minimum SDK, currently 9.0.300. The
 `SharpProof.Attributes` contract API alone remains a `netstandard2.0` library,
 and `SharpProofProfile=off` omits analyzer/generator loading on an older host.
-The preview verifier is qualified for Windows x64 command-line MSBuild and
-Visual Studio 2022 Build Tools 17.14 x64 MSBuild. Rider and Windows ARM64 are
-not supported for this preview. The exact host and filesystem boundary is
-listed in [Preview support boundary](docs/preview-support.md).
+The preview verifier is qualified only in the repository's pinned Linux amd64
+container using Core MSBuild. Docker Engine or Docker Desktop with Compose v2
+is the only host prerequisite. Native host execution, Visual Studio verifier
+execution, Rider, and ARM64 verifier containers are not supported for this
+preview. The portable analyzer remains separately cross-platform. The exact
+host and filesystem boundary is listed in
+[Preview support boundary](docs/preview-support.md).
+The permanent editor workflow is documented in
+[Container development](docs/container-development.md).
+
+For repository development, Docker is the only required tool. Start the
+persistent environment once and work inside it so incremental outputs survive:
+
+```text
+docker compose build tooling
+docker compose up -d dev
+docker compose exec dev sharpproof-dev-init
+docker compose exec dev bash
+```
+
+For a permanent editor environment, open the repository in VS Code and choose
+**Dev Containers: Reopen in Container**. The container validates its pinned
+contract, clones the configured remote branch with container Git, and performs
+a locked restore once. No host initialization command runs. Its terminal runs
+as the non-root `sharpproof` user and exposes the same commands without nested
+Docker. Source, Git state, build outputs, and artifacts live in a persistent
+Compose workspace volume:
+
+```text
+sp test-changed
+sp check
+sp build
+sp portable-tests
+sp worker-tests
+sp package-tests
+sp acceptance -Configuration Release
+```
+
+`sp test-changed` is the shortest edit-loop check. `sp check` runs one
+incremental build plus duration-aware semantic, Worker, package, and performance
+smoke shards. Disposable `docker compose run --rm tooling ...` commands remain
+the clean qualification path and intentionally discard build outputs.
+
+The default container budget is 16 CPUs and 40 GiB. Test-project concurrency is
+derived from the CPUs visible inside the container (one lane per two CPUs), so
+changing `SHARPPROOF_CONTAINER_CPU_LIMIT` also changes orchestration without a
+second hardcoded worker count. `SHARPPROOF_TEST_PROJECT_PARALLELISM` is an
+explicit diagnostic override and cannot exceed the visible CPU count.
+
+Compose derives its default project name from the source directory. Put a
+distinct `COMPOSE_PROJECT_NAME` and optional `SHARPPROOF_DEV_REF` in each
+checkout's untracked `.env` file. The persistent source volume, NuGet cache,
+and .NET home are then private to that Compose project. Finite task commands
+clone into a temporary container workspace instead of writing host `bin` or
+`obj` trees; only deliberate evidence is copied to the mounted checkout's
+`artifacts` folder.
 
 The coordinates below are the intended preview packages, but no SharpProof
 package has been promoted to the public NuGet feed yet. Until the first
@@ -123,7 +175,7 @@ For strict CI:
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="SharpProof.Verifier.Win-x64"
+  <PackageReference Include="SharpProof.Verifier"
                     Version="1.0.0-preview.1"
                     PrivateAssets="all" />
 </ItemGroup>
@@ -315,10 +367,11 @@ public static class Choices {
 }
 ```
 
-Opt into worker execution on Windows x64:
+Opt into worker execution inside the canonical container:
 
-```powershell
-dotnet build /p:SharpProofVerify=true
+```text
+docker compose run --rm tooling dev -lc \
+  'dotnet build /p:SharpProofVerify=true'
 ```
 
 `SharpProofVerify` remains optional in `advisory`; the `strict` profile
@@ -336,7 +389,7 @@ set. The default result is published under:
 obj/<Configuration>/<TargetFramework>/SharpProof/result.json
 ```
 
-Worker protocol version 10 separates the project run from semantic claim
+Worker protocol version 11 separates the project run from semantic claim
 outcomes. The compiler artifact records the effective `SharpProofFeatures`
 selection before manifest construction. A compiler-symbol-based manifest
 selects callables and assigns stable `spc1:` semantic IDs to direct clauses,
@@ -405,7 +458,7 @@ under every policy. The worker uses deterministic query, method, project,
 expression-depth, memory, process, and parallelism limits. Its
 content-addressed cache defaults to
 `obj/<Configuration>/<TargetFramework>/SharpProof/cache` in the MSBuild
-integration. Cache schema version 12 stores only complete, postcondition-only
+integration. Cache schema version 13 stores only complete, postcondition-only
 responses whose claims are all `Refuted`. Before accepting a hit, the worker
 reconstructs every canonical Boolean/integer model against the current lowered
 callable, validates entry assumptions and source ranges, and independently
@@ -587,21 +640,20 @@ The checked-in acceptance contract declares these consumer target frameworks:
 
 The Attributes and portable SharpProof packages target `netstandard2.0` and
 contain no verifier, Z3, or native solver payload.
-`SharpProof.Verifier.Win-x64` carries `SharpProof.Worker` as a `net9.0` tool,
-the launcher, and one Windows x64 native Z3 payload with mandatory Windows Job
-Object containment.
-`SharpProofVerify=true` on an unsupported host fails with an explicit
-unsupported-host build error; portable analyzer features remain available.
+`SharpProof.Verifier` carries `SharpProof.Worker` as a `net9.0` tool, the
+launcher, build tasks, and one pinned Linux x64 native Z3 payload. Docker is the
+hard CPU and memory boundary; SharpProof retains semantic and wall-clock
+budgets but does not duplicate cgroup enforcement.
+`SharpProofVerify=true` outside the canonical Linux amd64 container fails with
+an explicit unsupported-host build error; portable analyzer features remain
+available.
 
-The full acceptance workflow runs on `windows-latest`. A separate
-package-consumer workflow restores the exact same three-package artifact graph
-and exercises portable analyzer consumers on Windows x64, Linux x64, macOS x64,
-and macOS ARM64. Only Windows x64 executes the packaged worker; every other
-matrix host asserts the explicit unsupported-host rejection. Windows x64
-command-line and Visual Studio 2022 Build Tools 17.14 x64 MSBuild are
-qualified, including percent-containing paths and local publication paths
-beyond 260 characters. Project directories longer than 239 characters fail
-before compiler launch with a classified build error. Rider, Windows ARM64,
+The full acceptance and package-consumer workflows run in the pinned container.
+The portable analyzer remains operating-system-neutral, while all repository
+qualification uses the same Linux toolchain. Container qualification covers
+percent-containing, Unicode, space-containing, and long local paths, cache,
+SARIF, cancellation, and cooperative publication. Native host installs,
+Visual Studio verifier execution, Rider, ARM64 verifier containers,
 UNC/shared-network publication, and hostile concurrent filesystem mutation are
 outside this preview's supported boundary.
 
@@ -624,7 +676,7 @@ owner-protected `nuget.private-preview`
 environment and its configured private source; `v1.0.0-preview.2`,
 `v1.0.0-rc.1`, and `v1.0.0` use the owner-protected `nuget.org` environment
 and temporary OIDC credentials. Both paths download, revalidate, and promote
-the exact package bytes that passed the cross-platform consumer matrix.
+the exact package bytes that passed the container consumer matrix.
 Before any write, the publisher validates `SharpProof.release.json` and every
 artifact hash, then queries the feed's V3 `PackageBaseAddress` for all three
 IDs and rejects any existing main package. The publisher then sends main and
@@ -643,10 +695,8 @@ nonexistence is enforced by a push without duplicate skipping. The workflow
 contains no feed credential values. An offline plan and local remote-presence
 simulation are available through:
 
-```powershell
-.\scripts\Publish-SharpProofRelease.ps1 `
-  -PackageSource nupkgs `
-  -PlanOnly
+```text
+docker compose run --rm tooling release-plan -PackageSource nupkgs
 ```
 
 For a real publication, the publisher resolves an absolute `dotnet` host and
@@ -665,8 +715,8 @@ digests. Summary calls carry their source, exact implementation-IL, or audited
 pack identity plus their transitive dependency-evidence closure. For the admitted direct
 managed object/array allocations, it also seals the ordered unconditional
 event, exact constraint identity, semantic operation identity, and source-tree
-span needed for independent worker replay. Worker protocol version 10 and cache
-schema version 12 carry this wire break. Relational-summary schema version 1
+span needed for independent worker replay. Worker protocol version 11 and cache
+schema version 13 carry this wire break. Relational-summary schema version 1
 and specification-pack schema version 1 govern the new evidence. The artifact
 also records compiler error
 diagnostics with mapped locations,
@@ -716,10 +766,10 @@ expected diagnostics, and exact `Proven`/`Refuted`/`Unknown` worker records.
 Every sample restores packed NuGet artifacts from an isolated feed; none uses
 a repository project reference.
 
-Run the complete host-aware matrix with:
+Run the complete package-backed matrix with:
 
-```powershell
-.\scripts\Test-SharpProofSamples.ps1
+```text
+docker compose run --rm tooling samples -Configuration Release
 ```
 
 The supported consumer surface and its XML-documentation guarantee are listed
@@ -727,13 +777,19 @@ in [Supported public API](docs/public-api.md).
 
 ## Build and validate this repository
 
-Run long-lived .NET commands through the repository wrapper:
+Run repository tooling only in the canonical container:
 
-```powershell
-.\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln
-.\scripts\Format-CSharp.ps1 -Verify
-.\scripts\Generate-Readme.ps1 -Verify
-.\eng\acceptance\Verify.ps1 -Configuration Release
+```text
+docker compose up -d dev
+docker compose exec dev bash
+sp test-changed
+sp check
+```
+
+Run the clean exact qualification only for a coherent candidate:
+
+```text
+docker compose run --rm tooling acceptance -Configuration Release
 ```
 
 The acceptance gate enforces the dependency graph, exact trusted-boundary path

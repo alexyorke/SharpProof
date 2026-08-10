@@ -82,6 +82,7 @@ public sealed class CorpusGateTests
     }
 
     [Test]
+    [Category("Corpus")]
     public async Task AnalyzerMatchesCanonicalCorpusAndReplayModes()
     {
         var root = RepositoryLayout.FindRoot();

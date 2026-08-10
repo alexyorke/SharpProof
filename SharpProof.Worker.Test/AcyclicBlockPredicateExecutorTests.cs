@@ -195,6 +195,119 @@ public sealed class AcyclicBlockPredicateExecutorTests
     }
 
     [Test]
+    public void CancellationAfterEntryCheckInterruptsSynchronousBodyExecution()
+    {
+        var factory = new IrFactory();
+        var condition = factory.CreateVariable(
+            "condition",
+            factory.BooleanType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("cycle");
+        builder.Goto(entry, factory.CreateOperation(), entry);
+        var target = new CompilerCallablePreparation(
+            factory,
+            new WorkerCallableManifestEntry
+            {
+                CallableId = "M:Test.Subject.Canceled",
+                ClaimIds = ["claim"]
+            },
+            [
+                new CompilerPreparedClause(
+                    CompilerContractKind.Requires,
+                    factory.Variable(condition),
+                    CompilerContractEvidence.CompilerBoundInvocation,
+                    null,
+                    null),
+                new CompilerPreparedClause(
+                    CompilerContractKind.Ensures,
+                    factory.Boolean(true),
+                    CompilerContractEvidence.CompilerBoundInvocation,
+                    "claim",
+                    null)
+            ],
+            [new CompilerCanonicalVariable(
+                CompilerVariableRole.Parameter,
+                0,
+                condition,
+                null,
+                null,
+                "parameter:0")],
+            WorkerClaimReason.None,
+            CompilerPreparedBody.ProgramBody(
+                builder.Build(),
+                ImmutableDictionary<IrVarId, IrVarId>.Empty,
+                ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+                ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty));
+        using var cancellation = new CancellationTokenSource();
+        var resourceReads = 0;
+        var resourceBudget = new MethodResourceBudget(
+            () =>
+            {
+                if (Interlocked.Increment(ref resourceReads) == 3)
+                {
+                    cancellation.Cancel();
+                }
+                return 0;
+            },
+            WorkerBudgets.DefaultQueryRlimit,
+            WorkerBudgets.DefaultMethodRlimit);
+        var verifier = new CallableVerifier(
+            new CompletionThenProofBackend(),
+            WorkerBudgets.DefaultMaximumExpressionDepth);
+
+        Assert.ThrowsAsync<OperationCanceledException>(
+            (Func<Task>)(async () => await verifier.VerifyAsync(
+                target,
+                resourceBudget,
+                cancellation.Token)));
+        Assert.That(cancellation.IsCancellationRequested, Is.True);
+    }
+
+    [Test]
+    public void PreCanceledTokenStopsExecutorAndEvidenceConstruction()
+    {
+        var factory = new IrFactory();
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        builder.Return(entry, factory.CreateOperation(), factory.Integer(0));
+        var program = builder.Build();
+        var target = CreateTarget(
+            factory,
+            program,
+            [],
+            ImmutableDictionary<IrVarId, IrVarId>.Empty);
+        var body = Execute(factory, program, []);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.Throws<OperationCanceledException>((Action)(() =>
+                new AcyclicBlockPredicateExecutor(
+                    WorkerBudgets.DefaultMaximumExpressionDepth).Execute(
+                    [],
+                    factory,
+                    program,
+                    ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+                    ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty,
+                    ImmutableDictionary<IrVarId, IrTerm>.Empty,
+                    ImmutableDictionary<IrVarId, IrVarId>.Empty,
+                    cancellation.Token)));
+            Assert.Throws<OperationCanceledException>((Action)(() =>
+                CallableEvidenceBuilder.Build(
+                    target,
+                    body,
+                    WorkerBudgets.DefaultMaximumExpressionDepth,
+                    cancellation.Token)));
+            Assert.Throws<OperationCanceledException>((Action)(() =>
+                CallableEvidenceBuilder.BuildEntry(
+                    target,
+                    WorkerBudgets.DefaultMaximumExpressionDepth,
+                    cancellation.Token)));
+        }));
+    }
+
+    [Test]
     public void SymbolicOperationBudgetExhaustionIsTypedResourceLimit()
     {
         var factory = new IrFactory();

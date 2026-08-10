@@ -186,7 +186,8 @@ internal sealed class AnalyzerConfiguration
 
     private static SharpProofProfile ParseProfile(string value)
     {
-        return Is(value, "off") ? SharpProofProfile.Off :
+        return Is(value, SharpProofConfigurationCatalog.ProfileOff)
+            ? SharpProofProfile.Off :
         Is(value, "strict") ? SharpProofProfile.Strict :
         SharpProofProfile.Advisory;
     }

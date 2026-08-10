@@ -43,16 +43,57 @@ internal sealed record PerformanceGateResult(
     double ForcedTerminationMilliseconds,
     ImmutableArray<string> Failures);
 
+internal sealed record PerformanceSmokeResult(
+    bool Passed,
+    int Warmups,
+    int Samples,
+    double MaximumAllowedRatio,
+    double MaximumObservedRatio,
+    PackageBuildSdkIdentity PackageBuildSdk,
+    ImmutableArray<PackageBuildSample> PackageBuildSamples,
+    int UnannotatedAdvisoryAnalyzerDriverRunCount,
+    int UnannotatedAdvisoryAnalysisSessionCreateCount,
+    double ForcedTerminationMilliseconds,
+    ImmutableArray<string> Failures);
+
 internal static class PerformanceGate
 {
     private const int RetainedCompilationCount = 40;
 
-    public static async Task<PerformanceGateResult> RunAsync(
+    public static Task<PerformanceGateResult> RunAsync(
         string repositoryRoot,
         CancellationToken cancellationToken = default)
     {
         var contract = AcceptancePerformanceContract.Load(repositoryRoot);
         ValidateContract(contract);
+        return RunValidatedAsync(
+            repositoryRoot,
+            contract,
+            cancellationToken);
+    }
+
+    internal static Task<PerformanceGateResult> RunStructuralCoverageAsync(
+        string repositoryRoot,
+        CancellationToken cancellationToken = default)
+    {
+        var contract = AcceptancePerformanceContract.Load(repositoryRoot);
+        ValidateContract(contract);
+        return RunValidatedAsync(
+            repositoryRoot,
+            contract with
+            {
+                Warmups = 1,
+                Samples = 2,
+                IdeEdits = 2
+            },
+            cancellationToken);
+    }
+
+    private static async Task<PerformanceGateResult> RunValidatedAsync(
+        string repositoryRoot,
+        AcceptancePerformanceContract contract,
+        CancellationToken cancellationToken)
+    {
         var callBearingSource =
             CreateCallBearingUnannotatedAdvisorySource(320);
         var callFreeSource =
@@ -218,6 +259,74 @@ internal static class PerformanceGate
             editMaximum,
             editMeasurement.DiagnosticFailures.Length,
             cancellationP95,
+            forcedTermination,
+            failures.ToImmutable());
+    }
+
+    public static async Task<PerformanceSmokeResult> RunSmokeAsync(
+        string repositoryRoot,
+        CancellationToken cancellationToken = default)
+    {
+        var contract = AcceptancePerformanceContract.Load(repositoryRoot);
+        ValidateContract(contract);
+        var source = CreateCallBearingUnannotatedAdvisorySource(320);
+        ValidateAdvisoryPackagePolicy(repositoryRoot);
+        var configurationProbe = MeasureUnannotatedAdvisoryAnalyzerBatch(
+            source,
+            "UnannotatedAdvisorySmokeConfigurationProbe",
+            iterations: 1,
+            cancellationToken);
+        var timing = await MeasureUnannotatedAdvisoryPackageBuildsAsync(
+                repositoryRoot,
+                source,
+                contract.SmokeWarmups,
+                contract.SmokeSamples,
+                cancellationToken)
+            .ConfigureAwait(false);
+        var ratios = timing.Samples
+            .Select(static sample =>
+                sample.UnannotatedAdvisoryMilliseconds /
+                sample.BaselineMilliseconds)
+            .ToImmutableArray();
+        var maximumObservedRatio = ratios.Max();
+        var forcedTermination =
+            await WorkerPerformanceProbe.MeasureForcedTerminationAsync(
+                    repositoryRoot,
+                    contract,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        var failures = ImmutableArray.CreateBuilder<string>();
+        if (configurationProbe.AnalysisSessionCreateCount != 0 ||
+            configurationProbe.ApiSpecCreateCount != 0 ||
+            configurationProbe.EffectAnalysisCreateCount != 0)
+        {
+            failures.Add(
+                "Unselected advisory code created semantic analysis state.");
+        }
+        if (maximumObservedRatio > contract.SmokeMaximumRatio)
+        {
+            failures.Add(
+                "Unannotated advisory smoke ratio " +
+                $"{Format(maximumObservedRatio)} exceeds " +
+                $"{Format(contract.SmokeMaximumRatio)}.");
+        }
+        if (forcedTermination > contract.ForcedTerminationMilliseconds)
+        {
+            failures.Add(
+                $"Launcher forced termination {Format(forcedTermination)} ms " +
+                $"exceeds {Format(contract.ForcedTerminationMilliseconds)} ms.");
+        }
+
+        return new PerformanceSmokeResult(
+            failures.Count == 0,
+            contract.SmokeWarmups,
+            contract.SmokeSamples,
+            contract.SmokeMaximumRatio,
+            maximumObservedRatio,
+            timing.Sdk,
+            timing.Samples,
+            configurationProbe.AnalyzerDriverRunCount,
+            configurationProbe.AnalysisSessionCreateCount,
             forcedTermination,
             failures.ToImmutable());
     }
@@ -1026,6 +1135,16 @@ internal static class PerformanceGate
                 "30 samples, and 200 IDE edits.");
         }
 
+        if (contract.SmokeWarmups < 1 ||
+            contract.SmokeSamples < 2 ||
+            (contract.SmokeSamples & 1) != 0 ||
+            contract.SmokeMaximumRatio <= 0)
+        {
+            throw new InvalidDataException(
+                "The performance smoke protocol requires positive warmups, " +
+                "a positive even sample count, and a positive ratio limit.");
+        }
+
         if (contract.MaximumMedianRatio <= 0 ||
             contract.MaximumP95Ratio <= 0 ||
             contract.MaximumRetainedMemoryRatio <= 0 ||
@@ -1051,7 +1170,7 @@ internal static class PerformanceGate
             "buildTransitive");
         var verifierRoot = Path.Combine(
             repositoryRoot,
-            "SharpProof.Verifier.Win-x64",
+            "SharpProof.Verifier",
             "buildTransitive");
         var portableProps = XDocument.Load(Path.Combine(
             portableRoot,
@@ -1061,10 +1180,10 @@ internal static class PerformanceGate
             "SharpProof.targets"));
         var verifierProps = XDocument.Load(Path.Combine(
             verifierRoot,
-            "SharpProof.Verifier.Win-x64.props"));
+            "SharpProof.Verifier.props"));
         var verifierTargets = XDocument.Load(Path.Combine(
             verifierRoot,
-            "SharpProof.Verifier.Win-x64.targets"));
+            "SharpProof.Verifier.targets"));
         ValidateAdvisoryPackagePolicy(
             portableProps,
             portableTargets,
@@ -1163,7 +1282,8 @@ internal static class PerformanceGate
         var normalizedHostCondition = NormalizeMsBuildCondition(
             (string?)verifierHost?.Attribute("Condition"));
         const string expectedHostCondition =
-            "'$(OS)'=='Windows_NT'AND" +
+            "'$(MSBuildRuntimeType)'=='Core'AND" +
+            "'$(SHARPPROOF_CONTAINER)'=='1'AND" +
             "'$(_SharpProofVerifierHostArchitecture)'=='X64'AND" +
             "'$(_SharpProofVerifierProcessArchitecture)'=='X64'";
         const string expectedVerifierCondition =

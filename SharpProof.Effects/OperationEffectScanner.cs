@@ -989,6 +989,12 @@ internal sealed class OperationEffectScanner
                 parameter.ContainingSymbol?.OriginalDefinition,
                 _method.OriginalDefinition))
         {
+            if (parameter.Type.IsValueType &&
+                parameter.RefKind == RefKind.None)
+            {
+                return EffectRegionSet.Empty;
+            }
+
             return EffectRegionSet.Create(EffectRegionId.Parameter(parameter.Ordinal));
         }
 

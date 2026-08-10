@@ -161,6 +161,49 @@ public sealed class DefaultApiSpecCatalogGenerationTests
                 .And.Contain("Generate-ApiSpecCatalog.ps1"));
     }
 
+    [TestCase(
+        "\"schemaVersion\": 1",
+        "\"schemaVersion\": \"1\"")]
+    [TestCase(
+        "\"isStatic\": false",
+        "\"isStatic\": \"false\"")]
+    [TestCase(
+        "\"genericArity\": 1",
+        "\"genericArity\": \"1\"")]
+    [TestCase(
+        "\"ordinal\": -1",
+        "\"ordinal\": \"-1\"")]
+    [TestCase(
+        "\"value\": 0",
+        "\"value\": \"0\"")]
+    public async Task GeneratorRejectsCoercibleScalarStrings(
+        string original,
+        string replacement)
+    {
+        using var workspace = GenerationWorkspace.Create();
+        var catalog = await File.ReadAllTextAsync(CatalogPath());
+        Assert.That(catalog, Does.Contain(original));
+        await File.WriteAllTextAsync(
+            workspace.CatalogInputPath,
+            catalog.Replace(
+                original,
+                replacement,
+                StringComparison.Ordinal),
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+        var result = await RunGeneratorAsync(
+            "-CatalogPath",
+            workspace.CatalogInputPath,
+            "-SourceOutputPath",
+            workspace.FirstSourcePath,
+            "-DocumentationOutputPath",
+            workspace.FirstDocumentationPath,
+            "-RuntimeWitnessOutputPath",
+            workspace.FirstRuntimeWitnessPath);
+
+        Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
+    }
+
     private static void AssertDeclaration(
         JsonElement declaration,
         ApiSpecTemplate template,
@@ -642,6 +685,7 @@ public sealed class DefaultApiSpecCatalogGenerationTests
         private GenerationWorkspace(string root)
         {
             _root = root;
+            CatalogInputPath = Path.Combine(root, "catalog.json");
             FirstSourcePath = Path.Combine(root, "first.generated.cs");
             FirstDocumentationPath =
                 Path.Combine(root, "first.generated.md");
@@ -656,6 +700,10 @@ public sealed class DefaultApiSpecCatalogGenerationTests
         }
 
         internal string FirstSourcePath
+        {
+            get;
+        }
+        internal string CatalogInputPath
         {
             get;
         }

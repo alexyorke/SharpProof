@@ -37,6 +37,7 @@ internal static class IsolatedPackageFeedConfiguration
             : """
                   <packageSource key="FrameworkOffline">
                     <package pattern="Microsoft.NETCore.Platforms" />
+                    <package pattern="Microsoft.NETFramework.ReferenceAssemblies*" />
                     <package pattern="NETStandard.*" />
                   </packageSource>
               """;

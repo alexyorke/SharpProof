@@ -8,7 +8,9 @@ namespace System.Diagnostics.CodeAnalysis
 }
 #endif
 
-#if SHARPPROOF_SMT_ARGUMENT_GUARD
+#if SHARPPROOF_DATAFLOW_ARGUMENT_GUARD
+namespace SharpProof.Dataflow
+#elif SHARPPROOF_SMT_ARGUMENT_GUARD
 namespace SharpProof.Smt
 #else
 namespace SharpProof

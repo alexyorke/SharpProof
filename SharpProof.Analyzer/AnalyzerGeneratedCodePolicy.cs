@@ -44,16 +44,16 @@ internal static class AnalyzerGeneratedCodePolicy
         SyntaxTree tree,
         CancellationToken cancellationToken)
     {
-        var text = tree.GetText(cancellationToken);
-        var length = Math.Min(text.Length, 2048);
-        if (length == 0)
-        {
-            return false;
-        }
-
-        var prefix = text.ToString(new TextSpan(0, length));
-        return GeneratedHeaderMarkers.Any(marker =>
-            prefix.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0);
+        return tree.GetRoot(cancellationToken)
+            .GetLeadingTrivia()
+            .Where(static trivia =>
+                trivia.IsKind(SyntaxKind.SingleLineCommentTrivia) ||
+                trivia.IsKind(SyntaxKind.MultiLineCommentTrivia))
+            .Select(static trivia => trivia.ToString())
+            .Any(comment => GeneratedHeaderMarkers.Any(marker =>
+                comment.IndexOf(
+                    marker,
+                    StringComparison.OrdinalIgnoreCase) >= 0));
     }
 
     private static bool HasGeneratedCodeAttribute(
@@ -67,9 +67,19 @@ internal static class AnalyzerGeneratedCodePolicy
             return false;
         }
 
-        for (ISymbol? symbol = method;
-             symbol is IMethodSymbol or INamedTypeSymbol;
-             symbol = symbol.ContainingType)
+        var scopes = new List<ISymbol> { method };
+        if (method.AssociatedSymbol != null)
+        {
+            scopes.Add(method.AssociatedSymbol);
+        }
+        for (var type = method.ContainingType;
+             type != null;
+             type = type.ContainingType)
+        {
+            scopes.Add(type);
+        }
+
+        foreach (var symbol in scopes)
         {
             if (symbol.GetAttributes().Any(attribute =>
                     SymbolEqualityComparer.Default.Equals(

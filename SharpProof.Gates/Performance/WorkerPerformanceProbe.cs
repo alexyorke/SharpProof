@@ -304,11 +304,6 @@ internal static class WorkerPerformanceProbe
             WorkerBudgets.DefaultMaximumExpressionDepth);
         AddOption(
             startInfo,
-            "process-memory-bytes",
-            WorkerBudgets.DefaultProcessMemoryLimitBytes);
-        AddOption(startInfo, "max-worker-processes", 1);
-        AddOption(
-            startInfo,
             "termination-grace-ms",
             terminationGraceMilliseconds);
         AddOption(startInfo, "cache-enabled", false);
@@ -598,8 +593,7 @@ internal static class WorkerPerformanceProbe
                 {
                     MethodWallTimeMilliseconds = 30_000,
                     ProjectWallTimeMilliseconds = 30_000,
-                    MaxParallelism = 1,
-                    MaxWorkerProcesses = 1
+                    MaxParallelism = 1
                 },
                 Cache = new WorkerCacheOptions
                 {
@@ -689,17 +683,14 @@ internal static class WorkerPerformanceProbe
                 internal static class Program {
                     private static int Main(string[] args) {
                         var requestIndex = Array.IndexOf(args, "--request");
-                        var startEventIndex = Array.IndexOf(
-                            args,
-                            "--start-event");
                         if (requestIndex < 0 ||
-                            requestIndex + 1 >= args.Length ||
-                            startEventIndex < 0 ||
-                            startEventIndex + 1 >= args.Length)
+                            requestIndex + 1 >= args.Length)
                             return 2;
-                        using var startEvent = EventWaitHandle.OpenExisting(
-                            args[startEventIndex + 1]);
-                        startEvent.WaitOne();
+                        if (!string.Equals(
+                                Console.ReadLine(),
+                                "SharpProof.Start/1",
+                                StringComparison.Ordinal))
+                            return 2;
                         File.WriteAllText(
                             args[requestIndex + 1] + ".ready",
                             Environment.ProcessId.ToString(

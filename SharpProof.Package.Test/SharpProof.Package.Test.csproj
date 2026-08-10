@@ -10,6 +10,8 @@
                       PrivateAssets="all" />
     <PackageReference Include="Microsoft.Build.Utilities.Core"
                       PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp"
+                      PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="NUnit" />
     <PackageReference Include="NUnit3TestAdapter" />
@@ -20,6 +22,7 @@
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
     <ProjectReference Include="..\SharpProof.CompilerProbe.TestAsset\SharpProof.CompilerProbe.TestAsset.csproj" />
+    <ProjectReference Include="..\SharpProof.Host\SharpProof.Host.csproj" />
     <ProjectReference Include="..\SharpProof.Package\SharpProof.Package.csproj"
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\SharpProof.Worker.Launcher\SharpProof.Worker.Launcher.csproj" />

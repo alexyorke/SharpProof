@@ -15,24 +15,22 @@
 
   <Target Name="_SharpProofInitializeVerify"
           BeforeTargets="GenerateMSBuildEditorConfigFileShouldRun;GenerateMSBuildEditorConfigFile">
-    <Error Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false' AND $([System.String]::Copy('$(MSBuildProjectDirectory)').Length) &gt; $(_SharpProofMaximumProjectDirectoryLength)"
-           Text="SharpProof verification requires MSBuildProjectDirectory to be at most $(_SharpProofMaximumProjectDirectoryLength) characters because supported Windows compiler hosts cannot reliably launch child tools from a longer working directory." />
     <PropertyGroup>
       <_SharpProofVerifyDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)SharpProof'))))</_SharpProofVerifyDirectory>
-      <SharpProofVerifyRequestFile Condition="'$(SharpProofVerifyRequestFile)' == ''">$(_SharpProofVerifyDirectory)\request.json</SharpProofVerifyRequestFile>
-      <SharpProofVerifyResultFile Condition="'$(SharpProofVerifyResultFile)' == ''">$(_SharpProofVerifyDirectory)\result.json</SharpProofVerifyResultFile>
-      <SharpProofCompilerManifestFile Condition="'$(SharpProofCompilerManifestFile)' == ''">$(_SharpProofVerifyDirectory)\compiler-manifest.json</SharpProofCompilerManifestFile>
+      <SharpProofVerifyRequestFile Condition="'$(SharpProofVerifyRequestFile)' == ''">$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'request.json'))</SharpProofVerifyRequestFile>
+      <SharpProofVerifyResultFile Condition="'$(SharpProofVerifyResultFile)' == ''">$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'result.json'))</SharpProofVerifyResultFile>
+      <SharpProofCompilerManifestFile Condition="'$(SharpProofCompilerManifestFile)' == ''">$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'compiler-manifest.json'))</SharpProofCompilerManifestFile>
       <_SharpProofVerifyCacheDirectoryNormalized>$([System.String]::Copy('$(SharpProofVerifyCacheDirectory)').Trim())</_SharpProofVerifyCacheDirectoryNormalized>
-      <_SharpProofEffectiveCacheDirectory Condition="'$(_SharpProofVerifyCacheDirectoryNormalized)' == ''">$(_SharpProofVerifyDirectory)\cache</_SharpProofEffectiveCacheDirectory>
+      <_SharpProofEffectiveCacheDirectory Condition="'$(_SharpProofVerifyCacheDirectoryNormalized)' == ''">$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'cache'))</_SharpProofEffectiveCacheDirectory>
       <_SharpProofEffectiveCacheDirectory Condition="'$(_SharpProofVerifyCacheDirectoryNormalized)' != ''">$(SharpProofVerifyCacheDirectory)</_SharpProofEffectiveCacheDirectory>
       <_SharpProofInvocationId Condition="'$(_SharpProofInvocationId)' == ''">$([System.Guid]::NewGuid().ToString('N'))</_SharpProofInvocationId>
-      <_SharpProofInvocationDirectory>$(_SharpProofVerifyDirectory)\runs\$(_SharpProofInvocationId)</_SharpProofInvocationDirectory>
-      <_SharpProofInvocationRequestFile>$(_SharpProofInvocationDirectory)\request.json</_SharpProofInvocationRequestFile>
-      <_SharpProofInvocationResultFile>$(_SharpProofInvocationDirectory)\result.json</_SharpProofInvocationResultFile>
+      <_SharpProofInvocationDirectory>$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'runs', '$(_SharpProofInvocationId)'))</_SharpProofInvocationDirectory>
+      <_SharpProofInvocationRequestFile>$([System.IO.Path]::Combine('$(_SharpProofInvocationDirectory)', 'request.json'))</_SharpProofInvocationRequestFile>
+      <_SharpProofInvocationResultFile>$([System.IO.Path]::Combine('$(_SharpProofInvocationDirectory)', 'result.json'))</_SharpProofInvocationResultFile>
     </PropertyGroup>
     <PropertyGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
       <_SharpProofCompilationTargetFramework>$(TargetFramework)</_SharpProofCompilationTargetFramework>
-      <_SharpProofCompilerManifestPath>$(_SharpProofInvocationDirectory)\compiler-manifest.json</_SharpProofCompilerManifestPath>
+      <_SharpProofCompilerManifestPath>$([System.IO.Path]::Combine('$(_SharpProofInvocationDirectory)', 'compiler-manifest.json'))</_SharpProofCompilerManifestPath>
       <_SharpProofProjectDirectory>$(MSBuildProjectDirectory)</_SharpProofProjectDirectory>
     </PropertyGroup>
     <SharpProof.BuildTasks.InvalidatePublishedResult
@@ -54,7 +52,7 @@
   <Target Name="_SharpProofVerifyCore"
           DependsOnTargets="_SharpProofInitializeVerify;ResolveReferences">
     <Error Condition="'$(_SharpProofVerifierHostSupported)' != 'true'"
-           Text="SharpProof out-of-process verification is supported only on Windows x64. Portable analyzer profiles remain available on this host." />
+           Text="SharpProof verification is supported only by Core MSBuild inside the canonical Linux amd64 container. Portable analyzer profiles remain available on this host." />
     <Error Condition="'$(_SharpProofVerifyPolicyNormalized)' != 'advisory' AND '$(_SharpProofVerifyPolicyNormalized)' != 'warn-on-unknown' AND '$(_SharpProofVerifyPolicyNormalized)' != 'require-proven'"
            Text="SharpProofVerifyPolicy must be advisory, warn-on-unknown, or require-proven." />
     <Error Condition="'$(_SharpProofAssumptionPolicyNormalized)' != 'allow' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'warn' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'error'"
@@ -101,10 +99,6 @@
       <_SharpProofVerifierArgument Include="$(SharpProofVerifyMaxParallelism)" />
       <_SharpProofVerifierArgument Include="--max-expression-depth" />
       <_SharpProofVerifierArgument Include="$(SharpProofVerifyMaximumExpressionDepth)" />
-      <_SharpProofVerifierArgument Include="--process-memory-bytes" />
-      <_SharpProofVerifierArgument Include="$(SharpProofVerifyProcessMemoryLimitBytes)" />
-      <_SharpProofVerifierArgument Include="--max-worker-processes" />
-      <_SharpProofVerifierArgument Include="$(SharpProofVerifyMaxWorkerProcesses)" />
       <_SharpProofVerifierArgument Include="--termination-grace-ms" />
       <_SharpProofVerifierArgument Include="$(SharpProofVerifyTerminationGraceMilliseconds)" />
       <_SharpProofVerifierArgument Include="--cache-enabled" />
@@ -119,7 +113,7 @@
                                    Condition="'$(SharpProofVerifySarifFile)' != ''" />
     </ItemGroup>
     <SharpProof.BuildTasks.RunVerifier
-        Executable="$(SharpProofDotNetHost)"
+        Executable="$(_SharpProofDotNetHost)"
         Arguments="@(_SharpProofVerifierArgument)"
         WorkingDirectory="$(MSBuildProjectDirectory)">
       <Output TaskParameter="ExitCode"
@@ -143,6 +137,6 @@
   <Target Name="SharpProofRejectUnsupportedWorkerHost"
           AfterTargets="CoreCompile"
           Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' != 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
-    <Error Text="SharpProof out-of-process verification is supported only on Windows x64. Portable analyzer profiles remain available on this host." />
+    <Error Text="SharpProof verification is supported only by Core MSBuild inside the canonical Linux amd64 container. Portable analyzer profiles remain available on this host." />
   </Target>
 </Project>

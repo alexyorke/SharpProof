@@ -1,0 +1,94 @@
+[CmdletBinding()]
+param(
+    [ValidateSet('Debug', 'Release')]
+    [string]$Configuration = 'Debug',
+
+    [ValidateRange(1, 86400)]
+    [int]$TimeoutSeconds = 1800
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
+    throw 'The developer check requires the canonical Linux container.'
+}
+$dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
+$timings = [Collections.Generic.List[object]]::new()
+$campaign = [Diagnostics.Stopwatch]::StartNew()
+
+function Invoke-TimedPhase {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][scriptblock]$Action
+    )
+
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    & $Action
+    $timer.Stop()
+    $timings.Add([pscustomobject]@{
+        name = $Name
+        elapsedMilliseconds = [long]$timer.Elapsed.TotalMilliseconds
+    })
+}
+
+Invoke-TimedPhase -Name 'restore' -Action {
+    & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds `
+        restore SharpProof.sln --locked-mode
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Developer-check restore failed.'
+    }
+}
+Invoke-TimedPhase -Name 'build' -Action {
+    & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds `
+        build SharpProof.sln -c $Configuration --no-restore
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Developer-check build failed.'
+    }
+}
+Invoke-TimedPhase -Name 'semantic-tests' -Action {
+    & (Join-Path $PSScriptRoot 'Invoke-SharpProofSemanticTests.ps1') `
+        -Configuration $Configuration `
+        -NoBuild `
+        -TimeoutSeconds $TimeoutSeconds
+}
+Invoke-TimedPhase -Name 'package-tests' -Action {
+    $packageArguments = @{
+        Configuration = $Configuration
+        TimeoutSeconds = $TimeoutSeconds
+    }
+    if ($Configuration -eq 'Release') {
+        $packageArguments.NoBuild = $true
+    }
+    & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
+        @packageArguments
+}
+Invoke-TimedPhase -Name 'performance-smoke' -Action {
+    & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds `
+        run --project SharpProof.Gates/SharpProof.Gates.csproj `
+        -c $Configuration --no-build --no-restore -- performance-smoke
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Developer performance smoke failed.'
+    }
+}
+
+$campaign.Stop()
+$timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
+[IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
+$timingOutput = Join-Path $timingDirectory (
+    'dev-check-' + $Configuration.ToLowerInvariant() + '.json')
+$temporaryTiming =
+    $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
+[pscustomobject]@{
+    schemaVersion = 1
+    command = 'check'
+    configuration = $Configuration
+    totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
+    phases = @($timings)
+} | ConvertTo-Json -Depth 5 |
+    Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM
+Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force
+
+Write-Host 'SharpProof developer check passed.'
+Write-Host "Timing evidence: $timingOutput"

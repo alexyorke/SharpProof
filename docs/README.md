@@ -13,7 +13,8 @@ jobs; they are not interchangeable sources of truth.
 | [Diagnostics](diagnostic-examples.md) | Analyzer and verifier users | Current `SP`, `SPCF`, SP0047, SP0048, and SP0049 diagnostics, defaults, policies, and examples |
 | [Package-backed samples](../samples/README.md) | Evaluators and CI owners | Passing, diagnostic, mixed-outcome, strict-library, and host-rejection examples against packed artifacts |
 | [Analysis limits](analysis-limits.md) | Build and CI owners | Shipping profile/feature/policy properties, worker bounds, and acceptance-only budgets |
-| [Preview support boundary](preview-support.md) | Build and release owners | Normative Windows host, path, concurrency, and trusted-filesystem boundary |
+| [Preview support boundary](preview-support.md) | Build and release owners | Normative container host, path, concurrency, and trusted-filesystem boundary |
+| [Container development](container-development.md) | Contributors | Permanent Dev Container workflow, test concurrency, worktree isolation, and resource overrides |
 | [Release constants and ownership](release-constants.md) | Maintainers | Classification and authoritative sources for pins, defaults, and derived measurements |
 | [Typed abstention reasons](unknown-reasons.md) | Tool integrators | Exact typed reasons, run statuses, callable coverage, claim outcomes, and cache states |
 
@@ -24,7 +25,7 @@ jobs; they are not interchangeable sources of truth.
 | [SEMANTICS.md](../SEMANTICS.md) | Normative | Defines the soundness boundary. It wins over descriptive prose when documents conflict. |
 | [SharpProof architecture](architecture.md) | Maintained design | Describes the enforced dependency graph, trusted boundaries, proof construction, and package split. |
 | [SMT lifecycle](smt-lifecycle.md) | Maintained implementation reference | Describes solver ownership, proof and replay checks, and cache eligibility. |
-| [Native SMT packaging](native-smt-packaging.md) | Maintained packaging reference | Describes the Windows x64 worker payload and the analyzer/solver separation. |
+| [Native SMT packaging](native-smt-packaging.md) | Maintained packaging reference | Describes the pinned Linux worker payload and analyzer/solver separation. |
 
 The implementation remains the authority for enumerated surfaces:
 
@@ -45,7 +46,7 @@ The implementation remains the authority for enumerated surfaces:
   `*DiagnosticDescriptors.generated.cs` files are checked-in compiled
   projections.
 - `SharpProof.Worker.Protocol/ProtocolModel.schema.json` declares protocol
-  version 10, manifest schema version 4, cache schema version 12, policies, run
+  version 11, manifest schema version 4, cache schema version 13, policies, run
   statuses, callable coverage, claim outcomes/reasons, and summary records.
   `ProtocolModel.generated.cs` is the checked-in compiled projection.
 - `SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json` is the
@@ -111,7 +112,7 @@ the current coverage inventory or normative semantics.
 
 ## Known production gaps
 
-During Windows verification, the production analyzer emits a deterministic
+During container verification, the production analyzer emits a deterministic
 schema-11 compiler artifact from the final post-generator Roslyn
 `Compilation`. It contains the selected-claim manifest and portable lowered
 whole-body CFG/IR for supported selected callables, plus bounded relational
@@ -133,8 +134,8 @@ compiler-produced whole-body CFG. Schema 11 retains the independently
 replayable event for an unconditional definite managed object/array allocation.
 The worker can use it to refute `ZeroAllocations` or an `EffectContract`
 excluding `Allocates`; other effect candidates still fail closed as typed
-`Unknown`. Effect results remain noncacheable. Worker protocol 10, cache schema
-12, relational-summary schema version 1, and specification-pack schema version
+`Unknown`. Effect results remain noncacheable. Worker protocol 11, cache schema
+13, relational-summary schema version 1, and specification-pack schema version
 1 carry the
 current wire contract. The three-package split, portable SourceLink symbols,
 package validation, deterministic hashes, SPDX 2.3 package/component SBOM

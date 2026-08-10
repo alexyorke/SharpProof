@@ -14,13 +14,28 @@ internal static class CallableClaimResultAssembler
         switch (outcome)
         {
             case ProvenOutcome proven:
+                var proofCore = new SortedSet<string>(StringComparer.Ordinal);
+                var hasMalformedEvidence = false;
+                foreach (var justification in proven.Core)
+                {
+                    if (!assumptionLabels.TryGetValue(justification, out var label))
+                    {
+                        hasMalformedEvidence = true;
+                        break;
+                    }
+
+                    proofCore.Add(label);
+                }
+
+                if (hasMalformedEvidence)
+                {
+                    record.Reason = WorkerClaimReason.MalformedBackendResult;
+                    break;
+                }
+
                 (record.Outcome, record.Reason, record.Vacuity) =
                     (WorkerClaimOutcome.Proven, WorkerClaimReason.None, vacuity);
-                record.ProofCore = [.. proven.Core
-                    .Select(justification =>
-                        assumptionLabels.TryGetValue(justification, out var label) ? label : "hygienic")
-                    .Distinct(StringComparer.Ordinal)
-                    .OrderBy(static label => label, StringComparer.Ordinal)];
+                record.ProofCore = [.. proofCore];
                 foreach (var justification in proven.Core)
                 {
                     if (userAssumptionIds.TryGetValue(justification, out var id))

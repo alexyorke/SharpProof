@@ -1,4 +1,4 @@
-name: Fast PR gates
+name: Canonical container PR gates
 
 on:
   push:
@@ -10,165 +10,69 @@ on:
 permissions:
   contents: read
 
+env:
+  COMPOSE_PROJECT_NAME: sharpproof-ci-${{ github.run_id }}-${{ github.run_attempt }}
+  SHARPPROOF_CONTAINER_CPU_LIMIT: 4
+
 jobs:
-  build:
-    runs-on: windows-latest
+  build-and-test:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - name: Setup required .NET SDKs
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          dotnet-version: "9.0.316"
-          global-json-file: global.json
+      - name: Build the pinned Linux amd64 toolchain
+        run: docker compose build tooling
 
-      - name: Restore dependencies
-        shell: pwsh
+      - name: Validate the container contract
+        run: docker compose run --rm tooling contract
+
+      - name: Build the complete product
         run: >-
-          .\scripts\Invoke-SharpProofDotnet.ps1
-          restore SharpProof.sln
-          --locked-mode
-
-      - name: Verify standard C# formatting
-        shell: pwsh
-        run: .\scripts\Format-CSharp.ps1 -Verify
-
-      - name: Verify maintained documentation
-        shell: pwsh
-        run: .\scripts\Generate-Readme.ps1 -Verify
-
-      - name: Verify generated diagnostic descriptors
-        shell: pwsh
-        run: .\scripts\Generate-DiagnosticDescriptors.ps1 -Verify
-
-      - name: Verify generated C# scalar semantics
-        shell: pwsh
-        run: .\scripts\Generate-CSharpScalarSemantics.ps1 -Verify
-
-      - name: Verify generated Contract API catalog
-        shell: pwsh
-        run: .\scripts\Generate-ContractApiCatalog.ps1 -Verify
-
-      - name: Verify generated analyzer diagnostic catalog
-        shell: pwsh
-        run: .\scripts\Generate-AnalyzerDiagnosticCatalog.ps1 -Verify
-
-      - name: Verify generated projection catalog
-        shell: pwsh
-        run: .\scripts\Generate-ProjectionCatalog.ps1 -Verify
-
-      - name: Verify generated bound-contract model
-        shell: pwsh
-        run: .\scripts\Generate-BoundContractModel.ps1 -Verify
-
-      - name: Verify generated effect contract mappings
-        shell: pwsh
-        run: .\scripts\Generate-EffectContractMappings.ps1 -Verify
-
-      - name: Verify generated operation-support catalog
-        shell: pwsh
-        run: .\scripts\Generate-OperationSupportCatalog.ps1 -Verify
-
-      - name: Verify generated IR model
-        shell: pwsh
-        run: .\scripts\Generate-IrModel.ps1 -Verify
-
-      - name: Verify generated API specification catalog
-        shell: pwsh
-        run: .\scripts\Generate-ApiSpecCatalog.ps1 -Verify
-
-      - name: Verify generated protocol model
-        shell: pwsh
-        run: .\scripts\Generate-ProtocolModel.ps1 -Verify
-
-      - name: Verify generated compiler artifact model
-        shell: pwsh
-        run: .\scripts\Generate-CompilerArtifactModel.ps1 -Verify
-
-      - name: Verify generated declarative models
-        shell: pwsh
-        run: .\scripts\Generate-DeclarativeModels.ps1 -Verify
-
-      - name: Validate architecture, metadata, and size contract
-        shell: pwsh
-        run: >-
-          .\eng\acceptance\Verify.ps1
+          docker compose run --rm tooling build
           -Configuration Release
-          -SkipTests
+          -Target SharpProof.sln
 
-      - name: Run isolated release performance contract
-        id: performance
-        continue-on-error: true
-        shell: pwsh
+      - name: Run isolated performance contract
         run: >-
-          .\scripts\Invoke-SharpProofGateEvidence.ps1
-          -Gate performance
-          -OutputPath artifacts/ci/performance.json
-          -MemoryLimitMb 8192
-          -TimeoutSeconds 600
+          docker compose run --rm tooling performance
+          -Configuration Release
 
       - name: Run forced-termination stability probe
-        id: forced_termination
-        continue-on-error: true
-        shell: pwsh
         run: >-
-          .\scripts\Invoke-SharpProofDotnet.ps1
-          -MemoryLimitMb 8192
-          -TimeoutSeconds 300
-          test SharpProof.Gates.Test\SharpProof.Gates.Test.csproj
-          -c Release
-          --no-build
-          --filter
-          'FullyQualifiedName~ForcedTerminationDeadlineIsStableAcrossLaunches'
-          --logger 'console;verbosity=minimal'
+          docker compose run --rm tooling test
+          -Configuration Release
+          -Target SharpProof.Gates.Test/SharpProof.Gates.Test.csproj
+          -TestFilter 'FullyQualifiedName~ForcedTerminationDeadlineIsStableAcrossLaunches'
 
-      - name: Run unit, architecture, protocol, and package-layout tests
-        id: tests
-        continue-on-error: true
-        shell: pwsh
+      - name: Run functional and architecture tests
         run: >-
-          .\scripts\Invoke-SharpProofDotnet.ps1
-          -MemoryLimitMb 12288
-          -TimeoutSeconds 1800
-          test SharpProof.Dev.Tests.slnf
-          -c Release
-          --no-build
-          --filter 'TestCategory!=Performance&TestCategory!=Coverage'
-          --logger 'console;verbosity=minimal'
+          docker compose run --rm tooling test
+          -Configuration Release
+          -Target SharpProof.Dev.Tests.slnf
+          -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage'
 
-      - name: Upload fast-gate performance evidence
-        if: always() && steps.performance.outcome != 'skipped'
+      - name: Run packaged Linux verifier smoke
+        run: >-
+          docker compose run --rm tooling package-tests
+          -Configuration Release
+          -TestFilter 'FullyQualifiedName~PackageGraphAndLayoutsAreExact|FullyQualifiedName~VerifierPackageTransitivelySuppliesPortableProduct'
+
+      - name: Upload container gate evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: container-pr-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload isolated performance evidence
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fast-pr-performance-${{ github.sha }}-${{ github.run_attempt }}
-          path: |
-            artifacts/ci/performance.json
-            artifacts/ci/performance.gate.json
-            artifacts/ci/performance.stderr.txt
+          path: artifacts/ci/performance*.json
           if-no-files-found: error
           retention-days: 14
-
-      - name: Enforce fast-gate outcomes
-        if: always() && steps.performance.outcome != 'skipped'
-        shell: pwsh
-        env:
-          PERFORMANCE_OUTCOME: ${{ steps.performance.outcome }}
-          FORCED_TERMINATION_OUTCOME: ${{ steps.forced_termination.outcome }}
-          TESTS_OUTCOME: ${{ steps.tests.outcome }}
-        run: |
-          $failed = @(
-            if ($env:PERFORMANCE_OUTCOME -ne 'success') {
-              "performance=$env:PERFORMANCE_OUTCOME"
-            }
-            if ($env:FORCED_TERMINATION_OUTCOME -ne 'success') {
-              "forced-termination=$env:FORCED_TERMINATION_OUTCOME"
-            }
-            if ($env:TESTS_OUTCOME -ne 'success') {
-              "tests=$env:TESTS_OUTCOME"
-            }
-          )
-          if ($failed.Count -ne 0) {
-            throw 'Fast gate failure: ' + ($failed -join '; ')
-          }

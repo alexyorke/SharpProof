@@ -1,0 +1,30 @@
+{
+  "name": "SharpProof Linux amd64",
+  "dockerComposeFile": "../compose.yaml",
+  "service": "dev",
+  "workspaceFolder": "/workspace/SharpProof",
+  "containerUser": "sharpproof",
+  "remoteUser": "sharpproof",
+  "overrideCommand": false,
+  "shutdownAction": "stopCompose",
+  "postCreateCommand": "sharpproof-dev-init",
+  "postStartCommand": "sp contract",
+  "containerEnv": {
+    "SHARPPROOF_REPO_ROOT": "/workspace/SharpProof",
+    "SHARPPROOF_DEV_CONTAINER": "1"
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "dotnet.defaultSolution": "SharpProof.sln"
+      },
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.csdevkit",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  },
+  "forwardPorts": []
+}

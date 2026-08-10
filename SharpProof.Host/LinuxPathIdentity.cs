@@ -1,0 +1,665 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.Win32.SafeHandles;
+
+namespace SharpProof.Host;
+
+public static partial class LinuxPathIdentity
+{
+    private const int ErrorNoEntry = 2;
+    private const int ErrorWouldBlock = 11;
+    private const int ErrorNotDirectory = 20;
+    private const uint FileTypeMask = 0xF000;
+    private const uint FileTypeDirectory = 0x4000;
+    private const uint FileTypeRegular = 0x8000;
+    private const uint FileTypeSymbolicLink = 0xA000;
+    private const int LockExclusive = 2;
+    private const int LockNonBlocking = 4;
+    private const int LockUnlock = 8;
+    private const int OpenReadWrite = 2;
+    private const int OpenCreate = 0x40;
+    private const int OpenCloseOnExec = 0x80000;
+    private const uint OwnerReadWrite = 0x180;
+    private const string PublicationMarkerSuffix =
+        ".sharpproof-publication-set";
+    private const string PublicationLockSuffix =
+        ".sharpproof-publication-lock";
+    private const string PublicationMarkerHeader =
+        "SharpProof.PublicationSet/1\n";
+    private static readonly HashSet<string> UnsupportedRemoteFileSystems =
+        new(StringComparer.Ordinal)
+        {
+            "cifs", "nfs", "nfs4", "smb3", "sshfs", "fuse.sshfs"
+        };
+
+    public static string Canonicalize(string path)
+    {
+        EnsureLinux();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw new ArgumentException("A path is required.", nameof(path));
+        }
+
+        var fullPath = Path.GetFullPath(path);
+        if (!Path.IsPathFullyQualified(fullPath) || fullPath[0] != '/')
+        {
+            throw new ArgumentException(
+                "SharpProof paths must be absolute Linux paths.",
+                nameof(path));
+        }
+
+        var current = "/";
+        var segments = fullPath.Split(
+            '/',
+            StringSplitOptions.RemoveEmptyEntries);
+        for (var index = 0; index < segments.Length; index++)
+        {
+            current = current == "/"
+                ? "/" + segments[index]
+                : current + "/" + segments[index];
+            if (NativeMethods.LStat(current, out var information) == 0)
+            {
+                var type = information.Mode & FileTypeMask;
+                if (type == FileTypeSymbolicLink)
+                {
+                    throw new ArgumentException(
+                        "SharpProof paths must not traverse symbolic links.",
+                        nameof(path));
+                }
+                if (index != segments.Length - 1 &&
+                    type != FileTypeDirectory)
+                {
+                    throw new ArgumentException(
+                        "SharpProof path ancestors must be directories.",
+                        nameof(path));
+                }
+                continue;
+            }
+
+            var error = Marshal.GetLastPInvokeError();
+            if (error == ErrorNoEntry)
+            {
+                break;
+            }
+            if (error == ErrorNotDirectory)
+            {
+                throw new ArgumentException(
+                    "SharpProof path ancestors must be directories.",
+                    nameof(path));
+            }
+            throw new IOException(
+                $"SharpProof could not establish path identity (errno {error}).");
+        }
+        return fullPath;
+    }
+
+    public static string RequireLocalPath(string path)
+    {
+        var canonical = Canonicalize(path);
+        var fileSystem = FindFileSystemType(canonical);
+        if (UnsupportedRemoteFileSystems.Contains(fileSystem))
+        {
+            throw new ArgumentException(
+                $"SharpProof preview publication does not support the '{fileSystem}' filesystem.",
+                nameof(path));
+        }
+        return canonical;
+    }
+
+    public static string PublicationLockName(string publicationPath)
+    {
+        return PublicationLockNameForCanonicalPath(Canonicalize(publicationPath));
+    }
+
+    public static string PublicationMarkerPath(string publicationPath)
+    {
+        return Canonicalize(publicationPath) + PublicationMarkerSuffix;
+    }
+
+    public static IDisposable AcquirePublicationSet(
+        IEnumerable<string> publicationPaths,
+        TimeSpan timeout)
+    {
+        return AcquirePublicationSet(
+            publicationPaths,
+            timeout,
+            CancellationToken.None);
+    }
+
+    public static IDisposable AcquirePublicationSet(
+        IEnumerable<string> publicationPaths,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(publicationPaths);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(
+            timeout,
+            TimeSpan.Zero);
+
+        var requestedPaths = publicationPaths
+            .Where(static path => !string.IsNullOrWhiteSpace(path))
+            .ToArray();
+        if (requestedPaths.Length == 0)
+        {
+            throw new ArgumentException(
+                "At least one publication path is required.",
+                nameof(publicationPaths));
+        }
+
+        var canonicalPaths = CanonicalPublicationPaths(requestedPaths);
+        ValidatePublicationMetadataAliases(canonicalPaths);
+        var locks = canonicalPaths
+            .Select(PublicationLockNameForCanonicalPath)
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .Select(static path => new PublicationLock(path))
+            .ToArray();
+        var acquired = 0;
+        var ownershipTransferred = false;
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+            while (acquired != locks.Length)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var remaining = timeout - stopwatch.Elapsed;
+                if (remaining <= TimeSpan.Zero ||
+                    !locks[acquired].Acquire(remaining, cancellationToken))
+                {
+                    throw new IOException(
+                        "Timed out waiting for SharpProof publication paths.");
+                }
+                acquired++;
+            }
+
+            var confirmedPaths = CanonicalPublicationPaths(requestedPaths);
+            if (!canonicalPaths.SequenceEqual(
+                    confirmedPaths,
+                    StringComparer.Ordinal))
+            {
+                throw new IOException(
+                    "SharpProof publication path identity changed while acquiring locks.");
+            }
+            BindPublicationSet(canonicalPaths);
+            var lease = new PublicationLease(locks);
+            ownershipTransferred = true;
+            return lease;
+        }
+        finally
+        {
+            if (!ownershipTransferred)
+            {
+                ReleaseLocks(locks, acquired);
+            }
+        }
+    }
+
+    public static bool AreSameExistingFile(
+        string firstPath,
+        string secondPath)
+    {
+        var first = TryInformation(Canonicalize(firstPath));
+        var second = TryInformation(Canonicalize(secondPath));
+        return first.HasValue && second.HasValue &&
+            SameFile(first.Value, second.Value);
+    }
+
+    public static bool IsSameOrDescendant(string path, string directory)
+    {
+        var canonicalPath = Canonicalize(path);
+        var canonicalDirectory = Canonicalize(directory);
+        if (string.Equals(
+                canonicalPath,
+                canonicalDirectory,
+                StringComparison.Ordinal))
+        {
+            return true;
+        }
+        var prefix = canonicalDirectory.EndsWith('/')
+            ? canonicalDirectory
+            : canonicalDirectory + '/';
+        return canonicalPath.StartsWith(prefix, StringComparison.Ordinal);
+    }
+
+    public static bool DeleteIfUnprotected(
+        string path,
+        IEnumerable<string> protectedPaths)
+    {
+        ArgumentNullException.ThrowIfNull(protectedPaths);
+        var canonicalPath = Canonicalize(path);
+        var candidate = TryInformation(canonicalPath);
+        if (!candidate.HasValue)
+        {
+            return false;
+        }
+        if ((candidate.Value.Mode & FileTypeMask) != FileTypeRegular)
+        {
+            throw new InvalidOperationException(
+                "SharpProof outputs must be regular files.");
+        }
+
+        foreach (var protectedPath in protectedPaths)
+        {
+            var protectedInformation = TryInformation(
+                Canonicalize(protectedPath));
+            if (protectedInformation.HasValue &&
+                SameFile(candidate.Value, protectedInformation.Value))
+            {
+                throw new InvalidOperationException(
+                    "SharpProof output aliases a protected file.");
+            }
+        }
+        File.Delete(canonicalPath);
+        return true;
+    }
+
+    private static string[] CanonicalPublicationPaths(
+        IEnumerable<string> publicationPaths)
+    {
+        return publicationPaths
+            .Select(RequireLocalPath)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static string PublicationLockNameForCanonicalPath(
+        string canonicalPath)
+    {
+        return canonicalPath + PublicationLockSuffix;
+    }
+
+    private static void ValidatePublicationMetadataAliases(
+        IReadOnlyCollection<string> canonicalPaths)
+    {
+        if (canonicalPaths.Any(static path =>
+                path.EndsWith(PublicationMarkerSuffix, StringComparison.Ordinal) ||
+                path.EndsWith(PublicationLockSuffix, StringComparison.Ordinal)))
+        {
+            throw new ArgumentException(
+                "SharpProof publication paths must not use the publication metadata namespace.");
+        }
+        var metadata = new HashSet<string>(
+            canonicalPaths.SelectMany(static path => new[]
+            {
+                path + PublicationMarkerSuffix,
+                path + PublicationLockSuffix
+            }),
+            StringComparer.Ordinal);
+        if (canonicalPaths.Any(metadata.Contains))
+        {
+            throw new ArgumentException(
+                "SharpProof publication paths must not alias publication metadata.");
+        }
+    }
+
+    private static void BindPublicationSet(string[] canonicalPaths)
+    {
+        var setId = PublicationSetId(canonicalPaths);
+        var marker = PublicationMarkerHeader + setId + "\n";
+        var pending = new List<(string Path, string MarkerPath)>();
+        foreach (var path in canonicalPaths)
+        {
+            var markerPath = path + PublicationMarkerSuffix;
+            if (File.Exists(markerPath))
+            {
+                ValidatePublicationMarker(markerPath, marker);
+                continue;
+            }
+            if (File.Exists(path) || Directory.Exists(path))
+            {
+                throw new IOException(
+                    "SharpProof refuses to adopt a pre-existing publication destination without an exact ownership marker.");
+            }
+            pending.Add((path, markerPath));
+        }
+
+        foreach (var item in pending)
+        {
+            var directory = Path.GetDirectoryName(item.MarkerPath) ??
+                throw new IOException(
+                    "SharpProof publication metadata has no directory.");
+            Directory.CreateDirectory(directory);
+        }
+
+        var created = new List<string>();
+        var completed = false;
+        try
+        {
+            var bytes = new UTF8Encoding(false).GetBytes(marker);
+            foreach (var item in pending)
+            {
+                if (File.Exists(item.Path) || Directory.Exists(item.Path))
+                {
+                    throw new IOException(
+                        "SharpProof refuses to adopt a pre-existing publication destination without an exact ownership marker.");
+                }
+                try
+                {
+                    using var stream = new FileStream(
+                        item.MarkerPath,
+                        FileMode.CreateNew,
+                        FileAccess.Write,
+                        FileShare.Read);
+                    created.Add(item.MarkerPath);
+                    stream.Write(bytes);
+                    stream.Flush(true);
+                }
+                catch (IOException) when (File.Exists(item.MarkerPath))
+                {
+                    ValidatePublicationMarker(item.MarkerPath, marker);
+                }
+            }
+            completed = true;
+        }
+        finally
+        {
+            if (!completed)
+            {
+                foreach (var markerPath in created.AsEnumerable().Reverse())
+                {
+                    try
+                    {
+                        File.Delete(markerPath);
+                    }
+                    catch (Exception exception) when (exception is
+                        IOException or UnauthorizedAccessException)
+                    {
+                    }
+                }
+            }
+        }
+    }
+
+    private static string PublicationSetId(
+        IEnumerable<string> canonicalPaths)
+    {
+        var bytes = Encoding.UTF8.GetBytes(string.Join("\n", canonicalPaths));
+        return Convert.ToHexString(SHA256.HashData(bytes));
+    }
+
+    private static void ValidatePublicationMarker(
+        string markerPath,
+        string expected)
+    {
+        var information = new FileInfo(markerPath);
+        if (information.Length > 256 ||
+            !string.Equals(
+                File.ReadAllText(markerPath, new UTF8Encoding(false, true)),
+                expected,
+                StringComparison.Ordinal))
+        {
+            throw new IOException(
+                "SharpProof publication paths partially overlap another publication set. " +
+                "Clean the prior output set before changing publication paths.");
+        }
+    }
+
+    private static void ReleaseLocks(PublicationLock[] locks, int acquired)
+    {
+        for (var index = acquired - 1; index >= 0; index--)
+        {
+            locks[index].Release();
+        }
+        foreach (var publicationLock in locks)
+        {
+            publicationLock.Dispose();
+        }
+    }
+
+    private static LinuxStat? TryInformation(string path)
+    {
+        if (NativeMethods.LStat(path, out var information) == 0)
+        {
+            if ((information.Mode & FileTypeMask) == FileTypeSymbolicLink)
+            {
+                throw new ArgumentException(
+                    "SharpProof paths must not traverse symbolic links.",
+                    nameof(path));
+            }
+            return information;
+        }
+        var error = Marshal.GetLastPInvokeError();
+        if (error == ErrorNoEntry || error == ErrorNotDirectory)
+        {
+            return null;
+        }
+        throw new IOException(
+            $"SharpProof could not establish file identity (errno {error}).");
+    }
+
+    private static bool SameFile(LinuxStat left, LinuxStat right)
+    {
+        return left.Device == right.Device && left.Inode == right.Inode;
+    }
+
+    private static string FindFileSystemType(string canonicalPath)
+    {
+        const string mountInfoPath = "/proc/self/mountinfo";
+        if (!File.Exists(mountInfoPath))
+        {
+            throw new PlatformNotSupportedException(
+                "SharpProof requires Linux mount metadata.");
+        }
+
+        string? bestMount = null;
+        string? bestType = null;
+        foreach (var line in File.ReadLines(mountInfoPath))
+        {
+            var separator = line.IndexOf(" - ", StringComparison.Ordinal);
+            if (separator < 0)
+            {
+                continue;
+            }
+            var left = line.Substring(0, separator).Split(' ');
+            var right = line.Substring(separator + 3).Split(' ');
+            if (left.Length < 5 || right.Length == 0)
+            {
+                continue;
+            }
+            var mount = DecodeMountPath(left[4]);
+            if (!IsPathWithin(canonicalPath, mount) ||
+                bestMount != null && mount.Length <= bestMount.Length)
+            {
+                continue;
+            }
+            bestMount = mount;
+            bestType = right[0];
+        }
+        return bestType ?? throw new IOException(
+            "SharpProof could not identify the publication filesystem.");
+    }
+
+    private static bool IsPathWithin(string path, string directory)
+    {
+        if (string.Equals(path, directory, StringComparison.Ordinal))
+        {
+            return true;
+        }
+        var prefix = directory.EndsWith('/')
+            ? directory
+            : directory + '/';
+        return path.StartsWith(prefix, StringComparison.Ordinal);
+    }
+
+    private static string DecodeMountPath(string value)
+    {
+        return value
+            .Replace("\\040", " ", StringComparison.Ordinal)
+            .Replace("\\011", "\t", StringComparison.Ordinal)
+            .Replace("\\012", "\n", StringComparison.Ordinal)
+            .Replace("\\134", "\\", StringComparison.Ordinal);
+    }
+
+    private static void EnsureLinux()
+    {
+        if (!OperatingSystem.IsLinux() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            throw new PlatformNotSupportedException(
+                "SharpProof host identity requires Linux amd64.");
+        }
+    }
+
+    private sealed class PublicationLock : IDisposable
+    {
+        private readonly SafeFileHandle _handle;
+        private bool _acquired;
+
+        internal PublicationLock(string path)
+        {
+            var directory = Path.GetDirectoryName(path) ??
+                throw new IOException(
+                    "SharpProof publication lock has no directory.");
+            Directory.CreateDirectory(directory);
+            var descriptor = NativeMethods.Open(
+                path,
+                OpenReadWrite | OpenCreate | OpenCloseOnExec,
+                OwnerReadWrite);
+            if (descriptor < 0)
+            {
+                throw new IOException(
+                    $"SharpProof could not open a publication lock (errno {Marshal.GetLastPInvokeError()}).");
+            }
+            _handle = new SafeFileHandle(
+                new IntPtr(descriptor),
+                ownsHandle: true);
+            var information = TryInformation(path);
+            if (!information.HasValue ||
+                (information.Value.Mode & FileTypeMask) != FileTypeRegular)
+            {
+                _handle.Dispose();
+                throw new IOException(
+                    "SharpProof publication locks must be regular files.");
+            }
+        }
+
+        internal bool Acquire(
+            TimeSpan timeout,
+            CancellationToken cancellationToken)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (NativeMethods.Flock(
+                        _handle.DangerousGetHandle().ToInt32(),
+                        LockExclusive | LockNonBlocking) == 0)
+                {
+                    _acquired = true;
+                    return true;
+                }
+                var error = Marshal.GetLastPInvokeError();
+                if (error != ErrorWouldBlock)
+                {
+                    throw new IOException(
+                        $"SharpProof could not acquire a publication lock (errno {error}).");
+                }
+                var remaining = timeout - stopwatch.Elapsed;
+                if (remaining <= TimeSpan.Zero)
+                {
+                    return false;
+                }
+                var delay = remaining < TimeSpan.FromMilliseconds(20)
+                    ? remaining
+                    : TimeSpan.FromMilliseconds(20);
+                if (cancellationToken.WaitHandle.WaitOne(delay))
+                {
+                    throw new OperationCanceledException(cancellationToken);
+                }
+            }
+        }
+
+        internal void Release()
+        {
+            if (!_acquired)
+            {
+                return;
+            }
+            if (NativeMethods.Flock(
+                    _handle.DangerousGetHandle().ToInt32(),
+                    LockUnlock) != 0)
+            {
+                var error = Marshal.GetLastPInvokeError();
+                throw new IOException(
+                    $"SharpProof could not release a publication lock (errno {error}).");
+            }
+            _acquired = false;
+        }
+
+        public void Dispose()
+        {
+            if (_acquired)
+            {
+                Release();
+            }
+            _handle.Dispose();
+        }
+    }
+
+    private sealed class PublicationLease : IDisposable
+    {
+        private PublicationLock[]? _locks;
+
+        internal PublicationLease(PublicationLock[] locks)
+        {
+            _locks = locks;
+        }
+
+        public void Dispose()
+        {
+            var locks = Interlocked.Exchange(ref _locks, null);
+            if (locks != null)
+            {
+                ReleaseLocks(locks, locks.Length);
+            }
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LinuxTimespec
+    {
+        internal long Seconds;
+        internal long Nanoseconds;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LinuxStat
+    {
+        internal ulong Device;
+        internal ulong Inode;
+        internal ulong HardLinks;
+        internal uint Mode;
+        internal uint UserId;
+        internal uint GroupId;
+        private int _padding;
+        internal ulong RDevice;
+        internal long Size;
+        internal long BlockSize;
+        internal long Blocks;
+        internal LinuxTimespec AccessTime;
+        internal LinuxTimespec ModificationTime;
+        internal LinuxTimespec ChangeTime;
+        private long _reserved0;
+        private long _reserved1;
+        private long _reserved2;
+    }
+
+    private static partial class NativeMethods
+    {
+        [LibraryImport("libc", EntryPoint = "lstat", SetLastError = true,
+            StringMarshalling = StringMarshalling.Utf8)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static partial int LStat(string path, out LinuxStat information);
+
+        [LibraryImport("libc", EntryPoint = "flock", SetLastError = true)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static partial int Flock(int descriptor, int operation);
+
+        [LibraryImport("libc", EntryPoint = "open", SetLastError = true,
+            StringMarshalling = StringMarshalling.Utf8)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static partial int Open(string path, int flags, uint mode);
+    }
+}

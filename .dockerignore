@@ -1,0 +1,14 @@
+**/bin
+**/obj
+**/TestResults
+.vs
+.vscode/*.user
+.env
+artifacts
+.baseline-check
+*.binlog
+*.coverage
+*.coveragexml
+*.nupkg
+*.snupkg
+*.trx

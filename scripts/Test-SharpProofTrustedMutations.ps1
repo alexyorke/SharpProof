@@ -7,8 +7,20 @@ param(
 
     [string[]]$MutationName = @(),
 
+    [ValidateRange(0, 15)]
+    [int]$MutationShardIndex = 0,
+
+    [ValidateRange(1, 16)]
+    [int]$MutationShardCount = 1,
+
     [Parameter(Mandatory = $true)]
     [string]$ExpectedCommit,
+
+    [string]$BaselineEvidencePath = '',
+
+    [switch]$BaselineOnly,
+
+    [switch]$Resume,
 
     [switch]$KeepWorkspace
 )
@@ -17,6 +29,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationScheduling.psm1') -Force
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $output = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputPath))
@@ -24,6 +37,27 @@ if (-not $output.StartsWith(
         $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
         [StringComparison]::OrdinalIgnoreCase)) {
     throw "OutputPath must be inside the repository: $output"
+}
+$baselineFile = if ([string]::IsNullOrWhiteSpace($BaselineEvidencePath)) {
+    $null
+}
+else {
+    [IO.Path]::GetFullPath((Join-Path $repositoryRoot $BaselineEvidencePath))
+}
+if ($null -ne $baselineFile -and -not $baselineFile.StartsWith(
+        $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
+        [StringComparison]::OrdinalIgnoreCase)) {
+    throw "BaselineEvidencePath must be inside the repository: $baselineFile"
+}
+if ($BaselineOnly -and $null -eq $baselineFile) {
+    throw 'BaselineOnly requires BaselineEvidencePath.'
+}
+if ($BaselineOnly -and
+        ($MutationShardCount -ne 1 -or $MutationShardIndex -ne 0)) {
+    throw 'BaselineOnly cannot be combined with catalog sharding.'
+}
+if ($BaselineOnly -and $Resume) {
+    throw 'BaselineOnly cannot be combined with Resume.'
 }
 
 $sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
@@ -722,20 +756,36 @@ $mutations = @(
         Filter = 'FullyQualifiedName~CustomArgumentsProjectEveryRequestValueExactly'
     },
     [pscustomobject]@{
-        Name = 'launcher-kill-on-close'
-        File = 'SharpProof.Worker.Launcher\Program.cs'
-        Original = 'NativeMethods.JobObjectLimitFlags.KillOnJobClose |'
-        Mutated = 'NativeMethods.JobObjectLimitFlags.ActiveProcess |'
+        Name = 'launcher-stdin-start-release'
+        File = 'SharpProof.Host\LinuxWorkerProcess.cs'
+        Original = '    public const string StartMessage = "SharpProof.Start/1";'
+        Mutated = '    public const string StartMessage = "SharpProof.Start/0";'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
-        Filter = 'FullyQualifiedName~WorkerContainmentIsMandatoryOnTheSupportedHost'
+        Filter = 'FullyQualifiedName~LinuxWorkerReceivesTheExactStartupRelease'
     },
     [pscustomobject]@{
-        Name = 'launcher-create-suspended'
-        File = 'SharpProof.Worker.Launcher\Program.cs'
-        Original = 'NativeMethods.CreateSuspended | NativeMethods.CreateNoWindow,'
-        Mutated = 'NativeMethods.CreateNoWindow,'
+        Name = 'worker-parent-death-boundary'
+        File = 'SharpProof.Host\LinuxWorkerProcess.cs'
+        Original = '    private const int ParentDeathSignal = 1;'
+        Mutated = '    private const int ParentDeathSignal = 0;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~ParentDeathKillsAWorkerBlockedBeforeStartupRelease'
+    },
+    [pscustomobject]@{
+        Name = 'container-z3-payload-hash'
+        File = 'SharpProof.Host\ContainerContract.cs'
+        Original = "        if (!string.Equals(`n                hash,`n                contract.Z3LibrarySha256,`n                StringComparison.OrdinalIgnoreCase))"
+        Mutated = "        if (false && !string.Equals(`n                hash,`n                contract.Z3LibrarySha256,`n                StringComparison.OrdinalIgnoreCase))"
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
-        Filter = 'FullyQualifiedName~WorkerCannotReachModuleInitializerBeforeResume'
+        Filter = 'FullyQualifiedName~ContainerZ3PayloadRejectsAHashMismatch'
+    },
+    [pscustomobject]@{
+        Name = 'container-z3-refuses-ambient-load'
+        File = 'SharpProof.Host\ContainerNativeLibrary.cs'
+        Original = "            var handle = NativeLibrary.Load(`n                ContainerContract.ResolveZ3LibraryRequired());"
+        Mutated = '            var handle = NativeLibrary.Load(Z3ImportName);'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~NativeZ3ResolverLoadsOnlyTheContainerVerifiedPath'
     },
     [pscustomobject]@{
         Name = 'launcher-timeout-owns-result'
@@ -810,12 +860,12 @@ $mutations = @(
         Filter = 'FullyQualifiedName~MissingWorkerWithoutDllSuffixIsRejectedBeforeHashing'
     },
     [pscustomobject]@{
-        Name = 'launcher-disables-inherited-handles'
-        File = 'SharpProof.Worker.Launcher\Program.cs'
-        Original = '                    inheritHandles: false,'
-        Mutated = '                    inheritHandles: true,'
+        Name = 'linux-worker-startup-release-uses-private-stdin'
+        File = 'SharpProof.Host\LinuxWorkerProcess.cs'
+        Original = '            RedirectStandardInput = true,'
+        Mutated = '            RedirectStandardInput = false,'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
-        Filter = 'FullyQualifiedName~WorkerProcessCreationDisablesHandleInheritance'
+        Filter = 'FullyQualifiedName~WorkerProcessBoundaryUsesADirectLinuxChildAndStdinRelease'
     },
     [pscustomobject]@{
         Name = 'closure-retains-staged-component-handles'
@@ -826,17 +876,17 @@ $mutations = @(
         Filter = 'FullyQualifiedName~WorkerClosureRetainsStagedComponentsUntilSnapshotDisposal'
     },
     [pscustomobject]@{
-        Name = 'closure-canonicalizes-component-key'
+        Name = 'closure-preserves-linux-component-key-case'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
-        Original = '                    hash.Add(component.Key.ToUpperInvariant()).Add(stagedRead);'
-        Mutated = '                    hash.Add(component.Key).Add(stagedRead);'
+        Original = '                    hash.Add(component.Key).Add(stagedRead);'
+        Mutated = '                    hash.Add(component.Key.ToUpperInvariant()).Add(stagedRead);'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
-        Filter = 'FullyQualifiedName~IdentityIgnoresWindowsPathSpelling'
+        Filter = 'FullyQualifiedName~IdentityDistinguishesLinuxComponentNameCase'
     },
     [pscustomobject]@{
         Name = 'worker-rejects-request-result-alias'
         File = 'SharpProof.Worker\Program.cs'
-        Original = '        return !string.Equals(request, result, StringComparison.OrdinalIgnoreCase);'
+        Original = '        return !string.Equals(request, result, StringComparison.Ordinal);'
         Mutated = '        return true;'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~DirectInvocationRejectsRequestResultAliasBeforeStartBarrier'
@@ -868,7 +918,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'launcher-checks-discovered-runtime-paths'
         File = 'SharpProof.Worker.Launcher\Program.cs'
-        Original = "            runtimeSnapshot?.ComponentPaths.Any(path =>`n                !runtimeRoots.Contains(path, StringComparer.OrdinalIgnoreCase) &&`n                !LauncherArguments.LauncherRuntimePaths.Contains(`n                    path, StringComparer.OrdinalIgnoreCase) &&`n                !paths.Add(path)) is true"
+        Original = "            runtimeSnapshot?.ComponentPaths.Any(path =>`n                !runtimeRoots.Contains(path, StringComparer.Ordinal) &&`n                !LauncherArguments.LauncherRuntimePaths.Contains(`n                    path, StringComparer.Ordinal) &&`n                !paths.Add(path)) is true"
         Mutated = '            runtimeSnapshot?.ComponentPaths.Any(path => path.Length == 0) == true'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~RequestProjectionRejectsDiscoveredRuntimeAssetCollisionBeforeManifestRead'
@@ -916,7 +966,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'launcher-rejects-cache-inside-worker-tree'
         File = 'SharpProof.Worker.Launcher\Program.cs'
-        Original = "            candidates`n                .Skip(runtimeRoots.Length +`n                    LauncherArguments.LauncherRuntimePaths.Length)`n                .OfType<string>()`n                .Any(path => WorkerCachePath.IsSameOrDescendant(`n                    Path.GetFullPath(path),`n                    Path.GetDirectoryName(workerPath)!))"
+        Original = "            candidates`n                .Skip(runtimeRoots.Length +`n                    LauncherArguments.LauncherRuntimePaths.Length)`n                .OfType<string>()`n                .Any(path => LinuxPathIdentity.IsSameOrDescendant(`n                    path,`n                    Path.GetDirectoryName(workerPath)!))"
         Mutated = '            false'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~DirectLauncherRejectsCacheInsideWorkerRuntimeDirectory'
@@ -979,19 +1029,19 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'publication-locks-every-member'
-        File = 'SharpProof.Worker.Protocol\WindowsPathIdentity.cs'
-        Original = '            .OrderBy(static name => name, StringComparer.Ordinal)'
-        Mutated = '            .OrderBy(static name => name, StringComparer.Ordinal).Take(1)'
+        File = 'SharpProof.Host\LinuxPathIdentity.cs'
+        Original = "        var locks = canonicalPaths`n            .Select(PublicationLockNameForCanonicalPath)`n            .OrderBy(static path => path, StringComparer.Ordinal)`n            .Select(static path => new PublicationLock(path))"
+        Mutated = "        var locks = canonicalPaths`n            .Select(PublicationLockNameForCanonicalPath)`n            .OrderBy(static path => path, StringComparer.Ordinal)`n            .Take(1)`n            .Select(static path => new PublicationLock(path))"
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~OverlapOnAnyPublicationMemberBlocks'
     },
     [pscustomobject]@{
-        Name = 'publication-rejects-unc'
-        File = 'SharpProof.Worker.Protocol\WindowsPathIdentity.cs'
-        Original = '        if (fullPath.StartsWith(@"\\", StringComparison.Ordinal))'
-        Mutated = '        if (fullPath.StartsWith(@"\\", StringComparison.Ordinal) && string.IsNullOrEmpty(fullPath))'
+        Name = 'publication-rejects-symbolic-links'
+        File = 'SharpProof.Host\LinuxPathIdentity.cs'
+        Original = '                if (type == FileTypeSymbolicLink)'
+        Mutated = '                if (type == FileTypeSymbolicLink && current.Length == 0)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
-        Filter = 'FullyQualifiedName~RemotePublicationPathIsRejected'
+        Filter = 'FullyQualifiedName~SymbolicLinksAndNonDirectoryAncestorsAreRejected'
     },
     [pscustomobject]@{
         Name = 'analyzer-rejects-retired-mode'
@@ -1110,27 +1160,32 @@ $acceptanceContract = Get-Content -LiteralPath (
     ConvertFrom-Json
 $mutationPolicy = $acceptanceContract.mutationEvidence
 $catalogCount = @($mutations).Count
-$catalogLines = @(
-    $mutations |
-        ForEach-Object {
-            $file = $_.File.Replace('\', '/')
-            "$($_.Name)`t$file`t$($_.Filter)"
-        })
-$catalogText = [string]::Join("`n", $catalogLines) + "`n"
-$catalogHasher = [Security.Cryptography.SHA256]::Create()
-try {
-    $catalogBytes = [Text.UTF8Encoding]::new($false).GetBytes($catalogText)
-    $catalogSha256 = [Convert]::ToHexString(
-        $catalogHasher.ComputeHash($catalogBytes)).ToLowerInvariant()
-}
-finally {
-    $catalogHasher.Dispose()
-}
+$catalogSha256 = Get-SharpProofMutationCatalogSha256 -Mutations $mutations
 if ($catalogCount -ne [int]$mutationPolicy.expectedCatalogCount -or
     $catalogSha256 -ne [string]$mutationPolicy.expectedCatalogSha256) {
     throw (
         'Trusted mutation registrations do not match the acceptance ' +
         'catalog policy.')
+}
+
+$defaultShardWeight = [int]$acceptanceContract.automation.mutationDefaultWeight
+if ($defaultShardWeight -lt 1) {
+    throw 'The default mutation shard weight must be positive.'
+}
+$projectWeights = @{}
+foreach ($property in @(
+        $acceptanceContract.automation.mutationProjectWeights.PSObject.Properties)) {
+    $weight = [int]$property.Value
+    if ($weight -lt 1) {
+        throw "Mutation project weight must be positive: $($property.Name)."
+    }
+    $projectWeights[[string]$property.Name] = $weight
+}
+if ($MutationName.Count -gt 0 -and $MutationShardCount -ne 1) {
+    throw 'Named mutation selection cannot be combined with catalog sharding.'
+}
+if ($MutationShardIndex -ge $MutationShardCount) {
+    throw 'MutationShardIndex must be less than MutationShardCount.'
 }
 
 if ($MutationName.Count -gt 0) {
@@ -1143,8 +1198,80 @@ if ($MutationName.Count -gt 0) {
     }
     $mutations = @($mutations | Where-Object { $_.Name -in $requestedNames })
 }
+elseif ($MutationShardCount -gt 1) {
+    $selection = 'selected'
+    $plan = Get-SharpProofWeightedMutationShards `
+        -Mutations $mutations `
+        -ShardCount $MutationShardCount `
+        -ProjectWeights $projectWeights `
+        -DefaultWeight $defaultShardWeight
+    $selected = @($plan.Shards[$MutationShardIndex])
+    $mutations = @($selected | ForEach-Object {
+        $_.Mutation | Add-Member -NotePropertyName CatalogOrdinal `
+            -NotePropertyValue ([int]$_.CatalogOrdinal) -PassThru
+    })
+    if ($mutations.Count -eq 0) {
+        throw "Mutation shard $MutationShardIndex is empty."
+    }
+}
 else {
     $selection = 'full'
+}
+
+if ($Resume -and $selection -ne 'full') {
+    throw 'Resume is supported only for the complete mutation catalog.'
+}
+
+$completedResults = @()
+if ($Resume -and (Test-Path -LiteralPath $output -PathType Leaf)) {
+    $checkpoint = Get-Content -LiteralPath $output -Raw | ConvertFrom-Json
+    $checkpointMutations = @($checkpoint.mutations)
+    if ([int]$checkpoint.schemaVersion -ne 2 -or
+        [string]$checkpoint.commit -ne $sourceCommit -or
+        [string]$checkpoint.configuration -ne $Configuration -or
+        [string]$checkpoint.selection -notin @('inProgress', 'full') -or
+        [int]$checkpoint.catalogCount -ne $catalogCount -or
+        [string]$checkpoint.catalogSha256 -ne $catalogSha256 -or
+        [int]$checkpoint.mutationCount -ne $checkpointMutations.Count -or
+        [int]$checkpoint.killedCount -ne $checkpointMutations.Count) {
+        throw 'Mutation checkpoint does not match the current exact catalog run.'
+    }
+
+    if ($checkpointMutations.Count -gt $mutations.Count) {
+        throw 'Mutation checkpoint contains more results than the catalog.'
+    }
+    for ($index = 0; $index -lt $checkpointMutations.Count; $index++) {
+        $result = $checkpointMutations[$index]
+        $registered = $mutations[$index]
+        $name = [string]$result.name
+        if ($name -ne [string]$registered.Name) {
+            throw 'Mutation checkpoint is not a canonical catalog prefix.'
+        }
+        if ([string]$result.file -ne ([string]$registered.File).Replace('\', '/') -or
+            [string]$result.project -ne ([string]$registered.Project).Replace('\', '/') -or
+            [string]$result.test -ne [string]$registered.Filter -or
+            [string]$result.original -ne [string]$registered.Original -or
+            [string]$result.mutated -ne [string]$registered.Mutated -or
+            -not [bool]$result.killed -or
+            [int]$result.exitCode -eq 0 -or
+            [int]$result.assertionFailureCount -lt 1) {
+            throw 'Mutation checkpoint result does not match its catalog entry.'
+        }
+    }
+    $completedResults = $checkpointMutations
+    if ([string]$checkpoint.selection -eq 'full') {
+        if ($completedResults.Count -ne $catalogCount) {
+            throw 'Completed mutation evidence does not cover the full catalog.'
+        }
+        Write-Host "Mutation evidence is already complete: $output"
+        return
+    }
+}
+
+$completedMutationNames = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal)
+foreach ($result in $completedResults) {
+    [void]$completedMutationNames.Add([string]$result.name)
 }
 
 $mutationRoot = Join-Path ([IO.Path]::GetTempPath()) 'SharpProof-mutation'
@@ -1156,7 +1283,16 @@ $runId = $sourceCommit.Substring(0, 12) + '-' +
     [Guid]::NewGuid().ToString('N')
 $logs = Join-Path (Join-Path (Split-Path -Parent $output) 'mutation-logs') $runId
 New-Item -ItemType Directory -Path $sourceRoot, $logs -Force | Out-Null
-Remove-Item -LiteralPath $output -Force -ErrorAction SilentlyContinue
+if (-not $Resume) {
+    Remove-Item -LiteralPath $output -Force -ErrorAction SilentlyContinue
+}
+$restoreElapsedMilliseconds = 0L
+$baselineElapsedMilliseconds = 0L
+$mutationElapsedMilliseconds = 0L
+$baselineInvocationCount = 0
+$mutationInvocationCount = 0
+$mutationTimings = [Collections.Generic.List[object]]::new()
+$lastInvocationElapsedMilliseconds = 0L
 
 function Invoke-IsolatedDotnet {
     param(
@@ -1168,15 +1304,18 @@ function Invoke-IsolatedDotnet {
     )
 
     $log = Join-Path $logs $LogName
+    $timer = [Diagnostics.Stopwatch]::StartNew()
     Push-Location $sourceRoot
     try {
         & (Join-Path $sourceRoot 'scripts\Invoke-SharpProofDotnet.ps1') `
-            -MemoryLimitMb 8192 `
             -TimeoutSeconds 600 `
             @Arguments *> $log
         return $LASTEXITCODE
     }
     finally {
+        $timer.Stop()
+        $script:lastInvocationElapsedMilliseconds =
+            [long]$timer.Elapsed.TotalMilliseconds
         Pop-Location
     }
 }
@@ -1206,6 +1345,43 @@ function Assert-UniqueMutationTarget {
     }
 }
 
+function Write-MutationEvidence {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Results,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('inProgress', 'selected', 'full')]
+        [string]$EvidenceSelection
+    )
+
+    $outputDirectory = Split-Path -Parent $output
+    New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
+    $temporaryOutput =
+        $output + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
+    [pscustomobject]@{
+        schemaVersion = 2
+        commit = $sourceCommit
+        configuration = $Configuration
+        selection = $EvidenceSelection
+        catalogCount = $catalogCount
+        catalogSha256 = $catalogSha256
+        mutationCount = $Results.Count
+        killedCount = @($Results | Where-Object killed).Count
+        mutations = $Results
+        timing = [ordered]@{
+            restoreElapsedMilliseconds = $restoreElapsedMilliseconds
+            baselineElapsedMilliseconds = $baselineElapsedMilliseconds
+            mutationElapsedMilliseconds = $mutationElapsedMilliseconds
+            baselineInvocationCount = $baselineInvocationCount
+            mutationInvocationCount = $mutationInvocationCount
+            mutations = @($mutationTimings)
+        }
+    } | ConvertTo-Json -Depth 5 |
+        Set-Content -LiteralPath $temporaryOutput -Encoding utf8NoBOM
+    Move-Item -LiteralPath $temporaryOutput -Destination $output -Force
+}
+
 try {
     & git -C $repositoryRoot archive `
         --format=zip `
@@ -1216,59 +1392,186 @@ try {
     }
     Expand-Archive -LiteralPath $archive -DestinationPath $sourceRoot
 
+    foreach ($mutation in $mutations) {
+        $path = Join-Path $sourceRoot $mutation.File
+        $content = [IO.File]::ReadAllText($path)
+        Assert-UniqueMutationTarget `
+            -Content $content `
+            -Needle $mutation.Original `
+            -Name $mutation.Name
+    }
+
     $restoreExit = Invoke-IsolatedDotnet `
         -Arguments @('restore', 'SharpProof.sln') `
         -LogName 'restore.log'
+    $restoreElapsedMilliseconds = $lastInvocationElapsedMilliseconds
     if ($restoreExit -ne 0) {
         throw "Mutation workspace restore failed; see $logs\restore.log."
     }
 
-    foreach ($mutation in $mutations) {
-        $baselineTrxName = $mutation.Name + '-baseline.trx'
-        $baselineTrx = Join-Path $logs $baselineTrxName
-        Remove-Item -LiteralPath $baselineTrx -Force -ErrorAction SilentlyContinue
-        $baselineExit = Invoke-IsolatedDotnet `
-            -Arguments @(
-                'test',
-                $mutation.Project,
-                '-c',
-                $Configuration,
-                '--no-restore',
-                '--filter',
-                $mutation.Filter,
-                '--logger',
-                'console;verbosity=minimal',
-                '--logger',
-                "trx;LogFileName=$baselineTrxName",
-                '--results-directory',
-                $logs) `
-            -LogName ($mutation.Name + '-baseline.log')
-        if ($baselineExit -ne 0) {
-            throw (
-                "Baseline for mutation '$($mutation.Name)' failed; see " +
-                "$logs\$($mutation.Name)-baseline.log.")
+    $pendingMutations = @($mutations | Where-Object {
+            -not $completedMutationNames.Contains([string]$_.Name)
+        })
+    if ($null -ne $baselineFile -and -not $BaselineOnly) {
+        if (-not (Test-Path -LiteralPath $baselineFile -PathType Leaf)) {
+            throw "Mutation baseline evidence is missing: $baselineFile"
         }
-        $expectedMethodName = $mutation.Filter.Substring(
-            'FullyQualifiedName~'.Length)
-        $baselineEvidence = Read-SharpProofMutationTestEvidence `
-            -TrxPath $baselineTrx `
-            -EvidenceName ($mutation.Name + ' baseline') `
-            -Mode Baseline `
-            -ProcessExitCode $baselineExit `
-            -ExpectedMethodName $expectedMethodName
-        $mutation | Add-Member `
-            -NotePropertyName BaselineLedger `
-            -NotePropertyValue @($baselineEvidence.testLedger)
+        $savedBaseline = Get-Content -LiteralPath $baselineFile -Raw |
+            ConvertFrom-Json
+        $savedTests = @($savedBaseline.tests)
+        if ([int]$savedBaseline.schemaVersion -ne 1 -or
+            [string]$savedBaseline.commit -ne $sourceCommit -or
+            [string]$savedBaseline.configuration -ne $Configuration -or
+            [string]$savedBaseline.selection -notin @('full', 'selected') -or
+            [int]$savedBaseline.catalogCount -ne $catalogCount -or
+            [string]$savedBaseline.catalogSha256 -ne $catalogSha256 -or
+            [int]$savedBaseline.testCount -ne $savedTests.Count) {
+            throw 'Mutation baseline evidence does not match this campaign.'
+        }
+        $baselineMap = [Collections.Generic.Dictionary[
+            string, object]]::new([StringComparer]::Ordinal)
+        foreach ($test in $savedTests) {
+            $project = [string]$test.project
+            $method = [string]$test.method
+            $ledger = @($test.ledger)
+            if ([string]::IsNullOrWhiteSpace($project) -or
+                [string]::IsNullOrWhiteSpace($method) -or
+                $ledger.Count -eq 0) {
+                throw 'Mutation baseline evidence contains an invalid test row.'
+            }
+            $key = $project + "`n" + $method
+            if (-not $baselineMap.TryAdd($key, [object]$ledger)) {
+                throw "Mutation baseline evidence duplicates '$project::$method'."
+            }
+        }
+        foreach ($mutation in $pendingMutations) {
+            $method = $mutation.Filter.Substring(
+                'FullyQualifiedName~'.Length)
+            $key = [string]$mutation.Project + "`n" + $method
+            if (-not $baselineMap.ContainsKey($key)) {
+                throw (
+                    "Mutation baseline evidence does not cover " +
+                    "'$($mutation.Project)::$method'.")
+            }
+            $mutation | Add-Member `
+                -NotePropertyName BaselineLedger `
+                -NotePropertyValue @($baselineMap[$key])
+        }
+    }
+    else {
+        $baselineRows = [Collections.Generic.List[object]]::new()
+        $baselineKeys = [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::Ordinal)
+        $baselineGroupIndex = 0
+        foreach ($projectGroup in @($pendingMutations | Group-Object Project)) {
+            $baselineGroupIndex++
+            $projectMutations = @($projectGroup.Group)
+            $filters = @($projectMutations.Filter | Sort-Object -Unique)
+            $expectedMethodNames = @($filters | ForEach-Object {
+                    $_.Substring('FullyQualifiedName~'.Length)
+                })
+            if (@($expectedMethodNames | Sort-Object -Unique).Count -ne
+                $expectedMethodNames.Count) {
+                throw (
+                    "Mutation baseline project '$($projectGroup.Name)' has " +
+                    'duplicate method identities.')
+            }
+            $baselineTrxName = 'project-' +
+                $baselineGroupIndex.ToString(
+                    'D2', [Globalization.CultureInfo]::InvariantCulture) +
+                '-baseline.trx'
+            $baselineTrx = Join-Path $logs $baselineTrxName
+            Remove-Item -LiteralPath $baselineTrx `
+                -Force -ErrorAction SilentlyContinue
+            $baselineExit = Invoke-IsolatedDotnet `
+                -Arguments @(
+                    'test',
+                    [string]$projectGroup.Name,
+                    '-c',
+                    $Configuration,
+                    '--no-restore',
+                    '--filter',
+                    ($filters -join '|'),
+                    '--logger',
+                    'console;verbosity=minimal',
+                    '--logger',
+                    "trx;LogFileName=$baselineTrxName",
+                    '--results-directory',
+                    $logs) `
+                -LogName ('project-' + $baselineGroupIndex.ToString(
+                        'D2', [Globalization.CultureInfo]::InvariantCulture) +
+                    '-baseline.log')
+            $baselineElapsedMilliseconds += $lastInvocationElapsedMilliseconds
+            $baselineInvocationCount++
+            if ($baselineExit -ne 0) {
+                throw (
+                    "Baseline for mutation project '$($projectGroup.Name)' " +
+                    "failed; see $logs\project-" +
+                    $baselineGroupIndex.ToString(
+                        'D2', [Globalization.CultureInfo]::InvariantCulture) +
+                    '-baseline.log.')
+            }
+            $baselineTestEvidence = Read-SharpProofMutationTestEvidence `
+                -TrxPath $baselineTrx `
+                -EvidenceName ($projectGroup.Name + ' baseline') `
+                -Mode Baseline `
+                -ProcessExitCode $baselineExit `
+                -ExpectedMethodName $expectedMethodNames
+            foreach ($mutation in $projectMutations) {
+                $method = $mutation.Filter.Substring(
+                    'FullyQualifiedName~'.Length)
+                $ledger = @($baselineTestEvidence.testLedgers[$method])
+                $mutation | Add-Member `
+                    -NotePropertyName BaselineLedger `
+                    -NotePropertyValue $ledger
+                $key = [string]$mutation.Project + "`n" + $method
+                if ($baselineKeys.Add($key)) {
+                    $baselineRows.Add([pscustomobject]@{
+                        project = [string]$mutation.Project
+                        method = $method
+                        ledger = $ledger
+                    })
+                }
+            }
+        }
+        if ($BaselineOnly) {
+            $baselineParent = Split-Path -Parent $baselineFile
+            [IO.Directory]::CreateDirectory($baselineParent) | Out-Null
+            $temporaryBaseline = $baselineFile + '.' +
+                [Guid]::NewGuid().ToString('N') + '.tmp'
+            [pscustomobject]@{
+                schemaVersion = 1
+                commit = $sourceCommit
+                configuration = $Configuration
+                selection = $selection
+                catalogCount = $catalogCount
+                catalogSha256 = $catalogSha256
+                testCount = $baselineRows.Count
+                tests = @($baselineRows | Sort-Object project, method)
+                timing = [ordered]@{
+                    restoreElapsedMilliseconds = $restoreElapsedMilliseconds
+                    baselineElapsedMilliseconds = $baselineElapsedMilliseconds
+                    baselineInvocationCount = $baselineInvocationCount
+                }
+            } | ConvertTo-Json -Depth 7 |
+                Set-Content -LiteralPath $temporaryBaseline -Encoding utf8NoBOM
+            Move-Item -LiteralPath $temporaryBaseline `
+                -Destination $baselineFile -Force
+            Write-Host (
+                "Recorded $($baselineRows.Count) exact mutation baselines " +
+                "from $baselineInvocationCount test projects.")
+            Write-Host "Baseline evidence: $baselineFile"
+            return
+        }
     }
 
-    $results = @()
+    $results = @($completedResults)
     foreach ($mutation in $mutations) {
+        if ($completedMutationNames.Contains([string]$mutation.Name)) {
+            continue
+        }
         $path = Join-Path $sourceRoot $mutation.File
         $originalContent = [IO.File]::ReadAllText($path)
-        Assert-UniqueMutationTarget `
-            -Content $originalContent `
-            -Needle $mutation.Original `
-            -Name $mutation.Name
         $mutatedContent = $originalContent.Replace(
             $mutation.Original,
             $mutation.Mutated,
@@ -1278,19 +1581,6 @@ try {
                 $path,
                 $mutatedContent,
                 [Text.UTF8Encoding]::new($false))
-            $buildExit = Invoke-IsolatedDotnet `
-                -Arguments @(
-                    'build',
-                    $mutation.Project,
-                    '-c',
-                    $Configuration,
-                    '--no-restore') `
-                -LogName ($mutation.Name + '-build.log')
-            if ($buildExit -ne 0) {
-                throw (
-                    "Mutation '$($mutation.Name)' did not compile; see " +
-                    "$logs\$($mutation.Name)-build.log.")
-            }
             $testTrxName = $mutation.Name + '-test.trx'
             $testTrx = Join-Path $logs $testTrxName
             Remove-Item -LiteralPath $testTrx -Force -ErrorAction SilentlyContinue
@@ -1300,7 +1590,7 @@ try {
                     $mutation.Project,
                     '-c',
                     $Configuration,
-                    '--no-build',
+                    '--no-restore',
                     '--filter',
                     $mutation.Filter,
                     '--logger',
@@ -1310,6 +1600,12 @@ try {
                     '--results-directory',
                     $logs) `
                 -LogName ($mutation.Name + '-test.log')
+            $mutationElapsedMilliseconds += $lastInvocationElapsedMilliseconds
+            $mutationInvocationCount++
+            $mutationTimings.Add([pscustomobject]@{
+                name = $mutation.Name
+                elapsedMilliseconds = $lastInvocationElapsedMilliseconds
+            })
             if ($testExit -eq 0) {
                 throw (
                     "Mutation '$($mutation.Name)' survived its focused test; " +
@@ -1320,6 +1616,12 @@ try {
                     "Mutation '$($mutation.Name)' timed out instead of being " +
                     "killed by an assertion.")
             }
+            if (-not (Test-Path -LiteralPath $testTrx -PathType Leaf)) {
+                throw (
+                    "Mutation '$($mutation.Name)' did not compile or did " +
+                    "not produce test evidence; see " +
+                    "$logs\$($mutation.Name)-test.log.")
+            }
             $expectedMethodName = $mutation.Filter.Substring(
                 'FullyQualifiedName~'.Length)
             $testEvidence = Read-SharpProofMutationTestEvidence `
@@ -1329,10 +1631,13 @@ try {
                 -ProcessExitCode $testExit `
                 -ExpectedMethodName $expectedMethodName `
                 -ExpectedLedger $mutation.BaselineLedger
-            $results += [pscustomobject]@{
+            $result = [pscustomobject]@{
                 name = $mutation.Name
                 file = $mutation.File.Replace('\', '/')
                 test = $mutation.Filter
+                project = $mutation.Project.Replace('\', '/')
+                original = $mutation.Original
+                mutated = $mutation.Mutated
                 killed = $true
                 exitCode = $testExit
                 executedCount = $testEvidence.executedCount
@@ -1342,6 +1647,14 @@ try {
                 log = "mutation-logs/$runId/$($mutation.Name)-test.log"
                 trx = "mutation-logs/$runId/$testTrxName"
             }
+            if ($MutationShardCount -gt 1) {
+                $result | Add-Member -NotePropertyName catalogOrdinal `
+                    -NotePropertyValue ([int]$mutation.CatalogOrdinal)
+            }
+            $results += $result
+            Write-MutationEvidence `
+                -Results @($results) `
+                -EvidenceSelection inProgress
         }
         finally {
             [IO.File]::WriteAllText(
@@ -1351,8 +1664,6 @@ try {
         }
     }
 
-    $outputDirectory = Split-Path -Parent $output
-    New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
     $currentCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
     & git -C $repositoryRoot diff --quiet --
     $trackedTreeChanged = $LASTEXITCODE -ne 0
@@ -1362,20 +1673,7 @@ try {
         $trackedTreeChanged -or $trackedIndexChanged) {
         throw 'Repository identity changed while mutation evidence was produced.'
     }
-    $temporaryOutput = $output + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
-    [pscustomobject]@{
-        schemaVersion = 2
-        commit = $sourceCommit
-        configuration = $Configuration
-        selection = $selection
-        catalogCount = $catalogCount
-        catalogSha256 = $catalogSha256
-        mutationCount = $results.Count
-        killedCount = @($results | Where-Object killed).Count
-        mutations = $results
-    } | ConvertTo-Json -Depth 5 |
-        Set-Content -LiteralPath $temporaryOutput -Encoding utf8NoBOM
-    Move-Item -LiteralPath $temporaryOutput -Destination $output -Force
+    Write-MutationEvidence -Results @($results) -EvidenceSelection $selection
     Write-Host "Killed $($results.Count) trusted-boundary mutations."
     Write-Host "Evidence: $output"
 }

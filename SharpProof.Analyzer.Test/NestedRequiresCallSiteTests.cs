@@ -358,14 +358,97 @@ public sealed class NestedRequiresCallSiteTests
             }));
     }
 
+    [Test]
+    public async Task NestedCallableSuppressionsAreValidatedAndRecorded()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await Analyze(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    [SharpProofSuppress("reviewed local")]
+                    int Local() => Positive(-1);
+                    Func<int> lambda =
+                        [SharpProofSuppress("reviewed lambda")]
+                        () => Positive(-2);
+                    return Local() + lambda();
+                }
+            }
+            """,
+            factory,
+            ["SP0024", "SP0027"]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostics, Is.Empty);
+            Assert.That(
+                factory.GetNamedOutcome("Local"),
+                Is.EqualTo(AnalyzerSemanticOutcome.Suppressed));
+            Assert.That(
+                factory.GetOutcomes(MethodKind.AnonymousFunction),
+                Does.Contain(AnalyzerSemanticOutcome.Suppressed));
+        }
+    }
+
+    [Test]
+    public async Task InvalidNestedSuppressionReasonsDoNotSuppressAnalysis()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await Analyze(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    [SharpProofSuppress("")]
+                    int Local() => Positive(-1);
+                    Func<int> lambda =
+                        [SharpProofSuppress(" ")]
+                        () => Positive(-2);
+                    return Local() + lambda();
+                }
+            }
+            """,
+            factory,
+            ["SP0024", "SP0027"]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EquivalentTo(["SP0024", "SP0024", "SP0027", "SP0027"]));
+            Assert.That(
+                factory.GetNamedOutcome("Local"),
+                Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
+            Assert.That(
+                factory.GetOutcomes(MethodKind.AnonymousFunction),
+                Does.Contain(AnalyzerSemanticOutcome.Refuted));
+        }
+    }
+
     private static Task<ImmutableArray<Diagnostic>> Analyze(
         string source,
-        IAnalyzerSessionFactory? sessionFactory = null)
+        IAnalyzerSessionFactory? sessionFactory = null,
+        string[]? enabledIds = null)
     {
         return AnalyzerTestHost.AnalyzeAsync(
             source,
             "contracts",
-            ["SP0027"],
+            enabledIds ?? ["SP0027"],
             sessionFactory == null
                 ? null
                 : new SharpProofAnalyzer(

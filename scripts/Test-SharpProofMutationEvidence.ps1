@@ -97,6 +97,47 @@ function Assert-Throws {
 $zeroInfrastructure = 'error="0" timeout="0" aborted="0" inconclusive="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" passedButRunAborted="0"'
 
 try {
+    $catalogAuthority = [pscustomobject][ordered]@{
+        Name = 'authority'
+        File = 'Project\Source.cs'
+        Project = 'Project.Test\Project.Test.csproj'
+        Filter = 'FullyQualifiedName~AuthorityTest'
+        Original = "before`ntext"
+        Mutated = "after`ntext"
+    }
+    $catalogDigest = Get-SharpProofMutationCatalogSha256 `
+        -Mutations @($catalogAuthority)
+    if ($catalogDigest -ne (
+            Get-SharpProofMutationCatalogSha256 `
+                -Mutations @($catalogAuthority))) {
+        throw 'Mutation catalog authority digest is not deterministic.'
+    }
+    foreach ($change in @(
+            @{ Name = 'authority-2' },
+            @{ File = 'Project\Other.cs' },
+            @{ Project = 'Other.Test\Other.Test.csproj' },
+            @{ Filter = 'FullyQualifiedName~OtherTest' },
+            @{ Original = "different`noriginal" },
+            @{ Mutated = "different`nmutation" })) {
+        $changed = [ordered]@{
+            Name = $catalogAuthority.Name
+            File = $catalogAuthority.File
+            Project = $catalogAuthority.Project
+            Filter = $catalogAuthority.Filter
+            Original = $catalogAuthority.Original
+            Mutated = $catalogAuthority.Mutated
+        }
+        foreach ($entry in $change.GetEnumerator()) {
+            $changed[$entry.Key] = $entry.Value
+        }
+        if ((Get-SharpProofMutationCatalogSha256 `
+                -Mutations @([pscustomobject]$changed)) -eq $catalogDigest) {
+            throw (
+                "Mutation catalog digest ignored authority field " +
+                ($change.Keys -join ', ') + '.')
+        }
+    }
+
     $passing = New-TestParts -Outcome Passed -Message ''
     $passingPath = Write-Fixture `
         -Name passing `
@@ -114,6 +155,38 @@ try {
         -ExpectedMethodName ExpectedTest
     if ($baseline.executedCount -ne 1 -or $baseline.failedCount -ne 0) {
         throw 'Passing baseline evidence was not projected correctly.'
+    }
+
+    $batchFirst = New-TestParts `
+        -Outcome Passed `
+        -Message '' `
+        -Method FirstExpected `
+        -TestId test-batch-1 `
+        -ExecutionId execution-batch-1
+    $batchSecond = New-TestParts `
+        -Outcome Passed `
+        -Message '' `
+        -Method 'SecondExpected(CaseOne)' `
+        -TestId test-batch-2 `
+        -ExecutionId execution-batch-2
+    $batchPath = Write-Fixture `
+        -Name passing-batch `
+        -Summary Completed `
+        -Counters ('total="2" executed="2" passed="2" failed="0" ' +
+            $zeroInfrastructure) `
+        -Definitions ($batchFirst.Definition + $batchSecond.Definition) `
+        -Entries ($batchFirst.Entry + $batchSecond.Entry) `
+        -Results ($batchFirst.Result + $batchSecond.Result)
+    $batch = Read-SharpProofMutationTestEvidence `
+        -TrxPath $batchPath `
+        -EvidenceName passing-batch `
+        -Mode Baseline `
+        -ProcessExitCode 0 `
+        -ExpectedMethodName @('FirstExpected', 'SecondExpected')
+    if ($batch.executedCount -ne 2 -or
+        @($batch.testLedgers['FirstExpected']).Count -ne 1 -or
+        @($batch.testLedgers['SecondExpected']).Count -ne 1) {
+        throw 'Batched baseline evidence was not partitioned by method.'
     }
 
     $bomPath = Join-Path $fixtureRoot 'passing-bom.trx'

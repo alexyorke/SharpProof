@@ -5,8 +5,8 @@ param(
     [string]$Configuration = 'Release',
 
     [Parameter()]
-    [ValidateSet('Required', 'Graceful')]
-    [string]$ExpectedSmt,
+    [ValidateSet('Required')]
+    [string]$ExpectedSmt = 'Required',
 
     [Parameter()]
     [string]$PackageSource,
@@ -110,7 +110,7 @@ function Resolve-SharpProofPackageSource {
     $expectedIds = @(
         'SharpProof',
         'SharpProof.Attributes',
-        'SharpProof.Verifier.Win-x64'
+        'SharpProof.Verifier'
     ) | Sort-Object
     $actualIds = @($identities.Id | Sort-Object)
     if (($actualIds -join '|') -ne ($expectedIds -join '|')) {
@@ -149,7 +149,10 @@ function Get-SharpProofPortablePackageVersion {
 function New-FrameworkPackageSource {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$Root
+        [string]$Root,
+
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot
     )
 
     $configuredPackages = [Environment]::GetEnvironmentVariable(
@@ -169,9 +172,20 @@ function New-FrameworkPackageSource {
 
     $frameworkSource = Join-Path $Root 'framework-packages'
     [IO.Directory]::CreateDirectory($frameworkSource) | Out-Null
+    $toolchain = Get-Content -LiteralPath (Join-Path `
+        $RepositoryRoot 'eng/container/toolchain.json') -Raw |
+        ConvertFrom-Json
+    $testRuntimeVersion = [string]$toolchain.dotnet.testRuntimeVersion
+    if ($testRuntimeVersion -notmatch '^8\.0\.[0-9]+$') {
+        throw "The container test runtime version is invalid: '$testRuntimeVersion'."
+    }
     $frameworkPackages = @(
         @('netstandard.library', '2.0.3'),
-        @('microsoft.netcore.platforms', '1.1.0')
+        @('microsoft.netcore.platforms', '1.1.0'),
+        @('microsoft.netframework.referenceassemblies', '1.0.3'),
+        @('microsoft.netframework.referenceassemblies.net472', '1.0.3'),
+        @('microsoft.netcore.app.ref', $testRuntimeVersion),
+        @('microsoft.aspnetcore.app.ref', $testRuntimeVersion)
     )
     foreach ($package in $frameworkPackages) {
         $fileName = "$($package[0]).$($package[1]).nupkg"
@@ -217,10 +231,7 @@ function Invoke-ConsumerDotNet {
         [string[]]$Arguments,
 
         [Parameter(Mandatory = $true)]
-        [string]$RepositoryRoot,
-
-        [Parameter(Mandatory = $true)]
-        [bool]$WindowsHost
+        [string]$RepositoryRoot
     )
 
     Push-Location $WorkingDirectory
@@ -228,37 +239,8 @@ function Invoke-ConsumerDotNet {
     try {
         $captureOutput = $Arguments[0] -eq '--version' -or
             $Arguments[0] -eq 'msbuild'
-        if ($WindowsHost) {
-            $wrapper = Join-Path $RepositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
-            if ($captureOutput) {
-                $capturePath = Join-Path $WorkingDirectory (
-                    '.sharp-proof-dotnet-' +
-                    [Guid]::NewGuid().ToString('N') + '.log')
-                & $wrapper `
-                    -MemoryLimitMb 4096 `
-                    -TimeoutSeconds 300 `
-                    -OutputPath $capturePath `
-                    @Arguments
-                $output = if ([IO.File]::Exists($capturePath)) {
-                    [IO.File]::ReadAllText($capturePath)
-                }
-                else {
-                    ''
-                }
-            }
-            else {
-                & $wrapper `
-                    -MemoryLimitMb 4096 `
-                    -TimeoutSeconds 300 `
-                    @Arguments
-                $output = ''
-            }
-            $exitCode = $LASTEXITCODE
-        }
-        else {
-            $output = & dotnet @Arguments 2>&1 | Out-String
-            $exitCode = $LASTEXITCODE
-        }
+        $output = & dotnet @Arguments 2>&1 | Out-String
+        $exitCode = $LASTEXITCODE
         if (-not [string]::IsNullOrEmpty($output)) {
             Write-Host $output.TrimEnd()
         }
@@ -344,9 +326,6 @@ function Test-SharpProofFrameworkConsumers {
         [Parameter(Mandatory = $true)]
         [string]$RepositoryRoot,
 
-        [Parameter(Mandatory = $true)]
-        [bool]$WindowsHost,
-
         [Parameter()]
         [string]$SdkVersion
     )
@@ -377,7 +356,9 @@ function Test-SharpProofFrameworkConsumers {
                 $encoding)
         }
 
-        $frameworkSource = New-FrameworkPackageSource -Root $root
+        $frameworkSource = New-FrameworkPackageSource `
+            -Root $root `
+            -RepositoryRoot $RepositoryRoot
         $escapedSource = [Security.SecurityElement]::Escape($Source)
         $escapedFrameworkSource =
             [Security.SecurityElement]::Escape($frameworkSource)
@@ -397,6 +378,9 @@ function Test-SharpProofFrameworkConsumers {
             '    <packageSource key="FrameworkOffline">'
             '      <package pattern="NETStandard.Library" />'
             '      <package pattern="Microsoft.NETCore.Platforms" />'
+            '      <package pattern="Microsoft.NETCore.App.Ref" />'
+            '      <package pattern="Microsoft.AspNetCore.App.Ref" />'
+            '      <package pattern="Microsoft.NETFramework.ReferenceAssemblies*" />'
             '    </packageSource>'
             '  </packageSourceMapping>'
             '</configuration>'
@@ -409,8 +393,7 @@ function Test-SharpProofFrameworkConsumers {
         $actualSdk = Invoke-ConsumerDotNet `
             -WorkingDirectory $root `
             -Arguments @('--version') `
-            -RepositoryRoot $RepositoryRoot `
-            -WindowsHost $WindowsHost
+            -RepositoryRoot $RepositoryRoot
         if (-not [string]::IsNullOrWhiteSpace($SdkVersion) -and
             $actualSdk.Trim() -ne $SdkVersion) {
             throw (
@@ -418,18 +401,7 @@ function Test-SharpProofFrameworkConsumers {
                 "selected '$($actualSdk.Trim())'.")
         }
 
-        $frameworks = @('netstandard2.0')
-        if ($WindowsHost) {
-            # net472 qualification is deliberately build-only. The portable
-            # analyzer runs in the compiler host; this test never executes a
-            # .NET Framework consumer assembly.
-            $frameworks += 'net472'
-        }
-        else {
-            Write-Host (
-                'Skipping the build-only net472 consumer because the .NET ' +
-                'Framework targeting pack is Windows-only.')
-        }
+        $frameworks = @('netstandard2.0', 'net8.0', 'net472')
 
         $escapedVersion = [Security.SecurityElement]::Escape($Version)
         foreach ($framework in $frameworks) {
@@ -450,6 +422,9 @@ function Test-SharpProofFrameworkConsumers {
                 '  <ItemGroup>'
                 '    <PackageReference Include="SharpProof"'
                 "                      Version=`"$escapedVersion`" />"
+                if ($framework -eq 'net472') {
+                    '    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3" PrivateAssets="all" />'
+                }
                 '  </ItemGroup>'
                 '</Project>'
             )
@@ -481,8 +456,7 @@ function Test-SharpProofFrameworkConsumers {
                     '--packages',
                     $cache,
                     '--nologo') `
-                -RepositoryRoot $RepositoryRoot `
-                -WindowsHost $WindowsHost | Out-Null
+                -RepositoryRoot $RepositoryRoot | Out-Null
             $analyzers = Invoke-ConsumerDotNet `
                 -WorkingDirectory $consumer `
                 -Arguments @(
@@ -490,8 +464,7 @@ function Test-SharpProofFrameworkConsumers {
                     'Consumer.csproj',
                     '-getItem:Analyzer',
                     '--nologo') `
-                -RepositoryRoot $RepositoryRoot `
-                -WindowsHost $WindowsHost
+                -RepositoryRoot $RepositoryRoot
             Assert-SharpProofPortableAnalyzerItem `
                 -Output $analyzers `
                 -Framework $framework
@@ -503,11 +476,8 @@ function Test-SharpProofFrameworkConsumers {
                     '--configuration',
                     $Configuration,
                     '--no-restore',
-                    '--nologo',
-                    '/nodeReuse:false',
-                    '-p:UseSharedCompilation=false') `
-                -RepositoryRoot $RepositoryRoot `
-                -WindowsHost $WindowsHost | Out-Null
+                    '--nologo') `
+                -RepositoryRoot $RepositoryRoot | Out-Null
         }
     }
     finally {
@@ -526,24 +496,16 @@ function Test-SharpProofFrameworkConsumers {
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $testProject = Join-Path $repositoryRoot 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
-$isWindowsHost = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
-    [System.Runtime.InteropServices.OSPlatform]::Windows)
-$isSupportedWorkerHost = $isWindowsHost -and
+$isSupportedWorkerHost = $IsLinux -and
+    $env:SHARPPROOF_CONTAINER -ceq '1' -and
     [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq
         [System.Runtime.InteropServices.Architecture]::X64 -and
     [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq
         [System.Runtime.InteropServices.Architecture]::X64
-$expectedHostPolicy = if ($isSupportedWorkerHost) {
-    'Required'
-}
-else {
-    'Graceful'
-}
-if ([string]::IsNullOrWhiteSpace($ExpectedSmt)) {
-    $ExpectedSmt = $expectedHostPolicy
-}
-elseif ($ExpectedSmt -ne $expectedHostPolicy) {
-    throw "ExpectedSmt='$ExpectedSmt' does not match this host's '$expectedHostPolicy' verifier policy."
+if (-not $isSupportedWorkerHost) {
+    throw (
+        'SharpProof package consumers must run in the canonical Linux ' +
+        'amd64 container.')
 }
 
 if ([string]::IsNullOrWhiteSpace($PackageSource)) {
@@ -571,7 +533,6 @@ if ($null -ne $resolvedPackageSource) {
         -Source $resolvedPackageSource `
         -Version $packageVersion `
         -RepositoryRoot $repositoryRoot `
-        -WindowsHost $isWindowsHost `
         -SdkVersion $ConsumerSdkVersion
 }
 elseif ($FrameworkConsumersOnly) {
@@ -595,19 +556,25 @@ if ($null -ne $resolvedPackageSource) {
 
 Push-Location $repositoryRoot
 try {
-    if ($isWindowsHost) {
-        & (Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1') `
-            -MemoryLimitMb 6144 `
-            -TimeoutSeconds 1800 `
-            test $testProject `
-            --configuration $Configuration `
-            --logger 'console;verbosity=minimal'
+    $packageTestArguments = @(
+        'test',
+        $testProject,
+        '--configuration',
+        $Configuration,
+        '--logger',
+        'console;verbosity=minimal')
+    if ($null -ne $resolvedPackageSource) {
+        # Framework compatibility is exercised above. Re-run only the exact
+        # package graph, analyzer discovery, and real verifier proof here;
+        # the complete package suite belongs to the ordinary test/acceptance
+        # lane and must not be duplicated for every consumer job.
+        $focusedPackageFilter =
+            'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.PackageGraphAndLayoutsAreExact|' +
+            'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.StrictAnalyzerSetDiscoversEachEntrypointOnce|' +
+            'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.VerifierPackageTransitivelySuppliesPortableProduct'
+        $packageTestArguments += @('--filter', $focusedPackageFilter)
     }
-    else {
-        & dotnet test $testProject `
-            --configuration $Configuration `
-            --logger 'console;verbosity=minimal'
-    }
+    & dotnet @packageTestArguments
     if ($LASTEXITCODE -ne 0) {
         throw "SharpProof package consumer tests failed with exit code $LASTEXITCODE."
     }

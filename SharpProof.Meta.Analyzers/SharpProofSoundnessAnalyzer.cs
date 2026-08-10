@@ -27,7 +27,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         "SharpProof.Worker.CallableVerificationPolicy", "SharpProof.Worker.CallableVerificationResult",
         "SharpProof.Worker.Protocol.WorkerClaimReason",
         "SharpProof.Worker.Protocol.WorkerCallableCoverageReason", "SharpProof.Worker.Protocol.WorkerVerifyRequest",
-        "SharpProof.Worker.Protocol.WorkerVerifyResponse"
+        "SharpProof.Worker.Protocol.WorkerVerifyResponse",
+        "SharpProof.Worker.Protocol.WorkerResultAssembler",
+        "SharpProof.Worker.Protocol.WorkerRunStatus"
     ];
 
     private static readonly ImmutableDictionary<KnownType, ImmutableHashSet<string>> ForbiddenMethods =
@@ -97,11 +99,6 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         ISymbol containingSymbol,
         KnownSymbols symbols)
     {
-        if (!IsSemanticNamespace(containingSymbol))
-        {
-            return false;
-        }
-
         foreach (var entry in ForbiddenMethods)
         {
             if (IsSameType(method.ContainingType, symbols[entry.Key]) && entry.Value.Contains(method.Name))
@@ -188,7 +185,6 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             {
                 OperatorKind: BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals
             } binary ||
-            !IsSemanticNamespace(context.ContainingSymbol) ||
             !IsInsideCondition(binary.Syntax))
         {
             return;
@@ -208,7 +204,6 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     {
         if (!IsSameType(invocation.TargetMethod.ContainingType, symbols[KnownType.String]) ||
             invocation.TargetMethod.Name != "Equals" ||
-            !IsSemanticNamespace(context.ContainingSymbol) ||
             !IsInsideCondition(invocation.Syntax))
         {
             return;
@@ -225,8 +220,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeCSharpExpressionText(OperationAnalysisContext context)
     {
         if (context.Operation is not IBinaryOperation { OperatorKind: BinaryOperatorKind.Add } binary ||
-            binary.Type?.SpecialType != SpecialType.System_String ||
-            !IsSemanticNamespace(context.ContainingSymbol))
+            binary.Type?.SpecialType != SpecialType.System_String)
         {
             return;
         }
@@ -330,13 +324,6 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static bool IsSemanticNamespace(ISymbol symbol)
-    {
-        return IsCriticalStateNamespace(symbol.ContainingNamespace) ||
-        IsNamespaceOrNested(symbol.ContainingNamespace, "SharpProof", "Dataflow") ||
-        IsNamespaceOrNested(symbol.ContainingNamespace, "SharpProof", "Specs");
-    }
-
     private static bool IsCriticalStateNamespace(INamespaceSymbol? value)
     {
         return IsNamespaceOrNested(value, "SharpProof", "Analyzer") ||
@@ -403,7 +390,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         ValidatedModel, WorkerProgram, WorkerLauncherProgram, SharpProofWorker,
         CallableVerificationPolicy, CallableVerificationResult,
         WorkerClaimReason, WorkerCallableCoverageReason, WorkerVerifyRequest,
-        WorkerVerifyResponse
+        WorkerVerifyResponse, WorkerResultAssembler, WorkerRunStatus
     }
 
     internal sealed class KnownSymbols

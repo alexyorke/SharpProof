@@ -37,8 +37,8 @@
     <file src="..\SharpProof.PortableAnalyzer\bin\$configuration$\netstandard2.0\System.Threading.Tasks.Extensions.dll" target="tools\analyzers\dotnet\cs" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.CompilerCollector.dll" target="tools\collector" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.CompilerCollector.pdb" target="tools\collector" />
-    <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Analyzer.dll" target="tools\collector" />
-    <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Analyzer.pdb" target="tools\collector" />
+    <file src="..\SharpProof.Analyzer.Core\bin\$configuration$\netstandard2.0\SharpProof.Analyzer.Core.dll" target="tools\collector" />
+    <file src="..\SharpProof.Analyzer.Core\bin\$configuration$\netstandard2.0\SharpProof.Analyzer.Core.pdb" target="tools\collector" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.CompilerArtifact.dll" target="tools\collector" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.CompilerArtifact.pdb" target="tools\collector" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Contracts.dll" target="tools\collector" />

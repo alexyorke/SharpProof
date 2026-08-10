@@ -10,13 +10,13 @@ namespace SharpProof.Worker.Protocol;
 
 public static class WorkerProtocolVersions
 {
-    public const string Current = "10";
+    public const string Current = "11";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 public static class WorkerCacheVersions
 {
-    public const int Current = 12;
+    public const int Current = 13;
 }
 
 public static class WorkerManifestVersions
@@ -78,16 +78,12 @@ public sealed class WorkerBudgets
     public const int DefaultMethodWallTimeMilliseconds = 10000;
     public const int DefaultProjectWallTimeMilliseconds = 300000;
     public const int DefaultMaximumExpressionDepth = 64;
-    public const long DefaultProcessMemoryLimitBytes = 2147483648L;
-    public const long MaximumProcessMemoryLimitBytes = 17179869184L;
     public uint QueryRlimit { get; set; } = DefaultQueryRlimit;
     public uint MethodRlimit { get; set; } = DefaultMethodRlimit;
     public int MethodWallTimeMilliseconds { get; set; } = DefaultMethodWallTimeMilliseconds;
     public int ProjectWallTimeMilliseconds { get; set; } = DefaultProjectWallTimeMilliseconds;
     public int MaxParallelism { get; set; } = MaximumParallelism;
     public int MaximumExpressionDepth { get; set; } = DefaultMaximumExpressionDepth;
-    public long ProcessMemoryLimitBytes { get; set; } = DefaultProcessMemoryLimitBytes;
-    public int MaxWorkerProcesses { get; set; } = MaximumParallelism;
 }
 
 public sealed class WorkerCacheOptions
@@ -641,8 +637,6 @@ internal static class WorkerProtocolMetadata
         new("project_wall", static value => value.ProjectWallTimeMilliseconds > 0),
         new("parallelism", static value => value.MaxParallelism is >= 1 and <= WorkerBudgets.MaximumParallelism),
         new("expression_depth", static value => value.MaximumExpressionDepth is >= 1 and <= 256),
-        new("process_memory", static value => value.ProcessMemoryLimitBytes is >= 1 and <= WorkerBudgets.MaximumProcessMemoryLimitBytes),
-        new("worker_processes", static value => value.MaxWorkerProcesses is >= 1 and <= WorkerBudgets.MaximumParallelism),
         new("wall_order", static value => value.MethodWallTimeMilliseconds <= value.ProjectWallTimeMilliseconds),
     ];
     internal static bool IsSourceLocationValid(WorkerSourceLocation value) =>

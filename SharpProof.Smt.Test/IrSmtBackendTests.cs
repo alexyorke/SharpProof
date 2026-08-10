@@ -425,6 +425,48 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public void UnsatCoreWrappersAreDisposedOnSuccessAndMalformedResult()
+    {
+        var successful = new[]
+        {
+            new DisposableLabel("first"),
+            new DisposableLabel("second")
+        };
+        var success = IrSmtBackend.CreateUnsatisfiable(
+            successful,
+            new Dictionary<string, int>(StringComparer.Ordinal)
+            {
+                ["first"] = 2,
+                ["second"] = 1
+            },
+            static expression => expression.Label);
+
+        var malformed = new[]
+        {
+            new DisposableLabel("missing"),
+            new DisposableLabel("unvisited")
+        };
+        var failure = IrSmtBackend.CreateUnsatisfiable(
+            malformed,
+            new Dictionary<string, int>(StringComparer.Ordinal),
+            static expression => expression.Label);
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(
+                success.Status,
+                Is.EqualTo(BackendCheckStatus.Unsatisfiable));
+            Assert.That(success.UnsatCore, Is.EqualTo((int[])[1, 2]));
+            Assert.That(successful.All(static item => item.IsDisposed), Is.True);
+            Assert.That(failure.Status, Is.EqualTo(BackendCheckStatus.Unknown));
+            Assert.That(
+                failure.FailureReason,
+                Is.EqualTo(BackendFailureReason.MalformedResult));
+            Assert.That(malformed.All(static item => item.IsDisposed), Is.True);
+        }));
+    }
+
+    [Test]
     public void ActiveCancellationInterruptsTheNativeContext()
     {
         var factory = new IrFactory();
@@ -607,5 +649,16 @@ public sealed class IrSmtBackendTests
 
         Monitor.Exit(gate);
         return false;
+    }
+
+    private sealed class DisposableLabel(string label) : IDisposable
+    {
+        internal string Label { get; } = label;
+        internal bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
     }
 }

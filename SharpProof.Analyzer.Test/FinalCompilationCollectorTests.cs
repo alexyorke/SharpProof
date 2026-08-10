@@ -131,7 +131,7 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(first, Does.Not.Contain((byte)'\r'));
             Assert.That(artifact.Schema, Is.EqualTo("SharpProof.CompilerManifest"));
             Assert.That(artifact.SchemaVersion, Is.EqualTo(11));
-            Assert.That(artifact.ProtocolVersion, Is.EqualTo("10"));
+            Assert.That(artifact.ProtocolVersion, Is.EqualTo("11"));
             Assert.That(artifact.Compilation.TargetFramework, Is.EqualTo("net9.0"));
             Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.All));
             Assert.That(
@@ -510,6 +510,40 @@ public sealed class FinalCompilationCollectorTests
                 Is.EqualTo(["SP0049"]));
             Assert.That(File.Exists(artifactPath), Is.False);
         }
+    }
+
+    [TestCase("")]
+    [TestCase(".")]
+    [TestCase("..")]
+    [TestCase("nested/part.netmodule")]
+    [Platform("Linux")]
+    public void LinkedNetmoduleMustBeANonemptySiblingFileName(
+        string moduleName)
+    {
+        using var workspace = new CollectorWorkspace();
+        var manifestPath = Path.Combine(workspace.Path, "Linked.dll");
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerCompilationCapture.ResolveSiblingModule(
+                manifestPath,
+                moduleName)));
+    }
+
+    [TestCase("part.netmodule:payload")]
+    [TestCase("CON.netmodule")]
+    [TestCase("part\\name.netmodule")]
+    [Platform("Linux")]
+    public void LinkedNetmoduleAllowsOrdinaryLinuxFileNameCharacters(
+        string moduleName)
+    {
+        using var workspace = new CollectorWorkspace();
+        var manifestPath = Path.Combine(workspace.Path, "Linked.dll");
+
+        Assert.That(
+            CompilerCompilationCapture.ResolveSiblingModule(
+                manifestPath,
+                moduleName),
+            Is.EqualTo(Path.Combine(workspace.Path, moduleName)));
     }
 
     [Test]

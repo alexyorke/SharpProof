@@ -27,6 +27,7 @@ public sealed class ArchitectureTests
 
     private static readonly string[] ProductionProjects = [
         "SharpProof.Analyzer",
+        "SharpProof.Analyzer.Core",
         "SharpProof.Attributes",
         "SharpProof.BuildTasks",
         "SharpProof.Ir",
@@ -38,6 +39,7 @@ public sealed class ArchitectureTests
         "SharpProof.Specs",
         "SharpProof.Dataflow",
         "SharpProof.Frontend",
+        "SharpProof.Host",
         "SharpProof.Contracts",
         "SharpProof.Effects",
         "SharpProof.Verify",
@@ -46,6 +48,16 @@ public sealed class ArchitectureTests
         "SharpProof.Worker.Protocol",
         "SharpProof.Worker",
         "SharpProof.Worker.Launcher"
+    ];
+
+    private static readonly string[] AcceptanceTimingPhases = [
+        "restore",
+        "static-validation",
+        "build",
+        "semantic-tests",
+        "package-tests",
+        "fuzz",
+        "corpus-and-performance"
     ];
 
     [Test]
@@ -144,8 +156,16 @@ public sealed class ArchitectureTests
                 "SharpProof.Ir",
                 "SharpProof.Specs"
             ],
+            ["SharpProof.Analyzer.Core"] = [
+                "SharpProof.Contracts",
+                "SharpProof.Effects",
+                "SharpProof.Frontend",
+                "SharpProof.Ir",
+                "SharpProof.Specs"
+            ],
             ["SharpProof.Attributes"] = [],
-            ["SharpProof.BuildTasks"] = ["SharpProof.Worker.Protocol"],
+            ["SharpProof.BuildTasks"] = ["SharpProof.Host"],
+            ["SharpProof.Host"] = [],
             ["SharpProof.Ir"] = [],
             ["SharpProof.Meta.Analyzers"] = [],
             ["SharpProof.PortableAnalyzer"] = ["SharpProof.Attributes"],
@@ -154,7 +174,7 @@ public sealed class ArchitectureTests
                 "SharpProof.Worker.Protocol"
             ],
             ["SharpProof.CompilerCollector"] = [
-                "SharpProof.Analyzer",
+                "SharpProof.Analyzer.Core",
                 "SharpProof.CompilerArtifact",
                 "SharpProof.Contracts",
                 "SharpProof.Effects",
@@ -187,6 +207,7 @@ public sealed class ArchitectureTests
             ["SharpProof.Worker"] = [
                 "SharpProof.CompilerArtifact",
                 "SharpProof.Dataflow",
+                "SharpProof.Host",
                 "SharpProof.Ir",
                 "SharpProof.Smt",
                 "SharpProof.Specs",
@@ -195,6 +216,7 @@ public sealed class ArchitectureTests
             ],
             ["SharpProof.Worker.Launcher"] = [
                 "SharpProof.CompilerArtifact",
+                "SharpProof.Host",
                 "SharpProof.Ir",
                 "SharpProof.Specs",
                 "SharpProof.Worker.Protocol"
@@ -331,6 +353,7 @@ public sealed class ArchitectureTests
             "SharpProof.Dataflow",
             "SharpProof.Effects",
             "SharpProof.Frontend",
+            "SharpProof.Host",
             "SharpProof.Ir",
             "SharpProof.Smt",
             "SharpProof.Summaries",
@@ -701,13 +724,34 @@ public sealed class ArchitectureTests
         [
             "SharpProof.Package/buildTransitive/SharpProof.props",
             "SharpProof.Package/buildTransitive/SharpProof.targets",
-            "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.props",
-            "SharpProof.Verifier.Win-x64/buildTransitive/SharpProof.Verifier.Win-x64.targets"
+            "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props",
+            "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets"
         ];
         var buildFiles = buildFilePaths
             .Select(path => File.ReadAllText(Path.Combine(repository, path)))
             .ToArray();
         var combinedBuildSurface = string.Join("\n", buildFiles);
+        var actualPublicProperties = buildFiles
+            .SelectMany(static text =>
+                XDocument.Parse(text)
+                    .Descendants("PropertyGroup")
+                    .Elements()
+                    .Select(static element => element.Name.LocalName)
+                    .Concat(Regex.Matches(
+                            text,
+                            @"\$\((SharpProof[A-Za-z0-9_]+)\)",
+                            RegexOptions.CultureInvariant)
+                        .Select(static match => match.Groups[1].Value)))
+            .Where(static name => name.StartsWith(
+                "SharpProof",
+                StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
+        var frozenPublicProperties = active
+            .Concat(retired)
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
         var compilerVisible = XDocument.Parse(buildFiles[0])
             .Descendants("CompilerVisibleProperty")
             .Concat(XDocument.Parse(buildFiles[2])
@@ -731,6 +775,11 @@ public sealed class ArchitectureTests
             Assert.That(active, Is.Unique);
             Assert.That(retired, Is.Unique);
             Assert.That(active.Intersect(retired, StringComparer.Ordinal), Is.Empty);
+            Assert.That(
+                actualPublicProperties,
+                Is.EqualTo(frozenPublicProperties),
+                "Every SharpProof* MSBuild property consumed or declared by " +
+                "the shipping build files must be frozen in the preview snapshot.");
             foreach (var property in active)
             {
                 Assert.That(
@@ -757,8 +806,86 @@ public sealed class ArchitectureTests
                 versions.GetProperty("compilerArtifact").GetInt32(),
                 Is.EqualTo(worker.GetProperty("compilerArtifactSchemaVersion").GetInt32()));
             Assert.That(
+                versions.GetProperty("relationalSummary").GetInt32(),
+                Is.EqualTo(worker.GetProperty("relationalSummarySchemaVersion").GetInt32()));
+            Assert.That(
+                versions.GetProperty("specificationPack").GetInt32(),
+                Is.EqualTo(worker.GetProperty("specificationPackSchemaVersion").GetInt32()));
+            Assert.That(
                 versions.GetProperty("workerCache").GetInt32(),
                 Is.EqualTo(cache.GetProperty("schemaVersion").GetInt32()));
+        }
+    }
+
+    [Test]
+    public void PilotPackageVersionDerivesFromReleaseOwner()
+    {
+        var pilotProps = XDocument.Load(Path.Combine(
+            RepositoryRoot(),
+            "eng",
+            "pilots",
+            "Directory.Build.props"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                pilotProps.Descendants("Import")
+                    .Select(static element =>
+                        element.Attribute("Project")?.Value),
+                Does.Contain(@"..\..\SharpProof.Release.props"));
+            Assert.That(
+                pilotProps.Descendants("SharpProofPilotVersion")
+                    .Single()
+                    .Value,
+                Is.EqualTo("$(SharpProofPackageVersion)"));
+        }
+    }
+
+    [Test]
+    public void PilotRunnerPreservesRootedInputAndOutputPaths()
+    {
+        var script = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Test-SharpProofPilots.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(script, Does.Contain("[IO.Path]::IsPathRooted($Path)"));
+            Assert.That(
+                script,
+                Does.Contain("$resolvedPackageSource = Resolve-RepositoryPath $PackageSource"));
+            Assert.That(
+                script,
+                Does.Contain("$resolvedOutput = Resolve-RepositoryPath $OutputPath"));
+            Assert.That(script, Does.Not.Contain("Get-CimInstance"));
+            Assert.That(
+                script,
+                Does.Contain("[IO.Directory]::EnumerateDirectories('/proc')"));
+        }
+    }
+
+    [Test]
+    public void ContainerConsumerMatrixUsesCatalogOwnedNet8ReferencePacks()
+    {
+        var script = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Test-SharpProofPackageConsumers.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                script,
+                Does.Contain("$toolchain.dotnet.testRuntimeVersion"));
+            Assert.That(script, Does.Contain("microsoft.netcore.app.ref"));
+            Assert.That(script, Does.Contain("microsoft.aspnetcore.app.ref"));
+            Assert.That(
+                script,
+                Does.Contain("<package pattern=\"Microsoft.NETCore.App.Ref\" />"));
+            Assert.That(
+                script,
+                Does.Contain("<package pattern=\"Microsoft.AspNetCore.App.Ref\" />"));
         }
     }
 
@@ -801,68 +928,565 @@ public sealed class ArchitectureTests
     [Test]
     public void ReleasePackageWorkflowBindsTheExactRepositoryCommit()
     {
+        var root = RepositoryRoot();
         var workflow = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            root,
             ".github",
             "workflows",
             "package-consumers.yml"));
-        var bindings = Regex.Matches(
-                workflow,
-                @"/p:RepositoryCommit=\$env:GITHUB_SHA",
-                RegexOptions.CultureInvariant)
-            .Count;
-
-        Assert.That(bindings, Is.EqualTo(3));
-    }
-
-    [Test]
-    public void CrossPlatformPackageCachePrimingUsesTheNativeDotnetPath()
-    {
-        var workflow = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
-            ".github",
-            "workflows",
-            "package-consumers.yml"));
-        var primeStart = workflow.IndexOf(
-            "      - name: Prime the framework-only package cache",
-            StringComparison.Ordinal);
-        var primeEnd = workflow.IndexOf(
-            "      - name: Download exact NuGet artifacts",
-            primeStart,
-            StringComparison.Ordinal);
-
-        Assert.That(primeStart, Is.GreaterThanOrEqualTo(0));
-        Assert.That(primeEnd, Is.GreaterThan(primeStart));
-        var primeStep = workflow[primeStart..primeEnd];
+        var container = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(primeStep, Does.Contain("if ($IsWindows)"));
             Assert.That(
-                primeStep,
+                container,
                 Does.Contain(
-                    "Invoke-SharpProofDotnet.ps1\" @restoreArguments"));
-            Assert.That(primeStep, Does.Contain("& dotnet @restoreArguments"));
+                    "$repositoryCommitProperty = \"/p:RepositoryCommit=$repositoryCommit\""));
+            Assert.That(container, Does.Contain("$repositoryCommitProperty)"));
             Assert.That(
-                primeStep,
-                Does.Contain(
-                    "Framework-only package cache restore failed"));
+                container,
+                Does.Contain("'/p:GeneratePackageOnBuild=false'"));
+            Assert.That(
+                container,
+                Does.Contain("'--no-build', '--no-restore'"));
+            Assert.That(
+                workflow,
+                Does.Contain("docker compose run --rm tooling pack"));
+            Assert.That(workflow, Does.Contain("fetch-depth: 0"));
         }
     }
 
     [Test]
-    public void WorkerProcessCreationDisablesHandleInheritance()
+    public void ContainerMutationEvidenceUsesAPersistentRelativePath()
     {
-        var source = File.ReadAllText(Path.Combine(
+        var container = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                container,
+                Does.Contain(
+                    "$mutationOutput = " +
+                    "'artifacts/mutation/trusted-mutations.json'"));
+            Assert.That(
+                container,
+                Does.Contain("-OutputPath $mutationOutput"));
+            Assert.That(
+                container,
+                Does.Contain(
+                    "Invoke-SharpProofTrustedMutationsParallel.ps1"));
+            Assert.That(
+                container,
+                Does.Not.Contain(
+                    "-OutputPath (Join-Path $mutationRoot " +
+                    "'trusted-mutations.json')"));
+
+            var mutationDriver = File.ReadAllText(Path.Combine(
+                RepositoryRoot(),
+                "scripts",
+                "Test-SharpProofTrustedMutations.ps1"));
+            Assert.That(
+                mutationDriver,
+                Does.Contain("-EvidenceSelection inProgress"));
+            Assert.That(
+                mutationDriver,
+                Does.Contain("$completedMutationNames.Contains"));
+
+            var parallelDriver = File.ReadAllText(Path.Combine(
+                RepositoryRoot(),
+                "scripts",
+                "Invoke-SharpProofTrustedMutationsParallel.ps1"));
+            Assert.That(parallelDriver, Does.Contain("MutationShardCount"));
+            Assert.That(parallelDriver, Does.Contain("Test-CompleteShard"));
+            Assert.That(
+                parallelDriver,
+                Does.Contain("weighted-longest-processing-time-first"));
+            Assert.That(
+                parallelDriver,
+                Does.Contain("selection = 'full'"));
+
+            var scheduler = File.ReadAllText(Path.Combine(
+                RepositoryRoot(),
+                "scripts",
+                "SharpProof.MutationScheduling.psm1"));
+            Assert.That(scheduler, Does.Contain("CatalogOrdinal"));
+            Assert.That(scheduler, Does.Contain("Sort-Object"));
+            Assert.That(scheduler, Does.Not.Contain("chunkSize"));
+        }
+    }
+
+    [Test]
+    public void ContainerDependencyAuditRestoresTheDisposableClone()
+    {
+        var container = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+        var branchStart = container.IndexOf(
+            "'dependency-audit' {",
+            StringComparison.Ordinal);
+        var branchEnd = container.IndexOf(
+            "'acceptance' {",
+            branchStart,
+            StringComparison.Ordinal);
+        var branch = container[branchStart..branchEnd];
+
+        Assert.That(
+            branch.IndexOf("Invoke-DotNet @('restore'", StringComparison.Ordinal),
+            Is.LessThan(branch.IndexOf(
+                "Test-SharpProofDependencyAudit.ps1",
+                StringComparison.Ordinal)));
+    }
+
+    [Test]
+    public void ContainerPackageConsumersRestoreBeforeBuildingOfflineFeed()
+    {
+        var container = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+        var branchStart = container.IndexOf(
+            "'package-consumers' {",
+            StringComparison.Ordinal);
+        var branchEnd = container.IndexOf(
+            "'samples' {",
+            branchStart,
+            StringComparison.Ordinal);
+        var branch = container[branchStart..branchEnd];
+        var restore = branch.IndexOf(
+            "Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')",
+            StringComparison.Ordinal);
+        var consumer = branch.IndexOf(
+            "Test-SharpProofPackageConsumers.ps1",
+            StringComparison.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(restore, Is.GreaterThanOrEqualTo(0));
+            Assert.That(consumer, Is.GreaterThan(restore));
+        }
+    }
+
+    [Test]
+    public void ContainerTestConcurrencyIsCatalogOwnedAndProjectScoped()
+    {
+        var root = RepositoryRoot();
+        using var contract = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "acceptance",
+            "contract.json")));
+        var automation = contract.RootElement.GetProperty("automation");
+        var container = contract.RootElement.GetProperty("container");
+        var compose = File.ReadAllText(Path.Combine(root, "compose.yaml"));
+        var execution = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "SharpProof.ContainerExecution.psm1"));
+        var acceptance = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "acceptance",
+            "Verify.ps1"));
+        var semanticTests = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofSemanticTests.ps1"));
+        var portable = File.ReadAllText(Path.Combine(
+            root,
+            "SharpProof.Portable.Tests.slnf"));
+        var mutationDriver = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Test-SharpProofTrustedMutations.ps1"));
+        var parallelMutationDriver = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofTrustedMutationsParallel.ps1"));
+        var packageTests = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofPackageTests.ps1"));
+        var developerCheck = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofDevCheck.ps1"));
+        var mutationProjects = Regex.Matches(
+                mutationDriver,
+                @"(?m)^\s*Project\s*=\s*'([^']+)'\s*$")
+            .Select(static match => match.Groups[1].Value)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static value => value, StringComparer.Ordinal)
+            .ToArray();
+        var weightedProjects = automation
+            .GetProperty("mutationProjectWeights")
+            .EnumerateObject()
+            .Select(static property => property.Name)
+            .OrderBy(static value => value, StringComparer.Ordinal)
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(container.GetProperty("defaultCpuCount").GetInt32(),
+                Is.EqualTo(16));
+            Assert.That(container.GetProperty("defaultMemoryMiB").GetInt32(),
+                Is.EqualTo(40 * 1024));
+            Assert.That(
+                automation.GetProperty("testProjectCpuDivisor").GetInt32(),
+                Is.EqualTo(2));
+            Assert.That(
+                automation.GetProperty("mutationParallelism").GetInt32(),
+                Is.EqualTo(4));
+            Assert.That(
+                automation.GetProperty("mutationDefaultWeight").GetInt32(),
+                Is.Positive);
+            Assert.That(weightedProjects, Is.EqualTo(mutationProjects));
+            Assert.That(
+                automation.GetProperty("mutationProjectWeights")
+                    .EnumerateObject()
+                    .Select(static property => property.Value.GetInt32()),
+                Is.All.Positive);
+            Assert.That(compose, Does.Contain("CPU_LIMIT:-16"));
+            Assert.That(compose, Does.Contain("MEMORY_LIMIT:-40g"));
+            Assert.That(execution, Does.Contain("Environment]::ProcessorCount"));
+            Assert.That(
+                execution,
+                Does.Contain("SHARPPROOF_TEST_PROJECT_PARALLELISM"));
+            Assert.That(
+                acceptance,
+                Does.Contain("Invoke-SharpProofSemanticTests.ps1"));
+            Assert.That(
+                acceptance,
+                Does.Contain("Invoke-SharpProofPackageTests.ps1"));
+            Assert.That(
+                semanticTests,
+                Does.Contain("SharpProof.Semantic.Tests.slnf"));
+            Assert.That(semanticTests, Does.Contain("ProjectParallelism"));
+            Assert.That(
+                semanticTests,
+                Does.Contain("worker-claim-manifest"));
+            Assert.That(
+                semanticTests,
+                Does.Contain("artifacts/timings"));
+            Assert.That(
+                packageTests,
+                Does.Contain("priorMethodMilliseconds"));
+            Assert.That(packageTests, Does.Contain("Sort-Object"));
+            Assert.That(
+                packageTests,
+                Does.Contain("workerMethods = $workerMethodTimings"));
+            Assert.That(
+                mutationDriver,
+                Does.Contain("Group-Object Project"));
+            Assert.That(
+                mutationDriver,
+                Does.Contain("baselineInvocationCount"));
+            Assert.That(
+                parallelMutationDriver,
+                Does.Contain("-BaselineOnly"));
+            Assert.That(
+                parallelMutationDriver,
+                Does.Contain("-BaselineEvidencePath"));
+            Assert.That(
+                parallelMutationDriver,
+                Does.Contain("shared-baseline-v2"));
+            Assert.That(
+                developerCheck,
+                Does.Contain("Invoke-SharpProofSemanticTests.ps1"));
+            Assert.That(
+                developerCheck,
+                Does.Contain("performance-smoke"));
+            Assert.That(
+                portable,
+                Does.Not.Contain("SharpProof.Package.Test"));
+            Assert.That(
+                portable,
+                Does.Not.Contain("SharpProof.Worker.Test"));
+        }
+    }
+
+    [Test]
+    public void AcceptanceTimingEvidenceHasACatalogOwnedCanonicalShape()
+    {
+        var root = RepositoryRoot();
+        using var contract = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "acceptance",
+            "contract.json")));
+        var phases = contract.RootElement
+            .GetProperty("automation")
+            .GetProperty("acceptanceTimingPhases")
+            .EnumerateArray()
+            .Select(static value => value.GetString())
+            .ToArray();
+        var acceptance = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "acceptance",
+            "Verify.ps1"));
+        var container = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(phases, Is.EqualTo(AcceptanceTimingPhases));
+            Assert.That(phases, Is.Unique);
+            Assert.That(
+                acceptance,
+                Does.Contain("acceptanceTimingPhases"));
+            Assert.That(
+                acceptance,
+                Does.Contain("totalElapsedMilliseconds"));
+            Assert.That(
+                acceptance,
+                Does.Contain("Move-Item -LiteralPath $temporary"));
+            Assert.That(
+                container,
+                Does.Contain("SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS"));
+        }
+    }
+
+    [Test]
+    public void DevContainerIsNonRootPinnedAndDoesNotNestDocker()
+    {
+        var root = RepositoryRoot();
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root,
+            ".devcontainer",
+            "devcontainer.json")));
+        var configuration = document.RootElement;
+        var rawConfiguration = File.ReadAllText(Path.Combine(
+            root,
+            ".devcontainer",
+            "devcontainer.json"));
+        var dockerfile = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "container",
+            "Dockerfile"));
+        var initialization = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "container",
+            "dev-init.sh"));
+        var developerCommand = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "container",
+            "dev-command.sh"));
+        var compose = File.ReadAllText(Path.Combine(root, "compose.yaml"));
+        var gitIgnore = File.ReadAllText(Path.Combine(root, ".gitignore"));
+        var dockerIgnore = File.ReadAllText(Path.Combine(root, ".dockerignore"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                configuration.GetProperty("remoteUser").GetString(),
+                Is.EqualTo("sharpproof"));
+            Assert.That(
+                configuration.GetProperty("containerUser").GetString(),
+                Is.EqualTo("sharpproof"));
+            Assert.That(
+                configuration.GetProperty("forwardPorts").GetArrayLength(),
+                Is.Zero);
+            Assert.That(
+                configuration.GetProperty("postCreateCommand").GetString(),
+                Is.EqualTo("sharpproof-dev-init"));
+            Assert.That(
+                configuration.GetProperty("postStartCommand").GetString(),
+                Is.EqualTo("sp contract"));
+            Assert.That(
+                configuration.TryGetProperty("initializeCommand", out _),
+                Is.False,
+                "Dev Containers must not invoke host Git or other host tooling.");
+            Assert.That(rawConfiguration, Does.Not.Contain("pwsh"));
+            Assert.That(dockerfile, Does.Contain("/usr/local/bin/sp"));
+            Assert.That(
+                dockerfile,
+                Does.Contain("/usr/local/bin/sharpproof-dev-init"));
+            Assert.That(initialization, Does.Contain("SHARPPROOF_ORIGIN_URL"));
+            Assert.That(initialization, Does.Contain("SHARPPROOF_DEV_REF"));
+            Assert.That(
+                initialization,
+                Does.Contain("git \"${clone_arguments[@]}\""));
+            Assert.That(initialization, Does.Not.Contain("git bundle"));
+            Assert.That(initialization, Does.Not.Contain("repository.bundle"));
+            Assert.That(initialization, Does.Not.Contain("SHARPPROOF_SEED_ROOT"));
+            Assert.That(initialization, Does.Not.Contain("tar "));
+            Assert.That(initialization, Does.Not.Contain("reset --mixed"));
+            Assert.That(initialization, Does.Contain("sp restore"));
+            Assert.That(initialization, Does.Not.Contain("docker"));
+            Assert.That(developerCommand, Does.Contain("Invoke-SharpProofContainer.ps1"));
+            Assert.That(developerCommand, Does.Not.Contain("docker"));
+            Assert.That(
+                compose,
+                Does.Contain("sharpproof-workspace:/workspace/SharpProof"));
+            Assert.That(compose, Does.Not.Contain("/workspace/seed"));
+            Assert.That(compose, Does.Not.Contain("SHARPPROOF_SEED_ROOT"));
+            Assert.That(gitIgnore, Does.Not.Contain("repository.bundle"));
+            Assert.That(dockerIgnore, Does.Not.Contain("repository.bundle"));
+        }
+    }
+
+    [Test]
+    public void RepositoryMsBuildEntryPointsRejectHostExecution()
+    {
+        var targets = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "Directory.Build.targets"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                targets,
+                Does.Contain("_RequireSharpProofCanonicalContainer"));
+            Assert.That(targets, Does.Contain("BeforeTargets=\"Restore;PrepareForBuild\""));
+            Assert.That(targets, Does.Contain("'$(SHARPPROOF_CONTAINER)' != '1'"));
+            Assert.That(
+                targets,
+                Does.Contain("/etc/sharpproof/container-contract.json"));
+            Assert.That(targets, Does.Contain("Docker Compose tooling container"));
+        }
+    }
+
+    [Test]
+    public void MutationCatalogTargetsArePreflightedBeforeTests()
+    {
+        var mutationDriver = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Test-SharpProofTrustedMutations.ps1"));
+        var archiveExpansion = mutationDriver.IndexOf(
+            "Expand-Archive -LiteralPath $archive -DestinationPath $sourceRoot",
+            StringComparison.Ordinal);
+        var preflight = mutationDriver.IndexOf(
+            "Assert-UniqueMutationTarget `",
+            archiveExpansion,
+            StringComparison.Ordinal);
+        var restore = mutationDriver.IndexOf(
+            "$restoreExit = Invoke-IsolatedDotnet",
+            archiveExpansion,
+            StringComparison.Ordinal);
+        var baseline = mutationDriver.IndexOf(
+            "$baselineTrxName =",
+            archiveExpansion,
+            StringComparison.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(archiveExpansion, Is.GreaterThanOrEqualTo(0));
+            Assert.That(preflight, Is.GreaterThan(archiveExpansion));
+            Assert.That(restore, Is.GreaterThan(preflight));
+            Assert.That(baseline, Is.GreaterThan(restore));
+        }
+    }
+
+    [Test]
+    public void RepositoryAutomationRunsProductToolingOnlyInDocker()
+    {
+        var workflowRoot = Path.Combine(
+            RepositoryRoot(),
+            ".github",
+            "workflows");
+        var workflows = Directory
+            .EnumerateFiles(workflowRoot, "*.yml")
+            .Concat(Directory.EnumerateFiles(workflowRoot, "*.yaml"))
+            .Select(File.ReadAllText)
+            .ToArray();
+        var productWorkflows = workflows
+            .Where(static workflow => workflow.Contains(
+                "SharpProof",
+                StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(workflows, Has.None.Contain("actions/setup-dotnet"));
+            Assert.That(workflows, Has.None.Contain("runs-on: windows"));
+            Assert.That(workflows, Has.None.Contain("runs-on: macos"));
+            Assert.That(workflows, Has.None.Contain("shell: pwsh"));
+            Assert.That(productWorkflows, Has.Some.Contain("docker compose"));
+        }
+    }
+
+    [Test]
+    public void DockerWorkflowsCapCpuUseToHostedRunnerCapacity()
+    {
+        var workflowRoot = Path.Combine(
+            RepositoryRoot(),
+            ".github",
+            "workflows");
+        var dockerWorkflows = Directory
+            .EnumerateFiles(workflowRoot, "*.yml")
+            .Concat(Directory.EnumerateFiles(workflowRoot, "*.yaml"))
+            .Where(static path => File.ReadAllText(path).Contains(
+                "docker compose",
+                StringComparison.Ordinal))
+            .ToArray();
+
+        Assert.That(dockerWorkflows, Is.Not.Empty);
+        foreach (var workflow in dockerWorkflows)
+        {
+            Assert.That(
+                File.ReadAllText(workflow),
+                Does.Contain("SHARPPROOF_CONTAINER_CPU_LIMIT: 4"),
+                Path.GetFileName(workflow));
+        }
+    }
+
+    [Test]
+    public void WorkerProcessBoundaryUsesADirectLinuxChildAndStdinRelease()
+    {
+        var host = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "SharpProof.Host",
+            "LinuxWorkerProcess.cs"));
+        var launcher = File.ReadAllText(Path.Combine(
             RepositoryRoot(),
             "SharpProof.Worker.Launcher",
             "Program.cs"));
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(source, Does.Contain("inheritHandles: false"));
-            Assert.That(source, Does.Not.Contain("inheritHandles: true"));
+            Assert.That(
+                host.Contains(
+                    "RedirectStandardInput = true",
+                    StringComparison.Ordinal),
+                Is.True);
+            Assert.That(host, Does.Contain("--parent-pid"));
+            Assert.That(host, Does.Contain("EntryPoint = \"prctl\""));
+            Assert.That(launcher, Does.Contain("LinuxWorkerProcess.Start"));
+            Assert.That(launcher, Does.Not.Contain("kernel32"));
         }
+    }
+
+    [Test]
+    public void NativeZ3ResolverLoadsOnlyTheContainerVerifiedPath()
+    {
+        var host = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "SharpProof.Host",
+            "ContainerNativeLibrary.cs"));
+
+        var exactLoad =
+            "NativeLibrary.Load(" + Environment.NewLine +
+            "                " +
+            "ContainerContract.ResolveZ3LibraryRequired());";
+        Assert.That(
+            host.Contains(exactLoad, StringComparison.Ordinal) &&
+            !host.Contains(
+                "NativeLibrary.Load(Z3ImportName);",
+                StringComparison.Ordinal),
+            Is.True);
     }
 
     [Test]
@@ -892,7 +1516,7 @@ public sealed class ArchitectureTests
                 Is.True);
             Assert.That(
                 source.Contains(
-                    "hash.Add(component.Key.ToUpperInvariant()).Add(stagedRead);",
+                    "hash.Add(component.Key).Add(stagedRead);",
                     StringComparison.Ordinal),
                 Is.True);
             Assert.That(
@@ -924,9 +1548,19 @@ public sealed class ArchitectureTests
             root,
             "SharpProof.Gates.Test",
             "PerformanceGateTests.cs"));
+        var corpusTests = File.ReadAllText(Path.Combine(
+            root,
+            "SharpProof.Gates.Test",
+            "CorpusGateTests.cs"));
         Assert.That(
             performanceTests.Split("[Category(\"Performance\")]", StringSplitOptions.None),
             Has.Length.EqualTo(3));
+        Assert.That(
+            corpusTests,
+            Does.Contain(
+                "[Category(\"Corpus\")]" + Environment.NewLine +
+                "    public async Task " +
+                "AnalyzerMatchesCanonicalCorpusAndReplayModes"));
 
         var fastWorkflow = File.ReadAllText(Path.Combine(
             root,
@@ -934,10 +1568,10 @@ public sealed class ArchitectureTests
             "workflows",
             "ci.yml"));
         var performanceIndex = fastWorkflow.IndexOf(
-            "Invoke-SharpProofGateEvidence.ps1",
+            "tooling performance",
             StringComparison.Ordinal);
         var broadTestsIndex = fastWorkflow.IndexOf(
-            "test SharpProof.Dev.Tests.slnf",
+            "SharpProof.Dev.Tests.slnf",
             StringComparison.Ordinal);
         using (Assert.EnterMultipleScope())
         {
@@ -956,10 +1590,6 @@ public sealed class ArchitectureTests
             Assert.That(
                 fastWorkflow,
                 Does.Contain(
-                    "-OutputPath artifacts/ci/performance.json"));
-            Assert.That(
-                fastWorkflow,
-                Does.Contain(
                     "fast-pr-performance-${{ github.sha }}-" +
                     "${{ github.run_attempt }}"));
             Assert.That(performanceIndex, Is.GreaterThanOrEqualTo(0));
@@ -968,17 +1598,30 @@ public sealed class ArchitectureTests
                 Is.GreaterThan(performanceIndex));
         }
 
+        var containerCommands = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+        Assert.That(
+            containerCommands,
+            Does.Contain("artifacts/ci/performance.json"));
+
         var acceptance = File.ReadAllText(Path.Combine(
             root,
             "eng",
             "acceptance",
             "Verify.ps1"));
+        var semanticTests = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofSemanticTests.ps1"));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                acceptance,
+                semanticTests,
                 Does.Contain(
-                    "TestCategory!=Performance&TestCategory!=Coverage"));
+                    "TestCategory!=Performance&TestCategory!=Coverage&" +
+                    "TestCategory!=Corpus"));
             Assert.That(
                 acceptance,
                 Does.Contain(
@@ -1013,6 +1656,27 @@ public sealed class ArchitectureTests
         Assert.That(
             coverageCollector,
             Does.Contain("TestCategory=Coverage"));
+        var coverageContainerCommands = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+        Assert.That(
+            coverageContainerCommands,
+            Does.Contain("Invoke-SharpProofCoverage.ps1"));
+        Assert.That(
+            coverageContainerCommands,
+            Does.Contain("'performance' {"));
+        Assert.That(
+            coverageContainerCommands,
+            Does.Contain(
+                "'build', 'SharpProof.sln', '--configuration', 'Release'"));
+        var gateEvidence = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofGateEvidence.ps1"));
+        Assert.That(
+            gateEvidence,
+            Does.Contain("[IO.Path]::IsPathRooted($OutputPath)"));
         foreach (var workflow in new[] {
                      ".github/workflows/coverage.yml",
                      ".github/workflows/package-consumers.yml"
@@ -1023,7 +1687,7 @@ public sealed class ArchitectureTests
                 workflow.Replace('/', Path.DirectorySeparatorChar)));
             Assert.That(
                 contents,
-                Does.Contain("Invoke-SharpProofCoverage.ps1"),
+                Does.Contain("tooling coverage"),
                 workflow);
         }
     }
@@ -1051,6 +1715,12 @@ public sealed class ArchitectureTests
                 Does.Contain("SharpProof.Dev.Tests.slnf"));
             Assert.That(
                 collector,
+                Does.Contain("Invoke-SharpProofSemanticTests.ps1"));
+            Assert.That(
+                collector,
+                Does.Contain("Invoke-SharpProofPackageTests.ps1"));
+            Assert.That(
+                collector,
                 Does.Contain("SharpProof.Managed.runsettings"));
             Assert.That(
                 collector,
@@ -1071,7 +1741,9 @@ public sealed class ArchitectureTests
             .OrderBy(static name => name, StringComparer.Ordinal)
             .ToArray();
         var expectedCoverageProjects = ProductionProjects
-            .Where(static name => name != "SharpProof.PortableAnalyzer")
+            .Where(static name =>
+                name != "SharpProof.Analyzer.Core" &&
+                name != "SharpProof.PortableAnalyzer")
             .Append("SharpProof.Gates")
             .OrderBy(static name => name, StringComparer.Ordinal)
             .ToArray();
@@ -1079,13 +1751,28 @@ public sealed class ArchitectureTests
             actualCoverageProjects,
             Is.EqualTo(expectedCoverageProjects),
             "Every production source owner must participate in project and " +
-            "aggregate coverage; PortableAnalyzer is the explicit linked-source " +
-            "packaging exception.");
+            "aggregate coverage; Analyzer.Core and PortableAnalyzer are explicit " +
+            "linked-source packaging exceptions.");
         Assert.That(
             managedSettings,
             Does.Contain(
                 "<CollectFromChildProcesses>False" +
                 "</CollectFromChildProcesses>"));
+        Assert.That(
+            managedSettings,
+            Does.Not.Contain(
+                "<EnableStaticManagedInstrumentation>False" +
+                "</EnableStaticManagedInstrumentation>"));
+        Assert.That(
+            managedSettings,
+            Does.Contain(
+                "<EnableStaticManagedInstrumentation>True" +
+                "</EnableStaticManagedInstrumentation>"));
+        Assert.That(
+            managedSettings,
+            Does.Contain(
+                "<EnableDynamicManagedInstrumentation>False" +
+                "</EnableDynamicManagedInstrumentation>"));
 
         var gateSettings = File.ReadAllText(Path.Combine(
             root,
@@ -1106,6 +1793,49 @@ public sealed class ArchitectureTests
             Assert.That(
                 gateSettings,
                 Does.Not.Contain("SharpProof.Attributes"));
+        }
+    }
+
+    [Test]
+    public void PackageFeedConstructionIsDemandDriven()
+    {
+        var root = RepositoryRoot();
+        var feed = File.ReadAllText(Path.Combine(
+            root,
+            "SharpProof.Package.Test",
+            "PackagedProductFeed.cs"));
+        using var packageCatalog = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(root, "scripts", "package-projects.json")));
+        var packageProjects = packageCatalog.RootElement
+            .GetProperty("projects")
+            .EnumerateArray()
+            .Select(static project => project.GetString()!)
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(feed, Does.Not.Contain("[OneTimeSetUp]"));
+            Assert.That(
+                feed,
+                Does.Contain(
+                    "new(CreateAsync, " +
+                    "LazyThreadSafetyMode.ExecutionAndPublication)"));
+            Assert.That(
+                feed,
+                Does.Contain(
+                    "internal static Task<PackagedProductFeed> GetAsync()"));
+            foreach (var project in packageProjects)
+            {
+                var document = XDocument.Load(Path.Combine(root, project));
+                var generateOnBuild = document.Descendants(
+                        "GeneratePackageOnBuild")
+                    .SingleOrDefault();
+                Assert.That(
+                    generateOnBuild?.Value,
+                    Is.EqualTo("false").IgnoreCase,
+                    project + " must reserve package creation for the " +
+                    "explicit container pack command.");
+            }
         }
     }
 
@@ -1179,6 +1909,30 @@ public sealed class ArchitectureTests
 
         Assert.That(references, Does.Contain("SharpProof.Package"));
         Assert.That(references, Does.Contain("SharpProof.Worker"));
+    }
+
+    [Test]
+    public void ProductionComplexityRationaleBindsTheExactCeilings()
+    {
+        using var contract = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "eng",
+            "acceptance",
+            "contract.json")));
+        var complexity = contract.RootElement.GetProperty(
+            "productionComplexity");
+        var maximumExpressionNodes = complexity.GetProperty(
+            "maximumExpressionNodes").GetInt32();
+        var maximumDecisionPoints = complexity.GetProperty(
+            "maximumDecisionPoints").GetInt32();
+        var maximumMembers = complexity.GetProperty(
+            "maximumMembers").GetInt32();
+        var binding = FormattableString.Invariant(
+            $"ceilings:{maximumExpressionNodes}/{maximumDecisionPoints}/{maximumMembers}");
+
+        Assert.That(
+            complexity.GetProperty("ceilingRationale").GetString(),
+            Does.Contain(binding));
     }
 
     [Test]

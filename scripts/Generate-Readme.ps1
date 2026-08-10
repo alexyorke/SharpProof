@@ -14,11 +14,14 @@ $currentMaintainedDocuments = @(
     'docs\README.md',
     'docs\architecture.md',
     'docs\coverage-and-limits.md',
+    'docs\container-development.md',
     'docs\analysis-limits.md',
     'docs\public-api.md',
     'docs\diagnostic-examples.md',
     'docs\unknown-reasons.md',
     'docs\native-smt-packaging.md',
+    'docs\preview-support.md',
+    'docs\release-constants.md',
     'docs\smt-lifecycle.md',
     'samples\README.md',
     'eng\acceptance\README.md',
@@ -304,6 +307,30 @@ foreach ($relativePath in $maintainedDocuments) {
                 "'$obsoleteWorkerTerm': $relativePath")
         }
     }
+    if ([regex]::IsMatch(
+            $maintainedText,
+            '\b(?:requires?|must)\b[^.]{0,200}\bpublic(?:-|\s+)key\b' +
+            '[^.]{0,100}\bmatch\b',
+            [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)) {
+        throw (
+            'Maintained documentation makes an obsolete public-key ' +
+            "matching claim: $relativePath")
+    }
+}
+foreach ($relativePath in $currentMaintainedDocuments) {
+    $currentText = Get-RequiredText $relativePath
+    foreach ($obsoleteHostBootstrap in @(
+            'git bundle create',
+            'repository.bundle',
+            'Invoke-SharpProofDotnet.ps1')) {
+        if ($currentText.Contains(
+                $obsoleteHostBootstrap,
+                [StringComparison]::Ordinal)) {
+            throw (
+                'Current documentation invokes obsolete host tooling ' +
+                "'$obsoleteHostBootstrap': $relativePath")
+        }
+    }
 }
 foreach ($relativePath in @(
         'eng\diagnostics\diagnostic-descriptors.v1.json')) {
@@ -359,7 +386,7 @@ $requiredReadmeText = @(
     'Refuted',
     'Unknown',
     'SHARPPROOF_CONTRACTS',
-    'Windows x64',
+    'canonical Linux amd64 container',
     'compiler artifact',
     'SARIF',
     'docs/README.md'
@@ -368,7 +395,10 @@ $forbiddenReadmeText = @(
     'Deep Ensures',
     'DeepEnsures',
     'WorkerVerificationStatus',
-    'WorkerVerificationReason'
+    'WorkerVerificationReason',
+    'SharpProof.Verifier.Win-x64',
+    'supported only on Windows x64',
+    'Windows Job Object'
 )
 foreach ($required in $requiredReadmeText) {
     if (-not $readme.Contains($required, [StringComparison]::Ordinal)) {
@@ -492,7 +522,7 @@ $limitReference = Get-RequiredText 'docs\analysis-limits.md'
 $portablePackageProps = [xml](Get-RequiredText (
     'SharpProof.Package\buildTransitive\SharpProof.props'))
 $verifierPackageProps = [xml](Get-RequiredText (
-    'SharpProof.Verifier.Win-x64\buildTransitive\SharpProof.Verifier.Win-x64.props'))
+    'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.props'))
 $packagePropsDocuments = @(
     $portablePackageProps,
     $verifierPackageProps

@@ -5,8 +5,10 @@ finite release-debt list is now `preview-debt.md`. This file remains as
 historical mutation and coverage evidence; do not refill its backlog while the
 preview register is active.
 
-One item per iteration. Both gates must pass before every commit:
-`dotnet test SharpProof.Dev.Tests.slnf` and `pwsh eng/acceptance/Verify.ps1`.
+One item per iteration. Both gates must pass before every commit inside the
+canonical container: `docker compose run --rm tooling test -Target
+SharpProof.Dev.Tests.slnf` and `docker compose run --rm tooling acceptance
+-Configuration Release`.
 A green dev suite alone is not enough — it does not run the production
 complexity ratchet, which `ci.yml`, `package-consumers.yml` and `weekly.yml` do.
 

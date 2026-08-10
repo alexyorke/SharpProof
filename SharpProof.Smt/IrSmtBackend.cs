@@ -198,18 +198,42 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         Solver solver,
         Dictionary<string, int> tracked)
     {
-        var core = ImmutableArray.CreateBuilder<int>();
-        foreach (var expression in solver.UnsatCore)
-        {
-            if (!tracked.TryGetValue(expression.ToString(), out var index))
-            {
-                return BackendCheckResult.Unknown(BackendFailureReason.MalformedResult);
-            }
+        var expressions = solver.UnsatCore;
+        return CreateUnsatisfiable(
+            expressions,
+            tracked,
+            static expression => expression.ToString());
+    }
 
-            core.Add(index);
+    internal static BackendCheckResult CreateUnsatisfiable<T>(
+        IReadOnlyList<T> expressions,
+        IReadOnlyDictionary<string, int> tracked,
+        Func<T, string> format)
+        where T : IDisposable
+    {
+        var core = ImmutableArray.CreateBuilder<int>();
+        try
+        {
+            foreach (var expression in expressions)
+            {
+                if (!tracked.TryGetValue(format(expression), out var index))
+                {
+                    return BackendCheckResult.Unknown(
+                        BackendFailureReason.MalformedResult);
+                }
+
+                core.Add(index);
+            }
+            return BackendCheckResult.Unsatisfiable(
+                core.Distinct().OrderBy(static index => index));
         }
-        return BackendCheckResult.Unsatisfiable(
-            core.Distinct().OrderBy(static index => index));
+        finally
+        {
+            foreach (var expression in expressions)
+            {
+                expression.Dispose();
+            }
+        }
     }
 
     private static BackendCheckResult CreateSatisfiable(

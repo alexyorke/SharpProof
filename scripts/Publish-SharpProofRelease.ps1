@@ -41,7 +41,7 @@ $ErrorActionPreference = 'Stop'
 $packageOrder = @(
     'SharpProof.Attributes',
     'SharpProof',
-    'SharpProof.Verifier.Win-x64'
+    'SharpProof.Verifier'
 )
 
 function Get-RequiredProperty {

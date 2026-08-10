@@ -19,6 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.CompilerArtifact\SharpProof.CompilerArtifact.csproj" />
     <ProjectReference Include="..\SharpProof.Dataflow\SharpProof.Dataflow.csproj" />
+    <ProjectReference Include="..\SharpProof.Host\SharpProof.Host.csproj" />
     <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
     <ProjectReference Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj"
                       OutputItemType="Analyzer"

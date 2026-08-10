@@ -193,10 +193,18 @@ internal static class ContractForSymbolMatcher
         IMethodSymbol companion)
     {
         if ((target.Name, target.Arity, target.ReturnsByRef,
-                target.ReturnsByRefReadonly, true) !=
+                target.ReturnsByRefReadonly, target.CallingConvention,
+                target.IsVararg, true) !=
             (companion.Name, companion.Arity, companion.ReturnsByRef,
-                companion.ReturnsByRefReadonly, companion.IsStatic) ||
-            !TypesMatch(target.ReturnType, companion.ReturnType, target, companion))
+                companion.ReturnsByRefReadonly, companion.CallingConvention,
+                companion.IsVararg, companion.IsStatic) ||
+            !TypesMatch(target.ReturnType, companion.ReturnType, target, companion) ||
+            !CustomModifiersMatch(
+                target.ReturnTypeCustomModifiers,
+                companion.ReturnTypeCustomModifiers) ||
+            !CustomModifiersMatch(
+                target.RefCustomModifiers,
+                companion.RefCustomModifiers))
         {
             return false;
         }
@@ -337,8 +345,53 @@ internal static class ContractForSymbolMatcher
                    left.IsOptional, left.HasExplicitDefaultValue) ==
                (right.RefKind, right.ScopedKind, right.IsParams,
                    right.IsOptional, right.HasExplicitDefaultValue) &&
+        CustomModifiersMatch(left.CustomModifiers, right.CustomModifiers) &&
+        ParameterRefCustomModifiersMatch(left, right) &&
         (!left.HasExplicitDefaultValue || Equals(left.ExplicitDefaultValue, right.ExplicitDefaultValue)) &&
         TypesMatch(left.Type, right.Type, left.ContainingSymbol, right.ContainingSymbol);
+    }
+
+    private static bool ParameterRefCustomModifiersMatch(
+        IParameterSymbol left,
+        IParameterSymbol right)
+    {
+        if (left.RefKind != RefKind.In || right.RefKind != RefKind.In)
+        {
+            return CustomModifiersMatch(
+                left.RefCustomModifiers,
+                right.RefCustomModifiers);
+        }
+
+        // Roslyn adds a required InAttribute modifier to virtual/abstract `in`
+        // parameters but omits it from the equivalent static companion. RefKind
+        // already captures that source-level contract, so compare the remaining
+        // modifiers exactly.
+        return CustomModifiersMatch(
+            RemoveCompilerInAttribute(left.RefCustomModifiers),
+            RemoveCompilerInAttribute(right.RefCustomModifiers));
+    }
+
+    private static ImmutableArray<CustomModifier> RemoveCompilerInAttribute(
+        ImmutableArray<CustomModifier> modifiers)
+    {
+        return modifiers
+            .Where(static modifier =>
+                modifier.IsOptional ||
+                !IsCompilerInAttribute(modifier.Modifier))
+            .ToImmutableArray();
+    }
+
+    private static bool IsCompilerInAttribute(INamedTypeSymbol type)
+    {
+        var interopServices = type.ContainingNamespace;
+        var runtime = interopServices.ContainingNamespace;
+        var system = runtime.ContainingNamespace;
+        return type.ContainingType == null &&
+               string.Equals(type.MetadataName, "InAttribute", StringComparison.Ordinal) &&
+               string.Equals(interopServices.Name, "InteropServices", StringComparison.Ordinal) &&
+               string.Equals(runtime.Name, "Runtime", StringComparison.Ordinal) &&
+               string.Equals(system.Name, "System", StringComparison.Ordinal) &&
+               system.ContainingNamespace.IsGlobalNamespace;
     }
 
     private static bool TypeParameterListsMatch(
@@ -545,9 +598,9 @@ internal static class ContractForSymbolMatcher
         ITypeSymbol type,
         bool normalizeMappedTypeParameters)
     {
-        return normalizeMappedTypeParameters &&
-        type is ITypeParameterSymbol &&
-        type.NullableAnnotation == NullableAnnotation.None
+        return type.NullableAnnotation == NullableAnnotation.None &&
+        (normalizeMappedTypeParameters ||
+         type is not ITypeParameterSymbol)
             ? NullableAnnotation.NotAnnotated
             : type.NullableAnnotation;
     }

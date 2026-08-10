@@ -5,8 +5,8 @@ param(
     [string]$Configuration = 'Release',
 
     [Parameter()]
-    [ValidateSet('Required', 'Graceful')]
-    [string]$ExpectedSmt,
+    [ValidateSet('Required')]
+    [string]$ExpectedSmt = 'Required',
 
     [Parameter()]
     [string]$PackageSource
@@ -17,28 +17,14 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $samplesRoot = Join-Path $repositoryRoot 'samples'
-$dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
-$isWindowsHost =
-    [Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
-        [Runtime.InteropServices.OSPlatform]::Windows)
-$isSupportedWorkerHost = $isWindowsHost -and
+$isSupportedWorkerHost = $IsLinux -and
+    $env:SHARPPROOF_CONTAINER -ceq '1' -and
     [Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq
         [Runtime.InteropServices.Architecture]::X64 -and
     [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq
         [Runtime.InteropServices.Architecture]::X64
-$expectedHostPolicy = if ($isSupportedWorkerHost) {
-    'Required'
-}
-else {
-    'Graceful'
-}
-if ([string]::IsNullOrWhiteSpace($ExpectedSmt)) {
-    $ExpectedSmt = $expectedHostPolicy
-}
-elseif ($ExpectedSmt -ne $expectedHostPolicy) {
-    throw (
-        "ExpectedSmt='$ExpectedSmt' does not match this host's " +
-        "'$expectedHostPolicy' verifier policy.")
+if (-not $isSupportedWorkerHost) {
+    throw 'SharpProof samples must run in the canonical Linux amd64 container.'
 }
 
 $temporaryParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
@@ -78,17 +64,7 @@ function Invoke-CapturedDotNet {
             "-flp:logfile=$logPath;verbosity=normal")
     }
 
-    $lines = if ($isWindowsHost) {
-        @(
-            & $dotnetWrapper `
-                -MemoryLimitMb 6144 `
-                -TimeoutSeconds $TimeoutSeconds `
-                @effectiveArguments 2>&1
-        )
-    }
-    else {
-        @(& dotnet @effectiveArguments 2>&1)
-    }
+    $lines = @(& dotnet @effectiveArguments 2>&1)
     $exitCode = $LASTEXITCODE
     $global:LASTEXITCODE = 0
     $capturedOutput =
@@ -101,8 +77,7 @@ function Invoke-CapturedDotNet {
         ''
     }
     $output = $capturedOutput + "`n" + $loggedOutput
-    if (-not $isWindowsHost -and
-        -not [string]::IsNullOrWhiteSpace($capturedOutput)) {
+    if (-not [string]::IsNullOrWhiteSpace($capturedOutput)) {
         Write-Host $capturedOutput
     }
     return [pscustomobject]@{
@@ -208,7 +183,7 @@ function Test-SampleProjectInventory {
         [string[]]@(
             'SharpProof',
             'SharpProof.Attributes',
-            'SharpProof.Verifier.Win-x64'
+            'SharpProof.Verifier'
         ),
         [StringComparer]::Ordinal)
     foreach ($projectFile in $projectFiles) {
@@ -449,7 +424,7 @@ try {
         Assert-ExitCode $strict $false 'Unsupported-host strict library build'
         Assert-OutputContains `
             $strict `
-            @('supported only on Windows x64') `
+            @('supported only by Core MSBuild inside the canonical Linux amd64 container') `
             'Unsupported-host strict library build'
     }
 

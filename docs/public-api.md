@@ -3,8 +3,9 @@
 SharpProof's supported compile-time API is the `SharpProof.Attributes`
 package. The `SharpProof` package contributes portable analyzers, the
 `ContractFor` generator, and build-transitive configuration, but intentionally
-adds no compile-time assembly reference. `SharpProof.Verifier.Win-x64`
-contributes build tooling and a Windows x64 worker, not an application API.
+adds no compile-time assembly reference. `SharpProof.Verifier`
+contributes build tooling and a container-only Linux amd64 worker, not an
+application API.
 
 ## Contract clauses and expressions
 
@@ -16,9 +17,11 @@ either placeholder directly throws. SharpProof analysis rejects the reserved
 conditional symbol so a proof cannot silently assume compiler-elided ghost
 expressions that execute in the emitted program.
 
-Analyzer-side binding requires the referenced API assembly version and public
-key to match the analyzer payload. The `Contract` type must have the exact
-supported signatures, and each clause method must carry exactly one real
+Analyzer-side binding requires the referenced API assembly's exact
+name/version identity and embedded payload SHA-256 to match the analyzer
+payload. The package is unsigned and makes no public-key authenticity claim.
+The `Contract` type must have the exact supported signatures, and each clause
+method must carry exactly one real
 `Conditional("SHARPPROOF_CONTRACTS")` attribute. Source/project shadows,
 mismatched assemblies, and malformed lookalikes are not compatibility
 substitutes: they contribute no evidence, including compiler-bound ghost API

@@ -98,46 +98,45 @@ public static class IrRelationalSummaryBuilder
         IrFactory factory,
         IrSummarySignature signature)
     {
-        IrMemberInfo member;
         try
         {
-            member = factory.GetMemberInfo(signature.Member);
+            var member = factory.GetMemberInfo(signature.Member);
+
+            if (member.IsStatic == signature.Receiver.HasValue ||
+                member.ParameterTypes.Length != signature.Parameters.Length ||
+                factory.GetVariableInfo(signature.Result).Type != member.ReturnType)
+            {
+                return false;
+            }
+
+            if (signature.Receiver.HasValue &&
+                factory.GetVariableInfo(signature.Receiver.Value).Type !=
+                member.DeclaringType)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < signature.Parameters.Length; index++)
+            {
+                if (factory.GetVariableInfo(signature.Parameters[index]).Type !=
+                    member.ParameterTypes[index])
+                {
+                    return false;
+                }
+            }
+
+            var variables = signature.Parameters
+                .Concat(signature.Receiver.HasValue
+                    ? [signature.Receiver.Value]
+                    : [])
+                .Append(signature.Result)
+                .ToArray();
+            return variables.Distinct().Count() == variables.Length;
         }
         catch (ArgumentException)
         {
             return false;
         }
-
-        if (member.IsStatic == signature.Receiver.HasValue ||
-            member.ParameterTypes.Length != signature.Parameters.Length ||
-            factory.GetVariableInfo(signature.Result).Type != member.ReturnType)
-        {
-            return false;
-        }
-
-        if (signature.Receiver.HasValue &&
-            factory.GetVariableInfo(signature.Receiver.Value).Type !=
-            member.DeclaringType)
-        {
-            return false;
-        }
-
-        for (var index = 0; index < signature.Parameters.Length; index++)
-        {
-            if (factory.GetVariableInfo(signature.Parameters[index]).Type !=
-                member.ParameterTypes[index])
-            {
-                return false;
-            }
-        }
-
-        var variables = signature.Parameters
-            .Concat(signature.Receiver.HasValue
-                ? [signature.Receiver.Value]
-                : [])
-            .Append(signature.Result)
-            .ToArray();
-        return variables.Distinct().Count() == variables.Length;
     }
 
     private static bool ValidateEnvironment(
@@ -153,7 +152,8 @@ public static class IrRelationalSummaryBuilder
         {
             foreach (var item in environment)
             {
-                if (factory.GetVariableInfo(item.Key).Type != item.Value.Type ||
+                if (item.Value == null ||
+                    factory.GetVariableInfo(item.Key).Type != item.Value.Type ||
                     !ReferenceEquals(factory.GetTerm(item.Value.Id), item.Value) ||
                     !IrTermAnalysis.CollectVariables(item.Value).All(inputs.Contains))
                 {
@@ -347,9 +347,12 @@ public static class IrRelationalSummaryBuilder
                                     environment,
                                     predicate) is not { } application)
                             {
-                                _reason = _calls.ContainsKey(call.Id)
-                                    ? IrSummaryAbstentionReason.InvalidSignature
-                                    : IrSummaryAbstentionReason.MissingDependency;
+                                if (_reason == IrSummaryAbstentionReason.None)
+                                {
+                                    _reason = _calls.ContainsKey(call.Id)
+                                        ? IrSummaryAbstentionReason.InvalidSignature
+                                        : IrSummaryAbstentionReason.MissingDependency;
+                                }
                                 return false;
                             }
 

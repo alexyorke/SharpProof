@@ -1,7 +1,8 @@
+using System.Diagnostics;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
+using SharpProof.Host;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
@@ -49,8 +50,9 @@ public sealed class WorkerProgramTests
                 requestAndResultPath,
                 "--result",
                 requestAndResultPath,
-                "--start-event",
-                "missing-start-event"
+                "--start-stdin",
+                "--parent-pid",
+                "1"
             ]);
 
             Assert.That(exitCode, Is.EqualTo(2));
@@ -71,7 +73,7 @@ public sealed class WorkerProgramTests
             "verify",
             "--request", "request\0.json",
             "--result", "result.json",
-            "--start-event", "missing-start-event"
+            "--start-stdin", "--parent-pid", "1"
         ]);
 
         Assert.That(exitCode, Is.EqualTo(2));
@@ -80,11 +82,9 @@ public sealed class WorkerProgramTests
     [Test]
     public async Task DirectInvocationWritesFailureForMalformedRequest()
     {
-        if (!OperatingSystem.IsWindows() ||
-            RuntimeInformation.ProcessArchitecture != Architecture.X64 ||
-            RuntimeInformation.OSArchitecture != Architecture.X64)
+        if (!OperatingSystem.IsLinux())
         {
-            Assert.Ignore("The direct worker is supported only on Windows x64.");
+            Assert.Ignore("The direct worker is supported only in the Linux container.");
         }
 
         var directory = Path.Combine(
@@ -93,26 +93,26 @@ public sealed class WorkerProgramTests
         Directory.CreateDirectory(directory);
         var requestPath = Path.Combine(directory, "request.json");
         var resultPath = Path.Combine(directory, "result.json");
-        var eventName = "Local\\SharpProof.Worker.Test." +
-            Guid.NewGuid().ToString("N");
         try
         {
             await File.WriteAllTextAsync(requestPath, "{");
-            using var startEvent = new EventWaitHandle(
-                true, EventResetMode.ManualReset, eventName);
-
-            var exitCode = await Program.Main([
-                "verify",
-                "--request", requestPath,
-                "--result", resultPath,
-                "--start-event", eventName
-            ]);
+            var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet";
+            using var process = LinuxWorkerProcess.Start(
+                host,
+                [typeof(SharpProofWorker).Assembly.Location,
+                    "verify", "--request", requestPath,
+                    "--result", resultPath, "--start-stdin"],
+                directory);
+            var completion = process.WaitForExit(
+                TimeSpan.FromSeconds(10),
+                TimeSpan.FromSeconds(1));
 
             var response = WorkerProtocolJson.DeserializeResponse(
                 await File.ReadAllTextAsync(resultPath))!;
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(exitCode, Is.Zero);
+                Assert.That(completion.Kind, Is.EqualTo(LinuxWorkerCompletionKind.Exited));
+                Assert.That(completion.ExitCode, Is.Zero);
                 Assert.That(
                     response.FailureReason,
                     Is.EqualTo(WorkerRunFailureReason.InvalidRequest));
@@ -127,6 +127,97 @@ public sealed class WorkerProgramTests
             {
                 Directory.Delete(directory, recursive: true);
             }
+        }
+    }
+
+    [Test]
+    public async Task ParentDeathKillsAWorkerBlockedBeforeStartupRelease()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            Assert.Ignore("The direct worker is supported only in the Linux container.");
+        }
+
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SharpProof-worker-parent-death-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var requestPath = Path.Combine(directory, "request.json");
+        var resultPath = Path.Combine(directory, "result.json");
+        var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ??
+            "dotnet";
+        const string script = """
+            "$1" "$2" verify --request "$3" --result "$4" --start-stdin --parent-pid "$$" <&0 &
+            child="$!"
+            sleep 2
+            printf '%s\n' "$child"
+            sleep 300
+            """;
+        using var parent = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "/bin/bash",
+                UseShellExecute = false,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            }
+        };
+        parent.StartInfo.ArgumentList.Add("-c");
+        parent.StartInfo.ArgumentList.Add(script);
+        parent.StartInfo.ArgumentList.Add("sharpproof-parent");
+        parent.StartInfo.ArgumentList.Add(host);
+        parent.StartInfo.ArgumentList.Add(typeof(SharpProofWorker).Assembly.Location);
+        parent.StartInfo.ArgumentList.Add(requestPath);
+        parent.StartInfo.ArgumentList.Add(resultPath);
+
+        var childProcessId = 0;
+        var parentStarted = false;
+        try
+        {
+            parentStarted = parent.Start();
+            Assert.That(parentStarted, Is.True);
+            var childText = await parent.StandardOutput.ReadLineAsync()
+                .WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.That(
+                int.TryParse(childText, out childProcessId),
+                Is.True);
+            Assert.That(
+                Directory.Exists($"/proc/{childProcessId}"),
+                Is.True,
+                "The worker exited before its parent-death boundary was tested.");
+
+            parent.Kill();
+            await parent.WaitForExitAsync();
+            var terminated = SpinWait.SpinUntil(
+                () => !Directory.Exists($"/proc/{childProcessId}"),
+                TimeSpan.FromSeconds(5));
+            Assert.That(
+                terminated,
+                Is.True,
+                "The blocked worker survived termination of its direct parent.");
+        }
+        finally
+        {
+            if (parentStarted)
+            {
+                await parent.StandardInput.DisposeAsync();
+                if (!parent.HasExited)
+                {
+                    parent.Kill();
+                    await parent.WaitForExitAsync();
+                }
+            }
+            if (childProcessId > 0 &&
+                Directory.Exists($"/proc/{childProcessId}"))
+            {
+                using var child = Process.GetProcessById(childProcessId);
+                child.Kill();
+                await child.WaitForExitAsync();
+            }
+            Directory.Delete(directory, recursive: true);
         }
     }
 
@@ -146,9 +237,7 @@ public sealed class WorkerProgramTests
         {
             var compilation = new CompilerCompilationSnapshot
             {
-                ProjectDirectory = OperatingSystem.IsWindows()
-                    ? directory.Replace('\\', '/')
-                    : directory,
+                ProjectDirectory = directory,
                 AssemblyName = "Subject",
                 AssemblyIdentity = "Subject, Version=1.0.0.0",
                 TargetFramework = "net9.0",
@@ -191,7 +280,7 @@ public sealed class WorkerProgramTests
 
             arguments[^1] = "1";
             var validExitCode = await InvokeLauncherAsync(arguments);
-            Assert.That(validExitCode, Is.EqualTo(3));
+            Assert.That(validExitCode, Is.Zero);
             Assert.That(File.Exists(requestPath), Is.True);
             Assert.That(File.Exists(resultPath), Is.True);
         }

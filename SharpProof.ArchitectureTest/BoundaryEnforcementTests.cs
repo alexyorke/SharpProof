@@ -10,6 +10,7 @@ public sealed class BoundaryEnforcementTests
 {
     private static readonly string[] BannedApiProjects = [
         "SharpProof.Analyzer",
+        "SharpProof.Analyzer.Core",
         "SharpProof.Attributes",
         "SharpProof.BuildTasks",
         "SharpProof.CompilerArtifact",
@@ -19,6 +20,7 @@ public sealed class BoundaryEnforcementTests
         "SharpProof.Dataflow",
         "SharpProof.Effects",
         "SharpProof.Frontend",
+        "SharpProof.Host",
         "SharpProof.Ir",
         "SharpProof.Meta.Analyzers",
         "SharpProof.PortableAnalyzer",
@@ -33,6 +35,7 @@ public sealed class BoundaryEnforcementTests
 
     private static readonly string[] SoundnessCriticalProjects = [
         "SharpProof.Analyzer",
+        "SharpProof.Analyzer.Core",
         "SharpProof.CompilerArtifact",
         "SharpProof.CompilerCollector",
         "SharpProof.ContractForGenerator",
@@ -40,6 +43,7 @@ public sealed class BoundaryEnforcementTests
         "SharpProof.Dataflow",
         "SharpProof.Effects",
         "SharpProof.Frontend",
+        "SharpProof.Host",
         "SharpProof.Ir",
         "SharpProof.PortableAnalyzer",
         "SharpProof.Smt",
@@ -409,6 +413,7 @@ public sealed class BoundaryEnforcementTests
     {
         string[] expected = [
             @"SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj",
+            @"SharpProof.Analyzer.Core\SharpProof.Analyzer.Core.csproj",
             @"SharpProof.Analyzer\SharpProof.Analyzer.csproj",
             @"SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj",
             @"SharpProof.Attributes.Test\SharpProof.Attributes.Test.csproj",
@@ -443,10 +448,11 @@ public sealed class BoundaryEnforcementTests
             @"SharpProof.Summaries\SharpProof.Summaries.csproj",
             @"SharpProof.Testing.Test\SharpProof.Testing.Test.csproj",
             @"SharpProof.Testing\SharpProof.Testing.csproj",
-            @"SharpProof.Verifier.Win-x64\SharpProof.Verifier.Win-x64.csproj",
+            @"SharpProof.Verifier\SharpProof.Verifier.csproj",
             @"SharpProof.Fuzz.Test\SharpProof.Fuzz.Test.csproj",
             @"SharpProof.Gates.Test\SharpProof.Gates.Test.csproj",
             @"SharpProof.Gates\SharpProof.Gates.csproj",
+            @"SharpProof.Host\SharpProof.Host.csproj",
             @"SharpProof.Verify.Test\SharpProof.Verify.Test.csproj",
             @"SharpProof.Verify\SharpProof.Verify.csproj",
             @"SharpProof.Worker.Launcher\SharpProof.Worker.Launcher.csproj",
@@ -468,7 +474,11 @@ public sealed class BoundaryEnforcementTests
         foreach (var project in actual)
         {
             Assert.That(
-                File.Exists(Path.Combine(RepositoryRoot(), project)),
+                File.Exists(Path.Combine(
+                    RepositoryRoot(),
+                    project.Replace(
+                        '\\',
+                        Path.DirectorySeparatorChar))),
                 Is.True,
                 project);
         }

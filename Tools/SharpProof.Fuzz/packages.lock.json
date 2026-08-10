@@ -1,7 +1,7 @@
 {
   "version": 2,
   "dependencies": {
-    "net8.0": {
+    "net9.0": {
       "Microsoft.Z3": {
         "type": "Direct",
         "requested": "[4.12.2, )",
@@ -26,10 +26,7 @@
       "System.Reflection.Metadata": {
         "type": "Transitive",
         "resolved": "9.0.0",
-        "contentHash": "ANiqLu3DxW9kol/hMmTWbt3414t9ftdIuiIU7j80okq2YzAueo120M442xk1kDJWtmZTqWQn7wHDvMRipVOEOQ==",
-        "dependencies": {
-          "System.Collections.Immutable": "9.0.0"
-        }
+        "contentHash": "ANiqLu3DxW9kol/hMmTWbt3414t9ftdIuiIU7j80okq2YzAueo120M442xk1kDJWtmZTqWQn7wHDvMRipVOEOQ=="
       },
       "System.Text.Encodings.Web": {
         "type": "Transitive",
@@ -44,6 +41,9 @@
           "SharpProof.Ir": "[1.0.0-preview.1, )",
           "System.Collections.Immutable": "[9.0.18, )"
         }
+      },
+      "sharpproof.host": {
+        "type": "Project"
       },
       "sharpproof.ir": {
         "type": "Project",

@@ -9,7 +9,7 @@ is acceptable only when:
 - the supported-language gate is exhaustive, unsupported unannotated analyzer
   methods remain quiet, and unsupported explicitly selected methods report
   SP0047;
-- protocol version 10 binds compiler-manifest evidence and manifests every
+- protocol version 11 binds compiler-manifest evidence and manifests every
   selected callable, postcondition, and selected effect-attribute occurrence
   with a stable semantic ID, every lowered callable exactly matches that manifest,
   and every response has exact manifest/result equality;
@@ -75,7 +75,8 @@ files. Compiler MVIDs and reference identities remain artifact provenance and
 cache identity rather than runtime compatibility gates.
 Exact backend-model closure and independent whole-body counterexample replay
 are implemented for the admitted subset, and package validation covers the
-exact Attributes -> portable analyzer -> Windows verifier dependency chain.
+exact Attributes -> portable analyzer -> Linux container verifier dependency
+chain.
 The release workflow validates and promotes the already-tested bytes with
 hash, SBOM, repository, package-version, and tag checks. Optional SARIF 2.1.0
 projects only validated worker responses. Owner-enforced
@@ -91,30 +92,30 @@ acceptance gates. CI enforces construction boundaries, exact TCB path
 ownership, structural-complexity budgets, and the evidence contract. The
 preview has no reviewer-count or time-based freeze.
 
-Run the active local gate from the repository root:
+Run the active local gate from the repository root with Docker:
 
-```powershell
-.\scripts\Format-CSharp.ps1 -Verify
-.\eng\acceptance\Verify.ps1
+```text
+docker compose build tooling
+docker compose run --rm tooling acceptance -Configuration Release
 ```
 
 The verifier checks contract invariants, exact trusted-boundary path ownership,
 and formatting-neutral production, coordinator, file, and member complexity
 ratchets. Expression nodes, decision points, and declarations are release
 gates; physical and nonblank lines are informational only. It then builds the
-repository under the bounded Job Object wrapper and runs
+repository in an isolated container task and runs
 every current architecture, semantic, corpus, fuzz, worker, package,
 and coverage gate. Changed-TCB coverage selects the same canonical union used
 by release digests; C# paths are checked with sequence-point evidence, while
 changed declarative metadata is reported explicitly in the coverage summary.
-cancellation, and performance gate. Unannotated advisory performance compares
+cancellation, and performance gates. Unannotated advisory performance compares
 paired, order-interleaved compiler-only and SharpProof-imported MSBuild
 rebuilds of contract-free code with ordinary source and BCL calls under the
 repository-selected SDK. This exercises the contract-free activation boundary:
 the analyzer assembly loads, reference metadata is screened, and no semantic
 session or per-method callback is created. It separately checks the call-free
-advisory analyzer retention and no-session boundary. The full acceptance job currently runs on
-Windows x64. Separate package-consumer CI restores the exact same three-package
-artifacts and exercises the portable analyzer on Windows x64, Linux x64, macOS
-x64, and macOS ARM64. Packaged worker execution remains Windows x64 only;
-unsupported matrix hosts assert the explicit verification rejection.
+advisory analyzer retention and no-session boundary. Full acceptance, package
+consumers, and packaged verifier execution run only in the canonical Linux
+amd64 container. The portable analyzer remains framework- and
+operating-system-neutral, but release evidence never depends on a native-host
+SDK or MSBuild installation.

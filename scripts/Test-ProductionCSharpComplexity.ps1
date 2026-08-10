@@ -16,11 +16,6 @@ $contract = Get-Content -LiteralPath $contractPath -Raw |
 if ($null -eq $contract.productionComplexity) {
     throw 'The active acceptance contract must define productionComplexity.'
 }
-$ceilingRationale =
-    [string]$contract.productionComplexity.ceilingRationale
-if ([string]::IsNullOrWhiteSpace($ceilingRationale)) {
-    throw 'Production-complexity ceilings require an architectural rationale.'
-}
 $maximumExpressionNodes =
     [int]$contract.productionComplexity.maximumExpressionNodes
 $maximumDecisionPoints =
@@ -34,6 +29,20 @@ $limits = @(
 )
 if (@($limits | Where-Object { $_ -le 0 }).Count -ne 0) {
     throw 'Production-complexity ceilings must be positive.'
+}
+$ceilingRationale =
+    [string]$contract.productionComplexity.ceilingRationale
+if ([string]::IsNullOrWhiteSpace($ceilingRationale)) {
+    throw 'Production-complexity ceilings require an architectural rationale.'
+}
+$ceilingBinding =
+    "ceilings:$maximumExpressionNodes/$maximumDecisionPoints/$maximumMembers"
+if ($ceilingRationale.IndexOf(
+        $ceilingBinding,
+        [StringComparison]::Ordinal) -lt 0) {
+    throw (
+        'Production-complexity rationale must bind the exact current ' +
+        "limits with '$ceilingBinding'.")
 }
 
 $compactProbe = @'

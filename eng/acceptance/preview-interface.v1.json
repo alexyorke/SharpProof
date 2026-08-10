@@ -6,7 +6,6 @@
     "SharpProofCollectorDirectory",
     "SharpProofCompilerCollectorPath",
     "SharpProofCompilerManifestFile",
-    "SharpProofDotNetHost",
     "SharpProofFeatures",
     "SharpProofLauncherPath",
     "SharpProofPortableAnalyzerPath",
@@ -18,12 +17,10 @@
     "SharpProofVerifyCacheEnabled",
     "SharpProofVerifyCacheMaximumBytes",
     "SharpProofVerifyMaxParallelism",
-    "SharpProofVerifyMaxWorkerProcesses",
     "SharpProofVerifyMaximumExpressionDepth",
     "SharpProofVerifyMethodRlimit",
     "SharpProofVerifyMethodWallTimeMilliseconds",
     "SharpProofVerifyPolicy",
-    "SharpProofVerifyProcessMemoryLimitBytes",
     "SharpProofVerifyProjectWallTimeMilliseconds",
     "SharpProofVerifyQueryRlimit",
     "SharpProofVerifyRequestFile",
@@ -36,11 +33,11 @@
     "SharpProofMode"
   ],
   "versions": {
-    "workerProtocol": 10,
+    "workerProtocol": 11,
     "workerManifest": 4,
     "compilerArtifact": 11,
     "relationalSummary": 1,
     "specificationPack": 1,
-    "workerCache": 12
+    "workerCache": 13
   }
 }

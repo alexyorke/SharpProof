@@ -1,4 +1,4 @@
-name: Coverage
+name: Container coverage
 
 on:
   push:
@@ -10,60 +10,44 @@ on:
 permissions:
   contents: read
 
+env:
+  COMPOSE_PROJECT_NAME: sharpproof-coverage-${{ github.run_id }}-${{ github.run_attempt }}
+  SHARPPROOF_CONTAINER_CPU_LIMIT: 4
+
 jobs:
   coverage:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - name: Setup required .NET SDKs
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          dotnet-version: "9.0.316"
-          global-json-file: global.json
-
-      - name: Restore and build
-        shell: pwsh
+      - name: Select changed-TCB comparison commit
         run: |
-          .\scripts\Invoke-SharpProofDotnet.ps1 restore SharpProof.sln --locked-mode
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          .\scripts\Invoke-SharpProofDotnet.ps1 `
-            -MemoryLimitMb 8192 `
-            -TimeoutSeconds 600 `
-            build SharpProof.sln -c Release --no-restore
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if [[ '${{ github.event_name }}' == 'pull_request' ]]; then
+            comparison='${{ github.event.pull_request.base.sha }}'
+          elif [[ '${{ github.event.before }}' =~ ^[0-9a-f]{40}$ ]] &&
+               [[ '${{ github.event.before }}' != '0000000000000000000000000000000000000000' ]]; then
+            comparison='${{ github.event.before }}'
+          else
+            comparison='HEAD^'
+          fi
+          echo "SHARPPROOF_COVERAGE_COMPARISON_REF=${comparison}" >> "$GITHUB_ENV"
 
-      - name: Collect aggregate coverage
-        shell: pwsh
-        run: |
-          .\scripts\Invoke-SharpProofCoverage.ps1 `
-            -MemoryLimitMb 12288 `
-            -TimeoutSeconds 1800 `
-            -ResultsDirectory artifacts/coverage
+      - name: Build the pinned toolchain
+        run: docker compose build tooling
 
-      - name: Enforce project and changed C# TCB coverage
-        shell: pwsh
-        run: |
-          $comparisonRef = if ('${{ github.event_name }}' -eq 'pull_request') {
-            '${{ github.event.pull_request.base.sha }}'
-          } elseif ('${{ github.event.before }}' -match '^[0-9a-f]{40}$' -and
-                    '${{ github.event.before }}' -ne ('0' * 40)) {
-            '${{ github.event.before }}'
-          } else {
-            'HEAD^'
-          }
-          .\scripts\Test-SharpProofCoverage.ps1 `
-            -CoverageRoot artifacts/coverage `
-            -ComparisonRef $comparisonRef `
-            -SummaryPath artifacts/coverage/SharpProof.coverage.json
+      - name: Collect and enforce container coverage
+        run: >-
+          docker compose run --rm
+          -e SHARPPROOF_COVERAGE_COMPARISON_REF
+          tooling coverage -Configuration Release
 
       - name: Upload coverage evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: coverage
+          name: coverage-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/coverage
           if-no-files-found: error
           retention-days: 30

@@ -135,7 +135,7 @@
           "System.Runtime.CompilerServices.Unsafe": "6.1.2"
         }
       },
-      "sharpproof.analyzer": {
+      "sharpproof.analyzer.core": {
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",

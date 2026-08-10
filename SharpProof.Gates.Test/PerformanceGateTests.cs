@@ -18,6 +18,9 @@ public sealed class PerformanceGateTests
         {
             Assert.That(contract.Warmups, Is.EqualTo(5));
             Assert.That(contract.Samples, Is.EqualTo(30));
+            Assert.That(contract.SmokeWarmups, Is.EqualTo(1));
+            Assert.That(contract.SmokeSamples, Is.EqualTo(4));
+            Assert.That(contract.SmokeMaximumRatio, Is.EqualTo(2.0));
             Assert.That(contract.IdeEdits, Is.EqualTo(200));
             Assert.That(contract.MaximumMedianRatio, Is.EqualTo(1.10));
             Assert.That(contract.MaximumP95Ratio, Is.EqualTo(1.20));
@@ -420,14 +423,14 @@ public sealed class PerformanceGateTests
             "SharpProof.targets"));
         var verifierProps = XDocument.Load(Path.Combine(
             root,
-            "SharpProof.Verifier.Win-x64",
+            "SharpProof.Verifier",
             "buildTransitive",
-            "SharpProof.Verifier.Win-x64.props"));
+            "SharpProof.Verifier.props"));
         var verifierTargets = XDocument.Load(Path.Combine(
             root,
-            "SharpProof.Verifier.Win-x64",
+            "SharpProof.Verifier",
             "buildTransitive",
-            "SharpProof.Verifier.Win-x64.targets"));
+            "SharpProof.Verifier.targets"));
         var verifier = verifierTargets.Descendants("Target").Single(target =>
             string.Equals(
                 (string?)target.Attribute("Name"),
@@ -463,14 +466,14 @@ public sealed class PerformanceGateTests
             "SharpProof.targets"));
         var verifierProps = XDocument.Load(Path.Combine(
             root,
-            "SharpProof.Verifier.Win-x64",
+            "SharpProof.Verifier",
             "buildTransitive",
-            "SharpProof.Verifier.Win-x64.props"));
+            "SharpProof.Verifier.props"));
         var verifierTargets = XDocument.Load(Path.Combine(
             root,
-            "SharpProof.Verifier.Win-x64",
+            "SharpProof.Verifier",
             "buildTransitive",
-            "SharpProof.Verifier.Win-x64.targets"));
+            "SharpProof.Verifier.targets"));
         var verifier = verifierTargets.Descendants("Target").Single(target =>
             string.Equals(
                 (string?)target.Attribute("Name"),
@@ -543,14 +546,26 @@ public sealed class PerformanceGateTests
     [NonParallelizable]
     public async Task ReleasePerformanceProtocolProducesStructuralEvidence()
     {
-        var result = await PerformanceGate.RunAsync(
-            RepositoryLayout.FindRoot());
+        var root = RepositoryLayout.FindRoot();
+        var smoke = await PerformanceGate.RunSmokeAsync(root);
+        var result = await PerformanceGate.RunStructuralCoverageAsync(root);
 
-        AssertProtocolEvidence(result);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(smoke.Passed, Is.True);
+            Assert.That(smoke.Failures, Is.Empty);
+            Assert.That(smoke.PackageBuildSamples, Has.Length.EqualTo(4));
+            Assert.That(smoke.ForcedTerminationMilliseconds, Is.Positive);
+            Assert.That(result.Warmups, Is.EqualTo(1));
+            Assert.That(result.Samples, Is.EqualTo(2));
+            Assert.That(result.IdeEdits, Is.EqualTo(2));
+        }
+        AssertProtocolEvidence(result, expectedSamples: 2);
     }
 
     private static void AssertProtocolEvidence(
-        PerformanceGateResult result)
+        PerformanceGateResult result,
+        int expectedSamples = 30)
     {
         using (Assert.EnterMultipleScope())
         {
@@ -569,14 +584,14 @@ public sealed class PerformanceGateTests
                 Is.EqualTo(PackageBuildEstimator.Version));
             Assert.That(
                 result.PackageBuildSamples.Length,
-                Is.EqualTo(30));
+                Is.EqualTo(expectedSamples));
             Assert.That(
                 result.OrderBalancedRatios.Length,
-                Is.EqualTo(15));
+                Is.EqualTo(expectedSamples / 2));
             Assert.That(
                 result.PackageBuildSamples.Count(
                     static sample => sample.UnannotatedAdvisoryFirst),
-                Is.EqualTo(15));
+                Is.EqualTo(expectedSamples / 2));
             Assert.That(
                 result.PackageBuildSdk.ResolvedVersion,
                 Is.Not.Empty);

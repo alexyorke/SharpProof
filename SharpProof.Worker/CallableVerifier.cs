@@ -59,6 +59,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 _maximumExpressionDepth,
                 cancellationToken)
             .ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         var postconditions = await VerifyPostconditionsAsync(
                 target,
                 resourceBudget,
@@ -77,6 +78,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             CallableEntryFeasibility entryFeasibility,
             CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var factory = target.Factory;
         var ensures = target.Clauses.Where(static clause => clause.Kind == CompilerContractKind.Ensures).ToImmutableArray();
         if (ensures.Length > target.Entry.ClaimIds.Length ||
@@ -106,18 +108,22 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                     prepared.SpecCalls, prepared.SummaryCalls,
                     prepared.ParameterBindings.ToImmutableDictionary(
                         static item => item.Key, item => (IrTerm)factory.Variable(item.Value)),
-                    prepared.ParameterBindings),
+                    prepared.ParameterBindings,
+                    cancellationToken),
             _ => SymbolicBodyExecution.Failed(WorkerClaimReason.UnsupportedBody)
         };
         if (!body.IsSuccess)
         {
             return CallableClaimResultAssembler.PostconditionUnknowns(target, body.Reason);
         }
+        cancellationToken.ThrowIfCancellationRequested();
 
         var evidenceResult = CallableEvidenceBuilder.Build(
             target,
             body,
-            _maximumExpressionDepth);
+            _maximumExpressionDepth,
+            cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         if (!evidenceResult.IsSuccess)
         {
             return CallableClaimResultAssembler.PostconditionUnknowns(
@@ -220,7 +226,9 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 new Goal(factory, condition, ProofDiagnosticKind.Postcondition, new SourceLocationId(index)),
                 replayVariables);
             var outcome = await _kernel.VerifyAsync(query, cancellationToken).ConfigureAwait(false);
-            if (resourceBudget.IsExceeded)
+            var resourceLimitExceeded = resourceBudget.IsExceeded;
+            cancellationToken.ThrowIfCancellationRequested();
+            if (resourceLimitExceeded)
             {
                 records.AddRange(CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.ResourceLimit).Skip(index));
                 break;
@@ -287,6 +295,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
 
             records.Add(record);
         }
+        cancellationToken.ThrowIfCancellationRequested();
         return records.ToImmutable();
     }
 
@@ -313,7 +322,9 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             replayVariables);
         var outcome = await _kernel.VerifyAsync(query, cancellationToken)
             .ConfigureAwait(false);
-        return resourceBudget.IsExceeded ? null : outcome;
+        var resourceLimitExceeded = resourceBudget.IsExceeded;
+        cancellationToken.ThrowIfCancellationRequested();
+        return resourceLimitExceeded ? null : outcome;
     }
 
     private static SymbolicBodyExecution TrivialBody(IrFactory factory)

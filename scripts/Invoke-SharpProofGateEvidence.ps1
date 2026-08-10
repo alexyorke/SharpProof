@@ -8,10 +8,6 @@ param(
     [string]$OutputPath,
 
     [Parameter()]
-    [ValidateRange(1, 65536)]
-    [int]$MemoryLimitMb = 8192,
-
-    [Parameter()]
     [ValidateRange(1, 86400)]
     [int]$TimeoutSeconds = 600
 )
@@ -21,7 +17,12 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $resolvedOutput = [IO.Path]::GetFullPath(
-    (Join-Path $repositoryRoot $OutputPath))
+    $(if ([IO.Path]::IsPathRooted($OutputPath)) {
+        $OutputPath
+    }
+    else {
+        Join-Path $repositoryRoot $OutputPath
+    }))
 if (-not $resolvedOutput.StartsWith(
         $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
         [StringComparison]::OrdinalIgnoreCase)) {
@@ -56,9 +57,7 @@ $quotedArguments = @(
 ) -join ','
 $escapedWrapper = $wrapper.Replace("'", "''")
 $command = (
-    "& '$escapedWrapper' -MemoryLimitMb " +
-    [string]$MemoryLimitMb +
-    ' -TimeoutSeconds ' +
+    "& '$escapedWrapper' -TimeoutSeconds " +
     [string]$TimeoutSeconds +
     " @($quotedArguments); exit " + '$LASTEXITCODE')
 $encodedCommand = [Convert]::ToBase64String(
@@ -76,7 +75,6 @@ try {
             $encodedCommand
         ) `
         -WorkingDirectory $repositoryRoot `
-        -WindowStyle Hidden `
         -Wait `
         -PassThru `
         -RedirectStandardOutput $rawOutput `

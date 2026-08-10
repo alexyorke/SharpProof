@@ -1,11 +1,15 @@
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
-using SharpProof.Worker.Protocol;
+using SharpProof.Host;
 
 namespace SharpProof.BuildTasks;
 
-public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task
+public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, ICancelableTask
 {
+    private readonly object _synchronization = new();
+    private Action? _cancelExecution;
+    private bool _canceled;
+
     [Required]
     public string ResultPath { get; set; } = string.Empty;
 
@@ -37,6 +41,35 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task
 
     public override bool Execute()
     {
+        using var cancellation = new CancellationTokenSource();
+        Action cancel = cancellation.Cancel;
+        lock (_synchronization)
+        {
+            if (_canceled)
+            {
+                return false;
+            }
+            _cancelExecution = cancel;
+        }
+        try
+        {
+            return Execute(cancellation.Token);
+        }
+        finally
+        {
+            lock (_synchronization)
+            {
+                if (ReferenceEquals(_cancelExecution, cancel))
+                {
+                    _cancelExecution = null;
+                }
+            }
+        }
+    }
+
+    private bool Execute(CancellationToken cancellationToken)
+    {
+        ContainerContract.ValidateRequired();
         var lexicalProjectDirectory = Path.GetFullPath(ProjectDirectory);
         string ResolveLexicalPath(string path)
         {
@@ -46,7 +79,7 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task
         }
         string ResolvePath(string path)
         {
-            return WindowsPathIdentity.RequireLocalPath(ResolveLexicalPath(path));
+            return LinuxPathIdentity.RequireLocalPath(ResolveLexicalPath(path));
         }
 
         var outputPaths = Present(ResultPath, SarifPath)
@@ -60,16 +93,16 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task
             .Select(ResolvePath)
             .ToArray();
         var publicationMarkerPaths = publicationPaths
-            .Select(WindowsPathIdentity.PublicationMarkerPath)
+            .Select(LinuxPathIdentity.PublicationMarkerPath)
             .ToArray();
         var publicationMutationPaths = outputPaths
             .Concat(publicationMarkerPaths)
             .ToArray();
         var aliasesOutput = outputPaths
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Distinct(StringComparer.Ordinal)
             .Count() != outputPaths.Length ||
             Pairs(outputPaths).Any(static pair =>
-                WindowsPathIdentity.AreSameExistingFile(pair[0], pair[1]));
+                LinuxPathIdentity.AreSameExistingFile(pair[0], pair[1]));
         var resolvedLauncherPath = ResolvePath(LauncherPath);
         var toolPaths = Present(WorkerPath, LauncherPath)
             .SelectMany(static path => new[]
@@ -103,32 +136,32 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task
             protectedPaths.Any(input => !string.Equals(
                     output,
                     input,
-                    StringComparison.OrdinalIgnoreCase) &&
-                WindowsPathIdentity.AreSameExistingFile(output, input)));
+                    StringComparison.Ordinal) &&
+                LinuxPathIdentity.AreSameExistingFile(output, input)));
         var aliasesInput = aliasesFileIdentity ||
             publicationMutationPaths.Any(output => protectedPaths.Any(input =>
                 string.Equals(
                     output,
                     input,
-                    StringComparison.OrdinalIgnoreCase)));
+                    StringComparison.Ordinal)));
         var aliasesWorkerTree = workerTreeExists &&
             !string.IsNullOrWhiteSpace(workerDirectory) &&
             publicationMutationPaths.Any(output =>
-                WindowsPathIdentity.IsSameOrDescendant(
+                LinuxPathIdentity.IsSameOrDescendant(
                     output,
                     workerDirectory));
         var aliasesCache = resolvedCachePath != null &&
             (publicationMutationPaths.Any(output =>
-                 WindowsPathIdentity.IsSameOrDescendant(
+                 LinuxPathIdentity.IsSameOrDescendant(
                      output,
                      resolvedCachePath)) ||
              protectedPaths.Any(input =>
-                 WindowsPathIdentity.IsSameOrDescendant(
+                 LinuxPathIdentity.IsSameOrDescendant(
                      input,
                      resolvedCachePath)) ||
              workerTreeExists &&
              !string.IsNullOrWhiteSpace(workerDirectory) &&
-             WindowsPathIdentity.IsSameOrDescendant(
+             LinuxPathIdentity.IsSameOrDescendant(
                  resolvedCachePath,
                  workerDirectory));
 
@@ -157,16 +190,36 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task
             return false;
         }
 
-        using (WindowsPathIdentity.AcquirePublicationSet(
-                   publicationPaths,
-                   TimeSpan.FromSeconds(30)))
+        try
         {
-            foreach (var path in outputPaths)
+            using (LinuxPathIdentity.AcquirePublicationSet(
+                       publicationPaths,
+                       TimeSpan.FromSeconds(30),
+                       cancellationToken))
             {
-                WindowsPathIdentity.DeleteIfUnprotected(path, protectedPaths);
+                foreach (var path in outputPaths)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    LinuxPathIdentity.DeleteIfUnprotected(path, protectedPaths);
+                }
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
         return !Log.HasLoggedErrors;
+    }
+
+    public void Cancel()
+    {
+        Action? cancel;
+        lock (_synchronization)
+        {
+            _canceled = true;
+            cancel = _cancelExecution;
+        }
+        cancel?.Invoke();
     }
 
     private static IEnumerable<string> Present(params string?[] paths)
@@ -192,15 +245,7 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task
             throw new InvalidOperationException(
                 "The SharpProof launcher path has no directory.");
         return
-        [
-            Path.Combine(directory, "SharpProof.CompilerArtifact.dll"),
-            Path.Combine(directory, "SharpProof.Ir.dll"),
-            Path.Combine(directory, "SharpProof.Specs.dll"),
-            Path.Combine(directory, "SharpProof.Worker.Protocol.dll"),
-            Path.Combine(directory, "SharpProof.Worker.Launcher.exe"),
-            Path.Combine(directory, "System.IO.Pipelines.dll"),
-            Path.Combine(directory, "System.Text.Encodings.Web.dll"),
-            Path.Combine(directory, "System.Text.Json.dll")
-        ];
+            LauncherRuntimeCompanionInventory.FileNames.Select(
+                file => Path.Combine(directory, file));
     }
 }

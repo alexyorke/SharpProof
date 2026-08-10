@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using SharpProof.Host;
 using SharpProof.Ir;
 using SharpProof.Smt;
 using SharpProof.Verify;
@@ -130,6 +131,8 @@ public sealed class PartialTermSmtDifferentialOracle
 
         var variables = CollectVariables(generated.Formula);
         var interpreter = new IrInterpreter(factory);
+        ContainerNativeLibrary.InstallZ3ResolverRequired(
+            typeof(Microsoft.Z3.Context).Assembly);
         using var backend = new IrSmtBackend();
         var kernel = new ProofKernel(backend);
         var definedTrue = 0;

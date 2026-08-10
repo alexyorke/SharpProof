@@ -9,20 +9,20 @@
     <PackageTags>SharpProof;Attributes;Contracts;Purity;StaticAnalysis;MethodEffects;Capabilities;ZeroAllocations;Exceptions;Preconditions;Postconditions</PackageTags>
     <Title>SharpProof Attributes</Title>
     <PackageReleaseNotes>Breaking soundness-first preview with compiler-bound Contract APIs, closed contract attributes, explicit suppression and trust declarations, and the effect-contract flagship.</PackageReleaseNotes>
-    <GeneratePackageOnBuild>True</GeneratePackageOnBuild> 
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
   <ItemGroup>
     <None Include="..\README.md">
       <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
+      <PackagePath>/</PackagePath>
     </None>
     <None Include="..\LICENSE">
       <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
+      <PackagePath>/</PackagePath>
     </None>
     <None Include="SharpProof.Attributes.xml">
       <Pack>True</Pack>
-      <PackagePath>lib\netstandard2.0\</PackagePath>
+      <PackagePath>lib/netstandard2.0/</PackagePath>
     </None>
   </ItemGroup>
 </Project> 

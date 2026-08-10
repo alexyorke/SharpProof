@@ -2,12 +2,16 @@
 
 `SharpProof.Gates` is a deterministic console gate:
 
-```powershell
-.\scripts\Invoke-SharpProofDotnet.ps1 run --project SharpProof.Gates\SharpProof.Gates.csproj -- corpus
-.\scripts\Invoke-SharpProofDotnet.ps1 run --project SharpProof.Gates\SharpProof.Gates.csproj -- corpus-update
-.\scripts\Invoke-SharpProofDotnet.ps1 run --project SharpProof.Gates\SharpProof.Gates.csproj -- performance
-.\scripts\Invoke-SharpProofDotnet.ps1 run --project SharpProof.Gates\SharpProof.Gates.csproj -- all
+```text
+docker compose run --rm tooling corpus -Configuration Release
+docker compose run --rm tooling performance
+docker compose run --rm tooling gates -Configuration Release
 ```
+
+Run `sp corpus-update -Configuration Release` from the persistent Dev
+Container when intentionally updating checked-in corpus evidence. The update
+then occurs in the container-owned Git workspace rather than a disposable task
+checkout.
 
 ## Analyzer corpus
 
@@ -117,7 +121,7 @@ measures cancel-to-exit latency, while a real launcher process test measures
 the forced-termination deadline independently. The unannotated advisory and
 IDE analyzer performance paths reference neither SMT nor Z3.
 
-Worker/package tests also exercise protocol version 10 manifest equality,
+Worker/package tests also exercise protocol version 11 manifest equality,
 stable claim IDs, policy-controlled SP0047/SP0048 output, cache validation
 against the current manifest, fatal run handling, and compiler artifact schema
 version 11, including generated contracts, portable whole-body CFG/IR,

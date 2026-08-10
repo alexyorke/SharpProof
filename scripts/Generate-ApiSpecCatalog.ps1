@@ -165,6 +165,52 @@ function Assert-Text {
     return [string]$Value
 }
 
+function Assert-JsonBoolean {
+    param(
+        [AllowNull()]
+        [object]$Value,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    if ($Value -isnot [bool]) {
+        throw "$Context must be a JSON boolean."
+    }
+    return [bool]$Value
+}
+
+function Assert-JsonInt64 {
+    param(
+        [AllowNull()]
+        [object]$Value,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    if ($Value -isnot [long]) {
+        throw "$Context must be a JSON integer."
+    }
+    return [long]$Value
+}
+
+function Assert-JsonInt32 {
+    param(
+        [AllowNull()]
+        [object]$Value,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    $number = Assert-JsonInt64 -Value $Value -Context $Context
+    if ($number -lt [int]::MinValue -or $number -gt [int]::MaxValue) {
+        throw "$Context must be a 32-bit JSON integer."
+    }
+    return [int]$number
+}
+
 function Assert-EnumValue {
     param(
         [AllowNull()]
@@ -317,13 +363,15 @@ function Format-Term {
                 -Value (Get-RequiredProperty $Term 'role' $Context) `
                 -Type 'SpecVariableRole' `
                 -Context "$Context.role"
-            $ordinal = [int](
-                Get-RequiredProperty $Term 'ordinal' $Context)
+            $ordinal = Assert-JsonInt32 `
+                -Value (Get-RequiredProperty $Term 'ordinal' $Context) `
+                -Context "$Context.ordinal"
             return "new SpecVariableDeclaration($role, $ordinal, $type)"
         }
         'boolean' {
-            $value = [bool](
-                Get-RequiredProperty $Term 'value' $Context)
+            $value = Assert-JsonBoolean `
+                -Value (Get-RequiredProperty $Term 'value' $Context) `
+                -Context "$Context.value"
             $literal = if ($value) { 'true' } else { 'false' }
             if ($type -ne 'IrTypeKind.Boolean') {
                 throw "$Context boolean type must be Boolean."
@@ -331,8 +379,9 @@ function Format-Term {
             return "new SpecBooleanDeclaration($literal)"
         }
         'integer' {
-            $value = [long](
-                Get-RequiredProperty $Term 'value' $Context)
+            $value = Assert-JsonInt64 `
+                -Value (Get-RequiredProperty $Term 'value' $Context) `
+                -Context "$Context.value"
             if ($type -ne 'IrTypeKind.Integer') {
                 throw "$Context integer type must be Integer."
             }
@@ -516,8 +565,11 @@ function Assert-ExactGeneratedFile {
 
 $catalogText = [IO.File]::ReadAllText($CatalogPath)
 $catalog = $catalogText | ConvertFrom-Json -Depth 100
+$schemaVersion = Assert-JsonInt32 `
+    -Value (Get-RequiredProperty $catalog 'schemaVersion' 'catalog') `
+    -Context 'schemaVersion'
 if ($catalog.schema -ne 'SharpProof.ApiSpecCatalog' -or
-    [int]$catalog.schemaVersion -ne 1) {
+    $schemaVersion -ne 1) {
     throw 'The API-spec catalog schema must be SharpProof.ApiSpecCatalog v1.'
 }
 $tableIdentity = Assert-Text -Value $catalog.tableIdentity -Context 'tableIdentity'
@@ -860,13 +912,18 @@ foreach ($declaration in $declarations) {
         -Type 'IrTypeKind' `
         -Context "$context.target.resultType" `
         -Nullable
-    $isStatic = if ([bool]$target.isStatic) {
+    $isStaticValue = Assert-JsonBoolean `
+        -Value (Get-RequiredProperty $target 'isStatic' "$context.target") `
+        -Context "$context.target.isStatic"
+    $isStatic = if ($isStaticValue) {
         'true'
     }
     else {
         'false'
     }
-    $genericArity = [int]$target.genericArity
+    $genericArity = Assert-JsonInt32 `
+        -Value (Get-RequiredProperty $target 'genericArity' "$context.target") `
+        -Context "$context.target.genericArity"
     if ($genericArity -lt 0) {
         throw "$context.target.genericArity cannot be negative."
     }
@@ -917,7 +974,9 @@ foreach ($declaration in $declarations) {
         'null'
     }
     else {
-        ([int]$exactCountValue).ToString(
+        (Assert-JsonInt32 `
+            -Value $exactCountValue `
+            -Context "$context.facets.cardinality.exactCount").ToString(
             [Globalization.CultureInfo]::InvariantCulture)
     }
     $cardinalityEvidence = Get-EvidenceVariable `

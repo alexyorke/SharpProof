@@ -104,6 +104,7 @@ public sealed class CompilerManifestArtifactTests
             snapshot => snapshot.Options.ReferencesSupersedeLowerVersions = true,
             snapshot => snapshot.Options.Usings = [string.Empty],
             snapshot => snapshot.ProjectDirectory += "/.",
+            snapshot => snapshot.SyntaxTrees[0].Path = null!,
             snapshot => snapshot.SyntaxTrees[0].Features = null!,
             snapshot => snapshot.SyntaxTrees[0].Features = [
                 new() { Key = "z", Value = "1" },
@@ -159,24 +160,9 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
-    [Platform("Win")]
-    public void WindowsCaseAliasesCannotDuplicateModulePaths()
+    [Platform("Linux")]
+    public void CaseDistinctModulePathsRemainDistinct()
     {
-        var artifact = CreateArtifact();
-        AddCaseVariantModule(artifact);
-
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Deserialize(
-                CompilerManifestArtifactJson.Serialize(artifact))));
-    }
-
-    [Test]
-    public void UnixCaseDistinctModulePathsRemainDistinct()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            Assert.Ignore("Unix path semantics are required.");
-        }
         var artifact = CreateArtifact();
         AddCaseVariantModule(artifact);
 
@@ -186,12 +172,9 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
-    public void UnixCapturePreservesBackslashFilenameCharacters()
+    [Platform("Linux")]
+    public void CapturePreservesBackslashFilenameCharacters()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            Assert.Ignore("Unix filename semantics are required.");
-        }
         var root = Path.Combine(
             Path.GetTempPath(),
             "SharpProof.BackslashPath." + Guid.NewGuid().ToString("N"));
@@ -366,6 +349,23 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    [Platform("Linux")]
+    public void AdditionalFilesPermitCaseDistinctPaths()
+    {
+        var artifact = CreateArtifact();
+        artifact.Compilation.AdditionalFiles = [
+            AdditionalFile("CASE.input", 'a'),
+            AdditionalFile("case.input", 'b')
+        ];
+        artifact.CompilationSha256 =
+            CompilationFingerprint.ComputeSha256(artifact.Compilation, []);
+
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(artifact))));
+    }
+
+    [Test]
     public void AdditionalFilesRejectNoncanonicalPaths()
     {
         AssertMalformedAdditionalFiles(new CompilerAdditionalFileSnapshot
@@ -378,6 +378,36 @@ public sealed class CompilerManifestArtifactTests
                 .Replace('\\', '/'),
             Sha256 = new string('a', 64)
         });
+    }
+
+    [Test]
+    public void SerializationEnforcesWorkerInputByteLimit()
+    {
+        var artifact = CreateArtifact();
+        artifact.Compilation.AssemblyName = "x";
+        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation,
+            artifact.CompilerDiagnostics);
+        var initial = CompilerManifestArtifactJson.Serialize(artifact);
+        var padding = CompilerManifestArtifactFile.MaximumBytes -
+            Encoding.UTF8.GetByteCount(initial);
+        Assert.That(padding, Is.GreaterThan(0));
+
+        artifact.Compilation.AssemblyName += new string('x', padding);
+        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation,
+            artifact.CompilerDiagnostics);
+        var exact = CompilerManifestArtifactJson.Serialize(artifact);
+        Assert.That(
+            Encoding.UTF8.GetByteCount(exact),
+            Is.EqualTo(CompilerManifestArtifactFile.MaximumBytes));
+
+        artifact.Compilation.AssemblyName += "x";
+        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation,
+            artifact.CompilerDiagnostics);
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
     }
 
     [Test]
@@ -927,6 +957,51 @@ public sealed class CompilerManifestArtifactTests
             corrupt(artifact.Callables[0]);
             Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerManifestArtifactJson.DecodeCallables(artifact)));
+        }
+    }
+
+    [Test]
+    public void SummaryFreeVariablesAreFreshFromProgramAndCanonicalVariables()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                private static int Identity(int value) => value;
+
+                internal static int Call(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return Identity(value);
+                }
+            }
+            """;
+        Action<CompilerCallableArtifact>[] corruptions = [
+            callable => callable.Body!.SummaryCalls[0].Result =
+                callable.Variables.Single(static variable =>
+                    variable.Role == CompilerVariableRole.Parameter).Variable,
+            callable => callable.Body!.SummaryCalls[0].Result =
+                callable.Graph!.Blocks
+                    .SelectMany(static block => block.Instructions)
+                    .Single(static instruction =>
+                        instruction.Kind == IrInstructionKind.Call).A,
+            callable => callable.Body!.SummaryCalls[0].ExistentialVariables = [
+                callable.Variables.Single(static variable =>
+                    variable.Role == CompilerVariableRole.Parameter).Variable
+            ]
+        ];
+
+        foreach (var corrupt in corruptions)
+        {
+            var artifact = CreateContractArtifact(source);
+            Assert.That(
+                artifact.Callables[0].Body!.SummaryCalls,
+                Has.Length.EqualTo(1));
+            corrupt(artifact.Callables[0]);
+            var resealed = CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(artifact));
+
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerManifestArtifactJson.DecodeCallables(resealed)));
         }
     }
 

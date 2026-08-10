@@ -178,24 +178,74 @@ public sealed class WorkerBinaryIdentityTests
     [Test]
     public void RuntimeClosureComponentPathsAreImmutable()
     {
-        using var snapshot = WorkerBinaryIdentity.CreateSnapshot(
+#pragma warning disable CA2000 // The alias mutant is deliberately not disposed through an unowned source path.
+        var snapshot = WorkerBinaryIdentity.CreateSnapshot(
             typeof(SharpProofWorker).Assembly.Location);
-
-        using (Assert.EnterMultipleScope())
+#pragma warning restore CA2000
+        try
         {
-            Assert.That(
-                snapshot.ComponentPaths.GetType(),
-                Is.EqualTo(typeof(ImmutableArray<string>)));
-            Assert.That(
-                snapshot.ExecutionWorkerPath,
-                Is.Not.EqualTo(snapshot.WorkerPath));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    snapshot.ComponentPaths.GetType(),
+                    Is.EqualTo(typeof(ImmutableArray<string>)));
+                Assert.That(
+                    snapshot.ExecutionWorkerPath,
+                    Is.Not.EqualTo(snapshot.WorkerPath));
+            }
         }
-
-        if (OperatingSystem.IsWindows())
+        finally
         {
+            // Disposal removes the directory containing ExecutionWorkerPath.
+            // Do not let the deliberate alias mutation erase the test output.
+            if (!string.Equals(
+                    snapshot.ExecutionWorkerPath,
+                    snapshot.WorkerPath,
+                    StringComparison.Ordinal))
+            {
+                snapshot.Dispose();
+            }
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    public void IdentityDistinguishesLinuxComponentNameCase()
+    {
+        var temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.ComponentCase." + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temporaryDirectory);
+        try
+        {
+            static string WriteClosure(string directory, string workerName)
+            {
+                Directory.CreateDirectory(directory);
+                var worker = Path.Combine(directory, workerName + ".dll");
+                File.WriteAllBytes(worker, [1, 2, 3]);
+                File.WriteAllText(
+                    Path.Combine(directory, workerName + ".deps.json"),
+                    "{}");
+                File.WriteAllText(
+                    Path.Combine(directory, workerName + ".runtimeconfig.json"),
+                    "{}");
+                return worker;
+            }
+
+            var upper = WriteClosure(
+                Path.Combine(temporaryDirectory, "upper"),
+                "Worker");
+            var lower = WriteClosure(
+                Path.Combine(temporaryDirectory, "lower"),
+                "worker");
+
             Assert.That(
-                (Action)(() => File.Delete(snapshot.ExecutionWorkerPath)),
-                Throws.TypeOf<IOException>());
+                WorkerBinaryIdentity.ComputeSha256(lower),
+                Is.Not.EqualTo(WorkerBinaryIdentity.ComputeSha256(upper)));
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
         }
     }
 
@@ -274,7 +324,7 @@ public sealed class WorkerBinaryIdentityTests
             var nestedAppLocalAsset = Path.Combine(
                 temporaryDirectory,
                 "runtimes",
-                "win",
+                "linux",
                 "lib",
                 "net9.0",
                 "System.Collections.Immutable.dll");
@@ -292,9 +342,11 @@ public sealed class WorkerBinaryIdentityTests
             var nativeZ3 = Path.Combine(
                 temporaryDirectory,
                 "runtimes",
-                "win-x64",
+                "linux-x64",
                 "native",
-                "libz3.dll");
+                "libz3.so");
+            Directory.CreateDirectory(Path.GetDirectoryName(nativeZ3)!);
+            File.WriteAllText(nativeZ3, "not-the-container-owned-native-library");
             using (var oversized = new FileStream(
                        heldComponent,
                        FileMode.Create,
@@ -346,14 +398,14 @@ public sealed class WorkerBinaryIdentityTests
                             "OnlyBrowser.dll")));
                     Assert.That(
                         snapshot.ComponentPaths,
-                        Does.Contain(Path.Combine(
+                        Does.Not.Contain(Path.Combine(
                             temporaryDirectory,
-                            "runtimes", "win-x64", "native", "libz3.dll")));
+                            "runtimes", "linux-x64", "native", "libz3.so")));
                     Assert.That(
                         snapshot.ComponentPaths,
-                        Does.Contain(Path.Combine(
+                        Does.Not.Contain(Path.Combine(
                             temporaryDirectory,
-                            "runtimes", "win", "lib", "net9.0",
+                            "runtimes", "linux", "lib", "net9.0",
                             "System.Text.Encodings.Web.dll")));
 
                     foreach (var componentPath in snapshot.ComponentPaths)
@@ -418,9 +470,11 @@ public sealed class WorkerBinaryIdentityTests
                 Is.EqualTo(appLocalChanged));
 
             Assert.That(File.Exists(nativeZ3), Is.True);
+            var beforeNativeMutation =
+                WorkerBinaryIdentity.ComputeSha256(worker);
             File.AppendAllText(nativeZ3, "mutated");
             var nativeChanged = WorkerBinaryIdentity.ComputeSha256(worker);
-            Assert.That(nativeChanged, Is.Not.EqualTo(dependencyChanged));
+            Assert.That(nativeChanged, Is.EqualTo(beforeNativeMutation));
 
             File.Delete(
                 Path.Combine(temporaryDirectory, "SharpProof.Verify.dll"));
@@ -432,22 +486,6 @@ public sealed class WorkerBinaryIdentityTests
         {
             Directory.Delete(temporaryDirectory, recursive: true);
         }
-    }
-
-    [Test]
-    public void IdentityIgnoresWindowsPathSpelling()
-    {
-        if (!OperatingSystem.IsWindows())
-        {
-            Assert.Ignore("Windows path spelling is case-insensitive.");
-        }
-
-        var worker = typeof(SharpProofWorker).Assembly.Location;
-        var differentlyCased = worker.ToUpperInvariant();
-
-        Assert.That(
-            WorkerBinaryIdentity.ComputeSha256(differentlyCased),
-            Is.EqualTo(WorkerBinaryIdentity.ComputeSha256(worker)));
     }
 
     private static void ValidateLength(string key, long length)

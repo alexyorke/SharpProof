@@ -107,6 +107,8 @@ public static partial class WorkerProtocolJson
     {
         RequireSha256(expectedRequestHash, nameof(expectedRequestHash), "request");
         RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
+        _ = expectedManifest ??
+            throw new ArgumentNullException(nameof(expectedManifest));
         _ = expectedBudgets ?? throw new ArgumentNullException(nameof(expectedBudgets));
         return ValidateResponse(response, expectedInputHash, expectedManifest, expectedRequestHash, expectedBudgets);
     }
@@ -183,8 +185,13 @@ public static partial class WorkerProtocolJson
             errors.Check(response.InputHash == expectedInputHash, "response.input_mismatch");
         }
 
+        var manifestErrorCount = errors.Count;
         ValidateManifestCore(response.Manifest, "manifest", errors);
-        ValidateExpectedManifest(response.Manifest, expectedManifest, errors);
+        ValidateExpectedManifest(
+            response.Manifest,
+            expectedManifest,
+            errors.Count == manifestErrorCount,
+            errors);
         var protocolErrors = ValidateProtocolErrors(response.Errors, errors);
         ValidateRun(response, protocolErrors, errors);
         var callables = ValidateCallableResults(response.CallableResults, response.Manifest, errors);
@@ -201,7 +208,10 @@ public static partial class WorkerProtocolJson
         return errors.Result;
     }
     private static void ValidateExpectedManifest(
-        WorkerClaimManifest? actual, WorkerClaimManifest? expected, Validator errors)
+        WorkerClaimManifest? actual,
+        WorkerClaimManifest? expected,
+        bool actualIsValid,
+        Validator errors)
     {
         if (expected == null)
         {
@@ -214,7 +224,7 @@ public static partial class WorkerProtocolJson
         {
             errors.Add("response.expected_manifest");
         }
-        else if (actual != null)
+        else if (actualIsValid && actual != null)
         {
             errors.Check(
             ManifestsEqual(actual, expected), "response.manifest_mismatch");

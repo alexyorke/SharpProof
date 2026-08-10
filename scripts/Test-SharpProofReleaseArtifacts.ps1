@@ -73,7 +73,7 @@ if ($artifacts.Count -ne 7 -or
 $expectedPackageIds = @(
     'SharpProof',
     'SharpProof.Attributes',
-    'SharpProof.Verifier.Win-x64'
+    'SharpProof.Verifier'
 ) | Sort-Object
 foreach ($kind in @('package', 'symbols')) {
     $actualPackageIds = @(
@@ -206,7 +206,7 @@ $expectedDependencies = @(
         to = Get-SpdxPackageId -Name 'SharpProof.Attributes'
     },
     [pscustomobject]@{
-        from = Get-SpdxPackageId -Name 'SharpProof.Verifier.Win-x64'
+        from = Get-SpdxPackageId -Name 'SharpProof.Verifier'
         to = Get-SpdxPackageId -Name 'SharpProof'
     }
 )
@@ -252,7 +252,7 @@ $thirdPartyPackageIds = @(
 )
 $expectedThirdPartyPackageIds = @(
     'SharpProof',
-    'SharpProof.Verifier.Win-x64'
+    'SharpProof.Verifier'
 ) | Sort-Object
 if (($thirdPartyPackageIds -join '|') -ne
     ($expectedThirdPartyPackageIds -join '|') -or

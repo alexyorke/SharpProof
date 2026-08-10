@@ -6,18 +6,18 @@ namespace SharpProof.Samples.TrustedBoundary;
 public static class TrustedBoundaryExamples {
     [AllowedCapabilities(SharpProofCapability.NativeInterop)]
     public static int CurrentProcessId() =>
-        NativeMethods.GetCurrentProcessId();
+        NativeMethods.GetProcessId();
 
     private static class NativeMethods {
-        [DllImport("kernel32.dll")]
+        [DllImport("libc", EntryPoint = "getpid")]
         [SharpProofTrusted(
-            "The signature and effect summary were reviewed against Win32.")]
+            "The signature and effect summary were reviewed against libc.")]
         [EffectContract(
             SharpProofEffect.ReadsAmbientState |
                 SharpProofEffect.UsesNativeCode,
             Capabilities = SharpProofCapability.NativeInterop,
             Complete = true,
             IsDeterministic = false)]
-        internal static extern int GetCurrentProcessId();
+        internal static extern int GetProcessId();
     }
 }

@@ -20,7 +20,7 @@
     </Analyzer>
     <Analyzer Include="
         $(_SharpProofCollectorDirectory)/Microsoft.Bcl.AsyncInterfaces.dll;
-        $(_SharpProofCollectorDirectory)/SharpProof.Analyzer.dll;
+        $(_SharpProofCollectorDirectory)/SharpProof.Analyzer.Core.dll;
         $(_SharpProofCollectorDirectory)/SharpProof.CompilerArtifact.dll;
         $(_SharpProofCollectorDirectory)/SharpProof.Contracts.dll;
         $(_SharpProofCollectorDirectory)/SharpProof.Dataflow.dll;
@@ -61,6 +61,6 @@
           BeforeTargets="CoreCompile"
           DependsOnTargets="_SharpProofValidateConfiguration"
           Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierPackagePresent)' != 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
-    <Error Text="SharpProof verification requires the matching SharpProof.Verifier.Win-x64 package. Portable advisory analysis remains available without the verifier package." />
+    <Error Text="SharpProof verification requires the matching SharpProof.Verifier package. Portable advisory analysis remains available without the verifier package." />
   </Target>
 </Project>

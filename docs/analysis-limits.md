@@ -9,8 +9,8 @@ SharpProof has two kinds of limits:
 They have different sources.
 The portable `SharpProof.props` and `SharpProof.targets` define analyzer paths,
 profile/feature defaults, and verifier-package requirements.
-`SharpProof.Verifier.Win-x64.props` and
-`SharpProof.Verifier.Win-x64.targets` define worker budgets, policy defaults,
+`SharpProof.Verifier.props` and
+`SharpProof.Verifier.targets` define worker budgets, policy defaults,
 compiler-manifest properties, paths, invocation, and host enforcement.
 `SharpProof.Worker.Protocol/ProtocolModel.schema.json` is the authoritative
 model, and checked-in `ProtocolModel.generated.cs` defines the matching runtime
@@ -38,13 +38,10 @@ both generated C# projections before building.
 | `SharpProofVerifyProjectWallTimeMilliseconds` | `300000` | Outer project wall boundary | verifier props and `WorkerBudgets`; mirrored as 300 seconds by `contract.json` |
 | `SharpProofVerifyMaxParallelism` | `4` | Maximum concurrent worker method verification | verifier props and `WorkerBudgets`; mirrored by `contract.json` |
 | `SharpProofVerifyMaximumExpressionDepth` | `64` | Compiler-visible proof-obligation term depth sealed into the artifact; worker request must match | verifier props, `FinalCompilationCollector`, and `WorkerBudgets`; mirrored by `contract.json` |
-| `SharpProofVerifyProcessMemoryLimitBytes` | `2147483648` | Windows Job Object memory limit; accepted range is 1 byte through 16 GiB | verifier props and `WorkerBudgets`; mirrored as 2048 MiB by `contract.json` |
-| `SharpProofVerifyMaxWorkerProcesses` | `4` | Windows Job Object active-process limit | verifier props and `WorkerBudgets`; mirrored by `contract.json` |
 | `SharpProofVerifyTerminationGraceMilliseconds` | `1000` | Grace added to the project boundary before forced termination; accepted range is 1 through 300000 milliseconds | verifier props and `WorkerLauncherDefaults`; mirrored by `contract.json` |
 | `SharpProofVerifyCacheEnabled` | `true` | Enables the content-addressed disk cache | verifier props and `WorkerCacheOptions`; mirrored by `contract.json` |
 | `SharpProofVerifyCacheMaximumBytes` | `536870912` | Maximum cache size, 512 MiB | verifier props and `WorkerCacheOptions`; mirrored by `contract.json` |
 | `SharpProofVerifySarifFile` | unset | Opt-in deterministic SARIF 2.1.0 output path | verifier targets |
-| `SharpProofDotNetHost` | `dotnet` | Direct `dotnet.exe` muxer used to start the launcher; wrappers and scripts are rejected so cancellation terminates the launcher boundary | verifier props |
 
 `SharpProofVerifyCacheDirectory` is initialized by the verifier targets beneath
 the project's intermediate output, normally
@@ -55,7 +52,8 @@ files and other JSON files are intentionally ignored and are not removed by
 cache eviction. Historical files require user-managed cleanup.
 `SharpProofVerifyRequestFile` and `SharpProofVerifyResultFile` are initialized
 beside it. Concurrent builds use isolated invocation paths beneath
-`SharpProof/runs`. Validated writers are serialized by a cross-process mutex.
+`SharpProof/runs`. Validated writers are serialized by ordered local `flock`
+lock files.
 The stable result is removed first, the compiler manifest and request are
 atomically replaced, and the validated result is written last as the commit
 marker. Interrupted publication therefore leaves no successful result for a
@@ -67,7 +65,7 @@ mutex before committing the JSON result. Claim outcomes, SP0047 incomplete
 coverage, SP0048 assumption evidence, and run failures retain policy-matched
 levels; SARIF generation cannot change verifier exit behavior.
 
-Windows verification also initializes an internal, compiler-visible
+Container verification also initializes an internal, compiler-visible
 `_SharpProofCompilerManifestPath` beneath the isolated invocation directory.
 The final analyzer compilation atomically writes the manifest there. The
 launcher snapshots that file by absolute path and SHA-256 before starting the
@@ -79,9 +77,9 @@ Missing compiler evidence fails the build as SP0049 before worker launch.
 The removed `SharpProofMode`/`sharpproof_mode` alias fails configuration. Use
 `SharpProofProfile` and `SharpProofFeatures`.
 `SharpProofVerify=true` invokes the packaged worker target only for
-non-design-time builds on the supported Windows x64 host. Every unsupported
-host receives an explicit build error; portable analyzer features remain
-available. Strict rejects `SharpProofVerify=false`.
+non-design-time Core-MSBuild builds in the canonical Linux amd64 container.
+Every unsupported host receives an explicit build error; portable analyzer
+features remain available. Strict rejects `SharpProofVerify=false`.
 
 ## Protocol validation bounds
 
@@ -91,9 +89,8 @@ The worker rejects malformed budgets before analysis:
   method rlimit;
 - method and project wall times must be positive, and method time cannot exceed
   project time;
-- parallelism and the Job Object process limit must each be from 1 through 4;
+- parallelism must be from 1 through 4;
 - expression depth must be from 1 through 256;
-- process memory must be from 1 byte through 16 GiB;
 - cache size must be from 1 byte through 512 MiB for active
   `*.sharp-proof-cache.json` entries.
 
@@ -108,7 +105,8 @@ The configured termination grace must be from 1 through 300000 milliseconds.
 The configured method and project wall values are fail-closed outer boundaries,
 not proof facts. Z3 queries use deterministic resource limits. The launcher
 uses the project wall limit plus the termination grace to enforce a final
-process boundary.
+child-process boundary. Docker supplies the hard CPU and memory boundary;
+SharpProof does not inspect or duplicate cgroup enforcement.
 
 `SharpProofVerifyMaximumExpressionDepth` is also a compiler-visible property.
 The collector parses it, enforces the 1-through-256 range, and seals it into the
@@ -216,7 +214,7 @@ is the observed runner total rather than the requested budget.
 | IDE edit p95 | At most 100 ms |
 | IDE edit maximum | At most 250 ms |
 
-The active contract also fixes protocol version 10, cache schema version 12,
+The active contract also fixes protocol version 11, cache schema version 13,
 claim-manifest schema version 4, compiler artifact schema version 11,
 relational-summary schema version 1, and specification-pack schema version 1, along
 with exact proof-kernel and component TCB path inventories, formatting-neutral

@@ -26,7 +26,7 @@ compiled projection. Verifier MSBuild properties, the acceptance contract, and
 documentation repeat user-visible values only where the format cannot consume
 the C# constants; package, worker, acceptance, and README checks require exact
 parity. This covers query/method limits, wall times, parallelism, expression
-depth, process limits, memory, termination grace, and cache defaults.
+depth, parallelism, termination grace, and cache defaults.
 
 Portable profile, feature, verification-policy, and assumption-policy defaults
 are owned by the package props/targets and mirrored in the acceptance contract.

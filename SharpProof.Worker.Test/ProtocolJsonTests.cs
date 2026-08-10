@@ -61,8 +61,8 @@ public sealed class ProtocolJsonTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("10"));
-            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(12));
+            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("11"));
+            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(13));
             Assert.That(WorkerManifestVersions.Current, Is.EqualTo(4));
             Assert.That(
                 document.RootElement.EnumerateObject()
@@ -172,7 +172,7 @@ public sealed class ProtocolJsonTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(roundTrip.SchemaVersion, Is.EqualTo(11));
-            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("10"));
+            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("11"));
             Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(manifest.Hash));
             Assert.That(roundTrip.Manifest.Callables[0].Assumptions, Has.Length.EqualTo(2));
             Assert.That(
@@ -552,8 +552,6 @@ public sealed class ProtocolJsonTests
     [TestCase(nameof(WorkerBudgets.ProjectWallTimeMilliseconds))]
     [TestCase(nameof(WorkerBudgets.MaxParallelism))]
     [TestCase(nameof(WorkerBudgets.MaximumExpressionDepth))]
-    [TestCase(nameof(WorkerBudgets.ProcessMemoryLimitBytes))]
-    [TestCase(nameof(WorkerBudgets.MaxWorkerProcesses))]
     public void RequestValidationBindsEverySummaryBudget(string propertyName)
     {
         var request = CreateRequest();
@@ -863,6 +861,41 @@ public sealed class ProtocolJsonTests
                         expectedManifest)
                     .Errors.Select(static error => error.Code),
                 Does.Contain("response.expected_manifest"));
+        }
+    }
+
+    [Test]
+    public void RequestBoundValidationRequiresAndTotallyComparesManifests()
+    {
+        var request = CreateRequest();
+        var expected = CreateManifest();
+        var response = CreateResponse(expected);
+        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+
+        var nullError = Assert.Throws<ArgumentNullException>((Action)(() =>
+            WorkerProtocolJson.ValidateForRequest(
+                response,
+                response.RequestHash,
+                InputHash,
+                null!,
+                request.Budgets)));
+
+        response.Manifest.Claims[0].Kind =
+            (WorkerClaimKind)int.MaxValue;
+        var validation = WorkerProtocolJson.ValidateForRequest(
+            response,
+            response.RequestHash,
+            InputHash,
+            expected,
+            request.Budgets);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(nullError!.ParamName, Is.EqualTo("expectedManifest"));
+            Assert.That(validation.IsValid, Is.False);
+            Assert.That(
+                validation.Errors.Select(static error => error.Code),
+                Does.Contain("manifest.claim_kind"));
         }
     }
 

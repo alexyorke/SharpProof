@@ -9,8 +9,10 @@ internal static class CallableEvidenceBuilder
     internal static CallableEvidenceBuildResult Build(
         CompilerCallablePreparation target,
         SymbolicBodyExecution body,
-        int maximumExpressionDepth)
+        int maximumExpressionDepth,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var factory = target.Factory;
         var assumptions = ImmutableArray.CreateBuilder<Assumption>();
         var preconditions = ImmutableArray.CreateBuilder<Assumption>();
@@ -23,6 +25,7 @@ internal static class CallableEvidenceBuilder
         var assumptionOrdinal = 0;
         foreach (var clause in target.Clauses)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (clause.Kind == CompilerContractKind.Ensures)
             {
                 continue;
@@ -75,6 +78,7 @@ internal static class CallableEvidenceBuilder
 
         foreach (var specAssumption in body.SpecAssumptions)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var guard = SpecResultDomainProjection.Rewrite(
                 factory,
                 specAssumption.Guard,
@@ -103,6 +107,7 @@ internal static class CallableEvidenceBuilder
 
         foreach (var summaryAssumption in body.SummaryAssumptions)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!TryGetSummaryPrefix(
                     summaryAssumption.Origin,
                     out var summaryPrefix))
@@ -153,6 +158,7 @@ internal static class CallableEvidenceBuilder
             return CallableEvidenceBuildResult.Fail(
                 WorkerClaimReason.UnsupportedExpression);
         }
+        cancellationToken.ThrowIfCancellationRequested();
 
         var normalCompletion = AddNormalCompletionAssumption(
             factory,
@@ -181,6 +187,12 @@ internal static class CallableEvidenceBuilder
                     IrTypeKind.Integer)
             .Select(static variable => variable.Variable)
             .ToImmutableArray();
+        cancellationToken.ThrowIfCancellationRequested();
+        var usesSupportedDomain = evidence.All(assumption =>
+            IsSupportedProofDomain(
+                factory,
+                assumption.Predicate));
+        cancellationToken.ThrowIfCancellationRequested();
         return CallableEvidenceBuildResult.Success(new CallableEvidence(
             evidence,
             preconditions.ToImmutable(),
@@ -189,10 +201,7 @@ internal static class CallableEvidenceBuilder
             userAssumptionIds,
             normalCompletion,
             replayVariables,
-            evidence.All(assumption =>
-                IsSupportedProofDomain(
-                    factory,
-                    assumption.Predicate))));
+            usesSupportedDomain));
     }
 
     private static bool TryGetSummaryPrefix(
@@ -211,8 +220,10 @@ internal static class CallableEvidenceBuilder
 
     internal static CallableEntryEvidenceBuildResult BuildEntry(
         CompilerCallablePreparation target,
-        int maximumExpressionDepth)
+        int maximumExpressionDepth,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var factory = target.Factory;
         var assumptions = ImmutableArray.CreateBuilder<Assumption>();
         var labels = new Dictionary<ProofJustification, string>(
@@ -225,6 +236,7 @@ internal static class CallableEvidenceBuilder
         var hasNontrivialPrecondition = false;
         foreach (var clause in target.Clauses)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (clause.Kind == CompilerContractKind.Ensures)
             {
                 continue;
@@ -273,6 +285,7 @@ internal static class CallableEvidenceBuilder
                              ? -1
                              : variable.Ordinal))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (variable.SourceIntegerInterval is not { } sourceInterval)
             {
                 continue;
@@ -322,6 +335,7 @@ internal static class CallableEvidenceBuilder
                     IrTypeKind.Integer)
             .Select(static variable => variable.Variable)
             .ToImmutableArray();
+        cancellationToken.ThrowIfCancellationRequested();
         return CallableEntryEvidenceBuildResult.Success(
             new CallableEntryEvidence(
                 assumptions.ToImmutable(),
