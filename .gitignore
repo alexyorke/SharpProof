@@ -53,6 +53,7 @@ BenchmarkDotNet.Artifacts/
 project.lock.json
 project.fragment.lock.json
 artifacts/
+.devcontainer/repository.bundle
 .baseline-check/
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt

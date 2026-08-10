@@ -79,9 +79,7 @@ try {
         --no-build `
         --no-restore `
         --list-tests `
-        --filter "FullyQualifiedName~$workerClass" `
-        /nodeReuse:false `
-        -p:UseSharedCompilation=false 2>&1 | Out-String
+        --filter "FullyQualifiedName~$workerClass" 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) {
         throw 'Could not discover Worker MSBuild integration tests.'
     }
@@ -151,8 +149,7 @@ try {
                     'test', $testProject, '-c', $Configuration,
                     '--no-build', '--no-restore', '--filter', $shard.Filter,
                     '--logger', 'console;verbosity=minimal',
-                    '--results-directory', (Join-Path $results $shard.Name),
-                    '/nodeReuse:false', '-p:UseSharedCompilation=false')) {
+                    '--results-directory', (Join-Path $results $shard.Name))) {
                 [void]$startInfo.ArgumentList.Add($argument)
             }
             $process = [Diagnostics.Process]::new()

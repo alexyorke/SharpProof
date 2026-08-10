@@ -160,24 +160,9 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
-    [Platform("Win")]
-    public void WindowsCaseAliasesCannotDuplicateModulePaths()
+    [Platform("Linux")]
+    public void CaseDistinctModulePathsRemainDistinct()
     {
-        var artifact = CreateArtifact();
-        AddCaseVariantModule(artifact);
-
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Deserialize(
-                CompilerManifestArtifactJson.Serialize(artifact))));
-    }
-
-    [Test]
-    public void UnixCaseDistinctModulePathsRemainDistinct()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            Assert.Ignore("Unix path semantics are required.");
-        }
         var artifact = CreateArtifact();
         AddCaseVariantModule(artifact);
 
@@ -187,12 +172,9 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
-    public void UnixCapturePreservesBackslashFilenameCharacters()
+    [Platform("Linux")]
+    public void CapturePreservesBackslashFilenameCharacters()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            Assert.Ignore("Unix filename semantics are required.");
-        }
         var root = Path.Combine(
             Path.GetTempPath(),
             "SharpProof.BackslashPath." + Guid.NewGuid().ToString("N"));
@@ -367,12 +349,20 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
-    [Platform("Win")]
-    public void AdditionalFilesRejectWindowsCaseAliasPaths()
+    [Platform("Linux")]
+    public void AdditionalFilesPermitCaseDistinctPaths()
     {
-        AssertMalformedAdditionalFiles(
+        var artifact = CreateArtifact();
+        artifact.Compilation.AdditionalFiles = [
             AdditionalFile("CASE.input", 'a'),
-            AdditionalFile("case.input", 'b'));
+            AdditionalFile("case.input", 'b')
+        ];
+        artifact.CompilationSha256 =
+            CompilationFingerprint.ComputeSha256(artifact.Compilation, []);
+
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(artifact))));
     }
 
     [Test]

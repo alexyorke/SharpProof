@@ -9,13 +9,21 @@ fi
 
 if [[ "$(id -u)" = "0" ]] && id sharpproof >/dev/null 2>&1; then
   install -d -o sharpproof -g sharpproof \
+    /home/sharpproof/.nuget \
+    /home/sharpproof/.nuget/NuGet \
     /home/sharpproof/.nuget/packages \
     /home/sharpproof/.dotnet \
-    "${repo_root}/artifacts"
+    "${repo_root}"
   chown sharpproof:sharpproof \
+    /home/sharpproof/.nuget \
+    /home/sharpproof/.nuget/NuGet \
     /home/sharpproof/.nuget/packages \
     /home/sharpproof/.dotnet \
-    "${repo_root}/artifacts"
+    "${repo_root}"
+  if [[ "${command_name}" != "dev" ]]; then
+    install -d -o sharpproof -g sharpproof "${repo_root}/artifacts"
+    chown sharpproof:sharpproof "${repo_root}/artifacts"
+  fi
   export HOME=/home/sharpproof
   exec runuser --user sharpproof --preserve-environment -- \
     /usr/local/bin/sharpproof-container "${command_name}" "$@"
@@ -32,13 +40,15 @@ if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "x86_64" ]]; then
 fi
 
 git config --global --add safe.directory "${repo_root}"
-git config --global --add safe.directory \
-  "$(git -C "${repo_root}" rev-parse --absolute-git-dir)"
+if git_directory="$(git -C "${repo_root}" rev-parse --absolute-git-dir 2>/dev/null)"; then
+  git config --global --add safe.directory "${git_directory}"
+fi
+
+if [[ "${command_name}" = "dev" ]]; then
+  exec /bin/bash "$@"
+fi
 
 case "${command_name}" in
-  dev)
-    exec /bin/bash "$@"
-    ;;
   *)
     task_root="$(mktemp -d /tmp/sharpproof-task.XXXXXXXX)"
     mkdir -p "${repo_root}/artifacts"

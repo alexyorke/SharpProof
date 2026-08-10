@@ -18,8 +18,9 @@ digests, verified Z3 payload, and package hashes.
 | Package graph | Exactly `SharpProof.Attributes`, `SharpProof`, and `SharpProof.Verifier`, with one analyzer and one collector entry point |
 | Release gates | Debug, Release, acceptance, coverage, mutation, fuzz, corpus, performance, package, SBOM, pilots, and publication dry run pass in-container |
 
-Portable analyzer consumers remain qualified independently on their declared
-Linux, Windows, and macOS matrix. Those jobs do not execute the verifier.
+Portable analyzer packages remain operating-system-neutral, but their declared
+framework consumers are restored and built only inside the canonical
+container. No native-host SDK or MSBuild job participates in qualification.
 
 Windows/Visual Studio verifier execution, native host installs, ARM64 verifier
 containers, Rider, hostile host mutation, and shared/network publication are

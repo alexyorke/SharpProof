@@ -16,6 +16,9 @@ $contract = [ordered]@{
     contractVersion = [int]$catalog.containerContractVersion
     platform = [string]$catalog.platform
     dotnetSdkVersion = [string]$catalog.dotnet.sdkVersion
+    dotnetMinimumSdkVersion = [string]$catalog.dotnet.minimumSdkVersion
+    dotnetMinimumSdkFrameworkVersion =
+        [string]$catalog.dotnet.minimumSdkFrameworkVersion
     dotnetTestRuntimeVersion = [string]$catalog.dotnet.testRuntimeVersion
     dotnetBaseImage = [string]$catalog.dotnet.baseImage
     dotnetBaseImageDigest = [string]$catalog.dotnet.baseImageDigest

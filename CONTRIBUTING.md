@@ -11,15 +11,18 @@ must remain visible as a typed incomplete result, never silent success.
    changes synchronized when a public behavior or schema changes.
 3. Add a regression test for every correctness or soundness fix.
 4. Use LF line endings and do not commit generated build outputs.
-5. Run the relevant focused tests, then the full acceptance contract:
+5. Run the relevant focused tests, then the full acceptance contract inside
+   the canonical container:
 
-   ```powershell
-   .\eng\acceptance\Verify.ps1
+   ```text
+   docker compose build tooling
+   docker compose run --rm tooling acceptance -Configuration Release
    ```
 
-Long-lived local .NET commands on Windows must run through
-`scripts/Invoke-SharpProofDotnet.ps1`, which places the process tree in a Job
-Object. The acceptance script already uses the repository wrapper.
+Do not install or invoke repository .NET, PowerShell, MSBuild, Z3, test, pack,
+mutation, or release tooling on the host. Open the `dev` service for permanent
+work, or use the finite `tooling` commands for disposable validation. The
+container owns process cleanup and all wall deadlines.
 
 ## Pull request expectations
 
@@ -38,7 +41,7 @@ independently.
 ## Reporting bugs
 
 Use a minimal source example and include the SharpProof package version,
-profile, feature set, verification policy, host OS/architecture, SDK version,
+profile, feature set, verification policy, container contract, SDK version,
 diagnostic IDs, and worker result when available. Report security-sensitive
 issues through [SECURITY.md](SECURITY.md), not a public issue.
 

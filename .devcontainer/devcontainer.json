@@ -1,13 +1,22 @@
 {
   "name": "SharpProof Linux amd64",
   "dockerComposeFile": "../compose.yaml",
-  "service": "tooling",
+  "service": "dev",
   "workspaceFolder": "/workspace/SharpProof",
-  "containerUser": "root",
+  "containerUser": "sharpproof",
   "remoteUser": "sharpproof",
-  "overrideCommand": true,
+  "overrideCommand": false,
+  "initializeCommand": [
+    "git",
+    "bundle",
+    "create",
+    ".devcontainer/repository.bundle",
+    "HEAD",
+    "--branches",
+    "--tags"
+  ],
   "shutdownAction": "stopCompose",
-  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postCreateCommand": "sharpproof-dev-init",
   "postStartCommand": "pwsh -NoLogo -NoProfile -File scripts/Test-SharpProofContainerContract.ps1",
   "containerEnv": {
     "SHARPPROOF_REPO_ROOT": "/workspace/SharpProof",

@@ -22,17 +22,16 @@ jobs:
           fetch-depth: 0
 
       - name: Select changed-TCB comparison commit
-        shell: pwsh
         run: |
-          $comparison = if ('${{ github.event_name }}' -eq 'pull_request') {
-            '${{ github.event.pull_request.base.sha }}'
-          } elseif ('${{ github.event.before }}' -match '^[0-9a-f]{40}$' -and
-                    '${{ github.event.before }}' -ne ('0' * 40)) {
-            '${{ github.event.before }}'
-          } else {
-            'HEAD^'
-          }
-          "SHARPPROOF_COVERAGE_COMPARISON_REF=$comparison" >> $env:GITHUB_ENV
+          if [[ '${{ github.event_name }}' == 'pull_request' ]]; then
+            comparison='${{ github.event.pull_request.base.sha }}'
+          elif [[ '${{ github.event.before }}' =~ ^[0-9a-f]{40}$ ]] &&
+               [[ '${{ github.event.before }}' != '0000000000000000000000000000000000000000' ]]; then
+            comparison='${{ github.event.before }}'
+          else
+            comparison='HEAD^'
+          fi
+          echo "SHARPPROOF_COVERAGE_COMPARISON_REF=${comparison}" >> "$GITHUB_ENV"
 
       - name: Build the pinned toolchain
         run: docker compose build tooling

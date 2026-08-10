@@ -9,14 +9,12 @@ public sealed class ReleaseCoverageBaselineTests
 {
     private const string FirstPreviewBaseline =
         "8347a70187a63cc7302b35e747d484747a929f6c";
-    private static readonly string[] s_upstreamResultExpressions =
+    private static readonly string[] s_upstreamJobs =
     [
-        "${{ needs.package.result }}",
-        "${{ needs.portable-consumer.result }}",
-        "${{ needs.container-verifier.result }}",
-        "${{ needs.minimum-sdk-consumer.result }}",
-        "${{ needs.security.result }}",
-        "${{ needs.attest.result }}"
+        "      - package",
+        "      - container-verifier",
+        "      - security",
+        "      - attest"
     ];
 
     [Test]
@@ -28,19 +26,16 @@ public sealed class ReleaseCoverageBaselineTests
             ".github",
             "workflows",
             "package-consumers.yml"));
-
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(workflow, Does.Contain("always() &&"));
+            Assert.That(workflow, Does.Not.Contain("always() &&"));
             Assert.That(workflow, Does.Contain("- attest"));
-            foreach (var result in s_upstreamResultExpressions)
+            foreach (var job in s_upstreamJobs)
             {
-                Assert.That(workflow, Does.Contain(result), result);
+                Assert.That(workflow, Does.Contain(job), job);
             }
-            Assert.That(
-                workflow,
-                Does.Contain(
-                    "Where-Object { $_ -ne 'success' }"));
+            Assert.That(workflow, Does.Not.Contain("portable-consumer"));
+            Assert.That(workflow, Does.Not.Contain("minimum-sdk-consumer"));
         }
     }
 
@@ -64,7 +59,7 @@ public sealed class ReleaseCoverageBaselineTests
         var qualification = workflow[
             qualificationStart..qualificationEnd];
         var tagValidation = qualification.IndexOf(
-            "Require successful upstream gates and an annotated exact tag",
+            "Require an annotated exact tag in-container",
             StringComparison.Ordinal);
         var setup = qualification.IndexOf(
             "Build the pinned toolchain",
@@ -73,13 +68,10 @@ public sealed class ReleaseCoverageBaselineTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(tagValidation, Is.GreaterThanOrEqualTo(0));
-            Assert.That(setup, Is.GreaterThan(tagValidation));
+            Assert.That(setup, Is.LessThan(tagValidation));
             Assert.That(
                 qualification,
-                Does.Contain("cat-file -t $tagRef"));
-            Assert.That(
-                qualification,
-                Does.Contain("-cne $env:GITHUB_SHA"));
+                Does.Contain("tooling release-tag"));
             Assert.That(
                 qualification,
                 Does.Not.Contain("Setup required .NET SDKs"));
@@ -102,10 +94,10 @@ public sealed class ReleaseCoverageBaselineTests
             Assert.That(
                 qualification,
                 Does.Contain("tooling package-consumers"));
-            Assert.That(qualification, Does.Contain("-PlanOnly"));
+            Assert.That(qualification, Does.Contain("tooling release-plan"));
             Assert.That(
                 qualification,
-                Does.Contain("qualification.json"));
+                Does.Contain("tooling release-qualification"));
         }
     }
 
@@ -122,6 +114,10 @@ public sealed class ReleaseCoverageBaselineTests
             ".github",
             "workflows",
             "package-consumers.yml"));
+        var containerRelease = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofReleaseContainer.ps1"));
 
         using (Assert.EnterMultipleScope())
         {
@@ -141,7 +137,7 @@ public sealed class ReleaseCoverageBaselineTests
             Assert.That(resolver, Does.Contain("checked-out HEAD"));
 
             Assert.That(
-                workflow.Split(
+                containerRelease.Split(
                     "Resolve-SharpProofReleaseCoverageBaseline.ps1",
                     StringSplitOptions.None),
                 Has.Length.EqualTo(2));
@@ -153,8 +149,9 @@ public sealed class ReleaseCoverageBaselineTests
                 workflow,
                 Does.Not.Contain("-ComparisonRef HEAD^"));
             Assert.That(
-                workflow,
-                Does.Contain("-ReleaseCommit $env:GITHUB_SHA"));
+                containerRelease,
+                Does.Contain("-ReleaseCommit $commit"));
+            Assert.That(workflow, Does.Contain("tooling release-baseline"));
             Assert.That(workflow, Does.Contain("tooling coverage"));
         }
     }

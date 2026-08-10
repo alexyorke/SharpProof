@@ -248,6 +248,12 @@ function Invoke-DependencyAudit {
             -RedirectStandardOutput $standardOutput `
             -RedirectStandardError $standardError
         try {
+            $outputText = if ([IO.File]::Exists($standardOutput)) {
+                [IO.File]::ReadAllText($standardOutput)
+            }
+            else {
+                ''
+            }
             $errorText = if ([IO.File]::Exists($standardError)) {
                 [IO.File]::ReadAllText($standardError)
             }
@@ -257,7 +263,7 @@ function Invoke-DependencyAudit {
             if ($process.ExitCode -ne 0) {
                 throw (
                     "NuGet dependency audit exited with code " +
-                    "$($process.ExitCode): $errorText")
+                    "$($process.ExitCode): $errorText$outputText")
             }
             if (-not [string]::IsNullOrWhiteSpace($errorText)) {
                 throw (
@@ -267,7 +273,7 @@ function Invoke-DependencyAudit {
             if (-not [IO.File]::Exists($standardOutput)) {
                 throw 'NuGet dependency audit produced no JSON report.'
             }
-            return [IO.File]::ReadAllText($standardOutput)
+            return $outputText
         }
         finally {
             $process.Dispose()

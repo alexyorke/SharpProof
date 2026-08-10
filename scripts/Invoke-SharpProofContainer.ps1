@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('restore', 'build', 'test', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'performance', 'coverage', 'mutation', 'dependency-audit', 'acceptance', 'pack', 'pilots')]
+    [ValidateSet('contract', 'restore', 'build', 'test', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'performance', 'coverage', 'mutation', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -42,6 +42,10 @@ $testProjectParallelism = Get-SharpProofTestProjectParallelism `
     -RepositoryRoot $repositoryRoot
 
 switch ($Command) {
+    'contract' {
+        & (Join-Path $repositoryRoot `
+            'scripts/Test-SharpProofContainerContract.ps1')
+    }
     'restore' {
         Invoke-DotNet @('restore', $Target, '--locked-mode')
     }
@@ -101,6 +105,25 @@ switch ($Command) {
             -ExpectedSmt Required `
             -PackageSource $PackageSource
         if ($LASTEXITCODE -ne 0) { throw 'Package consumer validation failed.' }
+        $toolchain = Get-Content -LiteralPath (Join-Path `
+            $repositoryRoot 'eng/container/toolchain.json') -Raw |
+            ConvertFrom-Json
+        & (Join-Path $repositoryRoot 'scripts/Test-SharpProofPackageConsumers.ps1') `
+            -Configuration $Configuration `
+            -ExpectedSmt Required `
+            -PackageSource $PackageSource `
+            -ConsumerSdkVersion ([string]$toolchain.dotnet.minimumSdkVersion) `
+            -FrameworkConsumersOnly
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Minimum-SDK package consumer validation failed.'
+        }
+    }
+    'samples' {
+        & (Join-Path $repositoryRoot 'scripts/Test-SharpProofSamples.ps1') `
+            -Configuration $Configuration `
+            -ExpectedSmt Required `
+            -PackageSource $PackageSource
+        if ($LASTEXITCODE -ne 0) { throw 'Sample validation failed.' }
     }
     'performance' {
         $output = Join-Path $repositoryRoot 'artifacts/ci/performance.json'
@@ -161,6 +184,7 @@ switch ($Command) {
         if ($LASTEXITCODE -ne 0) { throw 'Trusted mutation validation failed.' }
     }
     'dependency-audit' {
+        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
         $output = Join-Path $repositoryRoot (
             'artifacts/dependency-audit/dependency-audit.json')
         & (Join-Path $repositoryRoot 'scripts/Test-SharpProofDependencyAudit.ps1') `
@@ -170,10 +194,22 @@ switch ($Command) {
         if ($LASTEXITCODE -ne 0) { throw 'Dependency audit failed.' }
     }
     'acceptance' {
+        $restoreTimer = [Diagnostics.Stopwatch]::StartNew()
         Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
-        & (Join-Path $repositoryRoot 'eng/acceptance/Verify.ps1') `
-            -Configuration $Configuration
-        if ($LASTEXITCODE -ne 0) { throw 'Acceptance validation failed.' }
+        $restoreTimer.Stop()
+        $env:SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS =
+            [string][long]$restoreTimer.Elapsed.TotalMilliseconds
+        try {
+            & (Join-Path $repositoryRoot 'eng/acceptance/Verify.ps1') `
+                -Configuration $Configuration
+            if ($LASTEXITCODE -ne 0) {
+                throw 'Acceptance validation failed.'
+            }
+        }
+        finally {
+            Remove-Item Env:SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS `
+                -ErrorAction SilentlyContinue
+        }
     }
     'pack' {
         Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
@@ -229,5 +265,40 @@ switch ($Command) {
         }
         & (Join-Path $repositoryRoot 'scripts/Test-SharpProofPilots.ps1') -PackageSource $PackageSource
         if ($LASTEXITCODE -ne 0) { throw 'Pilot validation failed.' }
+    }
+    'release-tag' {
+        & (Join-Path $repositoryRoot `
+            'scripts/Invoke-SharpProofReleaseContainer.ps1') `
+            -Mode ValidateTag
+    }
+    'release-baseline' {
+        & (Join-Path $repositoryRoot `
+            'scripts/Invoke-SharpProofReleaseContainer.ps1') `
+            -Mode ResolveCoverageBaseline
+    }
+    'release-plan' {
+        if ([string]::IsNullOrWhiteSpace($PackageSource)) {
+            throw 'release-plan requires -PackageSource.'
+        }
+        $planDirectory = Join-Path `
+            $repositoryRoot 'artifacts/release-qualification'
+        [IO.Directory]::CreateDirectory($planDirectory) | Out-Null
+        & (Join-Path $repositoryRoot `
+            'scripts/Publish-SharpProofRelease.ps1') `
+            -PackageSource $PackageSource `
+            -PlanOnly `
+            -PlanOutputPath (Join-Path $planDirectory 'publication-plan.json')
+    }
+    'release-qualification' {
+        & (Join-Path $repositoryRoot `
+            'scripts/Invoke-SharpProofReleaseContainer.ps1') `
+            -Mode WriteQualificationEvidence `
+            -PackageSource $PackageSource
+    }
+    'release-publish' {
+        & (Join-Path $repositoryRoot `
+            'scripts/Invoke-SharpProofReleaseContainer.ps1') `
+            -Mode Publish `
+            -PackageSource $PackageSource
     }
 }

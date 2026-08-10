@@ -21,13 +21,37 @@
     "solutionBuildWallSeconds": 600,
     "solutionTestWallSeconds": 1800,
     "mutationShardWallSeconds": 3600,
-    "testProjectCpuDivisor": 2
+    "testProjectCpuDivisor": 2,
+    "mutationParallelism": 8,
+    "mutationDefaultWeight": 1,
+    "acceptanceTimingPhases": [
+      "restore",
+      "static-validation",
+      "build",
+      "semantic-tests",
+      "package-tests",
+      "fuzz",
+      "corpus-and-performance"
+    ],
+    "mutationProjectWeights": {
+      "SharpProof.Package.Test\\SharpProof.Package.Test.csproj": 8,
+      "SharpProof.Worker.Test\\SharpProof.Worker.Test.csproj": 4,
+      "SharpProof.Analyzer.Test\\SharpProof.Analyzer.Test.csproj": 3,
+      "SharpProof.Effects.Test\\SharpProof.Effects.Test.csproj": 3,
+      "SharpProof.ArchitectureTest\\SharpProof.ArchitectureTest.csproj": 2,
+      "SharpProof.Contracts.Test\\SharpProof.Contracts.Test.csproj": 2,
+      "SharpProof.Frontend.Test\\SharpProof.Frontend.Test.csproj": 2,
+      "SharpProof.Ir.Test\\SharpProof.Ir.Test.csproj": 2,
+      "SharpProof.Smt.Test\\SharpProof.Smt.Test.csproj": 2,
+      "SharpProof.Specs.Test\\SharpProof.Specs.Test.csproj": 2,
+      "SharpProof.Summaries.Test\\SharpProof.Summaries.Test.csproj": 2
+    }
   },
   "container": {
     "contractVersion": 1,
     "platform": "linux/amd64",
-    "defaultCpuCount": 8,
-    "defaultMemoryMiB": 24576
+    "defaultCpuCount": 16,
+    "defaultMemoryMiB": 40960
   },
   "mutationEvidence": {
     "schemaVersion": 1,
@@ -66,7 +90,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "84c206d8738f31bf25806adc658c21b6f6229ca9b1e769277eacbffe22cd7d3f",
+    "inventorySha256": "a55a9c483cd8711ff5ae94ab6d2fdea32c1558690b2746bac1162c63a8892691",
     "components": [
       {
         "name": "discovery",
@@ -256,6 +280,8 @@
         "name": "mutationEvidencePolicy",
         "paths": [
           "scripts/SharpProof.MutationEvidence.psm1",
+          "scripts/SharpProof.MutationScheduling.psm1",
+          "scripts/Test-SharpProofMutationScheduling.ps1",
           "scripts/Test-SharpProofMutationEvidence.ps1",
           "scripts/Test-SharpProofTrustedMutations.ps1",
           "scripts/Invoke-SharpProofTrustedMutationsParallel.ps1",
@@ -482,10 +508,12 @@
           "eng/container/Dockerfile",
           "eng/container/entrypoint.sh",
           "eng/container/dev-command.sh",
+          "eng/container/dev-init.sh",
           "eng/container/Prepare-NativePayload.ps1",
           "eng/container/New-ContainerContract.ps1",
           "compose.yaml",
           "scripts/Invoke-SharpProofContainer.ps1",
+          "scripts/Invoke-SharpProofReleaseContainer.ps1",
           "scripts/Invoke-SharpProofPackageTests.ps1",
           "scripts/Test-SharpProofContainerContract.ps1",
           "scripts/Test-SharpProofPackageConsumers.ps1"

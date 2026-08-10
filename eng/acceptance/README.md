@@ -114,7 +114,8 @@ rebuilds of contract-free code with ordinary source and BCL calls under the
 repository-selected SDK. This exercises the contract-free activation boundary:
 the analyzer assembly loads, reference metadata is screened, and no semantic
 session or per-method callback is created. It separately checks the call-free
-advisory analyzer retention and no-session boundary. Full acceptance and
-packaged verifier execution run only in the canonical Linux amd64 container.
-Separate package-consumer CI restores the same three-package artifacts and
-exercises only the portable analyzer on Linux, Windows, and macOS.
+advisory analyzer retention and no-session boundary. Full acceptance, package
+consumers, and packaged verifier execution run only in the canonical Linux
+amd64 container. The portable analyzer remains framework- and
+operating-system-neutral, but release evidence never depends on a native-host
+SDK or MSBuild installation.

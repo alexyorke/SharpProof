@@ -128,11 +128,7 @@ internal static class CompilationFingerprint
         value.Modules.Length;
     }
 
-    private static StringComparer PathComparer =>
-        System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-            System.Runtime.InteropServices.OSPlatform.Windows)
-            ? StringComparer.OrdinalIgnoreCase
-            : StringComparer.Ordinal;
+    private static StringComparer PathComparer => StringComparer.Ordinal;
 
     private static bool ValidReferenceModule(
         CompilerReferenceModuleSnapshot? value)
@@ -175,10 +171,7 @@ internal static class CompilationFingerprint
 
     private static string NormalizePath(string path)
     {
-        return System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-            System.Runtime.InteropServices.OSPlatform.Windows)
-            ? path.Replace('\\', '/')
-            : path;
+        return path;
     }
 
     private static bool IsOrdered(string[]? values, bool unique)

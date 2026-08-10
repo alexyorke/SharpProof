@@ -49,12 +49,28 @@ Assert-Exact `
     'Acceptance container platform'
 
 $dotnetImage = "$($catalog.dotnet.baseImage)@$($catalog.dotnet.baseImageDigest)"
+$dotnetMinimumSdkImage =
+    "$($catalog.dotnet.minimumSdkImage)@$($catalog.dotnet.minimumSdkImageDigest)"
+$dotnetMinimumFrameworkImage =
+    "$($catalog.dotnet.minimumSdkFrameworkImage)@$($catalog.dotnet.minimumSdkFrameworkImageDigest)"
 $dotnetTestRuntimeImage =
     "$($catalog.dotnet.testRuntimeImage)@$($catalog.dotnet.testRuntimeImageDigest)"
 $powershellImage = "$($catalog.powershell.image)@$($catalog.powershell.imageDigest)"
 if ($dockerfile -cnotmatch [regex]::Escape(
         "ARG DOTNET_SDK_IMAGE=$dotnetImage")) {
     throw 'The Dockerfile .NET SDK base does not match the toolchain catalog.'
+}
+if ($dockerfile -cnotmatch [regex]::Escape(
+        "ARG DOTNET_MINIMUM_SDK_IMAGE=$dotnetMinimumSdkImage")) {
+    throw (
+        'The Dockerfile minimum .NET SDK base does not match the ' +
+        'toolchain catalog.')
+}
+if ($dockerfile -cnotmatch [regex]::Escape(
+        "ARG DOTNET_MINIMUM_FRAMEWORK_IMAGE=$dotnetMinimumFrameworkImage")) {
+    throw (
+        'The Dockerfile minimum-SDK framework source does not match the ' +
+        'toolchain catalog.')
 }
 if ($dockerfile -cnotmatch [regex]::Escape(
         "ARG DOTNET_TEST_RUNTIME_IMAGE=$dotnetTestRuntimeImage")) {
@@ -110,6 +126,14 @@ if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
         $catalog.dotnet.testRuntimeVersion `
         'Installed .NET test runtime version'
     Assert-Exact `
+        $marker.dotnetMinimumSdkVersion `
+        $catalog.dotnet.minimumSdkVersion `
+        'Installed minimum .NET SDK version'
+    Assert-Exact `
+        $marker.dotnetMinimumSdkFrameworkVersion `
+        $catalog.dotnet.minimumSdkFrameworkVersion `
+        'Installed minimum-SDK framework version'
+    Assert-Exact `
         $marker.z3LibrarySha256 `
         $catalog.z3.librarySha256 `
         'Installed Z3 hash declaration'
@@ -127,6 +151,22 @@ if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
     if ($installedRuntimes -notcontains
         "Microsoft.NETCore.App $($catalog.dotnet.testRuntimeVersion) [/usr/share/dotnet/shared/Microsoft.NETCore.App]") {
         throw 'The pinned .NET test runtime is not installed in the container.'
+    }
+    $installedSdks = & dotnet --list-sdks
+    if ($installedSdks -notcontains
+        "$($catalog.dotnet.minimumSdkVersion) [/usr/share/dotnet/sdk]") {
+        throw 'The pinned minimum .NET SDK is not installed in the container.'
+    }
+    foreach ($pack in @(
+            'Microsoft.NETCore.App.Ref',
+            'Microsoft.AspNetCore.App.Ref',
+            'Microsoft.NETCore.App.Host.linux-x64')) {
+        $packPath = Join-Path `
+            "/usr/share/dotnet/packs/$pack" `
+            ([string]$catalog.dotnet.minimumSdkFrameworkVersion)
+        if (-not (Test-Path -LiteralPath $packPath -PathType Container)) {
+            throw "The minimum-SDK framework pack is missing: $packPath"
+        }
     }
 }
 

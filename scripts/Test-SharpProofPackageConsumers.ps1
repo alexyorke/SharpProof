@@ -5,8 +5,8 @@ param(
     [string]$Configuration = 'Release',
 
     [Parameter()]
-    [ValidateSet('Required', 'Graceful')]
-    [string]$ExpectedSmt,
+    [ValidateSet('Required')]
+    [string]$ExpectedSmt = 'Required',
 
     [Parameter()]
     [string]$PackageSource,
@@ -476,9 +476,7 @@ function Test-SharpProofFrameworkConsumers {
                     '--configuration',
                     $Configuration,
                     '--no-restore',
-                    '--nologo',
-                    '/nodeReuse:false',
-                    '-p:UseSharedCompilation=false') `
+                    '--nologo') `
                 -RepositoryRoot $RepositoryRoot | Out-Null
         }
     }
@@ -504,17 +502,10 @@ $isSupportedWorkerHost = $IsLinux -and
         [System.Runtime.InteropServices.Architecture]::X64 -and
     [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq
         [System.Runtime.InteropServices.Architecture]::X64
-$expectedHostPolicy = if ($isSupportedWorkerHost) {
-    'Required'
-}
-else {
-    'Graceful'
-}
-if ([string]::IsNullOrWhiteSpace($ExpectedSmt)) {
-    $ExpectedSmt = $expectedHostPolicy
-}
-elseif ($ExpectedSmt -ne $expectedHostPolicy) {
-    throw "ExpectedSmt='$ExpectedSmt' does not match this host's '$expectedHostPolicy' verifier policy."
+if (-not $isSupportedWorkerHost) {
+    throw (
+        'SharpProof package consumers must run in the canonical Linux ' +
+        'amd64 container.')
 }
 
 if ([string]::IsNullOrWhiteSpace($PackageSource)) {

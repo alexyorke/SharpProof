@@ -1163,7 +1163,6 @@ internal static class PerformanceGate
         var normalizedHostCondition = NormalizeMsBuildCondition(
             (string?)verifierHost?.Attribute("Condition"));
         const string expectedHostCondition =
-            "'$(OS)'!='Windows_NT'AND" +
             "'$(MSBuildRuntimeType)'=='Core'AND" +
             "'$(SHARPPROOF_CONTAINER)'=='1'AND" +
             "'$(_SharpProofVerifierHostArchitecture)'=='X64'AND" +

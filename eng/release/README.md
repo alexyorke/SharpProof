@@ -24,9 +24,9 @@ qualification to:
   coverage, mutation, dependency, SBOM, and publication-plan evidence; and
 - five reviewed pilot reports from the same tested package bytes.
 
-The full verifier gates execute only in the canonical container. Portable
-analyzer consumers remain a separate Linux/Windows/macOS matrix and never
-serve as verifier qualification.
+All verifier and portable-consumer gates execute in the canonical container.
+The analyzer packages remain operating-system-neutral, but no native-host SDK
+or MSBuild job serves as release qualification.
 
 ## Promotion
 

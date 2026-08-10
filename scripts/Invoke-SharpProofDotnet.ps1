@@ -18,43 +18,12 @@ if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
     throw 'SharpProof .NET commands must run in the canonical Linux container. Use docker compose run --rm tooling <command>.'
 }
 
-$effectiveDotnetArgs = [Collections.Generic.List[string]]::new(
-    [string[]]$DotnetArgs)
-if ($effectiveDotnetArgs.Count -gt 0) {
-    $msbuildBackedCommands = [Collections.Generic.HashSet[string]]::new(
-        [string[]]@(
-            'build', 'clean', 'msbuild', 'pack', 'publish', 'restore', 'test'),
-        [StringComparer]::OrdinalIgnoreCase)
-    if ($msbuildBackedCommands.Contains($effectiveDotnetArgs[0])) {
-        if (-not ($effectiveDotnetArgs | Where-Object {
-                    $_.Equals(
-                        '/nodeReuse:false',
-                        [StringComparison]::OrdinalIgnoreCase) -or
-                    $_.Equals(
-                        '-nodeReuse:false',
-                        [StringComparison]::OrdinalIgnoreCase)
-                })) {
-            $effectiveDotnetArgs.Add('/nodeReuse:false')
-        }
-        if (-not ($effectiveDotnetArgs | Where-Object {
-                    $_.StartsWith(
-                        '-p:UseSharedCompilation=',
-                        [StringComparison]::OrdinalIgnoreCase) -or
-                    $_.StartsWith(
-                        '/p:UseSharedCompilation=',
-                        [StringComparison]::OrdinalIgnoreCase)
-                })) {
-            $effectiveDotnetArgs.Add('-p:UseSharedCompilation=false')
-        }
-    }
-}
-
 $startInfo = [Diagnostics.ProcessStartInfo]::new()
 $startInfo.FileName = 'dotnet'
 $startInfo.WorkingDirectory = (Get-Location).Path
 $startInfo.UseShellExecute = $false
 $startInfo.CreateNoWindow = $true
-foreach ($argument in $effectiveDotnetArgs) {
+foreach ($argument in $DotnetArgs) {
     [void]$startInfo.ArgumentList.Add($argument)
 }
 $capture = -not [string]::IsNullOrWhiteSpace($OutputPath)

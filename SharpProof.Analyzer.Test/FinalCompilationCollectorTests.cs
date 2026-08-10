@@ -512,10 +512,12 @@ public sealed class FinalCompilationCollectorTests
         }
     }
 
-    [TestCase("part.netmodule:payload")]
-    [TestCase("CON.netmodule")]
-    [Platform("Win")]
-    public void LinkedNetmoduleMustHaveARegularWindowsFileName(
+    [TestCase("")]
+    [TestCase(".")]
+    [TestCase("..")]
+    [TestCase("nested/part.netmodule")]
+    [Platform("Linux")]
+    public void LinkedNetmoduleMustBeANonemptySiblingFileName(
         string moduleName)
     {
         using var workspace = new CollectorWorkspace();
@@ -525,6 +527,23 @@ public sealed class FinalCompilationCollectorTests
             CompilerCompilationCapture.ResolveSiblingModule(
                 manifestPath,
                 moduleName)));
+    }
+
+    [TestCase("part.netmodule:payload")]
+    [TestCase("CON.netmodule")]
+    [TestCase("part\\name.netmodule")]
+    [Platform("Linux")]
+    public void LinkedNetmoduleAllowsOrdinaryLinuxFileNameCharacters(
+        string moduleName)
+    {
+        using var workspace = new CollectorWorkspace();
+        var manifestPath = Path.Combine(workspace.Path, "Linked.dll");
+
+        Assert.That(
+            CompilerCompilationCapture.ResolveSiblingModule(
+                manifestPath,
+                moduleName),
+            Is.EqualTo(Path.Combine(workspace.Path, moduleName)));
     }
 
     [Test]

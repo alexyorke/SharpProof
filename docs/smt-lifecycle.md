@@ -5,9 +5,9 @@ context.
 
 The packaged worker lifecycle is supported and exercised only in the canonical
 SharpProof Linux amd64 container. Package-consumer CI restores the exact same
-three-package artifacts and exercises portable analyzer consumption on Linux,
-Windows, and macOS without executing the verifier. Native host execution and
-ARM64 verifier containers are unsupported.
+three-package artifacts and exercises every declared target framework inside
+that container. The analyzer packages remain operating-system-neutral. Native
+host execution and ARM64 verifier containers are unsupported.
 
 The launcher validates the container contract and exact runtime closure before
 starting one direct child worker. An exact stdin message releases the startup

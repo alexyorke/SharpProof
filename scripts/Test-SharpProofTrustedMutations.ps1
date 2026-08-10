@@ -25,6 +25,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationScheduling.psm1') -Force
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $output = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputPath))
@@ -1142,6 +1143,19 @@ if ($catalogCount -ne [int]$mutationPolicy.expectedCatalogCount -or
         'catalog policy.')
 }
 
+$defaultShardWeight = [int]$acceptanceContract.automation.mutationDefaultWeight
+if ($defaultShardWeight -lt 1) {
+    throw 'The default mutation shard weight must be positive.'
+}
+$projectWeights = @{}
+foreach ($property in @(
+        $acceptanceContract.automation.mutationProjectWeights.PSObject.Properties)) {
+    $weight = [int]$property.Value
+    if ($weight -lt 1) {
+        throw "Mutation project weight must be positive: $($property.Name)."
+    }
+    $projectWeights[[string]$property.Name] = $weight
+}
 if ($MutationName.Count -gt 0 -and $MutationShardCount -ne 1) {
     throw 'Named mutation selection cannot be combined with catalog sharding.'
 }
@@ -1161,9 +1175,16 @@ if ($MutationName.Count -gt 0) {
 }
 elseif ($MutationShardCount -gt 1) {
     $selection = 'selected'
-    $chunkSize = [int][Math]::Ceiling($catalogCount / $MutationShardCount)
-    $start = $MutationShardIndex * $chunkSize
-    $mutations = @($mutations | Select-Object -Skip $start -First $chunkSize)
+    $plan = Get-SharpProofWeightedMutationShards `
+        -Mutations $mutations `
+        -ShardCount $MutationShardCount `
+        -ProjectWeights $projectWeights `
+        -DefaultWeight $defaultShardWeight
+    $selected = @($plan.Shards[$MutationShardIndex])
+    $mutations = @($selected | ForEach-Object {
+        $_.Mutation | Add-Member -NotePropertyName CatalogOrdinal `
+            -NotePropertyValue ([int]$_.CatalogOrdinal) -PassThru
+    })
     if ($mutations.Count -eq 0) {
         throw "Mutation shard $MutationShardIndex is empty."
     }
@@ -1455,7 +1476,7 @@ try {
                 -ProcessExitCode $testExit `
                 -ExpectedMethodName $expectedMethodName `
                 -ExpectedLedger $mutation.BaselineLedger
-            $results += [pscustomobject]@{
+            $result = [pscustomobject]@{
                 name = $mutation.Name
                 file = $mutation.File.Replace('\', '/')
                 test = $mutation.Filter
@@ -1471,6 +1492,11 @@ try {
                 log = "mutation-logs/$runId/$($mutation.Name)-test.log"
                 trx = "mutation-logs/$runId/$testTrxName"
             }
+            if ($MutationShardCount -gt 1) {
+                $result | Add-Member -NotePropertyName catalogOrdinal `
+                    -NotePropertyValue ([int]$mutation.CatalogOrdinal)
+            }
+            $results += $result
             Write-MutationEvidence `
                 -Results @($results) `
                 -EvidenceSelection inProgress

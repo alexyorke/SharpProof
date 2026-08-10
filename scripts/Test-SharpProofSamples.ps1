@@ -5,8 +5,8 @@ param(
     [string]$Configuration = 'Release',
 
     [Parameter()]
-    [ValidateSet('Required', 'Graceful')]
-    [string]$ExpectedSmt,
+    [ValidateSet('Required')]
+    [string]$ExpectedSmt = 'Required',
 
     [Parameter()]
     [string]$PackageSource
@@ -17,28 +17,14 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $samplesRoot = Join-Path $repositoryRoot 'samples'
-$isWindowsHost =
-    [Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
-        [Runtime.InteropServices.OSPlatform]::Windows)
 $isSupportedWorkerHost = $IsLinux -and
     $env:SHARPPROOF_CONTAINER -ceq '1' -and
     [Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq
         [Runtime.InteropServices.Architecture]::X64 -and
     [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq
         [Runtime.InteropServices.Architecture]::X64
-$expectedHostPolicy = if ($isSupportedWorkerHost) {
-    'Required'
-}
-else {
-    'Graceful'
-}
-if ([string]::IsNullOrWhiteSpace($ExpectedSmt)) {
-    $ExpectedSmt = $expectedHostPolicy
-}
-elseif ($ExpectedSmt -ne $expectedHostPolicy) {
-    throw (
-        "ExpectedSmt='$ExpectedSmt' does not match this host's " +
-        "'$expectedHostPolicy' verifier policy.")
+if (-not $isSupportedWorkerHost) {
+    throw 'SharpProof samples must run in the canonical Linux amd64 container.'
 }
 
 $temporaryParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())

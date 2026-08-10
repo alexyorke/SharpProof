@@ -3178,19 +3178,10 @@ public sealed class WorkerMsBuildIntegrationTests
         private async Task<BuildResult> RunDotNetAsync(
             IEnumerable<string> arguments)
         {
-            return await RunProcessAsync("dotnet", arguments);
-        }
-
-        private async Task<BuildResult> RunProcessAsync(
-            string executable,
-            IEnumerable<string> arguments)
-        {
             var startInfo = new ProcessStartInfo
             {
-                FileName = executable,
-                WorkingDirectory = _root.Length < 240
-                    ? _root
-                    : Path.GetTempPath(),
+                FileName = "dotnet",
+                WorkingDirectory = _root,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -3199,44 +3190,6 @@ public sealed class WorkerMsBuildIntegrationTests
             foreach (var argument in arguments)
             {
                 startInfo.ArgumentList.Add(argument);
-            }
-            if (string.Equals(
-                    Path.GetFileName(executable),
-                    "MSBuild.exe",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                foreach (var key in startInfo.Environment.Keys
-                             .Where(static key =>
-                                 key.StartsWith(
-                                     "DOTNET_",
-                                     StringComparison.OrdinalIgnoreCase) ||
-                                 key.StartsWith(
-                                     "MSBUILD",
-                                     StringComparison.OrdinalIgnoreCase))
-                             .ToArray())
-                {
-                    startInfo.Environment.Remove(key);
-                }
-                var dotnetHost = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ??
-                    throw new InvalidOperationException(
-                        "The test host did not disclose the dotnet host path.");
-                using var globalJson = JsonDocument.Parse(
-                    await File.ReadAllTextAsync(Path.Combine(
-                        FindRepositoryRoot(),
-                        "global.json")));
-                var sdkVersion = globalJson.RootElement
-                    .GetProperty("sdk")
-                    .GetProperty("version")
-                    .GetString() ?? throw new InvalidDataException(
-                        "global.json does not declare an SDK version.");
-                startInfo.Environment["MSBuildSDKsPath"] = Path.Combine(
-                    Path.GetDirectoryName(dotnetHost) ??
-                        throw new InvalidOperationException(
-                            "The dotnet host path has no directory."),
-                    "sdk",
-                    sdkVersion,
-                    "Sdks");
             }
             using var process = Process.Start(startInfo)!;
             var standardOutput = process.StandardOutput.ReadToEndAsync();

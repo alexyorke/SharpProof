@@ -7,7 +7,10 @@ param(
 
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^[0-9a-f]{40}$')]
-    [string]$ExpectedCommit
+    [string]$ExpectedCommit,
+
+    [ValidateRange(0, 16)]
+    [int]$Parallelism = 0
 )
 
 Set-StrictMode -Version Latest
@@ -16,11 +19,19 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
-$parallelism = Get-SharpProofTestProjectParallelism `
-    -RepositoryRoot $repositoryRoot
 $contract = Get-Content -LiteralPath (Join-Path `
     $repositoryRoot 'eng/acceptance/contract.json') -Raw |
     ConvertFrom-Json
+if ($Parallelism -eq 0) {
+    $Parallelism = [int]$contract.automation.mutationParallelism
+}
+$visibleProcessors = [Environment]::ProcessorCount
+if ($Parallelism -lt 1 -or $Parallelism -gt $visibleProcessors) {
+    throw (
+        'Mutation parallelism must be between 1 and the container-visible ' +
+        "CPU count ($visibleProcessors).")
+}
+$parallelism = $Parallelism
 $catalogCount = [int]$contract.mutationEvidence.expectedCatalogCount
 $catalogSha256 = [string]$contract.mutationEvidence.expectedCatalogSha256
 $shardWallSeconds = [int]$contract.automation.mutationShardWallSeconds
@@ -50,7 +61,7 @@ if (Test-Path -LiteralPath $output -PathType Leaf) {
 
 $shardRoot = Join-Path (Split-Path -Parent $output) (
     'shards/' + $ExpectedCommit + '/' + $Configuration.ToLowerInvariant() +
-    '-' + $parallelism)
+    '-weighted-v1-' + $parallelism)
 [IO.Directory]::CreateDirectory($shardRoot) | Out-Null
 $shards = @()
 for ($index = 0; $index -lt $parallelism; $index++) {
@@ -63,6 +74,8 @@ for ($index = 0; $index -lt $parallelism; $index++) {
             $repositoryRoot, (Join-Path $shardRoot $fileName))
     }
 }
+$campaignTimer = [Diagnostics.Stopwatch]::StartNew()
+$shardTimings = [Collections.Generic.List[object]]::new()
 
 function Test-CompleteShard([object]$Shard) {
     if (-not (Test-Path -LiteralPath $Shard.Path -PathType Leaf)) {
@@ -90,6 +103,14 @@ try {
     foreach ($shard in $shards) {
         if (Test-CompleteShard $shard) {
             Write-Host "Reusing completed mutation shard $($shard.Index + 1)."
+            $evidence = Get-Content -LiteralPath $shard.Path -Raw |
+                ConvertFrom-Json
+            $shardTimings.Add([pscustomobject]@{
+                index = $shard.Index
+                mutationCount = [int]$evidence.mutationCount
+                elapsedMilliseconds = 0
+                reused = $true
+            })
             continue
         }
         Remove-Item -LiteralPath $shard.Path -Force -ErrorAction SilentlyContinue
@@ -118,6 +139,7 @@ try {
         $running.Add([pscustomobject]@{
             Shard = $shard
             Process = $process
+            StartedUtc = $process.StartTime.ToUniversalTime()
             StandardOutput = $process.StandardOutput.ReadToEndAsync()
             StandardError = $process.StandardError.ReadToEndAsync()
         })
@@ -149,6 +171,16 @@ try {
                 "Mutation shard $($active.Shard.Index + 1) failed with " +
                 "exit code $($active.Process.ExitCode).")
         }
+        $evidence = Get-Content -LiteralPath $active.Shard.Path -Raw |
+            ConvertFrom-Json
+        $shardTimings.Add([pscustomobject]@{
+            index = $active.Shard.Index
+            mutationCount = [int]$evidence.mutationCount
+            elapsedMilliseconds = [long](
+                ($active.Process.ExitTime.ToUniversalTime() -
+                    $active.StartedUtc).TotalMilliseconds)
+            reused = $false
+        })
     }
 }
 finally {
@@ -178,9 +210,13 @@ foreach ($shard in $shards) {
         $orderedResults.Add($result)
     }
 }
+$orderedResults = @($orderedResults | Sort-Object catalogOrdinal)
 if ($orderedResults.Count -ne $catalogCount -or
     @($orderedResults.name | Sort-Object -Unique).Count -ne $catalogCount) {
     throw 'Parallel mutation shards do not cover the exact mutation catalog.'
+}
+foreach ($result in $orderedResults) {
+    $result.PSObject.Properties.Remove('catalogOrdinal')
 }
 
 $temporaryOutput = $output + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
@@ -197,5 +233,24 @@ $temporaryOutput = $output + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
 } | ConvertTo-Json -Depth 5 |
     Set-Content -LiteralPath $temporaryOutput -Encoding utf8NoBOM
 Move-Item -LiteralPath $temporaryOutput -Destination $output -Force
+$campaignTimer.Stop()
+$timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
+[IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
+$timingOutput = Join-Path $timingDirectory (
+    'mutation-' + $Configuration.ToLowerInvariant() + '.json')
+$temporaryTiming = $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
+[pscustomobject]@{
+    schemaVersion = 1
+    command = 'mutation'
+    commit = $ExpectedCommit
+    configuration = $Configuration
+    strategy = 'weighted-longest-processing-time-first'
+    parallelism = $parallelism
+    totalElapsedMilliseconds = [long]$campaignTimer.Elapsed.TotalMilliseconds
+    shards = @($shardTimings | Sort-Object index)
+} | ConvertTo-Json -Depth 5 |
+    Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM
+Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force
 Write-Host "Killed $catalogCount trusted-boundary mutations in $parallelism shards."
 Write-Host "Evidence: $output"
+Write-Host "Timing evidence: $timingOutput"

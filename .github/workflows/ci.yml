@@ -25,9 +25,7 @@ jobs:
         run: docker compose build tooling
 
       - name: Validate the container contract
-        run: >-
-          docker compose run --rm tooling dev -lc
-          'pwsh -NoLogo -NoProfile -File ./scripts/Test-SharpProofContainerContract.ps1'
+        run: docker compose run --rm tooling contract
 
       - name: Build the complete product
         run: >-

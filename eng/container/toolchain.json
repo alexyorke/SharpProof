@@ -6,6 +6,12 @@
     "sdkVersion": "9.0.316",
     "baseImage": "mcr.microsoft.com/dotnet/sdk:9.0.316-bookworm-slim",
     "baseImageDigest": "sha256:10e4355ee23eea62fddba62d35284d36e5fc682762561773ed76c8dae5fa8c9a",
+    "minimumSdkVersion": "9.0.300",
+    "minimumSdkImage": "mcr.microsoft.com/dotnet/sdk:9.0.300-bookworm-slim",
+    "minimumSdkImageDigest": "sha256:c5b188baf837b0180a14f988815b9cc7a55b836dd6cbe1b6e6523cf3098faaa8",
+    "minimumSdkFrameworkVersion": "8.0.16",
+    "minimumSdkFrameworkImage": "mcr.microsoft.com/dotnet/sdk:8.0.410-bookworm-slim",
+    "minimumSdkFrameworkImageDigest": "sha256:b56053d0a8f4627047740941396e76cd9e7a9421c83b1d81b68f10e5019862d7",
     "testRuntimeVersion": "8.0.29",
     "testRuntimeImage": "mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim",
     "testRuntimeImageDigest": "sha256:794b603ad8cf882df3a37dcb124eccdcd688c367864cd66e93e921cda9caba76"

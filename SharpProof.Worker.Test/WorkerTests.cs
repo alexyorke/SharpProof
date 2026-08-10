@@ -1547,7 +1547,7 @@ public sealed class WorkerTests
         using var project = TestProject.Create(RefutationSource);
         var requests = new List<WorkerVerifyRequest>();
         Add();
-        Add(targetFramework: "net8.0-windows");
+        Add(targetFramework: "net8.0-linux");
         Add(parseOptions: CreateParseOptions(LanguageVersion.CSharp11));
         Add(compilationOptions: CreateRoslynOptions(
             nullableContextOptions: NullableContextOptions.Warnings));
@@ -4290,57 +4290,6 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task CacheEvictionFailurePreservesHeldCacheEntry()
-    {
-        if (!OperatingSystem.IsWindows())
-        {
-            Assert.Ignore("Cache sharing violations are Windows-specific.");
-        }
-
-        using var project = TestProject.Create(RefutationSource);
-        var request = project.CreateRequest(cacheEnabled: true);
-        request.Cache.MaximumBytes = 1024 * 1024;
-        var backend = new SpuriousModelBackend();
-        using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
-        Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
-
-        var firstCacheFile = Directory.GetFiles(
-            project.CacheDirectory,
-            "*.sharp-proof-cache.json").Single();
-        var maximumBytes = new FileInfo(firstCacheFile).Length + 1;
-        using var held = new FileStream(
-            firstCacheFile,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.Read);
-
-        var secondRequest = project.CreateRequest(
-            cacheEnabled: true,
-            targetFramework: "net8.0-windows");
-        secondRequest.Cache.MaximumBytes = maximumBytes;
-        var second = await worker.VerifyAsync(secondRequest);
-        var thirdRequest = project.CreateRequest(
-            cacheEnabled: true,
-            targetFramework: "net9.0-windows");
-        thirdRequest.Cache.MaximumBytes = maximumBytes;
-        var third = await worker.VerifyAsync(thirdRequest);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(backend.CallCount, Is.EqualTo(3));
-            Assert.That(second.Errors, Is.Empty);
-            Assert.That(third.Errors, Is.Empty);
-            Assert.That(File.Exists(firstCacheFile), Is.True);
-            Assert.That(
-                Directory.GetFiles(
-                    project.CacheDirectory,
-                    "*.sharp-proof-cache.json"),
-                Is.EqualTo([firstCacheFile]));
-        }
-    }
-
-    [Test]
     public async Task CacheEvictionPreservesUnownedSuffixMatches()
     {
         using var project = TestProject.Create(RefutationSource);
@@ -4376,7 +4325,7 @@ public sealed class WorkerTests
 
         var request = project.CreateRequest(
             cacheEnabled: true,
-            targetFramework: "net8.0-windows");
+            targetFramework: "net8.0-linux");
         request.Cache.MaximumBytes = maximumBytes;
         var response = await worker.VerifyAsync(request);
 

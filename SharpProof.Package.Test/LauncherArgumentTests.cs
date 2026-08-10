@@ -258,11 +258,11 @@ public sealed class LauncherArgumentTests
 
     [Test]
     [Platform("Linux")]
-    public void RequestProjectionRejectsReparsePointPathBeforeManifestRead()
+    public void RequestProjectionRejectsSymbolicLinkPathBeforeManifestRead()
     {
         var root = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
-            "reparse-path-" + Guid.NewGuid().ToString("N"));
+            "symbolic-link-path-" + Guid.NewGuid().ToString("N"));
         var target = Path.Combine(root, "target");
         var alias = Path.Combine(root, "alias");
         Directory.CreateDirectory(target);
