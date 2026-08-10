@@ -9,12 +9,6 @@ namespace SharpProof.Package.Test;
 [SetUpFixture]
 public sealed class PackagedProductFeedLifecycle
 {
-    [OneTimeSetUp]
-    public async Task CreateFeed()
-    {
-        _ = await PackagedProductFeed.GetAsync();
-    }
-
     [OneTimeTearDown]
     public void RemoveFeed()
     {

@@ -1743,6 +1743,49 @@ public sealed class ArchitectureTests
     }
 
     [Test]
+    public void PackageFeedConstructionIsDemandDriven()
+    {
+        var root = RepositoryRoot();
+        var feed = File.ReadAllText(Path.Combine(
+            root,
+            "SharpProof.Package.Test",
+            "PackagedProductFeed.cs"));
+        using var packageCatalog = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(root, "scripts", "package-projects.json")));
+        var packageProjects = packageCatalog.RootElement
+            .GetProperty("projects")
+            .EnumerateArray()
+            .Select(static project => project.GetString()!)
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(feed, Does.Not.Contain("[OneTimeSetUp]"));
+            Assert.That(
+                feed,
+                Does.Contain(
+                    "new(CreateAsync, " +
+                    "LazyThreadSafetyMode.ExecutionAndPublication)"));
+            Assert.That(
+                feed,
+                Does.Contain(
+                    "internal static Task<PackagedProductFeed> GetAsync()"));
+            foreach (var project in packageProjects)
+            {
+                var document = XDocument.Load(Path.Combine(root, project));
+                var generateOnBuild = document.Descendants(
+                        "GeneratePackageOnBuild")
+                    .SingleOrDefault();
+                Assert.That(
+                    generateOnBuild?.Value,
+                    Is.EqualTo("false").IgnoreCase,
+                    project + " must reserve package creation for the " +
+                    "explicit container pack command.");
+            }
+        }
+    }
+
+    [Test]
     public void ContractApiMetadataNamesHaveOneSourceOfTruth()
     {
         var root = RepositoryRoot();
