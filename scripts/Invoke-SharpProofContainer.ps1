@@ -114,6 +114,7 @@ switch ($Command) {
         if ([string]::IsNullOrWhiteSpace($PackageSource)) {
             throw 'package-consumers requires -PackageSource.'
         }
+        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
         & (Join-Path $repositoryRoot 'scripts/Test-SharpProofPackageConsumers.ps1') `
             -Configuration $Configuration `
             -ExpectedSmt Required `

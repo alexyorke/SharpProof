@@ -1045,6 +1045,35 @@ public sealed class ArchitectureTests
     }
 
     [Test]
+    public void ContainerPackageConsumersRestoreBeforeBuildingOfflineFeed()
+    {
+        var container = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+        var branchStart = container.IndexOf(
+            "'package-consumers' {",
+            StringComparison.Ordinal);
+        var branchEnd = container.IndexOf(
+            "'samples' {",
+            branchStart,
+            StringComparison.Ordinal);
+        var branch = container[branchStart..branchEnd];
+        var restore = branch.IndexOf(
+            "Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')",
+            StringComparison.Ordinal);
+        var consumer = branch.IndexOf(
+            "Test-SharpProofPackageConsumers.ps1",
+            StringComparison.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(restore, Is.GreaterThanOrEqualTo(0));
+            Assert.That(consumer, Is.GreaterThan(restore));
+        }
+    }
+
+    [Test]
     public void ContainerTestConcurrencyIsCatalogOwnedAndProjectScoped()
     {
         var root = RepositoryRoot();
