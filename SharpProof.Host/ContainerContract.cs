@@ -193,6 +193,7 @@ public static class ContainerContract
     private static int RequireInteger(JsonElement element, string name)
     {
         if (!element.TryGetProperty(name, out var property) ||
+            property.ValueKind != JsonValueKind.Number ||
             !property.TryGetInt32(out var value))
         {
             throw new InvalidDataException(
@@ -216,6 +217,7 @@ public static class ContainerContract
     private static long RequireInteger64(JsonElement element, string name)
     {
         if (!element.TryGetProperty(name, out var property) ||
+            property.ValueKind != JsonValueKind.Number ||
             !property.TryGetInt64(out var value))
         {
             throw new InvalidDataException(
