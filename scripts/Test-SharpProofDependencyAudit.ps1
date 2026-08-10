@@ -243,7 +243,6 @@ function Invoke-DependencyAudit {
                 $encodedCommand
             ) `
             -WorkingDirectory $repositoryRoot `
-            -WindowStyle Hidden `
             -Wait `
             -PassThru `
             -RedirectStandardOutput $standardOutput `

@@ -37,7 +37,8 @@ RUN pwsh -NoLogo -NoProfile -File /opt/sharpproof/Prepare-NativePayload.ps1 \
         -OutputPath /etc/sharpproof/container-contract.json
 
 COPY eng/container/entrypoint.sh /usr/local/bin/sharpproof-container
-RUN chmod 0755 /usr/local/bin/sharpproof-container
+COPY eng/container/dev-command.sh /usr/local/bin/sp
+RUN chmod 0755 /usr/local/bin/sharpproof-container /usr/local/bin/sp
 
 FROM toolchain AS dev
 ARG USER_UID=1000

@@ -7,16 +7,24 @@
   "remoteUser": "sharpproof",
   "overrideCommand": true,
   "shutdownAction": "stopCompose",
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postStartCommand": "pwsh -NoLogo -NoProfile -File scripts/Test-SharpProofContainerContract.ps1",
   "containerEnv": {
-    "SHARPPROOF_REPO_ROOT": "/workspace/SharpProof"
+    "SHARPPROOF_REPO_ROOT": "/workspace/SharpProof",
+    "SHARPPROOF_DEV_CONTAINER": "1"
   },
   "customizations": {
     "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "dotnet.defaultSolution": "SharpProof.sln"
+      },
       "extensions": [
         "ms-dotnettools.csharp",
         "ms-dotnettools.csdevkit",
         "ms-azuretools.vscode-docker"
       ]
     }
-  }
+  },
+  "forwardPorts": []
 }

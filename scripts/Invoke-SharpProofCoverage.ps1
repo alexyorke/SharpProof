@@ -15,6 +15,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+$testProjectParallelism = Get-SharpProofTestProjectParallelism `
+    -RepositoryRoot $repositoryRoot
 $resolvedResultsDirectory = [IO.Path]::GetFullPath(
     $(if ([IO.Path]::IsPathRooted($ResultsDirectory)) {
         $ResultsDirectory
@@ -72,6 +76,7 @@ if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
     test (Join-Path $repositoryRoot 'SharpProof.Dev.Tests.slnf') `
     -c Release `
     --no-build `
+    "/m:$testProjectParallelism" `
     --filter $broadFilter `
     --settings $managedSettings `
     --collect 'Code Coverage;Format=Cobertura' `

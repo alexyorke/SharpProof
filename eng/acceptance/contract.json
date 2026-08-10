@@ -18,13 +18,16 @@
     "unsupportedSelectedCallableDiagnostic": "SP0047"
   },
   "automation": {
-    "solutionBuildWallSeconds": 600
+    "solutionBuildWallSeconds": 600,
+    "solutionTestWallSeconds": 1800,
+    "mutationShardWallSeconds": 3600,
+    "testProjectCpuDivisor": 2
   },
   "container": {
     "contractVersion": 1,
     "platform": "linux/amd64",
-    "defaultCpuCount": 4,
-    "defaultMemoryMiB": 12288
+    "defaultCpuCount": 8,
+    "defaultMemoryMiB": 24576
   },
   "mutationEvidence": {
     "schemaVersion": 1,
@@ -63,7 +66,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "506a677d44b13754b4adf4292110bf27d28caeed1d688b32d2e940572370065a",
+    "inventorySha256": "84c206d8738f31bf25806adc658c21b6f6229ca9b1e769277eacbffe22cd7d3f",
     "components": [
       {
         "name": "discovery",
@@ -255,6 +258,7 @@
           "scripts/SharpProof.MutationEvidence.psm1",
           "scripts/Test-SharpProofMutationEvidence.ps1",
           "scripts/Test-SharpProofTrustedMutations.ps1",
+          "scripts/Invoke-SharpProofTrustedMutationsParallel.ps1",
           "scripts/Test-SharpProofMutationCatalog.ps1"
         ]
       },
@@ -393,6 +397,8 @@
         "scripts/Get-SharpProofTcbPaths.ps1",
         "scripts/Get-SharpProofReleaseDigests.ps1",
         "scripts/Test-SharpProofCoverage.ps1",
+        "scripts/SharpProof.ContainerExecution.psm1",
+        "SharpProof.Acceptance.Tests.slnf",
         "eng/acceptance/Verify.ps1",
         "eng/acceptance/preview-evidence.v1.json"
         ]
@@ -475,10 +481,12 @@
           "eng/container/toolchain.json",
           "eng/container/Dockerfile",
           "eng/container/entrypoint.sh",
+          "eng/container/dev-command.sh",
           "eng/container/Prepare-NativePayload.ps1",
           "eng/container/New-ContainerContract.ps1",
           "compose.yaml",
           "scripts/Invoke-SharpProofContainer.ps1",
+          "scripts/Invoke-SharpProofPackageTests.ps1",
           "scripts/Test-SharpProofContainerContract.ps1",
           "scripts/Test-SharpProofPackageConsumers.ps1"
         ]

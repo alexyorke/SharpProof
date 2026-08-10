@@ -14,6 +14,7 @@ $currentMaintainedDocuments = @(
     'docs\README.md',
     'docs\architecture.md',
     'docs\coverage-and-limits.md',
+    'docs\container-development.md',
     'docs\analysis-limits.md',
     'docs\public-api.md',
     'docs\diagnostic-examples.md',

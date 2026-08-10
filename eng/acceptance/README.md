@@ -75,7 +75,8 @@ files. Compiler MVIDs and reference identities remain artifact provenance and
 cache identity rather than runtime compatibility gates.
 Exact backend-model closure and independent whole-body counterexample replay
 are implemented for the admitted subset, and package validation covers the
-exact Attributes -> portable analyzer -> Windows verifier dependency chain.
+exact Attributes -> portable analyzer -> Linux container verifier dependency
+chain.
 The release workflow validates and promotes the already-tested bytes with
 hash, SBOM, repository, package-version, and tag checks. Optional SARIF 2.1.0
 projects only validated worker responses. Owner-enforced

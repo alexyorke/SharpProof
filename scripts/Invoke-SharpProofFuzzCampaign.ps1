@@ -112,7 +112,6 @@ function Invoke-FuzzRun {
         -FilePath 'pwsh' `
         -ArgumentList $arguments `
         -WorkingDirectory $repositoryRoot `
-        -WindowStyle Hidden `
         -Wait `
         -PassThru `
         -RedirectStandardOutput $standardOutput `

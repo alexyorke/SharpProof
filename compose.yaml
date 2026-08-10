@@ -1,5 +1,3 @@
-name: ${COMPOSE_PROJECT_NAME:-sharpproof}
-
 x-sharpproof-common: &sharpproof-common
   build:
     context: .
@@ -20,8 +18,8 @@ x-sharpproof-common: &sharpproof-common
     - sharpproof-nuget:/home/sharpproof/.nuget/packages
     - sharpproof-dotnet-home:/home/sharpproof/.dotnet
     - ./artifacts:/workspace/SharpProof/artifacts
-  mem_limit: ${SHARPPROOF_CONTAINER_MEMORY_LIMIT:-12g}
-  cpus: ${SHARPPROOF_CONTAINER_CPU_LIMIT:-4}
+  mem_limit: ${SHARPPROOF_CONTAINER_MEMORY_LIMIT:-24g}
+  cpus: ${SHARPPROOF_CONTAINER_CPU_LIMIT:-8}
 
 services:
   tooling:

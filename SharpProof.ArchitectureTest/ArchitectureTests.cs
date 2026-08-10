@@ -966,10 +966,11 @@ public sealed class ArchitectureTests
                     "'artifacts/mutation/trusted-mutations.json'"));
             Assert.That(
                 container,
-                Does.Contain("OutputPath = $mutationOutput"));
+                Does.Contain("-OutputPath $mutationOutput"));
             Assert.That(
                 container,
-                Does.Contain("$mutationArguments.Resume = $true"));
+                Does.Contain(
+                    "Invoke-SharpProofTrustedMutationsParallel.ps1"));
             Assert.That(
                 container,
                 Does.Not.Contain(
@@ -986,6 +987,114 @@ public sealed class ArchitectureTests
             Assert.That(
                 mutationDriver,
                 Does.Contain("$completedMutationNames.Contains"));
+
+            var parallelDriver = File.ReadAllText(Path.Combine(
+                RepositoryRoot(),
+                "scripts",
+                "Invoke-SharpProofTrustedMutationsParallel.ps1"));
+            Assert.That(parallelDriver, Does.Contain("MutationShardCount"));
+            Assert.That(parallelDriver, Does.Contain("Test-CompleteShard"));
+            Assert.That(
+                parallelDriver,
+                Does.Contain("selection = 'full'"));
+        }
+    }
+
+    [Test]
+    public void ContainerTestConcurrencyIsCatalogOwnedAndProjectScoped()
+    {
+        var root = RepositoryRoot();
+        using var contract = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "acceptance",
+            "contract.json")));
+        var automation = contract.RootElement.GetProperty("automation");
+        var container = contract.RootElement.GetProperty("container");
+        var compose = File.ReadAllText(Path.Combine(root, "compose.yaml"));
+        var execution = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "SharpProof.ContainerExecution.psm1"));
+        var acceptance = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "acceptance",
+            "Verify.ps1"));
+        var portable = File.ReadAllText(Path.Combine(
+            root,
+            "SharpProof.Portable.Tests.slnf"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(container.GetProperty("defaultCpuCount").GetInt32(),
+                Is.EqualTo(8));
+            Assert.That(container.GetProperty("defaultMemoryMiB").GetInt32(),
+                Is.EqualTo(24 * 1024));
+            Assert.That(
+                automation.GetProperty("testProjectCpuDivisor").GetInt32(),
+                Is.EqualTo(2));
+            Assert.That(compose, Does.Contain("CPU_LIMIT:-8"));
+            Assert.That(compose, Does.Contain("MEMORY_LIMIT:-24g"));
+            Assert.That(execution, Does.Contain("Environment]::ProcessorCount"));
+            Assert.That(
+                execution,
+                Does.Contain("SHARPPROOF_TEST_PROJECT_PARALLELISM"));
+            Assert.That(
+                acceptance,
+                Does.Contain("SharpProof.Acceptance.Tests.slnf"));
+            Assert.That(
+                acceptance,
+                Does.Contain("Invoke-SharpProofPackageTests.ps1"));
+            Assert.That(acceptance, Does.Contain("/m:$testProjectParallelism"));
+            Assert.That(
+                portable,
+                Does.Not.Contain("SharpProof.Package.Test"));
+            Assert.That(
+                portable,
+                Does.Not.Contain("SharpProof.Worker.Test"));
+        }
+    }
+
+    [Test]
+    public void DevContainerIsNonRootPinnedAndDoesNotNestDocker()
+    {
+        var root = RepositoryRoot();
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root,
+            ".devcontainer",
+            "devcontainer.json")));
+        var configuration = document.RootElement;
+        var dockerfile = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "container",
+            "Dockerfile"));
+        var postCreate = File.ReadAllText(Path.Combine(
+            root,
+            ".devcontainer",
+            "post-create.sh"));
+        var developerCommand = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "container",
+            "dev-command.sh"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                configuration.GetProperty("remoteUser").GetString(),
+                Is.EqualTo("sharpproof"));
+            Assert.That(
+                configuration.GetProperty("forwardPorts").GetArrayLength(),
+                Is.Zero);
+            Assert.That(
+                configuration.GetProperty("postCreateCommand").GetString(),
+                Does.Contain("post-create.sh"));
+            Assert.That(dockerfile, Does.Contain("/usr/local/bin/sp"));
+            Assert.That(postCreate, Does.Contain("sp restore"));
+            Assert.That(developerCommand, Does.Contain("Invoke-SharpProofContainer.ps1"));
+            Assert.That(developerCommand, Does.Not.Contain("docker"));
         }
     }
 

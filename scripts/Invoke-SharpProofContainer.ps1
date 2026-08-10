@@ -20,6 +20,9 @@ Set-StrictMode -Version Latest
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $repositoryRoot
 
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+
 if (-not $IsLinux -or [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne [System.Runtime.InteropServices.Architecture]::X64) {
     throw 'SharpProof container commands require Linux x64.'
 }
@@ -35,22 +38,8 @@ function Invoke-DotNet([string[]]$Arguments) {
     }
 }
 
-$portableTests = @(
-    'SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj',
-    'SharpProof.Attributes.Test/SharpProof.Attributes.Test.csproj',
-    'SharpProof.ContractForGenerator.Test/SharpProof.ContractForGenerator.Test.csproj',
-    'SharpProof.Contracts.Test/SharpProof.Contracts.Test.csproj',
-    'SharpProof.Dataflow.Test/SharpProof.Dataflow.Test.csproj',
-    'SharpProof.Effects.Test/SharpProof.Effects.Test.csproj',
-    'SharpProof.Frontend.Test/SharpProof.Frontend.Test.csproj',
-    'SharpProof.Ir.Test/SharpProof.Ir.Test.csproj',
-    'SharpProof.Meta.Analyzers.Test/SharpProof.Meta.Analyzers.Test.csproj',
-    'SharpProof.Smt.Test/SharpProof.Smt.Test.csproj',
-    'SharpProof.Specs.Test/SharpProof.Specs.Test.csproj',
-    'SharpProof.Summaries.Test/SharpProof.Summaries.Test.csproj',
-    'SharpProof.Testing.Test/SharpProof.Testing.Test.csproj',
-    'SharpProof.Verify.Test/SharpProof.Verify.Test.csproj'
-)
+$testProjectParallelism = Get-SharpProofTestProjectParallelism `
+    -RepositoryRoot $repositoryRoot
 
 switch ($Command) {
     'restore' {
@@ -64,21 +53,25 @@ switch ($Command) {
         Invoke-DotNet @('restore', $Target, '--locked-mode')
         $arguments = @(
             'test', $Target, '--configuration', $Configuration, '--no-restore')
+        if ($Target.EndsWith('.sln', [StringComparison]::OrdinalIgnoreCase) -or
+            $Target.EndsWith('.slnf', [StringComparison]::OrdinalIgnoreCase)) {
+            $arguments += "/m:$testProjectParallelism"
+        }
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
             $arguments += @('--filter', $TestFilter)
         }
         Invoke-DotNet $arguments
     }
     'portable-tests' {
-        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
-        foreach ($project in $portableTests) {
-            $arguments = @(
-                'test', $project, '--configuration', $Configuration, '--no-restore')
-            if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-                $arguments += @('--filter', $TestFilter)
-            }
-            Invoke-DotNet $arguments
+        $target = 'SharpProof.Portable.Tests.slnf'
+        Invoke-DotNet @('restore', $target, '--locked-mode')
+        $arguments = @(
+            'test', $target, '--configuration', $Configuration,
+            '--no-restore', "/m:$testProjectParallelism")
+        if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
+            $arguments += @('--filter', $TestFilter)
         }
+        Invoke-DotNet $arguments
     }
     'worker-tests' {
         Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
@@ -92,15 +85,12 @@ switch ($Command) {
         Invoke-DotNet $arguments
     }
     'package-tests' {
-        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
-        $arguments = @(
-            'test',
-            'SharpProof.Package.Test/SharpProof.Package.Test.csproj',
-            '--configuration', $Configuration, '--no-restore')
-        if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-            $arguments += @('--filter', $TestFilter)
-        }
-        Invoke-DotNet $arguments
+        & (Join-Path `
+            $repositoryRoot 'scripts/Invoke-SharpProofPackageTests.ps1') `
+            -Configuration $Configuration `
+            -TestFilter $TestFilter `
+            -PackageSource $PackageSource
+        if ($LASTEXITCODE -ne 0) { throw 'Package tests failed.' }
     }
     'package-consumers' {
         if ([string]::IsNullOrWhiteSpace($PackageSource)) {
@@ -162,22 +152,12 @@ switch ($Command) {
         [IO.Directory]::CreateDirectory((Join-Path $repositoryRoot (
                     Split-Path -Parent $mutationOutput))) | Out-Null
         $commit = (& git rev-parse HEAD).Trim()
-        $mutationArguments = @{
-            Configuration = $Configuration
-            OutputPath = $mutationOutput
-            ExpectedCommit = $commit
-        }
-        $resolvedMutationOutput = Join-Path $repositoryRoot $mutationOutput
-        if (Test-Path -LiteralPath $resolvedMutationOutput -PathType Leaf) {
-            $existingMutationEvidence = Get-Content `
-                -LiteralPath $resolvedMutationOutput `
-                -Raw | ConvertFrom-Json
-            if ([string]$existingMutationEvidence.commit -eq $commit) {
-                $mutationArguments.Resume = $true
-            }
-        }
-        & (Join-Path $repositoryRoot 'scripts/Test-SharpProofTrustedMutations.ps1') `
-            @mutationArguments
+        & (Join-Path `
+            $repositoryRoot `
+            'scripts/Invoke-SharpProofTrustedMutationsParallel.ps1') `
+            -Configuration $Configuration `
+            -OutputPath $mutationOutput `
+            -ExpectedCommit $commit
         if ($LASTEXITCODE -ne 0) { throw 'Trusted mutation validation failed.' }
     }
     'dependency-audit' {

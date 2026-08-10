@@ -479,60 +479,40 @@ try {
             -TimeoutSeconds ([int]$contract.automation.solutionBuildWallSeconds)
     }
 
-    $testProjects = @(
-        'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj',
-        'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj',
-        'SharpProof.Attributes.Test\SharpProof.Attributes.Test.csproj',
-        'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj',
-        'SharpProof.Contracts.Test\SharpProof.Contracts.Test.csproj',
-        'SharpProof.Dataflow.Test\SharpProof.Dataflow.Test.csproj',
-        'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj',
-        'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj',
-        'SharpProof.Ir.Test\SharpProof.Ir.Test.csproj',
-        'SharpProof.Meta.Analyzers.Test\SharpProof.Meta.Analyzers.Test.csproj',
-        'SharpProof.Package.Test\SharpProof.Package.Test.csproj',
-        'SharpProof.Smt.Test\SharpProof.Smt.Test.csproj',
-        'SharpProof.Specs.Test\SharpProof.Specs.Test.csproj',
-        'SharpProof.Summaries.Test\SharpProof.Summaries.Test.csproj',
-        'SharpProof.Testing.Test\SharpProof.Testing.Test.csproj',
-        'SharpProof.Gates.Test\SharpProof.Gates.Test.csproj',
-        'SharpProof.Fuzz.Test\SharpProof.Fuzz.Test.csproj',
-        'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj',
-        'SharpProof.Verify.Test\SharpProof.Verify.Test.csproj'
-    )
-
-    foreach ($testProject in $testProjects) {
-        if ($SkipTests) {
-            break
-        }
-        $resolvedTestProject = Join-Path $repositoryRoot $testProject
-        if (-not (Test-Path -LiteralPath $resolvedTestProject -PathType Leaf)) {
-            throw "Required test project is missing: $testProject"
-        }
-
-        $testTimeoutSeconds = if ($testProject -like 'SharpProof.Package.Test*') {
-            1800
-        } else {
-            300
-        }
-        $testArguments = @(
-            'test',
-            $testProject,
-            '-c',
-            $Configuration,
-            '--no-build',
-            '--logger',
-            'console;verbosity=minimal'
-        )
-        if ($testProject -like 'SharpProof.Gates.Test*') {
-            $testArguments += @(
-                '--filter',
-                'TestCategory!=Performance&TestCategory!=Coverage'
-            )
-        }
+    if (-not $SkipTests) {
+        Import-Module (Join-Path `
+            $repositoryRoot 'scripts/SharpProof.ContainerExecution.psm1') -Force
+        $testProjectParallelism = Get-SharpProofTestProjectParallelism `
+            -RepositoryRoot $repositoryRoot
         Invoke-SharpProofDotnet `
-            -TimeoutSeconds $testTimeoutSeconds `
-            -Arguments $testArguments
+            -TimeoutSeconds ([int]$contract.automation.solutionTestWallSeconds) `
+            -Arguments @(
+                'test',
+                'SharpProof.Acceptance.Tests.slnf',
+                '-c',
+                $Configuration,
+                '--no-build',
+                '--no-restore',
+                "/m:$testProjectParallelism",
+                '--filter',
+                'TestCategory!=Performance&TestCategory!=Coverage',
+                '--logger',
+                'console;verbosity=minimal'
+            )
+
+        $packageTestArguments = @{
+            Configuration = $Configuration
+            TimeoutSeconds = [int]$contract.automation.solutionTestWallSeconds
+        }
+        if ($Configuration -eq 'Release') {
+            $packageTestArguments.NoBuild = $true
+        }
+        & (Join-Path `
+            $repositoryRoot 'scripts/Invoke-SharpProofPackageTests.ps1') `
+            @packageTestArguments
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Package test shards failed.'
+        }
     }
 
     if (-not $SkipTests) {

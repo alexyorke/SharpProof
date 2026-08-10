@@ -132,7 +132,6 @@ function Invoke-PilotDotNet {
     $startInfo.WorkingDirectory = $WorkingDirectory
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
-    $startInfo.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
     $payload = [ordered]@{
         wrapper = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
         log = $LogPath

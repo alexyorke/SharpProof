@@ -70,7 +70,6 @@ try {
             $encodedCommand
         ) `
         -WorkingDirectory $repositoryRoot `
-        -WindowStyle Hidden `
         -Wait `
         -PassThru `
         -RedirectStandardOutput $rawOutput `

@@ -7,6 +7,12 @@ param(
 
     [string[]]$MutationName = @(),
 
+    [ValidateRange(0, 15)]
+    [int]$MutationShardIndex = 0,
+
+    [ValidateRange(1, 16)]
+    [int]$MutationShardCount = 1,
+
     [Parameter(Mandatory = $true)]
     [string]$ExpectedCommit,
 
@@ -1136,6 +1142,13 @@ if ($catalogCount -ne [int]$mutationPolicy.expectedCatalogCount -or
         'catalog policy.')
 }
 
+if ($MutationName.Count -gt 0 -and $MutationShardCount -ne 1) {
+    throw 'Named mutation selection cannot be combined with catalog sharding.'
+}
+if ($MutationShardIndex -ge $MutationShardCount) {
+    throw 'MutationShardIndex must be less than MutationShardCount.'
+}
+
 if ($MutationName.Count -gt 0) {
     $selection = 'selected'
     $knownNames = @($mutations.Name)
@@ -1145,6 +1158,15 @@ if ($MutationName.Count -gt 0) {
         throw "Unknown mutation name(s): $($unknownNames -join ', ')."
     }
     $mutations = @($mutations | Where-Object { $_.Name -in $requestedNames })
+}
+elseif ($MutationShardCount -gt 1) {
+    $selection = 'selected'
+    $chunkSize = [int][Math]::Ceiling($catalogCount / $MutationShardCount)
+    $start = $MutationShardIndex * $chunkSize
+    $mutations = @($mutations | Select-Object -Skip $start -First $chunkSize)
+    if ($mutations.Count -eq 0) {
+        throw "Mutation shard $MutationShardIndex is empty."
+    }
 }
 else {
     $selection = 'full'
@@ -1321,8 +1343,17 @@ try {
         throw "Mutation workspace restore failed; see $logs\restore.log."
     }
 
+    $baselineEvidenceByTarget = @{}
     foreach ($mutation in $mutations) {
         if ($completedMutationNames.Contains([string]$mutation.Name)) {
+            continue
+        }
+        $baselineKey = [string]$mutation.Project + '|' +
+            [string]$mutation.Filter
+        if ($baselineEvidenceByTarget.ContainsKey($baselineKey)) {
+            $mutation | Add-Member `
+                -NotePropertyName BaselineLedger `
+                -NotePropertyValue @($baselineEvidenceByTarget[$baselineKey])
             continue
         }
         $baselineTrxName = $mutation.Name + '-baseline.trx'
@@ -1360,6 +1391,8 @@ try {
         $mutation | Add-Member `
             -NotePropertyName BaselineLedger `
             -NotePropertyValue @($baselineEvidence.testLedger)
+        $baselineEvidenceByTarget[$baselineKey] = @(
+            $baselineEvidence.testLedger)
     }
 
     $results = @($completedResults)
@@ -1378,19 +1411,6 @@ try {
                 $path,
                 $mutatedContent,
                 [Text.UTF8Encoding]::new($false))
-            $buildExit = Invoke-IsolatedDotnet `
-                -Arguments @(
-                    'build',
-                    $mutation.Project,
-                    '-c',
-                    $Configuration,
-                    '--no-restore') `
-                -LogName ($mutation.Name + '-build.log')
-            if ($buildExit -ne 0) {
-                throw (
-                    "Mutation '$($mutation.Name)' did not compile; see " +
-                    "$logs\$($mutation.Name)-build.log.")
-            }
             $testTrxName = $mutation.Name + '-test.trx'
             $testTrx = Join-Path $logs $testTrxName
             Remove-Item -LiteralPath $testTrx -Force -ErrorAction SilentlyContinue
@@ -1400,7 +1420,7 @@ try {
                     $mutation.Project,
                     '-c',
                     $Configuration,
-                    '--no-build',
+                    '--no-restore',
                     '--filter',
                     $mutation.Filter,
                     '--logger',
@@ -1419,6 +1439,12 @@ try {
                 throw (
                     "Mutation '$($mutation.Name)' timed out instead of being " +
                     "killed by an assertion.")
+            }
+            if (-not (Test-Path -LiteralPath $testTrx -PathType Leaf)) {
+                throw (
+                    "Mutation '$($mutation.Name)' did not compile or did " +
+                    "not produce test evidence; see " +
+                    "$logs\$($mutation.Name)-test.log.")
             }
             $expectedMethodName = $mutation.Filter.Substring(
                 'FullyQualifiedName~'.Length)

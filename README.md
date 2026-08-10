@@ -46,6 +46,8 @@ execution, Rider, and ARM64 verifier containers are not supported for this
 preview. The portable analyzer remains separately cross-platform. The exact
 host and filesystem boundary is listed in
 [Preview support boundary](docs/preview-support.md).
+The permanent editor workflow is documented in
+[Container development](docs/container-development.md).
 
 For repository development, Docker is the only required tool:
 
@@ -57,8 +59,30 @@ docker compose run --rm tooling worker-tests
 docker compose run --rm tooling dev
 ```
 
-Set a distinct `COMPOSE_PROJECT_NAME` for each worktree. NuGet and .NET home
-caches are then private to that worktree's Compose project, while task commands
+For a permanent editor environment, open the repository in VS Code and choose
+**Dev Containers: Reopen in Container**. The container validates its pinned
+contract and performs a locked restore once. Its terminal runs as the non-root
+`sharpproof` user and exposes the same commands without requiring nested
+Docker:
+
+```text
+sp build
+sp portable-tests
+sp worker-tests
+sp package-tests
+sp acceptance -Configuration Release
+```
+
+The default container budget is 8 CPUs and 24 GiB. Test-project concurrency is
+derived from the CPUs visible inside the container (one lane per two CPUs), so
+changing `SHARPPROOF_CONTAINER_CPU_LIMIT` also changes orchestration without a
+second hardcoded worker count. `SHARPPROOF_TEST_PROJECT_PARALLELISM` is an
+explicit diagnostic override and cannot exceed the visible CPU count.
+
+Compose derives its default project name from the worktree directory. Set an
+explicit distinct `COMPOSE_PROJECT_NAME` when two worktrees share the same
+directory basename. NuGet and .NET home caches are then private to that
+worktree's Compose project, while task commands
 build in a temporary container workspace instead of writing shared `bin` or
 `obj` directories.
 

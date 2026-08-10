@@ -231,10 +231,7 @@ function Invoke-ConsumerDotNet {
         [string[]]$Arguments,
 
         [Parameter(Mandatory = $true)]
-        [string]$RepositoryRoot,
-
-        [Parameter(Mandatory = $true)]
-        [bool]$WindowsHost
+        [string]$RepositoryRoot
     )
 
     Push-Location $WorkingDirectory
@@ -329,9 +326,6 @@ function Test-SharpProofFrameworkConsumers {
         [Parameter(Mandatory = $true)]
         [string]$RepositoryRoot,
 
-        [Parameter(Mandatory = $true)]
-        [bool]$WindowsHost,
-
         [Parameter()]
         [string]$SdkVersion
     )
@@ -399,8 +393,7 @@ function Test-SharpProofFrameworkConsumers {
         $actualSdk = Invoke-ConsumerDotNet `
             -WorkingDirectory $root `
             -Arguments @('--version') `
-            -RepositoryRoot $RepositoryRoot `
-            -WindowsHost $WindowsHost
+            -RepositoryRoot $RepositoryRoot
         if (-not [string]::IsNullOrWhiteSpace($SdkVersion) -and
             $actualSdk.Trim() -ne $SdkVersion) {
             throw (
@@ -463,8 +456,7 @@ function Test-SharpProofFrameworkConsumers {
                     '--packages',
                     $cache,
                     '--nologo') `
-                -RepositoryRoot $RepositoryRoot `
-                -WindowsHost $WindowsHost | Out-Null
+                -RepositoryRoot $RepositoryRoot | Out-Null
             $analyzers = Invoke-ConsumerDotNet `
                 -WorkingDirectory $consumer `
                 -Arguments @(
@@ -472,8 +464,7 @@ function Test-SharpProofFrameworkConsumers {
                     'Consumer.csproj',
                     '-getItem:Analyzer',
                     '--nologo') `
-                -RepositoryRoot $RepositoryRoot `
-                -WindowsHost $WindowsHost
+                -RepositoryRoot $RepositoryRoot
             Assert-SharpProofPortableAnalyzerItem `
                 -Output $analyzers `
                 -Framework $framework
@@ -488,8 +479,7 @@ function Test-SharpProofFrameworkConsumers {
                     '--nologo',
                     '/nodeReuse:false',
                     '-p:UseSharedCompilation=false') `
-                -RepositoryRoot $RepositoryRoot `
-                -WindowsHost $WindowsHost | Out-Null
+                -RepositoryRoot $RepositoryRoot | Out-Null
         }
     }
     finally {
@@ -508,8 +498,6 @@ function Test-SharpProofFrameworkConsumers {
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $testProject = Join-Path $repositoryRoot 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
-$isWindowsHost = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
-    [System.Runtime.InteropServices.OSPlatform]::Windows)
 $isSupportedWorkerHost = $IsLinux -and
     $env:SHARPPROOF_CONTAINER -ceq '1' -and
     [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq
@@ -554,7 +542,6 @@ if ($null -ne $resolvedPackageSource) {
         -Source $resolvedPackageSource `
         -Version $packageVersion `
         -RepositoryRoot $repositoryRoot `
-        -WindowsHost $isWindowsHost `
         -SdkVersion $ConsumerSdkVersion
 }
 elseif ($FrameworkConsumersOnly) {
@@ -578,9 +565,25 @@ if ($null -ne $resolvedPackageSource) {
 
 Push-Location $repositoryRoot
 try {
-    & dotnet test $testProject `
-        --configuration $Configuration `
-        --logger 'console;verbosity=minimal'
+    $packageTestArguments = @(
+        'test',
+        $testProject,
+        '--configuration',
+        $Configuration,
+        '--logger',
+        'console;verbosity=minimal')
+    if ($null -ne $resolvedPackageSource) {
+        # Framework compatibility is exercised above. Re-run only the exact
+        # package graph, analyzer discovery, and real verifier proof here;
+        # the complete package suite belongs to the ordinary test/acceptance
+        # lane and must not be duplicated for every consumer job.
+        $focusedPackageFilter =
+            'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.PackageGraphAndLayoutsAreExact|' +
+            'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.StrictAnalyzerSetDiscoversEachEntrypointOnce|' +
+            'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.VerifierPackageTransitivelySuppliesPortableProduct'
+        $packageTestArguments += @('--filter', $focusedPackageFilter)
+    }
+    & dotnet @packageTestArguments
     if ($LASTEXITCODE -ne 0) {
         throw "SharpProof package consumer tests failed with exit code $LASTEXITCODE."
     }
