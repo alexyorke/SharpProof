@@ -63,26 +63,58 @@ $managedSettings = Join-Path `
     $repositoryRoot `
     'eng\coverage\SharpProof.Managed.runsettings'
 
-# The Microsoft collector is used instead of Coverlet, and authenticated
-# compiler inputs are excluded from this broad pass below. Child collection is
-# disabled so concurrently tested package payloads cannot merge a second build
-# of the same assembly and PDB into the project coverage universe.
+# The Microsoft collector is used instead of Coverlet. Static managed
+# instrumentation rewrites assemblies on disk, so concurrent shards receive
+# private managed binaries while immutable dependencies remain hard-linked.
+# Child collection remains disabled so packaged consumer builds cannot merge a
+# second build of the same assembly and PDB into the project coverage universe.
 $broadFilter = 'TestCategory!=Performance&TestCategory!=Coverage'
 if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
     $broadFilter = "($broadFilter)&($TestFilter)"
 }
-& $dotnetWrapper `
-    -TimeoutSeconds $TimeoutSeconds `
-    test (Join-Path $repositoryRoot 'SharpProof.Dev.Tests.slnf') `
-    -c Release `
-    --no-build `
-    "/m:$testProjectParallelism" `
-    --filter $broadFilter `
-    --settings $managedSettings `
-    --collect 'Code Coverage;Format=Cobertura' `
-    --results-directory $resolvedResultsDirectory
-if ($LASTEXITCODE -ne 0) {
-    throw "Coverage collection failed with exit code $LASTEXITCODE."
+if ([string]::IsNullOrWhiteSpace($TestFilter)) {
+    $semanticResults = Join-Path $resolvedResultsDirectory 'semantic'
+    & (Join-Path $PSScriptRoot 'Invoke-SharpProofSemanticTests.ps1') `
+        -Configuration Release `
+        -NoBuild `
+        -TimeoutSeconds $TimeoutSeconds `
+        -TestFilter $broadFilter `
+        -CoverageSettings $managedSettings `
+        -CoverageResultsDirectory $semanticResults
+    if ($LASTEXITCODE -ne 0) {
+        throw (
+            'Sharded semantic coverage failed with exit code ' +
+            "$LASTEXITCODE.")
+    }
+
+    $packageResults = Join-Path $resolvedResultsDirectory 'package'
+    & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
+        -Configuration Release `
+        -NoBuild `
+        -TimeoutSeconds $TimeoutSeconds `
+        -CoverageSettings $managedSettings `
+        -CoverageResultsDirectory $packageResults
+    if ($LASTEXITCODE -ne 0) {
+        throw (
+            'Sharded package coverage failed with exit code ' +
+            "$LASTEXITCODE.")
+    }
+}
+else {
+    # Preserve a single-invocation targeted probe for arbitrary user filters.
+    & $dotnetWrapper `
+        -TimeoutSeconds $TimeoutSeconds `
+        test (Join-Path $repositoryRoot 'SharpProof.Dev.Tests.slnf') `
+        -c Release `
+        --no-build `
+        "/m:$testProjectParallelism" `
+        --filter $broadFilter `
+        --settings $managedSettings `
+        --collect 'Code Coverage;Format=Cobertura' `
+        --results-directory $resolvedResultsDirectory
+    if ($LASTEXITCODE -ne 0) {
+        throw "Coverage collection failed with exit code $LASTEXITCODE."
+    }
 }
 
 # SharpProof.Attributes is a compiler-input payload whose exact bytes are

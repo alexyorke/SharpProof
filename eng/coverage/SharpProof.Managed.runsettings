@@ -16,6 +16,8 @@
             <AllowLowIntegrityProcesses>False</AllowLowIntegrityProcesses>
             <CollectFromChildProcesses>False</CollectFromChildProcesses>
             <CollectAspDotNet>False</CollectAspDotNet>
+            <EnableStaticManagedInstrumentation>True</EnableStaticManagedInstrumentation>
+            <EnableDynamicManagedInstrumentation>False</EnableDynamicManagedInstrumentation>
             <EnableStaticNativeInstrumentation>False</EnableStaticNativeInstrumentation>
             <EnableDynamicNativeInstrumentation>False</EnableDynamicNativeInstrumentation>
           </CodeCoverage>

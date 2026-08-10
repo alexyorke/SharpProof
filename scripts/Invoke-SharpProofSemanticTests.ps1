@@ -6,7 +6,13 @@ param(
     [switch]$NoBuild,
 
     [ValidateRange(1, 86400)]
-    [int]$TimeoutSeconds = 1800
+    [int]$TimeoutSeconds = 1800,
+
+    [string]$TestFilter = '',
+
+    [string]$CoverageSettings = '',
+
+    [string]$CoverageResultsDirectory = ''
 )
 
 Set-StrictMode -Version Latest
@@ -22,6 +28,38 @@ Import-Module (Join-Path `
 $parallelism = Get-SharpProofTestProjectParallelism `
     -RepositoryRoot $repositoryRoot
 $dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
+$coverageEnabled =
+    -not [string]::IsNullOrWhiteSpace($CoverageSettings) -or
+    -not [string]::IsNullOrWhiteSpace($CoverageResultsDirectory)
+if ($coverageEnabled -and
+    ([string]::IsNullOrWhiteSpace($CoverageSettings) -or
+     [string]::IsNullOrWhiteSpace($CoverageResultsDirectory))) {
+    throw (
+        'CoverageSettings and CoverageResultsDirectory must be supplied ' +
+        'together.')
+}
+$resolvedCoverageSettings = if ($coverageEnabled) {
+    (Resolve-Path -LiteralPath $CoverageSettings -ErrorAction Stop).Path
+}
+else {
+    ''
+}
+$resolvedCoverageResults = if ($coverageEnabled) {
+    [IO.Path]::GetFullPath($CoverageResultsDirectory)
+}
+else {
+    ''
+}
+if ($coverageEnabled) {
+    [IO.Directory]::CreateDirectory($resolvedCoverageResults) | Out-Null
+}
+$isolatedOutputRoot = if ($coverageEnabled) {
+    Join-Path $repositoryRoot (
+        '.sharpproof-coverage-output-' + [Guid]::NewGuid().ToString('N'))
+}
+else {
+    ''
+}
 
 function Invoke-RequiredDotnet {
     param([Parameter(Mandatory = $true)][string[]]$Arguments)
@@ -41,7 +79,8 @@ if (-not $NoBuild) {
 $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
 [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
 $timingOutput = Join-Path $timingDirectory (
-    'semantic-tests-' + $Configuration.ToLowerInvariant() + '.json')
+    'semantic-tests-' + $Configuration.ToLowerInvariant() +
+    $(if ($coverageEnabled) { '-coverage' } else { '' }) + '.json')
 $priorDurations = @{}
 if (Test-Path -LiteralPath $timingOutput -PathType Leaf) {
     try {
@@ -84,38 +123,51 @@ $workerRemainderFilter = @(
 
 $testProject = Join-Path $repositoryRoot (
     'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj')
-$semanticFilter =
+$semanticFilter = if ([string]::IsNullOrWhiteSpace($TestFilter)) {
     'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
+}
+else {
+    $TestFilter
+}
+$claimTaskFilter = "($claimFilter)&($semanticFilter)"
+$manifestTaskFilter = "($manifestFilter)&($semanticFilter)"
+$workerCoreTaskFilter = "($workerCoreFilter)&($semanticFilter)"
+$workerRemainderTaskFilter = "($workerRemainderFilter)&($semanticFilter)"
 $tasks = @(
     [pscustomobject]@{
         Name = 'semantic-projects'
         Target = Join-Path $repositoryRoot 'SharpProof.Semantic.Tests.slnf'
         Filter = $semanticFilter
         ProjectParallelism = $mainParallelism
+        IsolateOutput = $false
     },
     [pscustomobject]@{
         Name = 'worker-claim-manifest'
         Target = $testProject
-        Filter = $claimFilter
+        Filter = $claimTaskFilter
         ProjectParallelism = 0
+        IsolateOutput = $true
     },
     [pscustomobject]@{
         Name = 'worker-compiler-manifest'
         Target = $testProject
-        Filter = $manifestFilter
+        Filter = $manifestTaskFilter
         ProjectParallelism = 0
+        IsolateOutput = $true
     },
     [pscustomobject]@{
         Name = 'worker-core'
         Target = $testProject
-        Filter = $workerCoreFilter
+        Filter = $workerCoreTaskFilter
         ProjectParallelism = 0
+        IsolateOutput = $true
     },
     [pscustomobject]@{
         Name = 'worker-remainder'
         Target = $testProject
-        Filter = $workerRemainderFilter
+        Filter = $workerRemainderTaskFilter
         ProjectParallelism = 0
+        IsolateOutput = $true
     }
 )
 foreach ($task in $tasks) {
@@ -131,8 +183,14 @@ $tasks = @($tasks | Sort-Object `
     @{ Expression = 'EstimatedMilliseconds'; Descending = $true }, `
     @{ Expression = 'Name'; Descending = $false })
 
-$resultsRoot = Join-Path ([IO.Path]::GetTempPath()) (
-    'sharpproof-semantic-tests-' + [Guid]::NewGuid().ToString('N'))
+$temporaryResults = -not $coverageEnabled
+$resultsRoot = if ($coverageEnabled) {
+    $resolvedCoverageResults
+}
+else {
+    Join-Path ([IO.Path]::GetTempPath()) (
+        'sharpproof-semantic-tests-' + [Guid]::NewGuid().ToString('N'))
+}
 [IO.Directory]::CreateDirectory($resultsRoot) | Out-Null
 $pending = [Collections.Generic.Queue[object]]::new()
 foreach ($task in $tasks) {
@@ -154,15 +212,34 @@ try {
             $startInfo.UseShellExecute = $false
             $startInfo.RedirectStandardOutput = $true
             $startInfo.RedirectStandardError = $true
+            $isolatedOutput = ''
+            if ($coverageEnabled -and $task.IsolateOutput) {
+                $isolatedOutput = New-SharpProofIsolatedTestOutput `
+                    -SourceDirectory (Join-Path $repositoryRoot (
+                        'SharpProof.Worker.Test/bin/' + $Configuration +
+                        '/net9.0')) `
+                    -DestinationDirectory (Join-Path `
+                        $isolatedOutputRoot (
+                            $task.Name + '/' + $Configuration + '/net9.0'))
+            }
             $arguments = @(
                 'test', $task.Target, '-c', $Configuration,
-                '--no-build', '--no-restore',
+                '--no-build', '--no-restore')
+            if (-not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
+                $arguments += '-p:OutDir=' + $isolatedOutput + '/'
+            }
+            $arguments += @(
                 '--filter', $task.Filter,
                 '--logger', 'console;verbosity=minimal',
                 '--logger', "trx;LogFileName=$($task.Name).trx",
-                '--results-directory', $resultsRoot)
+                '--results-directory', (Join-Path $resultsRoot $task.Name))
             if ($task.ProjectParallelism -gt 0) {
                 $arguments += "/m:$($task.ProjectParallelism)"
+            }
+            if ($coverageEnabled) {
+                $arguments += @(
+                    '--settings', $resolvedCoverageSettings,
+                    '--collect', 'Code Coverage;Format=Cobertura')
             }
             foreach ($argument in $arguments) {
                 [void]$startInfo.ArgumentList.Add($argument)
@@ -232,8 +309,12 @@ finally {
         }
         $active.Process.Dispose()
     }
-    if ([IO.Directory]::Exists($resultsRoot)) {
+    if ($temporaryResults -and [IO.Directory]::Exists($resultsRoot)) {
         [IO.Directory]::Delete($resultsRoot, $true)
+    }
+    if ($coverageEnabled -and
+        [IO.Directory]::Exists($isolatedOutputRoot)) {
+        [IO.Directory]::Delete($isolatedOutputRoot, $true)
     }
 }
 

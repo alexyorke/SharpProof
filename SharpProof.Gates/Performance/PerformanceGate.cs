@@ -60,12 +60,40 @@ internal static class PerformanceGate
 {
     private const int RetainedCompilationCount = 40;
 
-    public static async Task<PerformanceGateResult> RunAsync(
+    public static Task<PerformanceGateResult> RunAsync(
         string repositoryRoot,
         CancellationToken cancellationToken = default)
     {
         var contract = AcceptancePerformanceContract.Load(repositoryRoot);
         ValidateContract(contract);
+        return RunValidatedAsync(
+            repositoryRoot,
+            contract,
+            cancellationToken);
+    }
+
+    internal static Task<PerformanceGateResult> RunStructuralCoverageAsync(
+        string repositoryRoot,
+        CancellationToken cancellationToken = default)
+    {
+        var contract = AcceptancePerformanceContract.Load(repositoryRoot);
+        ValidateContract(contract);
+        return RunValidatedAsync(
+            repositoryRoot,
+            contract with
+            {
+                Warmups = 1,
+                Samples = 2,
+                IdeEdits = 2
+            },
+            cancellationToken);
+    }
+
+    private static async Task<PerformanceGateResult> RunValidatedAsync(
+        string repositoryRoot,
+        AcceptancePerformanceContract contract,
+        CancellationToken cancellationToken)
+    {
         var callBearingSource =
             CreateCallBearingUnannotatedAdvisorySource(320);
         var callFreeSource =

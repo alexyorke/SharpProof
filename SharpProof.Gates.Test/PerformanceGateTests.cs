@@ -548,7 +548,7 @@ public sealed class PerformanceGateTests
     {
         var root = RepositoryLayout.FindRoot();
         var smoke = await PerformanceGate.RunSmokeAsync(root);
-        var result = await PerformanceGate.RunAsync(root);
+        var result = await PerformanceGate.RunStructuralCoverageAsync(root);
 
         using (Assert.EnterMultipleScope())
         {
@@ -556,12 +556,16 @@ public sealed class PerformanceGateTests
             Assert.That(smoke.Failures, Is.Empty);
             Assert.That(smoke.PackageBuildSamples, Has.Length.EqualTo(4));
             Assert.That(smoke.ForcedTerminationMilliseconds, Is.Positive);
+            Assert.That(result.Warmups, Is.EqualTo(1));
+            Assert.That(result.Samples, Is.EqualTo(2));
+            Assert.That(result.IdeEdits, Is.EqualTo(2));
         }
-        AssertProtocolEvidence(result);
+        AssertProtocolEvidence(result, expectedSamples: 2);
     }
 
     private static void AssertProtocolEvidence(
-        PerformanceGateResult result)
+        PerformanceGateResult result,
+        int expectedSamples = 30)
     {
         using (Assert.EnterMultipleScope())
         {
@@ -580,14 +584,14 @@ public sealed class PerformanceGateTests
                 Is.EqualTo(PackageBuildEstimator.Version));
             Assert.That(
                 result.PackageBuildSamples.Length,
-                Is.EqualTo(30));
+                Is.EqualTo(expectedSamples));
             Assert.That(
                 result.OrderBalancedRatios.Length,
-                Is.EqualTo(15));
+                Is.EqualTo(expectedSamples / 2));
             Assert.That(
                 result.PackageBuildSamples.Count(
                     static sample => sample.UnannotatedAdvisoryFirst),
-                Is.EqualTo(15));
+                Is.EqualTo(expectedSamples / 2));
             Assert.That(
                 result.PackageBuildSdk.ResolvedVersion,
                 Is.Not.Empty);

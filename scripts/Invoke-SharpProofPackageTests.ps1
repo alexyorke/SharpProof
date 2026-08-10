@@ -10,7 +10,11 @@ param(
     [switch]$NoBuild,
 
     [ValidateRange(1, 86400)]
-    [int]$TimeoutSeconds = 1800
+    [int]$TimeoutSeconds = 1800,
+
+    [string]$CoverageSettings = '',
+
+    [string]$CoverageResultsDirectory = ''
 )
 
 Set-StrictMode -Version Latest
@@ -28,6 +32,35 @@ $parallelism = Get-SharpProofTestProjectParallelism `
 $dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
 $testProject = Join-Path `
     $repositoryRoot 'SharpProof.Package.Test/SharpProof.Package.Test.csproj'
+$coverageEnabled =
+    -not [string]::IsNullOrWhiteSpace($CoverageSettings) -or
+    -not [string]::IsNullOrWhiteSpace($CoverageResultsDirectory)
+if ($coverageEnabled -and
+    ([string]::IsNullOrWhiteSpace($CoverageSettings) -or
+     [string]::IsNullOrWhiteSpace($CoverageResultsDirectory))) {
+    throw (
+        'CoverageSettings and CoverageResultsDirectory must be supplied ' +
+        'together.')
+}
+$resolvedCoverageSettings = if ($coverageEnabled) {
+    (Resolve-Path -LiteralPath $CoverageSettings -ErrorAction Stop).Path
+}
+else {
+    ''
+}
+$resolvedCoverageResults = if ($coverageEnabled) {
+    [IO.Path]::GetFullPath($CoverageResultsDirectory)
+}
+else {
+    ''
+}
+$isolatedOutputRoot = if ($coverageEnabled) {
+    Join-Path $repositoryRoot (
+        '.sharpproof-coverage-output-' + [Guid]::NewGuid().ToString('N'))
+}
+else {
+    ''
+}
 
 function Invoke-RequiredDotnet {
     param([Parameter(Mandatory = $true)][string[]]$Arguments)
@@ -107,7 +140,12 @@ $feed = if ([string]::IsNullOrWhiteSpace($PackageSource)) {
 else {
     (Resolve-Path -LiteralPath $PackageSource -ErrorAction Stop).Path
 }
-$results = Join-Path $root 'results'
+$results = if ($coverageEnabled) {
+    $resolvedCoverageResults
+}
+else {
+    Join-Path $root 'results'
+}
 if ([string]::IsNullOrWhiteSpace($PackageSource)) {
     [IO.Directory]::CreateDirectory($feed) | Out-Null
 }
@@ -116,7 +154,8 @@ $campaign = [Diagnostics.Stopwatch]::StartNew()
 $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
 [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
 $timingOutput = Join-Path $timingDirectory (
-    'package-tests-' + $Configuration.ToLowerInvariant() + '.json')
+    'package-tests-' + $Configuration.ToLowerInvariant() +
+    $(if ($coverageEnabled) { '-coverage' } else { '' }) + '.json')
 $priorMethodMilliseconds = @{}
 $priorFilterMilliseconds = @{}
 if (Test-Path -LiteralPath $timingOutput -PathType Leaf) {
@@ -304,12 +343,33 @@ try {
             $startInfo.RedirectStandardOutput = $true
             $startInfo.RedirectStandardError = $true
             $startInfo.Environment['SHARPPROOF_PACKAGE_SOURCE'] = $feed
-            foreach ($argument in @(
-                    'test', $testProject, '-c', $Configuration,
-                    '--no-build', '--no-restore', '--filter', $shard.Filter,
+            $isolatedOutput = ''
+            if ($coverageEnabled) {
+                $isolatedOutput = New-SharpProofIsolatedTestOutput `
+                    -SourceDirectory (Join-Path $repositoryRoot (
+                        'SharpProof.Package.Test/bin/' + $Configuration +
+                        '/net9.0')) `
+                    -DestinationDirectory (Join-Path `
+                        $isolatedOutputRoot (
+                            $shard.Name + '/' + $Configuration + '/net9.0'))
+            }
+            $arguments = @(
+                'test', $testProject, '-c', $Configuration,
+                '--no-build', '--no-restore')
+            if (-not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
+                $arguments += '-p:OutDir=' + $isolatedOutput + '/'
+            }
+            $arguments += @(
+                    '--filter', $shard.Filter,
                     '--logger', 'console;verbosity=minimal',
                     '--logger', "trx;LogFileName=$($shard.Name).trx",
-                    '--results-directory', (Join-Path $results $shard.Name))) {
+                    '--results-directory', (Join-Path $results $shard.Name))
+            if ($coverageEnabled) {
+                $arguments += @(
+                    '--settings', $resolvedCoverageSettings,
+                    '--collect', 'Code Coverage;Format=Cobertura')
+            }
+            foreach ($argument in $arguments) {
                 [void]$startInfo.ArgumentList.Add($argument)
             }
             $process = [Diagnostics.Process]::new()
@@ -433,5 +493,9 @@ try {
 finally {
     if ([IO.Directory]::Exists($root)) {
         [IO.Directory]::Delete($root, $true)
+    }
+    if ($coverageEnabled -and
+        [IO.Directory]::Exists($isolatedOutputRoot)) {
+        [IO.Directory]::Delete($isolatedOutputRoot, $true)
     }
 }

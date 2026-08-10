@@ -17,7 +17,12 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $resolvedOutput = [IO.Path]::GetFullPath(
-    (Join-Path $repositoryRoot $OutputPath))
+    $(if ([IO.Path]::IsPathRooted($OutputPath)) {
+        $OutputPath
+    }
+    else {
+        Join-Path $repositoryRoot $OutputPath
+    }))
 if (-not $resolvedOutput.StartsWith(
         $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
         [StringComparison]::OrdinalIgnoreCase)) {

@@ -1609,6 +1609,20 @@ public sealed class ArchitectureTests
         Assert.That(
             coverageContainerCommands,
             Does.Contain("Invoke-SharpProofCoverage.ps1"));
+        Assert.That(
+            coverageContainerCommands,
+            Does.Contain("'performance' {"));
+        Assert.That(
+            coverageContainerCommands,
+            Does.Contain(
+                "'build', 'SharpProof.sln', '--configuration', 'Release'"));
+        var gateEvidence = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofGateEvidence.ps1"));
+        Assert.That(
+            gateEvidence,
+            Does.Contain("[IO.Path]::IsPathRooted($OutputPath)"));
         foreach (var workflow in new[] {
                      ".github/workflows/coverage.yml",
                      ".github/workflows/package-consumers.yml"
@@ -1645,6 +1659,12 @@ public sealed class ArchitectureTests
             Assert.That(
                 collector,
                 Does.Contain("SharpProof.Dev.Tests.slnf"));
+            Assert.That(
+                collector,
+                Does.Contain("Invoke-SharpProofSemanticTests.ps1"));
+            Assert.That(
+                collector,
+                Does.Contain("Invoke-SharpProofPackageTests.ps1"));
             Assert.That(
                 collector,
                 Does.Contain("SharpProof.Managed.runsettings"));
@@ -1684,6 +1704,21 @@ public sealed class ArchitectureTests
             Does.Contain(
                 "<CollectFromChildProcesses>False" +
                 "</CollectFromChildProcesses>"));
+        Assert.That(
+            managedSettings,
+            Does.Not.Contain(
+                "<EnableStaticManagedInstrumentation>False" +
+                "</EnableStaticManagedInstrumentation>"));
+        Assert.That(
+            managedSettings,
+            Does.Contain(
+                "<EnableStaticManagedInstrumentation>True" +
+                "</EnableStaticManagedInstrumentation>"));
+        Assert.That(
+            managedSettings,
+            Does.Contain(
+                "<EnableDynamicManagedInstrumentation>False" +
+                "</EnableDynamicManagedInstrumentation>"));
 
         var gateSettings = File.ReadAllText(Path.Combine(
             root,

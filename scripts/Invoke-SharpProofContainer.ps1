@@ -149,6 +149,11 @@ switch ($Command) {
             '--no-restore', '--', $gateMode)
     }
     'performance' {
+        Invoke-DotNet @(
+            'restore', 'SharpProof.sln', '--locked-mode')
+        Invoke-DotNet @(
+            'build', 'SharpProof.sln', '--configuration', 'Release',
+            '--no-restore')
         $output = Join-Path $repositoryRoot 'artifacts/ci/performance.json'
         & (Join-Path $repositoryRoot 'scripts/Invoke-SharpProofGateEvidence.ps1') `
             -Gate performance `
