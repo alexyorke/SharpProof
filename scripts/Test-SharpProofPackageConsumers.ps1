@@ -149,7 +149,10 @@ function Get-SharpProofPortablePackageVersion {
 function New-FrameworkPackageSource {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$Root
+        [string]$Root,
+
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot
     )
 
     $configuredPackages = [Environment]::GetEnvironmentVariable(
@@ -169,11 +172,20 @@ function New-FrameworkPackageSource {
 
     $frameworkSource = Join-Path $Root 'framework-packages'
     [IO.Directory]::CreateDirectory($frameworkSource) | Out-Null
+    $toolchain = Get-Content -LiteralPath (Join-Path `
+        $RepositoryRoot 'eng/container/toolchain.json') -Raw |
+        ConvertFrom-Json
+    $testRuntimeVersion = [string]$toolchain.dotnet.testRuntimeVersion
+    if ($testRuntimeVersion -notmatch '^8\.0\.[0-9]+$') {
+        throw "The container test runtime version is invalid: '$testRuntimeVersion'."
+    }
     $frameworkPackages = @(
         @('netstandard.library', '2.0.3'),
         @('microsoft.netcore.platforms', '1.1.0'),
         @('microsoft.netframework.referenceassemblies', '1.0.3'),
-        @('microsoft.netframework.referenceassemblies.net472', '1.0.3')
+        @('microsoft.netframework.referenceassemblies.net472', '1.0.3'),
+        @('microsoft.netcore.app.ref', $testRuntimeVersion),
+        @('microsoft.aspnetcore.app.ref', $testRuntimeVersion)
     )
     foreach ($package in $frameworkPackages) {
         $fileName = "$($package[0]).$($package[1]).nupkg"
@@ -350,7 +362,9 @@ function Test-SharpProofFrameworkConsumers {
                 $encoding)
         }
 
-        $frameworkSource = New-FrameworkPackageSource -Root $root
+        $frameworkSource = New-FrameworkPackageSource `
+            -Root $root `
+            -RepositoryRoot $RepositoryRoot
         $escapedSource = [Security.SecurityElement]::Escape($Source)
         $escapedFrameworkSource =
             [Security.SecurityElement]::Escape($frameworkSource)
@@ -370,6 +384,8 @@ function Test-SharpProofFrameworkConsumers {
             '    <packageSource key="FrameworkOffline">'
             '      <package pattern="NETStandard.Library" />'
             '      <package pattern="Microsoft.NETCore.Platforms" />'
+            '      <package pattern="Microsoft.NETCore.App.Ref" />'
+            '      <package pattern="Microsoft.AspNetCore.App.Ref" />'
             '      <package pattern="Microsoft.NETFramework.ReferenceAssemblies*" />'
             '    </packageSource>'
             '  </packageSourceMapping>'

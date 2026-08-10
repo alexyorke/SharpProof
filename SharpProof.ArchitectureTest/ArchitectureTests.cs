@@ -856,6 +856,30 @@ public sealed class ArchitectureTests
     }
 
     [Test]
+    public void ContainerConsumerMatrixUsesCatalogOwnedNet8ReferencePacks()
+    {
+        var script = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Test-SharpProofPackageConsumers.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                script,
+                Does.Contain("$toolchain.dotnet.testRuntimeVersion"));
+            Assert.That(script, Does.Contain("microsoft.netcore.app.ref"));
+            Assert.That(script, Does.Contain("microsoft.aspnetcore.app.ref"));
+            Assert.That(
+                script,
+                Does.Contain("<package pattern=\"Microsoft.NETCore.App.Ref\" />"));
+            Assert.That(
+                script,
+                Does.Contain("<package pattern=\"Microsoft.AspNetCore.App.Ref\" />"));
+        }
+    }
+
+    [Test]
     public void WorkflowCommandsUsePowerShellSafeMsBuildSwitches()
     {
         var workflowRoot = Path.Combine(RepositoryRoot(), ".github", "workflows");
