@@ -9,6 +9,34 @@ namespace SharpProof.Worker.Test;
 public sealed class LinuxPublicationSetTests
 {
     [Test]
+    public void InvalidAndNonRegularPublicationPathsFailClosed()
+    {
+        using var directory = TemporaryDirectory.Create();
+        Assert.Throws<ArgumentException>((Action)(() =>
+            LinuxPathIdentity.Canonicalize(" ")));
+        Assert.Throws<ArgumentException>((Action)(() =>
+        {
+            using var publication = LinuxPathIdentity.AcquirePublicationSet(
+                Array.Empty<string>(),
+                TimeSpan.FromSeconds(1));
+        }));
+
+        var missing = Path.Combine(directory.Path, "missing.json");
+        Assert.That(
+            LinuxPathIdentity.DeleteIfUnprotected(
+                missing,
+                Array.Empty<string>()),
+            Is.False);
+
+        var outputDirectory = Directory.CreateDirectory(
+            Path.Combine(directory.Path, "directory-output")).FullName;
+        Assert.Throws<InvalidOperationException>((Action)(() =>
+            LinuxPathIdentity.DeleteIfUnprotected(
+                outputDirectory,
+                Array.Empty<string>())));
+    }
+
+    [Test]
     public void SameSetInDifferentOrdersSerializesWithoutDeadlock()
     {
         using var directory = TemporaryDirectory.Create();
