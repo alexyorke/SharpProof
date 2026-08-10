@@ -39,8 +39,11 @@ checkout of another ref is required.
 Use the short `sp` command inside the container:
 
 ```text
+sp test-changed
+sp check
 sp build
 sp test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj
+sp semantic-tests
 sp portable-tests
 sp worker-tests
 sp package-tests
@@ -50,12 +53,24 @@ sp mutation -Configuration Release
 sp acceptance -Configuration Release
 ```
 
+Use `sp test-changed` during an edit loop. It derives the affected test-project
+closure from Git and project references. Use `sp check` for the coherent Debug
+gate: one incremental build, duration-aware semantic and Worker shards,
+duration-aware package shards, and a short performance smoke. The exact
+release performance protocol remains part of `sp acceptance`; trusted
+mutations remain a separate exact-commit gate.
+
+The permanent `dev` service retains `bin` and `obj`, MSBuild nodes, and
+Roslyn's compiler server. A no-change rebuild is therefore incremental.
+Finite `docker compose run --rm tooling ...` commands deliberately clone into
+a clean temporary workspace and pay a cold build; use them for qualification,
+not for every edit.
+
 `portable-tests`, broad coverage, and acceptance run independent test projects
 through MSBuild's project scheduler. The default 16-CPU container uses eight
-project lanes. Trusted mutations use eight deterministic weighted lanes so
-package and worker mutations do not collect in one slow tail. MSBuild node
-reuse and Roslyn's shared compiler remain enabled inside each disposable
-container; Docker removes those processes when the task exits. Override the
+project lanes. Worker fixtures and package integration methods run in isolated
+duration-weighted processes. Trusted mutations use eight deterministic
+weighted lanes. Override the
 Docker budget with
 `SHARPPROOF_CONTAINER_CPU_LIMIT` and `SHARPPROOF_CONTAINER_MEMORY_LIMIT`; the
 lane count follows the CPUs visible to .NET. Use
@@ -92,4 +107,6 @@ privileged mode, host network, host build output, or cross-machine shared state.
 Every finite acceptance run writes phase durations to
 `artifacts/timings/acceptance-<configuration>.json`. Mutation campaigns write
 their lane durations to `artifacts/timings/mutation-<configuration>.json`.
+Semantic, package, and developer checks write corresponding timing records in
+the same directory and reuse those timings for scheduling.
 Use those records before changing concurrency or time budgets.

@@ -49,14 +49,14 @@ host and filesystem boundary is listed in
 The permanent editor workflow is documented in
 [Container development](docs/container-development.md).
 
-For repository development, Docker is the only required tool:
+For repository development, Docker is the only required tool. Start the
+persistent environment once and work inside it so incremental outputs survive:
 
 ```text
 docker compose build tooling
-docker compose run --rm tooling build
-docker compose run --rm tooling portable-tests
-docker compose run --rm tooling worker-tests
-docker compose run --rm tooling dev
+docker compose up -d dev
+docker compose exec dev sharpproof-dev-init
+docker compose exec dev bash
 ```
 
 For a permanent editor environment, open the repository in VS Code and choose
@@ -68,12 +68,19 @@ Docker. Source, Git state, build outputs, and artifacts live in a persistent
 Compose workspace volume:
 
 ```text
+sp test-changed
+sp check
 sp build
 sp portable-tests
 sp worker-tests
 sp package-tests
 sp acceptance -Configuration Release
 ```
+
+`sp test-changed` is the shortest edit-loop check. `sp check` runs one
+incremental build plus duration-aware semantic, Worker, package, and performance
+smoke shards. Disposable `docker compose run --rm tooling ...` commands remain
+the clean qualification path and intentionally discard build outputs.
 
 The default container budget is 16 CPUs and 40 GiB. Test-project concurrency is
 derived from the CPUs visible inside the container (one lane per two CPUs), so
@@ -773,9 +780,15 @@ in [Supported public API](docs/public-api.md).
 Run repository tooling only in the canonical container:
 
 ```text
-docker compose run --rm tooling restore
-docker compose run --rm tooling build
-docker compose run --rm tooling portable-tests
+docker compose up -d dev
+docker compose exec dev bash
+sp test-changed
+sp check
+```
+
+Run the clean exact qualification only for a coherent candidate:
+
+```text
 docker compose run --rm tooling acceptance -Configuration Release
 ```
 

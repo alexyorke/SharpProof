@@ -157,6 +157,38 @@ try {
         throw 'Passing baseline evidence was not projected correctly.'
     }
 
+    $batchFirst = New-TestParts `
+        -Outcome Passed `
+        -Message '' `
+        -Method FirstExpected `
+        -TestId test-batch-1 `
+        -ExecutionId execution-batch-1
+    $batchSecond = New-TestParts `
+        -Outcome Passed `
+        -Message '' `
+        -Method 'SecondExpected(CaseOne)' `
+        -TestId test-batch-2 `
+        -ExecutionId execution-batch-2
+    $batchPath = Write-Fixture `
+        -Name passing-batch `
+        -Summary Completed `
+        -Counters ('total="2" executed="2" passed="2" failed="0" ' +
+            $zeroInfrastructure) `
+        -Definitions ($batchFirst.Definition + $batchSecond.Definition) `
+        -Entries ($batchFirst.Entry + $batchSecond.Entry) `
+        -Results ($batchFirst.Result + $batchSecond.Result)
+    $batch = Read-SharpProofMutationTestEvidence `
+        -TrxPath $batchPath `
+        -EvidenceName passing-batch `
+        -Mode Baseline `
+        -ProcessExitCode 0 `
+        -ExpectedMethodName @('FirstExpected', 'SecondExpected')
+    if ($batch.executedCount -ne 2 -or
+        @($batch.testLedgers['FirstExpected']).Count -ne 1 -or
+        @($batch.testLedgers['SecondExpected']).Count -ne 1) {
+        throw 'Batched baseline evidence was not partitioned by method.'
+    }
+
     $bomPath = Join-Path $fixtureRoot 'passing-bom.trx'
     [IO.File]::WriteAllText(
         $bomPath,

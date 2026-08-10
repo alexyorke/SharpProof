@@ -619,25 +619,11 @@ try {
 
     if (-not $SkipTests) {
         Start-AcceptanceTimingPhase -Name 'semantic-tests'
-        Import-Module (Join-Path `
-            $repositoryRoot 'scripts/SharpProof.ContainerExecution.psm1') -Force
-        $testProjectParallelism = Get-SharpProofTestProjectParallelism `
-            -RepositoryRoot $repositoryRoot
-        Invoke-SharpProofDotnet `
-            -TimeoutSeconds ([int]$contract.automation.solutionTestWallSeconds) `
-            -Arguments @(
-                'test',
-                'SharpProof.Acceptance.Tests.slnf',
-                '-c',
-                $Configuration,
-                '--no-build',
-                '--no-restore',
-                "/m:$testProjectParallelism",
-                '--filter',
-                'TestCategory!=Performance&TestCategory!=Coverage',
-                '--logger',
-                'console;verbosity=minimal'
-            )
+        & (Join-Path `
+            $repositoryRoot 'scripts/Invoke-SharpProofSemanticTests.ps1') `
+            -Configuration $Configuration `
+            -NoBuild `
+            -TimeoutSeconds ([int]$contract.automation.solutionTestWallSeconds)
         Complete-AcceptanceTimingPhase
 
         Start-AcceptanceTimingPhase -Name 'package-tests'
@@ -651,9 +637,6 @@ try {
         & (Join-Path `
             $repositoryRoot 'scripts/Invoke-SharpProofPackageTests.ps1') `
             @packageTestArguments
-        if ($LASTEXITCODE -ne 0) {
-            throw 'Package test shards failed.'
-        }
         Complete-AcceptanceTimingPhase
     }
     else {

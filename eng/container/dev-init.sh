@@ -31,5 +31,5 @@ sp restore
 
 cat <<'EOF'
 SharpProof persistent development volume is ready.
-Use: sp build | sp portable-tests | sp worker-tests | sp package-tests
+Use: sp check | sp test-changed | sp build | sp acceptance -Configuration Release
 EOF

@@ -226,7 +226,7 @@ function Read-SharpProofMutationTestEvidence {
         [int]$ProcessExitCode,
 
         [Parameter(Mandatory = $true)]
-        [string]$ExpectedMethodName,
+        [string[]]$ExpectedMethodName,
 
         [AllowNull()]
         [string[]]$ExpectedLedger
@@ -239,6 +239,17 @@ function Read-SharpProofMutationTestEvidence {
     if ($Mode -eq 'Mutation' -and
         ($null -eq $ExpectedLedger -or @($ExpectedLedger).Count -eq 0)) {
         throw "Mutation '$EvidenceName' requires a nonempty baseline ledger."
+    }
+    $expectedMethodNames = @($ExpectedMethodName | Sort-Object -Unique)
+    if ($expectedMethodNames.Count -eq 0 -or
+        @($ExpectedMethodName).Count -ne $expectedMethodNames.Count -or
+        @($expectedMethodNames | Where-Object {
+                [string]::IsNullOrWhiteSpace($_)
+            }).Count -ne 0) {
+        throw "Test evidence for '$EvidenceName' has invalid method identities."
+    }
+    if ($null -ne $ExpectedLedger -and $expectedMethodNames.Count -ne 1) {
+        throw "Ledger comparison for '$EvidenceName' requires one method identity."
     }
 
     if (-not (Test-Path -LiteralPath $TrxPath -PathType Leaf)) {
@@ -430,6 +441,11 @@ function Read-SharpProofMutationTestEvidence {
     }
 
     $ledger = @()
+    $ledgerByMethod = @{}
+    foreach ($methodName in $expectedMethodNames) {
+        $ledgerByMethod[$methodName] =
+            [Collections.Generic.List[string]]::new()
+    }
     $failedResults = @()
     $seenResults =
         [Collections.Generic.HashSet[string]]::new(
@@ -443,23 +459,29 @@ function Read-SharpProofMutationTestEvidence {
             throw "TRX for '$EvidenceName' has unresolved or duplicate results."
         }
         $definition = $definitionsById[$testId]
+        $matchingExpectedMethods = @($expectedMethodNames | Where-Object {
+                Test-NUnitMethodIdentity `
+                    -Actual $definition.methodName `
+                    -Expected $_
+            })
         if ([string]::IsNullOrWhiteSpace($executionId) -or
             -not [StringComparer]::Ordinal.Equals(
                 $executionId, $definition.executionId) -or
             -not [StringComparer]::Ordinal.Equals(
                 $executionId, $entriesById[$testId]) -or
-            -not (Test-NUnitMethodIdentity `
-                -Actual $definition.methodName `
-                -Expected $ExpectedMethodName) -or
+            $matchingExpectedMethods.Count -ne 1 -or
             [string]::IsNullOrWhiteSpace($definition.className) -or
             -not [StringComparer]::Ordinal.Equals(
                 $result.GetAttribute('testName'), $definition.displayName)) {
-            throw "TRX test identity does not match '$ExpectedMethodName' for '$EvidenceName'."
+            throw (
+                "TRX test identity does not match exactly one expected " +
+                "method for '$EvidenceName'.")
         }
 
         $identity = $definition.className + '.' + $definition.methodName +
             '|' + $definition.displayName
         $ledger += $identity
+        $ledgerByMethod[$matchingExpectedMethods[0]].Add($identity)
         $outcome = $result.GetAttribute('outcome')
         if ($outcome -eq 'Failed') {
             $failedResults += $result
@@ -472,6 +494,16 @@ function Read-SharpProofMutationTestEvidence {
     $ledger = @($ledger | Sort-Object -Unique)
     if ($ledger.Count -ne $results.Count) {
         throw "TRX for '$EvidenceName' has duplicate stable test identities."
+    }
+    foreach ($methodName in $expectedMethodNames) {
+        $methodLedger = @($ledgerByMethod[$methodName] | Sort-Object -Unique)
+        if ($methodLedger.Count -eq 0 -or
+            $methodLedger.Count -ne $ledgerByMethod[$methodName].Count) {
+            throw (
+                "TRX for '$EvidenceName' has missing or duplicate evidence " +
+                "for '$methodName'.")
+        }
+        $ledgerByMethod[$methodName] = $methodLedger
     }
     if ($null -ne $ExpectedLedger) {
         $expected = @($ExpectedLedger | Sort-Object -Unique)
@@ -521,6 +553,7 @@ function Read-SharpProofMutationTestEvidence {
         failedCount = $failedResults.Count
         assertionFailureCount = $assertionFailures.Count
         testLedger = $ledger
+        testLedgers = $ledgerByMethod
     }
 }
 

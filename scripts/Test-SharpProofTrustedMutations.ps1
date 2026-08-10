@@ -16,6 +16,10 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ExpectedCommit,
 
+    [string]$BaselineEvidencePath = '',
+
+    [switch]$BaselineOnly,
+
     [switch]$Resume,
 
     [switch]$KeepWorkspace
@@ -33,6 +37,27 @@ if (-not $output.StartsWith(
         $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
         [StringComparison]::OrdinalIgnoreCase)) {
     throw "OutputPath must be inside the repository: $output"
+}
+$baselineFile = if ([string]::IsNullOrWhiteSpace($BaselineEvidencePath)) {
+    $null
+}
+else {
+    [IO.Path]::GetFullPath((Join-Path $repositoryRoot $BaselineEvidencePath))
+}
+if ($null -ne $baselineFile -and -not $baselineFile.StartsWith(
+        $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
+        [StringComparison]::OrdinalIgnoreCase)) {
+    throw "BaselineEvidencePath must be inside the repository: $baselineFile"
+}
+if ($BaselineOnly -and $null -eq $baselineFile) {
+    throw 'BaselineOnly requires BaselineEvidencePath.'
+}
+if ($BaselineOnly -and
+        ($MutationShardCount -ne 1 -or $MutationShardIndex -ne 0)) {
+    throw 'BaselineOnly cannot be combined with catalog sharding.'
+}
+if ($BaselineOnly -and $Resume) {
+    throw 'BaselineOnly cannot be combined with Resume.'
 }
 
 $sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
@@ -1261,6 +1286,13 @@ New-Item -ItemType Directory -Path $sourceRoot, $logs -Force | Out-Null
 if (-not $Resume) {
     Remove-Item -LiteralPath $output -Force -ErrorAction SilentlyContinue
 }
+$restoreElapsedMilliseconds = 0L
+$baselineElapsedMilliseconds = 0L
+$mutationElapsedMilliseconds = 0L
+$baselineInvocationCount = 0
+$mutationInvocationCount = 0
+$mutationTimings = [Collections.Generic.List[object]]::new()
+$lastInvocationElapsedMilliseconds = 0L
 
 function Invoke-IsolatedDotnet {
     param(
@@ -1272,6 +1304,7 @@ function Invoke-IsolatedDotnet {
     )
 
     $log = Join-Path $logs $LogName
+    $timer = [Diagnostics.Stopwatch]::StartNew()
     Push-Location $sourceRoot
     try {
         & (Join-Path $sourceRoot 'scripts\Invoke-SharpProofDotnet.ps1') `
@@ -1280,6 +1313,9 @@ function Invoke-IsolatedDotnet {
         return $LASTEXITCODE
     }
     finally {
+        $timer.Stop()
+        $script:lastInvocationElapsedMilliseconds =
+            [long]$timer.Elapsed.TotalMilliseconds
         Pop-Location
     }
 }
@@ -1333,6 +1369,14 @@ function Write-MutationEvidence {
         mutationCount = $Results.Count
         killedCount = @($Results | Where-Object killed).Count
         mutations = $Results
+        timing = [ordered]@{
+            restoreElapsedMilliseconds = $restoreElapsedMilliseconds
+            baselineElapsedMilliseconds = $baselineElapsedMilliseconds
+            mutationElapsedMilliseconds = $mutationElapsedMilliseconds
+            baselineInvocationCount = $baselineInvocationCount
+            mutationInvocationCount = $mutationInvocationCount
+            mutations = @($mutationTimings)
+        }
     } | ConvertTo-Json -Depth 5 |
         Set-Content -LiteralPath $temporaryOutput -Encoding utf8NoBOM
     Move-Item -LiteralPath $temporaryOutput -Destination $output -Force
@@ -1360,60 +1404,165 @@ try {
     $restoreExit = Invoke-IsolatedDotnet `
         -Arguments @('restore', 'SharpProof.sln') `
         -LogName 'restore.log'
+    $restoreElapsedMilliseconds = $lastInvocationElapsedMilliseconds
     if ($restoreExit -ne 0) {
         throw "Mutation workspace restore failed; see $logs\restore.log."
     }
 
-    $baselineEvidenceByTarget = @{}
-    foreach ($mutation in $mutations) {
-        if ($completedMutationNames.Contains([string]$mutation.Name)) {
-            continue
+    $pendingMutations = @($mutations | Where-Object {
+            -not $completedMutationNames.Contains([string]$_.Name)
+        })
+    if ($null -ne $baselineFile -and -not $BaselineOnly) {
+        if (-not (Test-Path -LiteralPath $baselineFile -PathType Leaf)) {
+            throw "Mutation baseline evidence is missing: $baselineFile"
         }
-        $baselineKey = [string]$mutation.Project + '|' +
-            [string]$mutation.Filter
-        if ($baselineEvidenceByTarget.ContainsKey($baselineKey)) {
+        $savedBaseline = Get-Content -LiteralPath $baselineFile -Raw |
+            ConvertFrom-Json
+        $savedTests = @($savedBaseline.tests)
+        if ([int]$savedBaseline.schemaVersion -ne 1 -or
+            [string]$savedBaseline.commit -ne $sourceCommit -or
+            [string]$savedBaseline.configuration -ne $Configuration -or
+            [string]$savedBaseline.selection -notin @('full', 'selected') -or
+            [int]$savedBaseline.catalogCount -ne $catalogCount -or
+            [string]$savedBaseline.catalogSha256 -ne $catalogSha256 -or
+            [int]$savedBaseline.testCount -ne $savedTests.Count) {
+            throw 'Mutation baseline evidence does not match this campaign.'
+        }
+        $baselineMap = [Collections.Generic.Dictionary[
+            string, object]]::new([StringComparer]::Ordinal)
+        foreach ($test in $savedTests) {
+            $project = [string]$test.project
+            $method = [string]$test.method
+            $ledger = @($test.ledger)
+            if ([string]::IsNullOrWhiteSpace($project) -or
+                [string]::IsNullOrWhiteSpace($method) -or
+                $ledger.Count -eq 0) {
+                throw 'Mutation baseline evidence contains an invalid test row.'
+            }
+            $key = $project + "`n" + $method
+            if (-not $baselineMap.TryAdd($key, [object]$ledger)) {
+                throw "Mutation baseline evidence duplicates '$project::$method'."
+            }
+        }
+        foreach ($mutation in $pendingMutations) {
+            $method = $mutation.Filter.Substring(
+                'FullyQualifiedName~'.Length)
+            $key = [string]$mutation.Project + "`n" + $method
+            if (-not $baselineMap.ContainsKey($key)) {
+                throw (
+                    "Mutation baseline evidence does not cover " +
+                    "'$($mutation.Project)::$method'.")
+            }
             $mutation | Add-Member `
                 -NotePropertyName BaselineLedger `
-                -NotePropertyValue @($baselineEvidenceByTarget[$baselineKey])
-            continue
+                -NotePropertyValue @($baselineMap[$key])
         }
-        $baselineTrxName = $mutation.Name + '-baseline.trx'
-        $baselineTrx = Join-Path $logs $baselineTrxName
-        Remove-Item -LiteralPath $baselineTrx -Force -ErrorAction SilentlyContinue
-        $baselineExit = Invoke-IsolatedDotnet `
-            -Arguments @(
-                'test',
-                $mutation.Project,
-                '-c',
-                $Configuration,
-                '--no-restore',
-                '--filter',
-                $mutation.Filter,
-                '--logger',
-                'console;verbosity=minimal',
-                '--logger',
-                "trx;LogFileName=$baselineTrxName",
-                '--results-directory',
-                $logs) `
-            -LogName ($mutation.Name + '-baseline.log')
-        if ($baselineExit -ne 0) {
-            throw (
-                "Baseline for mutation '$($mutation.Name)' failed; see " +
-                "$logs\$($mutation.Name)-baseline.log.")
+    }
+    else {
+        $baselineRows = [Collections.Generic.List[object]]::new()
+        $baselineKeys = [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::Ordinal)
+        $baselineGroupIndex = 0
+        foreach ($projectGroup in @($pendingMutations | Group-Object Project)) {
+            $baselineGroupIndex++
+            $projectMutations = @($projectGroup.Group)
+            $filters = @($projectMutations.Filter | Sort-Object -Unique)
+            $expectedMethodNames = @($filters | ForEach-Object {
+                    $_.Substring('FullyQualifiedName~'.Length)
+                })
+            if (@($expectedMethodNames | Sort-Object -Unique).Count -ne
+                $expectedMethodNames.Count) {
+                throw (
+                    "Mutation baseline project '$($projectGroup.Name)' has " +
+                    'duplicate method identities.')
+            }
+            $baselineTrxName = 'project-' +
+                $baselineGroupIndex.ToString(
+                    'D2', [Globalization.CultureInfo]::InvariantCulture) +
+                '-baseline.trx'
+            $baselineTrx = Join-Path $logs $baselineTrxName
+            Remove-Item -LiteralPath $baselineTrx `
+                -Force -ErrorAction SilentlyContinue
+            $baselineExit = Invoke-IsolatedDotnet `
+                -Arguments @(
+                    'test',
+                    [string]$projectGroup.Name,
+                    '-c',
+                    $Configuration,
+                    '--no-restore',
+                    '--filter',
+                    ($filters -join '|'),
+                    '--logger',
+                    'console;verbosity=minimal',
+                    '--logger',
+                    "trx;LogFileName=$baselineTrxName",
+                    '--results-directory',
+                    $logs) `
+                -LogName ('project-' + $baselineGroupIndex.ToString(
+                        'D2', [Globalization.CultureInfo]::InvariantCulture) +
+                    '-baseline.log')
+            $baselineElapsedMilliseconds += $lastInvocationElapsedMilliseconds
+            $baselineInvocationCount++
+            if ($baselineExit -ne 0) {
+                throw (
+                    "Baseline for mutation project '$($projectGroup.Name)' " +
+                    "failed; see $logs\project-" +
+                    $baselineGroupIndex.ToString(
+                        'D2', [Globalization.CultureInfo]::InvariantCulture) +
+                    '-baseline.log.')
+            }
+            $baselineTestEvidence = Read-SharpProofMutationTestEvidence `
+                -TrxPath $baselineTrx `
+                -EvidenceName ($projectGroup.Name + ' baseline') `
+                -Mode Baseline `
+                -ProcessExitCode $baselineExit `
+                -ExpectedMethodName $expectedMethodNames
+            foreach ($mutation in $projectMutations) {
+                $method = $mutation.Filter.Substring(
+                    'FullyQualifiedName~'.Length)
+                $ledger = @($baselineTestEvidence.testLedgers[$method])
+                $mutation | Add-Member `
+                    -NotePropertyName BaselineLedger `
+                    -NotePropertyValue $ledger
+                $key = [string]$mutation.Project + "`n" + $method
+                if ($baselineKeys.Add($key)) {
+                    $baselineRows.Add([pscustomobject]@{
+                        project = [string]$mutation.Project
+                        method = $method
+                        ledger = $ledger
+                    })
+                }
+            }
         }
-        $expectedMethodName = $mutation.Filter.Substring(
-            'FullyQualifiedName~'.Length)
-        $baselineEvidence = Read-SharpProofMutationTestEvidence `
-            -TrxPath $baselineTrx `
-            -EvidenceName ($mutation.Name + ' baseline') `
-            -Mode Baseline `
-            -ProcessExitCode $baselineExit `
-            -ExpectedMethodName $expectedMethodName
-        $mutation | Add-Member `
-            -NotePropertyName BaselineLedger `
-            -NotePropertyValue @($baselineEvidence.testLedger)
-        $baselineEvidenceByTarget[$baselineKey] = @(
-            $baselineEvidence.testLedger)
+        if ($BaselineOnly) {
+            $baselineParent = Split-Path -Parent $baselineFile
+            [IO.Directory]::CreateDirectory($baselineParent) | Out-Null
+            $temporaryBaseline = $baselineFile + '.' +
+                [Guid]::NewGuid().ToString('N') + '.tmp'
+            [pscustomobject]@{
+                schemaVersion = 1
+                commit = $sourceCommit
+                configuration = $Configuration
+                selection = $selection
+                catalogCount = $catalogCount
+                catalogSha256 = $catalogSha256
+                testCount = $baselineRows.Count
+                tests = @($baselineRows | Sort-Object project, method)
+                timing = [ordered]@{
+                    restoreElapsedMilliseconds = $restoreElapsedMilliseconds
+                    baselineElapsedMilliseconds = $baselineElapsedMilliseconds
+                    baselineInvocationCount = $baselineInvocationCount
+                }
+            } | ConvertTo-Json -Depth 7 |
+                Set-Content -LiteralPath $temporaryBaseline -Encoding utf8NoBOM
+            Move-Item -LiteralPath $temporaryBaseline `
+                -Destination $baselineFile -Force
+            Write-Host (
+                "Recorded $($baselineRows.Count) exact mutation baselines " +
+                "from $baselineInvocationCount test projects.")
+            Write-Host "Baseline evidence: $baselineFile"
+            return
+        }
     }
 
     $results = @($completedResults)
@@ -1451,6 +1600,12 @@ try {
                     '--results-directory',
                     $logs) `
                 -LogName ($mutation.Name + '-test.log')
+            $mutationElapsedMilliseconds += $lastInvocationElapsedMilliseconds
+            $mutationInvocationCount++
+            $mutationTimings.Add([pscustomobject]@{
+                name = $mutation.Name
+                elapsedMilliseconds = $lastInvocationElapsedMilliseconds
+            })
             if ($testExit -eq 0) {
                 throw (
                     "Mutation '$($mutation.Name)' survived its focused test; " +

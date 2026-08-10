@@ -1065,6 +1065,10 @@ public sealed class ArchitectureTests
             "eng",
             "acceptance",
             "Verify.ps1"));
+        var semanticTests = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofSemanticTests.ps1"));
         var portable = File.ReadAllText(Path.Combine(
             root,
             "SharpProof.Portable.Tests.slnf"));
@@ -1072,6 +1076,18 @@ public sealed class ArchitectureTests
             root,
             "scripts",
             "Test-SharpProofTrustedMutations.ps1"));
+        var parallelMutationDriver = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofTrustedMutationsParallel.ps1"));
+        var packageTests = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofPackageTests.ps1"));
+        var developerCheck = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofDevCheck.ps1"));
         var mutationProjects = Regex.Matches(
                 mutationDriver,
                 @"(?m)^\s*Project\s*=\s*'([^']+)'\s*$")
@@ -1097,7 +1113,7 @@ public sealed class ArchitectureTests
                 Is.EqualTo(2));
             Assert.That(
                 automation.GetProperty("mutationParallelism").GetInt32(),
-                Is.EqualTo(8));
+                Is.EqualTo(4));
             Assert.That(
                 automation.GetProperty("mutationDefaultWeight").GetInt32(),
                 Is.Positive);
@@ -1115,11 +1131,48 @@ public sealed class ArchitectureTests
                 Does.Contain("SHARPPROOF_TEST_PROJECT_PARALLELISM"));
             Assert.That(
                 acceptance,
-                Does.Contain("SharpProof.Acceptance.Tests.slnf"));
+                Does.Contain("Invoke-SharpProofSemanticTests.ps1"));
             Assert.That(
                 acceptance,
                 Does.Contain("Invoke-SharpProofPackageTests.ps1"));
-            Assert.That(acceptance, Does.Contain("/m:$testProjectParallelism"));
+            Assert.That(
+                semanticTests,
+                Does.Contain("SharpProof.Semantic.Tests.slnf"));
+            Assert.That(semanticTests, Does.Contain("ProjectParallelism"));
+            Assert.That(
+                semanticTests,
+                Does.Contain("worker-claim-manifest"));
+            Assert.That(
+                semanticTests,
+                Does.Contain("artifacts/timings"));
+            Assert.That(
+                packageTests,
+                Does.Contain("priorMethodMilliseconds"));
+            Assert.That(packageTests, Does.Contain("Sort-Object"));
+            Assert.That(
+                packageTests,
+                Does.Contain("workerMethods = $workerMethodTimings"));
+            Assert.That(
+                mutationDriver,
+                Does.Contain("Group-Object Project"));
+            Assert.That(
+                mutationDriver,
+                Does.Contain("baselineInvocationCount"));
+            Assert.That(
+                parallelMutationDriver,
+                Does.Contain("-BaselineOnly"));
+            Assert.That(
+                parallelMutationDriver,
+                Does.Contain("-BaselineEvidencePath"));
+            Assert.That(
+                parallelMutationDriver,
+                Does.Contain("shared-baseline-v2"));
+            Assert.That(
+                developerCheck,
+                Does.Contain("Invoke-SharpProofSemanticTests.ps1"));
+            Assert.That(
+                developerCheck,
+                Does.Contain("performance-smoke"));
             Assert.That(
                 portable,
                 Does.Not.Contain("SharpProof.Package.Test"));
@@ -1441,9 +1494,19 @@ public sealed class ArchitectureTests
             root,
             "SharpProof.Gates.Test",
             "PerformanceGateTests.cs"));
+        var corpusTests = File.ReadAllText(Path.Combine(
+            root,
+            "SharpProof.Gates.Test",
+            "CorpusGateTests.cs"));
         Assert.That(
             performanceTests.Split("[Category(\"Performance\")]", StringSplitOptions.None),
             Has.Length.EqualTo(3));
+        Assert.That(
+            corpusTests,
+            Does.Contain(
+                "[Category(\"Corpus\")]" + Environment.NewLine +
+                "    public async Task " +
+                "AnalyzerMatchesCanonicalCorpusAndReplayModes"));
 
         var fastWorkflow = File.ReadAllText(Path.Combine(
             root,
@@ -1494,12 +1557,17 @@ public sealed class ArchitectureTests
             "eng",
             "acceptance",
             "Verify.ps1"));
+        var semanticTests = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofSemanticTests.ps1"));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                acceptance,
+                semanticTests,
                 Does.Contain(
-                    "TestCategory!=Performance&TestCategory!=Coverage"));
+                    "TestCategory!=Performance&TestCategory!=Coverage&" +
+                    "TestCategory!=Corpus"));
             Assert.That(
                 acceptance,
                 Does.Contain(

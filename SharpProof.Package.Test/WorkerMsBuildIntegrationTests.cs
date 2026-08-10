@@ -953,6 +953,8 @@ public sealed class WorkerMsBuildIntegrationTests
                 ("BaseOutputPath",
                     Path.Combine(project.Root, "bin-" + name) +
                     Path.DirectorySeparatorChar),
+                ("DefaultItemExcludesInProjectFolder",
+                    "obj-*/**"),
                 ("SharpProofFeatures", features),
                 ("SharpProofVerifyRequestFile", request),
                 ("SharpProofVerifyResultFile", result),
@@ -3107,6 +3109,8 @@ public sealed class WorkerMsBuildIntegrationTests
                     Path.DirectorySeparatorChar),
                 ("BaseOutputPath", Path.Combine(_root, "bin-" + name) +
                     Path.DirectorySeparatorChar),
+                ("DefaultItemExcludesInProjectFolder",
+                    "obj-*/**"),
                 ("SharpProofFeatures", features),
                 ("SharpProofVerifyRequestFile", RequestPath),
                 ("SharpProofVerifyResultFile", ResultPath),

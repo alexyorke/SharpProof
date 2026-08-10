@@ -15,6 +15,14 @@ must remain visible as a typed incomplete result, never silent success.
    the canonical container:
 
    ```text
+   sp test-changed
+   sp check
+   sp acceptance -Configuration Release
+   ```
+
+   For a clean disposable qualification run from the host:
+
+   ```text
    docker compose build tooling
    docker compose run --rm tooling acceptance -Configuration Release
    ```

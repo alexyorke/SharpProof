@@ -61,7 +61,7 @@ if (Test-Path -LiteralPath $output -PathType Leaf) {
 
 $shardRoot = Join-Path (Split-Path -Parent $output) (
     'shards/' + $ExpectedCommit + '/' + $Configuration.ToLowerInvariant() +
-    '-weighted-v1-' + $parallelism)
+    '-weighted-v2-shared-baseline-' + $parallelism)
 [IO.Directory]::CreateDirectory($shardRoot) | Out-Null
 $shards = @()
 for ($index = 0; $index -lt $parallelism; $index++) {
@@ -98,6 +98,102 @@ function Test-CompleteShard([object]$Shard) {
     }
 }
 
+$baselinePath = Join-Path $shardRoot 'baseline.json'
+$baselineRelativePath = [IO.Path]::GetRelativePath(
+    $repositoryRoot, $baselinePath)
+function Test-CompleteBaseline {
+    if (-not (Test-Path -LiteralPath $baselinePath -PathType Leaf)) {
+        return $false
+    }
+    try {
+        $baseline = Get-Content -LiteralPath $baselinePath -Raw |
+            ConvertFrom-Json
+        return [int]$baseline.schemaVersion -eq 1 -and
+            [string]$baseline.commit -eq $ExpectedCommit -and
+            [string]$baseline.configuration -eq $Configuration -and
+            [string]$baseline.selection -eq 'full' -and
+            [int]$baseline.catalogCount -eq $catalogCount -and
+            [string]$baseline.catalogSha256 -eq $catalogSha256 -and
+            [int]$baseline.testCount -gt 0 -and
+            [int]$baseline.testCount -eq @($baseline.tests).Count
+    }
+    catch {
+        return $false
+    }
+}
+
+$baselineTimer = [Diagnostics.Stopwatch]::StartNew()
+$baselineReused = Test-CompleteBaseline
+if (-not $baselineReused) {
+    Remove-Item -LiteralPath $baselinePath `
+        -Force -ErrorAction SilentlyContinue
+    $baselineRunOutput = [IO.Path]::GetRelativePath(
+        $repositoryRoot, (Join-Path $shardRoot 'baseline-run.json'))
+    & pwsh -NoLogo -NoProfile -File (
+        Join-Path $PSScriptRoot 'Test-SharpProofTrustedMutations.ps1') `
+        -Configuration $Configuration `
+        -OutputPath $baselineRunOutput `
+        -ExpectedCommit $ExpectedCommit `
+        -BaselineEvidencePath $baselineRelativePath `
+        -BaselineOnly
+    if ($LASTEXITCODE -ne 0 -or -not (Test-CompleteBaseline)) {
+        throw 'The shared mutation baseline campaign failed.'
+    }
+}
+else {
+    Write-Host "Reusing exact mutation baselines: $baselinePath"
+}
+$baselineTimer.Stop()
+$baselineEvidence = Get-Content -LiteralPath $baselinePath -Raw |
+    ConvertFrom-Json
+
+function New-ShardTiming {
+    param(
+        [Parameter(Mandatory = $true)][object]$Shard,
+        [Parameter(Mandatory = $true)][object]$Evidence,
+        [Parameter(Mandatory = $true)][long]$ElapsedMilliseconds,
+        [Parameter(Mandatory = $true)][bool]$Reused
+    )
+
+    $timing = if ($Evidence.PSObject.Properties.Name -contains 'timing') {
+        $Evidence.timing
+    }
+    else {
+        $null
+    }
+    return [pscustomobject]@{
+        index = $Shard.Index
+        mutationCount = [int]$Evidence.mutationCount
+        elapsedMilliseconds = $ElapsedMilliseconds
+        reused = $Reused
+        restoreElapsedMilliseconds =
+            $(if ($null -ne $timing) {
+                [long]$timing.restoreElapsedMilliseconds
+            }
+            else { 0L })
+        baselineElapsedMilliseconds =
+            $(if ($null -ne $timing) {
+                [long]$timing.baselineElapsedMilliseconds
+            }
+            else { 0L })
+        mutationElapsedMilliseconds =
+            $(if ($null -ne $timing) {
+                [long]$timing.mutationElapsedMilliseconds
+            }
+            else { 0L })
+        baselineInvocationCount =
+            $(if ($null -ne $timing) {
+                [int]$timing.baselineInvocationCount
+            }
+            else { 0 })
+        mutationInvocationCount =
+            $(if ($null -ne $timing) {
+                [int]$timing.mutationInvocationCount
+            }
+            else { 0 })
+    }
+}
+
 $running = [Collections.Generic.List[object]]::new()
 try {
     foreach ($shard in $shards) {
@@ -105,12 +201,11 @@ try {
             Write-Host "Reusing completed mutation shard $($shard.Index + 1)."
             $evidence = Get-Content -LiteralPath $shard.Path -Raw |
                 ConvertFrom-Json
-            $shardTimings.Add([pscustomobject]@{
-                index = $shard.Index
-                mutationCount = [int]$evidence.mutationCount
-                elapsedMilliseconds = 0
-                reused = $true
-            })
+            $shardTimings.Add((New-ShardTiming `
+                    -Shard $shard `
+                    -Evidence $evidence `
+                    -ElapsedMilliseconds 0 `
+                    -Reused $true))
             continue
         }
         Remove-Item -LiteralPath $shard.Path -Force -ErrorAction SilentlyContinue
@@ -126,6 +221,7 @@ try {
                 '-Configuration', $Configuration,
                 '-OutputPath', $shard.RelativePath,
                 '-ExpectedCommit', $ExpectedCommit,
+                '-BaselineEvidencePath', $baselineRelativePath,
                 '-MutationShardIndex', [string]$shard.Index,
                 '-MutationShardCount', [string]$parallelism)) {
             [void]$startInfo.ArgumentList.Add($argument)
@@ -173,14 +269,13 @@ try {
         }
         $evidence = Get-Content -LiteralPath $active.Shard.Path -Raw |
             ConvertFrom-Json
-        $shardTimings.Add([pscustomobject]@{
-            index = $active.Shard.Index
-            mutationCount = [int]$evidence.mutationCount
-            elapsedMilliseconds = [long](
-                ($active.Process.ExitTime.ToUniversalTime() -
-                    $active.StartedUtc).TotalMilliseconds)
-            reused = $false
-        })
+        $shardTimings.Add((New-ShardTiming `
+                -Shard $active.Shard `
+                -Evidence $evidence `
+                -ElapsedMilliseconds ([long](
+                    ($active.Process.ExitTime.ToUniversalTime() -
+                        $active.StartedUtc).TotalMilliseconds)) `
+                -Reused $false))
     }
 }
 finally {
@@ -244,9 +339,20 @@ $temporaryTiming = $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp
     command = 'mutation'
     commit = $ExpectedCommit
     configuration = $Configuration
-    strategy = 'weighted-longest-processing-time-first'
+    strategy = 'weighted-longest-processing-time-first-shared-baseline-v2'
     parallelism = $parallelism
     totalElapsedMilliseconds = [long]$campaignTimer.Elapsed.TotalMilliseconds
+    baseline = [ordered]@{
+        reused = $baselineReused
+        elapsedMilliseconds = [long]$baselineTimer.Elapsed.TotalMilliseconds
+        restoreElapsedMilliseconds =
+            [long]$baselineEvidence.timing.restoreElapsedMilliseconds
+        testElapsedMilliseconds =
+            [long]$baselineEvidence.timing.baselineElapsedMilliseconds
+        invocationCount =
+            [int]$baselineEvidence.timing.baselineInvocationCount
+        testCount = [int]$baselineEvidence.testCount
+    }
     shards = @($shardTimings | Sort-Object index)
 } | ConvertTo-Json -Depth 5 |
     Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM

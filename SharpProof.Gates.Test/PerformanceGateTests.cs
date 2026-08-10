@@ -18,6 +18,9 @@ public sealed class PerformanceGateTests
         {
             Assert.That(contract.Warmups, Is.EqualTo(5));
             Assert.That(contract.Samples, Is.EqualTo(30));
+            Assert.That(contract.SmokeWarmups, Is.EqualTo(1));
+            Assert.That(contract.SmokeSamples, Is.EqualTo(4));
+            Assert.That(contract.SmokeMaximumRatio, Is.EqualTo(2.0));
             Assert.That(contract.IdeEdits, Is.EqualTo(200));
             Assert.That(contract.MaximumMedianRatio, Is.EqualTo(1.10));
             Assert.That(contract.MaximumP95Ratio, Is.EqualTo(1.20));
@@ -543,9 +546,17 @@ public sealed class PerformanceGateTests
     [NonParallelizable]
     public async Task ReleasePerformanceProtocolProducesStructuralEvidence()
     {
-        var result = await PerformanceGate.RunAsync(
-            RepositoryLayout.FindRoot());
+        var root = RepositoryLayout.FindRoot();
+        var smoke = await PerformanceGate.RunSmokeAsync(root);
+        var result = await PerformanceGate.RunAsync(root);
 
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(smoke.Passed, Is.True);
+            Assert.That(smoke.Failures, Is.Empty);
+            Assert.That(smoke.PackageBuildSamples, Has.Length.EqualTo(4));
+            Assert.That(smoke.ForcedTerminationMilliseconds, Is.Positive);
+        }
         AssertProtocolEvidence(result);
     }
 

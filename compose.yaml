@@ -52,6 +52,21 @@ services:
     command: ["build"]
     profiles: ["tasks"]
 
+  check:
+    <<: *sharpproof-common
+    command: ["check"]
+    profiles: ["tests"]
+
+  test-changed:
+    <<: *sharpproof-common
+    command: ["test-changed"]
+    profiles: ["tests"]
+
+  semantic-tests:
+    <<: *sharpproof-common
+    command: ["semantic-tests"]
+    profiles: ["tests"]
+
   portable-tests:
     <<: *sharpproof-common
     command: ["portable-tests"]
@@ -81,6 +96,11 @@ services:
     <<: *sharpproof-common
     command: ["performance"]
     profiles: ["gates"]
+
+  performance-smoke:
+    <<: *sharpproof-common
+    command: ["performance-smoke"]
+    profiles: ["tests"]
 
   coverage:
     <<: *sharpproof-common

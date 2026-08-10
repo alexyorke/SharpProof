@@ -5,6 +5,9 @@ namespace SharpProof.Gates.Performance;
 internal sealed record AcceptancePerformanceContract(
     int Warmups,
     int Samples,
+    int SmokeWarmups,
+    int SmokeSamples,
+    double SmokeMaximumRatio,
     double MaximumMedianRatio,
     double MaximumP95Ratio,
     double MaximumRetainedMemoryRatio,
@@ -30,6 +33,9 @@ internal sealed record AcceptancePerformanceContract(
         return new AcceptancePerformanceContract(
             performance.GetProperty("warmups").GetInt32(),
             performance.GetProperty("samples").GetInt32(),
+            performance.GetProperty("smokeWarmups").GetInt32(),
+            performance.GetProperty("smokeSamples").GetInt32(),
+            performance.GetProperty("smokeMaximumRatio").GetDouble(),
             performance.GetProperty("maximumMedianRatio").GetDouble(),
             performance.GetProperty("maximumP95Ratio").GetDouble(),
             performance.GetProperty("maximumRetainedMemoryRatio").GetDouble(),

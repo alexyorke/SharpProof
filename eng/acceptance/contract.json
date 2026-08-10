@@ -22,7 +22,7 @@
     "solutionTestWallSeconds": 1800,
     "mutationShardWallSeconds": 3600,
     "testProjectCpuDivisor": 2,
-    "mutationParallelism": 8,
+    "mutationParallelism": 4,
     "mutationDefaultWeight": 1,
     "acceptanceTimingPhases": [
       "restore",
@@ -90,7 +90,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "2f0f9c59ace67e8db8bba1fb9bf93771c6f0769a786b54535d2da94a094c85f4",
+    "inventorySha256": "6e89bc13001368b905f7fd0b4525eed15626a0d8b8988233d399a7e16705b697",
     "components": [
       {
         "name": "discovery",
@@ -424,7 +424,7 @@
         "scripts/Get-SharpProofReleaseDigests.ps1",
         "scripts/Test-SharpProofCoverage.ps1",
         "scripts/SharpProof.ContainerExecution.psm1",
-        "SharpProof.Acceptance.Tests.slnf",
+        "SharpProof.Semantic.Tests.slnf",
         "eng/acceptance/Verify.ps1",
         "eng/acceptance/preview-evidence.v1.json"
         ]
@@ -516,8 +516,11 @@
           "eng/container/New-ContainerContract.ps1",
           "compose.yaml",
           "scripts/Invoke-SharpProofContainer.ps1",
+          "scripts/Invoke-SharpProofChangedTests.ps1",
+          "scripts/Invoke-SharpProofDevCheck.ps1",
           "scripts/Invoke-SharpProofReleaseContainer.ps1",
           "scripts/Invoke-SharpProofPackageTests.ps1",
+          "scripts/Invoke-SharpProofSemanticTests.ps1",
           "scripts/Test-SharpProofContainerContract.ps1",
           "scripts/Test-SharpProofPackageConsumers.ps1"
         ]
@@ -622,6 +625,9 @@
   "performance": {
     "warmups": 5,
     "samples": 30,
+    "smokeWarmups": 1,
+    "smokeSamples": 4,
+    "smokeMaximumRatio": 2.0,
     "maximumMedianRatio": 1.10,
     "maximumP95Ratio": 1.20,
     "maximumRetainedMemoryRatio": 1.05,

@@ -18,8 +18,7 @@
       "SharpProof.Testing.Test\\SharpProof.Testing.Test.csproj",
       "SharpProof.Fuzz.Test\\SharpProof.Fuzz.Test.csproj",
       "SharpProof.Gates.Test\\SharpProof.Gates.Test.csproj",
-      "SharpProof.Verify.Test\\SharpProof.Verify.Test.csproj",
-      "SharpProof.Worker.Test\\SharpProof.Worker.Test.csproj"
+      "SharpProof.Verify.Test\\SharpProof.Verify.Test.csproj"
     ]
   }
 }
