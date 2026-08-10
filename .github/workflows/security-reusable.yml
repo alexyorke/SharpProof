@@ -12,6 +12,9 @@ on:
 permissions:
   contents: read
 
+env:
+  SHARPPROOF_CONTAINER_CPU_LIMIT: 4
+
 jobs:
   dependency-review:
     if: inputs.run-dependency-review

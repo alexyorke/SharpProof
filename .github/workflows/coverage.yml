@@ -12,6 +12,7 @@ permissions:
 
 env:
   COMPOSE_PROJECT_NAME: sharpproof-coverage-${{ github.run_id }}-${{ github.run_attempt }}
+  SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
 jobs:
   coverage:

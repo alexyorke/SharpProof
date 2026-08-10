@@ -1390,6 +1390,31 @@ public sealed class ArchitectureTests
     }
 
     [Test]
+    public void DockerWorkflowsCapCpuUseToHostedRunnerCapacity()
+    {
+        var workflowRoot = Path.Combine(
+            RepositoryRoot(),
+            ".github",
+            "workflows");
+        var dockerWorkflows = Directory
+            .EnumerateFiles(workflowRoot, "*.yml")
+            .Concat(Directory.EnumerateFiles(workflowRoot, "*.yaml"))
+            .Where(static path => File.ReadAllText(path).Contains(
+                "docker compose",
+                StringComparison.Ordinal))
+            .ToArray();
+
+        Assert.That(dockerWorkflows, Is.Not.Empty);
+        foreach (var workflow in dockerWorkflows)
+        {
+            Assert.That(
+                File.ReadAllText(workflow),
+                Does.Contain("SHARPPROOF_CONTAINER_CPU_LIMIT: 4"),
+                Path.GetFileName(workflow));
+        }
+    }
+
+    [Test]
     public void WorkerProcessBoundaryUsesADirectLinuxChildAndStdinRelease()
     {
         var host = File.ReadAllText(Path.Combine(
