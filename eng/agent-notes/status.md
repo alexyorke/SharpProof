@@ -17,6 +17,11 @@ Current architecture:
 Static acceptance is green for deterministic generation, schema/catalog pins,
 the 136-entry mutation catalog identity, the 263-path TCB inventory, frozen
 preview interface, and structural complexity. Broad Debug and full Release
-acceptance are also green. Exact-commit mutation evidence, package/pilot
-qualification, and external release configuration remain as listed in
-`/BUGS.md`.
+acceptance are also green.
+
+`/BUGS.md` tracks only code and technical debt. Exact-commit mutation,
+package, pilot, SBOM, and publication-plan results are generated after the
+final source commit and remain external evidence so that documenting them does
+not invalidate the commit they qualify. NuGet credentials, protected tags,
+release environments, publication, promotion, and tagging remain separately
+authorized owner operations.
