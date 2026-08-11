@@ -334,8 +334,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'compiler-collector-configuration-gate'
         File = 'SharpProof.CompilerCollector\FinalCompilationCollector.cs'
-        Original = '            if (!SharpProofAnalyzer.GetConfigurationDiagnostics('
-        Mutated = '            if (SharpProofAnalyzer.GetConfigurationDiagnostics('
+        Original = '            if (!SharpProofAnalyzerEngine.GetConfigurationDiagnostics('
+        Mutated = '            if (SharpProofAnalyzerEngine.GetConfigurationDiagnostics('
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~TreeLocalConfigurationGateDoesNotEmitAnArtifact'
     },
@@ -1221,7 +1221,8 @@ if ($catalogCount -ne [int]$mutationPolicy.expectedCatalogCount -or
     $catalogSha256 -ne [string]$mutationPolicy.expectedCatalogSha256) {
     throw (
         'Trusted mutation registrations do not match the acceptance ' +
-        'catalog policy.')
+        'catalog policy. Actual count/digest: ' +
+        "$catalogCount/$catalogSha256.")
 }
 
 $defaultShardWeight = [int]$acceptanceContract.automation.mutationDefaultWeight
