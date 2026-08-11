@@ -135,6 +135,18 @@
           "System.Collections.Immutable": "9.0.0"
         }
       },
+      "sharpproof.analyzer.core": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
+          "SharpProof.Contracts": "[1.0.0-preview.1, )",
+          "SharpProof.Effects": "[1.0.0-preview.1, )",
+          "SharpProof.Frontend": "[1.0.0-preview.1, )",
+          "SharpProof.Ir": "[1.0.0-preview.1, )",
+          "SharpProof.Specs": "[1.0.0-preview.1, )",
+          "System.Collections.Immutable": "[9.0.18, )"
+        }
+      },
       "sharpproof.attributes": {
         "type": "Project"
       },
@@ -142,6 +154,7 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.Common": "[4.14.0, )",
+          "SharpProof.Analyzer.Core": "[1.0.0-preview.1, )",
           "SharpProof.Contracts": "[1.0.0-preview.1, )",
           "System.Collections.Immutable": "[9.0.18, )"
         }
@@ -153,6 +166,23 @@
           "Microsoft.CodeAnalysis.Common": "[4.14.0, )",
           "SharpProof.Frontend": "[1.0.0-preview.1, )",
           "SharpProof.Ir": "[1.0.0-preview.1, )",
+          "System.Collections.Immutable": "[9.0.18, )"
+        }
+      },
+      "sharpproof.dataflow": {
+        "type": "Project",
+        "dependencies": {
+          "System.Collections.Immutable": "[9.0.18, )"
+        }
+      },
+      "sharpproof.effects": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
+          "Microsoft.CodeAnalysis.Common": "[4.14.0, )",
+          "SharpProof.Dataflow": "[1.0.0-preview.1, )",
+          "SharpProof.Frontend": "[1.0.0-preview.1, )",
+          "SharpProof.Specs": "[1.0.0-preview.1, )",
           "System.Collections.Immutable": "[9.0.18, )"
         }
       },
@@ -169,6 +199,12 @@
         "type": "Project",
         "dependencies": {
           "System.Collections.Immutable": "[9.0.18, )"
+        }
+      },
+      "sharpproof.specs": {
+        "type": "Project",
+        "dependencies": {
+          "SharpProof.Ir": "[1.0.0-preview.1, )"
         }
       },
       "Microsoft.CodeAnalysis.Analyzers": {

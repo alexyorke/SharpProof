@@ -109,18 +109,20 @@ public sealed class DependencyAutomationTests
             Assert.That(
                 architecture,
                 Does.Contain(
-                    "Analyzer              -> Contracts, Effects, " +
+                    "Analyzer.Core         -> Contracts, Effects, " +
                     "Frontend, Ir, Specs"));
             Assert.That(
                 architecture,
+                Does.Contain("Analyzer              -> Analyzer.Core"));
+            Assert.That(
+                architecture,
                 Does.Contain(
-                    "CompilerCollector     -> Analyzer, CompilerArtifact, " +
+                    "CompilerCollector     -> Analyzer.Core, CompilerArtifact, " +
                     "Contracts, Effects,"));
             Assert.That(
                 architecture,
                 Does.Contain(
-                    "PortableAnalyzer      -> Attributes " +
-                    "(build-only payload identity)"));
+                    "ContractForGenerator  -> Analyzer.Core, Contracts"));
             Assert.That(
                 architecture,
                 Does.Contain(
@@ -286,7 +288,9 @@ public sealed class DependencyAutomationTests
                 Is.EqualTo("9.0.300"));
             Assert.That(workflows, Does.Not.Contain("actions/setup-dotnet"));
             Assert.That(workflows, Does.Not.Contain("dotnet-version:"));
-            Assert.That(workflows, Does.Contain("docker compose build tooling"));
+            Assert.That(
+                workflows,
+                Does.Contain("uses: ./.github/actions/build-tooling"));
             Assert.That(dockerfile, Does.Contain("DOTNET_SDK_IMAGE="));
             Assert.That(dockerfile, Does.Contain("DOTNET_MINIMUM_SDK_IMAGE="));
             Assert.That(

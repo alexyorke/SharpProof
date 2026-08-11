@@ -65,7 +65,7 @@ effect-only artifacts exclude postcondition claims.
 under every policy. The removed `SharpProofMode` alias is rejected; the
 preview configuration surface is frozen on profile and feature properties.
 
-This acceptance contract covers compiler artifact schema version 11,
+This acceptance contract covers compiler artifact schema version 12,
 relational-summary schema version 1, specification-pack schema version 1,
 generated-tree accountability, portable whole-body lowered CFG/IR, exact
 manifest/lowered-callable/result equality, compiler-diagnostic propagation, and

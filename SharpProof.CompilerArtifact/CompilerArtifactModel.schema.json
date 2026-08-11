@@ -4,7 +4,7 @@
   "jsonNamingPolicy": "camelCase",
   "artifactEnvelope": {
     "schema": "SharpProof.CompilerManifest",
-    "version": 11
+    "version": 12
   },
   "declarations": [
     {
@@ -21,7 +21,31 @@
           "accessibility": "internal",
           "name": "Current",
           "type": "int",
-          "value": 11
+          "value": 12
+        }
+      ]
+    },
+    {
+      "kind": "staticClass",
+      "name": "CompilerReferenceLimits",
+      "constants": [
+        {
+          "accessibility": "internal",
+          "name": "MaximumModuleBytes",
+          "type": "int",
+          "value": 268435456
+        },
+        {
+          "accessibility": "internal",
+          "name": "MaximumClosureBytes",
+          "type": "int",
+          "value": 1073741824
+        },
+        {
+          "accessibility": "internal",
+          "name": "MaximumModuleCount",
+          "type": "int",
+          "value": 4096
         }
       ]
     },
@@ -2738,6 +2762,16 @@
           "set": "set",
           "default": {
             "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "SizeBytes",
+          "jsonName": "sizeBytes",
+          "type": "long",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
           }
         }
       ]

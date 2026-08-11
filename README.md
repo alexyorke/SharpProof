@@ -137,7 +137,7 @@ both implemented feature groups:
   verification.
 
 `SharpProofFeatures` values are `effects`, `contracts`, and `all` (the
-default). The effective selection is sealed into the schema-11 compiler
+default). The effective selection is sealed into the schema-12 compiler
 artifact and filters its manifest: `contracts` excludes effect-only
 annotations, `effects` excludes postcondition claims and contract assumptions,
 and `all` selects both surfaces. Every effective effect contract has one typed
@@ -417,7 +417,7 @@ Each manifest claim receives:
 
 Effect claims use canonical compiler-produced evidence. They are `Proven` only
 when a complete effect summary establishes the selected contract. Compiler
-artifact schema 11 retains schema 10's independently replayable,
+artifact schema 12 retains schema 10's independently replayable,
 unconditional direct event for a definite managed object or array allocation.
 The worker validates the event's order, source-tree hash and span, semantic
 identity, selected constraint, and compiler witness, then derives the
@@ -509,7 +509,7 @@ unsupported opcodes, recursive dependencies, and exhausted budgets abstain as
 typed `Unknown`; they are never treated as implementation proof authority.
 Every composed call seals its origin, evidence digest, optional pack identity,
 and complete transitive dependency-evidence closure into compiler artifact
-schema 11. Relational-summary schema version 1 and specification-pack schema
+schema 12. Relational-summary schema version 1 and specification-pack schema
 version 1 govern those evidence records.
 
 Specification packs are off by default. The preview ships one data-driven
@@ -705,7 +705,7 @@ host shadowing and arbitrary relative overrides are rejected before any push.
 
 ## Closed compiler artifact and remaining release gaps
 
-The build-only collector now emits compiler artifact schema version 11 from the
+The build-only collector now emits compiler artifact schema version 12 from the
 final post-generator Roslyn `Compilation`. It seals the feature-selected claim
 manifest and, for each selected callable, either a typed lowering failure or
 portable whole-body CFG/IR with bound contract clauses, canonical variables,

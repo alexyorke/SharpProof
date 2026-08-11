@@ -232,7 +232,11 @@ try {
     }
 
     if (-not $passed) {
-        exit 1
+        throw (
+            'Production C# structural-complexity limits were exceeded: ' +
+            "expressions $expressionNodes/$maximumExpressionNodes; " +
+            "decisions $decisionPoints/$maximumDecisionPoints; " +
+            "members $members/$maximumMembers.")
     }
 }
 finally {

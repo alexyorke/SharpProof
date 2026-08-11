@@ -55,13 +55,16 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 129,
-    "expectedCatalogSha256": "62e55480a9faef47298c30a5f08583e049d894708bb35bdbbb8cd6508d8d3922"
+    "expectedCatalogCount": 136,
+    "expectedCatalogSha256": "d1cbcb480f24595e9874bd19f5f39e0f1c2dd1d89a6a0dc4504e40826a4646f6"
   },
   "worker": {
     "protocolVersion": 11,
     "manifestSchemaVersion": 4,
-    "compilerArtifactSchemaVersion": 11,
+    "compilerArtifactSchemaVersion": 12,
+    "maximumCompilerReferenceModuleBytes": 268435456,
+    "maximumCompilerReferenceClosureBytes": 1073741824,
+    "maximumCompilerReferenceModules": 4096,
     "relationalSummarySchemaVersion": 1,
     "specificationPackSchemaVersion": 1,
     "maximumParallelism": 4,
@@ -90,13 +93,16 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "6e89bc13001368b905f7fd0b4525eed15626a0d8b8988233d399a7e16705b697",
+    "inventorySha256": "35ea1b0bf9cf21f40c5103b54f643619e9d9d342b0f091dee577378a7fdd7c54",
     "components": [
       {
         "name": "discovery",
         "paths": [
           "SharpProof.Analyzer/SharpProofAnalyzer.cs",
-          "SharpProof.Analyzer/ContractRuntimePolicy.cs",
+          "SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs",
+          "SharpProof.Analyzer.Core/ContractRuntimePolicy.cs",
+          "SharpProof.Analyzer.Core/ContractForValidation/ContractForValidationEngine.cs",
+          "SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs",
           "SharpProof.CompilerCollector/FinalCompilationCollectorAnalyzer.cs",
           "SharpProof.CompilerCollector/FinalCompilationCollector.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs",
@@ -226,9 +232,9 @@
       {
         "name": "analyzerDiagnosticCatalog",
         "paths": [
-          "SharpProof.Analyzer/AnalyzerDiagnostic.catalog.json",
+          "SharpProof.Analyzer.Core/AnalyzerDiagnostic.catalog.json",
           "scripts/Generate-AnalyzerDiagnosticCatalog.ps1",
-          "SharpProof.Analyzer/AnalyzerDiagnosticCatalog.generated.cs"
+          "SharpProof.Analyzer.Core/AnalyzerDiagnosticCatalog.generated.cs"
         ]
       },
       {
@@ -236,8 +242,8 @@
         "paths": [
           "eng/diagnostics/diagnostic-descriptors.v1.json",
           "scripts/Generate-DiagnosticDescriptors.ps1",
-          "SharpProof.Analyzer/GeneratedDiagnosticDescriptors.generated.cs",
-          "SharpProof.ContractForGenerator/GeneratedDiagnosticDescriptors.generated.cs",
+          "SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs",
+          "SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs",
           "SharpProof.Meta.Analyzers/MetaDiagnosticDescriptors.generated.cs"
         ]
       },
@@ -247,7 +253,7 @@
           "SharpProof.Projection.catalog.json",
           "scripts/Generate-ProjectionCatalog.ps1",
           "SharpProof.Verify/VerificationProjections.generated.cs",
-          "SharpProof.Analyzer/EffectEvaluationProjections.generated.cs",
+          "SharpProof.Analyzer.Core/EffectEvaluationProjections.generated.cs",
           "SharpProof.Worker/WorkerProjections.generated.cs",
           "SharpProof.Contracts/ContractProjections.generated.cs",
           "SharpProof.Ir/IrPrinterProjections.generated.cs",
@@ -293,7 +299,7 @@
         "paths": [
           "SharpProof.DeclarativeModels.catalog.json",
           "scripts/Generate-DeclarativeModels.ps1",
-          "SharpProof.Analyzer/DeclarativeModels.generated.cs",
+          "SharpProof.Analyzer.Core/DeclarativeModels.generated.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/DeclarativeModels.generated.cs",
           "SharpProof.Specs/DeclarativeModels.generated.cs",
           "SharpProof.Worker/DeclarativeModels.generated.cs",
@@ -354,16 +360,16 @@
       {
         "name": "effectAnalysis",
         "paths": [
-          "SharpProof.Analyzer/AnalyzerFeaturePipeline.cs",
-          "SharpProof.Analyzer/AnalyzerSession.cs",
-          "SharpProof.Analyzer/CallArgumentAliasPolicy.cs",
-          "SharpProof.Analyzer/EffectCallPreconditionPolicy.cs",
-          "SharpProof.Analyzer/EffectContractDiagnostics.cs",
-          "SharpProof.Analyzer/EffectEvaluationTypes.cs",
-          "SharpProof.Analyzer/ManagedContractFacts.cs",
-          "SharpProof.Analyzer/RequiresCallSiteAnalyzer.cs",
-          "SharpProof.Analyzer/RequiresCallSiteDiscovery.cs",
-          "SharpProof.Analyzer/RequiresCallSiteTreeAnalyzer.cs",
+          "SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs",
+          "SharpProof.Analyzer.Core/AnalyzerSession.cs",
+          "SharpProof.Analyzer.Core/CallArgumentAliasPolicy.cs",
+          "SharpProof.Analyzer.Core/EffectCallPreconditionPolicy.cs",
+          "SharpProof.Analyzer.Core/EffectContractDiagnostics.cs",
+          "SharpProof.Analyzer.Core/EffectEvaluationTypes.cs",
+          "SharpProof.Analyzer.Core/ManagedContractFacts.cs",
+          "SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs",
+          "SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs",
+          "SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs",
           "SharpProof.Contracts/ContractSelectionInventory.cs",
           "SharpProof.Effects/EffectAnalysisSession.cs",
           "SharpProof.Effects/EffectCallPreconditionPolicy.cs",
@@ -411,10 +417,10 @@
     {
       "name": "policy",
       "paths": [
-        "SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs",
-        "SharpProof.Analyzer/AnalyzerGeneratedCodePolicy.cs",
-        "SharpProof.Analyzer/LanguageSubsetGate.cs",
-        "SharpProof.Analyzer/SharpProofControlAttributePolicy.cs",
+        "SharpProof.Analyzer.Core/Configuration/AnalyzerConfiguration.cs",
+        "SharpProof.Analyzer.Core/AnalyzerGeneratedCodePolicy.cs",
+        "SharpProof.Analyzer.Core/LanguageSubsetGate.cs",
+        "SharpProof.Analyzer.Core/SharpProofControlAttributePolicy.cs",
         "SharpProof.Effects/TrustedBoundaryPolicy.cs",
         "SharpProof.Frontend/FrontendSubset.cs",
         "SharpProof.Frontend/OperationSubsetClassifier.cs",
@@ -448,7 +454,7 @@
       {
         "name": "canonicalIdentityEncoding",
         "paths": [
-          "SharpProof.Analyzer/CompilerArtifact/CompilerExceptionTypeIdentity.cs",
+          "SharpProof.Analyzer.Core/CompilerArtifact/CompilerExceptionTypeIdentity.cs",
           "SharpProof.Frontend/CompilerIdentityBridge.cs",
           "SharpProof.Ir/CanonicalHashWriter.cs"
         ]
@@ -493,7 +499,9 @@
       {
         "name": "portableShippingBoundary",
         "paths": [
-          "SharpProof.PortableAnalyzer/SharpProof.PortableAnalyzer.csproj",
+          "SharpProof.Analyzer/SharpProof.Analyzer.csproj",
+          "SharpProof.Analyzer.Core/SharpProof.Analyzer.Core.csproj",
+          "SharpProof.ContractForGenerator/SharpProof.ContractForGenerator.csproj",
           "SharpProof.Package/SharpProof.nuspec",
           "SharpProof.Package/buildTransitive/SharpProof.props",
           "SharpProof.Package/buildTransitive/SharpProof.targets",
@@ -529,8 +537,8 @@
   },
   "productionComplexity": {
     "measurement": "Aggregate Roslyn expression nodes, decision points, and members across handwritten production C#; whitespace, comments, line wrapping, and optional braces are excluded.",
-    "ceilingRationale": "2026-08-07: extracting the cancellable verifier runner and invalidator from unmeasured inline MSBuild XML into the directly testable SharpProof.BuildTasks assembly moved that trusted-boundary logic under the production C# ratchet. 2026-08-08: bounded relational interprocedural verification added one reusable typed-IR summary engine, an isolated exact implementation-PE decoder, and a strict data-driven specification-pack parser; source, IL, and audited packs now share one Z3 composition path instead of growing method-specific verifier branches. Dead dependency-graph scaffolding was removed, production roots are derived from Directory.Build.props, and each new semantic layer has its own narrow ratchet below. 2026-08-08 audit: atomic publication ownership and cancellation, total malformed-evidence and cache validation, worker cancellation/evidence checks, and the non-entrypoint analyzer Core boundary added supported-surface safeguards with mutation-discriminating regressions; ceilings:113500/6050/3900.",
-    "maximumExpressionNodes": 113500,
+    "ceilingRationale": "2026-08-07: extracting the cancellable verifier runner and invalidator from unmeasured inline MSBuild XML into the directly testable SharpProof.BuildTasks assembly moved that trusted-boundary logic under the production C# ratchet. 2026-08-08: bounded relational interprocedural verification added one reusable typed-IR summary engine, an isolated exact implementation-PE decoder, and a strict data-driven specification-pack parser; source, IL, and audited packs now share one Z3 composition path instead of growing method-specific verifier branches. Dead dependency-graph scaffolding was removed, production roots are derived from Directory.Build.props, and each new semantic layer has its own narrow ratchet below. 2026-08-08 audit: atomic publication ownership and cancellation, total malformed-evidence and cache validation, worker cancellation/evidence checks, and the non-entrypoint analyzer Core boundary added supported-surface safeguards with mutation-discriminating regressions. 2026-08-10 consolidation: the duplicated portable-analyzer compilation was deleted, entry points now share one Core implementation, generated ContractFor companions are checked on the final compilation, and compiler references gained explicit module, closure, and count limits; ceilings:113800/6050/3900.",
+    "maximumExpressionNodes": 113800,
     "maximumDecisionPoints": 6050,
     "maximumMembers": 3900
   },
@@ -569,7 +577,7 @@
       },
       {
         "name": "requires-call-site-analyzer",
-        "path": "SharpProof.Analyzer/RequiresCallSiteAnalyzer.cs",
+        "path": "SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs",
         "maximumExpressionNodes": 1450,
         "maximumDecisionPoints": 105
       },
@@ -580,8 +588,8 @@
         "maximumDecisionPoints": 110
       },
       {
-        "name": "contract-for-generator",
-        "path": "SharpProof.ContractForGenerator/ContractForValidatorGenerator.cs",
+        "name": "contract-for-validation",
+        "path": "SharpProof.Analyzer.Core/ContractForValidation/ContractForValidationEngine.cs",
         "maximumExpressionNodes": 910,
         "maximumDecisionPoints": 35
       },

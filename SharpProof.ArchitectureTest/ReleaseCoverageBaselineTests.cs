@@ -574,6 +574,45 @@ public sealed class ReleaseCoverageBaselineTests
             releaseCommit);
     }
 
+    [TestCase("src/./trusted.cs")]
+    [TestCase("src/part/../trusted.cs")]
+    [TestCase("src\\trusted.cs")]
+    [TestCase("/src/trusted.cs")]
+    [TestCase("src//trusted.cs")]
+    [TestCase("src/trusted.cs/")]
+    public async Task TrustedComputingBaseRejectsNoncanonicalPaths(
+        string path)
+    {
+        var root = RepositoryRoot();
+        const string command = """
+            . $env:SHARPPROOF_TCB_HELPER
+            $contract = [pscustomobject]@{
+                trustedKernel = [pscustomobject]@{ paths = @(
+                    $env:SHARPPROOF_TCB_PATH) }
+                trustedComputingBase = [pscustomobject]@{ components = @() }
+            }
+            Get-SharpProofTcbPaths -Contract $contract | Out-Null
+            """;
+        var result = await RunAsyncCore(
+            root,
+            "pwsh",
+            new Dictionary<string, string>
+            {
+                ["SHARPPROOF_TCB_HELPER"] = Path.Combine(
+                    root,
+                    "scripts",
+                    "Get-SharpProofTcbPaths.ps1"),
+                ["SHARPPROOF_TCB_PATH"] = path
+            },
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            command);
+
+        Assert.That(result.ExitCode, Is.Not.Zero, path);
+    }
+
     private static async Task<ReleaseDigest> RunReleaseDigestAsync(
         string root,
         string repository,

@@ -39,7 +39,6 @@
       '$(MSBuildProjectName)' == 'SharpProof.Host' Or
       '$(MSBuildProjectName)' == 'SharpProof.Ir' Or
       '$(MSBuildProjectName)' == 'SharpProof.Meta.Analyzers' Or
-      '$(MSBuildProjectName)' == 'SharpProof.PortableAnalyzer' Or
       '$(MSBuildProjectName)' == 'SharpProof.Smt' Or
       '$(MSBuildProjectName)' == 'SharpProof.Specs' Or
       '$(MSBuildProjectName)' == 'SharpProof.Summaries' Or
@@ -48,7 +47,6 @@
       '$(MSBuildProjectName)' == 'SharpProof.Worker.Launcher' Or
       '$(MSBuildProjectName)' == 'SharpProof.Worker.Protocol'">true</SharpProofProductionProject>
     <SharpProofUsesIrIdentifiers Condition="
-      '$(MSBuildProjectName)' == 'SharpProof.Analyzer' Or
       '$(MSBuildProjectName)' == 'SharpProof.Analyzer.Core' Or
       '$(MSBuildProjectName)' == 'SharpProof.CompilerArtifact' Or
       '$(MSBuildProjectName)' == 'SharpProof.CompilerCollector' Or

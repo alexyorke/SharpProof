@@ -22,7 +22,7 @@ internal static class FinalCompilationCollector
                 return;
             }
 
-            if (!SharpProofAnalyzer.GetConfigurationDiagnostics(
+            if (!SharpProofAnalyzerEngine.GetConfigurationDiagnostics(
                     context.Compilation,
                     context.Options,
                     configuration,

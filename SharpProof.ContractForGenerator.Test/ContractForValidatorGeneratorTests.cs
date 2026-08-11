@@ -1001,6 +1001,30 @@ public sealed class ContractForValidatorGeneratorTests
     }
 
     [Test]
+    public void GeneratedTreesAreOwnedByTheFinalCompilationAnalyzer()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Target.cs",
+            """
+            public interface ITarget {
+                void Invoke();
+            }
+            """),
+            ("GeneratedContracts.g.cs",
+            """
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+            }
+            """));
+
+        var run = GeneratorTestHost.Run(compilation);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
     public void IncrementalRunsAndTreeOrderAreDeterministic()
     {
         const string target =

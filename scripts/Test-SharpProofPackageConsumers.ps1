@@ -259,7 +259,7 @@ function Invoke-ConsumerDotNet {
     }
 }
 
-function Assert-SharpProofPortableAnalyzerItem {
+function Assert-SharpProofAnalyzerItems {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Output,
@@ -298,20 +298,35 @@ function Assert-SharpProofPortableAnalyzerItem {
                     Select-Object -Last 1
             }
     )
+    $generators = @(
+        $sharpProofItems |
+            Where-Object {
+                $_.SharpProofAnalyzerRole -eq 'Generator'
+            }
+    )
+    $generatorNames = @(
+        $generators |
+            ForEach-Object {
+                (([string]$_.Identity) -replace '\\', '/') -split '/' |
+                    Select-Object -Last 1
+            }
+    )
     $legacyEntryPoints = @(
         $sharpProofItems |
             Where-Object {
                 (([string]$_.Identity) -replace '\\', '/') -match
-                    '/SharpProof\.(Analyzer|ContractForGenerator)\.dll$'
+                    '/SharpProof\.PortableAnalyzer\.dll$'
             }
     )
 
     if ($entryPointNames.Count -ne 1 -or
-        $entryPointNames[0] -ne 'SharpProof.PortableAnalyzer.dll' -or
+        $entryPointNames[0] -ne 'SharpProof.Analyzer.dll' -or
+        $generatorNames.Count -ne 1 -or
+        $generatorNames[0] -ne 'SharpProof.ContractForGenerator.dll' -or
         $legacyEntryPoints.Count -ne 0) {
         throw (
-            "The $Framework package consumer must load exactly the portable " +
-            'SharpProof analyzer entry point and no legacy split entry points.')
+            "The $Framework package consumer must load exactly one SharpProof " +
+            'analyzer and one ContractFor generator, with no portable monolith.')
     }
 }
 
@@ -465,7 +480,7 @@ function Test-SharpProofFrameworkConsumers {
                     '-getItem:Analyzer',
                     '--nologo') `
                 -RepositoryRoot $RepositoryRoot
-            Assert-SharpProofPortableAnalyzerItem `
+            Assert-SharpProofAnalyzerItems `
                 -Output $analyzers `
                 -Framework $framework
             Invoke-ConsumerDotNet `

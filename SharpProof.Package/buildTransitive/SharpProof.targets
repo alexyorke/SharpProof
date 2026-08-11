@@ -10,8 +10,30 @@
         Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(DefineConstants)', '(^|[;,])\s*SHARPPROOF_CONTRACTS\s*($|[;,])'))">true</_SharpProofContractsRuntimeEnabled>
   </PropertyGroup>
   <ItemGroup Condition="'$(_SharpProofProfileNormalized)' != 'off'">
-    <Analyzer Include="$(SharpProofPortableAnalyzerPath)">
+    <Analyzer Include="$(_SharpProofAnalyzerPath)">
       <SharpProofAnalyzerRole>EntryPoint</SharpProofAnalyzerRole>
+    </Analyzer>
+    <Analyzer Include="$(_SharpProofContractForGeneratorPath)">
+      <SharpProofAnalyzerRole>Generator</SharpProofAnalyzerRole>
+    </Analyzer>
+    <Analyzer Include="
+        $(_SharpProofSharedDirectory)/SharpProof.Analyzer.Core.dll;
+        $(_SharpProofSharedDirectory)/SharpProof.Contracts.dll;
+        $(_SharpProofSharedDirectory)/SharpProof.Dataflow.dll;
+        $(_SharpProofSharedDirectory)/SharpProof.Effects.dll;
+        $(_SharpProofSharedDirectory)/SharpProof.Frontend.dll;
+        $(_SharpProofSharedDirectory)/SharpProof.Ir.dll;
+        $(_SharpProofSharedDirectory)/SharpProof.Specs.dll;
+        $(_SharpProofSharedDirectory)/System.Buffers.dll;
+        $(_SharpProofSharedDirectory)/System.Collections.Immutable.dll;
+        $(_SharpProofSharedDirectory)/System.Memory.dll;
+        $(_SharpProofSharedDirectory)/System.Numerics.Vectors.dll;
+        $(_SharpProofSharedDirectory)/System.Reflection.Metadata.dll;
+        $(_SharpProofSharedDirectory)/System.Runtime.CompilerServices.Unsafe.dll;
+        $(_SharpProofSharedDirectory)/System.Text.Encoding.CodePages.dll;
+        $(_SharpProofSharedDirectory)/System.Threading.Tasks.Extensions.dll">
+      <SharpProofAnalyzerRole>Dependency</SharpProofAnalyzerRole>
+      <Visible>false</Visible>
     </Analyzer>
   </ItemGroup>
   <ItemGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(DesignTimeBuild)' != 'true'">
@@ -19,20 +41,13 @@
       <SharpProofAnalyzerRole>Collector</SharpProofAnalyzerRole>
     </Analyzer>
     <Analyzer Include="
-        $(_SharpProofCollectorDirectory)/Microsoft.Bcl.AsyncInterfaces.dll;
-        $(_SharpProofCollectorDirectory)/SharpProof.Analyzer.Core.dll;
-        $(_SharpProofCollectorDirectory)/SharpProof.CompilerArtifact.dll;
-        $(_SharpProofCollectorDirectory)/SharpProof.Contracts.dll;
-        $(_SharpProofCollectorDirectory)/SharpProof.Dataflow.dll;
-        $(_SharpProofCollectorDirectory)/SharpProof.Effects.dll;
-        $(_SharpProofCollectorDirectory)/SharpProof.Frontend.dll;
-        $(_SharpProofCollectorDirectory)/SharpProof.Ir.dll;
-        $(_SharpProofCollectorDirectory)/SharpProof.Specs.dll;
-        $(_SharpProofCollectorDirectory)/SharpProof.Summaries.dll;
-        $(_SharpProofCollectorDirectory)/SharpProof.Worker.Protocol.dll;
-        $(_SharpProofCollectorDirectory)/System.IO.Pipelines.dll;
-        $(_SharpProofCollectorDirectory)/System.Text.Encodings.Web.dll;
-        $(_SharpProofCollectorDirectory)/System.Text.Json.dll">
+        $(_SharpProofSharedDirectory)/Microsoft.Bcl.AsyncInterfaces.dll;
+        $(_SharpProofSharedDirectory)/SharpProof.CompilerArtifact.dll;
+        $(_SharpProofSharedDirectory)/SharpProof.Summaries.dll;
+        $(_SharpProofSharedDirectory)/SharpProof.Worker.Protocol.dll;
+        $(_SharpProofSharedDirectory)/System.IO.Pipelines.dll;
+        $(_SharpProofSharedDirectory)/System.Text.Encodings.Web.dll;
+        $(_SharpProofSharedDirectory)/System.Text.Json.dll">
       <SharpProofAnalyzerRole>CollectorDependency</SharpProofAnalyzerRole>
       <Visible>false</Visible>
     </Analyzer>
@@ -45,6 +60,8 @@
            Text="SharpProof analysis requires .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). Set SharpProofProfile=off to omit the analyzer on an older compiler host." />
     <Error Condition="'$(SharpProofMode)' != ''"
            Text="SharpProofMode was removed before preview.1. Use SharpProofProfile and SharpProofFeatures." />
+    <Error Condition="'$(SharpProofPortableAnalyzerPath)' != ''"
+           Text="SharpProofPortableAnalyzerPath was removed before preview.1. Analyzer layout is package-owned; use SharpProofAnalyzerDirectory only for package testing." />
     <Error Condition="'$(_SharpProofProfileNormalized)' != 'advisory' AND '$(_SharpProofProfileNormalized)' != 'strict' AND '$(_SharpProofProfileNormalized)' != 'off'"
            Text="SharpProofProfile must be advisory, strict, or off." />
     <Error Condition="'$(_SharpProofFeaturesNormalized)' != 'effects' AND '$(_SharpProofFeaturesNormalized)' != 'contracts' AND '$(_SharpProofFeaturesNormalized)' != 'all'"

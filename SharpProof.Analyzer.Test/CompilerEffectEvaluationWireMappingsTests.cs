@@ -1,16 +1,14 @@
-extern alias AnalyzerCore;
-
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
 using CoreEffectEvaluationCertainty =
-    AnalyzerCore::SharpProof.Analyzer.EffectEvaluationCertainty;
+    SharpProof.Analyzer.EffectEvaluationCertainty;
 using CoreEffectEvaluationContractKind =
-    AnalyzerCore::SharpProof.Analyzer.EffectEvaluationContractKind;
+    SharpProof.Analyzer.EffectEvaluationContractKind;
 using CoreEffectEvaluationOutcome =
-    AnalyzerCore::SharpProof.Analyzer.EffectEvaluationOutcome;
+    SharpProof.Analyzer.EffectEvaluationOutcome;
 using CoreEffectEvaluationReason =
-    AnalyzerCore::SharpProof.Analyzer.EffectEvaluationReason;
+    SharpProof.Analyzer.EffectEvaluationReason;
 
 namespace SharpProof.Analyzer.Test;
 

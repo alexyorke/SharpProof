@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   COMPOSE_PROJECT_NAME: sharpproof-coverage-${{ github.run_id }}-${{ github.run_attempt }}
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
@@ -35,7 +39,7 @@ jobs:
           echo "SHARPPROOF_COVERAGE_COMPARISON_REF=${comparison}" >> "$GITHUB_ENV"
 
       - name: Build the pinned toolchain
-        run: docker compose build tooling
+        uses: ./.github/actions/build-tooling
 
       - name: Collect and enforce container coverage
         run: >-

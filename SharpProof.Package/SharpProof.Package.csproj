@@ -28,7 +28,12 @@
                       SkipGetTargetFrameworkProperties="true"
                       PrivateAssets="all"
                       TreatAsPackageReference="false" />
-    <ProjectReference Include="..\SharpProof.PortableAnalyzer\SharpProof.PortableAnalyzer.csproj"
+    <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      PrivateAssets="all"
+                      TreatAsPackageReference="false" />
+    <ProjectReference Include="..\SharpProof.ContractForGenerator\SharpProof.ContractForGenerator.csproj"
                       ReferenceOutputAssembly="false"
                       SkipGetTargetFrameworkProperties="true"
                       PrivateAssets="all"

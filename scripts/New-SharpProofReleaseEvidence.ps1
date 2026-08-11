@@ -324,12 +324,12 @@ function Test-ThirdPartyComponentVersions {
     $assetRoutes = @{
         'SharpProof' = @(
             @{
-                EntryPrefix = 'tools/analyzers/dotnet/cs/'
+                EntryPrefix = 'tools/collector/'
                 AssetsPath =
-                    'SharpProof.PortableAnalyzer\obj\project.assets.json'
+                    'SharpProof.CompilerCollector\obj\project.assets.json'
             },
             @{
-                EntryPrefix = 'tools/collector/'
+                EntryPrefix = 'tools/shared/netstandard2.0/'
                 AssetsPath =
                     'SharpProof.CompilerCollector\obj\project.assets.json'
             }

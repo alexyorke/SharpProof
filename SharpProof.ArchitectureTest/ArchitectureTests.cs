@@ -25,6 +25,11 @@ public sealed class ArchitectureTests
             PropertyNameCaseInsensitive = true
         };
 
+    private static readonly string[] DeclarationOnlyTcbCoverageFiles =
+    [
+        "SharpProof.Analyzer.Core/EffectEvaluationTypes.cs"
+    ];
+
     private static readonly string[] ProductionProjects = [
         "SharpProof.Analyzer",
         "SharpProof.Analyzer.Core",
@@ -32,7 +37,6 @@ public sealed class ArchitectureTests
         "SharpProof.BuildTasks",
         "SharpProof.Ir",
         "SharpProof.Meta.Analyzers",
-        "SharpProof.PortableAnalyzer",
         "SharpProof.CompilerArtifact",
         "SharpProof.CompilerCollector",
         "SharpProof.ContractForGenerator",
@@ -149,13 +153,7 @@ public sealed class ArchitectureTests
     {
         var allowed = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
-            ["SharpProof.Analyzer"] = [
-                "SharpProof.Contracts",
-                "SharpProof.Effects",
-                "SharpProof.Frontend",
-                "SharpProof.Ir",
-                "SharpProof.Specs"
-            ],
+            ["SharpProof.Analyzer"] = ["SharpProof.Analyzer.Core"],
             ["SharpProof.Analyzer.Core"] = [
                 "SharpProof.Contracts",
                 "SharpProof.Effects",
@@ -168,7 +166,6 @@ public sealed class ArchitectureTests
             ["SharpProof.Host"] = [],
             ["SharpProof.Ir"] = [],
             ["SharpProof.Meta.Analyzers"] = [],
-            ["SharpProof.PortableAnalyzer"] = ["SharpProof.Attributes"],
             ["SharpProof.CompilerArtifact"] = [
                 "SharpProof.Ir",
                 "SharpProof.Worker.Protocol"
@@ -184,7 +181,10 @@ public sealed class ArchitectureTests
                 "SharpProof.Summaries",
                 "SharpProof.Worker.Protocol"
             ],
-            ["SharpProof.ContractForGenerator"] = ["SharpProof.Contracts"],
+            ["SharpProof.ContractForGenerator"] = [
+                "SharpProof.Analyzer.Core",
+                "SharpProof.Contracts"
+            ],
             ["SharpProof.Specs"] = ["SharpProof.Ir"],
             ["SharpProof.Dataflow"] = [],
             ["SharpProof.Frontend"] = [
@@ -649,14 +649,14 @@ public sealed class ArchitectureTests
             Does.Contain("SharpProof.Verify/Evidence.cs")
                 .And.Contain("SharpProof.Verify/Outcomes.cs")
                 .And.Contain("SharpProof.Effects/TrustedBoundaryPolicy.cs")
-                .And.Contain("SharpProof.Analyzer/LanguageSubsetGate.cs")
+                .And.Contain("SharpProof.Analyzer.Core/LanguageSubsetGate.cs")
                 .And.Contain("SharpProof.Frontend/OperationSubsetClassifier.cs")
                 .And.Contain("SharpProof.Frontend/FrontendSubset.cs")
-                .And.Contain("SharpProof.Analyzer/Configuration/AnalyzerConfiguration.cs")
-                .And.Contain("SharpProof.Analyzer/SharpProofControlAttributePolicy.cs")
+                .And.Contain("SharpProof.Analyzer.Core/Configuration/AnalyzerConfiguration.cs")
+                .And.Contain("SharpProof.Analyzer.Core/SharpProofControlAttributePolicy.cs")
                 .And.Contain("SharpProof.Verify/Backend.cs")
                 .And.Contain("SharpProof.Contracts/ContractApiSymbols.cs")
-                .And.Contain("SharpProof.Analyzer/AnalyzerGeneratedCodePolicy.cs")
+                .And.Contain("SharpProof.Analyzer.Core/AnalyzerGeneratedCodePolicy.cs")
                 .And.Contain("SharpProof.Attributes/EffectContractAttribute.cs")
                 .And.Contain("SharpProof.Frontend/CompilationModelProvider.cs")
                 .And.Contain("SharpProof.Contracts/ContractForSymbolMatcher.cs")
@@ -687,6 +687,49 @@ public sealed class ArchitectureTests
                 .And.Contain("changedMetadataFiles"));
     }
 
+    [Test]
+    public void DeclarationOnlyTcbCoverageExceptionsAreExplicitAndNonExecutable()
+    {
+        var repository = RepositoryRoot();
+        using var baseline = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            repository,
+            "eng",
+            "coverage",
+            "baseline.json")));
+        var paths = baseline.RootElement
+            .GetProperty("declarationOnlyTcbFiles")
+            .EnumerateArray()
+            .Select(static value => value.GetString() ?? string.Empty)
+            .ToArray();
+
+        Assert.That(
+            paths,
+            Is.EqualTo(DeclarationOnlyTcbCoverageFiles));
+        foreach (var path in paths)
+        {
+            var root = CSharpSyntaxTree.ParseText(File.ReadAllText(Path.Combine(
+                    repository,
+                    path.Replace('/', Path.DirectorySeparatorChar))))
+                .GetCompilationUnitRoot();
+            var declarations = root.DescendantNodes()
+                .Where(static node => node is BaseTypeDeclarationSyntax)
+                .ToArray();
+
+            Assert.That(declarations, Is.Not.Empty, path);
+            Assert.That(
+                declarations,
+                Is.All.InstanceOf<EnumDeclarationSyntax>(),
+                path);
+            Assert.That(
+                root.DescendantNodes().Any(static node =>
+                    node is StatementSyntax or
+                        ArrowExpressionClauseSyntax or
+                        EqualsValueClauseSyntax),
+                Is.False,
+                path);
+        }
+    }
+
     private static string TcbInventorySha256(IEnumerable<string> paths)
     {
         var framed = string.Join(
@@ -711,6 +754,11 @@ public sealed class ArchitectureTests
                 "preview-interface.v1.json")));
         using var contractDocument = JsonDocument.Parse(File.ReadAllText(
             Path.Combine(repository, "eng", "acceptance", "contract.json")));
+        using var compilerSchemaDocument = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(
+                repository,
+                "SharpProof.CompilerArtifact",
+                "CompilerArtifactModel.schema.json")));
         var snapshot = snapshotDocument.RootElement;
         var active = snapshot.GetProperty("msbuildProperties")
             .EnumerateArray()
@@ -763,6 +811,18 @@ public sealed class ArchitectureTests
         var worker = contract.GetProperty("worker");
         var cache = contract.GetProperty("cache");
         var versions = snapshot.GetProperty("versions");
+        var referenceLimits = compilerSchemaDocument.RootElement
+            .GetProperty("declarations")
+            .EnumerateArray()
+            .Single(static declaration =>
+                declaration.GetProperty("name").GetString() ==
+                    "CompilerReferenceLimits")
+            .GetProperty("constants")
+            .EnumerateArray()
+            .ToDictionary(
+                static constant => constant.GetProperty("name").GetString()!,
+                static constant => constant.GetProperty("value").GetInt32(),
+                StringComparer.Ordinal);
 
         using (Assert.EnterMultipleScope())
         {
@@ -814,6 +874,18 @@ public sealed class ArchitectureTests
             Assert.That(
                 versions.GetProperty("workerCache").GetInt32(),
                 Is.EqualTo(cache.GetProperty("schemaVersion").GetInt32()));
+            Assert.That(
+                referenceLimits["MaximumModuleBytes"],
+                Is.EqualTo(worker.GetProperty(
+                    "maximumCompilerReferenceModuleBytes").GetInt32()));
+            Assert.That(
+                referenceLimits["MaximumClosureBytes"],
+                Is.EqualTo(worker.GetProperty(
+                    "maximumCompilerReferenceClosureBytes").GetInt32()));
+            Assert.That(
+                referenceLimits["MaximumModuleCount"],
+                Is.EqualTo(worker.GetProperty(
+                    "maximumCompilerReferenceModules").GetInt32()));
         }
     }
 
@@ -1567,23 +1639,31 @@ public sealed class ArchitectureTests
             ".github",
             "workflows",
             "ci.yml"));
-        var performanceIndex = fastWorkflow.IndexOf(
-            "tooling performance",
+        var containerCommands = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+        var performanceIndex = containerCommands.IndexOf(
+            "scripts/Invoke-SharpProofGateEvidence.ps1",
             StringComparison.Ordinal);
-        var broadTestsIndex = fastWorkflow.IndexOf(
+        var broadTestsIndex = containerCommands.IndexOf(
             "SharpProof.Dev.Tests.slnf",
             StringComparison.Ordinal);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                fastWorkflow,
+                containerCommands,
                 Does.Contain(
                     "TestCategory!=Performance&TestCategory!=Coverage"));
             Assert.That(
-                fastWorkflow,
+                containerCommands,
+                Does.Contain(
+                    "pr-gates requires -Configuration Release."));
+            Assert.That(
+                containerCommands,
                 Does.Not.Contain("TestCategory=Performance"));
             Assert.That(
-                fastWorkflow,
+                containerCommands,
                 Does.Contain(
                     "FullyQualifiedName~" +
                     "ForcedTerminationDeadlineIsStableAcrossLaunches"));
@@ -1598,10 +1678,6 @@ public sealed class ArchitectureTests
                 Is.GreaterThan(performanceIndex));
         }
 
-        var containerCommands = File.ReadAllText(Path.Combine(
-            root,
-            "scripts",
-            "Invoke-SharpProofContainer.ps1"));
         Assert.That(
             containerCommands,
             Does.Contain("artifacts/ci/performance.json"));
@@ -1741,9 +1817,6 @@ public sealed class ArchitectureTests
             .OrderBy(static name => name, StringComparer.Ordinal)
             .ToArray();
         var expectedCoverageProjects = ProductionProjects
-            .Where(static name =>
-                name != "SharpProof.Analyzer.Core" &&
-                name != "SharpProof.PortableAnalyzer")
             .Append("SharpProof.Gates")
             .OrderBy(static name => name, StringComparer.Ordinal)
             .ToArray();
@@ -1751,8 +1824,7 @@ public sealed class ArchitectureTests
             actualCoverageProjects,
             Is.EqualTo(expectedCoverageProjects),
             "Every production source owner must participate in project and " +
-            "aggregate coverage; Analyzer.Core and PortableAnalyzer are explicit " +
-            "linked-source packaging exceptions.");
+            "aggregate coverage; linked-source packaging exceptions are forbidden.");
         Assert.That(
             managedSettings,
             Does.Contain(

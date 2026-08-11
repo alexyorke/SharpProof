@@ -1,10 +1,11 @@
 {
   "schemaVersion": 1,
   "outputs": [
-    "SharpProof.Analyzer/AnalyzerDiagnosticCatalog.generated.cs",
-    "SharpProof.Analyzer/DeclarativeModels.generated.cs",
-    "SharpProof.Analyzer/EffectEvaluationProjections.generated.cs",
-    "SharpProof.Analyzer/GeneratedDiagnosticDescriptors.generated.cs",
+    "SharpProof.Analyzer.Core/AnalyzerDiagnosticCatalog.generated.cs",
+    "SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs",
+    "SharpProof.Analyzer.Core/DeclarativeModels.generated.cs",
+    "SharpProof.Analyzer.Core/EffectEvaluationProjections.generated.cs",
+    "SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs",
     "SharpProof.BuildTasks/LauncherRuntimeCompanionInventory.generated.cs",
     "SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs",
     "SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs",
@@ -12,7 +13,6 @@
     "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableProjections.generated.cs",
     "SharpProof.CompilerCollector/CompilerArtifact/CompilerWireMappings.generated.cs",
     "SharpProof.CompilerCollector/CompilerArtifact/DeclarativeModels.generated.cs",
-    "SharpProof.ContractForGenerator/GeneratedDiagnosticDescriptors.generated.cs",
     "SharpProof.Contracts/BoundContractModel.generated.cs",
     "SharpProof.Contracts/ContractProjections.generated.cs",
     "SharpProof.Contracts/DeclarativeModels.generated.cs",

@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 0
 
       - name: Build the pinned toolchain
-        run: docker compose build tooling
+        uses: ./.github/actions/build-tooling
 
       - name: Run full acceptance
         run: >-

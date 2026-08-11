@@ -3,10 +3,8 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <AssemblyName>SharpProof.Analyzer.Core</AssemblyName>
     <RootNamespace>SharpProof</RootNamespace>
-    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <DefineConstants>$(DefineConstants);SHARPPROOF_ANALYZER_LIBRARY</DefineConstants>
     <NoWarn>$(NoWarn);RS2002;RS2003</NoWarn>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
@@ -21,9 +19,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\SharpProof.Analyzer\**\*.cs"
-             Exclude="..\SharpProof.Analyzer\bin\**\*;..\SharpProof.Analyzer\obj\**\*"
-             LinkBase="Sources\SharpProof.Analyzer" />
     <Compile Include="..\SharpProof.Specs\Polyfills\IsExternalInit.cs"
              Link="Polyfills\IsExternalInit.cs" />
   </ItemGroup>

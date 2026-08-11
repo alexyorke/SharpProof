@@ -10,6 +10,7 @@ namespace SharpProof.Analyzer.Test;
 public sealed class AnalyzerArchitectureTests
 {
     private static readonly string[] ExpectedAnalyzerReferences = [
+        "SharpProof.Analyzer.Core",
         "SharpProof.CompilerArtifact",
         "SharpProof.Contracts",
         "SharpProof.Dataflow",
@@ -213,6 +214,9 @@ public sealed class AnalyzerArchitectureTests
             "New Rules");
         var descriptors = new SharpProofAnalyzer()
             .SupportedDiagnostics
+            .Where(static descriptor => !descriptor.Id.StartsWith(
+                "SPCF",
+                StringComparison.Ordinal))
             .ToDictionary(
                 static descriptor => descriptor.Id,
                 StringComparer.Ordinal);

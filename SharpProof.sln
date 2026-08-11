@@ -72,8 +72,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.CompilerArtifact
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.CompilerCollector", "SharpProof.CompilerCollector\SharpProof.CompilerCollector.csproj", "{D1806F5A-79C9-4C14-84D6-68D21447A2F1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.PortableAnalyzer", "SharpProof.PortableAnalyzer\SharpProof.PortableAnalyzer.csproj", "{A4E4B743-774B-4381-9FB5-736F867C0CF6}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Worker", "SharpProof.Worker\SharpProof.Worker.csproj", "{99FD7C4B-043E-482A-A031-6B5314BC914B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpProof.Worker.Test", "SharpProof.Worker.Test\SharpProof.Worker.Test.csproj", "{574928DB-1543-464A-9D37-5134DF04EEE5}"
@@ -244,10 +242,6 @@ Global
 		{D1806F5A-79C9-4C14-84D6-68D21447A2F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D1806F5A-79C9-4C14-84D6-68D21447A2F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D1806F5A-79C9-4C14-84D6-68D21447A2F1}.Release|Any CPU.Build.0 = Release|Any CPU
-		{A4E4B743-774B-4381-9FB5-736F867C0CF6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{A4E4B743-774B-4381-9FB5-736F867C0CF6}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{A4E4B743-774B-4381-9FB5-736F867C0CF6}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A4E4B743-774B-4381-9FB5-736F867C0CF6}.Release|Any CPU.Build.0 = Release|Any CPU
 		{99FD7C4B-043E-482A-A031-6B5314BC914B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{99FD7C4B-043E-482A-A031-6B5314BC914B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{99FD7C4B-043E-482A-A031-6B5314BC914B}.Release|Any CPU.ActiveCfg = Release|Any CPU

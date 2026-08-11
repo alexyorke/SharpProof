@@ -130,7 +130,7 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(first.Take(3), Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
             Assert.That(first, Does.Not.Contain((byte)'\r'));
             Assert.That(artifact.Schema, Is.EqualTo("SharpProof.CompilerManifest"));
-            Assert.That(artifact.SchemaVersion, Is.EqualTo(11));
+            Assert.That(artifact.SchemaVersion, Is.EqualTo(12));
             Assert.That(artifact.ProtocolVersion, Is.EqualTo("11"));
             Assert.That(artifact.Compilation.TargetFramework, Is.EqualTo("net9.0"));
             Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.All));
@@ -461,6 +461,83 @@ public sealed class FinalCompilationCollectorTests
                 captured.Modules.Select(static module => module.Sha256),
                 Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
                     .Select(ReadSha256)));
+            Assert.That(
+                captured.Modules.Select(static module => module.SizeBytes),
+                Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
+                    .Select(static path => new FileInfo(path).Length)));
+        }
+    }
+
+    [Test]
+    public async Task ReferenceCaptureEnforcesModuleClosureAndCountLimits()
+    {
+        using var workspace = new CollectorWorkspace();
+        var firstImage = EmitImage(
+            "internal static class First {}",
+            "FirstLimit");
+        var secondImage = EmitImage(
+            "internal static class Second {}",
+            "SecondLimit");
+        var firstPath = Path.Combine(workspace.Path, "FirstLimit.dll");
+        var secondPath = Path.Combine(workspace.Path, "SecondLimit.dll");
+        await File.WriteAllBytesAsync(firstPath, firstImage);
+        await File.WriteAllBytesAsync(secondPath, secondImage);
+        MetadataReference[] references =
+        [
+            MetadataReference.CreateFromImage(
+                firstImage,
+                filePath: firstPath),
+            MetadataReference.CreateFromImage(
+                secondImage,
+                filePath: secondPath)
+        ];
+        var maximumModule = Math.Max(
+            firstImage.LongLength,
+            secondImage.LongLength);
+        var closure = firstImage.LongLength + secondImage.LongLength;
+
+        var captured = CompilerCompilationCapture.CaptureReferences(
+            references,
+            new CompilerCompilationCapture.ReferenceCaptureLimits(
+                maximumModule,
+                closure,
+                references.Length),
+            CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                captured.SelectMany(static item => item.Modules)
+                    .Select(static module => module.SizeBytes),
+                Is.EqualTo(new[]
+                {
+                    firstImage.LongLength,
+                    secondImage.LongLength
+                }));
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerCompilationCapture.CaptureReferences(
+                    references,
+                    new CompilerCompilationCapture.ReferenceCaptureLimits(
+                        maximumModule - 1,
+                        closure,
+                        references.Length),
+                    CancellationToken.None)));
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerCompilationCapture.CaptureReferences(
+                    references,
+                    new CompilerCompilationCapture.ReferenceCaptureLimits(
+                        maximumModule,
+                        closure - 1,
+                        references.Length),
+                    CancellationToken.None)));
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerCompilationCapture.CaptureReferences(
+                    references,
+                    new CompilerCompilationCapture.ReferenceCaptureLimits(
+                        maximumModule,
+                        closure,
+                        references.Length - 1),
+                    CancellationToken.None)));
         }
     }
 

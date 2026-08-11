@@ -375,11 +375,12 @@ try {
             " Expected and actual are both <System.Linq.Enumerable+SelectArrayIterator>`n" +
             " Values differ at index [0]`n" +
             " Expected string length 24 but was 20. Strings differ at index 0.`n" +
-            " Expected: ConsoleApplication`n" +
-            " But was: WindowsApplication`n" +
-            " First non-matching item at index [0]: item`n" +
-            " Extra: item`n" +
-            " -----------^")
+             " Expected: ConsoleApplication`n" +
+             " But was: WindowsApplication`n" +
+             " First non-matching item at index [0]: item`n" +
+             " Missing (1): expected-item`n" +
+             " Extra (2): actual-item`n" +
+             " -----------^")
     $nunitCollectionPath = Write-Fixture `
         -Name nunit-collection-assertion `
         -Summary Failed `
