@@ -1030,7 +1030,7 @@ $mutations = @(
         Name = 'compiler-reference-closure-byte-limit'
         File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerCompilationCapture.cs'
         Original = '                _closureBytes > _limits.MaximumClosureBytes - sizeBytes)'
-        Mutated = '                false)'
+        Mutated = '                _closureBytes > _limits.MaximumClosureBytes)'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~ReferenceCaptureEnforcesModuleClosureAndCountLimits'
     },
