@@ -46,6 +46,7 @@ $baseline = Get-Content -LiteralPath $resolvedBaselinePath -Raw |
     ConvertFrom-Json
 if ($baseline.schemaVersion -ne 1 -or
     $null -eq $baseline.projects -or
+    $null -eq $baseline.declarationOnlyTcbFiles -or
     @($baseline.projects.PSObject.Properties).Count -eq 0 -or
     [double]$baseline.minimumAggregateLinePercent -lt 0 -or
     [double]$baseline.minimumAggregateLinePercent -gt 100 -or
@@ -57,6 +58,22 @@ foreach ($property in $baseline.projects.PSObject.Properties) {
     if ([double]$property.Value -lt 0 -or
         [double]$property.Value -gt 100) {
         throw "Invalid coverage baseline for '$($property.Name)'."
+    }
+}
+$declarationOnlyTcbFiles =
+    [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::OrdinalIgnoreCase)
+foreach ($value in @($baseline.declarationOnlyTcbFiles)) {
+    $path = [string]$value
+    if ([string]::IsNullOrWhiteSpace($path) -or
+        [IO.Path]::IsPathRooted($path) -or
+        $path.Contains('\') -or
+        $path -match '(^|/)\.\.?(/|$)' -or
+        -not $path.EndsWith(
+            '.cs',
+            [StringComparison]::OrdinalIgnoreCase) -or
+        -not $declarationOnlyTcbFiles.Add($path)) {
+        throw "Invalid declaration-only TCB coverage path '$path'."
     }
 }
 $reports = @(
@@ -237,6 +254,7 @@ $changedTcb = [pscustomobject][ordered]@{
     coverableLines = 0
     linePercent = 100.0
     minimumLinePercent = [double]$baseline.minimumChangedTcbLinePercent
+    declarationOnlyFiles = @()
     nonCoverableFiles = @()
     uncoveredLines = @()
     passed = $true
@@ -257,6 +275,13 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
         [StringComparer]::OrdinalIgnoreCase)
     foreach ($coveragePath in $coverageTcbPaths) {
         [void]$coverageTcbFiles.Add($coveragePath)
+    }
+    foreach ($declarationOnlyPath in $declarationOnlyTcbFiles) {
+        if (-not $coverageTcbFiles.Contains($declarationOnlyPath) -or
+            -not (Test-Path -LiteralPath (
+                Join-Path $repositoryRoot $declarationOnlyPath) -PathType Leaf)) {
+            throw "Declaration-only TCB coverage path is not canonical: '$declarationOnlyPath'."
+        }
     }
     $diffTarget = if ($IncludeWorkingTree) {
         $ComparisonRef
@@ -331,6 +356,8 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
             Sort-Object)
     $nonCoverableChangedFiles =
         [Collections.Generic.List[string]]::new()
+    $declarationOnlyChangedFiles =
+        [Collections.Generic.List[string]]::new()
     $uncoveredChangedLines = [Collections.Generic.List[string]]::new()
     foreach ($changedPath in $changedTcbFiles) {
         if (-not $coverageTcbFiles.Contains($changedPath)) {
@@ -349,7 +376,12 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
             # trusted as covered. This also fails closed for non-C# TCB files,
             # deleted files, and binary changes until explicit evidence is
             # supplied by a separate gate.
-            $nonCoverableChangedFiles.Add($changedPath)
+            if ($declarationOnlyTcbFiles.Contains($changedPath)) {
+                $declarationOnlyChangedFiles.Add($changedPath)
+            }
+            else {
+                $nonCoverableChangedFiles.Add($changedPath)
+            }
             continue
         }
         $fileHits = $lineHits[$changedPath]
@@ -403,6 +435,8 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
         coverableLines = $changedCoverable
         linePercent = $changedPercent
         minimumLinePercent = [double]$baseline.minimumChangedTcbLinePercent
+        declarationOnlyFiles = @(
+            $declarationOnlyChangedFiles | Sort-Object)
         nonCoverableFiles = @($nonCoverableChangedFiles | Sort-Object)
         uncoveredLines = @($uncoveredChangedLines | Sort-Object)
         passed = $nonCoverableChangedFiles.Count -eq 0 -and

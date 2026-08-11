@@ -25,6 +25,11 @@ public sealed class ArchitectureTests
             PropertyNameCaseInsensitive = true
         };
 
+    private static readonly string[] DeclarationOnlyTcbCoverageFiles =
+    [
+        "SharpProof.Analyzer.Core/EffectEvaluationTypes.cs"
+    ];
+
     private static readonly string[] ProductionProjects = [
         "SharpProof.Analyzer",
         "SharpProof.Analyzer.Core",
@@ -680,6 +685,49 @@ public sealed class ArchitectureTests
                 .And.Contain("-IncludeAcceptanceContract")
                 .And.Contain("EndsWith('.cs'")
                 .And.Contain("changedMetadataFiles"));
+    }
+
+    [Test]
+    public void DeclarationOnlyTcbCoverageExceptionsAreExplicitAndNonExecutable()
+    {
+        var repository = RepositoryRoot();
+        using var baseline = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            repository,
+            "eng",
+            "coverage",
+            "baseline.json")));
+        var paths = baseline.RootElement
+            .GetProperty("declarationOnlyTcbFiles")
+            .EnumerateArray()
+            .Select(static value => value.GetString() ?? string.Empty)
+            .ToArray();
+
+        Assert.That(
+            paths,
+            Is.EqualTo(DeclarationOnlyTcbCoverageFiles));
+        foreach (var path in paths)
+        {
+            var root = CSharpSyntaxTree.ParseText(File.ReadAllText(Path.Combine(
+                    repository,
+                    path.Replace('/', Path.DirectorySeparatorChar))))
+                .GetCompilationUnitRoot();
+            var declarations = root.DescendantNodes()
+                .Where(static node => node is BaseTypeDeclarationSyntax)
+                .ToArray();
+
+            Assert.That(declarations, Is.Not.Empty, path);
+            Assert.That(
+                declarations,
+                Is.All.InstanceOf<EnumDeclarationSyntax>(),
+                path);
+            Assert.That(
+                root.DescendantNodes().Any(static node =>
+                    node is StatementSyntax or
+                        ArrowExpressionClauseSyntax or
+                        EqualsValueClauseSyntax),
+                Is.False,
+                path);
+        }
     }
 
     private static string TcbInventorySha256(IEnumerable<string> paths)
