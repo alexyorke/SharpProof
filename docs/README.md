@@ -58,7 +58,7 @@ The implementation remains the authority for enumerated surfaces:
   API vocabulary. `Generate-ContractApiCatalog.ps1` produces declarative
   descriptors; `ContractApiMetadataRuntime.cs` contains the handwritten lookup
   behavior.
-- `SharpProof.Analyzer/AnalyzerDiagnostic.catalog.json` owns finite diagnostic
+- `SharpProof.Analyzer.Core/AnalyzerDiagnostic.catalog.json` owns finite diagnostic
   wording projections for intrinsic and clause-placement failures.
   `Generate-AnalyzerDiagnosticCatalog.ps1` produces the projection; diagnostic
   selection and reporting remain handwritten.
@@ -113,7 +113,7 @@ the current coverage inventory or normative semantics.
 ## Known production gaps
 
 During container verification, the production analyzer emits a deterministic
-schema-11 compiler artifact from the final post-generator Roslyn
+schema-12 compiler artifact from the final post-generator Roslyn
 `Compilation`. It contains the selected-claim manifest and portable lowered
 whole-body CFG/IR for supported selected callables, plus bounded relational
 source/implementation-IL/audited-pack calls, bound contract/spec
@@ -130,7 +130,7 @@ production-plan Step 4 is complete for the bounded verifier subset.
 Independent whole-body postcondition-counterexample replay is implemented for
 the admitted scalar program subset. The proof kernel checks exact model closure
 and the lowered assumptions/goal before the worker independently executes the
-compiler-produced whole-body CFG. Schema 11 retains the independently
+compiler-produced whole-body CFG. Schema 12 retains the independently
 replayable event for an unconditional definite managed object/array allocation.
 The worker can use it to refute `ZeroAllocations` or an `EffectContract`
 excluding `Allocates`; other effect candidates still fail closed as typed

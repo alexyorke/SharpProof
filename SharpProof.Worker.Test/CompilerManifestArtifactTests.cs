@@ -119,6 +119,9 @@ public sealed class CompilerManifestArtifactTests
             snapshot => snapshot.References[0].Kind = "invalid",
             snapshot => snapshot.References[0].Kind = "Module",
             snapshot => snapshot.References[0].Modules[0].Mvid = "invalid",
+            snapshot => snapshot.References[0].Modules[0].SizeBytes = 0,
+            snapshot => snapshot.References[0].Modules[0].SizeBytes =
+                CompilerReferenceLimits.MaximumModuleBytes + 1L,
             snapshot => snapshot.Options.WarningLevel = -1,
             snapshot => snapshot.Options.SpecificDiagnosticOptions = null!,
             snapshot => snapshot.Options.SpecificDiagnosticOptions = [null!],
@@ -156,6 +159,27 @@ public sealed class CompilerManifestArtifactTests
             Assert.Throws<JsonException>(
                 (Action)(() =>
                     CompilerManifestArtifactJson.Deserialize(json)));
+        }
+    }
+
+    [Test]
+    public void ReferenceClosureResourceLimitsAreValidated()
+    {
+        var closure = CreateArtifact();
+        closure.Compilation.References[0].Modules = CreateModuleRows(
+            count: 5,
+            sizeBytes: CompilerReferenceLimits.MaximumModuleBytes);
+        var count = CreateArtifact();
+        count.Compilation.References[0].Modules = CreateModuleRows(
+            CompilerReferenceLimits.MaximumModuleCount + 1,
+            sizeBytes: 1);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.Throws<JsonException>((Action)(() =>
+                CompilationFingerprint.ValidateShape(closure.Compilation)));
+            Assert.Throws<JsonException>((Action)(() =>
+                CompilationFingerprint.ValidateShape(count.Compilation)));
         }
     }
 
@@ -209,7 +233,7 @@ public sealed class CompilerManifestArtifactTests
     public void NullableSchemaShapesFailWithJsonException()
     {
         var previousSchema = CreateArtifact();
-        previousSchema.SchemaVersion = 10;
+        previousSchema.SchemaVersion = 11;
         var modules = CreateArtifact();
         modules.Compilation.References[0].Modules = null!;
         modules.CompilationSha256 = CompilationFingerprint.ComputeSha256(
@@ -1165,11 +1189,30 @@ public sealed class CompilerManifestArtifactTests
                 Name = "zz-linked.netmodule",
                 Mvid = Guid.NewGuid().ToString("D"),
                 Path = caseVariant,
-                Sha256 = new string('a', 64)
+                Sha256 = new string('a', 64),
+                SizeBytes = 1
             }
         ];
         artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
             artifact.Compilation, []);
+    }
+
+    private static CompilerReferenceModuleSnapshot[] CreateModuleRows(
+        int count,
+        long sizeBytes)
+    {
+        var root = TestContext.CurrentContext.WorkDirectory;
+        return [.. Enumerable.Range(0, count).Select(index => new
+            CompilerReferenceModuleSnapshot
+            {
+                Name = $"module-{index:D5}.netmodule",
+                Mvid = Guid.NewGuid().ToString("D"),
+                Path = Path.GetFullPath(Path.Combine(
+                    root,
+                    $"module-{index:D5}.netmodule")),
+                Sha256 = new string((char)('a' + index % 6), 64),
+                SizeBytes = sizeBytes
+            })];
     }
 
     private static CompilerDiagnosticArtifact Diagnostic(

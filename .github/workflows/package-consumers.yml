@@ -12,12 +12,17 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
 jobs:
   security:
     name: Exact-SHA security
+    if: startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/security-reusable.yml
     permissions:
       contents: read
@@ -36,7 +41,7 @@ jobs:
           fetch-depth: 0
 
       - name: Build the pinned Linux amd64 toolchain
-        run: docker compose build tooling
+        uses: ./.github/actions/build-tooling
 
       - name: Validate release tag and checked-in version in-container
         run: >-
@@ -110,7 +115,7 @@ jobs:
           path: nupkgs
 
       - name: Build the pinned toolchain
-        run: docker compose build tooling
+        uses: ./.github/actions/build-tooling
 
       - name: Run analyzer and real verifier consumers
         run: >-
@@ -146,7 +151,7 @@ jobs:
           path: nupkgs
 
       - name: Build the pinned toolchain
-        run: docker compose build tooling
+        uses: ./.github/actions/build-tooling
 
       - name: Require an annotated exact tag in-container
         run: >-
@@ -229,8 +234,15 @@ jobs:
         with:
           name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
           path: nupkgs
+      - name: Validate private-feed configuration
+        env:
+          NUGET_PRIVATE_API_KEY: ${{ secrets.NUGET_PRIVATE_API_KEY }}
+          NUGET_PRIVATE_SOURCE: ${{ vars.NUGET_PRIVATE_SOURCE }}
+        run: |
+          test -n "${NUGET_PRIVATE_SOURCE}"
+          test -n "${NUGET_PRIVATE_API_KEY}"
       - name: Build the pinned toolchain
-        run: docker compose build tooling
+        uses: ./.github/actions/build-tooling
       - name: Publish already-qualified private-preview bytes in-container
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_PRIVATE_API_KEY }}
@@ -268,13 +280,17 @@ jobs:
         with:
           name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
           path: nupkgs
+      - name: Validate public-feed configuration
+        env:
+          NUGET_USER: ${{ vars.NUGET_USER }}
+        run: test -n "${NUGET_USER}"
       - name: Exchange GitHub OIDC token for a temporary NuGet key
         id: nuget-login
         uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
         with:
           user: ${{ vars.NUGET_USER }}
       - name: Build the pinned toolchain
-        run: docker compose build tooling
+        uses: ./.github/actions/build-tooling
       - name: Publish already-qualified package and symbol bytes in-container
         env:
           NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}

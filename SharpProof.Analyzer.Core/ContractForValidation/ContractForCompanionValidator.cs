@@ -1,4 +1,4 @@
-namespace SharpProof.ContractForGenerator;
+namespace SharpProof.ContractForValidation;
 
 /// <summary>
 /// Validates the one-to-one member mapping and clause bodies for a resolved
@@ -17,7 +17,7 @@ internal static class ContractForCompanionValidator
                 (companion.Target, companion.IsOpenTarget)))
         {
             diagnostics.Add(At(
-                GeneratedDiagnosticDescriptors.InvalidCompanionType,
+                ContractForDiagnosticDescriptors.InvalidCompanionType,
                 companion.AttributeLocation,
                 companion.Companion.Name,
                 companion.Target.Name));
@@ -62,7 +62,7 @@ internal static class ContractForCompanionValidator
             if (matches.Length > 1)
             {
                 Diagnose(
-                    GeneratedDiagnosticDescriptors.AmbiguousMember,
+                    ContractForDiagnosticDescriptors.AmbiguousMember,
                     target,
                     target.Name);
                 diagnosed.UnionWith(matches);
@@ -84,7 +84,7 @@ internal static class ContractForCompanionValidator
             if (mismatches.IsDefaultOrEmpty)
             {
                 Diagnose(
-                    GeneratedDiagnosticDescriptors.MissingMember,
+                    ContractForDiagnosticDescriptors.MissingMember,
                     target,
                     target.Name,
                     companion.Companion.Name);
@@ -96,7 +96,7 @@ internal static class ContractForCompanionValidator
                 if (diagnosed.Add(mismatch))
                 {
                     Diagnose(
-                        GeneratedDiagnosticDescriptors.SignatureMismatch,
+                        ContractForDiagnosticDescriptors.SignatureMismatch,
                         mismatch,
                         mismatch.Name);
                 }
@@ -110,7 +110,7 @@ internal static class ContractForCompanionValidator
             if (matches.Length > 1 && diagnosed.Add(candidate))
             {
                 Diagnose(
-                    GeneratedDiagnosticDescriptors.AmbiguousMember,
+                    ContractForDiagnosticDescriptors.AmbiguousMember,
                     candidate,
                     candidate.Name);
             }
@@ -119,7 +119,7 @@ internal static class ContractForCompanionValidator
                      diagnosed.Add(candidate))
             {
                 Diagnose(
-                    GeneratedDiagnosticDescriptors.SignatureMismatch,
+                    ContractForDiagnosticDescriptors.SignatureMismatch,
                     candidate,
                     candidate.Name);
             }
@@ -153,7 +153,7 @@ internal static class ContractForCompanionValidator
         if (inventory.ImplementationBody == null)
         {
             diagnostics.Add(At(
-                GeneratedDiagnosticDescriptors.BodyRequired,
+                ContractForDiagnosticDescriptors.BodyRequired,
                 GetSourceLocation(method, fallback),
                 method.Name));
             return;
@@ -166,7 +166,7 @@ internal static class ContractForCompanionValidator
                 clause.Placement != ContractClausePlacement.NestedCallable)
             {
                 diagnostics.Add(At(
-                    GeneratedDiagnosticDescriptors.InvalidClausePlacement,
+                    ContractForDiagnosticDescriptors.InvalidClausePlacement,
                     clause.Location,
                     clause.Kind,
                     method.Name,

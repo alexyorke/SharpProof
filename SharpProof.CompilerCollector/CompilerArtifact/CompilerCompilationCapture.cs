@@ -8,6 +8,35 @@ namespace SharpProof.CompilerArtifact;
 
 internal static class CompilerCompilationCapture
 {
+    internal readonly struct ReferenceCaptureLimits
+    {
+        internal ReferenceCaptureLimits(
+            long maximumModuleBytes,
+            long maximumClosureBytes,
+            int maximumModuleCount)
+        {
+            if (maximumModuleBytes <= 0 ||
+                maximumClosureBytes < maximumModuleBytes ||
+                maximumModuleCount <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(maximumModuleBytes));
+            }
+            MaximumModuleBytes = maximumModuleBytes;
+            MaximumClosureBytes = maximumClosureBytes;
+            MaximumModuleCount = maximumModuleCount;
+        }
+
+        internal long MaximumModuleBytes { get; }
+        internal long MaximumClosureBytes { get; }
+        internal int MaximumModuleCount { get; }
+
+        internal static ReferenceCaptureLimits Default => new(
+            CompilerReferenceLimits.MaximumModuleBytes,
+            CompilerReferenceLimits.MaximumClosureBytes,
+            CompilerReferenceLimits.MaximumModuleCount);
+    }
+
     internal static CompilerCompilationSnapshot Capture(CSharpCompilation compilation, string projectDirectory,
         string targetFramework, ImmutableArray<AdditionalText> additionalFiles, CancellationToken cancellationToken)
     {
@@ -72,7 +101,10 @@ internal static class CompilerCompilationCapture
                 ResolverPolicy = CompilerResolverPolicy.EvidenceOnly
             },
             SyntaxTrees = [.. compilation.SyntaxTrees.Select(tree => CaptureTree(tree, cancellationToken))],
-            References = [.. compilation.References.Select(reference => CaptureReference(reference, cancellationToken))],
+            References = CaptureReferences(
+                compilation.References,
+                ReferenceCaptureLimits.Default,
+                cancellationToken),
             AdditionalFiles = [.. additionalFiles.Select(file => CaptureAdditionalFile(
                 file, normalizedProject, cancellationToken)).OrderBy(static file => file.Path, StringComparer.Ordinal)
                 .ThenBy(static file => file.Sha256, StringComparer.Ordinal)]
@@ -100,7 +132,24 @@ internal static class CompilerCompilationCapture
                 .Select(static value => new CompilerFeatureSnapshot { Key = value.Key, Value = value.Value })]
         };
     }
-    private static CompilerReferenceSnapshot CaptureReference(MetadataReference reference,
+    internal static CompilerReferenceSnapshot[] CaptureReferences(
+        IEnumerable<MetadataReference> references,
+        ReferenceCaptureLimits limits,
+        CancellationToken cancellationToken)
+    {
+        references = ArgumentNullGuard.NotNull(
+            references,
+            nameof(references));
+        var budget = new ReferenceCaptureBudget(limits);
+        return [.. references.Select(reference => CaptureReference(
+            reference,
+            budget,
+            cancellationToken))];
+    }
+
+    private static CompilerReferenceSnapshot CaptureReference(
+        MetadataReference reference,
+        ReferenceCaptureBudget budget,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -149,6 +198,8 @@ internal static class CompilerCompilationCapture
                 FileMode.Open,
                 FileAccess.Read,
                 FileShare.Read);
+            var sizeBytes = stream.Length;
+            budget.Consume(sizeBytes);
             using var image = new PEReader(stream, PEStreamOptions.LeaveOpen);
             if (!image.HasMetadata)
             {
@@ -181,7 +232,8 @@ internal static class CompilerCompilationCapture
                 Name = fileName,
                 Mvid = fileMvid.ToString("D"),
                 Path = NormalizePath(modulePath),
-                Sha256 = Hash(stream, cancellationToken)
+                Sha256 = Hash(stream, cancellationToken),
+                SizeBytes = sizeBytes
             });
         }
         return new CompilerReferenceSnapshot
@@ -193,6 +245,35 @@ internal static class CompilerCompilationCapture
                 "A compiler reference contains no modules."),
             Modules = modules.ToArray()
         };
+    }
+
+    private sealed class ReferenceCaptureBudget
+    {
+        private readonly ReferenceCaptureLimits _limits;
+        private long _closureBytes;
+        private int _moduleCount;
+
+        internal ReferenceCaptureBudget(ReferenceCaptureLimits limits)
+        {
+            _limits = limits;
+        }
+
+        internal void Consume(long sizeBytes)
+        {
+            if (sizeBytes <= 0 || sizeBytes > _limits.MaximumModuleBytes)
+            {
+                throw new InvalidDataException(
+                    "A compiler reference module exceeds the byte limit.");
+            }
+            if (_moduleCount >= _limits.MaximumModuleCount ||
+                _closureBytes > _limits.MaximumClosureBytes - sizeBytes)
+            {
+                throw new InvalidDataException(
+                    "The compiler reference closure exceeds its resource limit.");
+            }
+            _moduleCount++;
+            _closureBytes += sizeBytes;
+        }
     }
     private static CompilerAdditionalFileSnapshot CaptureAdditionalFile(AdditionalText file, string projectDirectory,
         CancellationToken cancellationToken)

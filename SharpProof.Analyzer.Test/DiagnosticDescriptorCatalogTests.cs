@@ -11,6 +11,6 @@ public sealed class DiagnosticDescriptorCatalogTests
     {
         DiagnosticDescriptorCatalogAssertions.AssertOutput(
             "analyzer",
-            typeof(SharpProofAnalyzer).Assembly);
+            typeof(SharpProofAnalyzerEngine).Assembly);
     }
 }

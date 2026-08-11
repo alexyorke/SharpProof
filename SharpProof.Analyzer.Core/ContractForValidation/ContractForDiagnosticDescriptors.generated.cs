@@ -5,9 +5,9 @@
 // </auto-generated>
 #nullable enable
 
-namespace SharpProof.ContractForGenerator;
+namespace SharpProof.ContractForValidation;
 
-internal static class GeneratedDiagnosticDescriptors
+internal static class ContractForDiagnosticDescriptors
 {
 
     internal static readonly DiagnosticDescriptor InvalidTarget = new(
@@ -97,4 +97,15 @@ internal static class GeneratedDiagnosticDescriptors
         description: "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
         helpLinkUri: "",
         customTags: []);
+
+    internal static readonly ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics = [
+        InvalidTarget,
+        DuplicateCompanion,
+        InvalidCompanionType,
+        MissingMember,
+        SignatureMismatch,
+        AmbiguousMember,
+        BodyRequired,
+        InvalidClausePlacement
+    ];
 }

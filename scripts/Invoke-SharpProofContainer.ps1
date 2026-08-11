@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('contract', 'restore', 'build', 'check', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'performance-smoke', 'gates', 'coverage', 'mutation', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
+    [ValidateSet('contract', 'restore', 'build', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'performance-smoke', 'gates', 'coverage', 'mutation', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -56,6 +56,43 @@ switch ($Command) {
     'check' {
         & (Join-Path $repositoryRoot 'scripts/Invoke-SharpProofDevCheck.ps1') `
             -Configuration $Configuration
+    }
+    'pr-gates' {
+        if ($Configuration -ne 'Release') {
+            throw "pr-gates requires -Configuration Release. " +
+                "Use the test command for Debug validation."
+        }
+        & (Join-Path $repositoryRoot `
+            'scripts/Test-SharpProofContainerContract.ps1')
+        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
+        Invoke-DotNet @(
+            'build', 'SharpProof.sln', '--configuration', $Configuration,
+            '--no-restore')
+
+        $performanceOutput = Join-Path $repositoryRoot (
+            'artifacts/ci/performance.json')
+        & (Join-Path $repositoryRoot `
+            'scripts/Invoke-SharpProofGateEvidence.ps1') `
+            -Gate performance `
+            -OutputPath $performanceOutput
+        if ($LASTEXITCODE -ne 0) {
+            throw 'PR performance validation failed.'
+        }
+
+        Invoke-DotNet @(
+            'test',
+            'SharpProof.Gates.Test/SharpProof.Gates.Test.csproj',
+            '--configuration', $Configuration,
+            '--no-build', '--no-restore',
+            '--filter',
+            'FullyQualifiedName~ForcedTerminationDeadlineIsStableAcrossLaunches')
+        Invoke-DotNet @(
+            'test', 'SharpProof.Dev.Tests.slnf',
+            '--configuration', $Configuration,
+            '--no-build', '--no-restore',
+            "/m:$testProjectParallelism",
+            '--filter',
+            'TestCategory!=Performance&TestCategory!=Coverage')
     }
     'test' {
         Invoke-DotNet @('restore', $Target, '--locked-mode')

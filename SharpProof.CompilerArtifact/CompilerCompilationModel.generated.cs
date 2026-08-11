@@ -8,6 +8,13 @@
 
 namespace SharpProof.CompilerArtifact;
 
+internal static class CompilerReferenceLimits
+{
+    internal const int MaximumModuleBytes = 268435456;
+    internal const int MaximumClosureBytes = 1073741824;
+    internal const int MaximumModuleCount = 4096;
+}
+
 internal sealed class CompilerCompilationSnapshot
 {
     public string ProjectDirectory { get; set; } = string.Empty;
@@ -87,6 +94,7 @@ internal sealed class CompilerReferenceModuleSnapshot
     public string Mvid { get; set; } = string.Empty;
     public string Path { get; set; } = string.Empty;
     public string Sha256 { get; set; } = string.Empty;
+    public long SizeBytes { get; set; }
 }
 
 internal sealed class CompilerAdditionalFileSnapshot

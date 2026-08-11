@@ -2705,7 +2705,7 @@ public sealed class WorkerMsBuildIntegrationTests
                     Is.EqualTo("SharpProof.CompilerManifest"));
                 Assert.That(
                     root.GetProperty("schemaVersion").GetInt32(),
-                    Is.EqualTo(11));
+                    Is.EqualTo(12));
                 Assert.That(
                     root.GetProperty("protocolVersion").GetString(),
                     Is.EqualTo(WorkerProtocolVersions.Current));
@@ -3252,7 +3252,13 @@ public sealed class WorkerMsBuildIntegrationTests
                     "The test build configuration was not found.");
             var analyzerDirectory = SecurityElement.Escape(Path.Combine(
                 repository,
-                "SharpProof.PortableAnalyzer",
+                "SharpProof.Analyzer",
+                "bin",
+                testConfiguration,
+                "netstandard2.0"));
+            var generatorDirectory = SecurityElement.Escape(Path.Combine(
+                repository,
+                "SharpProof.ContractForGenerator",
                 "bin",
                 testConfiguration,
                 "netstandard2.0"));
@@ -3303,7 +3309,9 @@ public sealed class WorkerMsBuildIntegrationTests
                   <PropertyGroup>
                     <SharpProofAnalyzerDirectory>{analyzerDirectory}</SharpProofAnalyzerDirectory>
                     <_SharpProofAnalyzerDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>
-                    <SharpProofPortableAnalyzerPath>{analyzerDirectory}/SharpProof.PortableAnalyzer.dll</SharpProofPortableAnalyzerPath>
+                    <_SharpProofAnalyzerPath>{analyzerDirectory}/SharpProof.Analyzer.dll</_SharpProofAnalyzerPath>
+                    <_SharpProofContractForGeneratorPath>{generatorDirectory}/SharpProof.ContractForGenerator.dll</_SharpProofContractForGeneratorPath>
+                    <_SharpProofSharedDirectory>{collectorDirectory}</_SharpProofSharedDirectory>
                     <SharpProofCollectorDirectory>{collectorDirectory}</SharpProofCollectorDirectory>
                     <_SharpProofCollectorDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofCollectorDirectory)'))</_SharpProofCollectorDirectory>
                     <SharpProofCompilerCollectorPath>{collectorDirectory}/SharpProof.CompilerCollector.dll</SharpProofCompilerCollectorPath>
@@ -3347,7 +3355,7 @@ public sealed class WorkerMsBuildIntegrationTests
                   <Target Name="_RemoveSharpProofAnalyzersForWorkerTargetTest"
                           BeforeTargets="CoreCompile">
                     <ItemGroup>
-                      <Analyzer Remove="$(SharpProofPortableAnalyzerPath)" />
+                      <Analyzer Remove="$(_SharpProofAnalyzerPath);$(_SharpProofContractForGeneratorPath)" />
                     </ItemGroup>
                   </Target>
                 </Project>

@@ -4,6 +4,7 @@
   "minimumChangedTcbLinePercent": 90,
   "projects": {
     "SharpProof.Analyzer": 91.71,
+    "SharpProof.Analyzer.Core": 91.0,
     "SharpProof.Attributes": 55.88,
     "SharpProof.BuildTasks": 82.08,
     "SharpProof.CompilerArtifact": 95.46,

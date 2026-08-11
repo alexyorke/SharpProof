@@ -5,4 +5,6 @@ global using System.Linq;
 global using System.Threading;
 global using Microsoft.CodeAnalysis;
 global using Microsoft.CodeAnalysis.Diagnostics;
+global using SharpProof.Analyzer;
+global using SharpProof.ContractForValidation;
 global using SharpProof.Contracts;

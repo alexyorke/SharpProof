@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   COMPOSE_PROJECT_NAME: sharpproof-ci-${{ github.run_id }}-${{ github.run_attempt }}
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
@@ -23,41 +27,12 @@ jobs:
           fetch-depth: 0
 
       - name: Build the pinned Linux amd64 toolchain
-        run: docker compose build tooling
+        uses: ./.github/actions/build-tooling
 
-      - name: Validate the container contract
-        run: docker compose run --rm tooling contract
-
-      - name: Build the complete product
+      - name: Run the single-build PR gate
         run: >-
-          docker compose run --rm tooling build
+          docker compose run --rm tooling pr-gates
           -Configuration Release
-          -Target SharpProof.sln
-
-      - name: Run isolated performance contract
-        run: >-
-          docker compose run --rm tooling performance
-          -Configuration Release
-
-      - name: Run forced-termination stability probe
-        run: >-
-          docker compose run --rm tooling test
-          -Configuration Release
-          -Target SharpProof.Gates.Test/SharpProof.Gates.Test.csproj
-          -TestFilter 'FullyQualifiedName~ForcedTerminationDeadlineIsStableAcrossLaunches'
-
-      - name: Run functional and architecture tests
-        run: >-
-          docker compose run --rm tooling test
-          -Configuration Release
-          -Target SharpProof.Dev.Tests.slnf
-          -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage'
-
-      - name: Run packaged Linux verifier smoke
-        run: >-
-          docker compose run --rm tooling package-tests
-          -Configuration Release
-          -TestFilter 'FullyQualifiedName~PackageGraphAndLayoutsAreExact|FullyQualifiedName~VerifierPackageTransitivelySuppliesPortableProduct'
 
       - name: Upload container gate evidence
         if: always()

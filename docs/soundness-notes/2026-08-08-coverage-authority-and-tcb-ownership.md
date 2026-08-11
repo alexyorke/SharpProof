@@ -2,10 +2,12 @@
 
 ## Decision
 
-Coverage now measures every production source-owning assembly. The only
-production-project exception is `SharpProof.PortableAnalyzer`, which is a
-packaging project whose executable sources are linked from already measured
-owners. `SharpProof.Gates` remains an explicit additional measured assembly.
+At the time of this decision, coverage measured every production
+source-owning assembly and exempted the linked-source
+`SharpProof.PortableAnalyzer` packaging project. That project was subsequently
+deleted when analyzer implementations moved into `SharpProof.Analyzer.Core`;
+the current coverage baseline has no linked-source exception.
+`SharpProof.Gates` remains an explicit additional measured assembly.
 An architecture test requires exact equality between that project universe
 and the checked-in coverage baseline.
 

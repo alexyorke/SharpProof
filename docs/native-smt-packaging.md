@@ -13,6 +13,14 @@ current-version range at each edge. The portable package contains no worker,
 `tools/net9`, Z3, or native payload. The verifier package contains no analyzer
 directory or Attributes DLL.
 
+The `SharpProof` package has two small Roslyn entry assemblies under
+`tools/analyzers/dotnet/cs`: `SharpProof.Analyzer.dll` and
+`SharpProof.ContractForGenerator.dll`. Their non-entrypoint implementation and
+dependency closure is stored once under `tools/shared/netstandard2.0`; the
+compiler collector remains the only entry under `tools/collector`. This avoids
+the former linked-source analyzer monolith and prevents duplicate analyzer
+discovery without duplicating the implementation closure.
+
 ## Pinned Z3 closure
 
 `eng/container/toolchain.json` is the authority for the Z3 version, official
@@ -60,7 +68,7 @@ never used. A main or symbol collision fails closed; any partial publication
 requires a new version rather than reusing remote bytes.
 
 The worker protocol is 11, the cache schema is 13, and compiler artifacts use
-schema 11. The worker consumes sealed compiler artifacts rather than parsing
+schema 12. The worker consumes sealed compiler artifacts rather than parsing
 source or rereading references. The admitted semantic subset and typed
 `Unknown` behavior are documented separately in `SEMANTICS.md` and
 `docs/analysis-limits.md`.

@@ -412,7 +412,7 @@ foreach ($forbidden in $forbiddenReadmeText) {
 }
 
 $configurationSource = Get-RequiredText (
-    'SharpProof.Analyzer\Configuration\AnalyzerConfigurationOptionRegistry.cs')
+    'SharpProof.Analyzer.Core\Configuration\AnalyzerConfigurationOptionRegistry.cs')
 $configurationOptions = [regex]::Matches(
     $configurationSource,
     'new\("(?<key>sharpproof_[^"]+)"\s*,\s*\[(?<values>[^\]]+)\]',

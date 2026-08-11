@@ -245,7 +245,7 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'requires-concrete-compiler-constant-replay'
-        File = 'SharpProof.Analyzer\RequiresCallSiteAnalyzer.cs'
+        File = 'SharpProof.Analyzer.Core\RequiresCallSiteAnalyzer.cs'
         Original = "            var lowerer = RoslynOperationLowerer.CreateForConcreteReplay(`n                _factory,`n                session.IsKnownPure);"
         Mutated = '            var lowerer = new RoslynOperationLowerer(_factory, session.IsKnownPure);'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
@@ -325,7 +325,7 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'analyzer-configuration-provider-failure'
-        File = 'SharpProof.Analyzer\Configuration\AnalyzerConfiguration.cs'
+        File = 'SharpProof.Analyzer.Core\Configuration\AnalyzerConfiguration.cs'
         Original = '                [ProviderFailure(exception)]);'
         Mutated = '                []);'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
@@ -469,7 +469,7 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'effect-incomplete-reason-projection'
-        File = 'SharpProof.Analyzer\EffectEvaluationProjections.generated.cs'
+        File = 'SharpProof.Analyzer.Core\EffectEvaluationProjections.generated.cs'
         Original = '            (_, true) => EffectEvaluationReason.UnsupportedBody,'
         Mutated = '            (_, true) => EffectEvaluationReason.ResourceLimit,'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
@@ -509,7 +509,7 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'advisory-full-activation-selection'
-        File = 'SharpProof.Analyzer\SharpProofAnalyzer.cs'
+        File = 'SharpProof.Analyzer.Core\SharpProofAnalyzerEngine.cs'
         Original = 'return AdvisoryActivation.Full;'
         Mutated = "return new(`n                        RequiresSymbolAnalysis: false,`n                        RequiresOperationAnalysis: true,`n                        RequiresFullOperationAnalysis: false);"
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
@@ -517,7 +517,7 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'advisory-lazy-state-creation'
-        File = 'SharpProof.Analyzer\AnalyzerSession.cs'
+        File = 'SharpProof.Analyzer.Core\AnalyzerSession.cs'
         Original = '_callPreconditions = new('
         Mutated = "_ = _apiSpecs.Value;`n        _callPreconditions = new("
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
@@ -533,7 +533,7 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'effect-metadata-callsite-certificate'
-        File = 'SharpProof.Analyzer\AnalyzerSession.cs'
+        File = 'SharpProof.Analyzer.Core\AnalyzerSession.cs'
         Original = "            ResolveEffectContract(method) is`n            { Kind: > EffectContractResolutionKind.Missing and < EffectContractResolutionKind.Valid })"
         Mutated = "            ResolveEffectContract(method) is`n            { Kind: > EffectContractResolutionKind.Missing and <= EffectContractResolutionKind.Valid })"
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
@@ -541,7 +541,7 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'analyzer-bodyless-entry-precondition'
-        File = 'SharpProof.Analyzer\EffectCallPreconditionPolicy.cs'
+        File = 'SharpProof.Analyzer.Core\EffectCallPreconditionPolicy.cs'
         Original = "        if (method is`n            {`n                IsAbstract: false,`n                IsExtern: false,`n                DeclaringSyntaxReferences: { IsEmpty: false }`n            } &&`n            binding.Contracts.Clauses.Any(`n                static clause =>`n                    clause.Kind ==`n                    BoundContractKind.Requires))"
         Mutated = "        if (method.IsAbstract || method.IsExtern)"
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
@@ -557,7 +557,7 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'generated-selected-analysis-accountability'
-        File = 'SharpProof.Analyzer\SharpProofAnalyzer.cs'
+        File = 'SharpProof.Analyzer.Core\SharpProofAnalyzerEngine.cs'
         Original = "context.ConfigureGeneratedCodeAnalysis(`n            GeneratedCodeAnalysisFlags.Analyze |`n            GeneratedCodeAnalysisFlags.ReportDiagnostics);"
         Mutated = 'context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
@@ -677,7 +677,7 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'live-effect-bottom-entry-fails-closed'
-        File = 'SharpProof.Analyzer\EffectContractDiagnostics.cs'
+        File = 'SharpProof.Analyzer.Core\EffectContractDiagnostics.cs'
         Original = '        var declaredComplete = entrySummaryReachable && projection.IsComplete &&'
         Mutated = '        var declaredComplete = projection.IsComplete &&'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
@@ -973,7 +973,7 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'analyzer-source-companion-fallback'
-        File = 'SharpProof.Analyzer\AnalyzerSession.cs'
+        File = 'SharpProof.Analyzer.Core\AnalyzerSession.cs'
         Original = '                        includeSourceCompanions: false'
         Mutated = '                        includeSourceCompanions: true'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
@@ -1028,6 +1028,62 @@ $mutations = @(
         Filter = 'FullyQualifiedName~ReferencePathMustMatchRawMetadataWhenMvidIsUnchanged'
     },
     [pscustomobject]@{
+        Name = 'compiler-reference-module-byte-limit'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerCompilationCapture.cs'
+        Original = '            if (sizeBytes <= 0 || sizeBytes > _limits.MaximumModuleBytes)'
+        Mutated = '            if (sizeBytes <= 0)'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ReferenceCaptureEnforcesModuleClosureAndCountLimits'
+    },
+    [pscustomobject]@{
+        Name = 'compiler-reference-closure-byte-limit'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerCompilationCapture.cs'
+        Original = '                _closureBytes > _limits.MaximumClosureBytes - sizeBytes)'
+        Mutated = '                false)'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ReferenceCaptureEnforcesModuleClosureAndCountLimits'
+    },
+    [pscustomobject]@{
+        Name = 'compiler-reference-module-count-limit'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerCompilationCapture.cs'
+        Original = '            if (_moduleCount >= _limits.MaximumModuleCount ||'
+        Mutated = '            if (false ||'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ReferenceCaptureEnforcesModuleClosureAndCountLimits'
+    },
+    [pscustomobject]@{
+        Name = 'compiler-reference-evidence-size-validation'
+        File = 'SharpProof.CompilerArtifact\CompilationFingerprint.cs'
+        Original = '            value.SizeBytes is > 0 and'
+        Mutated = '            value.SizeBytes is >= 0 and'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~RecomputedOuterHashCannotHideMalformedNestedEvidence'
+    },
+    [pscustomobject]@{
+        Name = 'generated-contract-for-final-compilation-validation'
+        File = 'SharpProof.Analyzer.Core\SharpProofAnalyzerEngine.cs'
+        Original = '        if (configuration.ContractsEnabled)'
+        Mutated = '        if (false && configuration.ContractsEnabled)'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~GeneratedCompanionIsValidatedFromFinalCompilation'
+    },
+    [pscustomobject]@{
+        Name = 'package-contract-for-generator-entrypoint'
+        File = 'SharpProof.Package\SharpProof.nuspec'
+        Original = '    <file src="..\SharpProof.ContractForGenerator\bin\$configuration$\netstandard2.0\SharpProof.ContractForGenerator.dll" target="tools\analyzers\dotnet\cs" />'
+        Mutated = '    <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Analyzer.dll" target="tools\analyzers\dotnet\cs" />'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~PackageGraphAndLayoutsAreExact'
+    },
+    [pscustomobject]@{
+        Name = 'tcb-path-backslash-canonicality'
+        File = 'scripts\Get-SharpProofTcbPaths.ps1'
+        Original = "        if (`$path.Contains('\') -or"
+        Mutated = '        if ($false -or'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~TrustedComputingBaseRejectsNoncanonicalPaths'
+    },
+    [pscustomobject]@{
         Name = 'publication-locks-every-member'
         File = 'SharpProof.Host\LinuxPathIdentity.cs'
         Original = "        var locks = canonicalPaths`n            .Select(PublicationLockNameForCanonicalPath)`n            .OrderBy(static path => path, StringComparer.Ordinal)`n            .Select(static path => new PublicationLock(path))"
@@ -1045,7 +1101,7 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'analyzer-rejects-retired-mode'
-        File = 'SharpProof.Analyzer\Configuration\AnalyzerConfiguration.cs'
+        File = 'SharpProof.Analyzer.Core\Configuration\AnalyzerConfiguration.cs'
         Original = '        return (options.TryGetValue("sharpproof_mode", out value!) ||'
         Mutated = '        return (options.TryGetValue("sharpproof_removed", out value!) ||'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'

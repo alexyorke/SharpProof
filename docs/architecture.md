@@ -21,25 +21,26 @@ Verify                -> Ir, Specs
 Smt                   -> Ir, Verify
 Summaries             -> Ir
 CompilerArtifact      -> Ir, Worker.Protocol
-ContractForGenerator  -> Contracts
-Analyzer              -> Contracts, Effects, Frontend, Ir, Specs
-CompilerCollector     -> Analyzer, CompilerArtifact, Contracts, Effects,
+Analyzer.Core         -> Contracts, Effects, Frontend, Ir, Specs
+Analyzer              -> Analyzer.Core
+ContractForGenerator  -> Analyzer.Core, Contracts
+CompilerCollector     -> Analyzer.Core, CompilerArtifact, Contracts, Effects,
                          Frontend, Ir, Specs, Summaries, Worker.Protocol
-PortableAnalyzer      -> Attributes (build-only payload identity)
+BuildTasks            -> Host
+Host
 Worker.Protocol
-Worker                -> CompilerArtifact, Dataflow, Ir, Smt, Specs, Verify,
-                         Worker.Protocol
-Worker.Launcher       -> CompilerArtifact, Ir, Specs, Worker.Protocol
+Worker                -> CompilerArtifact, Dataflow, Host, Ir, Smt, Specs,
+                         Verify, Worker.Protocol
+Worker.Launcher       -> CompilerArtifact, Host, Ir, Specs, Worker.Protocol
 ```
 
 Build-only references to `SharpProof.Meta.Analyzers` are omitted. Frontend's
-and PortableAnalyzer's listed Attributes edges have
-`ReferenceOutputAssembly=false`; they establish build order so the exact
-Attributes DLL SHA-256 can be embedded without adding a runtime assembly
-dependency. The architecture suite compares every direct project reference
-against this graph. The ordinary live analyzer has no static dependency on the
-compiler-artifact model or worker protocol; those dependencies belong only to
-the build-only compiler collector.
+Attributes edge has `ReferenceOutputAssembly=false`; it establishes build
+order so the exact Attributes DLL SHA-256 can be embedded without adding a
+runtime assembly dependency. The architecture suite compares every direct
+project reference against this graph. The ordinary live analyzer has no static dependency on the
+compiler-artifact model or worker protocol; those
+dependencies belong only to the build-only compiler collector.
 
 The Roslyn analyzer has no verifier, SMT, Z3, or native dependency. Z3 is
 allowed only in `SharpProof.Smt`, which is packaged below
@@ -223,7 +224,7 @@ models are not cacheable.
 
 During container verification, the build-only compiler collector observes the
 final post-generator Roslyn `Compilation` and atomically emits compiler
-artifact schema version 11. The compiler owns selection, contract/spec binding,
+artifact schema version 12. The compiler owns selection, contract/spec binding,
 effect evaluation, relational-summary inference, and body lowering. Every selected callable has either a
 typed failure record or a portable graph containing its bound clauses,
 canonical variables, whole-body CFG/IR, body start, initial environment,
@@ -300,7 +301,7 @@ direct candidates become `Unknown(CounterexampleNotReplayable)`.
 Conditional/path-dependent and may-only conflicts remain
 `Unknown(EffectContractNotEstablished)`. A semantic replay disagreement
 becomes `Unknown(CounterexampleReplayFailed)` and fails the run. Effect results
-remain noncacheable. Under compiler artifact schema 11, worker protocol version
+remain noncacheable. Under compiler artifact schema 12, worker protocol version
 11 and cache schema version 13 carry the current request and cache wire break.
 
 Optional deterministic SARIF 2.1.0 projects the validated response under the

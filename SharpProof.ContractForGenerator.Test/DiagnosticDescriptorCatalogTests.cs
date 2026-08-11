@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using SharpProof.ContractForValidation;
 using SharpProof.TestSupport;
 
 namespace SharpProof.ContractForGenerator.Test;
@@ -11,6 +12,6 @@ public sealed class DiagnosticDescriptorCatalogTests
     {
         DiagnosticDescriptorCatalogAssertions.AssertOutput(
             "contractForGenerator",
-            typeof(ContractForValidatorGenerator).Assembly);
+            typeof(ContractForValidationEngine).Assembly);
     }
 }

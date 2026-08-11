@@ -2546,7 +2546,7 @@ public sealed class AnalyzerModeAndEffectTests
     [Test]
     public void AdvisoryDescriptorsUseProductionDefaults()
     {
-        var descriptors = new SharpProofAnalyzer().SupportedDiagnostics;
+        var descriptors = GeneratedDiagnosticDescriptors.SupportedDiagnostics;
         // SP0050 joins SP0049 as an infrastructure error: both report that
         // SharpProof could not do its job, which is not an advisory finding
         // about the user's code.

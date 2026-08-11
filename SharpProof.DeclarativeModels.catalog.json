@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "outputs": [
     {
-      "path": "SharpProof.Analyzer/DeclarativeModels.generated.cs",
+      "path": "SharpProof.Analyzer.Core/DeclarativeModels.generated.cs",
       "namespace": "SharpProof.Analyzer",
       "records": [
         {
@@ -66,7 +66,7 @@
       "containers": [
         {
           "types": [
-            {"kind": "class", "accessibility": "public", "modifiers": ["sealed"], "name": "SharpProofAnalyzer"}
+            {"kind": "class", "accessibility": "internal", "modifiers": ["sealed"], "name": "SharpProofAnalyzerEngine"}
           ],
           "records": [
             {

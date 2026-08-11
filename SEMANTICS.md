@@ -60,7 +60,7 @@ manifest claims while sharing the effective combined constraint and evidence.
 Each effect claim is `Proven` only when a complete compiler-produced effect
 summary establishes its contract. The compiler can record a structured
 `DefiniteViolation` candidate for a simple unconditional direct operation.
-Compiler artifact schema 11 carries an independently replayable event only for
+Compiler artifact schema 12 carries an independently replayable event only for
 a definite managed object or array allocation whose operands are already
 known to complete and whose allocation is not static-initialization-sensitive.
 The worker derives `Allocates` from that event rather than trusting the
@@ -209,7 +209,7 @@ identity-mismatched pack never contributes a fact.
 
 Every summary call seals its origin, SHA-256 evidence, pack identity when
 applicable, and the canonical transitive provenance of every composed
-dependency. Compiler artifact schema 11, relational-summary schema version 1,
+dependency. Compiler artifact schema 12, relational-summary schema version 1,
 and specification-pack schema version 1 validate that closure before backend
 creation.
 Unsupported or incomplete calls remain `Unknown`; neither a convenient method
@@ -376,7 +376,7 @@ its outcome is not combined with the containing callable. Unavailable captured
 facts remain unknown. An expression-tree lambda is quoted code and is not
 treated as an executing call site.
 
-The packaged verifier consumes compiler artifact schema version 11 produced
+The packaged verifier consumes compiler artifact schema version 12 produced
 from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed
 lowering failure or portable whole-body CFG/IR with bound clauses, canonical
@@ -402,8 +402,10 @@ depth to equal the request budget, and requires exact manifest/lowered-callable
 equality, including claim ownership and declared assumptions. It hydrates
 portable IR without constructing a Roslyn compilation, reparsing source, or
 rereading reference files. Compiler versions and MVIDs and reference
-paths/hashes/identities/aliases are provenance, not a runtime compatibility
-gate.
+paths/hashes/identities/aliases/sizes are provenance, not a runtime
+compatibility gate. Collection and replay reject a module above 256 MiB, a
+reference closure above 1 GiB, or more than 4,096 modules before hashing can
+consume unbounded resources.
 
 Artifact collection rejects resolver-dependent `#r`/`#load`, missing-assembly
 resolver mode, reference supersession, custom assembly-identity comparers, and

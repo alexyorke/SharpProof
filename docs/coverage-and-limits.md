@@ -191,7 +191,7 @@ ghost specification evidence.
   state is a fatal `CounterexampleReplayFailed`; one on an unselected path
   does not block the refutation. Result models expose only canonical user
   variables.
-  For an effect candidate, compiler artifact schema 11 currently admits one
+  For an effect candidate, compiler artifact schema 12 currently admits one
   unconditional definite managed object/array allocation event. The worker
   recomputes its constraint and operation identities, checks its source-tree
   identity/span and sealed witness, and independently derives `Allocates`.
@@ -243,7 +243,7 @@ ghost specification evidence.
 ## Closed compiler artifact and remaining limits
 
 During container verification, the production analyzer captures compiler
-artifact schema version 11 from the post-generator compilation. The artifact
+artifact schema version 12 from the post-generator compilation. The artifact
 contains:
 
 - the feature-selected, sealed claim manifest;
@@ -263,8 +263,10 @@ contains:
   mode, source kind, preprocessor symbols, and parse features;
 - a bounded proof-relevant compilation-option set, assembly and target
   identity, and compiler identity/MVID provenance; and
-- reference provenance: manifest and linked-module paths, image hashes, names,
-  MVIDs, symbol identity, image kind, embed-interop flag, and aliases.
+- reference provenance: manifest and linked-module paths, image hashes, byte
+  sizes, names, MVIDs, symbol identity, image kind, embed-interop flag, and
+  aliases. A module is capped at 256 MiB, the complete closure at 1 GiB, and
+  the closure at 4,096 modules.
 
 The bounded compilation-option record covers output kind, optimization,
 platform, nullable context, metadata import, checked overflow, unsafe mode,

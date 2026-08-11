@@ -43,7 +43,7 @@ internal readonly partial record struct RequiresCallSiteCandidate(
     ManagedFlowStatus FlowStatus
 );
 
-public sealed partial class SharpProofAnalyzer
+internal sealed partial class SharpProofAnalyzerEngine
 {
     private readonly partial record struct AdvisoryActivation(
         bool RequiresSymbolAnalysis,

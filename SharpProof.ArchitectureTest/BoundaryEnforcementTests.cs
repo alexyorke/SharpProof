@@ -23,7 +23,6 @@ public sealed class BoundaryEnforcementTests
         "SharpProof.Host",
         "SharpProof.Ir",
         "SharpProof.Meta.Analyzers",
-        "SharpProof.PortableAnalyzer",
         "SharpProof.Smt",
         "SharpProof.Specs",
         "SharpProof.Summaries",
@@ -45,7 +44,6 @@ public sealed class BoundaryEnforcementTests
         "SharpProof.Frontend",
         "SharpProof.Host",
         "SharpProof.Ir",
-        "SharpProof.PortableAnalyzer",
         "SharpProof.Smt",
         "SharpProof.Specs",
         "SharpProof.Summaries",
@@ -254,13 +252,7 @@ public sealed class BoundaryEnforcementTests
     public void ThinAnalyzerHasOnlyCurrentFrontendDependencies()
     {
         var direct = ProjectReferences("SharpProof.Analyzer");
-        string[] expectedDirect = [
-            "SharpProof.Contracts",
-            "SharpProof.Effects",
-            "SharpProof.Frontend",
-            "SharpProof.Ir",
-            "SharpProof.Specs"
-        ];
+        string[] expectedDirect = ["SharpProof.Analyzer.Core"];
         Assert.That(
             direct.OrderBy(static value => value, StringComparer.Ordinal),
             Is.EqualTo(expectedDirect));
@@ -342,8 +334,7 @@ public sealed class BoundaryEnforcementTests
             Is.False);
 
         string[] descriptorProjects = [
-            "SharpProof.Analyzer",
-            "SharpProof.ContractForGenerator",
+            "SharpProof.Analyzer.Core",
             "SharpProof.Meta.Analyzers"
         ];
         foreach (var project in descriptorProjects)
@@ -373,7 +364,7 @@ public sealed class BoundaryEnforcementTests
 
         var generated = File.ReadAllText(Path.Combine(
             RepositoryRoot(),
-            "SharpProof.Analyzer",
+            "SharpProof.Analyzer.Core",
             "GeneratedDiagnosticDescriptors.generated.cs"));
         Assert.That(
             generated,
@@ -438,7 +429,6 @@ public sealed class BoundaryEnforcementTests
             @"SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj",
             @"SharpProof.Package.Test\SharpProof.Package.Test.csproj",
             @"SharpProof.Package\SharpProof.Package.csproj",
-            @"SharpProof.PortableAnalyzer\SharpProof.PortableAnalyzer.csproj",
             @"SharpProof.Smoke.Net472\SharpProof.Smoke.Net472.csproj",
             @"SharpProof.Smt.Test\SharpProof.Smt.Test.csproj",
             @"SharpProof.Smt\SharpProof.Smt.csproj",

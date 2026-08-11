@@ -8,7 +8,6 @@
     "SharpProofCompilerManifestFile",
     "SharpProofFeatures",
     "SharpProofLauncherPath",
-    "SharpProofPortableAnalyzerPath",
     "SharpProofProfile",
     "SharpProofSpecificationPacks",
     "SharpProofToolsDirectory",
@@ -30,12 +29,13 @@
     "SharpProofWorkerPath"
   ],
   "retiredMsbuildProperties": [
-    "SharpProofMode"
+    "SharpProofMode",
+    "SharpProofPortableAnalyzerPath"
   ],
   "versions": {
     "workerProtocol": 11,
     "workerManifest": 4,
-    "compilerArtifact": 11,
+    "compilerArtifact": 12,
     "relationalSummary": 1,
     "specificationPack": 1,
     "workerCache": 13

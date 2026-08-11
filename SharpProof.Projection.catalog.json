@@ -29,7 +29,7 @@
       ]
     },
     {
-      "path": "SharpProof.Analyzer/EffectEvaluationProjections.generated.cs",
+      "path": "SharpProof.Analyzer.Core/EffectEvaluationProjections.generated.cs",
       "namespace": "SharpProof.Analyzer",
       "accessibility": "internal",
       "modifiers": ["static"],

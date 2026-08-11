@@ -1,0 +1,7 @@
+[assembly: InternalsVisibleTo("SharpProof.Analyzer.Test")]
+[assembly: InternalsVisibleTo("SharpProof.Analyzer")]
+[assembly: InternalsVisibleTo("SharpProof.ContractForGenerator")]
+[assembly: InternalsVisibleTo("SharpProof.ContractForGenerator.Test")]
+[assembly: InternalsVisibleTo("SharpProof.CompilerCollector")]
+[assembly: InternalsVisibleTo("SharpProof.Gates")]
+[assembly: InternalsVisibleTo("SharpProof.Worker.Test")]

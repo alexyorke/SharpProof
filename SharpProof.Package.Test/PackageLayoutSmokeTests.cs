@@ -25,10 +25,30 @@ public sealed class PackageLayoutSmokeTests
         "CC110556-A091-4D38-9FEC-25AB9A351A6A");
 
     private static readonly string[] ExpectedAnalyzerEntryFileNames = [
-        "SharpProof.PortableAnalyzer.dll"
+        "SharpProof.Analyzer.dll"
     ];
 
-    private static readonly string[] ExpectedAnalyzerDependencyFileNames = [];
+    private static readonly string[] ExpectedGeneratorEntryFileNames = [
+        "SharpProof.ContractForGenerator.dll"
+    ];
+
+    private static readonly string[] ExpectedAnalyzerDependencyFileNames = [
+        "SharpProof.Analyzer.Core.dll",
+        "SharpProof.Contracts.dll",
+        "SharpProof.Dataflow.dll",
+        "SharpProof.Effects.dll",
+        "SharpProof.Frontend.dll",
+        "SharpProof.Ir.dll",
+        "SharpProof.Specs.dll",
+        "System.Buffers.dll",
+        "System.Collections.Immutable.dll",
+        "System.Memory.dll",
+        "System.Numerics.Vectors.dll",
+        "System.Reflection.Metadata.dll",
+        "System.Runtime.CompilerServices.Unsafe.dll",
+        "System.Text.Encoding.CodePages.dll",
+        "System.Threading.Tasks.Extensions.dll"
+    ];
 
     private static readonly string[] ExpectedAllocationReplayEventKinds = [
         "ManagedArrayAllocation",
@@ -46,14 +66,7 @@ public sealed class PackageLayoutSmokeTests
 
     private static readonly string[] ExpectedCollectorDependencyFileNames = [
         "Microsoft.Bcl.AsyncInterfaces.dll",
-        "SharpProof.Analyzer.Core.dll",
         "SharpProof.CompilerArtifact.dll",
-        "SharpProof.Contracts.dll",
-        "SharpProof.Dataflow.dll",
-        "SharpProof.Effects.dll",
-        "SharpProof.Frontend.dll",
-        "SharpProof.Ir.dll",
-        "SharpProof.Specs.dll",
         "SharpProof.Summaries.dll",
         "SharpProof.Worker.Protocol.dll",
         "System.IO.Pipelines.dll",
@@ -62,31 +75,32 @@ public sealed class PackageLayoutSmokeTests
     ];
 
     private static readonly string[] ExpectedConditionalAnalyzerEntries = [
-        "tools/analyzers/dotnet/cs/SharpProof.PortableAnalyzer.dll",
-        "tools/analyzers/dotnet/cs/System.Buffers.dll",
-        "tools/analyzers/dotnet/cs/System.Collections.Immutable.dll",
-        "tools/analyzers/dotnet/cs/System.Memory.dll",
-        "tools/analyzers/dotnet/cs/System.Numerics.Vectors.dll",
-        "tools/analyzers/dotnet/cs/System.Reflection.Metadata.dll",
-        "tools/analyzers/dotnet/cs/System.Runtime.CompilerServices.Unsafe.dll",
-        "tools/analyzers/dotnet/cs/System.Text.Encoding.CodePages.dll",
-        "tools/analyzers/dotnet/cs/System.Threading.Tasks.Extensions.dll",
-        "tools/collector/Microsoft.Bcl.AsyncInterfaces.dll",
-        "tools/collector/SharpProof.Analyzer.Core.dll",
-        "tools/collector/SharpProof.CompilerArtifact.dll",
+        "tools/analyzers/dotnet/cs/SharpProof.Analyzer.dll",
+        "tools/analyzers/dotnet/cs/SharpProof.ContractForGenerator.dll",
         "tools/collector/SharpProof.CompilerCollector.dll",
-        "tools/collector/SharpProof.Contracts.dll",
-        "tools/collector/SharpProof.Dataflow.dll",
-        "tools/collector/SharpProof.Effects.dll",
-        "tools/collector/SharpProof.Frontend.dll",
-        "tools/collector/SharpProof.Ir.dll",
-        "tools/collector/SharpProof.Specs.dll",
-        "tools/collector/SharpProof.Summaries.dll",
         "tools/collector/RelationalSpecPackCatalog.json",
-        "tools/collector/SharpProof.Worker.Protocol.dll",
-        "tools/collector/System.IO.Pipelines.dll",
-        "tools/collector/System.Text.Encodings.Web.dll",
-        "tools/collector/System.Text.Json.dll"
+        "tools/shared/netstandard2.0/Microsoft.Bcl.AsyncInterfaces.dll",
+        "tools/shared/netstandard2.0/SharpProof.Analyzer.Core.dll",
+        "tools/shared/netstandard2.0/SharpProof.CompilerArtifact.dll",
+        "tools/shared/netstandard2.0/SharpProof.Contracts.dll",
+        "tools/shared/netstandard2.0/SharpProof.Dataflow.dll",
+        "tools/shared/netstandard2.0/SharpProof.Effects.dll",
+        "tools/shared/netstandard2.0/SharpProof.Frontend.dll",
+        "tools/shared/netstandard2.0/SharpProof.Ir.dll",
+        "tools/shared/netstandard2.0/SharpProof.Specs.dll",
+        "tools/shared/netstandard2.0/SharpProof.Summaries.dll",
+        "tools/shared/netstandard2.0/SharpProof.Worker.Protocol.dll",
+        "tools/shared/netstandard2.0/System.Buffers.dll",
+        "tools/shared/netstandard2.0/System.Collections.Immutable.dll",
+        "tools/shared/netstandard2.0/System.IO.Pipelines.dll",
+        "tools/shared/netstandard2.0/System.Memory.dll",
+        "tools/shared/netstandard2.0/System.Numerics.Vectors.dll",
+        "tools/shared/netstandard2.0/System.Reflection.Metadata.dll",
+        "tools/shared/netstandard2.0/System.Runtime.CompilerServices.Unsafe.dll",
+        "tools/shared/netstandard2.0/System.Text.Encoding.CodePages.dll",
+        "tools/shared/netstandard2.0/System.Text.Encodings.Web.dll",
+        "tools/shared/netstandard2.0/System.Text.Json.dll",
+        "tools/shared/netstandard2.0/System.Threading.Tasks.Extensions.dll"
     ];
 
     private static readonly string[] ExpectedToolEntries = [
@@ -150,6 +164,11 @@ public sealed class PackageLayoutSmokeTests
                 directory.FullName,
                 "tools",
                 "collector");
+            var sharedDirectory = Path.Combine(
+                directory.FullName,
+                "tools",
+                "shared",
+                "netstandard2.0");
             using var loader = new PackageAnalyzerAssemblyLoader();
             foreach (var dependency in Directory.EnumerateFiles(
                          directory.FullName,
@@ -166,12 +185,15 @@ public sealed class PackageLayoutSmokeTests
                      {
                          Path.Combine(
                              analyzerDirectory,
-                             "SharpProof.PortableAnalyzer.dll"),
+                             "SharpProof.Analyzer.dll"),
+                         Path.Combine(
+                             analyzerDirectory,
+                             "SharpProof.ContractForGenerator.dll"),
                          Path.Combine(
                              collectorDirectory,
                              "SharpProof.CompilerCollector.dll"),
                          Path.Combine(
-                             collectorDirectory,
+                             sharedDirectory,
                              "SharpProof.Analyzer.Core.dll")
                      })
             {
@@ -502,7 +524,8 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(enabledItems.ExitCode, Is.Zero, enabledItems.Output);
         Assert.That(
             enabledItems.Output,
-            Does.Contain("SharpProof.PortableAnalyzer.dll"));
+            Does.Contain("SharpProof.Analyzer.dll")
+                .And.Contain("SharpProof.ContractForGenerator.dll"));
         var packagedAnalyzerItems =
             GetPackagedAnalyzerItems(enabledItems.Output);
         Assert.That(
@@ -510,6 +533,11 @@ public sealed class PackageLayoutSmokeTests
                 .Where(static item => item.Role == "EntryPoint")
                 .Select(static item => item.FileName),
             Is.EquivalentTo(ExpectedAnalyzerEntryFileNames));
+        Assert.That(
+            packagedAnalyzerItems
+                .Where(static item => item.Role == "Generator")
+                .Select(static item => item.FileName),
+            Is.EquivalentTo(ExpectedGeneratorEntryFileNames));
         Assert.That(
             packagedAnalyzerItems
                 .Where(static item => item.Role == "Dependency")
@@ -705,6 +733,11 @@ public sealed class PackageLayoutSmokeTests
                 .Where(static item => item.Role == "EntryPoint")
                 .Select(static item => item.FileName),
             Is.EquivalentTo(ExpectedAnalyzerEntryFileNames));
+        Assert.That(
+            packagedAnalyzerItems
+                .Where(static item => item.Role == "Generator")
+                .Select(static item => item.FileName),
+            Is.EquivalentTo(ExpectedGeneratorEntryFileNames));
 
         // net472 qualification is intentionally build-only: the package
         // supplies compiler analyzers, but this test never executes the
@@ -738,6 +771,11 @@ public sealed class PackageLayoutSmokeTests
                 .Where(static item => item.Role == "EntryPoint")
                 .Select(static item => item.FileName),
             Is.EquivalentTo(ExpectedAnalyzerEntryFileNames));
+        Assert.That(
+            packagedAnalyzerItems
+                .Where(static item => item.Role == "Generator")
+                .Select(static item => item.FileName),
+            Is.EquivalentTo(ExpectedGeneratorEntryFileNames));
         Assert.That(
             packagedAnalyzerItems
                 .Where(static item => item.Role == "Dependency")
@@ -816,7 +854,7 @@ public sealed class PackageLayoutSmokeTests
                 manifest.RootElement
                     .GetProperty("schemaVersion")
                     .GetInt32(),
-                Is.EqualTo(11));
+                Is.EqualTo(12));
             var effectClaims = manifest.RootElement
                 .GetProperty("callables")
                 .EnumerateArray()
@@ -1354,7 +1392,8 @@ public sealed class PackageLayoutSmokeTests
             items.EntryFileNames,
             Is.EquivalentTo(
                 (includePortable
-                    ? ExpectedAnalyzerEntryFileNames
+                    ? ExpectedAnalyzerEntryFileNames.Concat(
+                        ExpectedGeneratorEntryFileNames)
                     : [])
                 .Concat(
                     includeCollector
@@ -1947,6 +1986,11 @@ public sealed class PackageLayoutSmokeTests
                 "tools/collector/",
                 StringComparison.Ordinal))
             .ToArray();
+        var sharedEntries = entries
+            .Where(entry => entry.StartsWith(
+                "tools/shared/netstandard2.0/",
+                StringComparison.Ordinal))
+            .ToArray();
         Assert.That(analyzerEntries, Is.Empty);
         Assert.That(
             conditionalAnalyzerEntries,
@@ -1963,7 +2007,16 @@ public sealed class PackageLayoutSmokeTests
                         "tools/collector/",
                         StringComparison.Ordinal))));
         Assert.That(
-            conditionalAnalyzerEntries.Concat(collectorEntries),
+            sharedEntries,
+            Is.EquivalentTo(
+                ExpectedConditionalAnalyzerEntries.Where(static entry =>
+                    entry.StartsWith(
+                        "tools/shared/netstandard2.0/",
+                        StringComparison.Ordinal))));
+        Assert.That(
+            conditionalAnalyzerEntries
+                .Concat(collectorEntries)
+                .Concat(sharedEntries),
             Has.None.Matches<string>(
                 entry =>
                     entry.Contains("Microsoft.Z3", StringComparison.Ordinal) ||
@@ -1984,6 +2037,8 @@ public sealed class PackageLayoutSmokeTests
                     "$(MSBuildThisFileDirectory)../tools/analyzers/dotnet/cs")
                 .And.Contain(
                     "$(MSBuildThisFileDirectory)../tools/collector")
+                .And.Contain(
+                    "$(MSBuildThisFileDirectory)../tools/shared/netstandard2.0")
                 .And.Not.Contain(@"..\tools\analyzers"));
         Assert.That(
             ReadArchiveText(
@@ -1992,7 +2047,9 @@ public sealed class PackageLayoutSmokeTests
             Does.Not.Contain("*.dll")
                 .And.Contain(
                     "<SharpProofAnalyzerRole>EntryPoint</SharpProofAnalyzerRole>")
-                .And.Not.Contain(
+                .And.Contain(
+                    "<SharpProofAnalyzerRole>Generator</SharpProofAnalyzerRole>")
+                .And.Contain(
                     "<SharpProofAnalyzerRole>Dependency</SharpProofAnalyzerRole>")
                 .And.Contain(
                     "<SharpProofAnalyzerRole>Collector</SharpProofAnalyzerRole>")
@@ -2153,14 +2210,16 @@ public sealed class PackageLayoutSmokeTests
             .EnumerateArray())
         {
             var identity = item.GetProperty("Identity").GetString();
-            var normalized = identity?.Replace('\\', '/');
-            var area = normalized?.Contains(
-                    "/tools/analyzers/dotnet/cs/",
-                    StringComparison.Ordinal) == true
+            if (!item.TryGetProperty(
+                    "SharpProofAnalyzerRole", out var roleElement))
+            {
+                continue;
+            }
+
+            var role = roleElement.GetString() ?? "";
+            var area = role is "EntryPoint" or "Generator" or "Dependency"
                 ? "Analyzer"
-                : normalized?.Contains(
-                        "/tools/collector/",
-                        StringComparison.Ordinal) == true
+                : role is "Collector" or "CollectorDependency"
                     ? "Collector"
                     : null;
             if (identity == null || area == null)
@@ -2170,7 +2229,7 @@ public sealed class PackageLayoutSmokeTests
 
             result.Add(new(
                 Path.GetFileName(identity),
-                item.GetProperty("SharpProofAnalyzerRole").GetString() ?? "",
+                role,
                 area));
         }
         return [.. result];
@@ -2222,6 +2281,12 @@ public sealed class PackageLayoutSmokeTests
                 ? Is.EquivalentTo(ExpectedAnalyzerEntryFileNames)
                 : Is.Empty);
         Assert.That(
+            items.Where(static item => item.Role == "Generator")
+                .Select(static item => item.FileName),
+            includePortable
+                ? Is.EquivalentTo(ExpectedGeneratorEntryFileNames)
+                : Is.Empty);
+        Assert.That(
             items.Where(static item => item.Role == "Dependency")
                 .Select(static item => item.FileName),
             includePortable
@@ -2241,7 +2306,7 @@ public sealed class PackageLayoutSmokeTests
                 : Is.Empty);
         Assert.That(
             items.Where(static item =>
-                    item.Role is "EntryPoint" or "Dependency")
+                    item.Role is "EntryPoint" or "Generator" or "Dependency")
                 .Select(static item => item.Area),
             Has.All.EqualTo("Analyzer"));
         Assert.That(
@@ -2254,6 +2319,7 @@ public sealed class PackageLayoutSmokeTests
             Has.All.Matches<string>(role =>
                 role is
                     "EntryPoint" or
+                    "Generator" or
                     "Dependency" or
                     "Collector" or
                     "CollectorDependency"));

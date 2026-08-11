@@ -5,7 +5,7 @@
       "name": "analyzer",
       "namespace": "SharpProof.Analyzer",
       "className": "GeneratedDiagnosticDescriptors",
-      "outputPath": "SharpProof.Analyzer/GeneratedDiagnosticDescriptors.generated.cs",
+      "outputPath": "SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs",
       "usings": [],
       "supportedDiagnosticsMember": "SupportedDiagnostics",
       "diagnostics": [
@@ -182,11 +182,11 @@
     },
     {
       "name": "contractForGenerator",
-      "namespace": "SharpProof.ContractForGenerator",
-      "className": "GeneratedDiagnosticDescriptors",
-      "outputPath": "SharpProof.ContractForGenerator/GeneratedDiagnosticDescriptors.generated.cs",
+      "namespace": "SharpProof.ContractForValidation",
+      "className": "ContractForDiagnosticDescriptors",
+      "outputPath": "SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs",
       "usings": [],
-      "supportedDiagnosticsMember": null,
+      "supportedDiagnosticsMember": "SupportedDiagnostics",
       "diagnostics": [
         {
           "order": 0,

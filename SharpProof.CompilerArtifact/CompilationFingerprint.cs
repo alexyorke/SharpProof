@@ -16,7 +16,7 @@ internal static class CompilationFingerprint
         using var hash = new CanonicalHashWriter();
         hash.Add(
             "SharpProof.CompilerCompilationSnapshot",
-            7,
+            8,
             JsonSerializer.Serialize(snapshot, WorkerProtocolJson.Options),
             JsonSerializer.Serialize(
                 CompilerDiagnosticArtifactOrdering.Canonicalize(
@@ -46,8 +46,34 @@ internal static class CompilationFingerprint
         Guid.TryParseExact(value.CSharpCompilerMvid, "D", out _) &&
         ValidOptions(value.Options) &&
         All(value.SyntaxTrees, ValidTree) &&
-        All(value.References, ValidReference) &&
+        ValidReferences(value.References) &&
         ValidAdditionalFiles(value.AdditionalFiles);
+    }
+
+    private static bool ValidReferences(
+        CompilerReferenceSnapshot[]? references)
+    {
+        if (references == null || !All(references, ValidReference))
+        {
+            return false;
+        }
+
+        var count = 0;
+        long size = 0;
+        foreach (var reference in references)
+        {
+            foreach (var module in reference.Modules)
+            {
+                count++;
+                size += module.SizeBytes;
+                if (count > CompilerReferenceLimits.MaximumModuleCount ||
+                    size > CompilerReferenceLimits.MaximumClosureBytes)
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private static bool ValidOptions(CompilerCompilationOptionsSnapshot? value)
@@ -137,7 +163,9 @@ internal static class CompilationFingerprint
             HasText(value.Name) &&
             Guid.TryParseExact(value.Mvid, "D", out _) &&
             IsCanonicalPath(value.Path) &&
-            WorkerProtocolJson.IsSha256(value.Sha256);
+            WorkerProtocolJson.IsSha256(value.Sha256) &&
+            value.SizeBytes is > 0 and
+                <= CompilerReferenceLimits.MaximumModuleBytes;
     }
 
     private static bool ValidAdditionalFiles(CompilerAdditionalFileSnapshot[]? values)

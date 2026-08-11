@@ -507,6 +507,19 @@ internal static class PerformanceGate
             AppContext.BaseDirectory.TrimEnd(
                 Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)).Parent!.Name;
         var analyzerDirectory = EscapeAnalyzerDirectory(repositoryRoot, configuration);
+        var generatorPath = EscapePath(
+            repositoryRoot,
+            "SharpProof.ContractForGenerator",
+            "bin",
+            configuration,
+            "netstandard2.0",
+            "SharpProof.ContractForGenerator.dll");
+        var sharedDirectory = EscapePath(
+            repositoryRoot,
+            "SharpProof.Analyzer.Core",
+            "bin",
+            configuration,
+            "netstandard2.0");
         var imports = importSharpProof
             ? ($"""<Import Project="{props}" />""" + Environment.NewLine,
                Environment.NewLine + $"""<Import Project="{targets}" />""")
@@ -522,6 +535,8 @@ internal static class PerformanceGate
                 <Deterministic>true</Deterministic>
                 <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
                 <SharpProofAnalyzerDirectory>{analyzerDirectory}</SharpProofAnalyzerDirectory>
+                <_SharpProofContractForGeneratorPath>{generatorPath}</_SharpProofContractForGeneratorPath>
+                <_SharpProofSharedDirectory>{sharedDirectory}</_SharpProofSharedDirectory>
               </PropertyGroup>
               {imports.Item1}{imports.Item2}
             </Project>
@@ -534,7 +549,7 @@ internal static class PerformanceGate
     {
         return EscapePath(
             root,
-            "SharpProof.PortableAnalyzer",
+            "SharpProof.Analyzer",
             "bin",
             configuration,
             "netstandard2.0");

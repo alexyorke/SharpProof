@@ -22,10 +22,23 @@ function Get-SharpProofTcbPaths {
             $Value
         )
 
-        $path = ([string]$Value).Replace('\', '/')
-        if ([string]::IsNullOrWhiteSpace($path) -or
-            -not $seen.Add($path)) {
-            throw "Trusted-computing-base path is blank or duplicated: '$path'."
+        $path = [string]$Value
+        if ([string]::IsNullOrWhiteSpace($path)) {
+            throw 'Trusted-computing-base path is blank.'
+        }
+        if ($path.Contains('\') -or
+            [IO.Path]::IsPathRooted($path) -or
+            $path.StartsWith('/', [StringComparison]::Ordinal) -or
+            $path.EndsWith('/', [StringComparison]::Ordinal) -or
+            $path.Contains('//')) {
+            throw "Trusted-computing-base path is not canonical: '$path'."
+        }
+        $segments = $path.Split('/')
+        if ($segments.Where({ $_ -eq '.' -or $_ -eq '..' }).Count -ne 0) {
+            throw "Trusted-computing-base path contains a dot segment: '$path'."
+        }
+        if (-not $seen.Add($path)) {
+            throw "Trusted-computing-base path is duplicated: '$path'."
         }
 
         [void]$paths.Add($path)
