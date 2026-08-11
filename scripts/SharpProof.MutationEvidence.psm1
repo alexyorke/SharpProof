@@ -179,7 +179,7 @@ function Test-NUnitAssertionMessage {
     }
 
     $details = @($lines[$expectedIndex..($lines.Count - 1)])
-    $allowedDetail = '^(Expected:|But was:|Expected is\b|Expected and actual are both\b|Values differ at index\b|Expected string length\b|String lengths are both\b|Missing:|Extra:|First non-matching item at index\b|-+\^$)'
+    $allowedDetail = '^(Expected:|But was:|Expected is\b|Expected and actual are both\b|Values differ at index\b|Expected string length\b|String lengths are both\b|Missing(?: \(\d+\))?:|Extra(?: \(\d+\))?:|First non-matching item at index\b|-+\^$)'
     if (@($details | Where-Object { $_ -notmatch $allowedDetail }).Count -ne 0) {
         return $false
     }
