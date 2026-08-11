@@ -71,15 +71,6 @@ if ($sourceCommit -ne $ExpectedCommit) {
     throw "Mutation source commit '$sourceCommit' does not match '$ExpectedCommit'."
 }
 
-& git -C $repositoryRoot diff --quiet --
-if ($LASTEXITCODE -ne 0) {
-    throw 'Mutation testing requires a clean tracked working tree.'
-}
-& git -C $repositoryRoot diff --cached --quiet --
-if ($LASTEXITCODE -ne 0) {
-    throw 'Mutation testing requires a clean tracked index.'
-}
-
 $mutations = @(
     [pscustomobject]@{
         Name = 'scalar-int32-upper-bound'
@@ -557,7 +548,7 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'generated-selected-analysis-accountability'
-        File = 'SharpProof.Analyzer.Core\SharpProofAnalyzerEngine.cs'
+        File = 'SharpProof.Analyzer\SharpProofAnalyzer.cs'
         Original = "context.ConfigureGeneratedCodeAnalysis(`n            GeneratedCodeAnalysisFlags.Analyze |`n            GeneratedCodeAnalysisFlags.ReportDiagnostics);"
         Mutated = 'context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
@@ -1223,6 +1214,47 @@ if ($catalogCount -ne [int]$mutationPolicy.expectedCatalogCount -or
         'Trusted mutation registrations do not match the acceptance ' +
         'catalog policy. Actual count/digest: ' +
         "$catalogCount/$catalogSha256.")
+}
+
+$invalidTargets = [Collections.Generic.List[string]]::new()
+foreach ($mutation in $mutations) {
+    $targetPath = Join-Path $repositoryRoot ([string]$mutation.File)
+    if (-not (Test-Path -LiteralPath $targetPath -PathType Leaf)) {
+        $invalidTargets.Add(
+            ([string]$mutation.Name) + ': target file was not found')
+        continue
+    }
+
+    $content = Get-Content -LiteralPath $targetPath -Raw
+    $needle = [string]$mutation.Original
+    $first = $content.IndexOf($needle, [StringComparison]::Ordinal)
+    if ($first -lt 0) {
+        $invalidTargets.Add(
+            ([string]$mutation.Name) + ': target text was not found')
+        continue
+    }
+
+    if ($content.IndexOf(
+            $needle,
+            $first + $needle.Length,
+            [StringComparison]::Ordinal) -ge 0) {
+        $invalidTargets.Add(
+            ([string]$mutation.Name) + ': target text was not unique')
+    }
+}
+if ($invalidTargets.Count -ne 0) {
+    throw (
+        "Trusted mutation target preflight failed:`n - " +
+        ($invalidTargets -join "`n - "))
+}
+
+& git -C $repositoryRoot diff --quiet --
+if ($LASTEXITCODE -ne 0) {
+    throw 'Mutation testing requires a clean tracked working tree.'
+}
+& git -C $repositoryRoot diff --cached --quiet --
+if ($LASTEXITCODE -ne 0) {
+    throw 'Mutation testing requires a clean tracked index.'
 }
 
 $defaultShardWeight = [int]$acceptanceContract.automation.mutationDefaultWeight
