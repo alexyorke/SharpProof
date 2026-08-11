@@ -1038,7 +1038,7 @@ $mutations = @(
         Name = 'compiler-reference-module-count-limit'
         File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerCompilationCapture.cs'
         Original = '            if (_moduleCount >= _limits.MaximumModuleCount ||'
-        Mutated = '            if (false ||'
+        Mutated = '            if (_moduleCount > _limits.MaximumModuleCount ||'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~ReferenceCaptureEnforcesModuleClosureAndCountLimits'
     },
