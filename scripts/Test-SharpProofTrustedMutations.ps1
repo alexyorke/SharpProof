@@ -1062,7 +1062,7 @@ $mutations = @(
         Name = 'package-contract-for-generator-entrypoint'
         File = 'SharpProof.Package\SharpProof.nuspec'
         Original = '    <file src="..\SharpProof.ContractForGenerator\bin\$configuration$\netstandard2.0\SharpProof.ContractForGenerator.dll" target="tools\analyzers\dotnet\cs" />'
-        Mutated = '    <file src="..\SharpProof.Analyzer\bin\$configuration$\netstandard2.0\SharpProof.Analyzer.dll" target="tools\analyzers\dotnet\cs" />'
+        Mutated = '    <file src="..\SharpProof.ContractForGenerator\bin\$configuration$\netstandard2.0\SharpProof.ContractForGenerator.dll" target="tools\shared\netstandard2.0" />'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~PackageGraphAndLayoutsAreExact'
     },
