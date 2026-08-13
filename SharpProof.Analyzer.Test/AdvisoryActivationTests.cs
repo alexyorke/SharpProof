@@ -9,6 +9,91 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class AdvisoryActivationTests
 {
+    [TestCase("Requires")]
+    [TestCase(@"\u0052equires")]
+    [TestCase(@"\U00000052equires")]
+    public async Task ContractIdentifierSpellingActivatesCallAnalysis(
+        string identifier)
+    {
+        var source = """
+            using SharpProof.Attributes;
+
+            internal static class ContractFixture {
+                internal static void Positive(int value) {
+                    Contract.__REQUIRES__(value > 0);
+                }
+
+                internal static void Call() {
+                    Positive(-1);
+                }
+            }
+            """.Replace(
+                "__REQUIRES__",
+                identifier,
+                StringComparison.Ordinal);
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            source,
+            ["SP0027"]);
+        var factory = new RecordingSessionFactory();
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: null,
+            analyzer: new SharpProofAnalyzer(factory));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(factory.CreateCount, Is.EqualTo(1));
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0027"]));
+        }
+    }
+
+    [Test]
+    public async Task UnicodeEscapeDecoysDoNotActivateCallAnalysis()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            internal static class Decoy {
+                private const string Text = @"Contract.\u0052equires(false)";
+                // Contract.\U00000052equires(false);
+                internal static int Identity(int value) => value;
+            }
+            """,
+            ["SP0027"]);
+        var factory = new RecordingSessionFactory();
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: null,
+            analyzer: new SharpProofAnalyzer(factory));
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(factory.CreateCount, Is.Zero);
+    }
+
+    [Test]
+    public async Task SourceWithoutContractSyntaxDoesNotActivateCallAnalysis()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            internal static class Plain {
+                internal static int Identity(int value) => value;
+            }
+            """,
+            ["SP0027"]);
+        var factory = new RecordingSessionFactory();
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: null,
+            analyzer: new SharpProofAnalyzer(factory));
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(factory.CreateCount, Is.Zero);
+    }
+
     [Test]
     public async Task CompilationReferenceNestedParameterContractActivatesCallAnalysis()
     {

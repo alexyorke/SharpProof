@@ -219,8 +219,13 @@ internal sealed partial class SharpProofAnalyzerEngine
     {
         for (var index = 0; index < text.Length; index++)
         {
-            if (text[index] == '[')
+            if (text[index] == '[' ||
+                (text[index] == '\\' &&
+                 index + 1 < text.Length &&
+                 text[index + 1] is 'u' or 'U'))
             {
+                // Unicode escapes can spell any identifier. The syntax scan
+                // compares decoded Identifier.ValueText before activation.
                 return true;
             }
         }
