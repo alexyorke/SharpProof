@@ -85,9 +85,14 @@ MSBuild, filesystem, or child-process hangs that solver limits cannot observe.
 ## Multiple independent workspaces
 
 Each source directory or remote ref must use a different Compose project name.
-This gives it a private persistent source volume, cache volumes, and output
-tree. Put the project name and ref in each checkout's untracked `.env` file,
-then use the same commands on every operating system:
+This gives it a private tooling image tag, persistent source volume, cache
+volumes, and output tree. By default the tooling image is
+`<compose-project-name>-tooling:local`; build and run therefore resolve the
+same checkout-owned tag. Put the project name and ref in each checkout's
+untracked `.env` file, especially when two checkout paths have the same base
+directory name, then use the same commands on every operating system. A
+reviewed immutable image can instead be selected explicitly with
+`SHARPPROOF_TOOLING_IMAGE`.
 
 ```text
 docker compose up -d dev

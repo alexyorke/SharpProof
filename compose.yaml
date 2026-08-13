@@ -1,5 +1,5 @@
 x-sharpproof-common: &sharpproof-common
-  image: ${SHARPPROOF_TOOLING_IMAGE:-sharpproof-tooling:local}
+  image: ${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}
   build:
     context: .
     dockerfile: eng/container/Dockerfile

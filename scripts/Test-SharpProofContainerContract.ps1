@@ -187,7 +187,7 @@ function Assert-ComposeAuthority {
         throw 'Compose common authority must precede the services mapping.'
     }
     $commonLines = @($lines[($commonStart + 1)..($servicesStart - 1)])
-    $expectedImage = '  image: ${SHARPPROOF_TOOLING_IMAGE:-sharpproof-tooling:local}'
+    $expectedImage = '  image: ${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}'
     Assert-SingleMatchingLine $commonLines '^  image:' $expectedImage 'Compose tooling image'
     Assert-SingleMatchingLine $commonLines '^  platform:' "  platform: $Platform" 'Compose platform'
     Assert-SingleMatchingLine $commonLines '^  build:' '  build:' 'Compose build mapping'

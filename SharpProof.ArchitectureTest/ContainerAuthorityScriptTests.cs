@@ -19,6 +19,39 @@ public sealed class ContainerAuthorityScriptTests
         Assert.That(result.ExitCode, Is.Zero, result.Error);
     }
 
+    [Test]
+    public async Task ComposeToolingImageIsProjectPrivateAndOverrideable()
+    {
+        var root = RepositoryRoot();
+        var compose = await File.ReadAllTextAsync(
+            Path.Combine(root, "compose.yaml"));
+        var imageLine = compose.Split('\n').Single(static line =>
+            line.StartsWith("  image: ", StringComparison.Ordinal));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                imageLine,
+                Is.EqualTo(
+                    "  image: ${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}"));
+            Assert.That(
+                ResolveComposeImage(imageLine, "audit-one", null),
+                Is.EqualTo("audit-one-tooling:local"));
+            Assert.That(
+                ResolveComposeImage(imageLine, "audit-two", null),
+                Is.EqualTo("audit-two-tooling:local"));
+            Assert.That(
+                ResolveComposeImage(imageLine, "audit-one", null),
+                Is.EqualTo(ResolveComposeImage(imageLine, "audit-one", null)));
+            Assert.That(
+                ResolveComposeImage(
+                    imageLine,
+                    "audit-two",
+                    "reviewed/tooling:candidate"),
+                Is.EqualTo("reviewed/tooling:candidate"));
+        }
+    }
+
     [TestCaseSource(nameof(DockerfileMutations))]
     public async Task DockerfileAuthorityDecoysAreRejected(
         string _,
@@ -77,14 +110,18 @@ public sealed class ContainerAuthorityScriptTests
             "  tooling:\n    <<: *sharpproof-common\n    platform: linux/arm64",
             StringComparison.Ordinal));
         yield return Case("comment-image-decoy", value => value.Replace(
-            "  image: ${SHARPPROOF_TOOLING_IMAGE:-sharpproof-tooling:local}",
-            "  # image: ${SHARPPROOF_TOOLING_IMAGE:-sharpproof-tooling:local}\n" +
+            "  image: ${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}",
+            "  # image: ${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}\n" +
             "  image: example.invalid/tooling:latest",
             StringComparison.Ordinal));
         yield return Case("duplicate-image", value => value.Replace(
-            "  image: ${SHARPPROOF_TOOLING_IMAGE:-sharpproof-tooling:local}",
-            "  image: ${SHARPPROOF_TOOLING_IMAGE:-sharpproof-tooling:local}\n" +
+            "  image: ${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}",
+            "  image: ${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}\n" +
             "  image: example.invalid/tooling:latest",
+            StringComparison.Ordinal));
+        yield return Case("shared-global-image", value => value.Replace(
+            "  image: ${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}",
+            "  image: ${SHARPPROOF_TOOLING_IMAGE:-sharpproof-tooling:local}",
             StringComparison.Ordinal));
         yield return Case("unused-build-decoy", value => value.Replace(
             "    dockerfile: eng/container/Dockerfile",
@@ -170,6 +207,22 @@ public sealed class ContainerAuthorityScriptTests
         var error = process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
         return new ProcessResult(process.ExitCode, await output, await error);
+    }
+
+    private static string ResolveComposeImage(
+        string imageLine,
+        string projectName,
+        string? image)
+    {
+        const string prefix = "  image: ${SHARPPROOF_TOOLING_IMAGE:-";
+        var fallback = imageLine.Substring(
+            prefix.Length,
+            imageLine.Length - prefix.Length - 1);
+        fallback = fallback.Replace(
+            "${COMPOSE_PROJECT_NAME}",
+            projectName,
+            StringComparison.Ordinal);
+        return image ?? fallback;
     }
 
     private sealed record ProcessResult(int ExitCode, string Output, string Error);
