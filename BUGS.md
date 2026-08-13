@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 96 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 95 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,25 @@ The active backlog contains 96 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-093 - Pilot qualification accepts duplicate and vacuous libraries (fixed)
+
+- [x] Fixed by `9ce2acfdd` (`fix: require substantive pilot coverage`).
+- The pilot authority now validates the exact five-row catalog, unique pilot IDs
+  and canonical projects, and unique external package identities and versions
+  derived from each project PackageReference. The schema-2 report binds those
+  identities and the exact claim projection from each hash-bound worker result.
+- Category coverage is independently derived from manifest claim kinds:
+  effect-heavy pilots require an Effect claim, contract-heavy pilots require a
+  Postcondition, and the mixed strict pilot requires both. The receipt reuses
+  the same validator; three pilots now contain real postcondition obligations.
+- Regression-first fixtures cover the canonical five libraries, duplicate
+  report/catalog IDs, projects, and libraries; mislabeled categories; zero
+  report and underlying claims; wrong claim kinds and project references;
+  unknown catalog fields; and the existing package-authority cases. The fixture,
+  focused Architecture test, Architecture 178/178, container contract, and
+  `git diff --check` passed. The real pilot restore was not run because it
+  requires external NuGet access.
 
 ### SP-AUDIT-092 - Contract companion bodies are analyzed as implementations (fixed)
 
@@ -1223,25 +1242,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   each permitted producer tuple.
 - Consolidated cases: SP-AUDIT-151.
 - Unified closure: Generate one producer/codec/hydrator/callable mapping for every supported compiler/effect Unknown reason and certainty tuple.
-
-### SP-AUDIT-093 - Pilot qualification accepts duplicate and vacuous libraries (P1)
-
-- [ ] `Test-SharpProofPilots.ps1` trusts the catalog's project, library, and
-  category labels, checks only row/category counts, and permits effect- or
-  contract-designated pilots with zero relevant claims. It does not require
-  five distinct projects or package identities.
-- Certifier impact: the exact qualification predicates accepted five rows
-  backed by only three projects while all four effect/contract rows contained
-  zero claims. A release can therefore claim five qualified libraries without
-  exercising five libraries or the required semantic categories.
-- Reproduction: a harmless in-memory catalog/report fixture duplicated project
-  paths and package identities and supplied zero-claim effect/contract rows;
-  every current qualification predicate passed.
-- Required closure: schema-validate the catalog, require exactly five unique
-  IDs, projects, and external library identities, authenticate library/version
-  from each project reference, and require non-vacuous category-specific claim
-  evidence. Add duplicate, mislabeled, zero-claim, and valid five-library
-  certifier fixtures.
 
 ### SP-AUDIT-105 - Semantic cache policy misses aliases and indexer writes (P1)
 
