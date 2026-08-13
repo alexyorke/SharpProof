@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 135 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 134 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 135 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-023 - Empty nullable boxing reports an allocation (fixed)
+
+- [x] Fixed by `f5ce546c5` (`fix: classify nullable boxing allocation`).
+- Boxing classification now uses abstract nullable-presence facts. Definitely
+  empty nullable values allocate nothing, definitely present nullable values
+  allocate a managed box, and unknown nullable values retain an incomplete
+  allocation possibility without a definite allocation witness. Ordinary
+  value-type boxing remains a managed allocation.
+- Regression-first coverage includes empty, present, parameter, lifted-empty,
+  lifted-present, and ordinary boxing at both the Effects and ZeroAllocations
+  analyzer layers. Full Effects passed 166/166, Analyzer passed 226/226, and
+  Architecture passed 110/110 in the canonical container.
 
 ### SP-AUDIT-018 - Definitely safe casts report impossible exceptions (fixed)
 
@@ -1161,25 +1174,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   calls, and possible exceptions in nonconstant ordinary interpolation. Keep
   custom handlers rejected. Add constant, string, primitive-format, throwing
   `ToString`, custom-handler, and catalog-removal mutation cases.
-
-### SP-AUDIT-023 - Empty nullable boxing reports an allocation (P1)
-
-- [ ] `OperationEffectScanner.ClassifyConversion` classifies every boxing
-  conversion as a managed allocation. CLR nullable boxing is conditional: an
-  empty `Nullable<T>` becomes a null reference and allocates no box.
-- Supported impact: `public static object? Box() => (int?)null;` produced a
-  complete effect projection whose allocation kind was `Managed`. A valid
-  selected `ZeroAllocations` claim is therefore rejected for a definitely
-  allocation-free supported conversion.
-- Reproduction: a temporary canonical-container Effects regression expected
-  `EffectAllocationKind.None` and a complete projection for that method. It
-  failed with actual allocation `Managed`.
-- Required closure: use constant/abstract nullable state when classifying
-  boxing. Empty nullable values must be allocation-free, known nonempty values
-  must allocate, and unknown values must preserve the conditional possibility
-  without inventing a definite witness. Add empty, nonempty, parameter,
-  lifted-conversion, ordinary value-type boxing, and mutation-discriminating
-  cases.
 
 ### SP-AUDIT-024 - Normal-completion sequencing is modeled inconsistently (P1)
 
