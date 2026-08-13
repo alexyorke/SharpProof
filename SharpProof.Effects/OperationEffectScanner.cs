@@ -7,6 +7,7 @@ internal sealed class OperationEffectScanner
     private readonly ManagedFlowResult? _abstractFlow;
     private readonly bool _allowDirectWitnesses;
     private readonly EffectCallSiteResolver _callResolver;
+    private readonly ConversionEffectClassifier _conversionEffects;
     private readonly CoalesceAssignmentFlowCaptures _coalesceCaptures = new();
     private readonly SyntaxNode? _directSyntax;
     private readonly ImmutableArray<EffectDirectWitness>.Builder _directWitnesses =
@@ -42,6 +43,7 @@ internal sealed class OperationEffectScanner
                 method,
                 calls,
                 abstractFlow);
+        _conversionEffects = new ConversionEffectClassifier(session, abstractFlow);
         _allowDirectWitnesses = allowDirectWitnesses;
         _directSyntax = GetDirectSyntax(root.Syntax);
         _exceptionType = session.Compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
@@ -184,7 +186,7 @@ internal sealed class OperationEffectScanner
             IIncrementOrDecrementOperation increment => EffectSummaryOperations.Join(
                 Scan(increment.Target, EffectAccess.Read),
                 ScanWriteTarget(increment.Target, increment.Target, valueIsStoredDirectly: false),
-                CheckedOverflow(increment.IsChecked, increment),
+                _conversionEffects.CheckedOverflow(increment.IsChecked, increment),
                 ResolveOperatorEffects(increment.OperatorMethod, [increment.Target], increment)),
             IInvocationOperation invocation => ScanInvocation(invocation),
             IObjectCreationOperation creation => ScanObjectCreation(creation),
@@ -388,7 +390,7 @@ internal sealed class OperationEffectScanner
             ScanWriteTarget(assignment.Target, assignment.Value, valueIsStoredDirectly: false),
             operatorCall,
             exceptions,
-            CheckedOverflow(assignment.IsChecked, assignment));
+            _conversionEffects.CheckedOverflow(assignment.IsChecked, assignment));
     }
 
     private EffectSummary ScanCoalesceAssignment(
@@ -554,7 +556,7 @@ internal sealed class OperationEffectScanner
                 ClassifyRegion),
             IntegralDivisionExceptions(binary.OperatorKind, binary.Type,
                 binary.LeftOperand, binary.RightOperand, binary),
-            CheckedOverflow(binary.IsChecked, binary),
+            _conversionEffects.CheckedOverflow(binary.IsChecked, binary),
             ResolveOperatorEffects(
                 binary.OperatorMethod,
                 [binary.LeftOperand, binary.RightOperand],
@@ -565,7 +567,7 @@ internal sealed class OperationEffectScanner
     {
         return EffectSummaryOperations.Join(
             Scan(unary.Operand),
-            CheckedOverflow(unary.IsChecked, unary),
+            _conversionEffects.CheckedOverflow(unary.IsChecked, unary),
             ResolveOperatorEffects(unary.OperatorMethod, [unary.Operand], unary));
     }
 
@@ -581,7 +583,7 @@ internal sealed class OperationEffectScanner
         var conversion = Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetConversion(operation);
         return EffectSummaryOperations.Join(
             Scan(operation.Operand),
-            ClassifyConversion(operation, conversion),
+            _conversionEffects.Classify(operation, conversion),
             ResolveOperatorEffects(operation.OperatorMethod, [operation.Operand], operation));
     }
 
@@ -596,110 +598,6 @@ internal sealed class OperationEffectScanner
             [.. operands.Select(operand => ClassifyRegion(operand))],
             operands,
             origin);
-    }
-
-    private EffectSummary ClassifyConversion(
-        IConversionOperation operation,
-        Microsoft.CodeAnalysis.CSharp.Conversion conversion)
-    {
-        if (!conversion.Exists)
-        {
-            return EffectSummaryOperations.Unsupported();
-        }
-
-        // These categories can overlap. Handle the effectful categories first,
-        // then the effect-neutral categories, and fail closed for every
-        // remaining Roslyn conversion category.
-        if (conversion.IsDynamic)
-        {
-            return EffectSummaryOperations.Unsupported();
-        }
-
-        if (conversion.IsBoxing)
-        {
-            return EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
-        }
-
-        if (conversion.IsUnboxing)
-        {
-            return Throw(
-                FrameworkTypeMetadataNames.InvalidCastException,
-                FrameworkTypeMetadataNames.NullReferenceException);
-        }
-
-        if (conversion.IsUserDefined)
-        {
-            return ClassifyNullableAndCheckedConversion(operation);
-        }
-
-        if (conversion.IsReference)
-        {
-            return conversion.IsExplicit && !operation.IsTryCast
-                ? Throw(FrameworkTypeMetadataNames.InvalidCastException)
-                : EffectSummary.Empty;
-        }
-
-        if (conversion.IsNullable)
-        {
-            return ClassifyNullableAndCheckedConversion(operation);
-        }
-
-        if (conversion is { IsNumeric: true } or { IsEnumeration: true })
-        {
-            return CheckedOverflow(operation.IsChecked, operation);
-        }
-
-        if (conversion.IsInterpolatedString)
-        {
-            return EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
-        }
-
-        if (conversion is
-        { IsAnonymousFunction: true } or
-        { IsMethodGroup: true })
-        {
-            return EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
-        }
-
-        if (conversion is
-        { IsIdentity: true } or
-        { IsNullLiteral: true } or
-        { IsDefaultLiteral: true } or
-        { IsConstantExpression: true } or
-        { IsThrow: true } or
-        { IsObjectCreation: true } or
-        { IsSwitchExpression: true } or
-        { IsConditionalExpression: true })
-        {
-            return EffectSummary.Empty;
-        }
-
-        // Collection expressions, interpolated-string handlers, tuple
-        // conversions, stackalloc/span/inline-array conversions, pointer and
-        // native-integer conversions are not modeled by this effect domain.
-        return EffectSummaryOperations.Unsupported();
-    }
-
-    private EffectSummary ClassifyNullableAndCheckedConversion(
-        IConversionOperation operation)
-    {
-        var result = CheckedOverflow(operation.IsChecked, operation);
-        if (IsNullableType(operation.Operand.Type) && !IsNullableType(operation.Type))
-        {
-            result = EffectSummaryOperations.Join(result,
-                Throw(FrameworkTypeMetadataNames.InvalidOperationException));
-        }
-
-        return result;
-    }
-
-    private EffectSummary CheckedOverflow(
-        bool isChecked, IOperation operation)
-    {
-        return isChecked &&
-        _abstractFlow?.ProvesNoOverflow(operation) != true
-            ? Throw(FrameworkTypeMetadataNames.OverflowException)
-            : EffectSummary.Empty;
     }
 
     private EffectSummary Throw(params string[] exceptionMetadataNames)
@@ -1211,14 +1109,6 @@ internal sealed class OperationEffectScanner
     private static bool IsOpenDispatchTarget(IMethodSymbol method)
     {
         return method.ContainingType?.IsSealed != true && !method.IsSealed;
-    }
-
-    private static bool IsNullableType(ITypeSymbol? type)
-    {
-        return type is INamedTypeSymbol
-        {
-            OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
-        };
     }
 
     private static bool IsIntrinsicArrayCardinalityProperty(

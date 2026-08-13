@@ -1953,6 +1953,59 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task ProvenSafeConversionsSatisfyDoesNotThrow()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [DoesNotThrow]
+                public static int? NullToNullableValue() =>
+                    (int?)(object?)null;
+
+                [DoesNotThrow]
+                public static string? NullToReference() =>
+                    (string?)(object?)null;
+
+                [DoesNotThrow]
+                public static int PresentNullableUnwrap() {
+                    int? value = 1;
+                    return (int)value;
+                }
+
+                [DoesNotThrow]
+                public static int? CompatibleNullableUnbox() =>
+                    (int?)(object)1;
+
+                [DoesNotThrow]
+                public static string CompatibleReferenceCast() =>
+                    (string)(object)"text";
+            }
+            """,
+            "effects",
+            ["SP0046"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(diagnostics, Is.Empty);
+        foreach (var methodName in new[]
+                 {
+                     "NullToNullableValue",
+                     "NullToReference",
+                     "PresentNullableUnwrap",
+                     "CompatibleNullableUnbox",
+                     "CompatibleReferenceCast"
+                 })
+        {
+            Assert.That(
+                factory.Outcomes[methodName],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven),
+                methodName);
+        }
+    }
+
+    [Test]
     public async Task EffectContractSelectsUnsupportedMethod()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

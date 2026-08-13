@@ -325,6 +325,83 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ConversionEffectsUseProvenNullnessAndNullablePresence()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static int? NullToNullableValue() =>
+                    (int?)(object?)null;
+                public static string? NullToReference() =>
+                    (string?)(object?)null;
+
+                public static int PresentNullableUnwrap() {
+                    int? value = 1;
+                    return (int)value;
+                }
+
+                public static int? CompatibleNullableUnbox() =>
+                    (int?)(object)1;
+                public static string CompatibleReferenceCast() =>
+                    (string)(object)"text";
+
+                public static int? UnknownNullableUnbox(object? value) =>
+                    (int?)value;
+                public static int? IncompatibleNullableUnbox() =>
+                    (int?)(object)"text";
+                public static string? UnknownReferenceCast(object? value) =>
+                    (string?)value;
+                public static string IncompatibleReferenceCast() =>
+                    (string)(object)new object();
+                public static int NullToNonNullableValue() =>
+                    (int)(object?)null!;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[]
+                 {
+                     "NullToNullableValue",
+                     "NullToReference",
+                     "PresentNullableUnwrap",
+                     "CompatibleNullableUnbox",
+                     "CompatibleReferenceCast"
+                 })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Throws.IsEmpty,
+                Is.True,
+                methodName);
+            Assert.That(result.Projection.IsComplete, Is.True, methodName);
+        }
+
+        foreach (var methodName in new[]
+                 {
+                     "UnknownNullableUnbox",
+                     "IncompatibleNullableUnbox",
+                     "UnknownReferenceCast",
+                     "IncompatibleReferenceCast"
+                 })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            AssertThrows(result.Summary, "System.InvalidCastException");
+            AssertDoesNotThrow(
+                result.Summary,
+                "System.NullReferenceException");
+            Assert.That(result.Projection.IsComplete, Is.True, methodName);
+        }
+
+        var nonNullable = session.Analyze(
+            Method(compilation, "NullToNonNullableValue"));
+        AssertThrows(nonNullable.Summary, "System.NullReferenceException");
+        AssertDoesNotThrow(
+            nonNullable.Summary,
+            "System.InvalidCastException");
+        Assert.That(nonNullable.Projection.IsComplete, Is.True);
+    }
+
+    [Test]
     public void ManagedAllocationUsesModeledObjectConstructor()
     {
         var result = Analyze(

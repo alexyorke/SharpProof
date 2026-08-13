@@ -652,6 +652,33 @@ internal sealed class ManagedAbstractFlow
             return operand;
         }
 
+        if (string.Equals(
+                conversion.Syntax.Language,
+                LanguageNames.CSharp,
+                StringComparison.Ordinal) &&
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions
+                .GetConversion(conversion).IsBoxing)
+        {
+            return IsNullableType(conversion.Operand.Type) &&
+                   operand.TryGetNullness(out var boxedNullness)
+                ? Reference(boxedNullness, operand.Cardinality)
+                : NonNull;
+        }
+
+        if (IsNullableType(conversion.Type) &&
+            conversion.OperatorMethod == null &&
+            !conversion.Conversion.IsUserDefined)
+        {
+            if (operand.TryGetNullness(out var nullableNullness))
+            {
+                return Reference(nullableNullness, operand.Cardinality);
+            }
+
+            return IsNullableType(conversion.Operand.Type)
+                ? Reference(NullnessValue.MaybeNull)
+                : NonNull;
+        }
+
         return !conversion.IsTryCast && conversion.OperatorMethod == null && conversion.Conversion.IsReference &&
                operand.TryGetNullness(out var nullness)
             ? Reference(nullness, operand.Cardinality)
@@ -1380,7 +1407,9 @@ internal readonly record struct ManagedAbstractValue(
             return Integer(IntervalValue.Range(integer.Minimum, integer.Maximum));
         }
 
-        return type?.IsReferenceType is true ? Reference(NullnessValue.MaybeNull) : Unknown;
+        return type?.IsReferenceType is true || IsNullableType(type)
+            ? Reference(NullnessValue.MaybeNull)
+            : Unknown;
     }
 
     internal static ManagedAbstractValue DefaultForType(ITypeSymbol? type)
@@ -1395,7 +1424,9 @@ internal readonly record struct ManagedAbstractValue(
             return Integer(IntervalValue.Constant(0));
         }
 
-        return type?.IsReferenceType is true ? Null : Unknown;
+        return type?.IsReferenceType is true || IsNullableType(type)
+            ? Null
+            : Unknown;
     }
 
     internal static ManagedAbstractValue FromConstant(object? value, ITypeSymbol? type)
@@ -1683,6 +1714,14 @@ internal readonly record struct ManagedAbstractValue(
     internal static bool IntegerType(ITypeSymbol? type, out CSharpIntegerSemantics semantics)
     {
         return CSharpScalarSemantics.TryGetInteger(type?.SpecialType ?? SpecialType.None, out semantics);
+    }
+
+    internal static bool IsNullableType(ITypeSymbol? type)
+    {
+        return type is INamedTypeSymbol
+        {
+            OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
+        };
     }
 }
 
