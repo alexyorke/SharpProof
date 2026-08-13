@@ -30,6 +30,9 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
     [Output]
     public int ExitCode { get; set; }
 
+    [Output]
+    public bool HasStructuredError { get; set; }
+
     internal bool HasActiveProcess
     {
         get
@@ -48,6 +51,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
     public override bool Execute()
     {
         Process? process = null;
+        HasStructuredError = false;
         try
         {
             ContainerContract.ValidateRequired();
@@ -124,74 +128,119 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
         using var reader = new StringReader(standardError);
         while (reader.ReadLine() is { } line)
         {
-            if (TryParseWarning(
+            VerifierDiagnostic diagnostic;
+            if (VerifierDiagnosticTransport.TryDeserialize(
                     line,
-                    out var code,
-                    out var file,
-                    out var lineNumber,
-                    out var columnNumber,
-                    out var message))
+                    out var structured))
             {
-                Log.LogWarning(
-                    string.Empty,
-                    code,
-                    string.Empty,
-                    file,
-                    lineNumber,
-                    columnNumber,
-                    0,
-                    0,
-                    message);
+                diagnostic = structured;
+            }
+            else if (!TryParseLegacyDiagnostic(
+                         line,
+                         out diagnostic))
+            {
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    Log.LogMessage(MessageImportance.High, "{0}", line);
+                }
                 continue;
             }
 
-            if (!string.IsNullOrWhiteSpace(line))
+            if (diagnostic.Severity == "error")
             {
-                Log.LogMessage(MessageImportance.High, "{0}", line);
+                HasStructuredError = true;
+                Log.LogError(
+                    string.Empty,
+                    diagnostic.Code,
+                    string.Empty,
+                    diagnostic.File,
+                    diagnostic.Line,
+                    diagnostic.Column,
+                    0,
+                    0,
+                    diagnostic.Message);
+            }
+            else
+            {
+                Log.LogWarning(
+                    string.Empty,
+                    diagnostic.Code,
+                    string.Empty,
+                    diagnostic.File,
+                    diagnostic.Line,
+                    diagnostic.Column,
+                    0,
+                    0,
+                    diagnostic.Message);
             }
         }
     }
 
-    private static bool TryParseWarning(
+    private static bool TryParseLegacyDiagnostic(
         string line,
-        out string code,
+        out VerifierDiagnostic diagnostic)
+    {
+        (string Severity, string Code, string Marker)[] markers =
+        {
+            ("warning", "SP0047", ": warning SP0047: "),
+            ("warning", "SP0048", ": warning SP0048: "),
+            ("error", "SP0047", ": error SP0047: "),
+            ("error", "SP0048", ": error SP0048: ")
+        };
+        diagnostic = null!;
+        var selectedIndex = -1;
+        foreach (var candidate in markers)
+        {
+            var marker = line.LastIndexOf(
+                candidate.Marker,
+                StringComparison.Ordinal);
+            while (marker > 0)
+            {
+                var location = line.Substring(0, marker);
+                if (marker > selectedIndex &&
+                    TryParseLocation(
+                        location,
+                        out var file,
+                        out var lineNumber,
+                        out var columnNumber))
+                {
+                    selectedIndex = marker;
+                    diagnostic = new VerifierDiagnostic(
+                        candidate.Severity,
+                        candidate.Code,
+                        file,
+                        lineNumber,
+                        columnNumber,
+                        line.Substring(marker + candidate.Marker.Length));
+                    break;
+                }
+                marker = line.LastIndexOf(
+                    candidate.Marker,
+                    marker - 1,
+                    StringComparison.Ordinal);
+            }
+        }
+        return selectedIndex >= 0;
+    }
+
+    private static bool TryParseLocation(
+        string location,
         out string file,
         out int lineNumber,
-        out int columnNumber,
-        out string message)
+        out int columnNumber)
     {
-        const string sp0047Marker = ": warning SP0047: ";
-        const string sp0048Marker = ": warning SP0048: ";
-        var marker = line.IndexOf(sp0047Marker, StringComparison.Ordinal);
-        var markerText = sp0047Marker;
-        code = "SP0047";
-        if (marker <= 0)
-        {
-            marker = line.IndexOf(sp0048Marker, StringComparison.Ordinal);
-            markerText = sp0048Marker;
-            code = "SP0048";
-        }
-        if (marker <= 0)
-        {
-            file = string.Empty;
-            lineNumber = 0;
-            columnNumber = 0;
-            message = string.Empty;
-            return false;
-        }
-
-        var location = line.Substring(0, marker);
-        message = line.Substring(marker + markerText.Length);
-        file = string.Equals(location, "SharpProof", StringComparison.Ordinal)
-            ? string.Empty
-            : location;
+        file = string.Empty;
         lineNumber = 0;
         columnNumber = 0;
-        if (!location.EndsWith(')'))
+        if (string.Equals(location, "SharpProof", StringComparison.Ordinal))
         {
             return true;
         }
 
+        if (!location.EndsWith(')'))
+        {
+            return false;
+        }
         var openParenthesis = location.LastIndexOf('(');
         var comma = location.LastIndexOf(',');
         if (openParenthesis <= 0 || comma <= openParenthesis ||
@@ -212,7 +261,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
         {
             lineNumber = 0;
             columnNumber = 0;
-            return true;
+            return false;
         }
 
         file = location.Substring(0, openParenthesis);

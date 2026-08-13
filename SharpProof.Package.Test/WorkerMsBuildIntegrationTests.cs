@@ -1061,6 +1061,9 @@ public sealed class WorkerMsBuildIntegrationTests
             ("SharpProofVerifyPolicy", "require-proven"));
         Assert.That(required.ExitCode, Is.Not.Zero);
         Assert.That(required.Output, Does.Contain("error SP0047"));
+        Assert.That(
+            required.Output,
+            Does.Not.Contain("SharpProof verifier failed with exit code"));
     }
 
     [Test]
@@ -2132,6 +2135,9 @@ public sealed class WorkerMsBuildIntegrationTests
             ("SharpProofAssumptionPolicy", "error"));
         Assert.That(error.ExitCode, Is.Not.Zero);
         Assert.That(error.Output, Does.Contain("error SP0048"));
+        Assert.That(
+            error.Output,
+            Does.Not.Contain("SharpProof verifier failed with exit code"));
 
         using var trusted = ConsumerProject.Create(
             """
@@ -2146,6 +2152,9 @@ public sealed class WorkerMsBuildIntegrationTests
             ("SharpProofAssumptionPolicy", "error"));
         Assert.That(declared.ExitCode, Is.Not.Zero);
         Assert.That(declared.Output, Does.Contain("error SP0048"));
+        Assert.That(
+            declared.Output,
+            Does.Not.Contain("SharpProof verifier failed with exit code"));
         Assert.That(
             declared.Output,
             Does.Contain("total=1, user=0, trusted=1"));
@@ -2430,6 +2439,10 @@ public sealed class WorkerMsBuildIntegrationTests
         var runnerTask = targets.Descendants("UsingTask")
             .Single(static task => task.Attribute("TaskName")?.Value ==
                 "SharpProof.BuildTasks.RunVerifier");
+        var verifierExitError = verifyCore.Descendants("Error")
+            .Single(static error => error.Attribute("Text")?.Value.StartsWith(
+                "SharpProof verifier failed with exit code",
+                StringComparison.Ordinal) == true);
         var arguments = string.Join(
             " ",
             verifyCore.Descendants("_SharpProofVerifierArgument")
@@ -2482,6 +2495,17 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(
                 invocation.Attribute("Executable")?.Value,
                 Is.EqualTo("$(_SharpProofDotNetHost)"));
+            Assert.That(
+                invocation.Elements("Output").Any(static output =>
+                    output.Attribute("TaskParameter")?.Value ==
+                        "HasStructuredError" &&
+                    output.Attribute("PropertyName")?.Value ==
+                        "_SharpProofVerifierHasStructuredError"),
+                Is.True);
+            Assert.That(
+                verifierExitError.Attribute("Condition")?.Value,
+                Does.Contain(
+                    "'$(_SharpProofVerifierHasStructuredError)' != 'true'"));
             Assert.That(verifyCore.Descendants("Exec"), Is.Empty);
             Assert.That(
                 runnerTask.Attribute("AssemblyFile")?.Value,

@@ -112,15 +112,104 @@ public sealed class BuildTaskTests
         {
             Assert.That(
                 engine.Warnings.Select(static warning => warning.Code),
-                Is.EqualTo((string[])["SP0047", "SP0048", "SP0047"]));
+                Is.EqualTo((string[])["SP0047", "SP0048"]));
             Assert.That(engine.Warnings[0].File, Is.EqualTo("source.cs"));
             Assert.That(engine.Warnings[0].LineNumber, Is.EqualTo(12));
             Assert.That(engine.Warnings[0].ColumnNumber, Is.EqualTo(3));
-            Assert.That(engine.Warnings[2].LineNumber, Is.Zero);
-            Assert.That(engine.Warnings[2].ColumnNumber, Is.Zero);
+            Assert.That(
+                engine.Messages.Select(static message => message.Message),
+                Does.Contain("source.cs(x,3): warning SP0047: malformed location"));
             Assert.That(
                 engine.Messages.Select(static message => message.Message),
                 Does.Contain("worker stderr"));
+        }));
+    }
+
+    [Test]
+    public void VerifierDiagnosticGrammarPreservesMarkerLikePathsAndSeverity()
+    {
+        var engine = new RecordingBuildEngine();
+        var task = new RunVerifier { BuildEngine = engine };
+
+        task.LogStandardError(
+            "/tmp/source: warning SP0047: detail.cs(4,5): warning SP0048: assumptions" +
+            Environment.NewLine +
+            "punctuation (draft), v2.cs(7,9): error SP0047: incomplete: detail" +
+            Environment.NewLine +
+            "SharpProof: error SP0048: strict assumptions");
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(engine.Warnings, Has.Count.EqualTo(1));
+            Assert.That(engine.Warnings[0].Code, Is.EqualTo("SP0048"));
+            Assert.That(
+                engine.Warnings[0].File,
+                Is.EqualTo("/tmp/source: warning SP0047: detail.cs"));
+            Assert.That(engine.Warnings[0].LineNumber, Is.EqualTo(4));
+            Assert.That(engine.Warnings[0].ColumnNumber, Is.EqualTo(5));
+            Assert.That(engine.Warnings[0].Message, Is.EqualTo("assumptions"));
+
+            Assert.That(engine.Errors, Has.Count.EqualTo(2));
+            Assert.That(engine.Errors[0].Code, Is.EqualTo("SP0047"));
+            Assert.That(
+                engine.Errors[0].File,
+                Is.EqualTo("punctuation (draft), v2.cs"));
+            Assert.That(engine.Errors[0].LineNumber, Is.EqualTo(7));
+            Assert.That(engine.Errors[0].ColumnNumber, Is.EqualTo(9));
+            Assert.That(engine.Errors[1].Code, Is.EqualTo("SP0048"));
+            Assert.That(engine.Errors[1].File, Is.Empty);
+            Assert.That(task.HasStructuredError, Is.True);
+        }));
+    }
+
+    [Test]
+    public void StructuredVerifierDiagnosticsPreserveArbitraryPathText()
+    {
+        var engine = new RecordingBuildEngine();
+        var task = new RunVerifier { BuildEngine = engine };
+        var path = "/tmp/line\nbreak: warning SP0047: (draft), \u03c0.cs";
+        var warning = VerifierDiagnosticTransport.Serialize(
+            new VerifierDiagnostic(
+                "warning",
+                "SP0048",
+                path,
+                12,
+                14,
+                "assumptions: (user, trusted)"));
+        var error = VerifierDiagnosticTransport.Serialize(
+            new VerifierDiagnostic(
+                "error",
+                "SP0047",
+                string.Empty,
+                0,
+                0,
+                "strict incomplete"));
+        var unknown = warning.Replace(
+            "SP0048",
+            "SP9999",
+            StringComparison.Ordinal);
+
+        task.LogStandardError(
+            warning + Environment.NewLine +
+            error + Environment.NewLine +
+            unknown + Environment.NewLine +
+            VerifierDiagnosticTransport.Prefix + "{malformed");
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(engine.Warnings, Has.Count.EqualTo(1));
+            Assert.That(engine.Warnings[0].Code, Is.EqualTo("SP0048"));
+            Assert.That(engine.Warnings[0].File, Is.EqualTo(path));
+            Assert.That(engine.Warnings[0].LineNumber, Is.EqualTo(12));
+            Assert.That(engine.Warnings[0].ColumnNumber, Is.EqualTo(14));
+            Assert.That(
+                engine.Warnings[0].Message,
+                Is.EqualTo("assumptions: (user, trusted)"));
+            Assert.That(engine.Errors, Has.Count.EqualTo(1));
+            Assert.That(engine.Errors[0].Code, Is.EqualTo("SP0047"));
+            Assert.That(engine.Errors[0].File, Is.Empty);
+            Assert.That(task.HasStructuredError, Is.True);
+            Assert.That(engine.Messages, Has.Count.EqualTo(2));
         }));
     }
 

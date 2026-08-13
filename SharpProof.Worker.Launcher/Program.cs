@@ -402,7 +402,21 @@ internal static class Program
             : location.Path + FormattableString.Invariant(
                 $"({location.Line},{location.Column})");
         var diagnostic = prefix + ": " + severity + " " + id + ": " + message;
-        (severity == "info" ? Console.Out : Console.Error).WriteLine(diagnostic);
+        if (severity == "info")
+        {
+            Console.Out.WriteLine(diagnostic);
+            return;
+        }
+
+        Console.Error.WriteLine(VerifierDiagnosticTransport.Serialize(
+            new VerifierDiagnostic(
+                severity,
+                id,
+                location.Path ?? string.Empty,
+                location.Line,
+                location.Column,
+                message)));
+        Console.Out.WriteLine(diagnostic);
     }
 
     private static void PublishOutputs(

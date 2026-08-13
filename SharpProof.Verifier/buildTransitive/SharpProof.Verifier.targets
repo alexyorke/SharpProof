@@ -143,9 +143,11 @@
         WorkingDirectory="$(MSBuildProjectDirectory)">
       <Output TaskParameter="ExitCode"
               PropertyName="_SharpProofVerifierExitCode" />
+      <Output TaskParameter="HasStructuredError"
+              PropertyName="_SharpProofVerifierHasStructuredError" />
     </SharpProof.BuildTasks.RunVerifier>
     <RemoveDir Directories="$(_SharpProofInvocationDirectory)" />
-    <Error Condition="'$(_SharpProofVerifierExitCode)' != '0'"
+    <Error Condition="'$(_SharpProofVerifierExitCode)' != '0' AND '$(_SharpProofVerifierHasStructuredError)' != 'true'"
            Text="SharpProof verifier failed with exit code $(_SharpProofVerifierExitCode)." />
     <SharpProof.BuildTasks.ValidatePublishedVerificationResult
         RequestPath="$(SharpProofVerifyRequestFile)"
