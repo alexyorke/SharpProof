@@ -49,11 +49,10 @@ if (Test-Path -LiteralPath $output -PathType Leaf) {
     if ([int]$existing.schemaVersion -eq 2 -and
         [string]$existing.commit -eq $ExpectedCommit -and
         [string]$existing.configuration -eq $Configuration -and
-        [string]$existing.selection -eq 'full' -and
-        [int]$existing.catalogCount -eq $catalogCount -and
-        [string]$existing.catalogSha256 -eq $catalogSha256 -and
-        [int]$existing.mutationCount -eq $catalogCount -and
-        [int]$existing.killedCount -eq $catalogCount) {
+        [string]$existing.selection -eq 'full') {
+        & (Join-Path $PSScriptRoot 'Test-SharpProofMutationCatalog.ps1') `
+            -EvidencePath $output `
+            -ExpectedCommit $ExpectedCommit
         Write-Host "Mutation evidence is already complete: $output"
         return
     }

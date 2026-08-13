@@ -1735,6 +1735,12 @@ try {
                 selectedTests = $testEvidence.testLedger
                 log = "mutation-logs/$runId/$($mutation.Name)-test.log"
                 trx = "mutation-logs/$runId/$testTrxName"
+                logSha256 = (Get-FileHash `
+                    -LiteralPath $testLog `
+                    -Algorithm SHA256).Hash.ToLowerInvariant()
+                trxSha256 = (Get-FileHash `
+                    -LiteralPath $testTrx `
+                    -Algorithm SHA256).Hash.ToLowerInvariant()
             }
             if ($MutationShardCount -gt 1) {
                 $result | Add-Member -NotePropertyName catalogOrdinal `

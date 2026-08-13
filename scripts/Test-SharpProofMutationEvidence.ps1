@@ -98,6 +98,220 @@ function Assert-Throws {
     }
 }
 
+function Test-MutationReuseValidation {
+    $repository = Join-Path $fixtureRoot 'reuse-repository'
+    $scripts = Join-Path $repository 'scripts'
+    $contractDirectory = Join-Path $repository 'eng/acceptance'
+    $evidenceDirectory = Join-Path $repository 'artifacts/mutation'
+    $receiptDirectory = Join-Path $evidenceDirectory 'receipts'
+    New-Item -ItemType Directory -Path `
+        $scripts, $contractDirectory, $receiptDirectory, `
+        (Join-Path $repository 'Project') -Force | Out-Null
+    foreach ($name in @(
+            'Invoke-SharpProofTrustedMutationsParallel.ps1',
+            'Test-SharpProofMutationCatalog.ps1',
+            'SharpProof.MutationEvidence.psm1',
+            'SharpProof.ContainerExecution.psm1')) {
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) `
+            -Destination (Join-Path $scripts $name)
+    }
+    [IO.File]::WriteAllText(
+        (Join-Path $scripts 'Test-SharpProofTrustedMutations.ps1'),
+        "Set-Content -LiteralPath (Join-Path `$PSScriptRoot '../campaign-launched') -Value launched`nthrow 'campaign launched'`n",
+        [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText(
+        (Join-Path $repository '.gitignore'),
+        "/artifacts/`n",
+        [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText(
+        (Join-Path $repository 'Project/Source.cs'),
+        "internal static class Source { }`n",
+        [Text.UTF8Encoding]::new($false))
+
+    $catalog = @(
+        [pscustomobject][ordered]@{
+            Name = 'first-mutation'
+            File = 'Project/Source.cs'
+            Project = 'Project.Test/Project.Test.csproj'
+            Filter = 'FullyQualifiedName~FirstTest'
+            Original = 'before-one'
+            Mutated = 'after-one'
+        },
+        [pscustomobject][ordered]@{
+            Name = 'second-mutation'
+            File = 'Project/Source.cs'
+            Project = 'Project.Test/Project.Test.csproj'
+            Filter = 'FullyQualifiedName~SecondTest'
+            Original = 'before-two'
+            Mutated = 'after-two'
+        })
+    $catalogSha256 = Get-SharpProofMutationCatalogSha256 -Mutations $catalog
+    [pscustomobject]@{
+        mutationEvidence = [ordered]@{
+            expectedCatalogCount = $catalog.Count
+            expectedCatalogSha256 = $catalogSha256
+        }
+        automation = [ordered]@{
+            mutationParallelism = 1
+            mutationShardWallSeconds = 30
+        }
+    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (
+        Join-Path $contractDirectory 'contract.json') -Encoding utf8NoBOM
+
+    $zeroInfrastructure = 'error="0" timeout="0" aborted="0" inconclusive="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" passedButRunAborted="0"'
+    $results = @()
+    for ($index = 0; $index -lt $catalog.Count; $index++) {
+        $entry = $catalog[$index]
+        $method = ([string]$entry.Filter).Substring(
+            'FullyQualifiedName~'.Length)
+        $identity = "Fixture.Tests.$method|$method"
+        $parts = New-TestParts `
+            -Outcome Failed `
+            -Message "Assert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2" `
+            -Method $method `
+            -DisplayName $method `
+            -Class 'Fixture.Tests' `
+            -TestId "test-$index" `
+            -ExecutionId "execution-$index"
+        $trx = Join-Path $receiptDirectory ($entry.Name + '.trx')
+        $log = Join-Path $receiptDirectory ($entry.Name + '.log')
+        $xml = @"
+<TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <TestDefinitions>$($parts.Definition)</TestDefinitions>
+  <TestEntries>$($parts.Entry)</TestEntries>
+  <Results>$($parts.Result)</Results>
+  <ResultSummary outcome="Failed"><Counters total="1" executed="1" passed="0" failed="1" $zeroInfrastructure /></ResultSummary>
+</TestRun>
+"@
+        [IO.File]::WriteAllText(
+            $trx, $xml, [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText(
+            $log, "assertion-backed failure`n", [Text.UTF8Encoding]::new($false))
+        $results += [pscustomobject][ordered]@{
+            name = $entry.Name
+            file = $entry.File
+            test = $entry.Filter
+            project = $entry.Project
+            original = $entry.Original
+            mutated = $entry.Mutated
+            killed = $true
+            exitCode = 1
+            executedCount = 1
+            failedCount = 1
+            assertionFailureCount = 1
+            selectedTests = @($identity)
+            log = "receipts/$($entry.Name).log"
+            trx = "receipts/$($entry.Name).trx"
+            logSha256 = (Get-FileHash -LiteralPath $log -Algorithm SHA256).Hash.ToLowerInvariant()
+            trxSha256 = (Get-FileHash -LiteralPath $trx -Algorithm SHA256).Hash.ToLowerInvariant()
+        }
+    }
+
+    & git -C $repository init --quiet
+    & git -C $repository config user.email fixture@sharpproof.test
+    & git -C $repository config user.name 'SharpProof Fixture'
+    & git -C $repository add -- .
+    & git -C $repository commit --quiet -m fixture
+    $commit = (& git -C $repository rev-parse HEAD).Trim()
+    $evidencePath = Join-Path $evidenceDirectory 'trusted-mutations.json'
+    $campaignSentinel = Join-Path $repository 'campaign-launched'
+
+    function New-CompleteEvidence {
+        return [pscustomobject][ordered]@{
+            schemaVersion = 2
+            commit = $commit
+            configuration = 'Release'
+            selection = 'full'
+            catalogCount = $catalog.Count
+            catalogSha256 = $catalogSha256
+            mutationCount = $catalog.Count
+            killedCount = $catalog.Count
+            mutations = @($results | ForEach-Object {
+                    $_ | ConvertTo-Json -Depth 5 | ConvertFrom-Json
+                })
+        }
+    }
+
+    function Invoke-ReuseCase {
+        param(
+            [Parameter(Mandatory = $true)][string]$Name,
+            [Parameter(Mandatory = $true)][object]$Evidence,
+            [bool]$ExpectSuccess = $false,
+            [bool]$Dirty = $false
+        )
+        $Evidence | ConvertTo-Json -Depth 6 | Set-Content `
+            -LiteralPath $evidencePath -Encoding utf8NoBOM
+        Remove-Item -LiteralPath $campaignSentinel `
+            -Force -ErrorAction SilentlyContinue
+        if ($Dirty) {
+            Add-Content -LiteralPath (Join-Path $repository 'Project/Source.cs') `
+                -Value '// dirty'
+        }
+        try {
+            $caseOutput = & pwsh -NoLogo -NoProfile -File (
+                Join-Path $scripts 'Invoke-SharpProofTrustedMutationsParallel.ps1') `
+                -Configuration Release `
+                -OutputPath 'artifacts/mutation/trusted-mutations.json' `
+                -ExpectedCommit $commit `
+                -Parallelism 1 2>&1
+            $exitCode = $LASTEXITCODE
+        }
+        finally {
+            if ($Dirty) {
+                & git -C $repository checkout -- Project/Source.cs
+            }
+        }
+        if ($ExpectSuccess) {
+            if ($exitCode -ne 0 -or
+                [string]::Join("`n", @($caseOutput)) -notlike `
+                    '*Mutation evidence is already complete*') {
+                throw "Valid mutation reuse failed for '$Name': $caseOutput"
+            }
+        }
+        elseif ($exitCode -eq 0) {
+            throw "Forged mutation reuse was accepted for '$Name'."
+        }
+        if (Test-Path -LiteralPath $campaignSentinel) {
+            throw "Mutation campaign launched while validating '$Name'."
+        }
+    }
+
+    $empty = New-CompleteEvidence
+    $empty.mutations = @()
+    Invoke-ReuseCase -Name empty-mutations -Evidence $empty
+
+    $duplicate = New-CompleteEvidence
+    $duplicate.mutations[1] = $duplicate.mutations[0]
+    Invoke-ReuseCase -Name duplicate-row -Evidence $duplicate
+
+    $wrongName = New-CompleteEvidence
+    $wrongName.mutations[0].name = 'wrong-name'
+    Invoke-ReuseCase -Name wrong-name -Evidence $wrongName
+
+    $missingName = New-CompleteEvidence
+    $missingName.mutations[0].PSObject.Properties.Remove('name')
+    Invoke-ReuseCase -Name missing-name -Evidence $missingName
+
+    foreach ($missing in @(
+            @{ Name = 'missing-log'; Property = 'log'; Delete = $false },
+            @{ Name = 'missing-trx'; Property = 'trx'; Delete = $false },
+            @{ Name = 'missing-log-digest'; Property = 'logSha256'; Delete = $false },
+            @{ Name = 'missing-trx-digest'; Property = 'trxSha256'; Delete = $false })) {
+        $candidate = New-CompleteEvidence
+        $candidate.mutations[0].PSObject.Properties.Remove($missing.Property)
+        Invoke-ReuseCase -Name $missing.Name -Evidence $candidate
+    }
+
+    Invoke-ReuseCase `
+        -Name dirty-tree `
+        -Evidence (New-CompleteEvidence) `
+        -Dirty $true
+    Invoke-ReuseCase `
+        -Name valid-complete `
+        -Evidence (New-CompleteEvidence) `
+        -ExpectSuccess $true
+}
+
 $zeroInfrastructure = 'error="0" timeout="0" aborted="0" inconclusive="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" passedButRunAborted="0"'
 
 try {
@@ -861,6 +1075,7 @@ try {
             -ExpectedMethodName ExpectedTest
     }
 
+    Test-MutationReuseValidation
     Write-Host 'Mutation evidence behavioral fixtures passed.'
 }
 finally {
