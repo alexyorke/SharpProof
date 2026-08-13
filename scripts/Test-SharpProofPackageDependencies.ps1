@@ -55,6 +55,26 @@ function Get-SharpProofNuspecDependencyModel {
         $licenseExpression = $license.InnerText
     }
 
+    $publicMetadata = [ordered]@{}
+    foreach ($name in @('authors', 'projectUrl', 'description', 'tags')) {
+        $nodes = @($metadata.SelectNodes("n:$name", $manager))
+        if ($nodes.Count -gt 1) {
+            throw "Package '$PackagePath' has duplicate '$name' metadata."
+        }
+        if ($nodes.Count -eq 0) {
+            $publicMetadata[$name] = $null
+            continue
+        }
+        $node = $nodes[0]
+        if ($node.Attributes.Count -ne 0 -or
+            $node.ChildNodes.Count -ne 1 -or
+            $node.ChildNodes[0].NodeType -ne [Xml.XmlNodeType]::Text -or
+            [string]::IsNullOrWhiteSpace($node.InnerText)) {
+            throw "Package '$PackagePath' has invalid '$name' metadata form."
+        }
+        $publicMetadata[$name] = $node.InnerText
+    }
+
     $groups = [Collections.Generic.List[object]]::new()
     $dependenciesNodes = @(
         $metadata.SelectNodes('n:dependencies', $manager)
@@ -97,6 +117,7 @@ function Get-SharpProofNuspecDependencyModel {
         Id = $idNode.InnerText
         Version = $versionNode.InnerText
         LicenseExpression = $licenseExpression
+        PublicMetadata = [pscustomobject]$publicMetadata
         DependencyGroups = @($groups)
     }
 }
@@ -158,6 +179,17 @@ function Get-SharpProofPackageDependencyGraph {
                 $actualLicense -cne
                     [string]$expected[0].licenseExpression)) {
             throw "Package '$($model.Nuspec.Id)' has an invalid license expression."
+        }
+        foreach ($name in @('authors', 'projectUrl', 'description', 'tags')) {
+            $actual = [string]$model.Nuspec.PublicMetadata.$name
+            $wanted = [string]$expected[0].publicMetadata.$name
+            if (($model.Extension -eq '.nupkg' -and
+                    $actual -cne $wanted) -or
+                ($model.Extension -eq '.snupkg' -and
+                    -not [string]::IsNullOrEmpty($actual) -and
+                    $actual -cne $wanted)) {
+                throw "Package '$($model.Nuspec.Id)' has invalid '$name' metadata."
+            }
         }
         $expectedGroups = @($expected[0].dependencyGroups)
         $actualGroups = @($model.Nuspec.DependencyGroups)

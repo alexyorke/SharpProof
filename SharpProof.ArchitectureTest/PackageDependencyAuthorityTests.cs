@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 using NUnit.Framework;
@@ -63,6 +64,51 @@ public sealed class PackageDependencyAuthorityTests
         var root = Path.Combine(
             Path.GetTempPath(),
             "sharpproof-licenses-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var paths = WritePackageGraph(root, mutation);
+            var result = await RunAuthorityAsync(paths);
+            Assert.That(
+                result.ExitCode == 0,
+                Is.EqualTo(expectedSuccess),
+                result.Output);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [TestCase("canonical", true)]
+    [TestCase("metadata-authors-missing", false)]
+    [TestCase("metadata-authors-changed", false)]
+    [TestCase("metadata-authors-duplicate", false)]
+    [TestCase("metadata-authors-case", false)]
+    [TestCase("metadata-authors-form", false)]
+    [TestCase("metadata-projectUrl-missing", false)]
+    [TestCase("metadata-projectUrl-changed", false)]
+    [TestCase("metadata-projectUrl-duplicate", false)]
+    [TestCase("metadata-projectUrl-case", false)]
+    [TestCase("metadata-projectUrl-form", false)]
+    [TestCase("metadata-description-missing", false)]
+    [TestCase("metadata-description-changed", false)]
+    [TestCase("metadata-description-duplicate", false)]
+    [TestCase("metadata-description-case", false)]
+    [TestCase("metadata-description-form", false)]
+    [TestCase("metadata-tags-missing", false)]
+    [TestCase("metadata-tags-changed", false)]
+    [TestCase("metadata-tags-duplicate", false)]
+    [TestCase("metadata-tags-case", false)]
+    [TestCase("metadata-tags-form", false)]
+    [TestCase("metadata-symbol-mismatch", false)]
+    public async Task PublicPackageMetadataMatchesTheExactCatalog(
+        string mutation,
+        bool expectedSuccess)
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "sharpproof-metadata-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
         {
@@ -146,7 +192,8 @@ public sealed class PackageDependencyAuthorityTests
                 var effectiveMutation = mutation;
                 if (extension == ".snupkg" &&
                     mutation is not "symbol-mismatch" and
-                        not "license-symbol-mismatch")
+                        not "license-symbol-mismatch" and
+                        not "metadata-symbol-mismatch")
                 {
                     effectiveMutation = "canonical";
                 }
@@ -162,12 +209,20 @@ public sealed class PackageDependencyAuthorityTests
                         ? "license-apache"
                         : "canonical";
                 }
+                else if (mutation == "metadata-symbol-mismatch")
+                {
+                    effectiveMutation = extension == ".snupkg"
+                        ? "metadata-authors-changed"
+                        : "canonical";
+                }
                 var dependencies = DependencyXml(id, effectiveMutation);
                 var license = LicenseXml(id, effectiveMutation);
+                var publicMetadata = PublicMetadataXml(id, effectiveMutation);
                 if (extension == ".snupkg" &&
                     effectiveMutation == "canonical")
                 {
                     license = string.Empty;
+                    publicMetadata = string.Empty;
                 }
                 var path = Path.Combine(root, id + extension);
                 using var archive = ZipFile.Open(
@@ -184,6 +239,7 @@ public sealed class PackageDependencyAuthorityTests
                         <id>{{id}}</id>
                         <version>{{Version}}</version>
                         {{license}}
+                        {{publicMetadata}}
                         {{dependencies}}
                       </metadata>
                     </package>
@@ -211,6 +267,75 @@ public sealed class PackageDependencyAuthorityTests
             "license-spelling" => "<license type=\"expression\">MITT</license>",
             _ => "<license type=\"expression\">MIT</license>"
         };
+    }
+
+    private static string PublicMetadataXml(string id, string mutation)
+    {
+        var values = id switch
+        {
+            "SharpProof.Attributes" => new Dictionary<string, string>
+            {
+                ["authors"] = "Alex Yorke",
+                ["projectUrl"] = "https://github.com/alexyorke/SharpProof",
+                ["description"] = "Contains SharpProof contracts for compiler-bound Requires, Ensures, Assume, Result, and Old expressions; closed contract attributes; suppressions and trust declarations; and composable method effects.",
+                ["tags"] = "SharpProof Attributes Contracts Purity StaticAnalysis MethodEffects Capabilities ZeroAllocations Exceptions Preconditions Postconditions"
+            },
+            "SharpProof.Verifier" => new Dictionary<string, string>
+            {
+                ["authors"] = "Alex Yorke",
+                ["projectUrl"] = "https://github.com/alexyorke/SharpProof",
+                ["description"] = "Container-only Linux amd64 postcondition verifier for SharpProof, including the worker, launcher, MSBuild integration, and the pinned native Z3 payload.",
+                ["tags"] = "SharpProof Verifier Contracts SMT Z3 Linux Container x64"
+            },
+            _ => new Dictionary<string, string>
+            {
+                ["authors"] = "Alex Yorke",
+                ["projectUrl"] = "https://github.com/alexyorke/SharpProof",
+                ["description"] = "Portable SharpProof Roslyn analysis and contract generation for bounded effect contracts, compiler-bound preconditions, and accountable postcondition verification. Unsupported selected code remains visibly incomplete.",
+                ["tags"] = "SharpProof Roslyn Analyzer Purity StaticAnalysis MethodEffects Capabilities ZeroAllocations ExceptionContracts Preconditions Contracts"
+            }
+        };
+        var parts = mutation.Split('-');
+        var mutatedField = parts.Length >= 3 && parts[0] == "metadata"
+            ? parts[1]
+            : null;
+        var operation = parts.Length >= 3 ? parts[2] : null;
+        var builder = new StringBuilder();
+        foreach (var pair in values)
+        {
+            if (id == "SharpProof" && pair.Key == mutatedField &&
+                operation == "missing")
+            {
+                continue;
+            }
+            var value = id == "SharpProof" && pair.Key == mutatedField
+                ? operation switch
+                {
+                    "changed" => "Fabricated metadata",
+                    "case" => pair.Value.ToUpperInvariant(),
+                    _ => pair.Value
+                }
+                : pair.Value;
+            if (id == "SharpProof" && pair.Key == mutatedField &&
+                operation == "form")
+            {
+                builder.Append(
+                    CultureInfo.InvariantCulture,
+                    $"<{pair.Key} xml:lang=\"en\">{value}</{pair.Key}>");
+                continue;
+            }
+            builder.Append(
+                CultureInfo.InvariantCulture,
+                $"<{pair.Key}>{value}</{pair.Key}>");
+            if (id == "SharpProof" && pair.Key == mutatedField &&
+                operation == "duplicate")
+            {
+                builder.Append(
+                    CultureInfo.InvariantCulture,
+                    $"<{pair.Key}>{value}</{pair.Key}>");
+            }
+        }
+        return builder.ToString();
     }
 
     private static string DependencyXml(string id, string mutation)
