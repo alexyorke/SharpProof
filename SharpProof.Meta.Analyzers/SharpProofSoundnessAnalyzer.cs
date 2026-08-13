@@ -68,6 +68,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             startContext.RegisterOperationAction(c => AnalyzeInvocation(c, symbols), OperationKind.Invocation);
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, symbols), OperationKind.ObjectCreation);
             startContext.RegisterOperationAction(AnalyzeBinaryOperation, OperationKind.BinaryOperator);
+            startContext.RegisterOperationAction(
+                AnalyzeInterpolatedString,
+                OperationKind.InterpolatedString);
             startContext.RegisterSymbolAction(AnalyzeField, SymbolKind.Field);
             startContext.RegisterSymbolAction(AnalyzeProperty, SymbolKind.Property);
             startContext.RegisterSymbolAction(AnalyzeEvent, SymbolKind.Event);
@@ -231,6 +234,36 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         if (fragment != null)
         {
             Report(context, MetaDiagnosticDescriptors.CSharpExpressionText, binary.Syntax.GetLocation(), fragment);
+        }
+    }
+
+    private static void AnalyzeInterpolatedString(
+        OperationAnalysisContext context)
+    {
+        var interpolated = (IInterpolatedStringOperation)context.Operation;
+        if (!interpolated.Parts.Any(static part =>
+                part is IInterpolationOperation))
+        {
+            return;
+        }
+
+        foreach (var part in interpolated.Parts)
+        {
+            if (part is not IInterpolatedStringTextOperation text)
+            {
+                continue;
+            }
+
+            var fragment = GetCSharpExpressionFragment(text.Text);
+            if (fragment != null)
+            {
+                Report(
+                    context,
+                    MetaDiagnosticDescriptors.CSharpExpressionText,
+                    interpolated.Syntax.GetLocation(),
+                    fragment);
+                return;
+            }
         }
     }
 

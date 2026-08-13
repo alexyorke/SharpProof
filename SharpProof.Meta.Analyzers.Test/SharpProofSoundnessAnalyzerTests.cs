@@ -291,6 +291,44 @@ public sealed class SharpProofSoundnessAnalyzerTests
             Does.Contain(expectedId));
     }
 
+    [TestCaseSource(nameof(CSharpExpressionConstructionCases))]
+    public async Task ReportsCSharpExpressionTextConstruction(string source)
+    {
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA009"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task AllowsOrdinaryInterpolatedFormattingAndValueDecoys()
+    {
+        const string source =
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                private const string Fragment = " is not null";
+                internal static string Ordinary(string name) =>
+                    $"Name: {name}";
+                internal static string Formatted(int value) =>
+                    $"Value: {value:D}";
+                internal static string Aligned(string value) =>
+                    $"Value: {value,10}";
+                internal static string ValueOnly() => $"{Fragment}";
+                internal static string FormatDecoy(int value) =>
+                    $"{value: is not null}";
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SPMETA009"));
+    }
+
     [Test]
     public async Task AllowsImmutableStateAndCancellationRethrow()
     {
@@ -1625,6 +1663,58 @@ public sealed class SharpProofSoundnessAnalyzerTests
         return await compilation
             .WithAnalyzers([new SharpProofSoundnessAnalyzer()])
             .GetAnalyzerDiagnosticsAsync();
+    }
+
+    private static IEnumerable<TestCaseData>
+        CSharpExpressionConstructionCases()
+    {
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(string name) =>
+                    $"({name}) is not null";
+            }
+            """).SetName("InterpolatedExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M() => $"({42}) is not null";
+            }
+            """).SetName("ConstantInterpolationExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(int value) =>
+                    $"({value:D}) is not null";
+            }
+            """).SetName("FormattedInterpolationExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(int value) =>
+                    $"({value,10}) is not null";
+            }
+            """).SetName("AlignedInterpolationExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(string name) =>
+                    $"\"{name}\" is not null";
+            }
+            """).SetName("EscapedInterpolationExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(string name) =>
+                    "(" + name + ") is not null";
+            }
+            """).SetName("ConcatenatedExpressionTextRemainsRejected");
     }
 
     private static IEnumerable<MetadataReference> PlatformReferences()
