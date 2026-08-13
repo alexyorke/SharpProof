@@ -143,6 +143,12 @@ internal sealed partial class SharpProofAnalyzerEngine
                     SyntaxKind.StructDeclaration,
                     SyntaxKind.RecordDeclaration,
                     SyntaxKind.RecordStructDeclaration);
+                context.RegisterSyntaxNodeAction(
+                    syntaxContext =>
+                        AnalyzerFeaturePipeline.AnalyzeMemberInitializer(
+                            syntaxContext,
+                            session),
+                    SyntaxKind.EqualsValueClause);
             }
             if (activation.RequiresFullOperationAnalysis)
             {

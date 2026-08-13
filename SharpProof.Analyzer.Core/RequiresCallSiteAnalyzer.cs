@@ -94,6 +94,42 @@ internal static partial class RequiresCallSiteAnalyzer
             .AnalyzeCallSite(call);
     }
 
+    internal static AnalyzerSemanticOutcome AnalyzeInitializerCall(
+        IMethodSymbol constructor,
+        EqualsValueClauseSyntax initializer,
+        IOperation operation,
+        SemanticModel semanticModel,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken)
+    {
+        var target = operation switch
+        {
+            IInvocationOperation invocation => invocation.TargetMethod,
+            IObjectCreationOperation creation => creation.Constructor,
+            _ => null
+        };
+        if (target == null)
+        {
+            return AnalyzerSemanticOutcome.NotApplicable;
+        }
+        var instance = (operation as IInvocationOperation)?.Instance;
+        var arguments = operation switch
+        {
+            IInvocationOperation invocation => invocation.Arguments,
+            IObjectCreationOperation creation => creation.Arguments,
+            _ => default
+        };
+        var call = new RequiresCallSiteCandidate(
+            operation, target, instance, arguments, CanReplay: true,
+            Flow: null, ManagedFlowStatus.BudgetExceeded);
+        return new Analysis(
+                constructor, initializer, semanticModel, session,
+                reportDiagnostic, graph: null, operationRoot: operation,
+                cancellationToken)
+            .AnalyzeCallSite(call, requireCallerOwnership: false);
+    }
+
     private sealed class Analysis(
         IMethodSymbol caller,
         SyntaxNode declaration,
@@ -142,9 +178,10 @@ internal static partial class RequiresCallSiteAnalyzer
         }
 
         internal AnalyzerSemanticOutcome AnalyzeCallSite(
-            RequiresCallSiteCandidate candidate)
+            RequiresCallSiteCandidate candidate,
+            bool requireCallerOwnership = true)
         {
-            if (!SymbolEqualityComparer.Default.Equals(
+            if (requireCallerOwnership && !SymbolEqualityComparer.Default.Equals(
                     semanticModel.GetEnclosingSymbol(
                         candidate.Operation.Syntax.SpanStart, cancellationToken),
                     caller))

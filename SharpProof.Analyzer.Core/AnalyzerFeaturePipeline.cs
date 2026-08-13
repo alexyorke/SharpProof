@@ -287,6 +287,61 @@ internal static partial class AnalyzerFeaturePipeline
         session.RecordSemanticOutcome(constructor, outcome);
     }
 
+    internal static void AnalyzeMemberInitializer(
+        SyntaxNodeAnalysisContext context,
+        AnalyzerSession session)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        if (context.Node is not EqualsValueClauseSyntax initializer ||
+            initializer.Parent is not VariableDeclaratorSyntax and not PropertyDeclarationSyntax ||
+            AnalyzerGeneratedCodePolicy.IsGenerated(
+                initializer.SyntaxTree, context.Compilation, context.CancellationToken))
+        {
+            return;
+        }
+        var symbol = initializer.Parent switch
+        {
+            VariableDeclaratorSyntax variable => context.SemanticModel.GetDeclaredSymbol(
+                variable, context.CancellationToken),
+            PropertyDeclarationSyntax property => context.SemanticModel.GetDeclaredSymbol(
+                property, context.CancellationToken),
+            _ => null
+        };
+        if (symbol is not IFieldSymbol and not IPropertySymbol ||
+            symbol.ContainingType is not { } type)
+        {
+            return;
+        }
+        var isStatic = symbol.IsStatic;
+        var constructor = (isStatic
+                ? type.StaticConstructors
+                : type.InstanceConstructors)
+            .OrderBy(static candidate => candidate.DeclaringSyntaxReferences
+                .FirstOrDefault()?.Span.Start ?? int.MaxValue)
+            .FirstOrDefault();
+        var root = context.SemanticModel.GetOperation(
+            initializer.Value, context.CancellationToken);
+        if (constructor == null || root == null)
+        {
+            return;
+        }
+        var outcome = AnalyzerSemanticOutcome.NotApplicable;
+        foreach (var operation in root.DescendantsAndSelf())
+        {
+            if (operation is not IInvocationOperation and not IObjectCreationOperation)
+            {
+                continue;
+            }
+            outcome = AnalyzerSemanticOutcomes.Combine(
+                outcome,
+                RequiresCallSiteAnalyzer.AnalyzeInitializerCall(
+                    constructor, initializer, operation,
+                    context.SemanticModel, session,
+                    context.ReportDiagnostic, context.CancellationToken));
+        }
+        session.RecordSemanticOutcome(constructor, outcome);
+    }
+
     private static bool ValidateContractClauses(
         IMethodSymbol method,
         AnalyzerSession session,
