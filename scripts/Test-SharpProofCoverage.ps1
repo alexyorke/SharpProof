@@ -283,11 +283,16 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
             throw "Declaration-only TCB coverage path is not canonical: '$declarationOnlyPath'."
         }
     }
-    $diffTarget = if ($IncludeWorkingTree) {
-        $ComparisonRef
-    }
-    else {
-        "$ComparisonRef...HEAD"
+    $diffTarget = "$ComparisonRef...HEAD"
+    if ($IncludeWorkingTree) {
+        $mergeBaseOutput = @(& git -C $repositoryRoot merge-base `
+            $ComparisonRef HEAD)
+        if ($LASTEXITCODE -ne 0 -or
+            $mergeBaseOutput.Count -ne 1 -or
+            [string]::IsNullOrWhiteSpace([string]$mergeBaseOutput[0])) {
+            throw "Could not resolve the merge base for comparison ref '$ComparisonRef'."
+        }
+        $diffTarget = ([string]$mergeBaseOutput[0]).Trim()
     }
     $diff = & git -C $repositoryRoot diff `
         --unified=0 `
