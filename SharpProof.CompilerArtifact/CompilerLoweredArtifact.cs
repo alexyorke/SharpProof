@@ -294,6 +294,11 @@ internal static class CompilerLoweredArtifact
             variables,
             artifact.Clauses.Length,
             compilation);
+        if (postconditionClaims.Length != 0 && body == null)
+        {
+            throw new InvalidDataException(
+                "A successful postcondition callable requires a lowered body.");
+        }
         return new CompilerCallablePreparation(
             decoded.Factory, entry, clauses, variables, WorkerClaimReason.None, body)
         {
@@ -429,6 +434,8 @@ internal static class CompilerLoweredArtifact
         {
             throw new InvalidDataException("A lowered program body is invalid.");
         }
+
+        ValidateExecutableBody(graph.Program, variables);
 
         var canonical = new HashSet<IrVarId>(variables.Select(static item => item.Variable));
         var parameters = new HashSet<IrVarId>(variables
@@ -598,6 +605,82 @@ internal static class CompilerLoweredArtifact
             bindings.ToImmutable(),
             specs.ToImmutable(),
             summaries.ToImmutable());
+    }
+
+    private static void ValidateExecutableBody(
+        IrProgram program,
+        ImmutableArray<CompilerCanonicalVariable> variables)
+    {
+        const int maximumReachableBlocks = 64;
+        var blocks = program.Blocks.ToDictionary(static block => block.Id);
+        var colors = new Dictionary<IrBlockId, byte>();
+        var reachable = 0;
+        var resultType = variables
+            .SingleOrDefault(static item =>
+                item.Role == CompilerVariableRole.Result) is { } result
+            ? program.Factory.GetVariableInfo(result.Variable).Type
+            : (IrTypeId?)null;
+
+        if (!Visit(program.Entry))
+        {
+            throw new InvalidDataException(
+                "A lowered program body is cyclic or exceeds its reachable block limit.");
+        }
+
+        bool Visit(IrBlockId blockId)
+        {
+            if (colors.TryGetValue(blockId, out var color))
+            {
+                return color == 2;
+            }
+
+            if (++reachable > maximumReachableBlocks ||
+                !blocks.TryGetValue(blockId, out var block) ||
+                block.Instructions.IsDefaultOrEmpty)
+            {
+                return false;
+            }
+
+            colors.Add(blockId, 1);
+            var terminator = block.Instructions[block.Instructions.Length - 1];
+            if (terminator is IrReturnInstruction returned)
+            {
+                if (resultType.HasValue &&
+                    (returned.Value == null ||
+                     returned.Value.Type != resultType.Value))
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                foreach (var successor in Successors(terminator))
+                {
+                    if (!Visit(successor))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            colors[blockId] = 2;
+            return true;
+        }
+
+        static ImmutableArray<IrBlockId> Successors(IrInstruction terminator)
+        {
+            return terminator switch
+            {
+                IrBranchInstruction branch when
+                    branch.WhenTrue == branch.WhenFalse => [branch.WhenTrue],
+                IrBranchInstruction branch =>
+                    [branch.WhenTrue, branch.WhenFalse],
+                IrGotoInstruction go => [go.Target],
+                IrReturnInstruction => [],
+                _ => throw new InvalidDataException(
+                    "A lowered block does not end in a terminator.")
+            };
+        }
     }
 
     internal static HashSet<IrVarId> CollectProgramVariables(

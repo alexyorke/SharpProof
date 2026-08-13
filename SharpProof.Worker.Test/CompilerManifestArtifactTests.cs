@@ -486,6 +486,143 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void ReachableCycleFailsCanonicalLoweredBodyHydration()
+    {
+        var artifact = CreateContractArtifact();
+        var graph = artifact.Callables[0].Graph!;
+        var block = graph.Blocks[graph.Entry];
+        var terminal = block.Instructions[^1];
+        Assert.That(terminal.Kind, Is.EqualTo(IrInstructionKind.Return));
+        block.Instructions[^1] = new PortableIrInstruction(
+            IrInstructionKind.Goto,
+            terminal.Operation,
+            a: 0);
+
+        var resealed = CanonicalRoundTrip(artifact);
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(resealed)));
+    }
+
+    [TestCase(64, false)]
+    [TestCase(65, true)]
+    public void ReachableBlockLimitIsExactDuringCanonicalHydration(
+        int blockCount,
+        bool malformed)
+    {
+        var artifact = CreateContractArtifact();
+        ReplaceWithLinearBody(artifact.Callables[0].Graph!, blockCount);
+        var resealed = CanonicalRoundTrip(artifact);
+
+        if (malformed)
+        {
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerManifestArtifactJson.DecodeCallables(resealed)));
+        }
+        else
+        {
+            Assert.DoesNotThrow((Action)(() =>
+                CompilerManifestArtifactJson.DecodeCallables(resealed)));
+        }
+    }
+
+    [Test]
+    public void UnreachableCycleDoesNotConsumeTheReachableBodyBudget()
+    {
+        var artifact = CreateContractArtifact();
+        var graph = artifact.Callables[0].Graph!;
+        var terminal = graph.Blocks[0].Instructions[^1];
+        var unreachable = graph.Blocks.Length;
+        graph.Blocks = [
+            .. graph.Blocks,
+            new PortableIrBlock(
+                instructions: [new PortableIrInstruction(
+                    IrInstructionKind.Goto,
+                    terminal.Operation,
+                    a: unreachable)])
+        ];
+
+        var resealed = CanonicalRoundTrip(artifact);
+
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(resealed)));
+    }
+
+    [Test]
+    public void SuccessfulPostconditionCallableRequiresALoweredBody()
+    {
+        var artifact = CreateContractArtifact();
+        var callable = artifact.Callables[0];
+        callable.Body = null;
+        callable.Graph!.HasProgram = false;
+        callable.Graph.Blocks = [];
+        callable.Graph.Entry = -1;
+
+        var resealed = CanonicalRoundTrip(artifact);
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(resealed)));
+    }
+
+    [Test]
+    public void SuccessfulCallableWithoutPostconditionsMayRemainBodyless()
+    {
+        var requiresOnly = CreateContractArtifact(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Identity(int value) {
+                    Contract.Requires(value >= 0);
+                    return value;
+                }
+            }
+            """);
+        var effectOnly = CreateEffectArtifact();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(requiresOnly.Callables[0].Body, Is.Null);
+            Assert.That(effectOnly.Callables[0].Body, Is.Null);
+            Assert.DoesNotThrow((Action)(() =>
+                CompilerManifestArtifactJson.DecodeCallables(
+                    CanonicalRoundTrip(requiresOnly))));
+            Assert.DoesNotThrow((Action)(() =>
+                CompilerManifestArtifactJson.DecodeCallables(
+                    CanonicalRoundTrip(effectOnly))));
+        }
+    }
+
+    [Test]
+    public void ValueReturningBodyRequiresAnExactReturnValue()
+    {
+        var missing = CreateContractArtifact();
+        var missingReturn = missing.Callables[0].Graph!.Blocks[0]
+            .Instructions[^1];
+        Assert.That(missingReturn.Kind, Is.EqualTo(IrInstructionKind.Return));
+        missingReturn.A = -1;
+
+        var wrongType = CreateContractArtifact();
+        var wrongGraph = wrongType.Callables[0].Graph!;
+        var wrongReturn = wrongGraph.Blocks[0]
+            .Instructions[^1];
+        wrongReturn.A = wrongGraph.Roots[0];
+
+        var honest = CanonicalRoundTrip(CreateContractArtifact());
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerManifestArtifactJson.DecodeCallables(
+                    CanonicalRoundTrip(missing))));
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerManifestArtifactJson.DecodeCallables(
+                    CanonicalRoundTrip(wrongType))));
+            Assert.DoesNotThrow((Action)(() =>
+                CompilerManifestArtifactJson.DecodeCallables(honest)));
+        }
+    }
+
+    [Test]
     public void EnsuresRowsExactlyMatchManifestClaimIdentityAndEvidence()
     {
         const string source =
@@ -1144,6 +1281,36 @@ public sealed class CompilerManifestArtifactTests
                 internal static int Identity(int value) => value;
             }
             """);
+    }
+
+    private static CompilerManifestArtifact CanonicalRoundTrip(
+        CompilerManifestArtifact artifact)
+    {
+        return CompilerManifestArtifactJson.Deserialize(
+            CompilerManifestArtifactJson.Serialize(artifact));
+    }
+
+    private static void ReplaceWithLinearBody(
+        PortableIrGraph graph,
+        int blockCount)
+    {
+        Assert.That(blockCount, Is.GreaterThan(0));
+        var terminal = graph.Blocks[graph.Entry].Instructions[^1];
+        Assert.That(terminal.Kind, Is.EqualTo(IrInstructionKind.Return));
+        var blocks = new List<PortableIrBlock>();
+        for (var index = 0; index < blockCount; index++)
+        {
+            var instruction = index == blockCount - 1
+                ? terminal
+                : new PortableIrInstruction(
+                    IrInstructionKind.Goto,
+                    terminal.Operation,
+                    a: index + 1);
+            blocks.Add(new PortableIrBlock(instructions: [instruction]));
+        }
+
+        graph.Blocks = [.. blocks];
+        graph.Entry = 0;
     }
 
     private sealed class UnexpectedBackend : ISmtBackend
