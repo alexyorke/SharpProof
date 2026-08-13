@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 130 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 129 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,22 @@ The active backlog contains 130 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-015 - Release evidence does not authenticate package payloads (fixed)
+
+- [x] Fixed by `76aedafd8` (`fix: authenticate package payload closure`).
+- Evidence generation now derives each main package's exact managed/native
+  payload closure from the package specifications and first-party inventory,
+  compares first-party bytes and assembly identities with Release outputs,
+  verifies pinned Z3 hashes/sizes, and emits per-entry ownership, identity,
+  size, and SHA-256 evidence. Final validation and publication revalidate the
+  archive entries against that immutable manifest without requiring build
+  outputs in publish jobs.
+- Regression-first local fixtures reject a renamed foreign DLL, unexpected
+  SharpProof DLL, altered first-party/native bytes, alternate-path duplicates,
+  and missing managed/native entries while preserving the exact valid closure.
+  The seven-case suite, deterministic evidence/final validation control,
+  publisher plan control, Architecture 110/110, and container contract passed.
 
 ### SP-AUDIT-014 - Empty symbol packages pass release validation (fixed)
 
@@ -481,43 +497,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   plus a mutation that removes primary-initializer discovery.
 - Consolidated cases: SP-AUDIT-032.
 - Unified closure: Use one type-declaration-to-synthesized-constructor inventory for analyzer and collector, including primary base initialization and every selected callable, claim, and assumption.
-
-### SP-AUDIT-015 - Release evidence does not authenticate package payloads (P0)
-
-- [ ] `New-SharpProofReleaseEvidence.ps1` classifies package DLLs as
-  third-party only when their leaf name does not start with `SharpProof.`.
-  It does not compare exempt assemblies with the catalog-owned SharpProof
-  output closure or validate their assembly identity/hash provenance.
-- Certifier impact: an arbitrary additional binary can be shipped in a
-  release package without a third-party component, license record, notice, or
-  SPDX package. Release hashes then make the incomplete SBOM internally
-  consistent rather than exposing the missing component.
-- Reproduction: the audit added a foreign byte payload as
-  `tools/net9/SharpProof.Untracked.dll` to the current verifier nupkg, then ran
-  release-evidence generation. The payload was ignored by third-party
-  inventory and SBOM generation; `Test-SharpProofReleaseArtifacts.ps1` also
-  exited zero and certified the modified bundle for current HEAD.
-- Adjacent reproduction: the audit flipped one byte in the verifier package's
-  catalog-pinned `libz3.so` without changing its size. Evidence generation and
-  final artifact validation again exited zero. The separate
-  `PackageGraphAndLayoutsAreExact` test correctly rejected the hash, so the
-  tag workflow currently has a mitigating gate; the release-evidence and
-  direct publication boundary is not independently authoritative.
-- Adjacent reproduction: the audit added a second
-  `lib/netstandard2.0/SharpProof.Attributes.dll` ZIP entry with different,
-  invalid bytes to the current main package. Both release-evidence generation
-  and final artifact validation exited zero and certified the ambiguous
-  archive for current HEAD. The disposable package copy and probe script were
-  removed.
-- Required closure: derive the exact first-party assembly entry set from the
-  generated package/runtime catalogs and exempt only entries whose names,
-  assembly identities, and hashes match those owned outputs. Treat every
-  other managed/native payload as third-party and require complete license and
-  SBOM coverage. Validate every declared third-party entry against its
-  catalog-owned size/hash as part of evidence generation and final publication
-  validation. Add renamed-foreign-DLL, unexpected SharpProof DLL,
-  altered-first-party DLL, altered-Z3, duplicate-entry, and exact-closure
-  fixtures.
 
 ### SP-AUDIT-028 - Qualification evidence blesses arbitrary package files (P0)
 
