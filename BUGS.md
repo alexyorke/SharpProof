@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 92 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 91 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 92 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-124 - One SARIF path breaks multitarget verification (fixed)
+
+- [x] Fixed by `6863cee87` (`fix: scope multitarget SARIF outputs`).
+- A configured SARIF path keeps its existing meaning for single-target projects.
+  For multitarget projects, each inner build now owns
+  `<configured-directory>/<target-framework>/<filename>` for both relative and
+  absolute paths. Invalidation, launcher publication, and messages all use the
+  same effective path.
+- Regression-first package tests cover parallel relative net8/net9 builds with
+  exact marker binding; reversed serial three-framework absolute builds;
+  incremental rebuild and Clean/rebuild; the default no-SARIF case; and
+  single-target compatibility. The focused matrix passed 3/3, the single-target
+  control 1/1, Architecture 178/178, and `git diff --check` passed.
 
 ### SP-AUDIT-114 - ContractFor reports foreign-compilation source locations (fixed)
 
@@ -1285,23 +1299,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   each permitted producer tuple.
 - Consolidated cases: SP-AUDIT-151.
 - Unified closure: Generate one producer/codec/hydrator/callable mapping for every supported compiler/effect Unknown reason and certainty tuple.
-
-### SP-AUDIT-124 - One SARIF path breaks multitarget verification (P1)
-
-- [ ] Request, result, and compiler-manifest defaults are framework-scoped, but
-  the configured SARIF path is passed unchanged into every inner framework
-  build. Publication ownership rejects the resulting partially overlapping
-  sets.
-- Supported impact: a packaged `net8.0;net9.0` strict build with one ordinary
-  SARIF path proved and published net8, then net9 failed with “publication paths
-  partially overlap another publication set.”
-- Reproduction: a temporary canonical-container package test exercised the
-  two-framework build and received exit one at the net9 invalidation task. The
-  test was removed.
-- Required closure: make SARIF framework-scoped for multitarget builds or define
-  one intentional aggregate owner. Add relative/absolute/default paths,
-  two/many frameworks, build order, parallel/serial, incremental/Clean, and
-  exact publication binding controls.
 
 ### SP-AUDIT-136 - Packaged MSBuild configuration lacks one normalized authority (P1)
 
