@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 127 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 126 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,22 @@ The active backlog contains 127 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-057 - Build success is not bound to the current verification result (fixed)
+
+- [x] Fixed by `43fcff1f4` (`fix: bind builds to current verifier results`).
+- The verifier now requires every runtime-selection property to resolve to the
+  exact package-owned tools, worker, launcher, protocol, and BuildTasks closure.
+  After an exit-zero launch, a BuildTask independently requires and parses the
+  current request, result, and compiler manifest, binds their paths and
+  SHA-256 identities, and requires protocol 11 with a Complete run. Supported
+  non-verifying build transitions invalidate stable proof output rather than
+  preserving an earlier success.
+- Regression-first coverage rejects resultless, malformed, stale-request, and
+  runtime-override builds while retaining authentic packaged verification and
+  design-time behavior. Focused tests passed 10/10, BuildTask tests 11/11,
+  Architecture 124/124, and the full Package suite 181/181 with one expected
+  unsupported-host skip; the container contract also passed.
 
 ### SP-AUDIT-046 - Container contract does not bind the effective Docker authority (fixed)
 
@@ -632,31 +648,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   Add always/pull-request-only/unknown actor, extra actor, missing field,
   duplicated actor, no-bypass, and exact-allowlist fixtures plus a certifier
   mutation that again ignores bypass authority.
-
-### SP-AUDIT-057 - Build success is not bound to the current verification result (P0)
-
-- [ ] The frozen public `SharpProofLauncherPath`/`SharpProofToolsDirectory`
-  properties allow a project to select an arbitrary managed launcher. The
-  verification target checks only that this file exists and treats process
-  exit code zero as success; neither `RunVerifier` nor MSBuild independently
-  requires or validates a published result before printing its result path.
-- Supported impact: an enabled strict verifier build can report success with
-  no worker request/result evidence and no proof execution. The stable result
-  is invalidated first, so the build's claimed result path need not even exist.
-- Reproduction: a focused canonical-container package test supplied an
-  ordinary local console DLL that reads the startup line and exits zero as
-  `SharpProofLauncherPath`. The consumer build exited zero, printed
-  `SharpProof verifier result: .../result.json`, and reported `Build
-  succeeded` although no result was created. The temporary regression was
-  removed.
-- Required closure: remove project-controlled runtime-closure overrides from
-  the supported interface or authenticate every selected launcher/tool file
-  against the package-owned closure. Independently require, parse, and bind the
-  exact invocation result before the build task can return success. Add
-  resultless, malformed, stale, wrong-request, nonzero, valid package launcher,
-  and override-rejection fixtures plus containment/evidence mutations.
-- Consolidated cases: SP-AUDIT-170.
-- Unified closure: Invalidate stable state on every relevant build transition and require a current request/result/manifest binding before MSBuild reports success.
 
 ### SP-AUDIT-058 - Summary provenance is unauthenticated or incompletely projected (P0)
 
