@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 107 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 106 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 107 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-021 - Documented ordinary interpolation is rejected (fixed)
+
+- [x] Fixed by `406c6b80f` (`fix: support ordinary interpolated strings`).
+- The generated operation catalog now admits ordinary interpolation. Constant
+  interpolation is effect-free; runtime interpolation accounts for allocation,
+  expression effects, and shared implicit `ToString` resolution. Alignment,
+  format clauses, custom handlers, and user conversions continue to abstain.
+- Regression-first tests cover constants, strings, scalars, escaped braces,
+  expression effects, throwing `ToString`, unsupported alignment/format and
+  handlers, and generated selected projection. Frontend passed 64/64, Effects
+  170/170, Analyzer 257/257, Architecture 176/176, the container contract
+  passed, and `git diff --check` passed.
 
 ### SP-AUDIT-020 - Exact safe array stores report type-mismatch throws (fixed)
 
@@ -960,29 +973,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   package-mismatched pilot evidence.
 - Consolidated cases: SP-AUDIT-082, SP-AUDIT-133, SP-AUDIT-145, SP-AUDIT-161, SP-AUDIT-171.
 - Unified closure: Generate one authoritative qualification matrix and exact-commit receipt set covering pilots, Debug, release configuration, portable OS consumers, repeated cancellation, and minimum SDK.
-
-### SP-AUDIT-021 - Documented ordinary interpolation is rejected (P1)
-
-- [ ] The public language matrix admits ordinary interpolated strings and
-  rejects only custom interpolated-string handlers, but
-  `OperationSupport.catalog.json` includes `InterpolatedStringText` and
-  `Interpolation` without including their parent `InterpolatedString`
-  operation. `LanguageSubsetGate` therefore rejects every selected method
-  containing ordinary interpolation before `OperationEffectScanner` can apply
-  its exact constant-string handling.
-- Supported impact: a `[ZeroAllocations]` method returning the compile-time
-  constant `$"sharp"` receives SP0047 `UnsupportedOperationKind
-  (InterpolatedString)` instead of establishing the exact allocation-free
-  result promised by the documented subset.
-- Reproduction: a temporary canonical-container analyzer regression enabled
-  SP0047 for that selected method and expected no diagnostic; it received one
-  SP0047 at the interpolation expression.
-- Required closure: add the parent operation to the generated support catalog
-  and implement a dedicated scanner branch that keeps constant interpolation
-  effect-free while conservatively accounting for allocation, formatting
-  calls, and possible exceptions in nonconstant ordinary interpolation. Keep
-  custom handlers rejected. Add constant, string, primitive-format, throwing
-  `ToString`, custom-handler, and catalog-removal mutation cases.
 
 ### SP-AUDIT-024 - Normal-completion sequencing is modeled inconsistently (P1)
 
