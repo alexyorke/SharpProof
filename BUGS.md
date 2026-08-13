@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 103 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 102 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,17 @@ The active backlog contains 103 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-051 - Nested catch rethrows fabricate an outer exception (fixed)
+
+- [x] Fixed by `7cf5c5d54` (`fix: bind rethrows to nearest catch`).
+- Bare rethrows are now attributed only to their nearest lexical catch, while
+  lambdas and local functions remain separate execution owners. Nested catches
+  no longer cause the outer caught exception to escape.
+- Regression-first tests cover nested, direct outer, multiply nested, filtered,
+  `finally`, sibling, lambda/local-function, and generated selected analyzer
+  cases. Focused regressions passed, Effects passed 171/171, Analyzer 284/284,
+  Architecture 176/176, and `git diff --check` passed.
 
 ### SP-AUDIT-043 - Worker result state is not an exact producer projection (fixed)
 
@@ -1058,26 +1069,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   receivers, conditional access, reduced extensions, and a mutation probe.
 - Consolidated cases: SP-AUDIT-030.
 - Unified closure: Model source-order normal completion once; join later receiver, argument, conditional-access, lock, constructor, and initializer effects only when prior evaluation may complete.
-
-### SP-AUDIT-051 - Nested catch rethrows fabricate an outer exception (P1)
-
-- [ ] `EffectExceptionFlow.ContainsRethrow` treats every descendant bare
-  `throw;` as rethrowing the exception owned by the catch block being
-  inspected. It excludes lambdas and local functions, but does not exclude a
-  rethrow lexically owned by a nested catch.
-- Supported impact: when an outer catch handles exception A and a nested catch
-  rethrows exception B, the effect summary reports both A and B as escaping.
-  `[DoesNotThrow]`, `[AllowedExceptions]`, and exact effect-contract outcomes
-  can therefore be rejected by an exception that cannot escape at runtime.
-- Reproduction: a focused container regression caught
-  `InvalidOperationException`, then inside that handler caught and rethrew an
-  `ApplicationException`. The expected escaping set contained only the inner
-  application exception; the analyzer returned both exception types. The
-  temporary test was removed.
-- Required closure: associate a bare throw with its nearest enclosing catch
-  and count it only when that catch is the block currently being analyzed.
-  Add direct, nested, sibling, nested-try, lambda/local-function, filtered,
-  and no-rethrow controls plus a mutation restoring descendant-wide matching.
 
 ### SP-AUDIT-056 - Final ContractFor reconciliation is provenance-incomplete (P1)
 
