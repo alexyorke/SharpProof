@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 95 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 94 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 95 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-105 - Semantic cache policy misses aliases and indexer writes (fixed)
+
+- [x] Fixed by `525b14823` (`fix: trace semantic cache writes`).
+- SPMETA010 now shares one semantic-answer classifier across cache method calls,
+  indexer assignments, and property assignments. On-demand local reaching-value
+  analysis follows direct aliases and straight-line reassignment, conservatively
+  joins conditional writes, excludes nested callable writes, and treats unresolved
+  SharpProof answer/result/outcome values as non-cacheable.
+- Source return syntax and semantic types distinguish safe Proven values and
+  external lookalikes from Unknown, Timeout/TimedOut, Error, and Failure/Failed
+  states. Regression tests cover Add/AddOrUpdate/Write, indexer/property writes,
+  direct and branched aliases, safe overwrite, unresolved parameters, and safe
+  name/lookalike controls. Focused tests passed 23/23, Meta Analyzer 83/83,
+  Architecture 178/178, and `git diff --check` passed.
 
 ### SP-AUDIT-093 - Pilot qualification accepts duplicate and vacuous libraries (fixed)
 
@@ -1242,22 +1257,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   each permitted producer tuple.
 - Consolidated cases: SP-AUDIT-151.
 - Unified closure: Generate one producer/codec/hydrator/callable mapping for every supported compiler/effect Unknown reason and certainty tuple.
-
-### SP-AUDIT-105 - Semantic cache policy misses aliases and indexer writes (P1)
-
-- [ ] SPMETA010 checks named cache-write invocation argument descendants only.
-  It performs no local value-flow and registers no assignment/property write
-  operation.
-- Supported impact: both `var answer = Answer.Unknown; cache.Add("key",
-  answer)` and `cache["key"] = Answer.Unknown` emitted no SPMETA010, allowing
-  the exact transient semantic answer prohibited by policy into a cache while
-  the boundary remains certified.
-- Reproduction: two harmless in-memory meta-analyzer fixtures exercised the
-  local alias and indexer setter forms; both diagnostic sets were empty.
-- Required closure: track simple local aliases into recognized writes and own
-  indexer/property-setter cache writes, conservatively rejecting unresolved
-  semantic answer values. Add Unknown/TimedOut/Failed aliases, Proven controls,
-  overwrite/add/indexer APIs, branches, and mutation probes.
 
 ### SP-AUDIT-112 - Valid long filenames overflow publication metadata names (P1)
 
