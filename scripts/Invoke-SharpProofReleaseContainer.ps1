@@ -99,7 +99,32 @@ switch ($Mode) {
     'WriteQualificationEvidence' {
         $commit = Require-Environment 'GITHUB_SHA'
         $tag = Require-Environment 'GITHUB_REF_NAME'
+        $head = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+        if ($commit -cne $head) {
+            throw "Qualification commit '$commit' does not match checkout HEAD '$head'."
+        }
+        if (@(& git -C $repositoryRoot status --porcelain).Count -ne 0) {
+            throw 'Qualification requires a clean checkout.'
+        }
+        $version = Get-ReleaseVersion
+        if ($tag -cne "v$version") {
+            throw "Qualification tag '$tag' does not match package version '$version'."
+        }
+        $tagRef = "refs/tags/$tag"
+        if ((& git -C $repositoryRoot cat-file -t $tagRef 2>$null).Trim() -cne
+                'tag' -or
+            (& git -C $repositoryRoot rev-parse "${tagRef}^{commit}").Trim() -cne
+                $head) {
+            throw 'Qualification requires an annotated tag at checkout HEAD.'
+        }
         $packageRoot = Resolve-RepositoryPath $PackageSource
+        & (Join-Path $repositoryRoot `
+            'scripts/Test-SharpProofReleaseArtifacts.ps1') `
+            -PackageSource $packageRoot `
+            -ExpectedTag $tag
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Strict release artifact validation failed.'
+        }
         $inputPaths = @(
             'eng/container/Dockerfile',
             'eng/container/toolchain.json',
@@ -108,15 +133,68 @@ switch ($Mode) {
             }
         $packages = @(Get-ChildItem -LiteralPath $packageRoot -File |
             Where-Object Name -Match '\.(?:nupkg|snupkg)$')
-        if ($packages.Count -eq 0) {
-            throw "No package artifacts were found in $packageRoot."
+        if ($packages.Count -ne 6) {
+            throw "Qualification requires exactly six package artifacts."
+        }
+        $packageArtifacts = @($packages |
+            Sort-Object Name |
+            ForEach-Object {
+                [ordered]@{
+                    fileName = $_.Name
+                    bytes = [int64]$_.Length
+                    sha256 = (Get-FileHash `
+                        -LiteralPath $_.FullName `
+                        -Algorithm SHA256).Hash.ToLowerInvariant()
+                }
+            })
+        $packageArtifactJson = $packageArtifacts | ConvertTo-Json -Compress
+        $requiredGates = @(
+            'acceptance',
+            'coverage',
+            'mutation',
+            'package-consumers',
+            'pilots')
+        $receiptDirectory = Join-Path `
+            $repositoryRoot `
+            'artifacts/release-qualification/qualification-receipts'
+        $gateReceipts = [ordered]@{}
+        foreach ($gate in $requiredGates) {
+            $receiptPath = Join-Path $receiptDirectory "$gate.json"
+            if (-not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
+                throw "Qualification gate receipt is missing: '$gate'."
+            }
+            $receipt = Get-Content -LiteralPath $receiptPath -Raw |
+                ConvertFrom-Json -ErrorAction Stop
+            $evidencePath = Resolve-RepositoryPath ([string]$receipt.evidence.path)
+            if ([int]$receipt.schemaVersion -ne 1 -or
+                [string]$receipt.gate -cne $gate -or
+                [string]$receipt.status -cne 'passed' -or
+                [string]$receipt.commit -cne $head -or
+                -not (Test-Path -LiteralPath $evidencePath -PathType Leaf) -or
+                [int64](Get-Item -LiteralPath $evidencePath).Length -ne
+                    [int64]$receipt.evidence.bytes -or
+                (Get-FileHash -LiteralPath $evidencePath -Algorithm SHA256).
+                    Hash.ToLowerInvariant() -cne
+                    [string]$receipt.evidence.sha256) {
+                throw "Qualification gate receipt is stale or failed: '$gate'."
+            }
+            if ($gate -in @('package-consumers', 'pilots') -and
+                (@($receipt.packageArtifacts) |
+                    Sort-Object fileName |
+                    ConvertTo-Json -Compress) -cne $packageArtifactJson) {
+                throw "Qualification gate receipt targets different packages: '$gate'."
+            }
+            $gateReceipts[$gate] = (Get-FileHash `
+                -LiteralPath $receiptPath `
+                -Algorithm SHA256).Hash.ToLowerInvariant()
         }
         $files = @($inputPaths) + @($packages.FullName)
         $record = [ordered]@{
-            schemaVersion = 1
+            schemaVersion = 2
             status = 'passed'
-            repositoryCommit = $commit
+            releaseCommit = $commit
             tag = $tag
+            gateReceipts = $gateReceipts
             inputs = @($files | ForEach-Object {
                 [ordered]@{
                     path = [IO.Path]::GetRelativePath(

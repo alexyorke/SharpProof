@@ -291,6 +291,20 @@ $report = [ordered]@{
     packageVersion = $version
     generatedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
     pilotCount = $results.Count
+    packageArtifacts = @(
+        Get-ChildItem -LiteralPath (Resolve-RepositoryPath $PackageSource) -File |
+            Where-Object { $_.Extension -in @('.nupkg', '.snupkg') } |
+            Sort-Object Name |
+            ForEach-Object {
+                [ordered]@{
+                    fileName = $_.Name
+                    bytes = [int64]$_.Length
+                    sha256 = (Get-FileHash `
+                        -LiteralPath $_.FullName `
+                        -Algorithm SHA256).Hash.ToLowerInvariant()
+                }
+            }
+    )
     pilots = $results
 }
 $resolvedOutput = Resolve-RepositoryPath $OutputPath

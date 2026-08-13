@@ -602,6 +602,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
 
 $summary = [pscustomobject][ordered]@{
     schemaVersion = 1
+    commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
     reportCount = $reports.Count
     aggregate = [pscustomobject][ordered]@{
         coveredLines = $aggregate.coveredLines

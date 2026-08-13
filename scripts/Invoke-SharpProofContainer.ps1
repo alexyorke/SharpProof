@@ -169,6 +169,42 @@ switch ($Command) {
         if ($LASTEXITCODE -ne 0) {
             throw 'Minimum-SDK package consumer validation failed.'
         }
+        $consumerEvidence = Join-Path `
+            $repositoryRoot `
+            'artifacts/release-qualification/package-consumers.json'
+        [IO.Directory]::CreateDirectory(
+            [IO.Path]::GetDirectoryName($consumerEvidence)) | Out-Null
+        [IO.File]::WriteAllText(
+            $consumerEvidence,
+            (([ordered]@{
+                schemaVersion = 1
+                status = 'passed'
+                commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+                packageSource = [IO.Path]::GetRelativePath(
+                    $repositoryRoot,
+                    [IO.Path]::GetFullPath($PackageSource)).Replace('\', '/')
+                packageArtifacts = @(
+                    Get-ChildItem -LiteralPath $PackageSource -File |
+                        Where-Object {
+                            $_.Extension -in @('.nupkg', '.snupkg')
+                        } |
+                        Sort-Object Name |
+                        ForEach-Object {
+                            [ordered]@{
+                                fileName = $_.Name
+                                bytes = [int64]$_.Length
+                                sha256 = (Get-FileHash `
+                                    -LiteralPath $_.FullName `
+                                    -Algorithm SHA256).Hash.ToLowerInvariant()
+                            }
+                        }
+                )
+            } | ConvertTo-Json) + "`n"),
+            [Text.UTF8Encoding]::new($false))
+        & (Join-Path $repositoryRoot `
+            'scripts/Write-SharpProofQualificationReceipt.ps1') `
+            -Gate package-consumers `
+            -EvidencePath $consumerEvidence
     }
     'samples' {
         & (Join-Path $repositoryRoot 'scripts/Test-SharpProofSamples.ps1') `
@@ -243,6 +279,10 @@ switch ($Command) {
         & (Join-Path $repositoryRoot 'scripts/Test-SharpProofCoverage.ps1') `
             @coverageArguments
         if ($LASTEXITCODE -ne 0) { throw 'Coverage validation failed.' }
+        & (Join-Path $repositoryRoot `
+            'scripts/Write-SharpProofQualificationReceipt.ps1') `
+            -Gate coverage `
+            -EvidencePath $summaryPath
     }
     'mutation' {
         $mutationOutput = 'artifacts/mutation/trusted-mutations.json'
@@ -256,6 +296,10 @@ switch ($Command) {
             -OutputPath $mutationOutput `
             -ExpectedCommit $commit
         if ($LASTEXITCODE -ne 0) { throw 'Trusted mutation validation failed.' }
+        & (Join-Path $repositoryRoot `
+            'scripts/Write-SharpProofQualificationReceipt.ps1') `
+            -Gate mutation `
+            -EvidencePath (Join-Path $repositoryRoot $mutationOutput)
     }
     'dependency-audit' {
         Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
@@ -284,6 +328,13 @@ switch ($Command) {
             Remove-Item Env:SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS `
                 -ErrorAction SilentlyContinue
         }
+        & (Join-Path $repositoryRoot `
+            'scripts/Write-SharpProofQualificationReceipt.ps1') `
+            -Gate acceptance `
+            -EvidencePath (Join-Path `
+                $repositoryRoot `
+                ('artifacts/timings/acceptance-' +
+                    $Configuration.ToLowerInvariant() + '.json'))
     }
     'pack' {
         Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
@@ -339,6 +390,10 @@ switch ($Command) {
         }
         & (Join-Path $repositoryRoot 'scripts/Test-SharpProofPilots.ps1') -PackageSource $PackageSource
         if ($LASTEXITCODE -ne 0) { throw 'Pilot validation failed.' }
+        & (Join-Path $repositoryRoot `
+            'scripts/Write-SharpProofQualificationReceipt.ps1') `
+            -Gate pilots `
+            -EvidencePath (Join-Path $repositoryRoot 'artifacts/pilots/report.json')
     }
     'release-tag' {
         & (Join-Path $repositoryRoot `

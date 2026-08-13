@@ -190,6 +190,11 @@ jobs:
           -Configuration Release
           -PackageSource nupkgs
 
+      - name: Run five exact-package pilots
+        run: >-
+          docker compose run --rm tooling pilots
+          -PackageSource nupkgs
+
       - name: Produce publication dry-run evidence
         run: >-
           docker compose run --rm tooling release-plan
