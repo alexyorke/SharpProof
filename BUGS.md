@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 117 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 116 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 117 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-054 - Protected release tags may have unreviewed bypass actors (fixed)
+
+- [x] Fixed by `5e2cfe916` (`fix: bind release ruleset bypass authority`).
+- The release contract now owns the exact deletion/update rules and an explicit
+  empty bypass-actor set. Validation rejects rule parameters and requires the
+  bypass field, canonical actor shape, type, numeric identity, mode, ordinal
+  uniqueness, and exact catalog equality before producing evidence.
+- Regression-first mocked-GitHub fixtures cover user, team, app, repository
+  role, always/pull-request/unknown modes, actor type/case/ID/field errors,
+  duplicates, missing bypass data, and extra/missing/parameterized rules. The
+  no-bypass control passed, Architecture passed 172/172, and release-publication
+  tests passed 18/18.
 
 ### SP-AUDIT-053 - Release tag policy does not bind the effective allowed ref set (fixed)
 
@@ -709,28 +722,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   mutation restoring report-defined denominators.
 - Consolidated cases: SP-AUDIT-120, SP-AUDIT-148, SP-AUDIT-149, SP-AUDIT-150.
 - Unified closure: Independently derive the complete production project/source/parse-option/generator universe and make coverage, complexity, generated exclusions, and TCB consume it.
-
-### SP-AUDIT-054 - Protected release tags may have unreviewed bypass actors (P0)
-
-- [ ] `Test-SharpProofReleaseConfiguration.ps1` selects an active tag ruleset
-  and requires the `deletion` and `update` rule types, but never inspects the
-  ruleset's `bypass_actors` collection or bypass modes.
-- Certifier impact: the evidence can claim immutable protected release tags
-  while an administrator, repository role, team, or app has an always-on
-  bypass that permits the protected update/deletion operations. This defeats
-  the independent tag-identity boundary the release procedure relies on.
-- Reproduction: a mocked GitHub API returned the exact required tag includes
-  and rule types plus a repository-role bypass actor with
-  `bypass_mode: always`. After temporarily bypassing only SP-AUDIT-052's
-  empty-array binder failure, the canonical container validator exited zero
-  and reported both publishing environments and the tag ruleset valid. The
-  contract edit, API mock, and generated evidence were removed.
-- Required closure: make ruleset bypass authority catalog-owned and exact;
-  preferably require no bypass actors for release tags, or explicitly allowlist
-  actor identity, type, and non-always mode with a documented operational need.
-  Add always/pull-request-only/unknown actor, extra actor, missing field,
-  duplicated actor, no-bypass, and exact-allowlist fixtures plus a certifier
-  mutation that again ignores bypass authority.
 
 ### SP-AUDIT-058 - Summary provenance is unauthenticated or incompletely projected (P0)
 
