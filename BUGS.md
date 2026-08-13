@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 157 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 156 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,16 @@ The active backlog contains 157 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-031 - Field-like event accessor claims are not discovered (fixed)
+
+- [x] Fixed by `4352f3a78` (`fix: discover field-like event accessors`).
+- Compiler discovery now maps every field-like event variable declarator to its
+  synthesized add/remove accessors while retaining normal deduplication.
+- Regression coverage includes two events in one declaration, explicit event
+  accessors, property/method controls, an unselected event, and exact callable,
+  claim, and effect-evidence counts. The full focused class passed 42/42 in the
+  canonical container.
 
 ### SP-AUDIT-244 - Dirty-tree coverage loses merge-base semantics (fixed)
 
@@ -370,30 +380,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   acceptance, coverage, mutation, package-consumer, and corrected pilot
   receipts into the record. Add fake-file, missing-package, extra-package,
   wrong-commit/tag, missing-receipt, stale-receipt, and exact-valid fixtures.
-
-### SP-AUDIT-031 - Field-like event accessor claims are not discovered (P0)
-
-- [ ] `ClaimManifestBuilder.DiscoverMethods` adds methods, explicit accessor
-  declarations, and accessors from `BasePropertyDeclarationSyntax`, but it
-  never visits `EventFieldDeclarationSyntax`. C# can apply a method-targeted
-  SharpProof effect attribute on a field-like event to both synthesized add and
-  remove methods, so those selected accessor symbols exist without any syntax
-  node handled by the discovery switch.
-- Supported impact: `[method: DoesNotThrow] public event Action? Changed;`
-  gave both `Changed.add` and `Changed.remove` one real SharpProof attribute,
-  while the compiler collector emitted zero manifest callables and zero claims.
-  The documented callable subset explicitly includes event add/remove
-  accessors, so strict verification silently omits selected obligations.
-- Reproduction: a temporary canonical-container `ClaimManifestBuilder` test
-  first asserted one attribute on each Roslyn accessor, then expected two
-  manifest callables and claims. Attribute assertions passed; manifest length
-  was zero.
-- Required closure: discover each field-like event symbol from its variable
-  declarator and add its synthesized add/remove accessors exactly once, while
-  preserving deterministic IDs and avoiding the raise/backing-field surface.
-  Add instance/static events, nullable/nonnullable delegates, multiple event
-  declarators, explicit events, generated trees, profile filtering, analyzer/
-  collector parity, and a mutation that removes event-field discovery.
 
 ### SP-AUDIT-040 - Compiler variable semantics are not bound to symbol and type identity (P0)
 
