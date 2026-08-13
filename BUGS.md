@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 87 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 86 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 87 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-167 - Fuzz campaign validation accepts non-schema JSON (fixed)
+
+- [x] Fixed by `93863ba1e` (`fix: validate fuzz runner evidence`).
+- The campaign now delegates every schema-4 runner result to a strict
+  System.Text.Json token validator. It requires exact top-level, failure, and
+  FrontendCoverage property sets; integer and Boolean token kinds; non-null
+  arrays; invocation identity; complete count relationships; positive full
+  frontend coverage; passing status; and zero failures.
+- Regression-first fixtures cover numeric strings, null and malformed arrays,
+  omitted/extra fields, wrong schema/status, count and invocation mismatches,
+  incomplete coverage, nonempty failures, and canonical rotating/retained runs.
+  Focused tests passed 1/1, Architecture 182/182, the container contract, and
+  `git diff --check` passed. The SP159 schema-3 campaign envelope is unchanged,
+  and the long fuzz campaign was not rerun locally.
 
 ### SP-AUDIT-160 - Standalone gate evidence is not source and result bound (fixed)
 
@@ -1358,17 +1373,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   each permitted producer tuple.
 - Consolidated cases: SP-AUDIT-151.
 - Unified closure: Generate one producer/codec/hydrator/callable mapping for every supported compiler/effect Unknown reason and certainty tuple.
-
-### SP-AUDIT-167 - Fuzz campaign validation accepts non-schema JSON (P1)
-
-- [ ] `Invoke-SharpProofFuzzCampaign.ps1` coercively casts numeric fields,
-  treats `Failures: null` as zero, and does not require the schema-4
-  `FrontendCoverage` shape.
-- Certifier impact: an exit-zero runner receipt with numeric strings, omitted
-  coverage details, and null failure evidence can certify a passing campaign.
-- Required closure: validate the exact property set, JSON token kinds, non-null
-  arrays, counts, and full schema-4 coverage object before accepting a run. Add
-  one mutation fixture per weakened field.
 
 ### SP-AUDIT-174 - Non-generic wrappers misalign generic ContractFor owners (P1)
 
