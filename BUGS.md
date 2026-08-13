@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 153 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 152 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -110,6 +110,18 @@ The active backlog contains 153 root-cause rows. Stable IDs are not renumbered; 
 
 ## Fixed during remediation
 
+### SP-AUDIT-001 - Coalesce assignment omits observable writes (fixed)
+
+- [x] Fixed by `d963c96f5` (`fix: retain coalesce assignment writes`).
+- The effect scanner now handles `ICoalesceAssignmentOperation` directly,
+  resolves Roslyn flow captures back to the original l-value, and retains the
+  conditional target write and setter effects. Ambiguous capture mappings
+  remain fail-closed.
+- Regressions cover receiver, static, and argument-owned fields; property and
+  indexer setters; and definitely-null, definitely-non-null, and unknown local
+  targets with exact write-region assertions. The full canonical-container
+  Effects suite passed 151/151.
+
 ### SP-AUDIT-025 - Cancellation policy certifies non-equivalent control flow (fixed)
 
 - [x] Fixed by `5a5379e7a` (`fix: bind cancellation response shape`).
@@ -163,25 +175,6 @@ The active backlog contains 153 root-cause rows. Stable IDs are not renumbered; 
 ## P0 active bugs
 
 Release blockers: false proofs, missing verifier obligations, destructive supported behavior, verifier bypasses, or release authority accepting invalid candidate bytes.
-
-### SP-AUDIT-001 - Coalesce assignment omits observable writes (P0)
-
-- [ ] `OperationSupport.catalog.json` declares `CoalesceAssignment` exact, but
-  `OperationEffectScanner.ScanCore` handles only simple and compound
-  assignments. An `ICoalesceAssignmentOperation` therefore falls through to
-  child traversal, which reads a field/property target without recording the
-  conditional write or property setter effects.
-- Supported impact: `field ??= value` produced no
-  `WritesReceiverState` projection in the canonical container. A selected
-  no-write/purity claim can therefore be established for a method that mutates
-  caller-visible state.
-- Reproduction: a temporary regression analyzed
-  `value ??= new object()` on an instance field. The focused Effects test failed
-  with expected `WritesReceiverState`, actual `None`.
-- Required closure: add field, static field, argument-owned field, property,
-  and local-only controls; model the conditional target write/setter or
-  conservatively abstain; add a trusted mutation that removes the dedicated
-  handling.
 
 ### SP-AUDIT-002 - Using disposal effects are omitted (P0)
 
