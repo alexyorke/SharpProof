@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 114 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 113 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,25 @@ The active backlog contains 114 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-003 - Pilot qualification is not bound to fresh candidate outputs (fixed)
+
+- [x] Fixed by `e739b3681` (`fix: bind pilots to fresh candidate evidence`).
+- Pilot qualification now requires a clean checkout and exactly six candidate
+  packages whose filenames, nuspec IDs, versions, and repository commits match
+  HEAD. It records each package's size and SHA-256 and isolates NuGet, DOTNET
+  home, verifier cache, logs, and configuration under a run-private directory.
+- Every pilot deletes prior request, result, compiler-manifest, and SARIF files,
+  requires a fresh complete four-file evidence set, and records the exact path,
+  kind, size, and SHA-256 of each file. The schema-2 report and qualification
+  receipt preserve those package and per-pilot identities.
+- Regression-first fixtures cover changed package bytes, stale commits,
+  missing/extra packages, wrong IDs and versions, incomplete/stale evidence,
+  ambient same-version cache collisions, and an exact valid six-package,
+  five-pilot report. Validation passed the focused fixtures, Architecture
+  (175/175), the release-publication package tests (18/18), and `git diff
+  --check`. The real five-pilot restore was not run because it requires external
+  dependency access.
 
 ### SP-AUDIT-107 - The TCB inventory can self-authorize changes (fixed)
 
@@ -836,26 +855,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
 ## P1 active bugs
 
 Material supported-surface defects: incorrect verdicts or diagnostics, missing required qualification, or workflows that produce the wrong result.
-
-### SP-AUDIT-003 - Pilot qualification is not bound to fresh candidate outputs (P1)
-
-- [ ] `Test-SharpProofPilots.ps1` checks only the three expected package
-  filenames/version, uses the ambient global NuGet cache, and writes only the
-  checkout commit into `report.json`. It neither validates each nuspec
-  repository commit nor records package hashes.
-- Certifier impact: all five pilots passed against packages embedding commit
-  `a4c5100164d5923a68ace77bf66f552df96c502c`, while the generated report claimed
-  current commit `a1c28160205b5376ec75cd4e11ef11de1ef122a4`. The reproduction used a
-  fresh NuGet cache, so the stale package source itself is sufficient; a shared
-  cache creates an additional same-version substitution path.
-- Evidence: `artifacts/pilots/audit-stale-package-report.json` records five
-  qualified pilots for the wrong checkout/package pairing.
-- Required closure: parse and require the exact checkout commit from all three
-  main packages, require one coherent package version/graph, hash the consumed
-  package files into the report, and use a candidate-private NuGet cache. Add a
-  stale-commit and stale-cache certifier fixture.
-- Consolidated cases: SP-AUDIT-026.
-- Unified closure: Run every pilot from candidate-private inputs and bind request/result, package IDs, package hashes, commit, and per-pilot evidence.
 
 ### SP-AUDIT-004 - Release qualification matrix is incomplete (P1)
 
