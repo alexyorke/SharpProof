@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 141 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 140 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 141 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-078 - Behavioral declaration changes bypass changed-TCB coverage (fixed)
+
+- [x] Fixed by `7e0ed5c0d` (`fix: cover semantic declaration changes`).
+- Changed TCB source lines without sequence points now fail closed as uncovered
+  semantic changes unless the line is independently clear as blank,
+  comment-only, or brace-only. This failure is enforced independently of the
+  configured percentage floor.
+- Regression-first disposable Git and Cobertura fixtures cover constants,
+  initializers, attributes, modifiers, signatures, expression bodies,
+  generated declarations, comments, and braces. Seven semantic cases failed
+  before the fix while both nonsemantic controls passed; afterward the focused
+  matrix passed 9/9 and full Architecture passed 110/110 in the canonical
+  container.
 
 ### SP-AUDIT-011 - Dirty source can be certified as the clean HEAD (fixed)
 
@@ -704,30 +718,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   compare them again during final validation/publication. Add removed, added,
   replaced, wrong-version, framework-specific, duplicate, symbol/main mismatch,
   and exact-valid cases plus mutations severing each package-to-SBOM binding.
-
-### SP-AUDIT-078 - Behavioral declaration changes bypass changed-TCB coverage (P0)
-
-- [ ] The changed-TCB gate counts only changed lines that appear as Coverlet
-  sequence points. It treats every changed source line absent from the report's
-  line map as non-executable syntax and silently skips it, even when the line is
-  a behavioral constant, attribute, initializer, signature modifier, or other
-  declaration that materially changes trusted execution.
-- Certifier impact: a TCB change can alter resource/soundness behavior without
-  requiring any discriminating test while the exact changed-TCB gate reports
-  100 percent. This is independent of SP-AUDIT-050's forged-report acceptance;
-  the reproduction used authentic project coverage.
-- Reproduction: the audit temporarily changed the compiler IL lowerer's trusted
-  `MaximumStack` ceiling from 128 to 129, then ran the canonical coverage
-  validator over 44 authentic Cobertura reports with `-ComparisonRef HEAD
-  -IncludeWorkingTree`. It reported one changed TCB file, zero coverable lines,
-  100 percent changed coverage, and `passed=true`. The constant was restored.
-- Required closure: classify changed semantic declarations rather than assuming
-  no sequence point means no behavior. Require explicit mutation/structural
-  evidence for uncovered declaration changes, or conservatively fail changed
-  TCB files whose semantic diff is not mapped to coverage. Add constant value,
-  field/property initializer, attribute, modifier, expression body, signature,
-  trivia-only, brace-only, and generated-declaration fixtures plus a certifier
-  mutation that restores sequence-point-only accounting.
 
 ### SP-AUDIT-080 - Compiler feature labels do not bind discovered proof scope (P0)
 
