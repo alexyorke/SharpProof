@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 99 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 98 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 99 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-079 - Backend renewal failure is erased as a method timeout (fixed)
+
+- [x] Fixed by `3c3050f0a` (`fix: preserve backend renewal failures`).
+- Lane renewal now returns typed success, unsupported, backend-unavailable, or
+  infrastructure outcomes. The completed callable retains MethodTimeout; only
+  unclaimed targets receive the renewal failure, and shared retirement prevents
+  later claims. Native/Z3 loading and reused-backend failures remain backend
+  unavailable; arbitrary factory/null/disposal failures are infrastructure.
+- Regression-first tests cover typed renewal failures, successful renewal,
+  reused/null/disposal states, multiple targets, and response validation while
+  preserving cancellation/project-timeout precedence. Focused tests passed 8/8,
+  Protocol 55/55, Architecture 176/176, Worker 465/465, and `git diff --check`.
 
 ### SP-AUDIT-076 - Text diagnostic transport loses structured MSBuild semantics (fixed)
 
@@ -1136,28 +1149,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   heuristic-only filter.
 - Consolidated cases: SP-AUDIT-064, SP-AUDIT-068, SP-AUDIT-127.
 - Unified closure: After all generators, reconcile every logical target/companion once in every non-off profile, independent of filename, partial ownership, and generator order.
-
-### SP-AUDIT-079 - Backend renewal failure is erased as a method timeout (P1)
-
-- [ ] After a timed-out solver lane is retired, `TryRenew` catches every
-  replacement-factory failure and returns only `false`. The caller retains the
-  original timeout reason and assigns it to all unclaimed work, losing the
-  distinct fact that the verifier backend could no longer be created.
-- Supported impact: a missing/corrupt native solver or other backend creation
-  failure after the first timeout is reported as an ordinary `TimedOut` run
-  with no failure reason. Operators and retry policy receive the wrong result,
-  and exact backend-availability evidence is absent, although claims remain
-  fail-closed as unknown.
-- Reproduction: a focused worker test used one lane and two callables. The first
-  backend exceeded the method deadline; the second factory call threw
-  `DllNotFoundException`. The response was `TimedOut`, failure reason `None`,
-  with both claims labeled `MethodTimeout` instead of a failed
-  `BackendUnavailable` result. The temporary test was removed.
-- Required closure: preserve a typed renewal failure and stop/classify remaining
-  work as backend unavailable while retaining the completed timeout result.
-  Add missing-library, null/reused replacement, disposal failure, successful
-  renewal, factoryless timeout, concurrent lanes, cancellation, and project
-  deadline controls plus a mutation that reduces renewal to a Boolean again.
 
 ### SP-AUDIT-083 - Compose projects share one mutable tooling image tag (P1)
 
